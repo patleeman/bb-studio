@@ -13,17 +13,13 @@
     "branding": {
       "icon": "./icons/pages.svg",
       "experimental_icons": {
-        "pages": "./icons/pages.svg",
-        "explore": "./src/explore/icons/explore.svg",
-        "bookmark-add": "./src/explore/icons/bookmark-add.svg",
-        "bookmark-check": "./src/explore/icons/bookmark-check.svg"
+        "pages": "./icons/pages.svg"
       }
     },
     "server": "./server.ts",
     "app": "./app.tsx",
     "skills": [
-      "skills",
-      "src/explore/skills"
+      "skills"
     ]
   },
   "dependencies": {

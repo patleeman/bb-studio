@@ -1,34 +1,24 @@
-import { migrateSpaceOrder } from "./space-order";
 import type Database from "better-sqlite3";
 import { newId } from "@bb-studio/kit/ids";
-import { officeContract, SPACE_COLORS, spaceSettingsSchema, spaceSettingsPatchSchema, type OfficeInput, type OfficeSpace, type SpaceSettings } from "./contract";
+import { officeContract, spaceSettingsSchema, type OfficeInput, type OfficeSpace, type SpaceSettings } from "./contract";
 import { PERSONAL_PROJECT_ID } from "./migration";
 
-type Row = { id: string; name: string; icon: string | null; color: string; description: string; is_default: number; default_project_id: string | null; created_at: number; updated_at: number; position: number };
-const defaults: SpaceSettings = { todayArchiveAfter: "3d", enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null };
+type Row = { id: string; name: string; icon: string | null; description: string; is_default: number; default_project_id: string | null; created_at: number; updated_at: number };
+const defaults: SpaceSettings = { enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null };
 
 /** Project ownership is authoritative. No membership is inferred from tags. */
 export class OfficeSpaceStore {
-  constructor(private readonly db: Database.Database) { migrateSpaceOrder(db); }
+  constructor(private readonly db: Database.Database) {}
 
   list(): OfficeSpace[] {
-    const rows = this.db.prepare("SELECT * FROM spaces ORDER BY position, id").all() as Row[];
+    const rows = this.db.prepare("SELECT * FROM spaces ORDER BY is_default DESC, name COLLATE NOCASE, id").all() as Row[];
     const projects = this.db.prepare("SELECT project_id, space_id FROM space_projects ORDER BY sort_key, created_at, project_id").all() as { project_id: string; space_id: string }[];
     return rows.map(row => ({
-      id: row.id, name: row.name, icon: row.icon, color: /^#[0-9a-fA-F]{6}$/.test(row.color) ? row.color : SPACE_COLORS[0], description: row.description,
+      id: row.id, name: row.name, icon: row.icon, description: row.description,
       isDefault: !!row.is_default, defaultProjectId: row.default_project_id,
-      createdAt: row.created_at, updatedAt: row.updated_at, position: row.position,
+      createdAt: row.created_at, updatedAt: row.updated_at,
       projectIds: projects.filter(p => p.space_id === row.id).map(p => p.project_id),
     }));
-  }
-
-  reorder(ids: string[]): void {
-    this.db.transaction(() => {
-      const current = this.list().map(s => s.id);
-      const ordered = [...new Set([...ids.filter(id => current.includes(id)), ...current])];
-      const put = this.db.prepare("UPDATE spaces SET position=? WHERE id=?");
-      ordered.forEach((id, i) => put.run(i, id));
-    })();
   }
 
   get(id: string): OfficeSpace {
@@ -58,18 +48,16 @@ export class OfficeSpaceStore {
     const parsed = officeContract.space_create.input.parse(input);
     const id = newId("spc");
     const now = Date.now();
-    // New Spaces take the next color in turn, so each one reads apart in the footer.
-    const count = (this.db.prepare("SELECT COUNT(*) AS n FROM spaces").get() as { n: number }).n;
-    this.db.prepare("INSERT INTO spaces(id,name,color,icon,description,created_at,updated_at,position) VALUES (?,?,?,?,?,?,?,?)")
-      .run(id, parsed.name, parsed.color ?? SPACE_COLORS[count % SPACE_COLORS.length], parsed.icon ?? null, parsed.description ?? "", now, now, Math.max(-1, ...this.list().map(s => s.position)) + 1);
+    this.db.prepare("INSERT INTO spaces(id,name,color,icon,description,created_at,updated_at) VALUES (?,?,'#3b82f6',?,?,?,?)")
+      .run(id, parsed.name, parsed.icon ?? null, parsed.description ?? "", now, now);
     return this.get(id);
   }
 
   update(input: OfficeInput<"space_update">): OfficeSpace {
     const parsed = officeContract.space_update.input.parse(input);
     const old = this.get(parsed.spaceId);
-    this.db.prepare("UPDATE spaces SET name=?,icon=?,color=?,description=?,updated_at=? WHERE id=?")
-      .run(parsed.name ?? old.name, parsed.icon === undefined ? old.icon : parsed.icon, parsed.color ?? old.color, parsed.description ?? old.description, Date.now(), old.id);
+    this.db.prepare("UPDATE spaces SET name=?,icon=?,description=?,updated_at=? WHERE id=?")
+      .run(parsed.name ?? old.name, parsed.icon === undefined ? old.icon : parsed.icon, parsed.description ?? old.description, Date.now(), old.id);
     return this.get(old.id);
   }
 
@@ -80,9 +68,6 @@ export class OfficeSpaceStore {
     if (space.projectIds.length) throw new Error("Move this Space's folders before deleting it.");
     this.db.transaction(() => {
       this.db.prepare("DELETE FROM space_settings WHERE space_id=?").run(id);
-      this.db.prepare("DELETE FROM office_tabs WHERE space_id=?").run(id);
-      this.db.prepare("DELETE FROM office_tab_folders WHERE space_id=?").run(id);
-      this.db.prepare("DELETE FROM office_tab_splits WHERE space_id=?").run(id);
       this.db.prepare("DELETE FROM spaces WHERE id=?").run(id);
     })();
   }
@@ -126,21 +111,11 @@ export class OfficeSpaceStore {
   settings(id: string): SpaceSettings {
     this.get(id);
     const rows = this.db.prepare("SELECT key,value FROM space_settings WHERE space_id=?").all(id) as { key: string; value: string }[];
-    const saved = Object.fromEntries(rows.map(row => [row.key, JSON.parse(row.value)]));
-    // Early office builds exposed a read_only label without enforceable SDK
-    // support. Preserve that setting for recovery and adopt the supported ask mode.
-    if (saved.defaultTrust === "read_only") {
-      this.db.transaction(() => {
-        this.db.prepare("INSERT OR IGNORE INTO space_settings(space_id,key,value) VALUES (?,'office.previousDefaultTrust',?)").run(id, JSON.stringify(saved.defaultTrust));
-        this.db.prepare("UPDATE space_settings SET value=? WHERE space_id=? AND key='defaultTrust'").run(JSON.stringify("ask"), id);
-      })();
-      saved.defaultTrust = "ask";
-    }
-    return spaceSettingsSchema.parse({ ...defaults, ...saved });
+    return spaceSettingsSchema.parse({ ...defaults, ...Object.fromEntries(rows.map(row => [row.key, JSON.parse(row.value)])) });
   }
 
   setSettings(id: string, patch: Partial<SpaceSettings>): SpaceSettings {
-    const next = spaceSettingsSchema.parse({ ...this.settings(id), ...spaceSettingsPatchSchema.parse(patch) });
+    const next = spaceSettingsSchema.parse({ ...this.settings(id), ...spaceSettingsSchema.partial().parse(patch) });
     this.db.transaction(() => {
       const put = this.db.prepare("INSERT INTO space_settings(space_id,key,value) VALUES (?,?,?) ON CONFLICT(space_id,key) DO UPDATE SET value=excluded.value");
       for (const [key, value] of Object.entries(next)) put.run(id, key, JSON.stringify(value));

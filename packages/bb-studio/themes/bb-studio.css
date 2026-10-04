@@ -1,13 +1,14 @@
 /*
  * BB Studio
  *
- * Neutral grays, light and dark, so the sidebar can take any Space's color
- * (the office tints it, as Arc does) without the page fighting it. The Silk S
- * icon's warm coral stays as the one accent, and its teal for file paths.
+ * The colors of the Silk S app icon: the icon's teal ground (a lifted slate in
+ * dark mode, about as bright as Cobalt2), the ribbon's warm coral-to-amber face
+ * as the one accent, and its teal back for file paths. Light mode keeps the
+ * same pairing on a cool, pale surface.
  *
- * The anchors are oklch with no chroma: Chrome drops the hue of a dark hex
- * color inside color-mix(in oklch), and a hue here would tint every derived
- * surface. The sidebar sits a step off the canvas so a Space tint reads.
+ * The anchors are oklch on purpose: Chrome drops the hue of a dark hex color
+ * inside color-mix(in oklch), which tints every derived surface red. Ink and
+ * canvas share a hue family so the mixed grays stay teal, not olive.
  *
  * The text tiers are set per mode, not mixed from ink. BB draws some labels
  * at 40-75% opacity on top of them (tool rows, sidebar headers, "No threads"),
@@ -16,16 +17,16 @@
 
 :root,
 .light {
-  --canvas: oklch(0.99 0 0);
-  --ink: oklch(0.21 0 0);
-  /* A step grayer than the page, so a Space's tint reads on it. */
-  --sidebar: oklch(0.955 0 0);
+  --canvas: oklch(0.985 0.003 205);
+  --ink: oklch(0.22 0.023 221);
+  /* The sidebar sits on the icon's ground: a touch cooler in light, deeper in dark. */
+  --sidebar: oklch(0.965 0.007 205);
 
   --primary: #c7431a;
   --primary-foreground: #ffffff;
-  --muted-foreground: oklch(0.4 0 0);
-  --subtle-foreground: oklch(0.46 0 0);
-  --readback-foreground: oklch(0.43 0 0);
+  --muted-foreground: oklch(0.4 0.018 218);
+  --subtle-foreground: oklch(0.46 0.016 216);
+  --readback-foreground: oklch(0.43 0.017 217);
 
   --destructive: #d42f55;
   --destructive-foreground: #ffffff;
@@ -41,16 +42,15 @@
 }
 
 .dark {
-  --canvas: oklch(0.235 0 0);
-  --ink: oklch(0.945 0 0);
-  /* A step darker than the page, so a Space's tint reads on it. */
-  --sidebar: oklch(0.205 0 0);
+  --canvas: oklch(0.3 0.035 220);
+  --ink: oklch(0.945 0.008 210);
+  --sidebar: oklch(0.27 0.033 221);
 
   --primary: #ff7a45;
   --primary-foreground: #1a0c07;
-  --muted-foreground: oklch(0.89 0 0);
-  --subtle-foreground: oklch(0.83 0 0);
-  --readback-foreground: oklch(0.86 0 0);
+  --muted-foreground: oklch(0.89 0.012 212);
+  --subtle-foreground: oklch(0.83 0.012 213);
+  --readback-foreground: oklch(0.86 0.012 212);
 
   --destructive: #ff5c7a;
   --destructive-foreground: #1a0c07;

@@ -132,11 +132,11 @@ extension StudioItem {
             default: recording.failedCount > 0 ? Badge(label: "\(recording.failedCount) failed", tone: "danger") : nil
             }
         self.init(
-            pluginId: "studio", itemId: recording.id, kind: recording.kind, title: recording.title,
+            pluginId: "talk", itemId: recording.id, kind: recording.kind, title: recording.title,
             projectId: recording.projectId, createdAt: recording.createdAt,
             updatedAt: recording.updatedAt ?? recording.createdAt,
             preview: recording.preview.isEmpty ? nil : recording.preview, facts: facts, badge: badge,
-            href: "/plugins/studio/recordings/\(recording.id)")
+            href: "/plugins/talk/recordings/\(recording.id)")
     }
 
     init(drawing: DrawingSummary) {
@@ -340,16 +340,16 @@ extension BBClient {
     }
 
     public func renameRecording(_ id: String, title: String) async throws {
-        let _: JSONValue = try await rpc("studio", "talk_recording_rename", ["id": .string(id), "title": .string(String(title.prefix(160)))])
+        let _: JSONValue = try await rpc("talk", "recording_rename", ["id": .string(id), "title": .string(String(title.prefix(160)))])
     }
 
     /// Transcribes a recording's failed segments again.
     public func retryRecording(_ id: String) async throws {
-        let _: JSONValue = try await rpc("studio", "talk_recording_retry", ["id": .string(id)])
+        let _: JSONValue = try await rpc("talk", "recording_retry", ["id": .string(id)])
     }
 
     public func deleteRecording(_ id: String) async throws {
-        let _: JSONValue = try await rpc("studio", "talk_recording_delete", ["id": .string(id)])
+        let _: JSONValue = try await rpc("talk", "recording_delete", ["id": .string(id)])
     }
 
     public func deletePage(_ id: String) async throws {

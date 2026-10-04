@@ -54,7 +54,7 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
     sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema, signal: AbortSignal.timeout(5000) });
   const [board, roster] = await Promise.all([
     available.has("studio-tasks") ? call("studio-tasks", "board", {}, z.object({ tasks: z.array(task) })).catch(() => null) : null,
-    (available.has("bot-teams") || available.has("studio")) ? call("bot-teams", "list", null, teams).catch(() => null) : null,
+    available.has("bot-teams") ? call("bot-teams", "list", null, teams).catch(() => null) : null,
   ]);
   // Each board has its own columns; a Tasks from before boards has them per project.
   const columnsOf = (item: { boardId?: string; projectId: string | null }) => item.boardId ?? item.projectId;

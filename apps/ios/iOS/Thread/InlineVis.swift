@@ -38,7 +38,6 @@ private struct InlineVisPreview: Decodable {
     var file: String
     var source: String
     var content: String?
-    var url: String?
 }
 
 struct InlineVisCard: View {
@@ -80,7 +79,7 @@ struct InlineVisCard: View {
             .accessibilityIdentifier("inlineVis")
             .task(id: vis) { await load() }
             .sheet(isPresented: $expanded) {
-                if let preview { InlineVisSheet(preview: preview) }
+                if let preview, let threadId { InlineVisSheet(threadId: threadId, preview: preview) }
             }
         }
     }
@@ -117,7 +116,7 @@ struct InlineVisCard: View {
 
     @ViewBuilder
     private var content: some View {
-        if let preview {
+        if let preview, let threadId {
             if preview.kind == "markdown" {
                 // As tall as the file up to the directive's height, then scrolling.
                 let markdown = MarkdownText(WorkspaceFileView.unwrap(preview.content ?? ""))
@@ -128,7 +127,7 @@ struct InlineVisCard: View {
                     markdown
                     ScrollView { markdown }
                 }
-            } else if let url = preview.url.flatMap({ URL(string: $0, relativeTo: app.client.baseURL)?.absoluteURL }) {
+            } else if let url = app.client.inlineVisURL(threadId: threadId, file: preview.file, source: preview.source) {
                 SandboxedWebView(url: url)
             }
         } else {
@@ -164,6 +163,7 @@ struct InlineVisCard: View {
 private struct InlineVisSheet: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
+    let threadId: String
     let preview: InlineVisPreview
 
     var body: some View {
@@ -175,7 +175,7 @@ private struct InlineVisSheet: View {
                             .frame(maxWidth: 760, alignment: .leading)
                             .frame(maxWidth: .infinity)
                     }
-                } else if let url = preview.url.flatMap({ URL(string: $0, relativeTo: app.client.baseURL)?.absoluteURL }) {
+                } else if let url = app.client.inlineVisURL(threadId: threadId, file: preview.file, source: preview.source) {
                     SandboxedWebView(url: url).ignoresSafeArea(edges: .bottom)
                 }
             }
@@ -213,4 +213,15 @@ struct SandboxedWebView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> WebView.Coordinator { WebView.Coordinator() }
+}
+
+extension BBClient {
+    /// Where BB serves a thread's file raw: its workspace or its thread storage.
+    func inlineVisURL(threadId: String, file: String, source: String) -> URL? {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_.!~*'()"))
+        let encode = { (part: String) in part.addingPercentEncoding(withAllowedCharacters: allowed) ?? part }
+        let root = source == "thread-storage" ? "thread-storage/files" : "worktree/files"
+        let path = file.split(separator: "/", omittingEmptySubsequences: false).map { encode(String($0)) }.joined(separator: "/")
+        return URL(string: "/api/v1/threads/\(encode(threadId))/\(root)/\(path)", relativeTo: baseURL)?.absoluteURL
+    }
 }

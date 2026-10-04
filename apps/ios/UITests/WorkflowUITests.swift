@@ -26,23 +26,6 @@ final class WorkflowUITests: XCTestCase {
         screenshot("new-thread-workspace")
     }
 
-    /// New thread is presented from both secondary screens after a cold Tabs launch.
-    func testNewThreadFromHomeAndTeam() {
-        app.terminate()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "tabs"]
-        app.launch()
-        app.openOfficeScreen("Home")
-        let newThread = app.buttons["New Thread"]
-        XCTAssertTrue(newThread.waitForExistence(timeout: 10))
-        newThread.tap()
-        XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
-        app.buttons["Cancel"].tap()
-        app.openOfficeScreen("Team")
-        app.open(URL(string: "bbstudio://new")!)
-        XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
-        app.buttons["Cancel"].tap()
-    }
-
     func testAutomationEditor() {
         app.open(URL(string: "bbstudio://automations")!)
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))

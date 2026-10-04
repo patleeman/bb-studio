@@ -5,12 +5,12 @@ linked conversation, or a new-conversation composer when there is no link.
 The menu offers **New conversation**, **Choose conversation…**, and **Unlink**.
 Chat keeps the same label whether Float is installed or absent.
 
-Built into plugin `studio` as module `chat`, in
-`packages/bb-studio/src/modules/chat`.
+Plugin id `studio-chat`, display name "Studio Chat", in
+`packages/bb-studio-chat`.
 
 ## Item identity and context
 
-Each action carries the item's plugin ID and item ID. The `chat_subject` RPC
+Each action carries the item's plugin ID and item ID. The `subject` RPC
 resolves its title, kind, project, and link through Studio's `itemAt`. A
 composer or picker stays bound to that item when the main pane navigates
 elsewhere. Actions inside Float therefore target their own item.

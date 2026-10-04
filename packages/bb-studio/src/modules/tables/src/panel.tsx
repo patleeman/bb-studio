@@ -1,6 +1,5 @@
-import { useModuleRpc } from "../../app";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { AddOnCollection, FLOATING_BUTTON, ICON_BUTTON, Icon, ItemHeader, ItemMenu, openAppPath, ThreadItemsPanel, useAddOnPanel } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { TABLES_CHANNEL, TABLES_PANEL, TABLES_PLUGIN_ID, parseTableSubPath, tableHref, tableSubPath, type Table, type TableTarget, type TablesContract } from "@bb-studio/kit/tables";
@@ -26,7 +25,7 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
   /** A thread's narrow side panel: icon buttons, and no New thread. */
   compact?: boolean;
 }) {
-  const rpc = useModuleRpc<TablesContract>("tables");
+  const rpc = useRpc<TablesContract>();
   const { tableId } = target;
   const [{ table, error }, setLoad] = useState<TableLoad>({ table: null, error: "" });
   const [items, setItems] = useState<TableItem[]>([]);
@@ -193,7 +192,7 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
 }
 
 export function TablesPanel({ subPath }: { subPath: string }) {
-  const { call, refreshKey, studio, toCollection } = useAddOnPanel(TABLES_CHANNEL, TABLES_PANEL, "table", "tables_");
+  const { call, refreshKey, studio, toCollection } = useAddOnPanel(TABLES_CHANNEL, TABLES_PANEL, "table");
   const navigate = useBbNavigate();
   const target = parseTableSubPath(subPath);
   if (target)

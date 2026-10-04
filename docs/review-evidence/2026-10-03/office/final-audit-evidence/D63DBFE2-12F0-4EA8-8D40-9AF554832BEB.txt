@@ -1,1 +1,0 @@
-home-default: decorative emoji: glyph=🧭, labeled Face image=Atlas, needs you, image frame=(32.0, 496.0, 34.0, 34.0); element frame=(36.5, 504.3333333333333, 23.0, 19.333333333333428)

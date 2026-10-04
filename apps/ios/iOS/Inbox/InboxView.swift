@@ -33,7 +33,7 @@ final class InboxModel: ObservableObject {
                 // in the list shows them; its status changes bring the fresh row.
                 let streaming = !changes.isEmpty && changes.allSatisfy { $0 == "events-appended" }
                 self?.scheduleReload(client, bots: false, within: streaming ? .seconds(30) : .milliseconds(400))
-            case .pluginSignal(let pluginId, _, _) where pluginId == "studio":
+            case .pluginSignal(let pluginId, _, _) where pluginId == "bot-teams":
                 self?.scheduleReload(client, bots: true)
             case .connected:
                 self?.scheduleReload(client, bots: true)
@@ -363,6 +363,11 @@ struct InboxView: View {
                 }
                 .accessibilityLabel("New Thread")
             }
+        }
+        .sheet(
+            isPresented: Binding(get: { app.newThreadDraft != nil }, set: { if !$0 { app.newThreadDraft = nil } })
+        ) {
+            NewThreadView(text: app.newThreadDraft ?? "")
         }
         .task(id: app.serverURL) {
             if let running = try? await app.client.runningPlugins() { runningPlugins = running.sorted().joined(separator: ",") }

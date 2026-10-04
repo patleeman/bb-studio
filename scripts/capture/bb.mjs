@@ -29,10 +29,10 @@ export const launchRoomReplies = [
 ];
 let launchRoomId = null;
 export async function launchRoomThread() {
- const views = await pluginRpc("studio", "teams_views",{});
+ const views = await pluginRpc("bot-teams","views",{});
  const view=views.find(v=>v.name==="Launch work"&&!v.archived);
  if(!view)throw new Error("Seed Launch work before capturing.");
- const page=await pluginRpc("studio", "teams_view",{id:view.id});
+ const page=await pluginRpc("bot-teams","view",{id:view.id});
  for(const reply of launchRoomReplies)if(!page.entries.some(e=>e.role==="assistant"&&e.text.startsWith(reply.slice(0,40))))throw new Error(`Missing seeded reply: ${reply}`);
  launchRoomId=view.id;
  return page.threads[0]?.id;

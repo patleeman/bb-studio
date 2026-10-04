@@ -8,25 +8,25 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
  };
  const seed = async () => {
   if (fixture) return fixture;
-  const existing = (await pluginRpc("studio", "teams_views", {})).find(view => view.name === "Channel layouts" && !view.archived);
+  const existing = (await pluginRpc("bot-teams", "views", {})).find(view => view.name === "Channel layouts" && !view.archived);
   if (existing) {
-   const page = await pluginRpc("studio", "teams_view", { id: existing.id });
+   const page = await pluginRpc("bot-teams", "view", { id: existing.id });
    await settleBots(page);
    fixture = { id: existing.id, threadId: page.view.members.filter(member => member.kind === "thread").at(-1).id };
    return fixture;
   }
   await launchRoomThread();
-  const launch = await pluginRpc("studio", "teams_view", { id: getLaunchRoomId() });
+  const launch = await pluginRpc("bot-teams", "view", { id: getLaunchRoomId() });
   const brief = launch.entries.filter(entry => entry.role === "user" && entry.text.includes("Here's the ORBIT-42 launch brief."));
   if (brief.length !== 1 || !brief[0].groupId) throw new Error("Hidden channel context lost merged receipt grouping");
   await settleBots(launch);
   const thread = JSON.parse(await bbCli(["thread", "spawn", "--project", projectId, "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low", "--title", "Release checklist", "--prompt", 'This is a deterministic UI fixture. Do not use tools or change files. Reply exactly with these two lines:\nThe launch checklist is ready.\n::reactions{items="✅ Approve|🔍 Review"}', "--json"]));
   await bbCli(["thread", "wait", thread.id, "--timeout", "1m"]);
   // Quinn joins without a thread here, so every layout shows a member that hasn't started.
-  const quinn = (await pluginRpc("studio", "teams_profiles", {})).find(bot => bot.handle === "quinn");
+  const quinn = (await pluginRpc("bot-teams", "profiles", {})).find(bot => bot.handle === "quinn");
   if (!quinn) throw new Error("Missing the seeded Quinn bot");
   const members = [...launch.threads.filter(thread => !thread.parentThreadId).map(thread => ({ kind: "thread", id: thread.id })), { kind: "thread", id: thread.id }, { kind: "bot", id: quinn.id }];
-  const view = await pluginRpc("studio", "teams_viewCreate", { name: "Channel layouts", members, requestId: crypto.randomUUID() });
+  const view = await pluginRpc("bot-teams", "viewCreate", { name: "Channel layouts", members, requestId: crypto.randomUUID() });
   fixture = { id: view.id, threadId: thread.id };
   return fixture;
  };
@@ -38,7 +38,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
  };
  const open = async (client, value) => {
   const data = await seed();
-  await client.navigate(`/plugins/studio/channels/${data.id}`);
+  await client.navigate(`/plugins/bot-teams/channels/${data.id}`);
   await client.waitForSelector('[data-view-composer] .ProseMirror');
   await mode(client, value);
   return data;
@@ -61,11 +61,11 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
  };
  const concise = client => client.evaluate(`(()=>{
   const text=Array.from(document.querySelectorAll('[data-channel-thread]')).map(pane=>pane.innerText).join('\\n');
-  for(const marker of ['[Studio view message','[End owner message]','Channel: /plugins/studio/','Recipients:','Recent channel replies (context'])if(text.includes(marker))throw new Error('Native transcript exposed transport context: '+marker);
+  for(const marker of ['[Studio view message','[End owner message]','Channel: /plugins/bot-teams/','Recipients:','Recent channel replies (context'])if(text.includes(marker))throw new Error('Native transcript exposed transport context: '+marker);
   if(!text.includes("Here's the ORBIT-42 launch brief."))throw new Error('Native transcript lost the owner request');
  })()`);
  return [
-  { id: "bots-grid", packageDir: "bb-studio/src/modules/teams", fileName: "channel-grid.png", setup: guard(async client => {
+  { id: "bots-grid", packageDir: "bb-studio-teams", fileName: "channel-grid.png", setup: guard(async client => {
    const data = await open(client, "grid");
    await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
    await client.waitForText("The launch checklist is ready.");
@@ -91,7 +91,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.clickAriaButtonWithPointer("Cancel reply");
    await client.evaluate("document.activeElement?.blur()");
   }) },
-  { id: "bots-grid-arrange", packageDir: "bb-studio/src/modules/teams", fileName: "channel-grid-arrange.png", setup: guard(async client => {
+  { id: "bots-grid-arrange", packageDir: "bb-studio-teams", fileName: "channel-grid-arrange.png", setup: guard(async client => {
    const data = await open(client, "grid");
    await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
    await client.evaluate("(()=>{const reset=Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Reset order');if(reset)reset.click();})()");
@@ -106,14 +106,14 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
     await client.evaluate(`(()=>{const dt=window.channelArrangeDrag;const pane=id=>document.querySelector('[data-channel-thread="'+id+'"]');pane(${JSON.stringify(target)}).dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));pane(${JSON.stringify(dragged)}).querySelector('header').dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:dt}));})()`);
     const expected = before.filter(id => id !== dragged).flatMap(id => id === target ? [dragged, id] : [id]);
     await wait(client, `JSON.stringify(${order})===${JSON.stringify(JSON.stringify(expected))}`);
-    await client.navigate(`/plugins/studio/channels/${data.id}`);
+    await client.navigate(`/plugins/bot-teams/channels/${data.id}`);
     await client.waitForSelector('[data-view-composer] .ProseMirror');
     await wait(client, `document.querySelectorAll('[data-channel-thread]').length===3&&JSON.stringify(${order})===${JSON.stringify(JSON.stringify(expected))}`);
     await client.clickElementWithTextAndPointer("button.channel-reset-order", "Reset order");
     await wait(client, `JSON.stringify(${order})===${JSON.stringify(JSON.stringify(before))}`);
    };
   }) },
-  { id: "bots-focus", packageDir: "bb-studio/src/modules/teams", fileName: "channel-focus.png", setup: guard(async client => {
+  { id: "bots-focus", packageDir: "bb-studio-teams", fileName: "channel-focus.png", setup: guard(async client => {
    const data = await open(client, "grid");
    await client.clickAriaButtonWithPointer("Focus Release checklist");
    await wait(client, `document.querySelectorAll('[data-channel-thread]').length===1&&!!document.querySelector('[data-channel-thread="${data.threadId}"]')`);
@@ -122,7 +122,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await margin(client);
    await unstarted("focus")(client);
   }) },
-  { id: "bots-focus-compact", packageDir: "bb-studio/src/modules/teams", fileName: "channel-focus-compact.png", setup: guard(async client => {
+  { id: "bots-focus-compact", packageDir: "bb-studio-teams", fileName: "channel-focus-compact.png", setup: guard(async client => {
    // A narrower window keeps the member box in the margin as avatars only.
    await client.command("Emulation.setDeviceMetricsOverride", { width: 1040, height: 800, deviceScaleFactor: 1, mobile: false });
    const data = await open(client, "focus");
@@ -131,10 +131,10 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await margin(client);
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
-  { id: "bots-active", packageDir: "bb-studio/src/modules/teams", fileName: "channel-active.png", setup: guard(async client => {
+  { id: "bots-active", packageDir: "bb-studio-teams", fileName: "channel-active.png", setup: guard(async client => {
    const data = await open(client, "active");
-   const bots = await pluginRpc("studio", "teams_profiles", {});
-   const page = await pluginRpc("studio", "teams_view", { id: data.id });
+   const bots = await pluginRpc("bot-teams", "profiles", {});
+   const page = await pluginRpc("bot-teams", "view", { id: data.id });
    const atlas = page.threads.find(thread => !thread.parentThreadId && thread.botId === bots.find(bot => bot.handle === "atlas")?.id);
    if (!atlas) throw new Error("Missing Atlas's channel thread");
    const workers = [data.threadId, atlas.id];
@@ -157,7 +157,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
     await wait(client, `${panes}.length===2`);
    };
   }) },
-  { id: "bots-grid-mobile", packageDir: "bb-studio/src/modules/teams", fileName: "channel-grid-mobile.png", privateSidebar: false, setup: guard(async client => {
+  { id: "bots-grid-mobile", packageDir: "bb-studio-teams", fileName: "channel-grid-mobile.png", privateSidebar: false, setup: guard(async client => {
    await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
    await open(client, "grid");
    await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
@@ -169,7 +169,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.evaluate("(()=>{if(document.documentElement.scrollWidth>innerWidth)throw new Error('Grid overflows the phone');const composer=document.querySelector('[data-view-composer]');if(!composer||composer.getBoundingClientRect().bottom>innerHeight)throw new Error('Grid composer is offscreen');})()");
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
-  { id: "bots-focus-mobile", packageDir: "bb-studio/src/modules/teams", fileName: "channel-focus-mobile.png", privateSidebar: false, setup: guard(async client => {
+  { id: "bots-focus-mobile", packageDir: "bb-studio-teams", fileName: "channel-focus-mobile.png", privateSidebar: false, setup: guard(async client => {
    await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
    await open(client, "grid");
    await client.evaluate("document.querySelector('[aria-label=\"Focus Atlas\"]').closest('[data-channel-thread]').scrollIntoView({block:'start'})");
@@ -180,10 +180,10 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.evaluate("(()=>{if(document.querySelectorAll('[data-channel-thread]').length!==1||document.querySelectorAll('.channel-switcher-row > button').length!==3)throw new Error('Phone focus lost its selected thread or member row');if(document.documentElement.scrollWidth>innerWidth||document.querySelector('[data-view-composer]').getBoundingClientRect().bottom>innerHeight)throw new Error('Phone focus exceeds the viewport');})()");
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
-  { id: "bots-thread-drop", packageDir: "bb-studio/src/modules/teams", fileName: "channel-thread-drop.png", showSidebar: true, setup: guard(async client => {
+  { id: "bots-thread-drop", packageDir: "bb-studio-teams", fileName: "channel-thread-drop.png", showSidebar: true, setup: guard(async client => {
    const data = await seed();
-   const { preferences } = await pluginRpc("studio", "sidebar_listPreferences", null);
-   await pluginRpc("studio", "sidebar_setPreference", { key: "organizationMode", value: "chronological" });
+   const { preferences } = await pluginRpc("thread-list-plus", "listPreferences", null);
+   await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: "chronological" });
    await client.navigate(`/projects/${projectId}/threads/${data.threadId}`);
    await client.waitForSelector(`[data-sidebar-thread-id="${data.threadId}"]`);
    const projectThreads = JSON.parse(await bbCli(["thread", "list", "--project", projectId, "--json"]));
@@ -210,12 +210,12 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
     await client.clickElementWithTextAndPointer('[role="dialog"]:has([aria-label="Channel name"]) button', "Create channel");
     await client.waitForSelector('[data-thread-view]');
     const id = await client.evaluate("location.pathname.split('/').at(-1)");
-    const page = await pluginRpc("studio", "teams_view", { id });
+    const page = await pluginRpc("bot-teams", "view", { id });
     const ids = page.view.members.map(member => member.id).sort();
     if (JSON.stringify(ids) !== JSON.stringify([target, data.threadId].sort()) || page.view.members.some(member=>member.kind!=="thread")) throw new Error("Drop did not create a channel of both ordinary threads");
     const after = JSON.parse(await bbCli(["thread", "list", "--project", projectId, "--json"])).filter(thread => [data.threadId, target].includes(thread.id)).map(thread => ({ id: thread.id, projectId: thread.projectId, parentThreadId: thread.parentThreadId }));
     if (JSON.stringify(before.sort((a,b)=>a.id.localeCompare(b.id))) !== JSON.stringify(after.sort((a,b)=>a.id.localeCompare(b.id)))) throw new Error("Creating the channel moved or nested its member threads");
-    await pluginRpc("studio", "sidebar_setPreference", { key: "organizationMode", value: preferences.organizationMode });
+    await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: preferences.organizationMode });
    };
   }) },
  ];

@@ -54,13 +54,9 @@ struct ThreadView: View {
     /// Permissions chosen in Model & permissions, waiting for the next message.
     @AppStorage private var pendingPermission: String?
 
-    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("studio") }
+    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("artifacts") }
 
-    /// Shown instead of the thread's own title, e.g. a bot's name on its desk.
-    private let titleOverride: String?
-
-    init(threadId: String, title: String? = nil) {
-        titleOverride = title
+    init(threadId: String) {
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
         _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
     }
@@ -198,7 +194,7 @@ struct ThreadView: View {
             if runningPlugins.split(separator: ",").contains("studio") {
                 Task { await spaces.load(model.threadId, client: client) }
             }
-            if runningPlugins.split(separator: ",").contains("studio") {
+            if runningPlugins.split(separator: ",").contains("bot-teams") {
                 Task {
                     profile = try? await client.threadProfile(model.threadId)
                     await loadProfileBot()
@@ -273,7 +269,7 @@ struct ThreadView: View {
             app.path.append(.thread(id: id))
             return .handled
         })
-        .navigationTitle(titleOverride ?? model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
+        .navigationTitle(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(sizeClass == .compact ? .hidden : .automatic, for: .tabBar)
         .toolbar {

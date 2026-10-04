@@ -8,7 +8,7 @@ struct TasksView: View {
     private var client: BBClient { operation.client }
     @AppStorage(ServerScope.key("tasksColumn")) private var column = "todo"
     @State private var tasks: [StudioTask] = []
-    @State private var columns: [Studio.TasksStatusesOutputColumnsItem] = []
+    @State private var columns: [Tasks.StatusesOutputColumnsItem] = []
     @State private var loaded = false
     @State private var error: String?
     @State private var creating = false
@@ -86,7 +86,7 @@ struct TasksView: View {
         .task {
             listener = app.realtime.listen { event in
                 switch event {
-                case .pluginSignal("studio", _, _), .connected: scheduleReload()
+                case .pluginSignal("studio-tasks", _, _), .connected: scheduleReload()
                 default: break
                 }
             }
@@ -219,8 +219,8 @@ struct TaskView: View {
     @State private var chatting = false
     @State private var editing = false
     @State private var editingFields = false
-    @State private var generatedTask: Studio.TasksGetOutputTask?
-    @State private var columns: [Studio.TasksStatusesOutputColumnsItem] = []
+    @State private var generatedTask: Tasks.GetOutputTask?
+    @State private var columns: [Tasks.StatusesOutputColumnsItem] = []
     @State private var handingOff = false
     @State private var addingLink = false
     @State private var sendingBack = false
@@ -261,7 +261,7 @@ struct TaskView: View {
             }
         }
         .studioChat(
-            isPresented: $chatting, pluginId: "studio", itemId: id, title: detail?.task?.displayTitle ?? "Task",
+            isPresented: $chatting, pluginId: "studio-tasks", itemId: id, title: detail?.task?.displayTitle ?? "Task",
             projectId: detail?.task?.projectId)
         .sheet(isPresented: $editing) {
             if let task = detail?.task { TaskEditor(task: task, status: task.status) { _ in Task { await load() } } }
@@ -300,7 +300,7 @@ struct TaskView: View {
         }
         .task {
             listener = app.realtime.listen { event in
-                guard case .pluginSignal("studio", _, let payload) = event else { return }
+                guard case .pluginSignal("studio-tasks", _, let payload) = event else { return }
                 if let changed = payload["taskId"]?.stringValue, changed != id { return }
                 Task { await load() }
             }
@@ -403,7 +403,7 @@ struct TaskView: View {
                 Button { addingLink = true } label: { Label("Add Link…", systemImage: "link.badge.plus") }
                     .accessibilityIdentifier("addTaskLink")
             }
-            RelatedSection(pluginId: "studio", itemId: id)
+            RelatedSection(pluginId: "studio-tasks", itemId: id)
         }
     }
 
@@ -427,7 +427,7 @@ struct TaskView: View {
         case "talk": "waveform"
         case "excalidraw": "scribble.variable"
         case "artifacts": "doc.text.image"
-        case "studio-tasks", "studio": "checklist"
+        case "studio-tasks": "checklist"
         default: "square.dashed"
         }
     }
@@ -437,7 +437,7 @@ struct TaskView: View {
             Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
             Button { editingFields = true } label: { Label("Priority, labels and reminders", systemImage: "slider.horizontal.3") }
             StudioChatMenuButton(isPresented: $chatting)
-            ShareLink(item: client.baseURL.appending(path: "plugins/studio/tasks/\(task.id)")) {
+            ShareLink(item: client.baseURL.appending(path: "plugins/studio-tasks/tasks/\(task.id)")) {
                 Label("Share Link", systemImage: "square.and.arrow.up")
             }
             Button { Task { await archive(task) } } label: {

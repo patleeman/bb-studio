@@ -1,6 +1,6 @@
 import { untitled } from "@bb-studio/kit/format";
 // Dictation through the Talk plugin. Talk's contract is plain DOM (see
-// bb-studio/src/modules/talk/src/client/fields.ts): the editor is marked as a dictation
+// bb-studio-talk/src/client/fields.ts): the editor is marked as a dictation
 // field, Talk hands transcripts back as a cancelable `bb-talk:insert` event,
 // and Talk's state is mirrored onto `<html data-bb-talk…>`.
 

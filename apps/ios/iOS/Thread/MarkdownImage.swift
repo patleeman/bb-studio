@@ -2,7 +2,7 @@ import SwiftUI
 
 /// `![alt](src)` in a reply. Like BB web, a path is a file on the thread's host:
 /// absolute paths as they are, relative ones from the workspace root, both read
-/// through the host-files route. Web URLs load directly. Tap to see it full screen.
+/// through `host-files/content`. Web URLs load directly. Tap to see it full screen.
 struct MarkdownImage: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.threadId) private var threadId
@@ -75,10 +75,11 @@ extension BBClient {
     /// Any file on the thread's host, as BB web loads a reply's images.
     func hostFileURL(threadId: String, path: String) -> URL? {
         let name = path.split(separator: "/").last ?? ""
-        guard path.hasPrefix("/"), name.contains(".") else { return nil }
-        let encoded = path.split(separator: "/").map {
-            String($0).addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? String($0)
-        }.joined(separator: "/")
-        return URL(string: "/api/v1/threads/\(threadId)/host-files/\(encoded)", relativeTo: baseURL)?.absoluteURL
+        guard path.hasPrefix("/"), name.contains("."),
+            var components = URLComponents(
+                url: baseURL.appending(path: "api/v1/threads/\(threadId)/host-files/content"), resolvingAgainstBaseURL: true)
+        else { return nil }
+        components.queryItems = [URLQueryItem(name: "path", value: path)]
+        return components.url
     }
 }

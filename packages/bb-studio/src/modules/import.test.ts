@@ -111,16 +111,3 @@ it("leaves an existing unmarked module database untouched", async () => {
     expect(core.prepare("SELECT count(*) AS n FROM module_imports").get()).toEqual({ n: 0 });
   } finally { legacy.close(); core.close(); }
 });
-
-it("imports into Pages without creating a Studio-owned database", async () => {
-  const { options, legacy, core } = fixture();
-  try {
-    const path = await importModule({ ...options, ownerPluginId: "pages" });
-    expect(path).toBe(join(options.dataDir, "plugins/pages/tables.db"));
-    expect(existsSync(join(options.dataDir, "plugins/studio/tables.db"))).toBe(false);
-    const imported = new Database(path);
-    try { expect(imported.prepare("SELECT body FROM items").get()).toEqual({ body: Buffer.from([0, 1, 255]) }); }
-    finally { imported.close(); }
-    await expect(importModule({ ...options, ownerPluginId: "../escape" })).rejects.toThrow("Invalid module identity");
-  } finally { legacy.close(); core.close(); }
-});

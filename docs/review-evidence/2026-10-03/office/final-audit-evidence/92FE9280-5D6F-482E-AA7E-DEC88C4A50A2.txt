@@ -1,1 +1,0 @@
-home-contrast-native-accessibility-xxxl-material-0-reaudit: policy 3: resolved element id= label=P sRGB foreground=[0, 0, 0], background=[239, 238, 240], contrast=18.15821285833895:1; element frame=(132.66666666666669, 74.00000000000001, 20.0, 20.0)

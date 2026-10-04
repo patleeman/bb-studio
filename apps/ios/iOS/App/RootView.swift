@@ -4,13 +4,6 @@ struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @State private var office = OfficeContext(client: AppModel.shared.client)
 
-    /// Whatever opens joins Today; something new from another Space opens
-    /// there, and the app follows it (Space routing).
-    private func noteOpened(_ route: Route) async {
-        guard let landed = await office.tabs?.noteOpened(route, client: model.client) else { return }
-        await office.select(landed)
-    }
-
     var body: some View {
         TabView(selection: $model.tab) {
             OfficeInboxTab()
@@ -18,9 +11,17 @@ struct RootView: View {
                 .badge(office.inboxBadge)
                 .tag(Tab.inbox)
 
-            TabsTab()
-                .tabItem { Label("Tabs", systemImage: "square.on.square") }
-                .tag(Tab.tabs)
+            HomeTab()
+                .tabItem { Label("Home", systemImage: "house") }
+                .tag(Tab.home)
+
+            WorkTab()
+                .tabItem { Label("Work", systemImage: "folder") }
+                .tag(Tab.work)
+
+            TeamTab()
+                .tabItem { Label("Team", systemImage: "person.2") }
+                .tag(Tab.team)
 
             NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gear") }
@@ -42,18 +43,6 @@ struct RootView: View {
             await office.load()
         }
         .onDisappear { office.stopObserving() }
-        // Whatever you open, in either stack, joins Today (docs/office-tabs.md).
-        .onChange(of: model.path.last) { _, route in
-            if let route { Task { await noteOpened(route) } }
-        }
-        .onChange(of: model.inboxPath.last) { _, route in
-            if let route { Task { await noteOpened(route) } }
-        }
-        .sheet(
-            isPresented: Binding(get: { model.newThreadDraft != nil }, set: { if !$0 { model.newThreadDraft = nil } })
-        ) {
-            NewThreadView(text: model.newThreadDraft ?? "")
-        }
         .sheet(item: $model.sheet) { sheet in
             switch sheet {
             case .capture:
@@ -68,6 +57,30 @@ struct RootView: View {
                 QuickWriteView()
             case .newTasks:
                 QuickTaskView()
+            }
+        }
+    }
+}
+
+/// Work: the current Space's folders, with threads and items together. A stack
+/// on iPhone; on iPad, the folders beside the open thread.
+struct WorkTab: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    var body: some View {
+        if sizeClass == .regular {
+            NavigationSplitView {
+                InboxView(mode: .work).navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 480)
+            } detail: {
+                NavigationStack(path: $model.path) {
+                    ContentUnavailableView("No thread selected", systemImage: "bubble.left.and.bubble.right")
+                        .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+                }
+            }
+        } else {
+            NavigationStack(path: $model.path) {
+                InboxView(mode: .work).navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
         }
     }
@@ -100,9 +113,6 @@ struct RouteDestination: View {
         case .feed: FeedView()
         case .feedPost(let id): FeedPostView(id: id).id(id)
         case .studioCollection: StudioView()
-        case .botDesk(let id): BotDeskView(botId: id).id(id)
-        case .officeHome: OfficeHomeScreen()
-        case .officeTeam: OfficeTeamScreen()
         }
     }
 }

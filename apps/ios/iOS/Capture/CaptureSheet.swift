@@ -75,8 +75,6 @@ struct CaptureSheet: View {
                         else if choosingFile { choosingFile = false }
                         else { operation.complete(on: app) { dismiss() } }
                     }
-                    .accessibilityIdentifier(writingNote || choosingFile ? "captureBack" : "captureClose")
-                    .accessibilityShowsLargeContentViewer()
                 }
             }
         }
@@ -257,7 +255,7 @@ struct CaptureSheet: View {
                 guard file.data.count <= 25 * 1024 * 1024 else {
                     throw BBError(status: 413, message: "\(file.name) is over 25 MB.")
                 }
-                let result: Studio.ArtifactsImportFileOutput = try await client.rpc("studio", Studio.Method.artifacts_importFile, [
+                let result: Artifacts.ImportFileOutput = try await client.rpc("artifacts", Artifacts.Method.importFile, [
                     "name": .string(file.name),
                     "mime": .string(file.mimeType),
                     "bytes": .string(file.data.base64EncodedString()),

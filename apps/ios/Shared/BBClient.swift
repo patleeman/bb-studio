@@ -204,7 +204,7 @@ extension BBClient {
     public func timeline(_ threadId: String, before cursor: TimelineCursor? = nil, after: Int? = nil, segments: Int = 8)
         async throws -> TimelinePage
     {
-        var path = "/api/v1/threads/\(threadId)/timeline?includeNestedRows=true&segmentLimit=\(segments)"
+        var path = "/api/v1/threads/\(threadId)/timeline?segmentLimit=\(segments)"
         if let after { path += "&afterSequence=\(after)" }
         if let cursor {
             let anchor = cursor.anchorId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor.anchorId
@@ -465,18 +465,18 @@ extension BBClient {
 
 extension BBClient {
     public func botTeams() async throws -> BotTeamsList {
-        try await rpc("studio", "teams_list")
+        try await rpc("bot-teams", "list")
     }
 
     /// A bot's MISSION.md or MEMORY.md, with the version a save must match.
     public func botDocument(_ id: String, file: String) async throws -> BotDocument {
-        try await rpc("studio", "teams_document", ["id": .string(id), "file": .string(file)])
+        try await rpc("bot-teams", "document", ["id": .string(id), "file": .string(file)])
     }
 
     /// Saves a bot's file. Fails if it changed since `version` was read.
     public func saveBotDocument(_ id: String, file: String, text: String, version: String) async throws -> BotDocument {
         try await rpc(
-            "studio", "teams_saveDocument",
+            "bot-teams", "saveDocument",
             ["id": .string(id), "file": .string(file), "text": .string(text), "version": .string(version)])
     }
 
@@ -484,46 +484,46 @@ extension BBClient {
 
     /// The active bots a thread can work as, by name.
     public func profiles() async throws -> [Bot] {
-        try await rpc("studio", "teams_profiles", [:])
+        try await rpc("bot-teams", "profiles", [:])
     }
 
     /// The bot this thread works as: `.some(nil)` for none, `nil` when the
     /// thread can't take a profile (channels and bot work threads).
     public func threadProfile(_ threadId: String) async throws -> String?? {
         struct Profile: Decodable { var botId: String? }
-        let profile: Profile? = try await rpcIfPresent("studio", "teams_threadProfile", ["threadId": .string(threadId)])
+        let profile: Profile? = try await rpcIfPresent("bot-teams", "threadProfile", ["threadId": .string(threadId)])
         return profile.map(\.botId)
     }
 
     /// Attaches a bot's profile to an idle thread, or removes it with `nil`.
     public func setThreadProfile(_ threadId: String, botId: String?) async throws {
         let _: JSONValue = try await rpc(
-            "studio", "teams_setThreadProfile", ["threadId": .string(threadId), "botId": botId.map { .string($0) } ?? .null])
+            "bot-teams", "setThreadProfile", ["threadId": .string(threadId), "botId": botId.map { .string($0) } ?? .null])
     }
 
     /// The profile the next new thread in this project takes with its first message.
     public func pendingThreadProfile(projectId: String, botId: String?) async throws {
         let _: JSONValue = try await rpc(
-            "studio", "teams_pendingThreadProfile",
+            "bot-teams", "pendingThreadProfile",
             ["projectId": .string(projectId), "botId": botId.map { .string($0) } ?? .null])
     }
 
     /// The bot each thread works as, by thread id.
     public func threadBots() async throws -> [String: String] {
         struct Row: Decodable { var threadId: String; var botId: String }
-        let rows: [Row] = try await rpc("studio", "teams_threadBots", [:])
+        let rows: [Row] = try await rpc("bot-teams", "threadBots", [:])
         return Dictionary(rows.map { ($0.threadId, $0.botId) }, uniquingKeysWith: { a, _ in a })
     }
 
     /// Every thread with this bot's profile, newest first.
     public func profileThreads(_ botId: String) async throws -> [ProfileThread] {
-        try await rpc("studio", "teams_profileThreads", ["id": .string(botId)])
+        try await rpc("bot-teams", "profileThreads", ["id": .string(botId)])
     }
 
     /// A new empty thread with this bot's profile; returns its id.
     public func newProfileThread(_ botId: String) async throws -> String {
         struct Conversation: Decodable { var threadId: String }
-        let conversation: Conversation = try await rpc("studio", "teams_newConversation", ["id": .string(botId)])
+        let conversation: Conversation = try await rpc("bot-teams", "newConversation", ["id": .string(botId)])
         return conversation.threadId
     }
 
@@ -535,7 +535,7 @@ extension BBClient {
 extension BBClient {
     public func createRecording(kind: String, threadId: String?, projectId: String?) async throws -> Recording {
         try await rpc(
-            "studio", "talk_recording_create",
+            "talk", "recording_create",
             ["kind": .string(kind), "projectId": .from(projectId), "threadId": .from(threadId)])
     }
 
@@ -544,7 +544,7 @@ extension BBClient {
         audio: Data
     ) async throws {
         let _: JSONValue = try await rpc(
-            "studio", "talk_segment_put",
+            "talk", "segment_put",
             [
                 "recordingId": .string(recordingId), "sessionId": .string(sessionId), "index": .from(index),
                 "startedAt": .from(startedAt), "durationMs": .from(durationMs), "mimeType": .string(mimeType),
@@ -554,22 +554,22 @@ extension BBClient {
 
     @discardableResult
     public func setRecordingState(_ id: String, _ status: String) async throws -> Recording {
-        try await rpc("studio", "talk_recording_state", ["id": .string(id), "status": .string(status)])
+        try await rpc("talk", "recording_state", ["id": .string(id), "status": .string(status)])
     }
 
     public func heartbeat(_ id: String) async throws {
-        let _: JSONValue = try await rpc("studio", "talk_recording_heartbeat", ["id": .string(id)])
+        let _: JSONValue = try await rpc("talk", "recording_heartbeat", ["id": .string(id)])
     }
 
     public func recording(_ id: String) async throws -> RecordingDetail {
-        try await rpc("studio", "talk_recording_get", ["id": .string(id)])
+        try await rpc("talk", "recording_get", ["id": .string(id)])
     }
 
     /// One segment's audio, as it was recorded: WebM/Opus from a browser, MP4/AAC from the phone.
     public func recordingAudio(_ id: String, segment: String) async throws -> Data {
         var query = URLComponents()
         query.queryItems = [URLQueryItem(name: "recording", value: id), URLQueryItem(name: "segment", value: segment)]
-        let path = "/api/v1/plugins/studio/http/audio?" + (query.percentEncodedQuery ?? "")
+        let path = "/api/v1/plugins/talk/http/audio?" + (query.percentEncodedQuery ?? "")
         let (status, data) = try await raw(method: "GET", path: path, body: nil)
         guard (200..<300).contains(status) else {
             throw BBError(status: status, message: Self.errorMessage(data) ?? "HTTP \(status) for the segment's audio")
@@ -579,7 +579,7 @@ extension BBClient {
 
     public func recordings(limit: Int = 50) async throws -> [Recording] {
         struct List: Decodable { var recordings: [Recording] }
-        let list: List = try await rpc("studio", "talk_recordings_list", ["limit": .from(limit)])
+        let list: List = try await rpc("talk", "recordings_list", ["limit": .from(limit)])
         return list.recordings
     }
 }

@@ -1,4 +1,3 @@
-import { absorbedPluginIds } from "@bb-studio/kit/contract";
 // Custom block and inline-content configs shared by the server schema
 // (src/schema-server.ts) and the React editor (components/blocks). Both sides
 // must build the same ProseMirror schema, so every custom type's config lives
@@ -62,11 +61,11 @@ export type EmbedKind = (typeof EMBED_KINDS)[number];
  */
 export const STUDIO_EMBEDS = {
   drawing: { pluginId: "excalidraw", panel: "drawings", label: "Drawing" },
-  artifact: { idPrefix: "art_", pluginId: "studio", panel: "artifacts", label: "Artifact" },
-  recording: { idPrefix: "rec_", pluginId: "studio", panel: "recordings", label: "Recording" },
-  task: { pluginId: "studio", panel: "tasks", label: "Task", idPrefix: "tsk_" },
-  board: { pluginId: "studio", panel: "tasks", label: "Board", idPrefix: "brd_" },
-  table: { pluginId: "studio", panel: "tables", label: "Table" },
+  artifact: { pluginId: "artifacts", panel: "artifacts", label: "Artifact" },
+  recording: { pluginId: "talk", panel: "recordings", label: "Recording" },
+  task: { pluginId: "studio-tasks", panel: "tasks", label: "Task", idPrefix: "tsk_" },
+  board: { pluginId: "studio-tasks", panel: "tasks", label: "Board", idPrefix: "brd_" },
+  table: { pluginId: "studio-tables", panel: "tables", label: "Table" },
 } as const;
 export type StudioEmbedKind = keyof typeof STUDIO_EMBEDS;
 
@@ -108,7 +107,6 @@ export function studioRef(kind: string, target: string): { pluginId: string; id:
 
 /** The embed kind and target for an add-on's item. */
 export function studioEmbedFor(pluginId: string, id: string): { kind: StudioEmbedKind | "item"; target: string } {
-  if (absorbedPluginIds.some(legacy => legacy === pluginId)) pluginId = "studio";
   const kind = (Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).find((each) => isEmbedKindItem(each, pluginId, id));
   return kind ? { kind, target: id } : { kind: "item", target: `${pluginId}:${id}` };
 }

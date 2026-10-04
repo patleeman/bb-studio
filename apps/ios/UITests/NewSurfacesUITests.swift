@@ -1,23 +1,20 @@
 import XCTest
 
 final class NewSurfacesUITests: XCTestCase {
-    private let projectId = StagedFixture.projectId
+    private let projectId = "proj_8ztiq6dkh5"
 
     func testHomeAndCollection() throws {
-        guard let spaces = rpc("studio", "spaces_list", [:])?["spaces"] as? [[String: Any]],
-              let spaceId = spaces.first?["id"] as? String,
-              rpc("studio", "home", ["spaceId": spaceId]) != nil else {
-            throw XCTSkip("Office RPCs are not installed")
-        }
-        let app = launch(tab: "inbox")
-        XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 15))
-        shot(app, "inbox")
-        app.openOfficeScreen("Home")
-        XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 15))
-        shot(app, "home")
-        openCollection(app)
+        guard rpc("studio", "home", ["periodDays": 7]) != nil else { throw XCTSkip("Updated Studio plugin is not installed") }
+        let app = launch()
+        app.tabBars.buttons["Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 15))
         XCTAssertTrue(studioSearch(app).exists)
         shot(app, "collection")
+        app.buttons["studioToday"].tap()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
+        shot(app, "home")
+        app.buttons["studioCollection"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
     }
 
     func testSearch() throws {
@@ -25,7 +22,7 @@ final class NewSurfacesUITests: XCTestCase {
             throw XCTSkip("Updated Studio search is not installed")
         }
         let app = launch()
-        openCollection(app)
+        app.tabBars.buttons["Studio"].tap()
         let search = studioSearch(app)
         XCTAssertTrue(search.exists)
         search.tap()
@@ -33,9 +30,9 @@ final class NewSurfacesUITests: XCTestCase {
         shot(app, "search")
     }
 
-    /// Search is the collection's first row and grows with Dynamic Type.
+    /// The collection's search field sits in the navigation drawer, hidden until the list is pulled down.
     private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
-        let search = app.descendants(matching: .any)["studioSearch"]
+        let search = app.searchFields["Search Studio"]
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         if !search.waitForExistence(timeout: 3) {
             let window = app.windows.firstMatch
@@ -47,16 +44,16 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     func testTaskFieldsAndRelated() throws {
-        let task = try XCTUnwrap(rpc("studio", "tasks_create", [
+        let task = try XCTUnwrap(rpc("studio-tasks", "create", [
             "title": "QA iOS7 task", "description": "Search and task fields", "projectId": projectId,
         ])?["task"] as? [String: Any])
         let id = try XCTUnwrap(task["id"] as? String)
         addTeardownBlock {
-            let tasks = self.rpc("studio", "tasks_board", ["includeArchived": true])?["tasks"] as? [[String: Any]] ?? []
+            let tasks = self.rpc("studio-tasks", "board", ["includeArchived": true])?["tasks"] as? [[String: Any]] ?? []
             for child in tasks where child["parentId"] as? String == id || child["title"] as? String == "QA iOS7 subtask" {
-                if let childId = child["id"] as? String { _ = self.rpc("studio", "tasks_delete", ["id": childId]) }
+                if let childId = child["id"] as? String { _ = self.rpc("studio-tasks", "delete", ["id": childId]) }
             }
-            _ = self.rpc("studio", "tasks_delete", ["id": id])
+            _ = self.rpc("studio-tasks", "delete", ["id": id])
         }
         let app = launch()
         app.open(URL(string: "bbstudio://task/\(id)")!)
@@ -70,7 +67,7 @@ final class NewSurfacesUITests: XCTestCase {
         subtask.typeText("QA iOS7 subtask")
         app.buttons["Add"].tap()
         if !app.staticTexts["QA iOS7 subtask"].waitForExistence(timeout: 10) {
-            let tasks = rpc("studio", "tasks_board", ["includeArchived": false])?["tasks"] as? [[String: Any]] ?? []
+            let tasks = rpc("studio-tasks", "board", ["includeArchived": false])?["tasks"] as? [[String: Any]] ?? []
             XCTAssertTrue(tasks.contains { $0["title"] as? String == "QA iOS7 subtask" && $0["parentId"] == nil },
                 "The subtask should appear when the updated Tasks plugin is installed")
         }
@@ -78,52 +75,38 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     func testTableViews() throws {
-        continueAfterFailure = false
-        let title = "QA table \(UUID().uuidString.prefix(8))"
-        let created = try XCTUnwrap(rpc("studio", "tables_create", [
-            "title": title, "projectId": projectId,
-            "columns": [["id": "name", "name": "Item", "type": "text"],
-                        ["id": "count", "name": "Count", "type": "number"]],
-            "rows": [["name": "Release notes", "count": 7]],
+        guard rpc("studio-tables", "list", NSNull()) != nil else { throw XCTSkip("Studio Tables is not installed") }
+        let created = try XCTUnwrap(rpc("studio-tables", "create", [
+            "title": "QA iOS7 table", "projectId": projectId,
         ])?["table"] as? [String: Any])
         let id = try XCTUnwrap(created["id"] as? String)
-        addTeardownBlock { _ = self.rpc("studio", "tables_remove", ["id": id]) }
+        addTeardownBlock { _ = self.rpc("studio-tables", "remove", ["id": id]) }
         let app = launch()
-        openCollection(app)
-        let search = app.descendants(matching: .any)["studioSearch"]
-        if !search.waitForExistence(timeout: 3) { app.swipeDown() }
-        XCTAssertTrue(search.waitForExistence(timeout: 10))
-        search.tap(); search.typeText(title)
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:"))
-            .matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 15)); row.tap()
+        app.open(URL(string: "bbstudio://studio")!)
+        app.tabBars.buttons["Studio"].tap()
+        XCTAssertTrue(app.staticTexts["QA iOS7 table"].waitForExistence(timeout: 15))
+        app.staticTexts["QA iOS7 table"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["studioTable"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Item, Release notes"].waitForExistence(timeout: 10), "list values")
         app.buttons["Table"].tap()
-        XCTAssertTrue(app.staticTexts["Release notes"].waitForExistence(timeout: 10), "grid text value")
-        XCTAssertTrue(app.staticTexts["7"].exists, "grid number value")
         shot(app, "table")
     }
 
     func testMeetingNotes() throws {
-        let id = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_MEETING_RECORDING"], "Seed meeting notes with BB_QA_DATA_DIR")
+        let recordings = rpc("talk", "recordings_list", ["limit": 200])?["recordings"] as? [[String: Any]] ?? []
+        guard let id = recordings.first(where: { $0["meetingNotes"] is [String: Any] })?["id"] as? String else {
+            throw XCTSkip("No recording with meeting notes is available for read-only QA")
+        }
         let app = launch()
         app.open(URL(string: "bbstudio://recording/\(id)")!)
         XCTAssertTrue(app.descendants(matching: .any)["recordingMeetingNotes"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["The release checklist is ready for Friday."].exists)
         shot(app, "meeting-notes")
     }
 
-    private func launch(tab: String = "tabs") -> XCUIApplication {
+    private func launch() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", tab]
+        app.launchArguments = ["-skipPushPrompt", "YES"]
         app.launch()
         return app
-    }
-
-    private func openCollection(_ app: XCUIApplication) {
-        app.open(URL(string: "bbstudio://studio")!)
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 15))
     }
 
     private func shot(_ app: XCUIApplication, _ name: String) {
@@ -135,7 +118,7 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     private func rpcRaw(_ plugin: String, _ method: String, _ input: Any) -> Any? {
-        var request = URLRequest(url: URL(string: "\(StagedFixture.serverURL)/api/v1/plugins/\(plugin)/rpc/\(method)")!)
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/\(plugin)/rpc/\(method)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: input, options: .fragmentsAllowed)

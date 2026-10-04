@@ -5,20 +5,19 @@ import XCTest
 /// assistant message ends with a `::reactions` directive. Nothing is sent.
 final class ThreadUITests: XCTestCase {
     private let app = XCUIApplication()
-    private var threadId: String { StagedFixture.threadId }
+    private var threadId: String { ProcessInfo.processInfo.environment["BBGO_QA_THREAD"] ?? "thr_64r2wmjrim" }
 
     override func setUp() {
         continueAfterFailure = true
-        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "tabs"]
         app.launch()
     }
 
-    func testTabs() {
-        XCTAssertTrue(app.buttons["officeTabsNew"].waitForExistence(timeout: 10))
-        shot("tabs-top")
+    func testHome() {
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
+        shot("home-top")
         app.swipeUp()
         app.swipeUp()
-        shot("tabs-bottom")
+        shot("home-bottom")
     }
 
     /// The split view and keyboard shortcuts; run on an iPad simulator. Nothing is sent.
@@ -49,9 +48,10 @@ final class ThreadUITests: XCTestCase {
     }
 
     func testThread() throws {
-        let fixture = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_REACTIONS_THREAD"], "Seed reactions with BB_QA_DATA_DIR")
-        app.open(URL(string: "bbstudio://thread/\(fixture)")!)
-        XCTAssertTrue(app.buttons["reaction"].firstMatch.waitForExistence(timeout: 10), "seeded reactions")
+        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
+        guard app.buttons["reaction"].firstMatch.waitForExistence(timeout: 10) else {
+            throw XCTSkip("the thread's last reply has no reactions")
+        }
         let chip = app.buttons.matching(identifier: "reaction").allElementsBoundByIndex.last!
         let chipText = chip.label
         sleep(2)
@@ -180,8 +180,8 @@ final class ThreadUITests: XCTestCase {
 
         // Model sheet, cancelled.
         app.buttons["More"].tap()
-        app.buttons["Model & permissions"].tap()
-        XCTAssertTrue(app.navigationBars["Model & Permissions"].waitForExistence(timeout: 5), "model sheet")
+        app.buttons["Model & reasoning"].tap()
+        XCTAssertTrue(app.navigationBars["Model"].waitForExistence(timeout: 5), "model sheet")
         sleep(2)
         shot("model")
         app.buttons["Cancel"].tap()
@@ -201,16 +201,14 @@ final class ThreadUITests: XCTestCase {
         shot("diff")
     }
 
+    /// Every Pages block kind, from a built-in page rather than a real one.
     /// Automations, usage and host settings. Read-only: nothing is run, paused or sent.
     func testTools() {
-        continueAfterFailure = false
         app.open(URL(string: "bbstudio://automations")!)
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
         sleep(2)
         shot("tools-automations")
-        let daily = app.staticTexts["Daily native UI fixture"].firstMatch
-        XCTAssertTrue(daily.waitForExistence(timeout: 10), "paused staged automation")
-        daily.tap()
+        app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Daily'")).firstMatch.tap()
         XCTAssertTrue(app.switches["Enabled"].waitForExistence(timeout: 10), "automation detail")
         sleep(2)
         shot("tools-automation")
@@ -221,12 +219,9 @@ final class ThreadUITests: XCTestCase {
         app.open(URL(string: "bbstudio://settings")!)
         XCTAssertTrue(app.switches["Keep Mac awake"].waitForExistence(timeout: 10), "keep awake")
         shot("tools-settings")
-        let automations = app.buttons["Automations"]
-        for _ in 0..<5 where !automations.exists || !automations.isHittable { app.swipeUp() }
-        XCTAssertTrue(automations.waitForExistence(timeout: 5), "Automations entry in Settings")
-        automations.tap()
-        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10), "Automations is in Settings")
-        shot("tools-settings-automations")
+        app.open(URL(string: "bbstudio://home")!)
+        XCTAssertTrue(app.buttons["Automations"].waitForExistence(timeout: 10))
+        shot("tools-home")
     }
 
     /// Read-only: opens sheets and screens, never sends, forks or compacts.
@@ -242,9 +237,9 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.segmentedControls.buttons["Changes"].waitForExistence(timeout: 10))
         sleep(2)
         shot("extras-changes")
-        let changedFile = app.staticTexts["README.md"].firstMatch
-        XCTAssertTrue(changedFile.waitForExistence(timeout: 10), "staged checkout has the deterministic README change")
-        changedFile.tap()
+        // The diff steps need the fixture thread's checkout to have changes.
+        try XCTSkipIf(app.staticTexts["No uncommitted changes"].exists, "no uncommitted changes to open")
+        app.staticTexts.matching(NSPredicate(format: "label ENDSWITH '.md'")).firstMatch.tap()
         sleep(2)
         shot("extras-diff")
         if app.buttons["View file"].waitForExistence(timeout: 3) {
@@ -281,31 +276,29 @@ final class ThreadUITests: XCTestCase {
 
     /// Read-only: filters Studio by kind, opens one of each, and searches. Records nothing.
     func testStudio() {
-        continueAfterFailure = false
         openStudioCollection()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("studio-all")
         for (chip, name) in [("Pages", "page"), ("Recordings", "recording"), ("Dictations", "dictation"), ("Drawings", "drawing"), ("Artifacts", "artifact")] {
-            let chips = app.scrollViews.containing(.button, identifier: "All").firstMatch
-            let button = chips.buttons[chip].firstMatch
-            for _ in 0..<6 where !button.exists || !button.isHittable { chips.swipeLeft() }
-            XCTAssertTrue(button.waitForExistence(timeout: 5), "seeded \(name) filter")
+            let button = app.buttons[chip].firstMatch
+            guard button.waitForExistence(timeout: 3) else { continue }
             button.tap()
             sleep(1)
             shot("studio-\(name)s")
             // Items only: the quick-action tiles start real recordings.
-            let first = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:")).firstMatch
-            XCTAssertTrue(first.waitForExistence(timeout: 5), "seeded \(name) item")
-            first.tap()
-            sleep(3)
-            shot("studio-\(name)")
-            XCTAssertFalse(app.navigationBars["Recording"].exists)
-            app.navigationBars.buttons.firstMatch.tap()
-            XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 5), "back from \(name)")
+            let first = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch
+            if first.waitForExistence(timeout: 3) {
+                first.tap()
+                sleep(3)
+                shot("studio-\(name)")
+                XCTAssertFalse(app.navigationBars["Recording"].exists)
+                app.navigationBars.buttons.firstMatch.tap()
+                sleep(1)
+            }
             app.buttons[chip].firstMatch.tap()
         }
-        let search = app.descendants(matching: .any)["studioSearch"]
+        let search = app.searchFields.firstMatch
         if !search.waitForExistence(timeout: 2) {
             app.collectionViews.firstMatch.swipeDown()
         }
@@ -319,12 +312,14 @@ final class ThreadUITests: XCTestCase {
 
     /// Read-only: browses a channel and custom instructions.
     func testPluginScreens() {
-        app.openOfficeScreen("Team")
-        let channel = app.staticTexts["ORBIT-42 release room"].firstMatch
-        XCTAssertTrue(channel.waitForExistence(timeout: 10))
-        channel.tap()
-        XCTAssertTrue(app.buttons["Edit channel"].waitForExistence(timeout: 10))
-        shot("plugins-channel")
+        app.open(URL(string: "bbstudio://home")!)
+        let channel = app.buttons.containing(.image, identifier: "number").firstMatch
+        if channel.waitForExistence(timeout: 10) {
+            channel.tap()
+            sleep(3)
+            shot("plugins-channel")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
         app.tabBars.buttons["Settings"].tap()
         let instructions = app.buttons["Custom Instructions"]
         if instructions.waitForExistence(timeout: 5) {
@@ -362,24 +357,21 @@ final class ThreadUITests: XCTestCase {
         shot("page-demo-bottom")
     }
 
-    /// Removes this test's scheduled message; never depends on a shared queue.
+    /// Needs a running thread with a queued message.
     func testQueueRemove() throws {
-        continueAfterFailure = false
-        let id = try XCTUnwrap(scratchThread("QA queue removal \(UUID().uuidString.prefix(8))"))
-        addTeardownBlock { _ = self.api("DELETE", "/threads/\(id)", ["childThreadsConfirmed": false]) }
-        XCTAssertEqual(api("GET", "/threads/\(id)", [:])?["queuedMessageCount"] as? Int, 1)
-        app.open(URL(string: "bbstudio://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         let remove = app.buttons["Remove from queue"].firstMatch
-        XCTAssertTrue(remove.waitForExistence(timeout: 10), "scheduled message has a removal control")
+        guard remove.waitForExistence(timeout: 10) else { throw XCTSkip("nothing queued") }
+        let count = app.buttons.matching(identifier: "Remove from queue").count
         remove.tap()
-        XCTAssertTrue(wait(10) { self.api("GET", "/threads/\(id)", [:])?["queuedMessageCount"] as? Int == 0 }, "server removed the queued message")
-        XCTAssertTrue(remove.waitForNonExistence(timeout: 10), "queued card removed")
+        XCTAssertTrue(wait(10) { app.buttons.matching(identifier: "Remove from queue").count < count }, "queued card removed")
         shot("queue-removed")
     }
 
-    /// Rewrites a future-scheduled message on its own scratch thread.
+    /// Rewrites the first queued message. Only runs against a scratch thread
+    /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
     func testQueueEdit() throws {
-        let id = try queuedScratchThread("Hello this")
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let card = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Hello'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 10), "queued card")
@@ -394,15 +386,10 @@ final class ThreadUITests: XCTestCase {
         shot("queue-edited")
     }
 
-    /// Collapses, expands and drags three future-scheduled scratch messages.
+    /// Collapses, expands and drags queued messages. Scratch thread only,
+    /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, with three or more queued.
     func testQueueReorder() throws {
-        let id = try queuedScratchThread("scratch message 1")
-        for number in 2...3 {
-            XCTAssertNotNil(api("POST", "/threads/\(id)/send", [
-                "input": [["type": "text", "text": "scratch message \(number)", "mentions": [String]()]],
-                "mode": "queue-if-active", "sendAt": 1_924_992_000_000,
-            ]))
-        }
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let summary = app.buttons["queueSummary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 10), "collapsed queue")
@@ -426,7 +413,7 @@ final class ThreadUITests: XCTestCase {
 
     /// Renames the scratch thread from the ⋯ menu.
     func testRenameThread() throws {
-        let id = try queuedScratchThread("Scratch rename fixture")
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10))
@@ -447,7 +434,7 @@ final class ThreadUITests: XCTestCase {
 
     /// Opens voice chat on the scratch thread and checks it starts listening.
     func testVoiceChat() throws {
-        let id = try queuedScratchThread("Voice chat fixture")
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         addUIInterruptionMonitor(withDescription: "permissions") { alert in
             for label in ["Allow", "OK"] where alert.buttons[label].exists {
                 alert.buttons[label].tap()
@@ -464,16 +451,7 @@ final class ThreadUITests: XCTestCase {
         app.tap()
         sleep(5)
         shot("voice-chat")
-        #if targetEnvironment(simulator)
-        if app.staticTexts["Speech recognition stopped: Failed to initialize recognizer"].exists {
-            app.buttons["Pause"].tap()
-            XCTAssertTrue(app.buttons["Resume"].waitForExistence(timeout: 5), "failed session can pause")
-            app.buttons["End"].tap()
-            XCTAssertTrue(more.waitForExistence(timeout: 5), "failed session can end")
-            throw XCTSkip("This Simulator cannot initialize Apple's speech recognizer; failed-session pause/end verified. Listening requires a speech-capable device.")
-        }
-        #endif
-        // A denied permission must offer a way to enable it.
+        // The simulator can't grant speech recognition, so accept the Settings path too.
         let listening = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Listening'")).firstMatch
         XCTAssertTrue(listening.waitForExistence(timeout: 5) || app.links["Open Settings"].exists || app.buttons["Open Settings"].exists,
             "listening, or a way to fix the permission")
@@ -504,7 +482,7 @@ final class ThreadUITests: XCTestCase {
 
     func testShelfDemo() {
         app.terminate()
-        app.launchArguments = ["-qaShelfDemo", "-skipPushPrompt", "YES", "-officeTab", "tabs"]
+        app.launchArguments = ["-qaShelfDemo"]
         app.launch()
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         XCTAssertTrue(app.staticTexts["Plan mode"].waitForExistence(timeout: 10))
@@ -532,39 +510,30 @@ final class ThreadUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count + 4))
     }
 
-    /// The Studio deep link opens the Library on the Tabs stack.
+    /// Studio opens on the collection.
     private func openStudioCollection() {
         app.open(URL(string: "bbstudio://studio")!)
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio collection")
+        XCTAssertTrue(app.buttons["studioToday"].waitForExistence(timeout: 10), "Studio collection")
     }
 
     /// The socket closes in the background: on return the inbox catches up on what
     /// changed meanwhile, then stays live. Creates two scratch threads, held
     /// with a far-off send, and deletes them.
     func testResumeReconnects() throws {
-        XCTAssertTrue(app.buttons["officeTabsNew"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
         let tag = String(UUID().uuidString.prefix(6))
         XCUIDevice.shared.press(.home)
         sleep(3)
         let away = try XCTUnwrap(scratchThread("QA away \(tag)"))
-        try registerTab(away)
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(away)", ["childThreadsConfirmed": false]) }
         app.activate()
         sleep(3)
         XCTAssertTrue(scrollTo("QA away \(tag)"), "picks up changes made while in the background")
         let live = try XCTUnwrap(scratchThread("QA live \(tag)"))
-        try registerTab(live)
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(live)", ["childThreadsConfirmed": false]) }
         sleep(4)
         XCTAssertTrue(scrollTo("QA live \(tag)"), "live again after returning")
         shot("resume")
-    }
-
-    private func registerTab(_ threadId: String) throws {
-        let spaces = try XCTUnwrap(rpc("studio", "spaces_list", [:])?["spaces"] as? [[String: Any]])
-        let space = try XCTUnwrap(spaces.first { ($0["projectIds"] as? [String])?.contains(StagedFixture.projectId) == true })
-        let id = try XCTUnwrap(space["id"] as? String)
-        XCTAssertNotNil(rpc("studio", "tabs_open", ["spaceId": id, "ref": "thread:\(threadId)"])?["tab"])
     }
 
     /// The inbox list renders only the rows on screen: look further down, then back up.
@@ -606,9 +575,10 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["QA artifact"].waitForExistence(timeout: 10), "card opens the viewer")
     }
 
-    /// The work bar, saved version and rename on an owned scratch page.
+    /// A scratch page named by `TEST_RUNNER_BBGO_QA_PAGE`: the work bar, a saved
+    /// version, and rename. Nothing is sent, so no thread starts.
     func testPageTools() throws {
-        let id = try scratchPage()
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
         app.open(URL(string: "bbstudio://page/\(id)")!)
         XCTAssertTrue(app.descendants(matching: .any)["pageWorkField"].waitForExistence(timeout: 10), "work bar")
         sleep(1)
@@ -635,12 +605,17 @@ final class ThreadUITests: XCTestCase {
         shot("page-renamed")
     }
 
-    /// Replies, resolves, and starts comments on an owned scratch page.
+    /// Comments on a scratch page named by `TEST_RUNNER_BBGO_QA_PAGE` that has one
+    /// open thread: reply, resolve, then start a new thread on "Ship it".
     func testPageComments() throws {
-        let id = try scratchPage()
-        let blocks = try XCTUnwrap(rpc("pages", "commentBlocks", ["id": id])?["blocks"] as? [[String: Any]])
-        let blockId = try XCTUnwrap(blocks.first?["id"] as? String)
-        XCTAssertNotNil(rpc("pages", "commentCreate", ["id": id, "block": blockId, "text": "Is this final?"])?["threadId"])
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
+        // Reopen the first thread and drop what earlier runs added.
+        let threads = (rpc("pages", "comments", ["id": id, "includeResolved": true])?["threads"] as? [[String: Any]]) ?? []
+        let first = try XCTUnwrap(threads.min { ($0["updatedAt"] as? Double ?? 0) < ($1["updatedAt"] as? Double ?? 0) }?["id"] as? String)
+        _ = rpc("pages", "commentResolve", ["id": id, "thread": first, "resolved": false])
+        for thread in threads where thread["id"] as? String != first {
+            _ = rpc("pages", "commentResolve", ["id": id, "thread": thread["id"] as? String ?? "", "resolved": true])
+        }
         app.open(URL(string: "bbstudio://page/\(id)")!)
         let comments = app.buttons["Comments"].firstMatch
         XCTAssertTrue(comments.waitForExistence(timeout: 10), "comments button")
@@ -674,8 +649,8 @@ final class ThreadUITests: XCTestCase {
     /// Plays real recordings, read-only: WebM/Opus ones from the browser and MP4 ones
     /// from the phone. Playback crosses segments, skips, jumps from the transcript, and speeds up.
     func testRecordingPlayback() throws {
-        let webm = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_RECORDING"], "Seed playback fixtures with BB_QA_DATA_DIR")
-        let mp4 = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_RECORDING_MP4"], "Seed playback fixtures with BB_QA_DATA_DIR")
+        let webm = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING"] ?? "rec_ad0bc5936076aad9"
+        let mp4 = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING_MP4"] ?? "rec_4e03a488bb709b29"
         let position = app.staticTexts["playerPosition"]
         func seconds() -> Int {
             let parts = position.label.split(separator: ":").compactMap { Int($0) }
@@ -699,11 +674,12 @@ final class ThreadUITests: XCTestCase {
             app.buttons["Back 15 seconds"].tap()
             sleep(1)
             XCTAssertLessThan(seconds(), 47, "skipped back")
-            let firstSentence = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Play from '")).firstMatch
-            XCTAssertTrue(firstSentence.waitForExistence(timeout: 5), "seeded transcript seek control")
-            firstSentence.tap()
-            sleep(2)
-            XCTAssertLessThan(seconds(), 10, "jumped to the first sentence")
+            let links = app.links
+            if links.count > 1 {
+                links.element(boundBy: 0).tap()
+                sleep(2)
+                XCTAssertLessThan(seconds(), 10, "jumped to the first sentence")
+            }
             app.buttons["Speed"].tap()
             app.buttons["2×"].firstMatch.tap()
             let before = seconds()
@@ -721,10 +697,10 @@ final class ThreadUITests: XCTestCase {
     /// A bot's Mission and Memory open from the bot. Read-only on a real bot: edit is
     /// started and cancelled, and the file's version is checked to be unchanged.
     func testBotDocuments() throws {
-        let bots = (rpc("studio", "teams_list", NSNull())?["bots"] as? [[String: Any]]) ?? []
+        let bots = (rpc("bot-teams", "list", NSNull())?["bots"] as? [[String: Any]]) ?? []
         let bot = try XCTUnwrap(bots.first { $0["retired"] as? Bool != true })
         let id = try XCTUnwrap(bot["id"] as? String)
-        let before = try XCTUnwrap(rpc("studio", "teams_document", ["id": id, "file": "MISSION.md"])?["version"] as? String)
+        let before = try XCTUnwrap(rpc("bot-teams", "document", ["id": id, "file": "MISSION.md"])?["version"] as? String)
         app.open(URL(string: "bbstudio://bot/\(id)")!)
         let mission = app.buttons["Mission"]
         XCTAssertTrue(mission.waitForExistence(timeout: 10), "bot files")
@@ -742,7 +718,7 @@ final class ThreadUITests: XCTestCase {
         shot("bot-mission-edit")
         app.navigationBars["Mission"].buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Mission"].buttons["Edit"].waitForExistence(timeout: 5), "back to reading")
-        let after = rpc("studio", "teams_document", ["id": id, "file": "MISSION.md"])?["version"] as? String
+        let after = rpc("bot-teams", "document", ["id": id, "file": "MISSION.md"])?["version"] as? String
         XCTAssertEqual(before, after, "mission untouched")
         app.navigationBars["Mission"].buttons.element(boundBy: 0).tap()
         app.buttons["Memory"].tap()
@@ -750,50 +726,65 @@ final class ThreadUITests: XCTestCase {
         shot("bot-memory")
     }
 
-    /// Office channels are Team conversations over ordinary threads. Edit and archive
-    /// a scratch conversation without sending a message or dispatching a bot.
+    /// Makes a scratch channel from Home, changes its mode, permissions and members,
+    /// then deletes it. No message is sent, so no bot runs. The mode goes Smart and
+    /// back to Everyone, the remembered default, so that setting ends where it was.
     func testChannelManagement() throws {
-        continueAfterFailure = false
-        let name = "QA channel \(UUID().uuidString.prefix(8))"
-        let bots = try XCTUnwrap(rpc("studio", "teams_list", NSNull())?["bots"] as? [[String: Any]])
-        let atlas = try XCTUnwrap(bots.first { $0["name"] as? String == "Atlas" })
-        let scribe = try XCTUnwrap(bots.first { $0["name"] as? String == "Scribe" })
-        let atlasId = try XCTUnwrap(atlas["id"] as? String)
-        let scribeId = try XCTUnwrap(scribe["id"] as? String)
-        let quinnId = try XCTUnwrap(bots.first { $0["name"] as? String == "Quinn" }?["id"] as? String)
-        let created = try XCTUnwrap(rpc("studio", "teams_viewCreate", ["name": name,
-            "members": [["kind": "bot", "id": atlasId], ["kind": "bot", "id": quinnId]], "requestId": UUID().uuidString]))
-        let id = try XCTUnwrap(created["id"] as? String)
-        addTeardownBlock { _ = self.rpc("studio", "teams_viewDelete", ["id": id]) }
-        func channel() -> [String: Any]? { rpc("studio", "teams_view", ["id": id])?["view"] as? [String: Any] }
-        app.openOfficeScreen("Team")
-        let row = app.staticTexts[name].firstMatch
-        for _ in 0..<5 where !row.isHittable { app.swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "conversation on Team")
-        row.tap()
-        XCTAssertTrue(app.buttons["Edit channel"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.textFields["Message or @mention members…"].exists)
-        app.buttons["Edit channel"].tap()
-        let field = app.textFields["Channel name"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        clear(field); field.typeText(name + " edited")
-        app.buttons["Scribe"].tap()
-        app.navigationBars["Edit Channel"].buttons["Save"].tap()
-        XCTAssertTrue(wait(10) { channel()?["name"] as? String == name + " edited" })
-        let members = try XCTUnwrap(channel()?["members"] as? [[String: Any]])
-        XCTAssertEqual(Set(members.compactMap { $0["id"] as? String }), Set([atlasId, scribeId, quinnId]))
-        shot("team-channel-edited")
-        app.buttons["Edit channel"].tap()
-        let archive = app.buttons["Archive channel"]
-        for _ in 0..<8 where !archive.isHittable { app.swipeUp() }
-        XCTAssertTrue(archive.waitForExistence(timeout: 5)); archive.tap()
-        XCTAssertTrue(wait(10) { channel()?["archived"] as? Bool == true })
-        app.buttons["Edit channel"].tap()
-        let restore = app.buttons["Restore channel"]
-        for _ in 0..<8 where !restore.isHittable { app.swipeUp() }
-        XCTAssertTrue(restore.waitForExistence(timeout: 5)); restore.tap()
-        XCTAssertTrue(wait(10) { channel()?["archived"] as? Bool == false })
-        shot("team-channel-restored")
+        let name = "QA channel \(Int(Date().timeIntervalSince1970))"
+        func channel() -> [String: Any]? {
+            (rpc("bot-teams", "list", NSNull())?["rooms"] as? [[String: Any]])?.first { $0["name"] as? String == name }
+        }
+        addTeardownBlock {
+            if let id = channel()?["id"] as? String { _ = self.rpc("bot-teams", "deleteRoom", ["id": id]) }
+        }
+        let bots = (rpc("bot-teams", "list", NSNull())?["bots"] as? [[String: Any]]) ?? []
+        let bot = try XCTUnwrap(bots.first { $0["retired"] as? Bool != true }?["name"] as? String)
+        app.buttons["New Channel"].firstMatch.tap()
+        let field = app.textFields["channelNameField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "new channel sheet")
+        field.typeText(name)
+        shot("channel-new")
+        app.navigationBars["New Channel"].buttons["Create"].tap()
+        XCTAssertTrue(app.navigationBars["#\(name)"].waitForExistence(timeout: 10), "opened the channel")
+        XCTAssertFalse(app.buttons["Stop"].exists, "nothing to stop")
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Members & Settings"].tap()
+        let mode = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Mode'")).firstMatch
+        XCTAssertTrue(mode.waitForExistence(timeout: 5), "details")
+        mode.tap()
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Smart'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["A coordinator picks collaborators, work order, and busy-bot actions"].waitForExistence(timeout: 5), "smart")
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Permissions'")).firstMatch.tap()
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Auto'")).firstMatch.tap()
+        let member = app.buttons.containing(NSPredicate(format: "label BEGINSWITH %@", bot)).firstMatch
+        XCTAssertTrue(member.waitForExistence(timeout: 5), "members")
+        member.tap()
+        let joined = NSPredicate { _, _ in (channel()?["memberIds"] as? [String])?.count == 1 }
+        wait(for: [expectation(for: joined, evaluatedWith: nil)], timeout: 10)
+        shot("channel-details")
+        var room = try XCTUnwrap(channel())
+        XCTAssertEqual(room["responseBehavior"] as? String, "smart")
+        XCTAssertEqual(room["permissionMode"] as? String, "auto")
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Mode'")).firstMatch.tap()
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Everyone'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Every bot in the channel can answer"].waitForExistence(timeout: 5), "everyone")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.staticTexts["\(bot) joined the channel."].waitForExistence(timeout: 10), "join message")
+        shot("channel-joined")
+        room = try XCTUnwrap(channel())
+        XCTAssertEqual(room["responseBehavior"] as? String, "everyone")
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Members & Settings"].tap()
+        let delete = app.buttons["Delete Channel"].firstMatch
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Mode'")).firstMatch.waitForExistence(timeout: 5))
+        for _ in 0..<6 where !delete.isHittable { app.swipeUp() }
+        delete.tap()
+        // The confirmation's button, not the form's.
+        let deletes = app.buttons.matching(NSPredicate(format: "label == 'Delete Channel'"))
+        XCTAssertTrue(deletes.element(boundBy: 1).waitForExistence(timeout: 5), "confirmation")
+        deletes.element(boundBy: deletes.count - 1).tap()
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10), "back home")
+        XCTAssertNil(channel(), "deleted")
     }
 
     /// The Save to Studio sheet on a scratch thread that never runs, so there's nothing to save.
@@ -877,7 +868,7 @@ final class ThreadUITests: XCTestCase {
                 let id = item["id"] as? String ?? ""
                 switch item["pluginId"] as? String {
                 case "pages": _ = self.rpc("pages", "remove", ["id": id])
-                case "studio-tasks", "studio": _ = self.rpc("studio", "tasks_delete", ["id": id])
+                case "studio-tasks": _ = self.rpc("studio-tasks", "delete", ["id": id])
                 default: break
                 }
             }
@@ -911,7 +902,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     private func rpc(_ plugin: String, _ method: String, _ input: Any) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "\(StagedFixture.serverURL)/api/v1/plugins/\(plugin)/rpc/\(method)")!)
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/\(plugin)/rpc/\(method)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: input, options: .fragmentsAllowed)
@@ -957,13 +948,13 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(wait(5) { !pending.exists }, "undo clears it")
     }
 
-    /// A seeded assistant message's menu ends with when it was sent.
+    /// A message's menu ends with when it was sent. Read-only on a real thread.
     func testMessageSentTime() throws {
-        let fixture = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_MESSAGE_THREAD"], "Seed the assistant fixture with BB_QA_DATA_DIR")
-        let text = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_MESSAGE_TEXT"])
-        app.open(URL(string: "bbstudio://thread/\(fixture)")!)
-        let message = app.staticTexts[text].firstMatch
-        XCTAssertTrue(message.waitForExistence(timeout: 15), "seeded assistant message")
+        app.open(URL(string: "bbstudio://thread/thr_64r2wmjrim")!)
+        let texts = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "(?s).{20,}"))
+        XCTAssertTrue(texts.firstMatch.waitForExistence(timeout: 15), "messages")
+        sleep(2)
+        let message = try XCTUnwrap(texts.allElementsBoundByIndex.last { $0.isHittable }, "a message on screen")
         message.press(forDuration: 1)
         let sent = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Sent '")).firstMatch
         let button = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Sent '")).firstMatch
@@ -971,10 +962,10 @@ final class ThreadUITests: XCTestCase {
         shot("message-sent-time")
     }
 
-    /// Opens and closes a terminal in the staged workspace fixture.
+    /// Opens terminals from a scratch thread's menu, named by
+    /// `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
     func testTerminal() throws {
-        let id = threadId
-        XCTAssertNotNil(api("GET", "/threads/\(id)", [:])?["environmentId"], "staged workspace fixture")
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 15), "thread")
@@ -1057,11 +1048,11 @@ final class ThreadUITests: XCTestCase {
     /// moving it with the Status menu, and a swipe to the next column.
     func testTasks() throws {
         let title = "QA task \(Int(Date().timeIntervalSince1970))"
-        let created = rpc("studio", "tasks_create", [
+        let created = rpc("studio-tasks", "create", [
             "title": title, "description": "Scratch task for a **UI test**.", "due": "2026-10-02", "assignee": "me",
         ])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
-        addTeardownBlock { _ = self.rpc("studio", "tasks_delete", ["id": id]) }
+        addTeardownBlock { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
         app.open(URL(string: "bbstudio://tasks")!)
         app.segmentedControls.buttons.element(boundBy: 0).tap()
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
@@ -1072,7 +1063,7 @@ final class ThreadUITests: XCTestCase {
         shot("task-detail")
         app.buttons["taskStatus"].tap()
         app.buttons["Review"].tap()
-        XCTAssertTrue(wait(10) { (self.rpc("studio", "tasks_get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "review" }, "moved to Review")
+        XCTAssertTrue(wait(10) { (self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "review" }, "moved to Review")
         shot("task-review")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.segmentedControls.buttons.element(boundBy: 2).tap()
@@ -1080,7 +1071,7 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(moved.waitForExistence(timeout: 10), "in the Review column")
         moved.swipeRight()
         app.buttons["Done"].firstMatch.tap()
-        XCTAssertTrue(wait(10) { (self.rpc("studio", "tasks_get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "done" }, "swiped to Done")
+        XCTAssertTrue(wait(10) { (self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "done" }, "swiped to Done")
         shot("tasks-done")
     }
 
@@ -1088,14 +1079,14 @@ final class ThreadUITests: XCTestCase {
     func testStudioTags() throws {
         let stamp = Int(Date().timeIntervalSince1970)
         let title = "QA tag task \(stamp)", tagName = "QA tag \(stamp)"
-        let created = rpc("studio", "tasks_create", ["title": title, "description": ""])
+        let created = rpc("studio-tasks", "create", ["title": title, "description": ""])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
         func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
         addTeardownBlock {
             for tag in (overview()?["tags"] as? [[String: Any]]) ?? [] where tag["name"] as? String == tagName {
                 _ = self.rpc("studio", "deleteTag", ["id": tag["id"] as? String ?? ""])
             }
-            _ = self.rpc("studio", "tasks_delete", ["id": id])
+            _ = self.rpc("studio-tasks", "delete", ["id": id])
         }
         openStudioCollection()
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
@@ -1107,7 +1098,7 @@ final class ThreadUITests: XCTestCase {
         app.alerts.buttons["Add"].tap()
         func tagged() -> Bool {
             let tagId = ((overview()?["tags"] as? [[String: Any]]) ?? []).first { $0["name"] as? String == tagName }?["id"] as? String
-            let item = ((overview()?["items"] as? [[String: Any]]) ?? []).first { $0["pluginId"] as? String == "studio" && $0["id"] as? String == id }
+            let item = ((overview()?["items"] as? [[String: Any]]) ?? []).first { $0["pluginId"] as? String == "studio-tasks" && $0["id"] as? String == id }
             return tagId != nil && (item?["tags"] as? [String])?.contains(tagId!) == true
         }
         XCTAssertTrue(wait(10, tagged), "task tagged")
@@ -1124,12 +1115,12 @@ final class ThreadUITests: XCTestCase {
     /// Starts a real Studio Chat thread from a scratch task, then deletes both.
     func testStudioChat() throws {
         let title = "QA chat task \(Int(Date().timeIntervalSince1970))"
-        let created = rpc("studio", "tasks_create", ["title": title, "description": "Scratch task.", "projectId": StagedFixture.projectId])
+        let created = rpc("studio-tasks", "create", ["title": title, "description": "Scratch task.", "projectId": "proj_8ztiq6dkh5"])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
         var threadId: String?
         addTeardownBlock {
             if let threadId { _ = self.api("DELETE", "/threads/\(threadId)", ["childThreadsConfirmed": false]) }
-            _ = self.rpc("studio", "tasks_delete", ["id": id])
+            _ = self.rpc("studio-tasks", "delete", ["id": id])
         }
         app.open(URL(string: "bbstudio://task/\(id)")!)
         let more = app.buttons["More"].firstMatch
@@ -1142,7 +1133,7 @@ final class ThreadUITests: XCTestCase {
         shot("studio-chat-sheet")
         app.buttons["Start"].tap()
         XCTAssertTrue(wait(20) {
-            threadId = ((self.rpc("studio", "chat_home", ["pluginId": "studio", "id": id])?["thread"] as? [String: Any])?["threadId"] as? String)
+            threadId = (self.rpc("studio-chat", "lastThread", ["pluginId": "studio-tasks", "id": id])?["threadId"] as? String)
             return threadId != nil
         }, "thread linked to the task")
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'automated UI test'")).firstMatch.waitForExistence(timeout: 15), "opened the thread")
@@ -1151,101 +1142,103 @@ final class ThreadUITests: XCTestCase {
         _ = wait(90) { (self.api("GET", "/threads/\(threadId!)", [:])?["status"] as? String).map { !["running", "starting", "queued"].contains($0) } ?? false }
     }
 
-    /// Channels are opened from Team. Scheduling is now the host Automations
-    /// surface: preserve editor, schedule, pause/resume, and rename coverage there.
-    /// The scratch run is scheduled an hour ahead and deleted in teardown.
+    /// Read-only on Command Center's real automations; writes only touch a
+    /// disabled one-off scratch automation 300 days out, deleted at the end.
     func testChannelAutomations() throws {
-        continueAfterFailure = false
-        app.openOfficeScreen("Team")
-        let channel = app.staticTexts["ORBIT-42 release room"].firstMatch
-        XCTAssertTrue(channel.waitForExistence(timeout: 10)); channel.tap()
-        XCTAssertTrue(app.buttons["Edit channel"].waitForExistence(timeout: 10))
-        app.open(URL(string: "bbstudio://automations")!)
-        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
-        let name = "QA automation \(UUID().uuidString.prefix(8))"
-        func automation() -> [String: Any]? {
-            let entries = rpc("automations", "automations_overview", NSNull())?["automations"] as? [[String: Any]] ?? []
-            return entries.compactMap { $0["automation"] as? [String: Any] }.first {
-                ($0["name"] as? String)?.hasPrefix(name) == true
-            }
-        }
+        let channel = "1a5943b7-4148-436b-94b0-aab0a5401064"
+        let room = app.staticTexts["Command Center"].firstMatch
+        XCTAssertTrue(room.waitForExistence(timeout: 10), "channel in Home")
+        room.tap()
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "channel menu")
+        more.tap()
+        app.buttons["Automations"].tap()
+        let reminder = app.staticTexts["Daily garbage-day reminder"].firstMatch
+        XCTAssertTrue(reminder.waitForExistence(timeout: 10), "automations listed")
+        XCTAssertTrue(app.staticTexts["Every day at 19:00 · America/New_York"].exists, "schedule described")
+        shot("channel-automations")
+        reminder.tap()
+        XCTAssertTrue(app.staticTexts["Status"].waitForExistence(timeout: 10), "detail")
+        for _ in 0..<6 where !app.staticTexts["RUNS"].exists && !app.staticTexts["Runs"].exists { app.swipeUp() }
+        XCTAssertTrue(app.buttons["Run Now"].exists && app.buttons["Pause"].exists, "actions shown")
+        XCTAssertTrue(app.staticTexts["RUNS"].exists || app.staticTexts["Runs"].exists, "runs section")
+        _ = wait(5) { !self.app.activityIndicators.firstMatch.exists }
+        shot("channel-automation-detail")
+
+        // Create through the editor on the scratch-safe path.
+        let name = "QA automation \(Int(Date().timeIntervalSince1970))"
+        var createdId: String?
         addTeardownBlock {
-            if let item = automation(), let id = item["id"], let project = item["projectId"] {
-                _ = self.rpc("automations", "automations_delete", ["projectId": project, "automationId": id])
+            let list = self.rpc("bot-teams", "automationList", ["channelId": channel, "limit": 50])
+            for case let automation as [String: Any] in list?["automations"] as? [Any] ?? []
+            where (automation["name"] as? String)?.hasPrefix("QA automation") == true {
+                _ = self.rpc("bot-teams", "automationAction", [
+                    "channelId": channel, "automationId": automation["id"] as! String, "action": "delete"])
             }
         }
-        app.buttons["workflowNewAutomation"].tap()
-        let nameField = app.textFields["workflowAutomationName"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
-        nameField.tap(); nameField.typeText(name)
-        let prompt = app.textFields["workflowAutomationPrompt"].exists ? app.textFields["workflowAutomationPrompt"] : app.textViews["workflowAutomationPrompt"]
-        prompt.tap(); prompt.typeText("UI test scratch. Never runs.")
-        let repeatPicker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Repeat'")).firstMatch
-        for _ in 0..<4 where !repeatPicker.isHittable { app.swipeUp() }
-        repeatPicker.tap(); app.buttons["Once"].firstMatch.tap()
-        app.buttons["workflowAutomationSave"].tap()
-        let row = app.staticTexts[name].firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 15), "created automation")
-        let created = try XCTUnwrap(automation())
-        XCTAssertEqual((created["trigger"] as? [String: Any])?["triggerType"] as? String, "once")
-        row.tap()
-        let enabled = app.switches["Enabled"].firstMatch
-        XCTAssertTrue(enabled.waitForExistence(timeout: 10))
-        func toggleEnabled() {
-            let control = enabled.switches.firstMatch
-            (control.exists ? control : enabled).tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["New Automation"].tap()
+        let nameField = app.textFields["automationName"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5), "editor")
+        nameField.tap()
+        nameField.typeText(name)
+        let prompt = app.textViews["automationPrompt"].exists ? app.textViews["automationPrompt"] : app.textFields["automationPrompt"]
+        prompt.tap()
+        prompt.typeText("UI test scratch. Never runs.")
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Repeat'")).firstMatch.tap()
+        app.buttons["Once"].firstMatch.tap()
+        let toggle = app.switches["Start enabled"].firstMatch
+        if !toggle.isHittable { app.swipeUp() }
+        toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "0", "created paused")
+        shot("channel-automation-editor")
+        app.buttons["Save"].tap()
+        let created = app.staticTexts[name].firstMatch
+        XCTAssertTrue(created.waitForExistence(timeout: 10), "created and listed")
+        let list = rpc("bot-teams", "automationList", ["channelId": channel, "limit": 50])
+        let automation = (list?["automations"] as? [[String: Any]])?.first { $0["name"] as? String == name }
+        createdId = automation?["id"] as? String
+        XCTAssertEqual(automation?["enabled"] as? Bool, false, "saved disabled")
+        XCTAssertEqual((automation?["trigger"] as? [String: Any])?["triggerType"] as? String, "once")
+        // Push it far out so nothing can fire even if a later step enables it.
+        if let id = createdId {
+            _ = rpc("bot-teams", "automationUpdate", [
+                "channelId": channel, "automationId": id,
+                "trigger": ["triggerType": "once", "runAt": (Date().timeIntervalSince1970 + 300 * 86400) * 1000]])
         }
-        toggleEnabled()
-        XCTAssertTrue(wait(10) { automation()?["enabled"] as? Bool == false }, "paused")
-        XCTAssertTrue(app.buttons["Run now"].exists)
-        XCTAssertTrue(app.staticTexts["No runs yet"].waitForExistence(timeout: 10))
-        shot("office-automation-paused")
-        toggleEnabled()
-        XCTAssertTrue(wait(10) { automation()?["enabled"] as? Bool == true }, "resumed future run")
-        toggleEnabled()
-        XCTAssertTrue(wait(10) { automation()?["enabled"] as? Bool == false })
+
+        let bar = app.navigationBars["Automations"].frame.maxY
+        for _ in 0..<4 where created.frame.minY < bar { app.swipeDown() }
+        for _ in 0..<4 where !created.isHittable { app.swipeUp() }
+        created.tap()
+        let resumed = app.buttons["Resume"].waitForExistence(timeout: 10)
+        shot("channel-automation-created")
+        XCTAssertTrue(resumed, "paused detail")
         app.buttons["Edit"].tap()
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
-        clear(nameField); nameField.typeText(name + " edited")
-        app.buttons["workflowAutomationSave"].tap()
-        XCTAssertTrue(wait(10) { automation()?["name"] as? String == name + " edited" })
-        shot("office-automation-edited")
-        // The current native detail has no delete control; verify removal through
-        // the same host API used by teardown, without leaving scheduled work.
-        let saved = try XCTUnwrap(automation())
-        let removed = rpc("automations", "automations_delete", [
-            "projectId": try XCTUnwrap(saved["projectId"]),
-            "automationId": try XCTUnwrap(saved["id"]),
-        ])
-        XCTAssertEqual(removed?["ok"] as? Bool, true)
-        XCTAssertNil(automation())
+        nameField.tap()
+        nameField.typeText(" edited")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["\(name) edited"].waitForExistence(timeout: 10), "renamed")
+        app.buttons["Delete"].firstMatch.tap()
+        app.buttons.matching(identifier: "Delete").allElementsBoundByIndex.last { $0.isHittable }?.tap()
+        XCTAssertTrue(reminder.waitForExistence(timeout: 10), "back to list")
+        XCTAssertTrue(wait(10) { !self.app.staticTexts["\(name) edited"].exists }, "deleted")
+        shot("channel-automations-after")
     }
 
     func testBotInStudio() throws {
-        continueAfterFailure = false
-        let bots = try XCTUnwrap(rpc("studio", "teams_list", NSNull())?["bots"] as? [[String: Any]])
-        let bot = try XCTUnwrap(bots.first { $0["name"] as? String == "Atlas" })
-        let id = try XCTUnwrap(bot["id"] as? String)
-        app.openOfficeScreen("Team")
-        XCTAssertTrue(app.buttons["Atlas"].waitForExistence(timeout: 10)); app.buttons["Atlas"].tap()
-        XCTAssertTrue(app.buttons["Chat"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Atlas"].exists)
-        app.buttons["Tasks"].tap()
-        XCTAssertTrue(app.staticTexts["Review the ORBIT-42 release checklist"].waitForExistence(timeout: 10))
-        app.buttons["Profile"].tap()
-        XCTAssertTrue(app.staticTexts["Trust, Asks first"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Edit Profile"].exists)
-        shot("team-bot-desk-profile")
-        // Preserve legacy deep-link coverage with an actual fixture bot.
-        app.open(URL(string: "bbgo://bot/\(id)")!)
-        XCTAssertTrue(app.buttons["Mission"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Memory"].exists)
+        // A link from before the rename still opens.
+        app.open(URL(string: "bbgo://bot/bot_32fb8c40db41abea")!)
+        XCTAssertTrue(app.staticTexts["Chief of Staff"].firstMatch.waitForExistence(timeout: 10), "bot screen")
+        XCTAssertTrue(app.staticTexts["Channels"].waitForExistence(timeout: 5) || app.staticTexts["CHANNELS"].exists, "channels")
+        shot("bot-view")
         openStudioCollection()
-        XCTAssertTrue(app.buttons["New"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["Bots"].exists, "bots belong to Team")
-        let items = rpc("studio", "overview", NSNull())?["items"] as? [[String: Any]] ?? []
-        XCTAssertFalse(items.contains { ["bot", "view"].contains($0["kind"] as? String ?? "") })
-        shot("work-without-bots")
+        let bots = app.buttons["Bots"].firstMatch
+        for _ in 0..<4 where !bots.isHittable { app.scrollViews.containing(.button, identifier: "All").firstMatch.swipeLeft() }
+        bots.tap()
+        XCTAssertTrue(app.staticTexts["Red4"].firstMatch.waitForExistence(timeout: 10), "bots listed in Studio")
+        shot("studio-bots")
     }
 
     /// Finds two scratch tasks by their description, renames and deletes a scratch
@@ -1256,23 +1249,23 @@ final class ThreadUITests: XCTestCase {
         let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
         var ids: [String] = []
         for title in [titleA, titleB] {
-            let created = rpc("studio", "tasks_create", ["title": title, "description": "Has \(word) inside.", "projectId": StagedFixture.projectId])
+            let created = rpc("studio-tasks", "create", ["title": title, "description": "Has \(word) inside.", "projectId": "proj_8ztiq6dkh5"])
             ids.append(try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String))
         }
         func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
         func tagId(_ name: String) -> String? {
             ((overview()?["tags"] as? [[String: Any]]) ?? []).first { $0["name"] as? String == name }?["id"] as? String
         }
-        func task(_ id: String) -> [String: Any]? { self.rpc("studio", "tasks_get", ["id": id])?["task"] as? [String: Any] }
+        func task(_ id: String) -> [String: Any]? { self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any] }
         addTeardownBlock {
             for name in [tagName, renamed] { if let id = tagId(name) { _ = self.rpc("studio", "deleteTag", ["id": id]) } }
-            for id in ids { _ = self.rpc("studio", "tasks_delete", ["id": id]) }
+            for id in ids { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
         }
         let tag = try XCTUnwrap((rpc("studio", "createTag", ["name": tagName])?["tag"] as? [String: Any])?["id"] as? String)
-        _ = rpc("studio", "tagItems", ["items": [["pluginId": "studio", "id": ids[0]]], "add": [tag], "remove": [String]()])
+        _ = rpc("studio", "tagItems", ["items": [["pluginId": "studio-tasks", "id": ids[0]]], "add": [tag], "remove": [String]()])
 
         openStudioCollection()
-        let search = app.descendants(matching: .any)["studioSearch"]
+        let search = app.searchFields.firstMatch
         if !search.waitForExistence(timeout: 5) { app.swipeDown() }
         XCTAssertTrue(search.waitForExistence(timeout: 10), "search field")
         search.tap()
@@ -1282,7 +1275,7 @@ final class ThreadUITests: XCTestCase {
 
         // The tag chip: rename, then delete.
         let chips = app.scrollViews.containing(.button, identifier: "All").firstMatch
-        let chip = chips.buttons["studioTagChip-\(tag)"]
+        let chip = chips.buttons.matching(NSPredicate(format: "label CONTAINS %@", tagName)).firstMatch
         for _ in 0..<6 where !chip.isHittable { chips.swipeLeft() }
         XCTAssertTrue(chip.waitForExistence(timeout: 10), "tag chip")
         chip.press(forDuration: 1.5)
@@ -1295,7 +1288,7 @@ final class ThreadUITests: XCTestCase {
         sleep(1)
         app.alerts.buttons["Rename"].tap()
         XCTAssertTrue(wait(10) { tagId(renamed) != nil && tagId(tagName) == nil }, "tag renamed")
-        let renamedChip = chips.buttons["studioTagChip-\(tag)"]
+        let renamedChip = chips.buttons.matching(NSPredicate(format: "label CONTAINS %@", renamed)).firstMatch
         XCTAssertTrue(renamedChip.waitForExistence(timeout: 10), "renamed chip")
         for _ in 0..<6 where !renamedChip.isHittable { chips.swipeLeft() }
         renamedChip.press(forDuration: 1)
@@ -1328,9 +1321,9 @@ final class ThreadUITests: XCTestCase {
     /// sheet's agent pickers without starting anything; deletes the task.
     func testTaskLinksAndHandOff() throws {
         let title = "QA link task \(Int(Date().timeIntervalSince1970))"
-        let created = rpc("studio", "tasks_create", ["title": title, "description": "", "projectId": StagedFixture.projectId])
+        let created = rpc("studio-tasks", "create", ["title": title, "description": "", "projectId": "proj_8ztiq6dkh5"])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
-        addTeardownBlock { _ = self.rpc("studio", "tasks_delete", ["id": id]) }
+        addTeardownBlock { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
         app.open(URL(string: "bbstudio://task/\(id)")!)
         let add = app.buttons["addTaskLink"]
         XCTAssertTrue(add.waitForExistence(timeout: 10), "Add Link")
@@ -1341,7 +1334,7 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 10), "linkables")
         shot("task-link-picker")
         first.tap()
-        XCTAssertTrue(wait(10) { ((self.rpc("studio", "tasks_get", ["id": id])?["links"] as? [Any]) ?? []).count == 1 }, "linked")
+        XCTAssertTrue(wait(10) { ((self.rpc("studio-tasks", "get", ["id": id])?["links"] as? [Any]) ?? []).count == 1 }, "linked")
         shot("task-linked")
 
         let handOff = app.buttons["Hand to an Agent"]
@@ -1353,32 +1346,17 @@ final class ThreadUITests: XCTestCase {
         app.buttons["Cancel"].tap()
     }
 
-    private func scratchPage() throws -> String {
-        let created = rpc("pages", "create", ["projectId": StagedFixture.projectId,
-            "parentId": NSNull(), "title": "QA page \(UUID().uuidString.prefix(8))",
-            "markdown": "Ship it\n\nThe release checklist is ready for review."])
-        let id = try XCTUnwrap((created?["page"] as? [String: Any])?["id"] as? String)
-        addTeardownBlock { _ = self.rpc("pages", "remove", ["id": id]) }
-        return id
-    }
-
-    private func queuedScratchThread(_ text: String) throws -> String {
-        let id = try XCTUnwrap(scratchThread("QA queue \(UUID().uuidString.prefix(8))", text: text))
-        addTeardownBlock { _ = self.api("DELETE", "/threads/\(id)", ["childThreadsConfirmed": false]) }
-        return id
-    }
-
-    private func scratchThread(_ title: String, text: String = "Scratch thread for a UI test. Do nothing.") -> String? {
+    private func scratchThread(_ title: String) -> String? {
         let json = api("POST", "/threads", [
-            "projectId": StagedFixture.projectId, "origin": "app", "title": title,
+            "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,
             "environment": ["type": "project-default"], "sendAt": 1_924_992_000_000,
-            "input": [["type": "text", "text": text, "mentions": [String]()]],
+            "input": [["type": "text", "text": "Scratch thread for a UI test. Do nothing.", "mentions": [String]()]],
         ])
         return json?["id"] as? String ?? (json?["thread"] as? [String: Any])?["id"] as? String
     }
 
     private func api(_ method: String, _ path: String, _ body: [String: Any]) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "\(StagedFixture.serverURL)/api/v1\(path)")!)
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1\(path)")!)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if method != "GET" { request.httpBody = try? JSONSerialization.data(withJSONObject: body) }

@@ -8,6 +8,6 @@ describe("table links", () => {
     expect(parseTableSubPath(tableSubPath(target))).toEqual(target);
     expect(parseTableSubPath("tbl_1")).toEqual({ tableId: "tbl_1" });
     expect(parseTableSubPath("")).toBeNull();
-    expect(tableHref({ tableId: "tbl_1", rowId: "row_3" })).toBe("/plugins/studio/tables/tbl_1/row/row_3");
+    expect(tableHref({ tableId: "tbl_1", rowId: "row_3" })).toBe("/plugins/studio-tables/tables/tbl_1/row/row_3");
   });
 });

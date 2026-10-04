@@ -1,8 +1,8 @@
 [
   {
     "id": "talk-create",
-    "plugin": "studio",
-    "method": "talk_recording_create",
+    "plugin": "talk",
+    "method": "recording_create",
     "input": {
       "kind": "dictation",
       "projectId": null,
@@ -32,8 +32,8 @@
   },
   {
     "id": "talk-segment",
-    "plugin": "studio",
-    "method": "talk_segment_put",
+    "plugin": "talk",
+    "method": "segment_put",
     "input": {
       "recordingId": "rec_aaaaaaaa",
       "sessionId": "session01",
@@ -49,8 +49,8 @@
   },
   {
     "id": "talk-read",
-    "plugin": "studio",
-    "method": "talk_recording_get",
+    "plugin": "talk",
+    "method": "recording_get",
     "input": {
       "id": "rec_aaaaaaaa"
     },
@@ -96,8 +96,8 @@
   },
   {
     "id": "task-fields",
-    "plugin": "studio",
-    "method": "tasks_update",
+    "plugin": "studio-tasks",
+    "method": "update",
     "input": {
       "id": "tsk_contract",
       "priority": "high",
@@ -113,8 +113,8 @@
   },
   {
     "id": "task-create",
-    "plugin": "studio",
-    "method": "tasks_create",
+    "plugin": "studio-tasks",
+    "method": "create",
     "input": {
       "title": "Contract task",
       "description": "Task body",
@@ -156,8 +156,8 @@
   },
   {
     "id": "task-handoff",
-    "plugin": "studio",
-    "method": "tasks_handOff",
+    "plugin": "studio-tasks",
+    "method": "handOff",
     "input": {
       "id": "tsk_contract",
       "projectId": null,
@@ -173,8 +173,8 @@
   },
   {
     "id": "bot-document",
-    "plugin": "studio",
-    "method": "teams_saveDocument",
+    "plugin": "bot-teams",
+    "method": "saveDocument",
     "input": {
       "id": "bot_aaaaaaaaaaaaaaaa",
       "file": "MEMORY.md",
@@ -188,8 +188,8 @@
   },
   {
     "id": "bot-send",
-    "plugin": "studio",
-    "method": "teams_viewSend",
+    "plugin": "bot-teams",
+    "method": "viewSend",
     "input": {
       "id": "11111111-1111-4111-8111-111111111111",
       "text": "Review this",
@@ -222,8 +222,8 @@
   },
   {
     "id": "table-read",
-    "plugin": "studio",
-    "method": "tables_get",
+    "plugin": "studio-tables",
+    "method": "get",
     "input": {
       "id": "tbl_contract"
     },
@@ -270,8 +270,8 @@
   },
   {
     "id": "feed-list",
-    "plugin": "studio",
-    "method": "feed_list",
+    "plugin": "feed",
+    "method": "list",
     "input": {
       "limit": 40,
       "cursor": "older",
@@ -315,8 +315,8 @@
   },
   {
     "id": "chat-start",
-    "plugin": "studio",
-    "method": "chat_start",
+    "plugin": "studio-chat",
+    "method": "start",
     "input": {
       "item": {
         "pluginId": "pages",
@@ -363,9 +363,7 @@
             "proj_personal"
           ],
           "createdAt": 1,
-          "updatedAt": 2,
-          "color": "#3b82f6",
-          "position": 0
+          "updatedAt": 2
         }
       ]
     }
@@ -390,9 +388,7 @@
           "proj_personal"
         ],
         "createdAt": 1,
-        "updatedAt": 2,
-        "color": "#3b82f6",
-        "position": 0
+        "updatedAt": 2
       }
     }
   },
@@ -418,9 +414,7 @@
           "proj_personal"
         ],
         "createdAt": 1,
-        "updatedAt": 2,
-        "color": "#3b82f6",
-        "position": 0
+        "updatedAt": 2
       }
     }
   },
@@ -455,9 +449,7 @@
           "proj_personal"
         ],
         "createdAt": 1,
-        "updatedAt": 2,
-        "color": "#3b82f6",
-        "position": 0
+        "updatedAt": 2
       }
     }
   },
@@ -470,7 +462,6 @@
     },
     "output": {
       "settings": {
-        "todayArchiveAfter": "3d",
         "enabledItemKinds": null,
         "defaultTrust": "ask",
         "defaultBotModel": null
@@ -491,7 +482,6 @@
     },
     "output": {
       "settings": {
-        "todayArchiveAfter": "3d",
         "enabledItemKinds": null,
         "defaultTrust": "ask",
         "defaultBotModel": null
@@ -547,9 +537,7 @@
           "proj_personal"
         ],
         "createdAt": 1,
-        "updatedAt": 2,
-        "color": "#3b82f6",
-        "position": 0
+        "updatedAt": 2
       },
       "folders": [
         {

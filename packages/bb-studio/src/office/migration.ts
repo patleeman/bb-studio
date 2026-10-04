@@ -1,5 +1,4 @@
 import type Database from "better-sqlite3";
-import { SPACE_COLORS } from "./space-colors";
 
 export const PERSONAL_PROJECT_ID = "proj_personal";
 export interface LegacyMember { pluginId: string; id: string }
@@ -83,21 +82,4 @@ export function migrateOfficeSpaces(db: Database.Database, options: SpaceMigrati
     db.prepare("INSERT INTO office_migrations VALUES ('space-root-v1', ?)").run(now);
   })();
   for (const message of conflicts) options.logConflict(message);
-  spreadSpaceColors(db, options.now ?? Date.now());
-}
-
-/**
- * Spaces were made with one stock blue. Once, give each Space still on it its
- * own color from the palette, in the footer's order, so they read apart. Runs
- * on every start (it is a no-op after the first), since installs that
- * migrated before it existed skip migrateOfficeSpaces.
- */
-export function spreadSpaceColors(db: Database.Database, now = Date.now()): void {
-  db.transaction(() => {
-    if (db.prepare("SELECT 1 FROM office_migrations WHERE id = 'space-colors-v1'").get()) return;
-    const spaces = db.prepare("SELECT id, color FROM spaces ORDER BY is_default DESC, name COLLATE NOCASE, id").all() as { id: string; color: string }[];
-    const put = db.prepare("UPDATE spaces SET color = ? WHERE id = ?");
-    spaces.forEach((space, index) => { if (space.color === SPACE_COLORS[0]) put.run(SPACE_COLORS[index % SPACE_COLORS.length], space.id); });
-    db.prepare("INSERT INTO office_migrations VALUES ('space-colors-v1', ?)").run(now);
-  })();
 }

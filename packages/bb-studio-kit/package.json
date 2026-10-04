@@ -18,12 +18,7 @@
     "./table-grid": "./src/tables/grid/index.ts",
     "./app": "./src/app/index.ts",
     "./ui": "./src/ui/index.ts",
-    "./ui/huge-icon": "./src/ui/huge-icon.tsx",
-    "./modules/import": "./src/modules/import.ts",
-    "./modules/settings": "./src/modules/settings.ts",
-    "./modules/agents": "./src/modules/agents.ts",
-    "./modules/services": "./src/modules/services.ts",
-    "./modules/refs": "./src/modules/refs.ts"
+    "./ui/huge-icon": "./src/ui/huge-icon.tsx"
   },
   "scripts": {
     "test": "vitest run --config vitest.config.mts",
@@ -60,7 +55,6 @@
     "react": "19.2.4",
     "sonner": "^1.7.4",
     "typescript": "^5.7.0",
-    "vitest": "4.1.1",
-    "@types/better-sqlite3": "^7.6.13"
+    "vitest": "4.1.1"
   }
 }

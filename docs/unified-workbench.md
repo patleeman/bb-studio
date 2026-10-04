@@ -183,11 +183,11 @@ The compact-layout implementation and capture definitions are pushed in
 Live captures on stable BB 0.45.0, with all 17 plugins installed from 786fd2f,
 pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
 [Draw](../packages/bb-studio-draw/assets/compact-header.png),
-[Artifacts](../packages/bb-studio/src/modules/artifacts/assets/compact-header.png),
-[Talk](../packages/bb-studio/src/modules/talk/assets/compact-header.png),
-[Tables](../packages/bb-studio/src/modules/tables/assets/compact-header.png),
-[Tasks](../packages/bb-studio/src/modules/tasks/assets/compact-header.png), and
-[Teams](../packages/bb-studio/src/modules/teams/assets/compact-header.png).
+[Artifacts](../packages/bb-studio-artifacts/assets/compact-header.png),
+[Talk](../packages/bb-studio-talk/assets/compact-header.png),
+[Tables](../packages/bb-studio-tables/assets/compact-header.png),
+[Tasks](../packages/bb-studio-tasks/assets/compact-header.png), and
+[Teams](../packages/bb-studio-teams/assets/compact-header.png).
 Each checks the primary Chat action, every visible header button's bounds
 and hit target, page overflow, and the Related popover at 390 by 844 pixels.
 Visual review caught Tables' sticky grid header covering Export and More;
@@ -198,7 +198,7 @@ Explore now registers shared companion views for its explainers and lists.
 Finding rows and the thread launcher use that policy; the legacy thread panel
 remains available without Float. Open in Pages now targets Pages rather than
 the owner-only SDK panel route. Its 67 tests and typecheck pass. The repeatable
-stable BB 0.45.0 [companion capture](../packages/bb-studio-pages/src/explore/assets/companion-preview.png)
+stable BB 0.45.0 [companion capture](../packages/bb-studio-explore/assets/companion-preview.png)
 uses Explore from pushed 6d900de with the suite installed from 786fd2f. Seeded
 writing/ready job states verify both list routes, progress becoming the saved
 document, destination reuse, exact iframe and scroll retention after switching
@@ -213,8 +213,8 @@ installed from `258d801`, now checks the current handoff, earlier handoff and
 linked discussion from the real task page. It verifies one companion per
 destination, the unchanged main task, and exact reply draft/attachment DOM
 retention after returning and folding. The
-[desktop](../packages/bb-studio/src/modules/tasks/assets/companion-handoffs.png) and
-[phone](../packages/bb-studio/src/modules/tasks/assets/companion-handoffs-mobile.png)
+[desktop](../packages/bb-studio-tasks/assets/companion-handoffs.png) and
+[phone](../packages/bb-studio-tasks/assets/companion-handoffs-mobile.png)
 screenshots are visually checked; all phone composer controls fit at 390 by
 844 pixels. Deterministic handoff rows and scheduled threads seed the workflow;
 all fixtures are deleted without running agents.
@@ -228,7 +228,7 @@ The created conversations contain their task context and the agent's edited
 note. This exposed two fixed bugs: a missing host ID during ordinary handoff,
 and bot reuse depending on a mutable human link label. All 60 Tasks tests,
 typecheck and build pass. The
-[dispatch screenshot](../packages/bb-studio/src/modules/tasks/assets/companion-dispatch.png)
+[dispatch screenshot](../packages/bb-studio-tasks/assets/companion-dispatch.png)
 is visually checked. Brief fixture agent turns run; cleanup deletes their
 tasks, board and threads and retires the temporary bot.
 
@@ -245,7 +245,7 @@ Artifacts from 902d642.
 It verifies conversation linking/reuse, exact native composer and attachment
 retention through real sidebar navigation, a second item draft and folding,
 and a cropped image quote whose image, edited prompt, and file attachment
-return after a browser reload. The [screenshot](../packages/bb-studio/src/modules/chat/assets/staged-preview.png)
+return after a browser reload. The [screenshot](../packages/bb-studio-chat/assets/staged-preview.png)
 is visually checked. The workflow caught and fixed a server-only SDK import
 in the frontend and a quote card whose controls were behind Float. Artifacts'
 53 tests, typecheck, and build pass; the capture verifies the quote controls'
@@ -255,7 +255,7 @@ also checks the recovered image quote at 390 by 844 pixels. Its crop, edited
 prompt and attachment remain intact, resizing retains the exact native
 composer, and every visible composer button and image stays in the viewport
 with an unobstructed hit target. The
-[phone screenshot](../packages/bb-studio/src/modules/chat/assets/quote-mobile.png) is
+[phone screenshot](../packages/bb-studio-chat/assets/quote-mobile.png) is
 visually checked. The capture now waits for the new document after reload,
 preventing an old composer from satisfying the recovery assertion.
 
@@ -290,8 +290,8 @@ returns. Talk's 127 tests, typecheck and build pass. The stable BB 0.45.0
 capture uses source `b52d193` with the compact-controls fix `fb4ca80`. It checks
 the saved recording's thread/project, exact native draft and attachment DOM,
 one tab per destination, and an unchanged main page after both return flows.
-The [desktop](../packages/bb-studio/src/modules/talk/assets/companion-dictation.png) and
-[phone](../packages/bb-studio/src/modules/talk/assets/companion-dictation-mobile.png)
+The [desktop](../packages/bb-studio-talk/assets/companion-dictation.png) and
+[phone](../packages/bb-studio-talk/assets/companion-dictation-mobile.png)
 screenshots are visually checked. At 390 by 844 pixels, every visible Talk
 control stays inside the viewport; clipped inline controls fall back to the
 floating pill. All staged recordings, threads and pages are removed without
@@ -404,7 +404,7 @@ verified commits. Legacy-host transfers, playback continuity, native desktop
 Reactions menu QA, and the final suite audit remain open.
 
 
-Talk playback continuity now has [live proof](../packages/bb-studio/src/modules/talk/assets/companion-playback.png)
+Talk playback continuity now has [live proof](../packages/bb-studio-talk/assets/companion-playback.png)
 on the same isolated current host. Real seeded audio retains its exact audio
 object and control nodes through Float, workbench/main moves, navigation
 away, and returning after close. Position advances without restart; speed and

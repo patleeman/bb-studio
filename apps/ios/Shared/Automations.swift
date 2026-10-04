@@ -36,11 +36,6 @@ public struct Automation: Decodable, Identifiable, Hashable, Sendable {
     public var lastRunThreadId: String?
     public var lastError: String?
 
-    /// Stable BB requires a positive integer number of milliseconds.
-    public static func onceTrigger(at date: Date) -> JSONValue {
-        ["triggerType": "once", "runAt": .number((date.timeIntervalSince1970 * 1000).rounded(.down))]
-    }
-
     public var schedule: String {
         switch trigger.triggerType {
         case "once":
@@ -141,11 +136,11 @@ extension BBClient {
     }
 
     public func createAutomation(projectId: String, name: String, prompt: String, trigger: JSONValue,
-                                 execution: ExecutionChoice, enabled: Bool = true) async throws -> Automation {
+                                 execution: ExecutionChoice) async throws -> Automation {
         let provider = execution.providerId ?? ""
         let model = execution.model ?? ""
         let body: JSONValue = [
-            "projectId": .string(projectId), "name": .string(name), "enabled": .bool(enabled),
+            "projectId": .string(projectId), "name": .string(name), "enabled": true,
             "trigger": trigger, "origin": "app",
             "execution": ["mode": "agent", "prompt": .string(prompt), "providerId": .string(provider),
                           "model": .string(model), "reasoningLevel": .string(execution.reasoningLevel ?? "medium"),

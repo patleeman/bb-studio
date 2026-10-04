@@ -1,0 +1,173 @@
+// Names, statuses and labels the server and the app share.
+import type { StudioTone } from "@bb-studio/kit/contract";
+
+export const PLUGIN_ID = "studio-tasks";
+/** The nav panel: /plugins/studio-tasks/tasks lists boards; tasks/<id> is a board or a task. */
+export const PANEL_PATH = "tasks";
+export const TASK_ICON = "studio-tasks/task";
+export const BOARD_ICON = "studio-tasks/board";
+/** Realtime channel: the server says when a task changed. */
+export const REALTIME_CHANNEL = "tasks";
+export const TASK_UPDATE_TYPE = "task:updated";
+
+export const STATUSES = ["todo", "in_progress", "review", "done"] as const;
+export type TaskStatus = (typeof STATUSES)[number] | (string & {});
+export const PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
+export type Priority = (typeof PRIORITIES)[number];
+export const RECURRENCES = ["daily", "weekly", "monthly", "weekdays"] as const;
+export type Recurrence = (typeof RECURRENCES)[number];
+
+export const STATUS_LABELS: Record<string, string> = {
+  todo: "To do",
+  in_progress: "In progress",
+  review: "Review",
+  done: "Done",
+};
+
+export function isStatus(value: unknown): value is (typeof STATUSES)[number] {
+  return typeof value === "string" && (STATUSES as readonly string[]).includes(value);
+}
+
+/** Who a task is for: you, an agent (through a handoff), or nobody yet. */
+export type Assignee = "me" | "agent" | string | null;
+
+/**
+ * Where a handed-off thread stands. The task's status follows it, and the
+ * card shows its label so it's clear who acts next.
+ */
+export const HANDOFF_STATES = ["starting", "working", "needs-input", "replied", "ready", "failed", "archived", "deleted"] as const;
+export type HandoffState = (typeof HANDOFF_STATES)[number];
+
+export const HANDOFF_LABELS: Record<HandoffState, string> = {
+  starting: "Starting agent",
+  working: "Agent working",
+  "needs-input": "Agent needs your input",
+  replied: "Agent replied, check its answer",
+  ready: "Agent says it's ready for review",
+  failed: "Agent failed",
+  archived: "Thread archived",
+  deleted: "Thread deleted",
+};
+
+/** The short form for cards. */
+export const HANDOFF_SHORT: Record<HandoffState, string> = {
+  starting: "Starting",
+  working: "Agent working",
+  "needs-input": "Needs your input",
+  replied: "Agent replied",
+  ready: "Ready for review",
+  failed: "Agent failed",
+  archived: "Thread archived",
+  deleted: "Thread deleted",
+};
+
+export const HANDOFF_TONES: Record<HandoffState, StudioTone> = {
+  starting: "progress",
+  working: "live",
+  "needs-input": "warning",
+  replied: "success",
+  ready: "success",
+  failed: "danger",
+  archived: "neutral",
+  deleted: "neutral",
+};
+
+/** A handoff whose thread still exists and can change the task. */
+export function isOpenHandoff(state: HandoffState): boolean {
+  return state !== "archived" && state !== "deleted";
+}
+
+export function taskHref(id: string): string {
+  return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}`;
+}
+
+/** The ways a board shows its tasks; the board itself is the default. */
+export const BOARD_VIEWS = ["board", "list", "calendar"] as const;
+export type BoardView = (typeof BOARD_VIEWS)[number];
+
+/** A board, or one of its views: `tasks/<board id>/list`. */
+export function boardHref(id: string, view: BoardView = "board"): string {
+  return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}${view === "board" ? "" : `/${view}`}`;
+}
+
+/** Where each Studio add-on shows an item, for links an agent adds by id. */
+const ITEM_PANELS: Record<string, string> = { pages: "pages", talk: "recordings", excalidraw: "drawings", artifacts: "artifacts" };
+
+export function studioHref(pluginId: string, itemId: string): string | null {
+  const panel = ITEM_PANELS[pluginId];
+  return panel ? `/plugins/${pluginId}/${panel}/${encodeURIComponent(itemId)}` : null;
+}
+
+const ID = /^tsk_[0-9a-z]{16}$/;
+const BOARD_ID = /^brd_[0-9a-z]{16}$/;
+
+export function isTaskId(value: string): boolean {
+  return ID.test(value);
+}
+
+export function isBoardId(value: string): boolean {
+  return BOARD_ID.test(value);
+}
+
+/** A status id for a new column, from its name: unique, and the shape the server accepts. */
+export function columnId(label: string, columns: readonly { id: string }[]): string {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 50);
+  const base = /^[a-z]/.test(slug) ? slug : `column_${slug}`.replace(/_+$/, "");
+  const taken = new Set(columns.map((column) => column.id));
+  let id = base;
+  for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
+  return id;
+}
+
+/** A due date is a day, "2026-10-01". */
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isDay(value: string): boolean {
+  if (!DAY.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
+}
+
+/** Today in local time, as a day. */
+export function today(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** "Today", "Tomorrow", "Yesterday", "Oct 3", or "Oct 3, 2027" in another year. */
+export function formatDue(day: string, now = new Date()): string {
+  const current = today(now);
+  const offset = dayNumber(day) - dayNumber(current);
+  if (offset === 0) return "Today";
+  if (offset === 1) return "Tomorrow";
+  if (offset === -1) return "Yesterday";
+  const date = new Date(`${day}T12:00:00`);
+  const sameYear = day.slice(0, 4) === current.slice(0, 4);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+}
+
+/** Past due and not done. */
+export function isOverdue(day: string | null, status: TaskStatus, now = new Date()): boolean {
+  return day !== null && status !== "done" && day < today(now);
+}
+
+function dayNumber(day: string): number {
+  return Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
+}
+
+/** Advance from the previous due day, skipping weekends for weekday tasks. */
+export function nextDue(day: string, recurrence: Recurrence): string {
+  const date = new Date(`${day}T12:00:00Z`);
+  if (recurrence === "monthly") {
+    const dayOfMonth = date.getUTCDate();
+    date.setUTCDate(1);
+    date.setUTCMonth(date.getUTCMonth() + 1);
+    const last = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+    date.setUTCDate(Math.min(dayOfMonth, last));
+  }
+  else {
+    date.setUTCDate(date.getUTCDate() + (recurrence === "weekly" ? 7 : 1));
+    if (recurrence === "weekdays") while (date.getUTCDay() === 0 || date.getUTCDay() === 6) date.setUTCDate(date.getUTCDate() + 1);
+  }
+  return date.toISOString().slice(0, 10);
+}

@@ -294,7 +294,7 @@ struct EmbedCard: View {
     @ObservedObject private var studio = StudioStore.shared
 
     /// Embeds of other add-ons' items, by the add-on that makes them.
-    private static let studioPlugins = ["drawing": "excalidraw", "artifact": "studio", "recording": "studio", "task": "studio"]
+    private static let studioPlugins = ["drawing": "excalidraw", "artifact": "artifacts", "recording": "talk", "task": "studio-tasks"]
 
     var body: some View {
         let target = embed.target ?? embed.url ?? embed.id ?? ""
@@ -376,9 +376,7 @@ struct EmbedCard: View {
         switch ref.pluginId {
         case "excalidraw": .drawing(id: ref.id)
         case "artifacts": .artifact(id: ref.id)
-        case "studio" where ref.id.hasPrefix("art_"): .artifact(id: ref.id)
         case "talk": .recording(id: ref.id)
-        case "studio" where ref.id.hasPrefix("rec_"): .recording(id: ref.id)
         case "pages": .page(id: ref.id)
         default: nil
         }

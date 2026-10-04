@@ -8,7 +8,7 @@ import { untitled } from "../format";
 import { discoverProviderSnapshot, fanOutProviders, loadProviderItems } from "./discovery";
 
 /** The Studio add-ons, in the order their items are offered. */
-export const STUDIO_SUITE = ["excalidraw", "artifacts", "talk", "pages", "studio"];
+export const STUDIO_SUITE = ["studio-tasks", "excalidraw", "artifacts", "talk", "pages", "studio-tables"];
 const FRESH_MS = 5_000;
 const MAX_ITEMS = 500;
 
@@ -57,7 +57,7 @@ export function studioIndex(sdk: BbPluginApi["sdk"], studio: StudioSchemas, opti
   const previous = new Map<string, StudioIndexItem[]>();
 
   async function load(): Promise<Snapshot> {
-    const discovery = await discoverProviderSnapshot(sdk, { method: "studio_list", known: STUDIO_SUITE, exclude: options.exclude ?? [] });
+    const discovery = await discoverProviderSnapshot(sdk, { method: "studio_list", known: STUDIO_SUITE, exclude: ["studio", ...(options.exclude ?? [])] });
     const installed = new Set(discovery.installed.map((plugin) => plugin.id));
     const discovered = new Set(discovery.providers.map((plugin) => plugin.id));
     for (const id of previous.keys()) if (!installed.has(id) || (discovery.complete && !discovered.has(id))) previous.delete(id);

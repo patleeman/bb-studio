@@ -1,5 +1,3 @@
-import { registerPagesWithExplore } from "./src/explore/integration";
-import { migratePageModuleRefs } from "./src/module-refs";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { readFile } from "node:fs/promises";
@@ -27,7 +25,7 @@ import { agentConfiguration, registerTools } from "./src/tools";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
-async function registerPages(bb: BbPluginApi) {
+export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
     snapshotsPerPage: {
       type: "number",
@@ -41,8 +39,6 @@ async function registerPages(bb: BbPluginApi) {
   settings.onChange((next) => { config = next; });
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
-  const rewritten = migratePageModuleRefs(db);
-  if (rewritten) bb.log.info(`Studio module references: rewrote ${rewritten} document nodes`);
   const store = new PageStore(db, () => config.snapshotsPerPage);
   const bots = new BotDirectory(bb);
   const service = new PagesService(bb, store, bots);
@@ -251,16 +247,16 @@ async function registerPages(bb: BbPluginApi) {
       const checkbox = pageCheckboxes(expected).find((row) => row.blockId === blockId.replace(/-/g, "").slice(0, 8));
       if (!checkbox) throw new Error("Select a checkbox block first.");
       if (checkbox.taskId) throw new Error("This checkbox already has a task.");
-      const result = await bb.sdk.plugins.callRpc({ pluginId: "studio", method: "tasks_create",
+      const result = await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "create",
         input: { title: checkbox.title, projectId: meta.project_id, status: checkbox.checked ? "done" : "todo" } as never,
         outputSchema: z.object({ task: z.object({ id: z.string() }) }) });
       try {
-        await bb.sdk.plugins.callRpc({ pluginId: "studio", method: "tasks_link",
+        await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "link",
           input: { id: result.task.id, link: { target: "item", pluginId: "pages", itemId: id, label: meta.title || "Page", href: `${pageUrl(id)}#${checkbox.blockId}` } } as never,
           outputSchema: z.object({ ok: z.boolean() }) });
-        service.editClientBlock(id, expected, checkbox.blockId, `${checkbox.line} [Task](item:studio:${result.task.id})`);
+        service.editClientBlock(id, expected, checkbox.blockId, `${checkbox.line} [Task](item:studio-tasks:${result.task.id})`);
       } catch (error) {
-        await bb.sdk.plugins.callRpc({ pluginId: "studio", method: "tasks_delete", input: { id: result.task.id } as never, outputSchema: z.object({ ok: z.boolean() }) }).catch(() => {});
+        await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "delete", input: { id: result.task.id } as never, outputSchema: z.object({ ok: z.boolean() }) }).catch(() => {});
         throw error;
       }
       return { taskId: result.task.id };
@@ -429,7 +425,7 @@ async function registerPages(bb: BbPluginApi) {
       studioNotifier.changed(event.pageId); syncLinks(event.pageId);
       const markdown = readMarkdown(service.hub.open(event.pageId).doc, { ids: true });
       for (const checkbox of pageCheckboxes(markdown).filter((row) => row.taskId).slice(0, 100)) {
-        void bb.sdk.plugins.callRpc({ pluginId: "studio", method: "tasks_syncCheckbox",
+        void bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "syncCheckbox",
           input: { id: checkbox.taskId!, checked: checkbox.checked } as never,
           outputSchema: z.object({ ok: z.boolean() }) }).catch(() => { /* Tasks may not be installed. */ });
       }
@@ -555,5 +551,3 @@ async function registerPages(bb: BbPluginApi) {
     service.dispose();
   });
 }
-
-export default async function plugin(bb: BbPluginApi) { await registerPagesWithExplore(bb, registerPages); }

@@ -70,13 +70,13 @@ try {
   id=table.id;
   const views = [{id:'qa-grid',name:'Grid QA',type:'table'}, {id:'qa-board',name:'Board QA',type:'board',groupBy:'status'}, {id:'qa-calendar',name:'Calendar QA',type:'calendar',dateBy:'date'}].map(view=>({groupBy:null,dateBy:null,filters:[],sorts:[],hidden:[],...view}));
   await pluginRpc('studio-tables','update',{id,views});
-  const base=`/plugins/studio/tables/${id}`;
+  const base=`/plugins/studio-tables/tables/${id}`;
   // Page.navigate is used once, outside all measurements. Every measured route stays in this document.
   await client.navigate(base);
   await settled(`document.querySelector('[data-cell="0:0"]')`);
   report.environment.document = await client.evaluate(`({timeOrigin:performance.timeOrigin,token:(window.__lifecycleToken=crypto.randomUUID())})`);
   const selectors={grid:`document.querySelector('[data-cell="0:0"]')`,board:`document.querySelector('section[aria-label="Ready"]')`,calendar:`document.querySelector('section[aria-label="Calendar"]')`,closed:`!document.querySelector('input[aria-label="Table title"]') && document.body.innerText.includes('Tables')`};
-  const path = kind => kind==='closed'?'/plugins/studio/tables':`${base}/view/qa-${kind}`;
+  const path = kind => kind==='closed'?'/plugins/studio-tables/tables':`${base}/view/qa-${kind}`;
   for (const kind of ['board','calendar','grid']) {
     const readyMs = await route(path(kind),selectors[kind]);
     const stats = {kind,readyMs,...await metrics()};

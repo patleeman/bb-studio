@@ -1,4 +1,3 @@
-import { absorbedPluginIds, rewriteLegacyText } from "./legacy-refs";
 /** Item IDs are opaque. Only URL path segments are URI-decoded. */
 export interface StudioReference { pluginId: string; id: string }
 export interface ReferenceProvider {
@@ -64,7 +63,7 @@ export function parseStudioItemHref(href: string, options: ReferenceOptions = {}
       path = url.pathname;
     } catch { return null; }
   }
-  for (const route of [...STUDIO_REFERENCE_ROUTES, ...STUDIO_REFERENCE_ROUTES.filter(route => (absorbedPluginIds as readonly string[]).includes(route.pluginId)).map(route => ({ ...route, pluginId: "studio", path: rewriteLegacyText(route.path) })), ...(options.routes ?? [])]) {
+  for (const route of [...STUDIO_REFERENCE_ROUTES, ...(options.routes ?? [])]) {
     if (!validPlugin(route.pluginId) || !route.path.startsWith(`/plugins/${route.pluginId}/`) || !route.path.endsWith("/") || !path.startsWith(route.path)) continue;
     try {
       const [id, ...suffix] = path.slice(route.path.length).split("/").map(decodeURIComponent);

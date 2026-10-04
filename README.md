@@ -1,90 +1,105 @@
 # BB Studio
 
-Your office in [BB](https://getbb.app), with a team of bots you can work with
-and delegate to. Keep your work in Spaces and folders. Talk to your team in
-DMs and channels. Read their reports and answer requests in one Inbox.
+A suite of [BB](https://getbb.app) plugins for writing, talking, drawing,
+tracking tasks, running bot teams, and keeping what your agents make. Every
+item lives in one Studio collection that you can search, tag, and hand to an
+agent.
 
-![BB Studio in a staged BB](packages/bb-studio/assets/staged-preview.png)
+![Live BB screenshot of the Studio collection](packages/bb-studio/assets/staged-preview.png)
 
-- **Spaces** separate your work, team, conversations, and settings. Each folder
-  is a BB project, with or without a Git repository.
-- **Work** holds your threads, pages, drawings, tables, task boards, recordings,
-  and files. Search them together and keep related work in the same folder.
-- **Team** gives each bot a role, memory, model, and trust level. Open a bot's
-  desk to chat or see its tasks.
-- **Delegate** a brief and relevant items to a bot. Its task keeps the progress
-  and outputs together, in the folder where the work belongs.
-- **Inbox** collects requests, reports, and comments. Choose one Space or
-  **All spaces**. Home shows what needs you, active work, reports, and recent items.
-- **Trust** is explicit: **Ask first** bots ask in your Inbox before changing
-  anything outside their own work; **Act and report** bots go ahead and tell
-  you what they did.
-
-## Six plugins
-
-| Plugin | ID | What it adds |
+| Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The office: Spaces, Work, Team, Talk, Inbox, delegation, tasks, tables, recordings, and artifacts. |
-| [Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages and Explore explainers. |
-| [Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you and your agents can edit. |
-| [Float](packages/bb-studio-float/) | `float` | Keep threads, conversations, and items open in a floating or docked panel. |
-| [Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions that draft quick replies. |
-| [Mobile](packages/bb-studio-mobile/) | `mobile` | Push notifications and server support for the iOS app. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. Home for what needs you today, plus one collection for pages, recordings, drawings, artifacts, tasks, tables and bots, with search, tags, project filters, templates and tabs. |
+| [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents. |
+| [Studio Explore](packages/bb-studio-explore/) | `explore` | Experimental. Agents end answers with things they noticed along the way; click one for a page explaining it. Needs Studio Pages. |
+| [Studio Feed](packages/bb-studio-feed/) | `feed` | One feed of what your agents report. An agent ends a reply with a `::post` line, from any thread, channel or automation; read it on desktop and phone and discuss any post. |
+| [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
+| [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
+| [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
+| [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | Boards of tasks you can hand to agents and embed in pages; each task follows its thread from working to review. |
+| [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
+| [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bot profiles and saved views of ordinary threads, with shared memory and missions. |
+| [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | One Chat action opens an item's linked conversation or a new composer. Choose or start another from its menu. |
+| [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, channel, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
+| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
+| [Studio Navigation](packages/bb-studio-navigation/) | `studio-navigation` | Replaces BB's sidebar navigation with one that leaves out the Studio rows Studio and Studio Sidebar already open. Rows from BB and other plugins stay. |
+| [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
+| [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread, and chooses recipients in Studio Teams views. |
+| [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
-Studio includes the former Sidebar, Navigation, Feed, Teams, Tasks, Artifacts,
-Chat, Tables, Talk recordings, and Decisions plugins. Explore is part of Pages.
-Pages and Draw also work on their own; their items join Work when Studio is installed.
-Bots and conversations have their own places in Team and Talk.
+Every add-on works on its own. With Studio installed, their items also appear in
+Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
+all. Studio Teams needs Studio Decisions to choose recipients in views, and Studio
+Explore needs Studio Pages.
+
+## iOS app
+
+[`apps/ios`](apps/ios/) is BB Studio for iPhone and Apple Watch: BB's threads,
+approvals, terminals and automations, plus native Studio, Pages, Talk, Draw,
+Artifacts, Tasks, Tables and Teams. It talks to your BB server and uses the plugins
+above; install `mobile` for push notifications. See its
+[README](apps/ios/README.md) to build it and ship it to TestFlight.
 
 ## Install
 
-Paste this into a BB thread:
+Requires BB 0.44 or later. Paste this prompt into a BB thread and your agent
+sets it up:
 
 ```text
 Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
 
-1. Add the marketplace with:
-   bb marketplace add git:github.com/patleeman/bb-studio@main
-   If bb marketplace list already shows bb-studio, use:
-   bb marketplace refresh bb-studio
-2. Install studio, pages, and excalidraw with:
-   bb plugin install <id>@bb-studio --yes
-   Ask whether I also want float (floating panels), emoji-react (quick replies),
-   and mobile (notifications for the iOS app), then install my choices.
-3. If I have the old separate Studio plugins, disable them first and reload
-   Studio and Pages so they import the old data and settings. Verify the import
-   before uninstalling the old plugins. Do not remove their data directories;
-   once I've checked my data, I can back them up and remove them from
-   Space settings → Old plugin data.
-4. Run bb plugin list, verify the selected plugins are running, and report
-   any failures with their errors. Show me Home and Inbox in the Studio sidebar.
+1. Add its marketplace: `bb marketplace add git:github.com/patleeman/bb-studio@main`.
+   If `bb marketplace list` already shows `bb-studio`, run
+   `bb marketplace refresh bb-studio` instead.
+2. Ask me whether to install all of these plugins or only some. List them with
+   a one-line description each:
+   - studio: the Studio collection; recommended, since the others plug into it
+   - pages: collaborative pages
+   - explore: Studio Explore (experimental); pages explaining what an agent
+     noticed along the way; needs pages
+   - feed: Studio Feed; one feed of what agents and automations post
+   - talk: dictation and voice recordings with transcripts
+   - excalidraw: Excalidraw drawings
+   - artifacts: keeps files your agents make
+   - studio-tasks: a task board you hand to agents
+   - studio-tables: structured tables with views and CSV import and export
+   - bot-teams: bot profiles and saved thread views
+   - studio-chat: Chat on Studio items, with New conversation and Choose conversation in its menu
+   - float: a panel of tabs for threads, views and Studio items, docked
+     or dragged anywhere
+   - thread-list-plus: Studio Sidebar; it replaces BB's thread list
+   - studio-navigation: Studio Navigation; it replaces BB's sidebar navigation
+     without the Studio rows that Studio and Studio Sidebar already open
+   - emoji-react: Studio Reactions; emoji reactions that draft quick replies
+   - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue and
+     Studio Teams routing; needed by bot-teams
+   - mobile: push notifications for the BB Studio iOS app; only if I use it
+3. Install each one I choose with `bb plugin install <id>@bb-studio --yes`.
+4. Run `bb plugin list`, confirm each installed plugin is running, and report
+   anything that failed with its error.
 ```
 
-You can also add `git:github.com/patleeman/bb-studio@main` in
-**Settings → Plugin marketplaces** and install from the store. The
-`@bb-studio` CLI suffix chooses this marketplace when another lists the same IDs.
-The plugins target stable BB; `pnpm check:compat` checks the current stable release.
+To do it yourself, add the marketplace in **Settings → Plugin marketplaces**
+with the source `git:github.com/patleeman/bb-studio@main` (or run the
+`bb marketplace add` command above), then install from the store or with
+`bb plugin install <id>@bb-studio`.
 
-### Upgrading from the 17-plugin layout
+The `@bb-studio` suffix matters if you have another marketplace that lists
+the same IDs. Without it, BB refuses the install and lists the choices.
 
-Disable the old plugins, then reload Studio and Pages. Imports preserve their
-items, settings, links, recordings, and bot homes. Verify the imported content
-before uninstalling the old plugins: uninstalling clears their host settings
-and secrets. Studio commands now use `bb studio <old-id> …`; Explore uses
-`bb pages explore …`.
+### Coming from patleeman/bb-plugins
 
-Old links in past thread transcripts and browser bookmarks may no longer open.
-Studio's own resolver accepts old item prefixes. Imported data stays in separate
-module databases; source files remain until you explicitly clean them up.
-See [legacy data cleanup](docs/legacy-data-cleanup.md) for previews, archives,
-and the directories that must remain in place.
+These plugins also ship in [patleeman/bb-plugins](https://github.com/patleeman/bb-plugins)
+for now, with the same IDs. BB won't move an installed plugin to a new source,
+so to switch one, remove it and install it from here:
 
-## iOS
+```sh
+bb plugin remove talk
+bb plugin install talk@bb-studio --yes
+```
 
-The [iPhone app](apps/ios/) has **Inbox**, **Home**, **Work**, and **Team** tabs.
-It connects to your BB server and uses the same Spaces, bots, tasks, and items.
-Install `mobile` for push notifications. See the [iOS README](apps/ios/README.md)
-for building and testing it, plus Apple Watch support.
+Your items (pages, recordings, drawings, tasks, bots) are kept, but removing a
+plugin deletes its settings and secrets, so note them first.
 
 ## Development
 
@@ -108,9 +123,9 @@ pnpm test
 pnpm check:compat        # every plugin installs on the current stable BB
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
-scripts/refresh-locks.sh bb-studio  # refresh a plugin npm lock in a clean clone
+scripts/refresh-locks.sh bb-studio-tasks  # refresh a plugin npm lock in a clean clone
 node scripts/staged-bb.mjs start         # stage the suite; stop removes it
-node scripts/staged-bb.mjs start --plugin studio # all plugins, only this capture's fixtures
+node scripts/staged-bb.mjs start --plugin studio-chat # all plugins, only this capture's fixtures
 ```
 
 The iOS app builds with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen)

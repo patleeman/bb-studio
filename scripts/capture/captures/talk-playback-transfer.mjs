@@ -1,12 +1,12 @@
 export default ({ projectId, seedTalkRecording, seedPages, talkRpc, sleep }) => ({
   id: "talk-playback-transfer",
-  packageDir: "bb-studio/src/modules/talk",
+  packageDir: "bb-studio-talk",
   fileName: "companion-playback.png",
   privateSidebar: true,
   setup: async (client) => {
     const recordingId = await seedTalkRecording(projectId, { transcribe: false, title: "Playback continuity check" });
     const page = await seedPages();
-    const path = `/plugins/studio/recordings/${recordingId}`;
+    const path = `/plugins/talk/recordings/${recordingId}`;
     const key = `path:${path}`;
     let previous = 0;
     const forget = async () => {

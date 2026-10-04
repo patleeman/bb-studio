@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
   props: new Map<string, any>(),
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
-  experimental_usePluginId: () => "studio",
+  experimental_usePluginId: () => "studio-chat",
   experimental_Icon: () => null,
   useRpc: () => state.rpc,
   useBbNavigate: () => state.navigate,
@@ -45,8 +45,8 @@ beforeEach(async () => {
   vi.clearAllMocks();
   state.submit.clear(); state.props.clear();
   state.rpc.call.mockImplementation(async method => {
-    if (method === "chat_subject") return { item };
-    if (method === "chat_start") return { threadId: "created" };
+    if (method === "subject") return { item };
+    if (method === "start") return { threadId: "created" };
     throw new Error(`Unexpected RPC ${method}`);
   });
   setFloatHost({ open, navigate });
@@ -85,20 +85,20 @@ describe("retained new-conversation tabs", () => {
   it("replaces only the originating composer tab when a background submission finishes", async () => {
     await anchor("first");
     let release!: (value: { threadId: string }) => void;
-    state.rpc.call.mockImplementation(method => method === "chat_start" ? new Promise(resolve => { release = resolve; }) : Promise.resolve({ item }));
+    state.rpc.call.mockImplementation(method => method === "start" ? new Promise(resolve => { release = resolve; }) : Promise.resolve({ item }));
     const request = { input: [{ type: "text", text: "Fix it" }] };
     let sending!: Promise<void>;
     await act(async () => { sending = state.submit.get("studio-chat:artifacts:first")!(request); });
     const second = document.createElement("div"); document.body.append(second);
     try {
-      await anchor("second", "/plugins/studio/chats", second);
+      await anchor("second", "/plugins/studio-chat/chats", second);
       const draft = second.querySelector("textarea")!; draft.value = "A different draft";
       await act(async () => { release({ threadId: "created" }); await sending; });
       expect(navigate).toHaveBeenCalledWith("first", { kind: "thread", threadId: "created" });
       expect(open).not.toHaveBeenCalled();
       expect(second.querySelector("textarea")).toBe(draft);
       expect(draft.value).toBe("A different draft");
-      expect(state.rpc.call).toHaveBeenCalledWith("chat_start", { item: ref, request });
+      expect(state.rpc.call).toHaveBeenCalledWith("start", { item: ref, request });
     } finally { second.remove(); }
   });
 
@@ -118,7 +118,7 @@ describe("retained new-conversation tabs", () => {
     expect(body.querySelector("textarea")).toBe(textarea);
     expect(body.textContent).toContain("Connection lost");
     await act(async () => { await state.submit.get(draftKey)!(request); });
-    expect(state.rpc.call).toHaveBeenLastCalledWith("chat_start", { item: ref, request: { input: [...request.input, { type: "image", url: quote.image }] } });
+    expect(state.rpc.call).toHaveBeenLastCalledWith("start", { item: ref, request: { input: [...request.input, { type: "image", url: quote.image }] } });
     expect(remove).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith("quote", { kind: "thread", threadId: "created" });
   });

@@ -60,7 +60,7 @@ struct FeedView: View {
         }
         .task {
             listener = app.realtime.listen { event in
-                guard case .pluginSignal(let pluginId, _, _) = event, pluginId == "studio" else { return }
+                guard case .pluginSignal(let pluginId, _, _) = event, pluginId == "feed" else { return }
                 Task { await load() }
             }
         }
@@ -330,7 +330,7 @@ struct FeedPostView: View {
         .refreshable { await load() }
         .task {
             listener = app.realtime.listen { event in
-                guard case .pluginSignal(let pluginId, _, let payload) = event, pluginId == "studio" else { return }
+                guard case .pluginSignal(let pluginId, _, let payload) = event, pluginId == "feed" else { return }
                 // A removal or a change to this post or its story.
                 let changed = payload["postId"]?.stringValue
                 let story = payload["story"]?.stringValue

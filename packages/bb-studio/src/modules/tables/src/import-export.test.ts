@@ -7,8 +7,6 @@ const hosts: ReturnType<typeof createFakePluginHost>[] = [];
 afterEach(async () => { for (const host of hosts.splice(0)) await host.harness.lifecycle.dispose(); });
 function fixture() {
   const host = createFakePluginHost({ pluginId: "studio-tables" });
-  // Large imports can outlast the notifier debounce before fixture disposal.
-  host.harness.sdk.stub("plugins.callRpc", async () => ({}));
   hosts.push(host);
   plugin(host.bb);
   return host.harness.behavior;

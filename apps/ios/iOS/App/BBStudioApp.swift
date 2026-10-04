@@ -21,7 +21,7 @@ struct BBStudioApp: App {
                         let id = Spotlight.currentIdentifier(identifier) {
                         let parts = id.split(separator: ":", maxSplits: 1).map(String.init)
                         if parts.count == 2 {
-                            let host = parts[0] == "studio" && parts[1].hasPrefix("rec_") ? "recording" : parts[0] == "studio" && parts[1].hasPrefix("art_") ? "artifact" : parts[0] == "studio" && parts[1].hasPrefix("tsk_") ? "task" : ["pages": "page", "studio-tasks": "task", "talk": "recording", "excalidraw": "drawing", "artifacts": "artifact"][parts[0]]
+                            let host = ["pages": "page", "studio-tasks": "task", "talk": "recording", "excalidraw": "drawing", "artifacts": "artifact"][parts[0]]
                             if let host, let url = URL(string: "bbstudio://\(host)/\(parts[1])") { model.handle(url) }
                         } else { model.openThread(id) }
                     }

@@ -3,22 +3,22 @@ export default context => {
   const fixtures = [
     { id: "pages", packageDir: "bb-studio-pages", seed: async () => { const { page, cleanup } = await seedPages(); return { path: `/plugins/pages/pages/${page.id}`, ready: '.pages-editor .ProseMirror', cleanup }; } },
     { id: "draw", packageDir: "bb-studio-draw", seed: async () => { const { drawing, cleanup } = await seedDrawing(); return { path: `/plugins/excalidraw/drawings/${drawing.id}`, ready: 'canvas.excalidraw__canvas', cleanup }; } },
-    { id: "artifacts", packageDir: "bb-studio/src/modules/artifacts", seed: async () => { const { artifactId, cleanup } = await seedArtifact(); return { path: `/plugins/studio/artifacts/${artifactId}`, ready: 'iframe[title="q3-usage-report.html"]', cleanup }; } },
-    { id: "talk", packageDir: "bb-studio/src/modules/talk", seed: async () => { const id = await seedTalkRecording(projectId, { transcribe: false }); return { path: `/plugins/studio/recordings/${id}`, ready: 'input[aria-label="Title"]', cleanup: () => talkRpc("recording_delete", { id }) }; } },
-    { id: "tables", packageDir: "bb-studio/src/modules/tables", seed: async () => {
-      const { table } = await pluginRpc("studio", "tables_create", { title: "Release inventory", projectId, columns: [{ id: "name", name: "Name", type: "text", options: [] }] });
-      await pluginRpc("studio", "tables_insert", { id: table.id, values: { name: "Review notes" } });
-      return { path: `/plugins/studio/tables/${table.id}`, ready: 'input[aria-label="Table title"]', cleanup: () => pluginRpc("studio", "tables_remove", { id: table.id }) };
+    { id: "artifacts", packageDir: "bb-studio-artifacts", seed: async () => { const { artifactId, cleanup } = await seedArtifact(); return { path: `/plugins/artifacts/artifacts/${artifactId}`, ready: 'iframe[title="q3-usage-report.html"]', cleanup }; } },
+    { id: "talk", packageDir: "bb-studio-talk", seed: async () => { const id = await seedTalkRecording(projectId, { transcribe: false }); return { path: `/plugins/talk/recordings/${id}`, ready: 'input[aria-label="Title"]', cleanup: () => talkRpc("recording_delete", { id }) }; } },
+    { id: "tables", packageDir: "bb-studio-tables", seed: async () => {
+      const { table } = await pluginRpc("studio-tables", "create", { title: "Release inventory", projectId, columns: [{ id: "name", name: "Name", type: "text", options: [] }] });
+      await pluginRpc("studio-tables", "insert", { id: table.id, values: { name: "Review notes" } });
+      return { path: `/plugins/studio-tables/tables/${table.id}`, ready: 'input[aria-label="Table title"]', cleanup: () => pluginRpc("studio-tables", "remove", { id: table.id }) };
     } },
-    { id: "tasks", packageDir: "bb-studio/src/modules/tasks", seed: async () => {
-      const { board } = await pluginRpc("studio", "tasks_boardCreate", { title: "Release checklist", projectId });
-      await pluginRpc("studio", "tasks_create", { title: "Review the launch notes", projectId, boardId: board.id, assignee: "me" });
-      return { path: `/plugins/studio/tasks/${board.id}`, ready: 'input[aria-label="Board title"]', cleanup: () => pluginRpc("studio", "tasks_boardDelete", { id: board.id }) };
+    { id: "tasks", packageDir: "bb-studio-tasks", seed: async () => {
+      const { board } = await pluginRpc("studio-tasks", "boardCreate", { title: "Release checklist", projectId });
+      await pluginRpc("studio-tasks", "create", { title: "Review the launch notes", projectId, boardId: board.id, assignee: "me" });
+      return { path: `/plugins/studio-tasks/tasks/${board.id}`, ready: 'input[aria-label="Board title"]', cleanup: () => pluginRpc("studio-tasks", "boardDelete", { id: board.id }) };
     } },
-    { id: "teams", packageDir: "bb-studio/src/modules/teams", seed: async () => {
-      const { bots } = await pluginRpc("studio", "teams_list", null);
+    { id: "teams", packageDir: "bb-studio-teams", seed: async () => {
+      const { bots } = await pluginRpc("bot-teams", "list", null);
       const bot = bots.find(b => b.handle === "atlas"); if (!bot) throw new Error("Missing staged Atlas profile");
-      return { path: `/plugins/studio/bots/${bot.id}/profile`, ready: '[aria-label="Bot sections"]', cleanup: async () => {} };
+      return { path: `/plugins/bot-teams/bots/${bot.id}/profile`, ready: '[aria-label="Bot sections"]', cleanup: async () => {} };
     } },
   ];
   return fixtures.map(fixture => ({

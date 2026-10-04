@@ -23,8 +23,6 @@ const RUNTIME = new Set([
   "@radix-ui/react-dropdown-menu",
   "@get-bb/plugin-sdk/app",
   "node:crypto",
-  "node:fs",
-  "node:path",
 ]);
 
 function sources(dir: string): string[] {

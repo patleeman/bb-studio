@@ -28,7 +28,7 @@ In all three profiles, Ctrl+End reaches the visible final quantity cell (`4,999`
 
 The failure phase blocks only `/api/v1/plugins/studio-tables/rpc/get` inside the owned Chrome session. The table shows an accessible alert, “Failed to fetch,” and no grid. [The failed-load capture](failed-load.png) shows only the Back to Studio action.
 
-After the block is cleared, a 6-second observation finds no new table request, the same error and no Retry or Try again button. The source's error branch in `packages/bb-studio/src/modules/tables/src/panel.tsx` provides only the back header. Its load effect retries only when the RPC object, table ID or version changes.
+After the block is cleared, a 6-second observation finds no new table request, the same error and no Retry or Try again button. The source's error branch in `packages/bb-studio-tables/src/panel.tsx` provides only the back header. Its load effect retries only when the RPC object, table ID or version changes.
 
 Leaving and reopening the table clears the error and loads successfully in 143ms in this local fixture run. Ctrl+End again reaches row 5,000. [The recovered-load capture](recovered-load.png) records the final row.
 

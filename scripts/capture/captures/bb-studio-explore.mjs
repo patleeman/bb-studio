@@ -6,7 +6,7 @@ export default context => {
   ...(process.env.BB_CAPTURE_EXPLORE_COMPANIONS === "1" ? [companions(context)] : []),
   {
     id: "explore",
-    packageDir: "bb-studio-pages/src/explore",
+    packageDir: "bb-studio-explore",
     privateSidebar: true,
     // The staged BB seeds a thread that reads Orbit's retry helper with
     // Explore on; its reply must end with "Along the way" rows.

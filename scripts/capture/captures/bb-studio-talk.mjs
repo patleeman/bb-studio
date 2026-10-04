@@ -14,7 +14,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
   ...(process.env.BB_CAPTURE_TALK_COMPANION === "1" ? [companionReturn({ projectId, seedPages, pluginRpc, bbCli, sleep })] : []),
   {
     id: "talk-settings",
-    packageDir: "bb-studio/src/modules/talk",
+    packageDir: "bb-studio-talk",
     fileName: "model-settings.png",
     setup: async (client) => {
       const original = await talkRpc("models.get", null);
@@ -56,7 +56,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
   },
   {
     id: "talk-inline",
-    packageDir: "bb-studio/src/modules/talk",
+    packageDir: "bb-studio-talk",
     fileName: "inline-dictation.png",
     privateSidebar: true,
     setup: async (client) => {
@@ -128,7 +128,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
   },
   {
     id: "talk-composer",
-    packageDir: "bb-studio/src/modules/talk",
+    packageDir: "bb-studio-talk",
     fileName: "dictation-message.png",
     privateSidebar: true,
     setup: async (client) => {
@@ -163,16 +163,16 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         await client.navigate(`/projects/${projectId}/threads/${threadId}`);
         const mentionSelector = `[data-promptbox] [data-prompt-mention-resource*="${recordingId}"]`;
         await client.waitForSelector(mentionSelector);
-        if (await client.evaluate(`document.querySelector('[data-promptbox] [contenteditable="true"]').textContent.includes('/plugins/studio/recordings/')`)) throw new Error("Dictation injected a separate recording link into the draft.");
+        if (await client.evaluate(`document.querySelector('[data-promptbox] [contenteditable="true"]').textContent.includes('/plugins/talk/recordings/')`)) throw new Error("Dictation injected a separate recording link into the draft.");
         const source = await client.evaluate(`JSON.parse(document.querySelector(${JSON.stringify(mentionSelector)}).getAttribute('data-prompt-mention-resource'))`);
         if (source?.pluginId !== "talk" || source.itemId !== `recordings:${recordingId}`) throw new Error("Recovered dictation did not attach its native Talk mention.");
         // The delivery toast otherwise covers the submit button while hovered.
         await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1, buttons: 0 });
         await sleep(5000);
         await client.clickAriaButtonWithPointer("Submit (Enter)");
-        const linkSelector = `[data-talk-recording-link="/plugins/studio/recordings/${recordingId}"]`;
+        const linkSelector = `[data-talk-recording-link="/plugins/talk/recordings/${recordingId}"]`;
         await client.waitForSelector(linkSelector);
-        if (await client.evaluate(`!!document.querySelector('a[href="/plugins/studio/recordings/${recordingId}"]')`)) throw new Error("Dictation injected a separate recording link into the message.");
+        if (await client.evaluate(`!!document.querySelector('a[href="/plugins/talk/recordings/${recordingId}"]')`)) throw new Error("Dictation injected a separate recording link into the message.");
         await bbCli(["thread", "wait", threadId, "--timeout", "60s", "--json"]);
         const events = JSON.parse(await bbCli(["thread", "messages", threadId, "--json"]));
         const input = events.findLast(event => event.type === "client/turn/requested")?.data.input;
@@ -217,7 +217,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
   },
   {
     id: "talk",
-    packageDir: "bb-studio/src/modules/talk",
+    packageDir: "bb-studio-talk",
     privateSidebar: true,
     setup: async (client) => {
       const recordingId = await seedTalkRecording(projectId);
@@ -226,7 +226,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
       try {
         // Summaries are optional. Generate this fixture's summary explicitly.
         await talkRpc("meeting_regenerate", { id: recordingId });
-        await client.navigate(`/plugins/studio/recordings/${recordingId}`);
+        await client.navigate(`/plugins/talk/recordings/${recordingId}`);
         await client.waitForText("Weekly product sync");
         await client.waitForText("offline mode beta");
         await client.waitForText("guided import spec");

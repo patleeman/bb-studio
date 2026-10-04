@@ -113,7 +113,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     privateSidebar: true,
     setup: async (client) => {
       const ids = [];
-      const cleanup = async () => { for (const id of ids) await pluginRpc("studio", "tasks_delete", { id }).catch(() => {}); };
+      const cleanup = async () => { for (const id of ids) await pluginRpc("studio-tasks", "delete", { id }).catch(() => {}); };
       try {
         const today = new Date();
         const due = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
@@ -121,7 +121,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           { title: "QA Review launch copy", status: "review", assignee: "me" },
           { title: "QA Ship onboarding guide", status: "todo", assignee: "me", due },
         ]) {
-          const { task } = await pluginRpc("studio", "tasks_create", { ...input, projectId });
+          const { task } = await pluginRpc("studio-tasks", "create", { ...input, projectId });
           ids.push(task.id);
         }
         await pluginRpc("studio", "recordActivity", { ref: { pluginId: "studio-tasks", id: ids[0] }, actor: { kind: "user" }, verb: "updated", at: Date.now(), summary: "QA Review launch copy is ready" });
@@ -227,14 +227,14 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       const cleanup = async () => {
         await pages.cleanup();
         await artifact.cleanup();
-        for (const id of taskIds) await pluginRpc("studio", "tasks_delete", { id }).catch(() => {});
+        for (const id of taskIds) await pluginRpc("studio-tasks", "delete", { id }).catch(() => {});
       };
       try {
         for (const task of [
           { title: "Write the launch post", status: "todo", assignee: "me", description: "Announce offline sync and the new team plans." },
           { title: "Add offline sync to settings", status: "review", assignee: "agent" },
         ]) {
-          const { task: created } = await pluginRpc("studio", "tasks_create", { ...task, projectId });
+          const { task: created } = await pluginRpc("studio-tasks", "create", { ...task, projectId });
           taskIds.push(created.id);
         }
         // Artifacts search their saved text through Studio's index.

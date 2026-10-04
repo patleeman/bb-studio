@@ -6,9 +6,9 @@ import { openAppPath, studioPath } from "./nav";
 import { useStudioPresent } from "./presence";
 
 /** The common RPC, realtime, and back navigation for an add-on panel. */
-export function useAddOnPanel(channel: string, panelPath: string, kind: string, rpcPrefix = "") {
+export function useAddOnPanel(channel: string, panelPath: string, kind: string) {
   const rpc = useRpc<StudioSchemas["provider"]>();
-  const call = useCallback<ProviderCall>((method, input) => rpc.call((rpcPrefix + method) as typeof method, input as never) as never, [rpc, rpcPrefix]);
+  const call = useCallback<ProviderCall>((method, input) => rpc.call(method, input as never) as never, [rpc]);
   const navigate = useBbNavigate();
   const studio = useStudioPresent();
   const [refreshKey, setRefreshKey] = useState(0);

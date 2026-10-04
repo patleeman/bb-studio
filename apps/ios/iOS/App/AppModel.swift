@@ -25,23 +25,13 @@ enum Route: Hashable {
     case feedPost(id: String)
     /// Every Studio item, filtered by kind; reached from Work and Search.
     case studioCollection
-    /// A bot's desk in the office: its DM, tasks and profile.
-    case botDesk(id: String)
-    /// The Space's Home: what needs you, what the team is doing, what came back.
-    case officeHome
-    /// The Space's bots and conversations.
-    case officeTeam
 }
 
 extension Route {
     /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
-        if parts.count == 2, parts[0] == "threads" {
-            self = .thread(id: parts[1])
-            return
-        }
-        if (parts == ["plugins", "feed", "feed"] || parts == ["plugins", "studio", "feed"]) {
+        if parts == ["plugins", "feed", "feed"] {
             self = .feed
             return
         }
@@ -53,15 +43,15 @@ extension Route {
         let id = parts[3]
         switch (parts[1], parts[2]) {
         case ("pages", "pages"): self = .page(id: id)
-        case ("studio", "artifacts"), ("artifacts", "artifacts"): self = .artifact(id: id)
+        case ("artifacts", "artifacts"): self = .artifact(id: id)
         case ("excalidraw", "drawings"): self = .drawing(id: id)
-        case ("studio", "recordings"), ("talk", "recordings"): self = .recording(id: id)
-        case ("studio-tasks", "tasks"), ("studio", "tasks"): self = .task(id: id)
-        case ("studio-tables", "tables"), ("studio", "tables"): self = .table(id: id)
-        case ("bot-teams", "bots"), ("studio", "bots"): self = .bot(id: id)
+        case ("talk", "recordings"): self = .recording(id: id)
+        case ("studio-tasks", "tasks"): self = .task(id: id)
+        case ("studio-tables", "tables"): self = .table(id: id)
+        case ("bot-teams", "bots"): self = .bot(id: id)
         // Channels lived at /views/<id>; both open the same channel.
-        case ("bot-teams", "channels"), ("bot-teams", "views"), ("studio", "channels"), ("studio", "views"): self = .savedView(id: id)
-        case ("feed", "feed"), ("studio", "feed"): self = .feedPost(id: id)
+        case ("bot-teams", "channels"), ("bot-teams", "views"): self = .savedView(id: id)
+        case ("feed", "feed"): self = .feedPost(id: id)
         default: return nil
         }
     }
@@ -89,10 +79,8 @@ enum Sheet: Identifiable, Hashable {
 
 /// The office: Inbox (every Space), then the current Space's Home, Work and
 /// Team. See docs/office-model.md.
-/// Inbox (every Space), the current Space's tabs, and Settings. Home, Work
-/// and Team folded into Tabs: bots and Home open from there or from search.
 enum Tab: Hashable {
-    case inbox, tabs, settings
+    case inbox, home, work, team, settings
 }
 
 @MainActor
@@ -101,10 +89,12 @@ final class AppModel: ObservableObject {
 
     @Published private(set) var client: BBClient
     @Published private(set) var realtime: BBRealtime
-    @Published var tab: Tab = .tabs
-    /// The Tabs stack: threads and items open here unless another tab is showing.
+    @Published var tab: Tab = .home
+    /// Work's stack: threads and items open here unless another tab is showing.
     @Published var path: [Route] = []
     @Published var inboxPath: [Route] = []
+    @Published var homePath: [Route] = []
+    @Published var teamPath: [Route] = []
     /// Studio used to be its own tab; its routes now open in Work.
     var studioPath: [Route] {
         get { path }
@@ -139,7 +129,8 @@ final class AppModel: ObservableObject {
         // `simctl launch <device> nyc.plee.bbgo -officeTab work` opens a tab, for screenshots.
         switch UserDefaults.standard.string(forKey: "officeTab") {
         case "inbox": tab = .inbox
-        case "tabs", "work", "team", "home": tab = .tabs
+        case "work": tab = .work
+        case "team": tab = .team
         case "settings": tab = .settings
         default: break
         }
@@ -173,6 +164,8 @@ final class AppModel: ObservableObject {
         flushOutboxOnConnect()
         path = []
         inboxPath = []
+        homePath = []
+        teamPath = []
         lastThreadId = ""
         newThreadDraft = nil
         replyThreadId = nil
@@ -236,31 +229,32 @@ final class AppModel: ObservableObject {
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "inbox": tab = .inbox
-        case "tabs", "work", "team", "home": tab = .tabs
+        case "work": tab = .work
+        case "team": tab = .team
         case "web", "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
-        default: tab = .tabs
+        default: tab = .home
         }
     }
 
     func newThread(text: String = "") {
-        if tab == .inbox || tab == .settings { tab = .tabs }
+        if tab == .inbox || tab == .settings { tab = .work }
         newThreadDraft = text
     }
 
     func openThread(_ id: String) {
-        tab = .tabs
+        tab = .work
         path = [.thread(id: id)]
     }
 
     func open(_ route: Route) {
-        tab = .tabs
+        tab = .work
         path = [route]
     }
 
     /// Over the feed, so Back reads the rest of it.
     func openFeedPost(_ id: String) {
-        tab = .tabs
+        tab = .work
         path = [.feed, .feedPost(id: id)]
     }
 
@@ -268,9 +262,11 @@ final class AppModel: ObservableObject {
     func push(_ route: Route) {
         switch tab {
         case .inbox: inboxPath.append(route)
-        case .tabs: path.append(route)
+        case .home: homePath.append(route)
+        case .team: teamPath.append(route)
+        case .work: path.append(route)
         case .settings:
-            tab = .tabs
+            tab = .work
             path.append(route)
         }
     }
@@ -290,7 +286,7 @@ final class AppModel: ObservableObject {
     }
 
     func openStudio(kind: String?, _ route: Route? = nil) {
-        tab = .tabs
+        tab = .work
         if let kind { studioKind = kind }
         path = [route ?? .studioCollection]
     }
@@ -308,7 +304,7 @@ final class AppModel: ObservableObject {
 
     func startVoiceChat(threadId: String? = nil) {
         guard let id = threadId ?? (lastThreadId.isEmpty ? nil : lastThreadId) else {
-            tab = .tabs
+            tab = .work
             return
         }
         sheet = .voiceChat(threadId: id)

@@ -1,8 +1,0 @@
-Query chain:
- →Find: Target Application 'nyc.plee.bbgo'
-  ↪︎Find: Descendants matching type Cell
-    ↪︎Find: Elements containing elements matching predicate 'identifier == "officeRequestOpen" AND label CONTAINS "Native approval card QA"'
-      ↪︎Find: First Match
-        ↪︎Find: Descendants matching type Button
-          ↪︎Find: Elements matching predicate '"Approve" IN identifiers'
-            ↪︎Find: First Match

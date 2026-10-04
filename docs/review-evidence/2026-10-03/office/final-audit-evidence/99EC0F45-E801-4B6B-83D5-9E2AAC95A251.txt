@@ -1,1 +1,0 @@
-studio-default: policy 3: resolved element id=studioSelect label=Select sRGB foreground=[0, 0, 0], background=[243, 243, 247], contrast=18.974254200706998:1; element frame=(320.0, 66.0, 62.0, 36.0)

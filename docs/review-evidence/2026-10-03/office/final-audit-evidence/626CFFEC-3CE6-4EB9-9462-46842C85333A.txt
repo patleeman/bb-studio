@@ -1,1 +1,0 @@
-XCTAssertTrue failed - studio-accessibility-xxxl: XCUIAccessibilityAuditType(rawValue: 131072) Text of this UISearchBarTextField may be clipped at larger Dynamic Type sizes. [Search Studio] frame=Optional((16.0, 116.0, 370.0, 124.0)) id= nativeBars=[(0.0, 791.0, 402.0, 83.0), (0.0, 62.0, 402.0, 188.0)]

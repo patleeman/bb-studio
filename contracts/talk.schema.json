@@ -1,0 +1,2307 @@
+{
+  "pluginId": "talk",
+  "methods": {
+    "models.get": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cleanup": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "serviceTier": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "fast"
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "model",
+                  "reasoningLevel"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "serviceTier": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "fast"
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "model",
+                  "reasoningLevel"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "serviceTier": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "fast"
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "model",
+                  "reasoningLevel"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "cleanup",
+          "title",
+          "summary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "models.set": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "cleanup",
+              "title",
+              "summary"
+            ]
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "serviceTier": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "fast"
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "model",
+                  "reasoningLevel"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "purpose",
+          "selection"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cleanup": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "serviceTier": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "fast"
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "model",
+                  "reasoningLevel"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "serviceTier": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "fast"
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "model",
+                  "reasoningLevel"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "serviceTier": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "fast"
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "model",
+                  "reasoningLevel"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "cleanup",
+          "title",
+          "summary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "models.suggest": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "providerId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "reasoningLevel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra",
+                      "ultracode"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "fast"
+                ]
+              }
+            },
+            "required": [
+              "providerId",
+              "model",
+              "reasoningLevel"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "recordings_list": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recordings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "titleSource": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "auto",
+                    "user"
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "recording",
+                    "dictation"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "recording",
+                    "paused",
+                    "interrupted",
+                    "finishing",
+                    "done"
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "threadId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "endedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "durationMs": {
+                  "type": "number"
+                },
+                "segmentCount": {
+                  "type": "number"
+                },
+                "pendingCount": {
+                  "type": "number"
+                },
+                "failedCount": {
+                  "type": "number"
+                },
+                "wordCount": {
+                  "type": "number"
+                },
+                "preview": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "audioRemoved": {
+                  "type": "boolean"
+                },
+                "meetingNotes": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "decisions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "actionItems": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string"
+                              },
+                              "assignee": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "me",
+                                      "agent"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "assignee"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "decisions",
+                        "actionItems"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "titleSource",
+                "kind",
+                "status",
+                "projectId",
+                "threadId",
+                "createdAt",
+                "updatedAt",
+                "endedAt",
+                "durationMs",
+                "segmentCount",
+                "pendingCount",
+                "failedCount",
+                "wordCount",
+                "preview",
+                "archived",
+                "audioRemoved"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "recordings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_get": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recording": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "titleSource": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "auto",
+                  "user"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "dictation"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "paused",
+                  "interrupted",
+                  "finishing",
+                  "done"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "threadId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "endedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "segmentCount": {
+                "type": "number"
+              },
+              "pendingCount": {
+                "type": "number"
+              },
+              "failedCount": {
+                "type": "number"
+              },
+              "wordCount": {
+                "type": "number"
+              },
+              "preview": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "audioRemoved": {
+                "type": "boolean"
+              },
+              "meetingNotes": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "summary": {
+                        "type": "string"
+                      },
+                      "decisions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "actionItems": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string"
+                            },
+                            "assignee": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "me",
+                                    "agent"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "title",
+                            "assignee"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "summary",
+                      "decisions",
+                      "actionItems"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "titleSource",
+              "kind",
+              "status",
+              "projectId",
+              "threadId",
+              "createdAt",
+              "updatedAt",
+              "endedAt",
+              "durationMs",
+              "segmentCount",
+              "pendingCount",
+              "failedCount",
+              "wordCount",
+              "preview",
+              "archived",
+              "audioRemoved"
+            ],
+            "additionalProperties": false
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "number"
+                },
+                "offsetMs": {
+                  "type": "number"
+                },
+                "durationMs": {
+                  "type": "number"
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "bytes": {
+                  "type": "number"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "done",
+                    "empty",
+                    "failed"
+                  ]
+                },
+                "text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cleanedText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "attempts": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "sessionId",
+                "startedAt",
+                "offsetMs",
+                "durationMs",
+                "mimeType",
+                "bytes",
+                "status",
+                "text",
+                "error",
+                "attempts"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "recording",
+          "segments"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_create": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "dictation"
+            ]
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "threadId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "projectId",
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "titleSource": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "auto",
+              "user"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "dictation"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "interrupted",
+              "finishing",
+              "done"
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "endedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "segmentCount": {
+            "type": "number"
+          },
+          "pendingCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "wordCount": {
+            "type": "number"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "audioRemoved": {
+            "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "titleSource",
+          "kind",
+          "status",
+          "projectId",
+          "threadId",
+          "createdAt",
+          "updatedAt",
+          "endedAt",
+          "durationMs",
+          "segmentCount",
+          "pendingCount",
+          "failedCount",
+          "wordCount",
+          "preview",
+          "archived",
+          "audioRemoved"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_rename": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "titleSource": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "auto",
+              "user"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "dictation"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "interrupted",
+              "finishing",
+              "done"
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "endedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "segmentCount": {
+            "type": "number"
+          },
+          "pendingCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "wordCount": {
+            "type": "number"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "audioRemoved": {
+            "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "titleSource",
+          "kind",
+          "status",
+          "projectId",
+          "threadId",
+          "createdAt",
+          "updatedAt",
+          "endedAt",
+          "durationMs",
+          "segmentCount",
+          "pendingCount",
+          "failedCount",
+          "wordCount",
+          "preview",
+          "archived",
+          "audioRemoved"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_state": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "finishing"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "titleSource": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "auto",
+              "user"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "dictation"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "interrupted",
+              "finishing",
+              "done"
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "endedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "segmentCount": {
+            "type": "number"
+          },
+          "pendingCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "wordCount": {
+            "type": "number"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "audioRemoved": {
+            "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "titleSource",
+          "kind",
+          "status",
+          "projectId",
+          "threadId",
+          "createdAt",
+          "updatedAt",
+          "endedAt",
+          "durationMs",
+          "segmentCount",
+          "pendingCount",
+          "failedCount",
+          "wordCount",
+          "preview",
+          "archived",
+          "audioRemoved"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_heartbeat": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "paused",
+                  "interrupted",
+                  "finishing",
+                  "done"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "segment_put": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recordingId": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{6,32}$"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "startedAt": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 600000
+          },
+          "mimeType": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^audio\\/[a-z0-9.+-]+(;.*)?$"
+          },
+          "audioBase64": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16777216
+          }
+        },
+        "required": [
+          "recordingId",
+          "sessionId",
+          "index",
+          "startedAt",
+          "durationMs",
+          "mimeType",
+          "audioBase64"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "stored": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stored"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_retry": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "titleSource": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "auto",
+              "user"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "dictation"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "interrupted",
+              "finishing",
+              "done"
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "endedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "segmentCount": {
+            "type": "number"
+          },
+          "pendingCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "wordCount": {
+            "type": "number"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "audioRemoved": {
+            "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "titleSource",
+          "kind",
+          "status",
+          "projectId",
+          "threadId",
+          "createdAt",
+          "updatedAt",
+          "endedAt",
+          "durationMs",
+          "segmentCount",
+          "pendingCount",
+          "failedCount",
+          "wordCount",
+          "preview",
+          "archived",
+          "audioRemoved"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "meeting_regenerate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recording": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "titleSource": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "auto",
+                  "user"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "dictation"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "paused",
+                  "interrupted",
+                  "finishing",
+                  "done"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "threadId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "endedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "segmentCount": {
+                "type": "number"
+              },
+              "pendingCount": {
+                "type": "number"
+              },
+              "failedCount": {
+                "type": "number"
+              },
+              "wordCount": {
+                "type": "number"
+              },
+              "preview": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "audioRemoved": {
+                "type": "boolean"
+              },
+              "meetingNotes": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "summary": {
+                        "type": "string"
+                      },
+                      "decisions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "actionItems": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string"
+                            },
+                            "assignee": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "me",
+                                    "agent"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "title",
+                            "assignee"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "summary",
+                      "decisions",
+                      "actionItems"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "titleSource",
+              "kind",
+              "status",
+              "projectId",
+              "threadId",
+              "createdAt",
+              "updatedAt",
+              "endedAt",
+              "durationMs",
+              "segmentCount",
+              "pendingCount",
+              "failedCount",
+              "wordCount",
+              "preview",
+              "archived",
+              "audioRemoved"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "recording"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "meeting_create_task": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "index"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "dictation_cleanup": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_cleanup": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          },
+          "segmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "segmentId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_keep": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "titleSource": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "auto",
+              "user"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "dictation"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "interrupted",
+              "finishing",
+              "done"
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "endedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "segmentCount": {
+            "type": "number"
+          },
+          "pendingCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "wordCount": {
+            "type": "number"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "audioRemoved": {
+            "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "titleSource",
+          "kind",
+          "status",
+          "projectId",
+          "threadId",
+          "createdAt",
+          "updatedAt",
+          "endedAt",
+          "durationMs",
+          "segmentCount",
+          "pendingCount",
+          "failedCount",
+          "wordCount",
+          "preview",
+          "archived",
+          "audioRemoved"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_delete": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

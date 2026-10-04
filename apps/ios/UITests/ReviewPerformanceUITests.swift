@@ -2,13 +2,13 @@ import XCTest
 
 /// Opt-in read-only performance observation. The runner and app must use staged BB.
 final class ReviewPerformanceUITests: XCTestCase {
-    private var fixture: String { StagedFixture.serverURL }
+    private let fixture = "http://127.0.0.1:49486"
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        guard StagedFixture.isIsolated,
-              ProcessInfo.processInfo.environment["BBGO_QA_PERFORMANCE_READY"] == "YES" else {
-            throw XCTSkip("Use the isolated UI runner with BB_QA_DATA_DIR to seed 24 performance pages.")
+        guard ProcessInfo.processInfo.environment["BB_PERFORMANCE_QA_SERVER_URL"] == fixture,
+              ProcessInfo.processInfo.environment["BB_PERFORMANCE_QA_PRIVATE_SIM"] == "YES" else {
+            throw XCTSkip("Requires exact staged origin and fresh private simulator opt-in before app launch.")
         }
     }
 
@@ -22,11 +22,11 @@ final class ReviewPerformanceUITests: XCTestCase {
         let server = app.descendants(matching: .any)["settingsServerURL"]
         XCTAssertTrue(server.waitForExistence(timeout: 10))
         XCTAssertEqual(server.value as? String, fixture)
-        app.openOfficeScreen("Library")
+        app.tabBars.buttons["Studio"].tap()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.buttons["Pages"].tap()
         app.swipeUp()
-        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:"))
+        let rows = app.buttons.matching(identifier: "studioItem")
         XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15))
         XCTAssertTrue(visibleFixtureRows(rows).count >= 2, "Seed 24 Native Performance pages before this suite")
 

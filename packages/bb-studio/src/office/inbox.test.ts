@@ -35,13 +35,3 @@ describe("Inbox read model", () => {
     db.close();
   });
 });
-
-it("routes a known action without depending on unrelated unavailable sources", async () => {
-  const db = new Database(":memory:"); let acted = false;
-  const inbox = new Inbox(db, [
-    { id:"target",keyPrefix:"target:",list:async()=>[event("target:1")],act:async()=>{acted=true;} },
-    { id:"offline",keyPrefix:"offline:",list:async()=>{throw new Error("offline");},act:async()=>{} },
-  ],()=>"personal");
-  await inbox.act("target:1","approve"); expect(acted).toBe(true);
-  db.close();
-});

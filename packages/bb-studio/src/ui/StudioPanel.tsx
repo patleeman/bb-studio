@@ -460,7 +460,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   const headerActions = (
     <>
-    <ViewMoveMenu item={{ href: panelHref("studio", "studio", subPath), title: "Library" }} />
+    <ViewMoveMenu item={{ href: panelHref("studio", "studio", subPath), title: "Studio" }} />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -507,7 +507,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   if (data && !providers.length) {
     return (
       <PageColumn>
-        <h1 className="text-[28px] leading-tight font-semibold tracking-tight">Library</h1>
+        <h1 className="text-[28px] leading-tight font-semibold tracking-tight">Studio</h1>
         <EmptyState icon="studio/studio" title="No add-ons installed">
           Install one from Extensions.
         </EmptyState>
@@ -607,7 +607,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         />
       ) : (
         <CollectionPage
-          title="Library"
+          title="Studio"
           kinds={kinds}
           items={shownItems}
           error={error && !data ? error : null}

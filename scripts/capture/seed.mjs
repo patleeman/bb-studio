@@ -200,17 +200,17 @@ export async function seedArtifact() {
   const write = (content) => bbCli(["file", "write", path, "--host", hostId, "--root", workspace, "--content", content]);
   let artifactId = null;
   const cleanup = async () => {
-    if (artifactId) await pluginRpc("studio", "artifacts_delete", { id: artifactId }).catch(() => {});
+    if (artifactId) await pluginRpc("artifacts", "delete", { id: artifactId }).catch(() => {});
     await bbCli(["file", "remove", path, "--yes", "--host", hostId, "--root", workspace]).catch(() => {});
   };
   try {
     for (const draft of [true, false]) {
       await write(usageReportHtml({ draft }));
-      const { saved, failed } = await pluginRpc("studio", "artifacts_saveFiles", { threadId: workspaceThreadId, paths: [file] });
+      const { saved, failed } = await pluginRpc("artifacts", "saveFiles", { threadId: workspaceThreadId, paths: [file] });
       if (failed.length) throw new Error(`Couldn't save the report: ${failed[0].error}`);
       artifactId = saved[0].artifactId;
     }
-    await pluginRpc("studio", "artifacts_update", { id: artifactId, title: "Q3 usage report", description: "Weekly active teams, July to September" });
+    await pluginRpc("artifacts", "update", { id: artifactId, title: "Q3 usage report", description: "Weekly active teams, July to September" });
   } catch (error) {
     await cleanup();
     throw error;
@@ -223,7 +223,7 @@ export async function talkRpc(method, input) {
   const file = join(dir, "input.json");
   await writeFile(file, JSON.stringify(input));
   try {
-    return JSON.parse(await bbCli(["plugin", "rpc", "call", "studio", `talk_${method}`, "--input-file", file, "--json"]));
+    return JSON.parse(await bbCli(["plugin", "rpc", "call", "talk", method, "--input-file", file, "--json"]));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -287,7 +287,7 @@ export async function seedTalkRecording(projectId, { transcribe = true, kind = "
     await talkRpc("recording_state", { id: recording.id, status: "finishing" });
     const started = Date.now();
     for (;;) {
-      const current = JSON.parse(await bbCli(["studio", "talk", "show", recording.id, "--json"]));
+      const current = JSON.parse(await bbCli(["talk", "show", recording.id, "--json"]));
       if (current.status === "done" && current.pendingCount === 0) {
         if (current.failedCount > 0) throw new Error(`Talk could not transcribe ${current.failedCount} seeded pieces.`);
         break;

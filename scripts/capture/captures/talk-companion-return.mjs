@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
-  id: "talk-companion-return", packageDir: "bb-studio/src/modules/talk", fileName: "companion-dictation.png", privateSidebar: true,
+  id: "talk-companion-return", packageDir: "bb-studio-talk", fileName: "companion-dictation.png", privateSidebar: true,
   setup: async client => {
     const { page, cleanup } = await seedPages();
     const directory = await mkdtemp(join(tmpdir(), "bb-talk-companion-"));
@@ -13,7 +13,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
     const forget = async () => {
       const stop = await client.evaluate("!!document.querySelector('button[aria-label=\"Stop without inserting\"]')").catch(() => false);
       if (stop) await client.clickAriaButtonWithPointer("Stop without inserting").catch(() => {});
-      for (const id of records) await pluginRpc("studio", "talk_recording_delete", { id }).catch(() => {});
+      for (const id of records) await pluginRpc("talk", "recording_delete", { id }).catch(() => {});
       if (threadId) await bbCli(["thread", "delete", threadId, "--yes", "--json"]);
       if (disabled) await bbCli(["plugin", "enable", "studio-chat", "--json"]);
       await cleanup(); await rm(directory, { recursive: true, force: true });
@@ -76,7 +76,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
       await client.evaluate(`(() => { window.bbTalkSource = document.querySelector(${JSON.stringify(prompt(threadKey))}); return true; })()`);
       const threadCapture = await start(threadKey);
       if (threadCapture.threadId !== threadId) throw new Error("Talk associated the companion microphone with the main thread");
-      const { recording } = await pluginRpc("studio", "talk_recording_get", { id: threadCapture.recordingId });
+      const { recording } = await pluginRpc("talk", "recording_get", { id: threadCapture.recordingId });
       if (recording.threadId !== threadId || recording.projectId !== projectId) throw new Error("Talk stored the wrong thread or project");
       await newConversation(); await client.waitForSelector(prompt(composeKey));
       await client.waitForAriaButton("Back to where you're dictating");
@@ -92,7 +92,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
       await client.evaluate(`(() => { window.bbTalkSource = document.querySelector(${JSON.stringify(prompt(composeKey))}); return true; })()`);
       const composeCapture = await start(composeKey);
       if (composeCapture.threadId !== null || composeCapture.composePath !== `/plugins/pages/pages/${page.id}/compose`) throw new Error("Talk did not remember the new conversation's exact route");
-      const composeRecording = await pluginRpc("studio", "talk_recording_get", { id: composeCapture.recordingId });
+      const composeRecording = await pluginRpc("talk", "recording_get", { id: composeCapture.recordingId });
       if (composeRecording.recording.projectId !== projectId) throw new Error("Talk ignored the conversation's selected project");
       await client.dragBy(`[data-float-tab="${threadKey}"]`, 0, 0);
       await client.waitForAriaButton("Back to where you're dictating");

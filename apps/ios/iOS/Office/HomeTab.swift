@@ -1,20 +1,24 @@
 import SwiftUI
 
-/// Home of the current Space, opened from Tabs: start work or hand it off,
-/// then what needs you, what the team is doing, and what came back.
-struct OfficeHomeScreen: View {
+/// Home of the current Space: start work or hand it off, then what needs you,
+/// what the team is doing, and what came back.
+struct HomeTab: View {
+    @EnvironmentObject private var app: AppModel
     @Environment(OfficeContext.self) private var office
 
     var body: some View {
-        Group {
-            if let home = office.home {
-                HomeList(store: home)
-            } else {
-                ProgressView()
+        NavigationStack(path: $app.homePath) {
+            Group {
+                if let home = office.home {
+                    HomeList(store: home)
+                } else {
+                    ProgressView()
+                }
             }
+            .toolbar { ToolbarItem(placement: .principal) { SpaceSwitcher() } }
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
         }
-        .navigationTitle("Home")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -28,16 +32,10 @@ private struct HomeList: View {
         List {
             Section {
                 Button { app.newThread() } label: {
-                    HStack(alignment: .firstTextBaseline) {
-                        Image(systemName: "square.and.pencil").accessibilityHidden(true)
-                        Text("New Thread").fixedSize(horizontal: false, vertical: true)
-                    }
+                    Label("New Thread", systemImage: "square.and.pencil")
                 }
                 Button { delegating = true } label: {
-                    HStack(alignment: .firstTextBaseline) {
-                        Image(systemName: "paperplane").accessibilityHidden(true)
-                        Text("Hand Off to a Bot").fixedSize(horizontal: false, vertical: true)
-                    }
+                    Label("Hand Off to a Bot", systemImage: "paperplane")
                 }
                 .disabled(office.team?.bots.isEmpty ?? true)
             }
@@ -46,7 +44,7 @@ private struct HomeList: View {
                 Section { ConnectionBanner(message: error) { await store.refresh() } }
             }
 
-            Section {
+            Section("Needs You") {
                 if store.needsYou.isEmpty {
                     if store.home != nil, store.error == nil {
                         Text("Nothing is waiting on you.").foregroundStyle(.secondary)
@@ -56,26 +54,26 @@ private struct HomeList: View {
                         OfficeEventRow(event: event, bot: office.bot(event.botId)) { await store.refresh() }
                     }
                 }
-            } header: { Text("Needs You").foregroundStyle(Color(.label)) }
+            }
 
             if !store.working.isEmpty {
-                Section {
+                Section("Your Team Is Working On") {
                     ForEach(store.working) { task in OfficeTaskRow(task: task, bot: office.bot(task.botId)) }
-                } header: { Text("Your Team Is Working On").foregroundStyle(Color(.label)) }
+                }
             }
 
             if !store.reports.isEmpty {
-                Section {
+                Section("Reports") {
                     ForEach(store.reports.prefix(5)) { event in
                         OfficeEventRow(event: event, bot: office.bot(event.botId)) { await store.refresh() }
                     }
-                } header: { Text("Reports").foregroundStyle(Color(.label)) }
+                }
             }
 
             if !store.recent.isEmpty {
-                Section {
+                Section("Recent Work") {
                     ForEach(store.recent.prefix(8)) { item in OfficeItemRow(item: item, author: office.bot(item.authorBotId)) }
-                } header: { Text("Recent Work").foregroundStyle(Color(.label)) }
+                }
             }
         }
         .listStyle(.insetGrouped)
@@ -87,7 +85,6 @@ private struct HomeList: View {
 
 /// A request, report or comment addressed to you, acted on in place.
 struct OfficeEventRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
     let event: OfficeInboxEvent
     let bot: OfficeTeamBot?
@@ -108,34 +105,19 @@ struct OfficeEventRow: View {
                     .font(.title3).foregroundStyle(.secondary).frame(width: 32, height: 32)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Button { open() } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        let headingLayout = dynamicTypeSize.isAccessibilitySize
-                            ? AnyLayout(VStackLayout(alignment: .leading))
-                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
-                        headingLayout {
-                            Text(event.title)
-                                .font(.body.weight(.semibold))
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            Text(Date(timeIntervalSince1970: event.createdAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                                .font(.footnote).monospacedDigit().foregroundStyle(Color(.label))
-                                .accessibilityIdentifier("officeEventTime:\(event.id)")
-                        }
-                        Text(bot.map { "\($0.name) · \(event.body)" } ?? event.body)
-                            .font(.subheadline).foregroundStyle(Color(.label))
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let space {
-                            Label(space.name, systemImage: "building.2").font(.caption).foregroundStyle(Color(.label))
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .accessibilityElement(children: .combine)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(event.title)
+                        .font(.body.weight(event.type == .request || event.readAt == nil ? .semibold : .regular))
+                        .lineLimit(2)
+                    Spacer(minLength: 4)
+                    Text(Date(timeIntervalSince1970: event.createdAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityIdentifier("officeRequestOpen")
+                Text(bot.map { "\($0.name) · \(event.body)" } ?? event.body)
+                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
+                if let space {
+                    Label(space.name, systemImage: "building.2").font(.caption).foregroundStyle(.secondary)
+                }
                 if event.answerable == true {
                     HStack {
                         TextField("Answer", text: $answer).textFieldStyle(.roundedBorder)
@@ -143,33 +125,24 @@ struct OfficeEventRow: View {
                     }
                 }
                 if let actions = event.actions, !actions.isEmpty {
-                    let layout = dynamicTypeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(alignment: .leading)) : AnyLayout(HStackLayout())
-                    layout {
+                    HStack {
                         ForEach(actions) { action in
                             if action.primary == true {
-                                Button { act(action.id) } label: {
-                                    Text(action.label).frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
-                                }
-                                    .buttonStyle(.borderedProminent)
-                                    .accessibilityIdentifier("officeEventAction:\(event.id):\(action.id)")
+                                Button(action.label) { act(action.id) }.buttonStyle(.borderedProminent)
                             } else {
-                                Button { act(action.id) } label: {
-                                    Text(action.label).frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
-                                }
-                                    .buttonStyle(.bordered)
-                                    .tint(.primary)
-                                    .accessibilityIdentifier("officeEventAction:\(event.id):\(action.id)")
+                                Button(action.label) { act(action.id) }.buttonStyle(.bordered)
                             }
                         }
                     }
-                    .controlSize(.regular)
+                    .controlSize(.small)
                     .disabled(busy || event.isPending)
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
             }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture { open() }
         .swipeActions(edge: .trailing) {
             Button { done() } label: { Label(event.type == .request ? "Dismiss" : "Done", systemImage: "checkmark") }
                 .tint(.indigo)
@@ -253,8 +226,6 @@ struct OfficeTaskRow: View {
 
 struct OfficeItemRow: View {
     @EnvironmentObject private var app: AppModel
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 22
     let item: OfficeItem
     let author: OfficeTeamBot?
 
@@ -264,13 +235,11 @@ struct OfficeItemRow: View {
         } label: {
             HStack(spacing: 10) {
                 if let icon = item.icon, !icon.isEmpty {
-                    Text(icon).frame(width: iconWidth)
+                    Text(icon).frame(width: 22)
                 } else {
-                    Image(systemName: item.symbol).foregroundStyle(.secondary).frame(width: iconWidth)
+                    Image(systemName: item.symbol).foregroundStyle(.secondary).frame(width: 22)
                 }
-                Text(item.title.isEmpty ? "Untitled" : item.title)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(item.title.isEmpty ? "Untitled" : item.title).lineLimit(1)
                 Spacer()
                 if let author { Face(author, size: 20).accessibilityLabel("Made by \(author.name)") }
             }
@@ -297,7 +266,7 @@ struct DelegateSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
+                Section("Who") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 14) {
                             ForEach(bots) { bot in
@@ -314,15 +283,15 @@ struct DelegateSheet: View {
                         }
                         .padding(.vertical, 6)
                     }
-                } header: { Text("Who").foregroundStyle(Color(.label)) }
-                Section {
+                }
+                Section("What") {
                     TextField("Describe the outcome you want", text: $brief, axis: .vertical).lineLimit(3...8)
-                } header: { Text("What").foregroundStyle(Color(.label)) }
-                Section {
+                }
+                Section("When") {
                     Picker("Schedule", selection: $schedule) {
                         ForEach(schedules, id: \.0) { Text($0.1).tag($0.0) }
                     }
-                } header: { Text("When").foregroundStyle(Color(.label)) }
+                }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
             .navigationTitle("Hand Off Work")
@@ -344,17 +313,33 @@ struct DelegateSheet: View {
     private func submit() {
         guard let botId else { return }
         sending = true
-        let text = brief.trimmingCharacters(in: .whitespacesAndNewlines)
+        var input: [String: JSONValue] = [
+            "botId": .string(botId),
+            "brief": .string(brief.trimmingCharacters(in: .whitespacesAndNewlines)),
+        ]
+        if schedule != "once" { input["schedule"] = .string(schedule) }
+        if let context {
+            input["context"] = .array([.string(context.ref)])
+            if let folderId = context.folderId { input["folderId"] = .string(folderId) }
+        }
         Task {
             defer { sending = false }
             do {
-                _ = try await app.client.officeDelegate(
-                    botId: botId, brief: text, schedule: OfficeSchedule(rawValue: schedule),
-                    context: context.map { [$0.ref] }, folderId: context?.folderId)
+                _ = try await app.client.officePendingCall("delegate", .object(input))
                 dismiss()
             } catch {
                 self.error = BBClient.describe(error)
             }
         }
+    }
+}
+
+extension BBClient {
+    /// Office RPCs whose contracts land in later backend stages (delegate,
+    /// talk_dm). Dynamic on purpose, so the native inventory treats them as
+    /// runtime-validated until their generated methods exist.
+    func officePendingCall(_ method: String, _ input: JSONValue) async throws -> JSONValue {
+        let plugin = "studio"
+        return try await rpc(plugin, method, input)
     }
 }

@@ -5,7 +5,7 @@ import { quote, ref, type ItemRef } from "../schemas";
 export const CHATS_PATH = "chats";
 export const CHAT_ICON = "MessageSquare";
 export const CONVERSATION_STARTED = "bb-studio-chat:started";
-const ROOT = `/plugins/studio/${CHATS_PATH}`;
+const ROOT = `/plugins/studio-chat/${CHATS_PATH}`;
 const STORE = "quotes";
 const savedQuote = z.object({ id: z.uuid(), item: ref, quote, createdAt: z.number() });
 export type QuoteDraft = z.infer<typeof savedQuote>;

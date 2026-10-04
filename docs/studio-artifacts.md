@@ -46,7 +46,7 @@ and an automatic sweep of every file an agent touches would bury them.
 1. **Agent saves it.** An `artifacts_save` tool takes a thread-storage or
    workspace path (or inline content for small text), a title, and an optional
    description. The skill tells agents to save finished deliverables, not
-   scratch files. The CLI mirror is `bb studio artifacts save <path>`. The tool
+   scratch files. The CLI mirror is `bb artifacts save <path>`. The tool
    replies with a `::artifact{id=…}` directive, so the saved item shows as a
    card in the conversation.
 2. **You save it.** A "Save to Studio" `messageAction` opens a picker listing
@@ -120,7 +120,7 @@ Header actions: **New thread** (mentions it), **Copy** (text types), **Download*
 - The tools are `artifacts_save`, `artifacts_list` and `artifacts_read`.
   `artifacts_save` also takes `artifactId` to add a version to a chosen
   artifact.
-- The CLI is `bb studio artifacts save | list | show | export | delete`. `export`
+- The CLI is `bb artifacts save | list | show | export | delete`. `export`
   copies an artifact into the thread's workspace, so an agent can edit a
   file and save it back.
 - "Save to Studio" is also in the thread panel launcher, where it lists the

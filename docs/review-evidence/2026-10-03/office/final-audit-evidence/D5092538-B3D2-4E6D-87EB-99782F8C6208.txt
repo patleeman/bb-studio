@@ -1,1 +1,0 @@
-inbox-default: policy 3: resolved element id= label=26 min. ago sRGB foreground=[14, 14, 14], background=[242, 242, 242], contrast=17.243946524470985:1; element frame=(298.33333333333337, 808.1666666666666, 71.66666666666663, 15.666666666666742)

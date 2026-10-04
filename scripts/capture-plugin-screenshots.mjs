@@ -23,7 +23,6 @@ import bb_studio_decisions from "./capture/captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./capture/captures/bb-studio-mobile.mjs";
 import bb_studio_tables from "./capture/captures/bb-studio-tables.mjs";
 import bb_studio_navigation from "./capture/captures/bb-studio-navigation.mjs";
-import office from "./capture/captures/office.mjs";
 import compactHeaders from "./capture/captures/compact-headers.mjs";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginFlag = process.argv.indexOf("--plugin");
@@ -39,7 +38,6 @@ const captureOnly = process.env.BB_CAPTURE_ONLY
 if (!projectId || !threadId) throw new Error("Set BB_CAPTURE_PROJECT_ID and BB_CAPTURE_THREAD_ID to a seeded BB thread before capturing.");
 const context = { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
 const captures = [
-  ...office(context),
   ...(process.env.BB_CAPTURE_COMPACT_HEADERS === "1" ? compactHeaders(context) : []),
   ...bb_studio_sidebar(context),
   ...bb_studio_teams(context),
@@ -60,12 +58,6 @@ const captures = [
   ...bb_studio_navigation(context)
 ];
 
-const selectedCaptures = captures.filter(capture =>
-  (!captureOnly || captureOnly.has(capture.id)) &&
-  (!packageOnly || capture.packageDir === packageOnly || capture.packageDir.startsWith(packageOnly + "/")),
-);
-if (!selectedCaptures.length) throw new Error("No captures match the selected plugin and capture IDs.");
-
 const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();
 const client = new CdpClient(webSocketUrl);
 await client.connect();
@@ -77,7 +69,8 @@ await client.command("Emulation.setDeviceMetricsOverride", {
 });
 
 try {
-  for (const capture of selectedCaptures) {
+  for (const capture of captures) {
+    if ((captureOnly && !captureOnly.has(capture.id)) || (packageOnly && capture.packageDir !== packageOnly)) continue;
     process.stdout.write(`Capturing ${capture.id}...\n`);
     const cleanup = await capture.setup(client);
     try {

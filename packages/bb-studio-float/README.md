@@ -10,13 +10,15 @@ right, or drag it anywhere.
 
 ![Live BB screenshot of Float's tab panel dragged over Studio](assets/staged-preview.png)
 
-Captured from stable BB with the Office sidebar, Orbit fixtures, and an open
-Page above Home. The capture uses the page header's **Move → Float this** action
-and verifies that the original live editor remains mounted when Home opens.
-
-```sh
-BB_CAPTURE_ONLY=office-float node scripts/capture-plugin-screenshots.mjs --plugin float
-```
+Captured from a staged BB (`node scripts/staged-bb.mjs start`): a Studio
+page ("Offline mode launch"), the seeded "Draft the ORBIT-42 release notes"
+thread and the "Checkout flow" drawing, each floated from its sidebar menu,
+as three tabs in one panel. The drawing's tab was dragged to the front,
+then the pinned page was selected over the Studio list. The capture also
+checks the real Pages editor and an unsent thread draft through tab switches,
+folding, hiding, and moving Float, and verifies the pin in saved state.
+Before their first Float moves, it records the main Pages editor and drawing
+canvas and verifies that both original nodes move into their companions.
 
 ![The original main Pages editor after a mobile header move](assets/first-main-transfer-mobile.png)
 
@@ -130,8 +132,8 @@ BB_CAPTURE_MAIN_THREAD=1 BB_CAPTURE_ONLY=float-native-main-thread \
 ## What you get
 
 - **Float from the sidebar.** **Float** is in the menu of every thread row (with
-  [Studio Sidebar](../bb-studio/src/modules/sidebar)), every channel row (with
-  [Studio Teams](../bb-studio/src/modules/teams)), and every Studio tab (with
+  [Studio Sidebar](../bb-studio-sidebar)), every channel row (with
+  [Studio Teams](../bb-studio-teams)), and every Studio tab (with
   [Studio](../bb-studio)).
 - **Move any item in one gesture.** This works on Studio items and threads
   anywhere: a collection row, a mention or embed on a page, a table's item
@@ -213,7 +215,7 @@ main route. The shared kit's `FloatPanels` does this
 Talk, Artifacts and Studio render it, so their items and views can float.
 Other plugins open tabs with the kit's `openFloat`.
 
-[Studio Chat](../bb-studio/src/modules/chat) provides the shared item-header Chat action
+[Studio Chat](../bb-studio-chat) provides the shared item-header Chat action
 and adds a "Viewing" chip to conversation tabs. Chat prefers the native
 workbench when available and otherwise opens Float.
 

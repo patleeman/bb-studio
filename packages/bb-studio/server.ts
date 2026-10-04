@@ -1,17 +1,3 @@
-import { registerServer as registerSidebar } from "./src/modules/sidebar/server";
-import { registerServer as registerNavigation } from "./src/modules/navigation/server";
-import { registerServer as registerTalk } from "./src/modules/talk/server";
-import { registerServer as registerDecisions } from "./src/modules/decisions/server";
-import { registerServer as registerArtifacts } from "./src/modules/artifacts/server";
-import { registerServer as registerTeams } from "./src/modules/teams/server";
-import { registerServer as registerTasks } from "./src/modules/tasks/server";
-import { registerServer as registerFeed } from "./src/modules/feed/server";
-import type { ModuleServices } from "./src/modules/services";
-import { ModuleRuntime } from "./src/modules/runtime";
-import type { LocalProvider } from "./src/hub";
-import { registerServer as registerTables } from "./src/modules/tables/server";
-import { registerServer as registerChat } from "./src/modules/chat/server";
-import { officeContract } from "./src/office/contract";
 import { initializeOffice } from "./src/office/server";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -29,7 +15,7 @@ import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 //   query language (src/query.ts) drives the agent tool and CLI too.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { rewriteLegacyText, STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type SpaceThreadView, type TabView } from "./src/contract";
@@ -67,34 +53,17 @@ function queryArg(arg: string): string {
   return filter ? `${filter[1]}"${filter[2]}"` : `"${arg}"`;
 }
 
-export default async function plugin(host: BbPluginApi) {
-  const runtime = new ModuleRuntime(host);
-  await registerCore(runtime.coreApi(), runtime.provider, runtime.services);
-  await runtime.register([
-    { name: "sidebar", legacyPluginId: "thread-list-plus", registerServer: registerSidebar },
-    { name: "navigation", legacyPluginId: "studio-navigation", registerServer: registerNavigation },
-    { name: "talk", legacyPluginId: "talk", registerServer: registerTalk },
-    { name: "decisions", legacyPluginId: "smart-decisions", skills: ["smart-decisions"], registerServer: registerDecisions },
-    { name: "artifacts", legacyPluginId: "artifacts", skills: ["artifacts"], registerServer: registerArtifacts },
-    { name: "teams", legacyPluginId: "bot-teams", skills: ["bots"], registerServer: registerTeams },
-    { name: "tasks", legacyPluginId: "studio-tasks", registerServer: registerTasks },
-    { name: "feed", legacyPluginId: "feed", registerServer: registerFeed },
-    { name: "tables", legacyPluginId: "studio-tables", skills: ["studio-tables"], registerServer: registerTables },
-    { name: "chat", legacyPluginId: "studio-chat", skills: ["studio-chat"], registerServer: registerChat },
-  ]);
-}
-
-async function registerCore(bb: BbPluginApi, modules: LocalProvider, moduleServices: ModuleServices) {
+export default async function plugin(bb: BbPluginApi) {
   // Spaces list as Studio's own items; `spaces` is set up below, before any call.
-  const hub = new StudioHub(bb.sdk, modules);
+  const hub = new StudioHub(bb.sdk);
   const changes = new ChangeLog();
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
-  const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
-  const { spaces, folders: officeFolders, home: officeHome } = await initializeOffice(bb, db, hub, { moduleServices, searchIndex });
+  const { spaces, folders: officeFolders } = await initializeOffice(bb, db, hub);
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
+  const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
   bb.onDispose(() => searchIndex.dispose());
   const contentSearch = async (query: string) => {
     await searchIndex.ensure();
@@ -433,11 +402,10 @@ async function registerCore(bb: BbPluginApi, modules: LocalProvider, moduleServi
   };
 
   const itemForPath = async (path: string) => {
-    path = rewriteLegacyText(path);
     const parts = path.split(/[?#]/)[0]!.split("/");
     const pluginId = parts[2];
     // A space opens at /plugins/studio/studio/space/<id>.
-    const id = pluginId === STUDIO_PLUGIN_ID && parts[3] === "studio" && parts[4] === "space" ? parts[5] : parts[4];
+    const id = pluginId === STUDIO_PLUGIN_ID ? parts[5] : parts[4];
     if (!pluginId || !id) return null;
     // A space's page opens as the space.
     const home = pluginId === PAGES_PLUGIN_ID ? spaces.list().find((space) => space.pageId === decodeURIComponent(id)) : undefined;
@@ -458,12 +426,8 @@ async function registerCore(bb: BbPluginApi, modules: LocalProvider, moduleServi
     return { panels: panels.map((panel) => ({ ...panel, visible: isPanelVisible(order, visible, panel.id) })) };
   };
 
-  const transitionalContract = { ...rpcContract, home: {
-    input: z.union([officeContract.home.input, rpcContract.home.input]),
-    output: z.union([officeContract.home.output, rpcContract.home.output]),
-  } };
-  bb.rpc.register(transitionalContract, {
-    home: input => "spaceId" in input ? officeHome(input.spaceId) : homeData(bb.sdk, hub, services, providerComments, input.projectId, input.periodDays),
+  bb.rpc.register(rpcContract, {
+    home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, providerComments, projectId, periodDays),
     homeRespond: async (input) => {
       await respondToNeed(bb.sdk, input);
       changes.append(null);
@@ -519,16 +483,9 @@ async function registerCore(bb: BbPluginApi, modules: LocalProvider, moduleServi
     archive: ({ pluginId, ids, archived }) => hub.call(pluginId, "studio_archive", { ids, archived }),
     remove: async ({ pluginId, ids }) => {
       if (pluginId === STUDIO_PLUGIN_ID) {
-        // Consolidated modules share Studio's plugin ID with spaces.
-        const spaceIds = ids.filter((id) => id.startsWith("spc_"));
-        const itemIds = ids.filter((id) => !id.startsWith("spc_"));
-        const done = spaceIds.filter((id) => spaces.get(id));
+        const done = ids.filter((id) => spaces.get(id));
         for (const id of done) deleteSpace(id);
-        const items = itemIds.length ? await deleteItems(pluginId, itemIds) : { done: [], failed: [] };
-        return {
-          done: [...done, ...items.done],
-          failed: [...spaceIds.filter((id) => !done.includes(id)).map((id) => ({ id, error: "That space no longer exists." })), ...items.failed],
-        };
+        return { done, failed: ids.filter((id) => !done.includes(id)).map((id) => ({ id, error: "That space no longer exists." })) };
       }
       return deleteItems(pluginId, ids);
     },

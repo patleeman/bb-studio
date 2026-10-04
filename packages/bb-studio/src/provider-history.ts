@@ -26,7 +26,7 @@ export class ProviderHistory {
         };
       }));
     }
-    if ((ref.pluginId === "artifacts" || (ref.pluginId === "studio" && ref.id.startsWith("art_")))) {
+    if (ref.pluginId === "artifacts") {
       const { versions } = await this.call("artifacts", "get", { id: ref.id }, z.object({ versions: z.array(z.object({ id: z.string(), name: z.string(), createdAt: z.number() })) }));
       return Promise.all(versions.map(async (version) => {
         const bytes = await this.read(ref, version.id);
@@ -42,7 +42,7 @@ export class ProviderHistory {
       const { bytes } = await this.call("pages", "snapshotBytes", { id: ref.id, snapshotId: id }, bytesSchema);
       return bytes ? Buffer.from(bytes, "base64") : null;
     }
-    if ((ref.pluginId === "artifacts" || (ref.pluginId === "studio" && ref.id.startsWith("art_")))) {
+    if (ref.pluginId === "artifacts") {
       const { bytes } = await this.call("artifacts", "versionBytes", { id: ref.id, versionId: id }, bytesSchema);
       return bytes ? Buffer.from(bytes, "base64") : null;
     }

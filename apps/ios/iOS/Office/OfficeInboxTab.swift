@@ -33,13 +33,13 @@ struct OfficeInboxTab: View {
                 let shown = store.events.filter { $0.doneAt == nil && (filter == nil || $0.spaceId == filter) }
                 let requests = shown.filter { $0.type == .request }
                 let rest = shown.filter { $0.type != .request }
-                Section {
+                Section("Needs You") {
                     if requests.isEmpty, !store.isLoading, store.error == nil {
                         Text("Nothing is waiting on you.").foregroundStyle(.secondary)
                     }
                     ForEach(requests) { event in row(event, store) }
-                } header: { Text("Needs You").foregroundStyle(Color(.label)) }
-                Section {
+                }
+                Section("Reports and Comments") {
                     if rest.isEmpty, !store.isLoading, store.error == nil {
                         Text("You're caught up.").foregroundStyle(.secondary)
                     }
@@ -47,7 +47,7 @@ struct OfficeInboxTab: View {
                     if store.nextCursor != nil {
                         Button("Load More") { Task { await store.loadMore() } }
                     }
-                } header: { Text("Reports and Comments").foregroundStyle(Color(.label)) }
+                }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Inbox")

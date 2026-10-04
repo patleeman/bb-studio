@@ -3,20 +3,20 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 
-const require = createRequire(new URL("../../../packages/bb-studio-pages/package.json", import.meta.url));
+const require = createRequire(new URL("../../../packages/bb-studio-explore/package.json", import.meta.url));
 const Database = require("better-sqlite3");
 
 export default ({ projectId, threadId, pluginRpc, sleep }) => ({
-  id: "explore-companions", packageDir: "bb-studio-pages/src/explore", fileName: "companion-preview.png", privateSidebar: true,
+  id: "explore-companions", packageDir: "bb-studio-explore", fileName: "companion-preview.png", privateSidebar: true,
   setup: async client => {
     const dataDir = process.env.BB_DATA_DIR;
     const manifest = await readFile(resolve(dataDir, "../capture.env"), "utf8");
     if (!manifest.includes(`export BB_DATA_DIR=${JSON.stringify(dataDir)}`) || !manifest.includes(`export BB_SERVER_URL=${process.env.BB_SERVER_URL}`)) throw new Error("Explore fixtures require an isolated staged BB capture.env");
-    const db = new Database(join(dataDir, "plugins/pages/explore.db"), { fileMustExist: true });
+    const db = new Database(join(dataDir, "plugins/explore/data.db"), { fileMustExist: true });
     const id = `expl_capture_${randomUUID()}`, jobId = `job_capture_${randomUUID()}`;
     const label = "How the upload queue retries", now = Date.now();
     let page;
-    const path = `/plugins/pages/explainers/${id}`, key = `path:${path}`;
+    const path = `/plugins/explore/explainers/${id}`, key = `path:${path}`;
     const root = `[data-float-window="${key}"]`, panel = `${root} [data-explainer-panel="${id}"]`;
     const forget = async () => {
       db.prepare("DELETE FROM explore_jobs WHERE id = ?").run(jobId);
@@ -32,12 +32,12 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => ({
         .run(id, id, threadId, `msg_capture_${id}`, "🏗️", label, projectId, "generating", now, now);
       db.prepare("INSERT INTO explore_jobs (id,explainer_id,kind,status,label,detail,progress,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
         .run(jobId, id, "generate", "writing", "Writing", "Investigating the upload queue", 45, now, now);
-      const seeded = await pluginRpc("pages", "explore_explainers", {});
+      const seeded = await pluginRpc("explore", "explainers", {});
       if (!seeded.explainers.some(explainer => explainer.id === id)) throw new Error("Explore's live RPC cannot read its seeded fixture");
-      await client.navigate("/plugins/pages/explainers");
+      await client.navigate("/plugins/explore/explainers");
       await client.waitForText(label);
       await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`);
-      await client.navigate(`/plugins/pages/explainers/thread/${threadId}`);
+      await client.navigate(`/plugins/explore/explainers/thread/${threadId}`);
       await client.waitForText(label);
       await client.dragBy(`button[data-explainer-open="${id}"]`, 0, 0);
       await client.waitForSelector(panel);

@@ -1,1 +1,0 @@
-capture-default: policy 3: resolved element id=captureClose label=Close sRGB foreground=[7, 7, 7], background=[243, 243, 247], contrast=18.20083208805953:1; element frame=(27.203980099502488, 257.23383084577114, 64.33333333333334, 34.56716417910451)

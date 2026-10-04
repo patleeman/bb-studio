@@ -1,114 +1,31 @@
 import SwiftUI
 
-/// Who you work with in this Space, opened from Tabs: bots as faces, then the
-/// conversations you have with them. A face opens the bot's desk; a channel
-/// opens the channel.
-struct OfficeTeamScreen: View {
-    @Environment(OfficeContext.self) private var office
-    @State private var adding = false
-
-    var body: some View {
-        Group {
-            if let team = office.team {
-                TeamList(store: team)
-            } else {
-                ProgressView()
-            }
-        }
-        .navigationTitle("Team")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { adding = true } label: { Label("Add a Bot", systemImage: "person.badge.plus") }
-                    .disabled(office.currentSpace == nil)
-            }
-        }
-        .sheet(isPresented: $adding) {
-            if let space = office.currentSpace { AddBotSheet(space: space) }
-        }
-    }
-}
-
-/// Hire a bot into the current Space: who it is, its mission, how much it may do.
-struct AddBotSheet: View {
+/// Who you work with in this Space: bots as faces, then the conversations you
+/// have with them. A face opens the bot's desk; a channel opens the channel.
+struct TeamTab: View {
     @EnvironmentObject private var app: AppModel
     @Environment(OfficeContext.self) private var office
-    @Environment(\.dismiss) private var dismiss
-    let space: OfficeSpace
-    @State private var name = ""
-    @State private var avatar = ""
-    @State private var role = ""
-    @State private var mission = ""
-    @State private var trust = "ask"
-    @State private var error: String?
-    @State private var saving = false
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Name", text: $name)
-                    TextField("Face (emoji)", text: $avatar)
-                    TextField("Role", text: $role)
+        NavigationStack(path: $app.teamPath) {
+            Group {
+                if let team = office.team {
+                    TeamList(store: team)
+                } else {
+                    ProgressView()
                 }
-                Section {
-                    TextField("What this bot is responsible for, and how it should work", text: $mission, axis: .vertical)
-                        .lineLimit(4...10)
-                } header: { Text("Mission") }
-                Section {
-                    Picker("Trust", selection: $trust) {
-                        Text("Ask first").tag("ask")
-                        Text("Act and report").tag("act")
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                } header: { Text("Trust") } footer: {
-                    Text(trust == "ask"
-                        ? "Asks in your Inbox before changing anything outside its own files."
-                        : "Acts on its own and tells you what it did.")
-                }
-                if let error { Section { Text(error).foregroundStyle(.red) } }
             }
-            .navigationTitle("Add a Bot")
+            .toolbar { ToolbarItem(placement: .principal) { SpaceSwitcher() } }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { save() }
-                        .disabled(saving || name.trimmingCharacters(in: .whitespaces).isEmpty
-                            || mission.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-        }
-    }
-
-    private func save() {
-        saving = true
-        var input: [String: JSONValue] = [
-            "name": .string(name.trimmingCharacters(in: .whitespaces)),
-            "mission": .string(mission.trimmingCharacters(in: .whitespacesAndNewlines)),
-            "description": .string(role.trimmingCharacters(in: .whitespaces)),
-            "trust": .string(trust),
-        ]
-        let face = avatar.trimmingCharacters(in: .whitespaces)
-        if !face.isEmpty { input["avatar"] = .string(face) }
-        if let project = space.defaultProjectId { input["projectId"] = .string(project) }
-        Task {
-            defer { saving = false }
-            do {
-                let _: JSONValue = try await app.client.rpc("studio", Studio.Method.teams_create, .object(input))
-                await office.team?.refresh()
-                dismiss()
-            } catch {
-                self.error = BBClient.describe(error)
-            }
+            .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+            .navigationDestination(for: BotDeskRoute.self) { BotDeskView(botId: $0.botId) }
         }
     }
 }
 
+struct BotDeskRoute: Hashable { var botId: String }
 
 private struct TeamList: View {
-    @EnvironmentObject private var app: AppModel
     @Environment(OfficeContext.self) private var office
     let store: TeamStore
 
@@ -119,7 +36,7 @@ private struct TeamList: View {
             if let error = store.error, store.bots.isEmpty {
                 Section { ConnectionBanner(message: error) { await store.refresh() } }
             }
-            Section {
+            Section("Team") {
                 if store.bots.isEmpty {
                     if !store.isLoading, store.error == nil {
                         Text("No bots work in this space yet.").foregroundStyle(.secondary)
@@ -127,30 +44,22 @@ private struct TeamList: View {
                 } else {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(store.bots) { bot in
-                            // Several links in one List row would all fire on a tap, so each
-                            // face is its own borderless button that pushes its desk.
-                            Button {
-                                app.push(.botDesk(id: bot.id))
-                            } label: {
+                            NavigationLink(value: BotDeskRoute(botId: bot.id)) {
                                 VStack(spacing: 6) {
                                     Face(bot, size: 52)
                                     Text(bot.name).font(.caption).lineLimit(1)
                                 }
                                 .frame(maxWidth: .infinity)
-                                .contentShape(Rectangle())
                             }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.primary)
-                            .accessibilityLabel(bot.name)
-                            .accessibilityHint("Opens \(bot.name)'s desk")
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.vertical, 8)
                 }
-            } header: { Text("Team").foregroundStyle(Color(.label)) }
+            }
             let channels = store.conversations.filter { !$0.isDirect }
             if !channels.isEmpty {
-                Section {
+                Section("Conversations") {
                     ForEach(channels) { conversation in
                         NavigationLink(value: Route.savedView(id: conversation.id)) {
                             HStack(spacing: 10) {
@@ -173,7 +82,7 @@ private struct TeamList: View {
                             }
                         }
                     }
-                } header: { Text("Conversations").foregroundStyle(Color(.label)) }
+                }
             }
         }
         .listStyle(.insetGrouped)
@@ -262,13 +171,13 @@ struct BotDeskView: View {
     @ViewBuilder
     private func chat(_ desk: OfficeBotDesk) -> some View {
         if let threadId = desk.directThreadId {
-            ThreadView(threadId: threadId, title: desk.bot.name).id(threadId)
+            ThreadView(threadId: threadId).id(threadId)
         } else {
             VStack(spacing: 12) {
                 Text("You haven't talked with \(desk.bot.name) directly yet.").foregroundStyle(.secondary)
                 Button("Message \(desk.bot.name)") {
                     Task {
-                        try? await app.client.officeDirectMessage(botId: botId)
+                        _ = try? await app.client.officePendingCall("talk_dm", ["botId": .string(botId)])
                         await load()
                     }
                 }
@@ -296,8 +205,8 @@ struct BotDeskView: View {
                 LabeledContent("Trust", value: trustLabel(desk.bot.trust))
             }
             if let memory = desk.memory {
-                Section { Text(memory.mission.isEmpty ? "No mission yet." : memory.mission).font(.callout) } header: { Text("Mission").foregroundStyle(Color(.label)) }
-                Section { Text(memory.memory.isEmpty ? "Nothing remembered yet." : memory.memory).font(.callout) } header: { Text("Memory").foregroundStyle(Color(.label)) }
+                Section("Mission") { Text(memory.mission.isEmpty ? "No mission yet." : memory.mission).font(.callout) }
+                Section("Memory") { Text(memory.memory.isEmpty ? "Nothing remembered yet." : memory.memory).font(.callout) }
             }
             Section {
                 NavigationLink(value: Route.bot(id: botId)) { Label("Edit Profile", systemImage: "pencil") }

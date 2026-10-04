@@ -55,7 +55,7 @@ struct SavedViewScreen: View {
         .sheet(isPresented: $editing) { if let view = page?.view { SavedViewEditor(initial: view) { _ in Task { await load() } } } }
         .task {
             listener = app.realtime.listen { event in
-                if case .pluginSignal(let pluginId, _, _) = event, pluginId == "studio" { Task { await load() } }
+                if case .pluginSignal(let pluginId, _, _) = event, pluginId == "bot-teams" { Task { await load() } }
             }
             bots = (try? await app.client.profiles()) ?? []
             await load()

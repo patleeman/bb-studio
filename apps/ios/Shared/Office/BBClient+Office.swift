@@ -1,42 +1,6 @@
 import Foundation
 
 extension BBClient {
-    public func officeTeam(_ spaceId: String) async throws -> [OfficeTeamBot] {
-        struct Result: Decodable { var bots: [OfficeTeamBot] }
-        let result: Result = try await rpc("studio", Studio.Method.team_list, ["spaceId": .string(spaceId)])
-        return result.bots
-    }
-
-    public func officeTalk(_ spaceId: String) async throws -> [OfficeConversation] {
-        struct Result: Decodable { var conversations: [OfficeConversation] }
-        let result: Result = try await rpc("studio", Studio.Method.talk_list, ["spaceId": .string(spaceId)])
-        return result.conversations
-    }
-
-    /// Creates or reuses the bot's DM and returns both navigation targets.
-    @discardableResult
-    public func officeDirectMessage(botId: String) async throws -> OfficeDirectMessageResult {
-        try await rpc("studio", Studio.Method.talk_dm, ["botId": .string(botId)])
-    }
-
-    public func officeDelegate(botId: String, brief: String, schedule: OfficeSchedule? = nil,
-                               context: [String]? = nil, folderId: String? = nil) async throws -> OfficeDelegationResult {
-        try await rpc("studio", Studio.Method.delegate, .object(omittingNil: [
-            "botId": .string(botId), "brief": .string(brief),
-            "context": context.map { .array($0.map(JSONValue.string)) },
-            "folderId": folderId.map(JSONValue.string), "schedule": schedule.map { .string($0.rawValue) },
-        ]))
-    }
-
-    public func officeBotDesk(_ botId: String) async throws -> OfficeBotDesk {
-        try await rpc("studio", Studio.Method.bot_desk, ["botId": .string(botId)])
-    }
-
-    /// The backend dispatches the office Home shape when spaceId is supplied.
-    public func officeHome(_ spaceId: String) async throws -> OfficeHome {
-        try await rpc("studio", Studio.Method.home, ["spaceId": .string(spaceId)])
-    }
-
     public func officeSpaces() async throws -> [OfficeSpace] {
         struct Result: Decodable { var spaces: [OfficeSpace] }
         let result: Result = try await rpc("studio", Studio.Method.spaces_list, [:])

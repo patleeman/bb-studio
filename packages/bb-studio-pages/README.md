@@ -1,11 +1,11 @@
 # Studio Pages
 
-> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), Studio Pages, [Studio Talk](../bb-studio/src/modules/talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio/src/modules/artifacts), [Studio Tasks](../bb-studio/src/modules/tasks), [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../bb-studio/src/modules/teams).
+> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), Studio Pages, [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), [Studio Chat](../bb-studio-chat), and [Studio Teams](../bb-studio-teams).
 
 Collaborative documents for BB that you write together with your agents.
 Pages gives you a Notion-style block editor with live multiplayer editing,
 comments, charts, and embeds. It also connects to
-[Studio Teams](../bb-studio/src/modules/teams): @mention a bot in a page to hand it
+[Studio Teams](../bb-studio-teams): @mention a bot in a page to hand it
 work, or give a page an owner bot that keeps it up to date on a schedule.
 
 With Studio Talk installed, the microphone in a comment box lets you dictate
@@ -150,7 +150,7 @@ afterwards.
   Conversations use the shared companion system: workbench on a capable BB
   host, Float on stable hosts without that capability, or ordinary thread
   navigation without Float. Existing page chats and links still work.
-  [Studio Chat](../bb-studio/src/modules/chat) provides the suite-wide item links and
+  [Studio Chat](../bb-studio-chat) provides the suite-wide item links and
   conversation picker when installed. Standalone Pages uses the same
   retained companion tabs and preserves its existing composer draft keys.
   New conversation focuses `/plugins/pages/pages/<id>/compose`; it keeps
@@ -163,7 +163,7 @@ afterwards.
 
 ## Dictation with Talk
 
-With the [Talk](../bb-studio/src/modules/talk) plugin installed, you can dictate into a
+With the [Talk](../bb-studio-talk) plugin installed, you can dictate into a
 page:
 
 - The **Dictate** button at the top right, or **Dictate** in the `/` menu, starts Talk. Press
@@ -261,9 +261,3 @@ run `pnpm tailwind:blocknote` to regenerate it.
 ## Templates and export
 
 Studio can duplicate a page with its subpages, mark a page as a template, and instantiate it with `{{name}}` variables. The provider exports Markdown with uploaded assets, printable HTML with those assets, or a text PDF. Use Studio's New menu to start from a saved template.
-
-## Explore
-
-[Explore](src/explore/README.md) is included in Pages. The Suggest things to explore setting adds findings to agent answers; the existing Explore tool, directive, and explainer views remain available. CLI commands use `bb pages explore …`.
-
-For an existing installation, disable the old Explore plugin, reload Pages to import its explainers and settings, and then uninstall the old plugin. Pages keeps the original database and records a one-time import into its separate `explore.db`.

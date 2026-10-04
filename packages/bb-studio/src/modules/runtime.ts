@@ -1,26 +1,15 @@
-import { join } from "node:path";
-import { ModuleHooks } from "./hooks";
-import { officeTrustAgents } from "../office/trust-agents";
-import { ModuleAgents } from "./agents";
-import { moduleSettings } from "./settings";
-import { moduleStatusContract } from "./status";
-import { cleanupLegacyModules } from "./cleanup";
-import { migrateModuleRefs } from "./refs";
 import type Database from "better-sqlite3";
 import type { BbPluginApi, PluginCliRegistration, PluginRpcContract, PluginRpcHandlers, PluginStorage } from "@get-bb/plugin-sdk";
 import { importModule } from "./import";
-import { ModuleProvider, moduleProviderContract } from "./provider";
 import { ModuleServices } from "./services";
 
 export interface ModuleContext {
   bb: BbPluginApi;
   services: ModuleServices;
-  coreDatabase?: Database.Database;
 }
 export interface ServerModule {
   name: string;
   legacyPluginId: string;
-  skills?: string[];
   registerServer(context: ModuleContext): void | Promise<void>;
 }
 
@@ -31,18 +20,12 @@ export const moduleMethod = (module: string, method: string) => `${module}_${met
 export class ModuleRuntime {
   readonly services = new ModuleServices();
   readonly skipped: string[] = [];
-  readonly legacyInstalled: string[] = [];
-  readonly provider = new ModuleProvider(this.services);
-  private readonly databases: Database.Database[] = [];
-  private readonly activeIds: string[] = [];
   private readonly commands = new Map<string, PluginCliRegistration>();
   private coreCommand: PluginCliRegistration | undefined;
   private readonly coreContract: Record<string, PluginRpcContract[string]> = {};
   private readonly coreHandlers: PluginRpcHandlers<PluginRpcContract> = {};
 
-  private readonly agents: ModuleAgents;
-  private readonly hooks: ModuleHooks;
-  constructor(private readonly host: BbPluginApi) { this.hooks = new ModuleHooks(host.experimental_hooks); this.agents = new ModuleAgents(officeTrustAgents(host, this.services)); }
+  constructor(private readonly host: BbPluginApi) {}
 
   private sdk(): BbPluginApi["sdk"] {
     const sdk = this.host.sdk;
@@ -54,7 +37,7 @@ export class ModuleRuntime {
   }
 
   coreApi(): BbPluginApi {
-    return { ...this.host, sdk: this.sdk(), experimental_hooks: this.hooks.scope(), agents: this.agents.scope(["studio"]), rpc: { register: (contract, handlers, options) => {
+    return { ...this.host, sdk: this.sdk(), rpc: { register: (contract, handlers, options) => {
       Object.assign(this.coreContract, contract);
       Object.assign(this.coreHandlers, handlers);
       this.host.rpc.register(contract, handlers, options);
@@ -68,7 +51,6 @@ export class ModuleRuntime {
     this.services.register("studio", this.coreContract, this.coreHandlers);
     const installed = (await this.host.sdk.plugins.list()).plugins;
     for (const module of modules) {
-      if (installed.some(plugin => plugin.id === module.legacyPluginId)) this.legacyInstalled.push(module.legacyPluginId);
       // Enabled legacy plugins may still be starting. Do not race their tools
       // or take a snapshot while they can continue writing their old store.
       if (installed.some(plugin => plugin.id === module.legacyPluginId && plugin.enabled)) {
@@ -77,31 +59,7 @@ export class ModuleRuntime {
       }
       await this.registerModule(module);
     }
-    if (this.legacyInstalled.length) this.host.log.warn(`Studio now includes ${this.legacyInstalled.join(", ")}. Disable those old plugins, then reload Studio to import their data and settings before uninstalling them.`);
-    for (const database of [this.host.storage.database(), ...this.databases]) {
-      const cells = migrateModuleRefs(database, [...this.activeIds, "explore"]);
-      if (cells) this.host.log.info(`Studio module references: rewrote ${cells} cells`);
-    }
-    if (this.provider.kinds.length) {
-      Object.assign(this.coreContract, moduleProviderContract);
-      Object.assign(this.coreHandlers, this.provider.handlers);
-      this.host.rpc.register(moduleProviderContract, this.provider.handlers);
-    }
-    let cleanupRunning = false;
-    this.host.rpc.register(moduleStatusContract, {
-      modules_status: () => ({ active: modules.filter(module => this.activeIds.includes(module.legacyPluginId)).map(module => module.name), legacyInstalled: this.legacyInstalled }),
-      modules_cleanup_legacy: async ({ dryRun }) => {
-        if (cleanupRunning) throw new Error("Legacy cleanup is already running");
-        cleanupRunning = true;
-        try {
-          const Constructor = this.host.storage.database().constructor as new (path: string, options?: Database.Options) => Database.Database;
-          return await cleanupLegacyModules({ dataDir: this.host.server.experimental_dataDir, dryRun,
-            open: (path, options) => new Constructor(path, options), installed: async () => (await this.host.sdk.plugins.list()).plugins });
-        } finally { cleanupRunning = false; }
-      },
-    });
-    this.agents.register();
-    this.hooks.register();
+    if (this.skipped.length) this.host.log.warn(`Studio now includes ${this.skipped.join(", ")}. Uninstall those old plugins, then reload Studio to import their data.`);
     const core = this.coreCommand;
     if (core) this.host.cli.register({ ...core, commands: [
       ...core.commands ?? [],
@@ -118,12 +76,11 @@ export class ModuleRuntime {
     const path = await importModule({ dataDir: this.host.server.experimental_dataDir, module: module.name,
       legacyPluginId: module.legacyPluginId, core, open: (path, options) => new Constructor(path, options), legacyRunning: false });
     const db = new Constructor(path);
-    this.databases.push(db); this.activeIds.push(module.legacyPluginId);
     db.pragma("journal_mode = WAL"); db.pragma("busy_timeout = 5000");
     this.host.onDispose(() => { if (db.open) db.close(); });
     const contract: Record<string, PluginRpcContract[string]> = {};
     const handlers: Record<string, PluginRpcHandlers<PluginRpcContract>[string]> = {};
-    const api: BbPluginApi = { ...this.host, sdk: this.sdk(), experimental_hooks: this.hooks.scope(), agents: this.agents.scope(module.skills), settings: moduleSettings(this.host.settings, db, module.name, join(this.host.server.experimental_dataDir, "plugins", module.legacyPluginId, "secrets")), storage: {
+    const api: BbPluginApi = { ...this.host, sdk: this.sdk(), storage: {
       ...this.host.storage, database: () => db, kv: moduleKv(db),
     }, rpc: { register: (methods, implementations, options) => {
       const exposed: Record<string, PluginRpcContract[string]> = {};
@@ -134,16 +91,13 @@ export class ModuleRuntime {
         exposed[moduleMethod(module.name, name)] = methods[name];
         publicHandlers[moduleMethod(module.name, name)] = implementations[name];
       }
-      Object.assign(this.coreContract, exposed);
-      Object.assign(this.coreHandlers, publicHandlers);
       this.host.rpc.register(exposed, publicHandlers, options);
     } }, cli: { register: command => {
       if (this.commands.has(module.legacyPluginId)) throw new Error(`Duplicate module CLI: ${module.name}`);
       this.commands.set(module.legacyPluginId, command);
     } } };
-    await module.registerServer({ bb: api, services: this.services, coreDatabase: core });
+    await module.registerServer({ bb: api, services: this.services });
     this.services.register(module.legacyPluginId, contract, handlers);
-    if (contract.studio_describe) await this.provider.add(module.legacyPluginId);
   }
 }
 

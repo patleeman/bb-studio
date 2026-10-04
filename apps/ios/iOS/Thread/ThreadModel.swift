@@ -511,10 +511,7 @@ enum TimelineItem: Identifiable {
             pending = []
         }
         for row in rows {
-            if row.kind == "turn", let children = row.children {
-                flush()
-                items.append(contentsOf: group(children))
-            } else if row.isConversation, !(row.text ?? "").isEmpty || row.hasAttachments {
+            if row.isConversation, !(row.text ?? "").isEmpty || row.hasAttachments {
                 flush()
                 items.append(.message(row))
             } else if row.kind == "work" || row.kind == "system" {

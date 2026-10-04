@@ -12,10 +12,10 @@ it("copies a reference as a Markdown link to the item's view", () => {
 it("reads a reference back from its text", () => {
   expect(parseItemReference("[Plan](/plugins/pages/pages/pg_1)", "")).toEqual({ href: "/plugins/pages/pages/pg_1", title: "Plan" });
   expect(parseItemReference("@[Board](https://bb.local/plugins/studio-tasks/tasks/brd_1)", "https://bb.local")).toEqual({
-    href: "/plugins/studio/tasks/brd_1",
+    href: "/plugins/studio-tasks/tasks/brd_1",
     title: "Board",
   });
-  expect(parseItemReference("https://bb.local/plugins/talk/recordings/r_1", "https://bb.local")).toEqual({ href: "/plugins/studio/recordings/r_1" });
+  expect(parseItemReference("https://bb.local/plugins/talk/recordings/r_1", "https://bb.local")).toEqual({ href: "/plugins/talk/recordings/r_1" });
   expect(parseItemReference("[Web](https://example.com/plugins/a/b/c)", "https://bb.local")).toBeNull();
   expect(parseItemReference("See [Plan](/plugins/pages/pages/pg_1) today", "")).toBeNull();
 });
@@ -46,15 +46,9 @@ it("finds the @ query before the caret", () => {
 
 it("picks an item's icon from its link", () => {
   expect(itemLinkIcon("/plugins/pages/pages/pg_1")).toBe("pages/pages");
-  expect(itemLinkIcon("/plugins/studio-tasks/tasks/brd_1/list")).toBe("studio/board");
-  expect(itemLinkIcon("/plugins/studio-tasks/tasks/tsk_1")).toBe("studio/task");
+  expect(itemLinkIcon("/plugins/studio-tasks/tasks/brd_1/list")).toBe("studio-tasks/board");
+  expect(itemLinkIcon("/plugins/studio-tasks/tasks/tsk_1")).toBe("studio-tasks/task");
   expect(itemLinkIcon("/plugins/studio-tables/tables/tbl_1/view/v_1")).toBe("Rows2");
   expect(itemLinkIcon("/plugins/studio/studio/space/spc_1")).toBe("Layers");
   expect(itemLinkIcon("/plugins/unknown/things/x_1")).toBe("GridView");
-});
-
-
-it("accepts the absorbed table prefix and old route", () => {
-  expect(parseItemReference("studio-tables:tbl_1", "")).toEqual({ href: "/plugins/studio/tables/tbl_1" });
-  expect(parseItemReference("[Table](/plugins/studio-tables/tables/tbl_1)", "")).toEqual({ href: "/plugins/studio/tables/tbl_1", title: "Table" });
 });

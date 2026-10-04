@@ -11,7 +11,7 @@ the core: one collection that lists every item from every installed add-on.
 | Add-on | Plugin id | Items | Open with |
 | --- | --- | --- | --- |
 | Studio Pages | `pages` | Pages | the `pages` skill and `pages_*` tools |
-| Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb studio talk` |
+| Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Studio Draw | `excalidraw` | Drawings | the `draw` skill and `excalidraw_*` tools |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
 | Studio Tasks | `studio-tasks` | Task boards, and tasks on them you can hand to agents | the `studio-tasks` skill and `tasks_*` tools |

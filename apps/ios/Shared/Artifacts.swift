@@ -24,7 +24,7 @@ public struct Artifact: Decodable, Identifiable, Hashable, Sendable {
     }
 
     /// App path that opens it in BB web, and that agents link to.
-    public var href: String { "/plugins/studio/artifacts/\(id)" }
+    public var href: String { "/plugins/artifacts/artifacts/\(id)" }
 
     /// `art_` and 16 lowercase letters or digits.
     public static func isId(_ value: String) -> Bool {
@@ -77,7 +77,7 @@ extension BBClient {
             var artifact: Artifact?
             var versions: [ArtifactVersion]
         }
-        let result: Result = try await rpc("studio", "artifacts_get", ["id": .string(id)])
+        let result: Result = try await rpc("artifacts", "get", ["id": .string(id)])
         return (result.artifact, result.versions)
     }
 
@@ -87,14 +87,14 @@ extension BBClient {
             var text: String?
             var truncated: Bool
         }
-        let result: Result = try await rpc("studio", "artifacts_text", ["id": .string(id), "versionId": .string(versionId)])
+        let result: Result = try await rpc("artifacts", "text", ["id": .string(id), "versionId": .string(versionId)])
         return (result.text, result.truncated)
     }
 
     /// A version's bytes. Versions never change, so it caches forever.
     public func artifactContentURL(_ id: String, versionId: String, download: Bool = false) -> URL {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
-        components.path = "/api/v1/plugins/studio/http/content"
+        components.path = "/api/v1/plugins/artifacts/http/content"
         components.queryItems = [URLQueryItem(name: "artifact", value: id), URLQueryItem(name: "version", value: versionId)]
             + (download ? [URLQueryItem(name: "download", value: "1")] : [])
         return components.url!
@@ -102,41 +102,41 @@ extension BBClient {
 
     public func renameArtifact(_ id: String, title: String) async throws {
         let _: JSONValue = try await rpc(
-            "studio", "artifacts_update", ["id": .string(id), "title": .string(String(title.prefix(200)))])
+            "artifacts", "update", ["id": .string(id), "title": .string(String(title.prefix(200)))])
     }
 
     public func moveArtifact(_ id: String, projectId: String?) async throws {
         let _: JSONValue = try await rpc(
-            "studio", "artifacts_move", ["id": .string(id), "projectId": projectId.map { .string($0) } ?? .null])
+            "artifacts", "move", ["id": .string(id), "projectId": projectId.map { .string($0) } ?? .null])
     }
 
     public func deleteArtifact(_ id: String) async throws {
-        let _: JSONValue = try await rpc("studio", "artifacts_delete", ["id": .string(id)])
+        let _: JSONValue = try await rpc("artifacts", "delete", ["id": .string(id)])
     }
 
     /// Copies a Markdown or text artifact into a new page; returns the page's app path.
     public func saveArtifactAsPage(_ id: String) async throws -> String {
         struct Result: Decodable { var href: String }
-        let result: Result = try await rpc("studio", "artifacts_saveAsPage", ["id": .string(id)])
+        let result: Result = try await rpc("artifacts", "saveAsPage", ["id": .string(id)])
         return result.href
     }
 
     /// Artifacts saved from a thread.
     public func threadArtifacts(_ threadId: String) async throws -> [Artifact] {
         struct Result: Decodable { var artifacts: [Artifact] }
-        let result: Result = try await rpc("studio", "artifacts_threadArtifacts", ["threadId": .string(threadId)])
+        let result: Result = try await rpc("artifacts", "threadArtifacts", ["threadId": .string(threadId)])
         return result.artifacts
     }
 
     /// Files a reply produced (the reply ending at `seq`, or the latest one) and the thread's storage files.
     public func artifactCandidates(threadId: String, seq: Int?) async throws -> ArtifactCandidates {
-        try await rpc("studio", "artifacts_candidates", ["threadId": .string(threadId), "seq": seq.map { .number(Double($0)) } ?? .null])
+        try await rpc("artifacts", "candidates", ["threadId": .string(threadId), "seq": seq.map { .number(Double($0)) } ?? .null])
     }
 
     /// Saves files into Studio; a file saved before gets a new version.
     public func saveFilesToStudio(threadId: String, paths: [String]) async throws -> SavedFiles {
         try await rpc(
-            "studio", "artifacts_saveFiles", ["threadId": .string(threadId), "paths": .array(paths.prefix(50).map { .string($0) })])
+            "artifacts", "saveFiles", ["threadId": .string(threadId), "paths": .array(paths.prefix(50).map { .string($0) })])
     }
 }
 

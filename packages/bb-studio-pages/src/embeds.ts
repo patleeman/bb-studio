@@ -11,7 +11,7 @@ import { z } from "zod";
 import { PLUGIN_ID, spaceWidgetSchema, type BoardCard, type RecordingCard, type TaskCard, type TaskColumn } from "./contract";
 
 const MAX_TEXT = 20_000;
-const TASKS_PLUGIN_ID = "studio";
+const TASKS_PLUGIN_ID = "studio-tasks";
 const TALK_PLUGIN_ID = "talk";
 const STUDIO_PLUGIN_ID = "studio";
 
@@ -73,7 +73,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
   type Tables = typeof tablesContract;
   /** Calls Studio Tables with its own contract's schemas. */
   const table = <M extends keyof Tables>(method: M, input: z.input<Tables[M]["input"]>) =>
-    call(TABLES_PLUGIN_ID, `tables_${method}`, input, tablesContract[method].output) as Promise<z.infer<Tables[M]["output"]>>;
+    call(TABLES_PLUGIN_ID, method, input, tablesContract[method].output) as Promise<z.infer<Tables[M]["output"]>>;
 
   const spacesSchema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), icon: z.string().nullable(), description: z.string() })) });
   /** Studio's spaces, as items to mention; the index leaves Studio's own out. */
@@ -120,28 +120,28 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       return result;
     },
     async task(id: string): Promise<{ task: TaskCard | null; columns: TaskColumn[] }> {
-      const { task } = await call(TASKS_PLUGIN_ID, "tasks_get", { id }, taskSchema);
+      const { task } = await call(TASKS_PLUGIN_ID, "get", { id }, taskSchema);
       if (!task) return { task: null, columns: [] };
-      const { columns } = await call(TASKS_PLUGIN_ID, "tasks_statuses", task.boardId ? { boardId: task.boardId } : { projectId: task.projectId }, columnsSchema);
+      const { columns } = await call(TASKS_PLUGIN_ID, "statuses", task.boardId ? { boardId: task.boardId } : { projectId: task.projectId }, columnsSchema);
       return { task, columns };
     },
     async updateTask({ id, status, index, ...fields }: { id: string; title?: string; status?: string; index?: number; due?: string | null }) {
-      if (Object.keys(fields).length) await call(TASKS_PLUGIN_ID, "tasks_update", { id, ...fields }, okSchema);
-      if (status) await call(TASKS_PLUGIN_ID, "tasks_move", { id, status, ...(index !== undefined ? { index } : {}) }, okSchema.extend({ archivedThreads: z.number() }));
+      if (Object.keys(fields).length) await call(TASKS_PLUGIN_ID, "update", { id, ...fields }, okSchema);
+      if (status) await call(TASKS_PLUGIN_ID, "move", { id, status, ...(index !== undefined ? { index } : {}) }, okSchema.extend({ archivedThreads: z.number() }));
       return { ok: true };
     },
     /** A board and its open tasks, top-level and subtasks alike, in board order. */
     async board(id: string): Promise<{ board: BoardCard | null; tasks: TaskCard[] }> {
-      const { board, tasks } = await call(TASKS_PLUGIN_ID, "tasks_board", { boardId: id }, boardSchema);
+      const { board, tasks } = await call(TASKS_PLUGIN_ID, "board", { boardId: id }, boardSchema);
       return { board, tasks: board ? tasks.filter((task) => !task.archived) : [] };
     },
     async renameBoard(id: string, title: string) {
-      await call(TASKS_PLUGIN_ID, "tasks_boardUpdate", { id, title }, okSchema);
+      await call(TASKS_PLUGIN_ID, "boardUpdate", { id, title }, okSchema);
       index.invalidate();
       return { ok: true };
     },
     async createBoardTask(boardId: string, title: string, status?: string) {
-      const { task } = await call(TASKS_PLUGIN_ID, "tasks_create", { boardId, title, ...(status ? { status } : {}) }, z.object({ task: z.object({ id: z.string() }) }));
+      const { task } = await call(TASKS_PLUGIN_ID, "create", { boardId, title, ...(status ? { status } : {}) }, z.object({ task: z.object({ id: z.string() }) }));
       index.invalidate();
       return { taskId: task.id };
     },
@@ -179,18 +179,18 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
           if (!text || budget <= 0) return [];
           budget -= text.length;
           const query = `recording=${encodeURIComponent(recording.id)}&segment=${encodeURIComponent(segment.id)}`;
-          return [{ id: segment.id, offsetMs: segment.offsetMs, durationMs: segment.durationMs, text, url: `/api/v1/plugins/studio/http/audio?${query}` }];
+          return [{ id: segment.id, offsetMs: segment.offsetMs, durationMs: segment.durationMs, text, url: `/api/v1/plugins/talk/http/audio?${query}` }];
         }),
       };
     },
     async artifactView(id: string) {
-      const { artifact } = await sdk.plugins.callRpc({ pluginId: "studio", method: "artifacts_get", input: { id } as never, outputSchema: artifactSchema });
+      const { artifact } = await sdk.plugins.callRpc({ pluginId: "artifacts", method: "get", input: { id } as never, outputSchema: artifactSchema });
       if (!artifact) return null;
       const { version } = artifact;
       let text: string | null = null;
       if (version.type === "markdown" || version.type === "code" || version.type === "text") {
         const result = await sdk.plugins.callRpc({
-          pluginId: "studio",
+          pluginId: "artifacts",
           method: "studio_read",
           input: { id, format: "markdown" } as never,
           outputSchema: studio.provider.studio_read.output,
@@ -198,7 +198,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
         text = result.content === null ? null : result.content.slice(0, MAX_TEXT) + (result.content.length > MAX_TEXT ? "\n…" : "");
       }
       const query = `artifact=${encodeURIComponent(artifact.id)}&version=${encodeURIComponent(version.id)}`;
-      return { type: version.type, name: version.name, url: `/api/v1/plugins/studio/http/content?${query}`, text };
+      return { type: version.type, name: version.name, url: `/api/v1/plugins/artifacts/http/content?${query}`, text };
     },
   };
 }

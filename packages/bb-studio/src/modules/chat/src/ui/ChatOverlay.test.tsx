@@ -69,12 +69,12 @@ beforeEach(async () => {
   state.composer = state.picker = null;
   state.float.mockReturnValue(true);
   state.rpc.call.mockImplementation(async (method, input) => {
-    if (method === "chat_viewing") return { item: main };
-    if (method === "chat_subject") return { item: input.id === companion.id ? companion : main };
-    if (method === "chat_home") return { thread: null };
-    if (method === "chat_send") return { threadId: null };
-    if (method === "chat_start") return { threadId: "created_thread" };
-    if (method === "chat_link") return { thread: { threadId: input.threadId, title: "Chosen", origin: "chosen" } };
+    if (method === "viewing") return { item: main };
+    if (method === "subject") return { item: input.id === companion.id ? companion : main };
+    if (method === "home") return { thread: null };
+    if (method === "send") return { threadId: null };
+    if (method === "start") return { threadId: "created_thread" };
+    if (method === "link") return { thread: { threadId: input.threadId, title: "Chosen", origin: "chosen" } };
     throw new Error(`Unexpected RPC ${method}`);
   });
   container = document.createElement("div");
@@ -89,7 +89,7 @@ describe("item Chat actions", () => {
     state.available = true;
     await render();
     await actHost(host => host.start!(companion));
-    const expected = { kind: "path", path: `/plugins/studio/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: companion.pluginId, id: companion.id }))}`, title: "Chat: Companion drawing", icon: "MessageSquare" };
+    const expected = { kind: "path", path: `/plugins/studio-chat/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: companion.pluginId, id: companion.id }))}`, title: "Chat: Companion drawing", icon: "MessageSquare" };
     expect(state.float).toHaveBeenCalledWith(expected);
     expect(container.querySelector("textarea")).toBeNull();
     await actHost(host => host.start!(companion));
@@ -99,7 +99,7 @@ describe("item Chat actions", () => {
   it("refreshes an item's home after a retained composer creates its thread", async () => {
     state.rpc.call.mockClear();
     await act(async () => { window.dispatchEvent(new CustomEvent("bb-studio-chat:started", { detail: { pluginId: companion.pluginId, id: companion.id } })); });
-    expect(state.rpc.call).toHaveBeenCalledWith("chat_home", { pluginId: companion.pluginId, id: companion.id });
+    expect(state.rpc.call).toHaveBeenCalledWith("home", { pluginId: companion.pluginId, id: companion.id });
   });
 
   it("refreshes again when a conversation is created during an earlier home lookup", async () => {
@@ -142,7 +142,7 @@ describe("item Chat actions", () => {
     await actHost(host => host.send(companion, { ...quote, image }));
     expect(container.querySelector("img")?.src).toBe(image);
     await act(async () => { await state.composer.onSubmit({ input: [{ type: "text", text: "Fix the arrow" }] }); });
-    expect(state.rpc.call).toHaveBeenCalledWith("chat_start", {
+    expect(state.rpc.call).toHaveBeenCalledWith("start", {
       item: { pluginId: companion.pluginId, id: companion.id },
       request: { input: [{ type: "text", text: "Fix the arrow" }, { type: "image", url: image }] },
     });
@@ -157,7 +157,7 @@ describe("item Chat actions", () => {
     expect(container.querySelector("textarea")).not.toBeNull();
     const request = { input: [{ type: "text", text: "Fix it" }] };
     await act(async () => { await state.composer.onSubmit(request); });
-    expect(state.rpc.call).toHaveBeenCalledWith("chat_start", { item: { pluginId: companion.pluginId, id: companion.id }, request });
+    expect(state.rpc.call).toHaveBeenCalledWith("start", { item: { pluginId: companion.pluginId, id: companion.id }, request });
     expect(state.float).toHaveBeenCalledWith({ kind: "thread", threadId: "created_thread" }, { tag: "studio-chat:item" });
   });
 
@@ -165,7 +165,7 @@ describe("item Chat actions", () => {
     await actHost((host) => host.choose(companion));
     expect(container.textContent).toContain("Companion drawing");
     await act(async () => { state.picker.onPick("picked_thread"); });
-    expect(state.rpc.call).toHaveBeenCalledWith("chat_link", { pluginId: companion.pluginId, id: companion.id, threadId: "picked_thread" });
+    expect(state.rpc.call).toHaveBeenCalledWith("link", { pluginId: companion.pluginId, id: companion.id, threadId: "picked_thread" });
     expect(state.host!.home(companion)?.threadId).toBe("picked_thread");
     expect(state.host!.home(main)).toBeNull();
   });
@@ -175,7 +175,7 @@ describe("item Chat actions", () => {
     expect(state.composer.initialPrompt).toContain("Keep this arrow");
     expect(state.composer.defaultProjectId).toBe(companion.projectId);
     expect(container.textContent).toContain(companion.title);
-    expect(state.rpc.call).toHaveBeenCalledWith("chat_subject", { pluginId: companion.pluginId, id: companion.id });
+    expect(state.rpc.call).toHaveBeenCalledWith("subject", { pluginId: companion.pluginId, id: companion.id });
   });
 
   it("continues the linked conversation and can explicitly start another", async () => {
@@ -192,7 +192,7 @@ describe("item Chat actions", () => {
 
   it("keeps the latest intent when an earlier item resolves late", async () => {
     let release!: (value: { item: Viewed }) => void;
-    state.rpc.call.mockImplementation((method, input) => method === "chat_subject" && input.id === main.id
+    state.rpc.call.mockImplementation((method, input) => method === "subject" && input.id === main.id
       ? new Promise((resolve) => { release = resolve; })
       : Promise.resolve({ item: companion }));
     await actHost((host) => host.start!(main));
@@ -223,7 +223,7 @@ describe("item Chat actions", () => {
     await actHost((host) => host.start!(companion));
     let release!: (value: { threadId: string }) => void;
     const original = state.rpc.call.getMockImplementation()!;
-    state.rpc.call.mockImplementation((method, input) => method === "chat_start"
+    state.rpc.call.mockImplementation((method, input) => method === "start"
       ? new Promise((resolve) => { release = resolve; }) : original(method, input));
     let sending!: Promise<void>;
     await act(async () => { sending = state.composer.onSubmit({ input: [{ type: "text", text: "Fix it" }] }); });
@@ -260,6 +260,6 @@ describe("item Chat actions", () => {
     state.rpc.call.mockResolvedValue({ item: { ...main, pluginId: "bot-teams", id: "launch", kind: "view", href: state.path } });
     await render();
     expect(container.children).toHaveLength(0);
-    expect(state.rpc.call.mock.calls.map(([method]) => method)).toEqual(["chat_viewing"]);
+    expect(state.rpc.call.mock.calls.map(([method]) => method)).toEqual(["viewing"]);
   });
 });

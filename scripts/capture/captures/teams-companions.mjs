@@ -3,23 +3,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, sleep }) => ({
-  id: "bots-companions", packageDir: "bb-studio/src/modules/teams", fileName: "companion-preview.png",
+  id: "bots-companions", packageDir: "bb-studio-teams", fileName: "companion-preview.png",
   setup: async client => {
     await launchRoomThread();
     const id = getLaunchRoomId();
-    const { bots } = await pluginRpc("studio", "teams_list", null);
+    const { bots } = await pluginRpc("bot-teams", "list", null);
     const bot = bots.find(b => b.handle === "atlas");
     if (!bot) throw new Error("Missing staged Atlas profile");
-    const before = new Set((await pluginRpc("studio", "teams_profileThreads", { id: bot.id })).map(t => t.threadId));
+    const before = new Set((await pluginRpc("bot-teams", "profileThreads", { id: bot.id })).map(t => t.threadId));
     const directory = await mkdtemp(join(tmpdir(), "bb-teams-companions-"));
     const attachment = join(directory, "release-review.txt");
     await writeFile(attachment, "Deterministic attachment retained by the saved-view composer.\n");
-    const viewKey = `path:/plugins/studio/channels/${id}`;
-    const botKey = `path:/plugins/studio/bots/${bot.id}`;
+    const viewKey = `path:/plugins/bot-teams/channels/${id}`;
+    const botKey = `path:/plugins/bot-teams/bots/${bot.id}`;
     const composer = `[data-float-window="${viewKey}"] [data-view-composer] [contenteditable="true"]`;
     const forget = async () => {
       await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1'); delete window.bbTeamsCompanionComposer`).catch(() => {});
-      for (const thread of await pluginRpc("studio", "teams_profileThreads", { id: bot.id })) if (!before.has(thread.threadId)) await bbCli(["thread", "delete", thread.threadId, "--yes", "--json"]);
+      for (const thread of await pluginRpc("bot-teams", "profileThreads", { id: bot.id })) if (!before.has(thread.threadId)) await bbCli(["thread", "delete", thread.threadId, "--yes", "--json"]);
       await rm(directory, { recursive: true, force: true });
     };
     const retained = async visible => {
@@ -31,9 +31,9 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, sleep }) 
       if (!result.same || result.count !== 1 || result.visible !== visible || !result.draft?.includes("Keep the release review draft.") || !result.attachment) throw new Error(`Saved-view state was lost: ${JSON.stringify(result)}`);
     };
     try {
-      await client.navigate(`/plugins/studio/bots/${bot.id}/profile`);
+      await client.navigate(`/plugins/bot-teams/bots/${bot.id}/profile`);
       await client.waitForText("Research and verify the facts");
-      await client.navigate(`/plugins/studio/channels/${id}`);
+      await client.navigate(`/plugins/bot-teams/channels/${id}`);
       await client.waitForSelector('[data-thread-view]');
       await client.waitForSelector(`[data-studio-tab="bot-teams:${id}"] a`);
       await client.openContextMenu(`[data-studio-tab="bot-teams:${id}"] a`);
@@ -50,7 +50,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, sleep }) 
       await client.command("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [attachment] });
       await client.waitForText("release-review.txt");
       await retained(true);
-      const ownChat = await pluginRpc("studio", "chat_viewing", { path: `/plugins/studio/channels/${id}` });
+      const ownChat = await pluginRpc("studio-chat", "viewing", { path: `/plugins/bot-teams/channels/${id}` });
       if (ownChat.item) throw new Error("Saved view still triggers automatic Studio Chat");
 
       await client.dragBy(`[data-studio-tab="bot-teams:${bot.id}"] a`, 0, 0);
@@ -60,11 +60,11 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, sleep }) 
       await client.clickElementWithTextAndPointer('[role="menuitem"]', "Float this");
       await client.waitForSelector(`[data-float-window="${botKey}"] [data-studio-item-header]`);
       await retained(false);
-      const conversation = await pluginRpc("studio", "teams_conversation", { id: bot.id });
-      const baseline = (await pluginRpc("studio", "teams_profileThreads", { id: bot.id })).length;
+      const conversation = await pluginRpc("bot-teams", "conversation", { id: bot.id });
+      const baseline = (await pluginRpc("bot-teams", "profileThreads", { id: bot.id })).length;
       await client.clickElementWithTextAndPointer(`[data-float-window="${botKey}"] [data-studio-item-header] button`, "Chat");
       await client.waitForSelector(`[data-float-window="thread:${conversation.threadId}"] [data-promptbox]`);
-      if ((await pluginRpc("studio", "teams_profileThreads", { id: bot.id })).length !== baseline) throw new Error("Bot Chat created a duplicate conversation");
+      if ((await pluginRpc("bot-teams", "profileThreads", { id: bot.id })).length !== baseline) throw new Error("Bot Chat created a duplicate conversation");
       await retained(false);
       await client.dragBy(`[data-float-tab="${viewKey}"]`, 0, 0);
       await retained(true);

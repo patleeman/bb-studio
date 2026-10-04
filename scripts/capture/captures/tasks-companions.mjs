@@ -3,11 +3,11 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const require = createRequire(new URL("../../../packages/bb-studio/src/modules/tasks/package.json", import.meta.url));
+const require = createRequire(new URL("../../../packages/bb-studio-tasks/package.json", import.meta.url));
 const Database = require("better-sqlite3");
 
 export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
-  id: "tasks-companions", packageDir: "bb-studio/src/modules/tasks", fileName: "companion-handoffs.png", privateSidebar: true,
+  id: "tasks-companions", packageDir: "bb-studio-tasks", fileName: "companion-handoffs.png", privateSidebar: true,
   setup: async client => {
     const dataDir = process.env.BB_DATA_DIR;
     const manifest = await readFile(resolve(dataDir, "../capture.env"), "utf8");
@@ -18,7 +18,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
     await writeFile(attachment, "Keep this reply attachment with its handoff thread.\n");
     const threads = []; let boardId, task;
     const forget = async () => {
-      if (boardId) await pluginRpc("studio", "tasks_boardDelete", { id: boardId }).catch(() => {});
+      if (boardId) await pluginRpc("studio-tasks", "boardDelete", { id: boardId }).catch(() => {});
       for (const threadId of threads) await bbCli(["thread", "delete", threadId, "--yes", "--json"]);
       await cleanup(); await rm(directory, { recursive: true, force: true });
       await client.evaluate("sessionStorage.removeItem('bb-studio-float:windows'); delete window.bbTaskDraft").catch(() => {});
@@ -37,7 +37,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
       await client.clickElementWithTextAndPointer(selector, text);
     };
     const assertMain = async () => {
-      if (await client.evaluate("location.pathname") !== `/plugins/studio/tasks/${task.id}`) throw new Error("A handoff replaced the main task instead of opening a companion");
+      if (await client.evaluate("location.pathname") !== `/plugins/studio-tasks/tasks/${task.id}`) throw new Error("A handoff replaced the main task instead of opening a companion");
     };
     const assertRetained = async () => {
       const state = await client.evaluate(`(() => { const node = document.querySelector(${JSON.stringify(draft(threads[0]))}); return {
@@ -48,8 +48,8 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
       await assertMain();
     };
     try {
-      ({ board: { id: boardId } } = await pluginRpc("studio", "tasks_boardCreate", { title: "Companion handoff checks", projectId }));
-      ({ task } = await pluginRpc("studio", "tasks_create", { title: "Review the offline launch", boardId, projectId, assignee: "agent", status: "review", description: "Check the rollout plan and retain feedback beside this task." }));
+      ({ board: { id: boardId } } = await pluginRpc("studio-tasks", "boardCreate", { title: "Companion handoff checks", projectId }));
+      ({ task } = await pluginRpc("studio-tasks", "create", { title: "Review the offline launch", boardId, projectId, assignee: "agent", status: "review", description: "Check the rollout plan and retain feedback beside this task." }));
       for (let index = 0; index < 3; index++) {
         const { threadId } = await pluginRpc("pages", "work", { id: page.id, request: {
           projectId, providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "medium", permissionMode: "full",
@@ -65,10 +65,10 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
         insert.run(threads[0], task.id, "ready", "Ready for your review.", "Current review", at, at);
         insert.run(threads[1], task.id, "replied", "Earlier investigation.", "Earlier investigation", at - 60000, at - 60000);
       } finally { db.close(); }
-      await pluginRpc("studio", "tasks_link", { id: task.id, link: { target: "thread", pluginId: null, itemId: threads[2], label: "Release discussion", href: `/threads/${threads[2]}` } });
-      const live = await pluginRpc("studio", "tasks_get", { id: task.id });
+      await pluginRpc("studio-tasks", "link", { id: task.id, link: { target: "thread", pluginId: null, itemId: threads[2], label: "Release discussion", href: `/threads/${threads[2]}` } });
+      const live = await pluginRpc("studio-tasks", "get", { id: task.id });
       if (live.handoffs.length !== 2 || live.handoffs[0].threadId !== threads[0] || !live.links.some(link => link.itemId === threads[2])) throw new Error("Tasks' live RPC cannot read the seeded handoffs and link");
-      await client.navigate(`/plugins/studio/tasks/${task.id}`);
+      await client.navigate(`/plugins/studio-tasks/tasks/${task.id}`);
       await client.waitForText("Ready for your review.");
       await click("button", "Open thread");
       await client.waitForSelector(selected(threads[0])); await client.waitForSelector(draft(threads[0]));
@@ -101,7 +101,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
       await client.waitForText("handoff-review.txt"); await assertRetained();
       const clipped = await client.evaluate(`(() => [...document.querySelectorAll(${JSON.stringify(`[data-float-window=${JSON.stringify(key(threads[0]))}] [data-promptbox] button`)} )].filter(node => node.checkVisibility()).filter(node => { const r = node.getBoundingClientRect(); return r.width <= 0 || r.left < 0 || r.right > innerWidth || r.bottom > innerHeight; }).map(node => node.getAttribute('aria-label') ?? node.innerText))()`);
       if (clipped.length) throw new Error(`The phone handoff composer clips controls: ${JSON.stringify(clipped)}`);
-      await client.capture(join(process.cwd(), "packages/bb-studio/src/modules/tasks/assets/companion-handoffs-mobile.png"));
+      await client.capture(join(process.cwd(), "packages/bb-studio-tasks/assets/companion-handoffs-mobile.png"));
       await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
       await sleep(500); await assertRetained();
     } catch (error) {

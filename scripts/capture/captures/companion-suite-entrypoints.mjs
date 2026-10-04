@@ -14,35 +14,35 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
     return dataDir;
   };
   const seedPost = async () => {
-    const { post } = await pluginRpc("studio", "feed_publish", { projectId, threadId, author: "Atlas", title: "Release notes ready for review", body: "The release checklist and notes are ready. Review the wording before sharing." });
-    return { post, cleanup: () => pluginRpc("studio", "feed_remove", { postId: post.id }) };
+    const { post } = await pluginRpc("feed", "publish", { projectId, threadId, author: "Atlas", title: "Release notes ready for review", body: "The release checklist and notes are ready. Review the wording before sharing." });
+    return { post, cleanup: () => pluginRpc("feed", "remove", { postId: post.id }) };
   };
   const fixtures = [
     { id: "studio", packageDir: "bb-studio", seed: async () => {
       const { cleanup } = await seedPages();
       return { path: "/plugins/studio/studio", ready: 'input[aria-label="Search and filter studio"]', draft: "Release notes", visibleText: "Release notes: October", cleanup };
     } },
-    { id: "chat", packageDir: "bb-studio/src/modules/chat", seed: async () => {
+    { id: "chat", packageDir: "bb-studio-chat", seed: async () => {
       const { page, cleanup } = await seedPages();
-      return { path: `/plugins/studio/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: "pages", id: page.id }))}`, ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent item conversation", attachment: true, cleanup };
+      return { path: `/plugins/studio-chat/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: "pages", id: page.id }))}`, ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent item conversation", attachment: true, cleanup };
     } },
-    { id: "feed", packageDir: "bb-studio/src/modules/feed", seed: async () => {
+    { id: "feed", packageDir: "bb-studio-feed", seed: async () => {
       const { post, cleanup } = await seedPost();
-      return { path: "/plugins/studio/feed", ready: 'form[aria-label="Filter feed"] input[type="search"]', draft: "Unapplied feed filter", visibleText: post.title, cleanup };
+      return { path: "/plugins/feed/feed", ready: 'form[aria-label="Filter feed"] input[type="search"]', draft: "Unapplied feed filter", visibleText: post.title, cleanup };
     } },
-    { id: "feed-post", packageDir: "bb-studio/src/modules/feed", seed: async () => {
+    { id: "feed-post", packageDir: "bb-studio-feed", seed: async () => {
       const { post, cleanup } = await seedPost();
-      return { path: `/plugins/studio/feed/${post.id}`, ready: 'article h1', cleanup };
+      return { path: `/plugins/feed/feed/${post.id}`, ready: 'article h1', cleanup };
     } },
-    { id: "feed-discussion", packageDir: "bb-studio/src/modules/feed", seed: async () => {
+    { id: "feed-discussion", packageDir: "bb-studio-feed", seed: async () => {
       const { post, cleanup } = await seedPost();
-      return { path: `/plugins/studio/feed/${post.id}/discussion`, ready: '.feed-discussion-composer [contenteditable="true"]', draft: "Keep this unsent Feed discussion", attachment: true, cleanup };
+      return { path: `/plugins/feed/feed/${post.id}/discussion`, ready: '.feed-discussion-composer [contenteditable="true"]', draft: "Keep this unsent Feed discussion", attachment: true, cleanup };
     } },
-    { id: "explore", packageDir: "bb-studio-pages/src/explore", seed: async () => {
+    { id: "explore", packageDir: "bb-studio-explore", seed: async () => {
       const dataDir = await requireStage();
-      const require = createRequire(new URL("../../../packages/bb-studio-pages/package.json", import.meta.url));
+      const require = createRequire(new URL("../../../packages/bb-studio-explore/package.json", import.meta.url));
       const Database = require("better-sqlite3");
-      const db = new Database(join(dataDir, "plugins/pages/explore.db"), { fileMustExist: true });
+      const db = new Database(join(dataDir, "plugins/explore/data.db"), { fileMustExist: true });
       const id = `expl_transfer_${randomUUID()}`, now = Date.now();
       let page;
       const cleanup = async () => {
@@ -54,9 +54,9 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         ({ page } = await pluginRpc("pages", "create", { title: "Release usage explainer", projectId, parentId: null, markdown: `\`\`\`html\n${usageReportHtml({ draft: false })}\n\`\`\`` }));
         db.prepare("INSERT INTO explore_explainers (id,key,thread_id,message_id,emoji,label,project_id,status,page_id,generated_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
           .run(id, id, threadId, `msg_transfer_${id}`, "🏗️", page.title, projectId, "ready", page.id, now, now, now);
-        const { explainers } = await pluginRpc("pages", "explore_explainers", {});
+        const { explainers } = await pluginRpc("explore", "explainers", {});
         if (!explainers.some(explainer => explainer.id === id)) throw new Error("Explore RPC cannot read the transfer fixture");
-        return { path: `/plugins/pages/explainers/${id}`, ready: `iframe[title="${page.title}"]`, embedded: true, cleanup };
+        return { path: `/plugins/explore/explainers/${id}`, ready: `iframe[title="${page.title}"]`, embedded: true, cleanup };
       } catch (error) { await cleanup(); throw error; }
     } },
   ];
@@ -84,8 +84,8 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         return { path: `/plugins/studio/studio/space/${space.id}`, ready: 'button[aria-label="Space options"]', visibleText: space.name, cleanup };
       } catch (error) { await cleanup(); throw error; }
     } },
-    { id: "chat-plain", packageDir: "bb-studio/src/modules/chat", seed: async () => ({ path: "/plugins/studio/chats", ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent general conversation", attachment: true, cleanup: async () => {} }) },
-    { id: "chat-quote", packageDir: "bb-studio/src/modules/chat", seed: async client => {
+    { id: "chat-plain", packageDir: "bb-studio-chat", seed: async () => ({ path: "/plugins/studio-chat/chats", ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent general conversation", attachment: true, cleanup: async () => {} }) },
+    { id: "chat-quote", packageDir: "bb-studio-chat", seed: async client => {
       const { page, cleanup } = await seedPages();
       let path;
       try {
@@ -94,7 +94,7 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         const quote = { text: "Ship offline sync to beta teams", note: "Clarify the rollout timing", where: "Launch checklist", image: null };
         await client.evaluate(`window.__bbStudioItemChat_v1.host.send(${JSON.stringify({ pluginId: "pages", id: page.id })}, ${JSON.stringify(quote)})`, true);
         await client.waitForSelector('.studio-chat-composer [contenteditable="true"]');
-        path = await client.evaluate(`JSON.parse(sessionStorage.getItem('bb-studio-float:windows')).tabs.find(tab => tab.target.kind === 'path' && tab.target.path.startsWith('/plugins/studio/chats/quote/'))?.target.path`);
+        path = await client.evaluate(`JSON.parse(sessionStorage.getItem('bb-studio-float:windows')).tabs.find(tab => tab.target.kind === 'path' && tab.target.path.startsWith('/plugins/studio-chat/chats/quote/'))?.target.path`);
         if (!path) throw new Error("The real quote action did not create a saved quote composer");
         await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`);
         await client.command('Page.navigate', { url: 'about:blank' });
@@ -113,10 +113,10 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         };
       } catch (error) { await cleanup(); throw error; }
     } },
-    ...["list", "thread"].map(kind => ({ id: `explore-${kind}`, packageDir: "bb-studio-pages/src/explore", seed: async () => {
+    ...["list", "thread"].map(kind => ({ id: `explore-${kind}`, packageDir: "bb-studio-explore", seed: async () => {
       const seeded = await explore.seed();
       const id = seeded.path.split('/').at(-1);
-      return { ...seeded, path: `/plugins/pages/explainers${kind === "thread" ? `/thread/${threadId}` : ""}`, ready: `button[data-explainer-open="${id}"]`, embedded: false, visibleText: "Release usage explainer" };
+      return { ...seeded, path: `/plugins/explore/explainers${kind === "thread" ? `/thread/${threadId}` : ""}`, ready: `button[data-explainer-open="${id}"]`, embedded: false, visibleText: "Release usage explainer" };
     } })),
   ];
 };

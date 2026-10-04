@@ -1,12 +1,3 @@
-import { BotProjects } from "./bot-projects";
-import { OfficeProjects } from "./projects";
-import { OfficeTabs } from "./tabs";
-import { officeTabHandlers } from "./tab-service";
-import { tabCatalog } from "./tab-catalog";
-import { SearchIndex } from "../search-index";
-import { officeAuthors } from "./authors";
-import { officeTalk, officeBotDesk } from "./talk";
-import { officeTeamServiceContract } from "./team-service-contract";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { mkdir } from "node:fs/promises";
@@ -20,18 +11,14 @@ import { commentSource, pageRequestSource } from "./item-sources";
 import type { ModuleServices } from "../modules/services";
 import { moduleInboxSources } from "./module-sources";
 import { officeHome } from "./home";
-import { officeTeam } from "./team";
-import { startOffice } from "./start";
-import { delegateOffice } from "./delegation";
-import { legacyAttentionSource } from "./legacy-attention";
 import { Inbox } from "./inbox";
 import { interactionSource } from "./interaction-source";
 import { officeContract } from "./contract";
 import { FolderService } from "./folders";
-import { migrateOfficeSpaces, spreadSpaceColors } from "./migration";
+import { migrateOfficeSpaces } from "./migration";
 import { ProjectSpaceStore } from "./legacy-spaces";
 
-export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string; moduleServices?: ModuleServices; searchIndex?: SearchIndex } = {}) {
+export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string; moduleServices?: ModuleServices } = {}) {
   const projects = await bb.sdk.projects.list({ includePersonal: true });
   const migrated = db.prepare("SELECT 1 FROM sqlite_master WHERE name='office_migrations'").get()
     && db.prepare("SELECT 1 FROM office_migrations WHERE id='space-root-v1'").get();
@@ -46,7 +33,6 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
     migrateOfficeSpaces(db, { projectIds: projects.map(p => p.id),
       projectForMember: m => projectByRef.get(`${m.pluginId}:${m.id}`), logConflict: m => bb.log.warn(m) });
   }
-  spreadSpaceColors(db);
   const spaces = new ProjectSpaceStore(db);
   spaces.office.reconcileProjects(projects.map(p => p.id));
   const folders = new FolderService(db, spaces.office, {
@@ -61,62 +47,15 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
     },
   });
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-  const officeProjects = new OfficeProjects(db, bb.sdk, changed, hub);
-  bb.agents.contributeInstructions(({ threadId }) => {
-    const lead = db.prepare("SELECT project_id FROM office_projects WHERE lead_thread_id=?").get(threadId) as { project_id: string } | undefined;
-    return lead ? officeProjects.links.context(lead.project_id).slice(0, 4096) : null;
-  });
-  const botProjects = new BotProjects(db, bb.sdk, officeProjects, options.moduleServices, changed);
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
-  const inbox = new Inbox(db, [interactionSource(bb.sdk), legacyAttentionSource(db), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
-  const search = options.searchIndex ?? new SearchIndex(db, hub, changed);
-  if (!options.searchIndex) bb.onDispose(() => search.dispose());
-  const tabStore = new OfficeTabs(db, spaces.office, changed);
-  const tabHandlers = officeTabHandlers(tabStore, spaceId => tabCatalog(spaceId, { bb, hub, spaces: spaces.office, inbox, search, modules: options.moduleServices }));
+  const inbox = new Inbox(db, [interactionSource(bb.sdk), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
   const { home: _homeContract, ...registeredContract } = officeContract;
   bb.rpc.register(registeredContract, {
-    ...tabHandlers,
-    projects_list: () => officeProjects.list(),
-    project_membership: () => officeProjects.links.all(),
-    project_create: input => officeProjects.create(input),
-    project_update: input => officeProjects.update(input),
-    project_reorder: input => officeProjects.store.reorder(input),
-    project_archive: ({ projectId, archived }) => officeProjects.archive(projectId, archived),
-    project_thread_start: input => officeProjects.start(input),
-    project_link: ({ projectId, refs }) => officeProjects.membershipMutation(projectId, refs),
-    project_unlink: ({ refs }) => officeProjects.membershipMutation(null, refs),
-    project_set_run: input => officeProjects.setRun(input),
-    thread_handoff: input => officeProjects.handoff(input),
-    bots_overview: () => botProjects.overview(),
-    bot_to_project: input => botProjects.migrate(input),
-    bot_retire: ({ botId }) => botProjects.retire(botId),
-    project_get: ({ projectId }) => officeProjects.get(projectId),
-    project_setup: input => officeProjects.setup(input),
-    project_threads: ({ projectId }) => officeProjects.threads(projectId),
-    office_start: async input => {
-      const result = await startOffice(input, bb.sdk.threads, spaces.office, folders, hub, options.moduleServices);
-      changed(); return result;
-    },
-    talk_dm: async ({ botId }) => {
-      if (!options.moduleServices?.has("bot-teams")) throw new Error("Teams must finish loading before starting a conversation.");
-      const result = await options.moduleServices.client("bot-teams", officeTeamServiceContract).call("office_dm", { botId }); changed(); return result;
-    },
-    talk_list: ({ spaceId }) => options.moduleServices ? officeTalk(spaceId, options.moduleServices, spaces.office) : { conversations: [] },
-    bot_desk: ({ botId }) => {
-      if (!options.moduleServices) throw new Error("Office modules are unavailable.");
-      return officeBotDesk(botId, options.moduleServices, spaces.office, inbox);
-    },
-    delegate: async input => {
-      if (!options.moduleServices) throw new Error("Office modules are unavailable.");
-      const result = await delegateOffice(input, options.moduleServices, spaces.office, folders, hub); changed(); return result;
-    },
-    team_list: ({ spaceId }) => officeTeam(spaceId, spaces.office, inbox, options.moduleServices),
     inbox_list: input => inbox.list(input),
     inbox_counts: () => inbox.counts(spaces.office.list().map(s => s.id)),
     inbox_read: ({ keys }) => { inbox.mark(keys, "read"); changed(); return { ok: true }; },
     inbox_done: ({ keys }) => { inbox.mark(keys, "done"); changed(); return { ok: true }; },
     inbox_act: async ({ key, actionId, text }) => { await inbox.act(key, actionId, text); changed(); return { ok: true }; },
-    space_reorder: ({ spaceIds }) => { spaces.office.reorder(spaceIds); changed(); return { ok: true as const }; },
     spaces_list: async () => { spaces.office.reconcileProjects((await bb.sdk.projects.list({ includePersonal: true })).map(p => p.id)); await ensureFolders(); return { spaces: spaces.office.list() }; },
     space_create: async input => {
       // Name uniqueness also makes a lost create response recoverable.
@@ -148,18 +87,17 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
       const listed = (await folders.list(spaceId)).filter(f => !f.archived);
       const { items } = await hub.overview();
       const personal = spaces.office.defaultSpace().defaultProjectId;
-      const authors = await officeAuthors(db, options.moduleServices);
       return { space: spaces.office.get(spaceId), folders: await Promise.all(listed.map(async folder => ({
         ...folder,
         threads: (await bb.sdk.threads.list({ projectId: folder.id, archived: false, limit: 1000 })).map(t => ({
-          id: t.id, title: t.title ?? "Untitled", state: t.status, updatedAt: t.updatedAt, authorBotId: authors.thread(t.id),
+          id: t.id, title: t.title ?? "Untitled", state: t.status, updatedAt: t.updatedAt, authorBotId: null,
         })),
         items: items.filter(i => !i.archived && (i.projectId ?? personal) === folder.id && !["space", "bot", "view"].includes(i.kind)).map(i => ({
           pluginId: i.pluginId, id: i.id, kind: i.kind, title: i.title, href: i.href, projectId: i.projectId,
-          authorBotId: authors.item(i), updatedAt: i.updatedAt,
+          authorBotId: (i as typeof i & { authorBotId?: string }).authorBotId ?? null, updatedAt: i.updatedAt,
         })),
       }))) };
     },
   });
-  return { spaces, folders, home: async (spaceId: string) => officeHome(spaceId, inbox, spaces.office, hub, options.moduleServices, await officeAuthors(db, options.moduleServices)) };
+  return { spaces, folders, home: (spaceId: string) => officeHome(spaceId, inbox, spaces.office, hub, options.moduleServices) };
 }

@@ -71,12 +71,7 @@ struct InteractionCard: View {
             if let cwd = subject?.cwd { Text(cwd).font(.caption2).foregroundStyle(.secondary).lineLimit(1) }
         case "plan":
             Text(subject?.plan ?? "").font(.subheadline).lineLimit(6)
-            Button { showingPlan = true } label: {
-                Text("Read the full plan")
-                    .font(.footnote)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-            }
+            Button("Read the full plan") { showingPlan = true }.font(.footnote)
         default:
             Text(interaction.summary).font(.subheadline)
         }

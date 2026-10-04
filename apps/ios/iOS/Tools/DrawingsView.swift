@@ -119,7 +119,6 @@ struct DrawingView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var chatting = false
-    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @State private var editing = false
     @State private var showingRelated = false
     @State private var openedEmptyEditor = false
@@ -174,7 +173,7 @@ struct DrawingView: View {
             } label: { Image(systemName: "pencil") }
             .accessibilityLabel("Rename")
             .disabled(scene == nil)
-            if runningPlugins.split(separator: ",").contains(where: { $0 == "studio" || $0 == "studio-chat" }) {
+            if StudioStore.shared.plugins.contains("studio-chat") {
                 Button { chatting = true } label: { Image(systemName: "bubble.left.and.text.bubble.right") }
                     .accessibilityLabel("Chat About This")
                     .disabled(scene == nil)

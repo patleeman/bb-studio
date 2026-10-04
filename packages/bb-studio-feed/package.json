@@ -1,0 +1,49 @@
+{
+  "name": "@bb-studio/feed",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.44",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "Studio Feed",
+    "description": "Part of BB Studio. One feed of what your agents report. Agents post with the feed_post tool from any thread, channel or automation, and the post shows as a card where they wrote it. Read it like a news reader on desktop and mobile: unread first, posts open in place, stories group their updates, and linked pages and artifacts are previewed.",
+    "branding": {
+      "icon": "./icons/feed.svg",
+      "experimental_icons": {
+        "feed": "./icons/feed.svg",
+        "mark-read": "./icons/mark-read.svg"
+      }
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "skills"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.mts",
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@bb-studio/kit": "file:../bb-studio-kit.tgz",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.29",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^12.11.1",
+    "hono": "^4.11.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "typescript": "^5.7.0",
+    "vitest": "4.1.1"
+  }
+}

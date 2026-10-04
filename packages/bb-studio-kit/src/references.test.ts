@@ -2,10 +2,6 @@ import { describe, expect, it } from "vitest";
 import { parseStudioItemHref, parseStudioItemReference, parseStudioMentionReference, studioTextReferences } from "./references";
 
 describe("canonical Studio references", () => {
-  it("accepts module routes alongside legacy routes", () => {
-    expect(parseStudioItemHref("/plugins/studio/tables/tbl_1/view/v1")).toEqual({ pluginId: "studio", id: "tbl_1" });
-    expect(parseStudioItemHref("/plugins/studio/tasks/tsk_1")).toEqual({ pluginId: "studio", id: "tsk_1" });
-  });
   it("preserves opaque percent escapes and colons in raw references and mentions", () => {
     expect(parseStudioItemReference("item:custom:opaque:50%2F%broken")).toEqual({ pluginId: "custom", id: "opaque:50%2F%broken" });
     expect(parseStudioMentionReference("custom", "opaque:50%2F%broken")).toEqual({ pluginId: "custom", id: "opaque:50%2F%broken" });

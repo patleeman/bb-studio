@@ -14,19 +14,12 @@ on failure and ignores superseded responses.
 - `HomeStore(spaceId:client:)`: `home`, `needsYou`, `working`, `reports`, `recent`.
 - `TeamStore(spaceId:client:)`: `bots`, `conversations`.
 
-`BBClient+Office.swift` wraps the Space/folder, Home, Team, Talk, bot desk,
-and delegation contracts. Home sends `spaceId` to `home`, which distinguishes
-it from legacy project Home. The generator merges `src/office/contract.ts`
-into the Studio schema and generated Swift methods.
-
-`officeDirectMessage(botId:)` returns `conversationId` and `threadId`.
-`officeDelegate(botId:brief:schedule:context:folderId:)` returns `taskId` and
-`task`. Omit `schedule` for one-time work; `OfficeSchedule` supports hourly,
-daily, weekdays, and weekly. Context strings are item references.
-
-iOS starts threads through `NewThreadView`, so there is no `officeStart` wrapper.
-Its published request and response remain available in the generated Studio contract.
-All office client wrappers use published generated method names.
+`BBClient+Office.swift` wraps the live Space/folder contract. The generator merges
+`src/office/contract.ts` into the Studio schema and generated Swift methods.
+`OfficeProvisionalAPI.swift` currently follows the web office model for Home,
+Team, Talk, and bot desks. These methods are pending backend stages 4–6, are
+explicitly recorded as dynamic calls in the native inventory, and must be
+reconciled with the generated contract when it lands.
 
 `OfficeModels.swift` uses seconds/milliseconds exactly as sent by the server;
 its timestamp fields are raw `Double` values. Do not infer dates without checking
@@ -50,22 +43,3 @@ Studio source signals, and validated pushes. It does not own the shared socket.
 Notifications with `inboxKey` route approve/deny/text-answer through `inbox_act`;
 unsupported forms open the app. The coordinator owns their Inbox navigation.
 Legacy notifications without an Inbox key retain their existing action path.
-
-Trust uses the backend’s two supported levels, `ask` and `act`.
-
-`TabsStore(spaceId:client:)` owns `essentials`, `pinned`, `today`, and `folders`.
-`refresh()` seeds an unseeded Space from pinned sidebar threads, then resolves
-thread titles. `title(for:)` uses that cache with an `Untitled` fallback.
-`open(ref:)`, `open(href:)`, `move(_:to:folderId:)`, `archive(_:)`, and
-`clearToday()` refresh after mutation and expose failures through `error`.
-Folder methods are `createFolder(name:)`, `renameFolder(_:to:)`,
-`setFolderOpen(_:_:)`, and `deleteFolder(_:)`.
-`archived(query:)` and `search(_:)` throw on failure. Search returns matching
-open tabs, other matching BB threads, then server search results, deduplicated
-by ref. Future tab kinds are skipped when decoding server result envelopes.
-
-OfficeContext rebuilds TabsStore per Space and manages its realtime listener.
-The iOS-only `OfficeTab+Route.swift` reuses OfficeItem routing; channels open
-`.savedView`, bots open `.botDesk`, and Home/Inbox return nil for tab selection.
-Call `await tabs.noteOpened(route)` after pushing a native route. Item routes
-use canonical server hrefs; routes without a target ID cannot identify an item.

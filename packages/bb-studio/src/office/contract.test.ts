@@ -8,7 +8,7 @@ describe("office RPC boundary", () => {
     expect(officeContract.folder_archive.input.safeParse({}).success).toBe(false);
   });
   it("allows explicit clearing of optional model and kind defaults", () => {
-    expect(spaceSettingsSchema.parse({ enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null })).toEqual({ enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null, todayArchiveAfter: "3d" });
+    expect(spaceSettingsSchema.parse({ enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null })).toEqual({ enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null });
     expect(officeContract.space_settings_set.input.parse({ spaceId: "s", settings: { enabledItemKinds: [] } }).settings).toEqual({ enabledItemKinds: [] });
   });
 });

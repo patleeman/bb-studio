@@ -1,7 +1,0 @@
-Test Case '-[BBStudioUITests.ReviewQualityUITests testHomeClippingAtDefaultText]' started.
-/Users/patrick/workingdir/bb-studio/apps/ios/UITests/ReviewQualityUITests.swift:325: error: -[BBStudioUITests.ReviewQualityUITests testHomeClippingAtDefaultText] : Text clipped
-Test Case '-[BBStudioUITests.ReviewQualityUITests testHomeClippingAtDefaultText]' failed (15.197 seconds).
-	 Executed 1 test, with 1 failure (0 unexpected) in 15.197 (15.200) seconds
-	 Executed 1 test, with 1 failure (0 unexpected) in 15.197 (15.200) seconds
-	 Executed 1 test, with 1 failure (0 unexpected) in 15.197 (15.201) seconds
- xcrun: error: unable to find utility "simctl", not a developer tool or in PATH

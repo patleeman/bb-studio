@@ -23,7 +23,7 @@ struct RecordingDetailView: View {
     @State private var renaming = false
     @State private var newTitle = ""
     @State private var showingRelated = false
-    @State private var meetingNotes: Studio.TalkRecordingGetOutputRecordingMeetingNotes?
+    @State private var meetingNotes: Talk.RecordingGetOutputRecordingMeetingNotes?
     @State private var generatingNotes = false
 
     var body: some View {
@@ -103,8 +103,8 @@ struct RecordingDetailView: View {
             }
         }
         .sheet(isPresented: $creatingThread) { NewThreadView(text: transcript) }
-        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "studio", itemId: id) }
-        .studioChat(isPresented: $chatting, pluginId: "studio", itemId: id, title: recording?.title ?? "Recording", projectId: recording?.projectId)
+        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "talk", itemId: id) }
+        .studioChat(isPresented: $chatting, pluginId: "talk", itemId: id, title: recording?.title ?? "Recording", projectId: recording?.projectId)
         .confirmationDialog("Delete this recording?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
         } message: {
@@ -175,7 +175,7 @@ struct RecordingDetailView: View {
             player.stop()
             try await client.deleteRecording(id)
             guard client.baseURL == app.serverURL else { return }
-            StudioStore.shared.removed(pluginId: "studio", id: id)
+            StudioStore.shared.removed(pluginId: "talk", id: id)
             operation.complete(on: app) { dismiss() }
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

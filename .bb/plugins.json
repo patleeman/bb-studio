@@ -8,6 +8,10 @@
       "source": "./packages/bb-studio"
     },
     {
+      "name": "studio-chat",
+      "source": "./packages/bb-studio-chat"
+    },
+    {
       "name": "float",
       "source": "./packages/bb-studio-float"
     },
@@ -16,8 +20,40 @@
       "source": "./packages/bb-studio-pages"
     },
     {
+      "name": "explore",
+      "source": "./packages/bb-studio-explore"
+    },
+    {
+      "name": "feed",
+      "source": "./packages/bb-studio-feed"
+    },
+    {
+      "name": "talk",
+      "source": "./packages/bb-studio-talk"
+    },
+    {
       "name": "excalidraw",
       "source": "./packages/bb-studio-draw"
+    },
+    {
+      "name": "artifacts",
+      "source": "./packages/bb-studio-artifacts"
+    },
+    {
+      "name": "studio-tasks",
+      "source": "./packages/bb-studio-tasks"
+    },
+    {
+      "name": "bot-teams",
+      "source": "./packages/bb-studio-teams"
+    },
+    {
+      "name": "thread-list-plus",
+      "source": "./packages/bb-studio-sidebar"
+    },
+    {
+      "name": "studio-navigation",
+      "source": "./packages/bb-studio-navigation"
     },
     {
       "name": "mobile",
@@ -26,6 +62,14 @@
     {
       "name": "emoji-react",
       "source": "./packages/bb-studio-reactions"
+    },
+    {
+      "name": "smart-decisions",
+      "source": "./packages/bb-studio-decisions"
+    },
+    {
+      "name": "studio-tables",
+      "source": "./packages/bb-studio-tables"
     }
   ]
 }

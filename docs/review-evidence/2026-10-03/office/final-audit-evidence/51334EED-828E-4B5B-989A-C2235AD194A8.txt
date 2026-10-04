@@ -1,1 +1,0 @@
-inbox-default: policy 3: resolved element id= label=ORBIT-42 checks are ready sRGB foreground=[13, 13, 13], background=[224, 223, 224], contrast=14.623762729953288:1; element frame=(76.0, 804.1666666666666, 143.0, 42.33333333333337)

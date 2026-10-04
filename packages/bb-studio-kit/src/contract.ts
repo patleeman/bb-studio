@@ -40,7 +40,7 @@ export const STUDIO_REALTIME_CHANNEL = "studio-changed";
 export const STUDIO_ITEM_AT_METHOD = "itemAt";
 
 /** Studio Chat: "Work with this…" on Studio items. */
-export const STUDIO_CHAT_PLUGIN_ID = "studio";
+export const STUDIO_CHAT_PLUGIN_ID = "studio-chat";
 /** Float, the windows along the bottom of the screen. */
 export const FLOAT_PLUGIN_ID = "float";
 /**
@@ -334,5 +334,3 @@ export function mentionPrompt(items: readonly { title: string; href: string }[])
 export { copyTitle, fillTemplate, fillTemplateJson } from "./template";
 
 export { parseStudioItemReference, parseStudioMentionReference, parseStudioItemHref, studioTextReferences, STUDIO_REFERENCE_ROUTES, type StudioReference, type ReferenceProvider, type ReferenceRoute, type ReferenceOptions } from "./references";
-
-export { absorbedPluginIds, legacyReferencePluginIds, rewriteLegacyText, rewriteLegacyValue } from "./legacy-refs";

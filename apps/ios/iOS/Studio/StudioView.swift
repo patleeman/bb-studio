@@ -115,7 +115,7 @@ final class StudioStore: ObservableObject {
         spaces = []
         supportsSpaces = false
         async let pages = Self.attempt(plugins.contains("pages")) { try await client.pages() }
-        async let recordings = Self.attempt(plugins.contains("studio")) { try await client.recordings(limit: 200) }
+        async let recordings = Self.attempt(plugins.contains("talk")) { try await client.recordings(limit: 200) }
         async let drawings = Self.attempt(plugins.contains("excalidraw")) { try await client.drawings() }
         let (p, r, d) = await (pages, recordings, drawings)
         let lists: [Result<[StudioItem], Error>] = [
@@ -360,7 +360,6 @@ struct StudioView: View {
     @ObservedObject private var store = StudioStore.shared
     @AppStorage(ServerScope.key("studioProject")) private var project = ""
     @State private var query = ""
-    @FocusState private var searchFocused: Bool
     /// Content matches, keyed like items, with the matching text.
     @State private var contentMatches: [String: String] = [:]
     @State private var externalMatches: [Studio.SearchAllOutputItem] = []
@@ -386,9 +385,6 @@ struct StudioView: View {
 
     var body: some View {
         List(selection: $selection) {
-            GrowingSearchField(text: $query, prompt: "Search", label: "Search Studio",
-                               identifier: "studioSearch", isFocused: $searchFocused)
-                .listRowBackground(Color.clear)
             if let error = store.error {
                 Section { PagesErrorRow(message: error) { await store.load(client) } }
             }
@@ -415,7 +411,7 @@ struct StudioView: View {
                     }
                 }
             }
-            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["studio", "pages", "studio-tasks"]) {
+            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["talk", "pages", "studio-tasks"]) {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -466,6 +462,9 @@ struct StudioView: View {
         .environment(\.editMode, $editMode)
         .navigationTitle(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio")
         .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)
+        .searchable(text: $query, prompt: "Search Studio")
+        // Keep Select reachable, so search results can be acted on together.
+        .searchPresentationToolbarBehavior(.avoidHidingContent)
         .toolbar {
             if selecting {
                 ToolbarItem(placement: .topBarLeading) {
@@ -485,8 +484,6 @@ struct StudioView: View {
                 if store.viaStudio, !visible.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Select") { withAnimation { editMode = .active } }
-                            .accessibilityIdentifier("studioSelect")
-                            .accessibilityShowsLargeContentViewer()
                     }
                 }
             }
@@ -589,9 +586,9 @@ struct StudioView: View {
 
     /// Capture first, file later: each tile opens straight into typing or recording.
     private var quickActions: some View {
-        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 1 + (store.plugins.contains("studio") ? 2 : 0) + (!store.plugins.isDisjoint(with: ["studio", "studio-tasks"]) ? 1 : 0)
+        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 1 + (store.plugins.contains("talk") ? 2 : 0) + (store.plugins.contains("studio-tasks") ? 1 : 0)
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
-            if store.plugins.contains("studio") {
+            if store.plugins.contains("talk") {
                 tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
                     if store.plugins.contains("pages") {
                         Button("Dictate a Page", systemImage: "doc.badge.plus") { dictatingPage = true }
@@ -606,12 +603,12 @@ struct StudioView: View {
                     }
                 }
             }
-            if !store.plugins.isDisjoint(with: ["studio", "studio-tasks"]) {
+            if store.plugins.contains("studio-tasks") {
                 tile("Task", "checklist", .green) { app.sheet = .newTasks } menu: {
                     Button("Open Board", systemImage: "rectangle.split.3x1") { operation.complete(on: app) { app.push(.tasks) } }
                 }
             }
-            if store.plugins.contains("studio") {
+            if store.plugins.contains("talk") {
                 tile("Record", "record.circle", .red) { recordingKind = "recording" } menu: {}
             }
         }
@@ -647,36 +644,26 @@ struct StudioView: View {
                     }
                 }
                 ForEach(store.spaces) { space in
-                    Menu {
-                        Button { operation.complete(on: app) { app.studioPath.append(.space(id: space.id)) } } label: { Label("Open Space", systemImage: "arrow.up.right") }
-                        Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
-                    } label: {
-                        chipLabel(space.emoji.map { "\($0) \(space.name)" } ?? space.name, space.emoji == nil ? "square.stack.3d.up" : nil,
-                                  selected: app.studioSpace == space.id, tint: Color(hex: space.color))
-                    } primaryAction: {
+                    chip(space.emoji.map { "\($0) \(space.name)" } ?? space.name, space.emoji == nil ? "square.stack.3d.up" : nil,
+                        selected: app.studioSpace == space.id, tint: Color(hex: space.color)) {
                         app.studioSpace = app.studioSpace == space.id ? nil : space.id
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("studioSpaceChip-\(space.id)")
-                    .accessibilityAddTraits(app.studioSpace == space.id ? .isSelected : [])
-                    .sensoryFeedback(.selection, trigger: app.studioSpace == space.id)
+                    .contextMenu {
+                        Button { operation.complete(on: app) { app.studioPath.append(.space(id: space.id)) } } label: { Label("Open Space", systemImage: "arrow.up.right") }
+                        Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
+                    }
                 }
                 ForEach(usedTags) { tag in
-                    Menu {
+                    chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {
+                        tagFilter = tagFilter == tag.id ? nil : tag.id
+                    }
+                    .contextMenu {
                         Button {
                             newTag = tag.name
                             renamingTag = tag
                         } label: { Label("Rename Tag…", systemImage: "pencil") }
                         Button(role: .destructive) { deletingTag = tag } label: { Label("Delete Tag…", systemImage: "trash") }
-                    } label: {
-                        chipLabel(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color))
-                    } primaryAction: {
-                        tagFilter = tagFilter == tag.id ? nil : tag.id
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("studioTagChip-\(tag.id)")
-                    .accessibilityAddTraits(tagFilter == tag.id ? .isSelected : [])
-                    .sensoryFeedback(.selection, trigger: tagFilter == tag.id)
                 }
                 if hasArchived {
                     chip("Archived", "archivebox", selected: showArchived) { showArchived.toggle() }
@@ -689,22 +676,18 @@ struct StudioView: View {
 
     private func chip(_ title: String, _ symbol: String?, selected: Bool, tint: Color? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            chipLabel(title, symbol, selected: selected, tint: tint)
+            HStack(spacing: 5) {
+                if let symbol { Image(systemName: symbol).font(.caption).foregroundStyle(selected ? .white : tint ?? .primary) }
+                Text(title).font(.subheadline.weight(.medium))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .foregroundStyle(selected ? Color.white : .primary)
+            .background(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.background.secondary), in: .capsule)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .sensoryFeedback(.selection, trigger: selected)
-    }
-
-    private func chipLabel(_ title: String, _ symbol: String?, selected: Bool, tint: Color? = nil) -> some View {
-        HStack(spacing: 5) {
-            if let symbol { Image(systemName: symbol).font(.caption).foregroundStyle(selected ? .white : tint ?? .primary) }
-            Text(title).font(.subheadline.weight(.medium))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .foregroundStyle(selected ? Color.white : .primary)
-        .background(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.background.secondary), in: .capsule)
     }
 
     private var newMenu: some View {
@@ -764,7 +747,7 @@ struct StudioView: View {
         Group {
             if !selecting, let route = route(item) {
                 NavigationLink(value: route) { content }
-                    .accessibilityIdentifier("studioItem:\(item.id)")
+                    .accessibilityIdentifier("studioItem")
             } else {
                 content
             }
@@ -867,7 +850,7 @@ struct StudioView: View {
     private var hasArchived: Bool { showArchived || store.items.contains(where: \.archived) }
 
     private func canDelete(_ item: StudioItem) -> Bool {
-        store.viaStudio || ["pages", "studio", "excalidraw"].contains(item.pluginId)
+        store.viaStudio || ["pages", "talk", "excalidraw"].contains(item.pluginId)
     }
 
     private func projectName(_ item: StudioItem) -> String? {
@@ -1238,7 +1221,6 @@ struct StudioRow: View {
                     Text(([kind.label] + [project].compactMap { $0 } + facts).joined(separator: " · "))
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("studioMetadata:\(item.id)")
                     if let badge = item.badge {
                         Text(badge.label)
                             .font(.caption2.weight(.semibold))
@@ -1259,7 +1241,7 @@ struct StudioRow: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary.opacity(0.75))
             }
         }
         .padding(.vertical, 2)

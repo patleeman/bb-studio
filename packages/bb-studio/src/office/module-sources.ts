@@ -10,7 +10,6 @@ const feedPage = z.object({ posts: z.array(z.object({
 export const taskList = z.object({ tasks: z.array(z.object({
   id: z.string(), title: z.string(), description: z.string(), status: z.string(), statusLabel: z.string(), projectId: z.string().nullable(),
   assignee: z.string().nullable(), archived: z.boolean(), updatedAt: z.number(), recurrence: z.string().nullable(),
-  schedule: z.string().nullable().optional(),
   handoff: z.object({ threadId: z.string(), state: z.string(), note: z.string().nullable() }).nullable(),
 })) });
 const roster = z.object({ bots: z.array(z.object({ id: z.string(), projectId: z.string().nullable() })), botCreateRequests: z.array(z.object({
@@ -23,7 +22,7 @@ const base = (key: string, projectId: string | null, source: string): SourceEven
 /** Modules register later in startup; check the registry on every read. */
 export function moduleInboxSources(services: ModuleServices): InboxSource[] {
   return [{
-    id: "feed", keyPrefix: "feed:",
+    id: "feed",
     async list() {
       if (!services.has("feed")) return [];
       const events = new Map<string, SourceEvent>();
@@ -47,7 +46,7 @@ export function moduleInboxSources(services: ModuleServices): InboxSource[] {
     },
     async act() { throw new Error("Reports have no source action. Mark the report done instead."); },
   }, {
-    id: "task-review", keyPrefix: "task-review:",
+    id: "task-review",
     async list() {
       if (!services.has("studio-tasks")) return [];
       const { tasks } = taskList.parse(await services.call("studio-tasks", "board", {}));
@@ -64,13 +63,12 @@ export function moduleInboxSources(services: ModuleServices): InboxSource[] {
       await services.call("studio-tasks", "update", { id: event.key.slice("task-review:".length), status: "done" });
     },
   }, {
-    id: "bot-create", keyPrefix: "bot-create:",
+    id: "bot-create",
     async list() {
       if (!services.has("bot-teams")) return [];
       const { bots, botCreateRequests } = roster.parse(await services.call("bot-teams", "list", null));
       return botCreateRequests.filter(r => r.expiresAt > Date.now()).map(r => ({
         ...base(`bot-create:${r.id}`, bots.find(b => b.id === r.requesterBotId)?.projectId ?? null, "bot-create"),
-        href: bots.find(b => b.id === r.requesterBotId)?.projectId ? `/plugins/studio/projects/${encodeURIComponent(bots.find(b => b.id === r.requesterBotId)!.projectId!)}` : null,
         type: "request" as const, title: `Create ${r.name}`, body: r.description || r.mission, botId: r.requesterBotId,
         createdAt: r.createdAt, actions: [{ id: "approve", label: "Approve", primary: true }, { id: "deny", label: "Deny" }],
       }));

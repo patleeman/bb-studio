@@ -1,1 +1,0 @@
-studio-accessibility-xxxl-material-0-reaudit: policy 3: resolved element id=studioSelect label=Select sRGB foreground=[0, 0, 0], background=[249, 249, 249], contrast=19.946130734663996:1; element frame=(310.3333333333333, 66.0, 71.66666666666669, 36.0)

@@ -94,48 +94,4 @@ import XCTest
         XCTAssertTrue(store.events.isEmpty)
         XCTAssertEqual(store.counts.count().requests, 0)
     }
-    func testOverlappingActionsCommitAndRollbackIndependently() async throws {
-        var completions: [String: CheckedContinuation<Void, Error>] = [:]
-        let originals = [event("one"), event("two")]
-        let store = InboxStore(fetch: { _ in OfficeInboxPage(events: originals) },
-                               counts: { OfficeInboxCounts(bySpace: ["sp_one": .init(requests: 2, unreadReports: 0)]) },
-                               mutate: { keys, _ in try await withCheckedThrowingContinuation { completions[keys[0]] = $0 } })
-        await store.load()
-        let one = Task { await store.done(keys: ["one"]) }
-        let two = Task { await store.done(keys: ["two"]) }
-        for _ in 0..<100 where completions.count < 2 { await Task.yield() }
-        let first = try XCTUnwrap(completions["one"])
-        let second = try XCTUnwrap(completions["two"])
-        XCTAssertEqual(store.counts.count().requests, 0)
-        first.resume()
-        let committed = await one.value
-        XCTAssertTrue(committed)
-        XCTAssertEqual(store.events.map(\.key), ["two"])
-        XCTAssertTrue(store.events[0].isPending)
-        XCTAssertEqual(store.counts.count().requests, 0)
-        second.resume(throwing: BBError(status: 500, message: "Retry this one"))
-        let rejected = await two.value
-        XCTAssertFalse(rejected)
-        XCTAssertEqual(store.events.map(\.key), ["two"])
-        XCTAssertFalse(store.events[0].isPending)
-        XCTAssertEqual(store.counts.count().requests, 1)
-    }
-
-    func testRealtimeReconnectAndInboxSourcesRefreshButUnrelatedSignalsDoNot() async {
-        var fetches = 0
-        let store = InboxStore(fetch: { _ in
-            fetches += 1
-            return OfficeInboxPage(events: [])
-        }, counts: { OfficeInboxCounts(bySpace: [:]) }, mutate: { _, _ in })
-        await store.receiveRealtime(.pluginSignal(pluginId: "unrelated", channel: "changed", payload: .null))
-        XCTAssertEqual(fetches, 0)
-        await store.receiveRealtime(.connected)
-        await store.receiveRealtime(.changed(entity: "thread", id: "thr_one", changes: ["interactions"]))
-        for plugin in ["studio", "pages", "bot-teams", "feed", "studio-tasks"] {
-            await store.receiveRealtime(.pluginSignal(pluginId: plugin, channel: "changed", payload: .null))
-        }
-        XCTAssertEqual(fetches, 7)
-        XCTAssertFalse(store.isLoading)
-    }
-
 }

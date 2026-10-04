@@ -2,11 +2,11 @@ import SwiftUI
 
 /// "Chat About This" for a Studio item's ⋯ menu, when Studio Chat is running.
 struct StudioChatMenuButton: View {
-    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
+    @ObservedObject private var store = StudioStore.shared
     @Binding var isPresented: Bool
 
     var body: some View {
-        if runningPlugins.split(separator: ",").contains(where: { $0 == "studio" || $0 == "studio-chat" }) {
+        if store.plugins.contains("studio-chat") {
             Button { isPresented = true } label: { Label("Chat About This", systemImage: "bubble.left.and.text.bubble.right") }
         }
     }
@@ -85,7 +85,6 @@ private struct StudioChatSheet: View {
                 }
             }
             .task {
-                await store.load(client)
                 if chosenProjectId.isEmpty, store.projectNames[lastProjectId] != nil { chosenProjectId = lastProjectId }
                 lastThread = try? await client.lastStudioChat(pluginId: pluginId, itemId: itemId)
             }

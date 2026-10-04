@@ -5,7 +5,6 @@ public struct OfficeSpace: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
     public var icon: String?
-    public var color: String? = nil
     public var description: String
     public var isDefault: Bool
     public var defaultProjectId: String?
@@ -14,7 +13,7 @@ public struct OfficeSpace: Codable, Identifiable, Hashable, Sendable {
     public var updatedAt: Double
 }
 
-public enum OfficeTrust: String, Codable, Sendable { case ask, act }
+public enum OfficeTrust: String, Codable, Sendable { case readOnly = "read_only", ask, act }
 
 public struct OfficeSpaceSettings: Codable, Hashable, Sendable {
     public struct Model: Codable, Hashable, Sendable {
@@ -71,6 +70,8 @@ public struct OfficeSpaceTree: Codable, Sendable {
     public var favorites: [String]?
 }
 
+// Stage 4–6 types currently mirror src/ui/office/model.ts. Reconcile with
+// src/office/contract.ts when those server contracts land.
 public enum OfficeBotState: String, Codable, Sendable { case idle, working, needsYou = "needs_you" }
 
 public struct OfficeTeamBot: Codable, Identifiable, Hashable, Sendable {
@@ -83,17 +84,6 @@ public struct OfficeTeamBot: Codable, Identifiable, Hashable, Sendable {
     public var model: String?
     public var trust: OfficeTrust?
     public var spaceId: String?
-    /// codex, claude-code, or an outside agent such as hermes or openclaw.
-    public var providerId: String?
-    /// The outside agent's name when this bot runs on one.
-    public var externalAgent: String? {
-        switch providerId {
-        case "hermes": "Hermes"
-        case "openclaw": "OpenClaw"
-        case "dot": "Dot"
-        default: nil
-        }
-    }
 }
 
 public struct OfficeConversation: Codable, Identifiable, Hashable, Sendable {
@@ -131,7 +121,6 @@ public struct OfficeInboxEvent: Codable, Identifiable, Hashable, Sendable {
     public var body: String
     public var actions: [OfficeInboxAction]?
     public var answerable: Bool?
-    public var urgent: Bool?
     public var href: String?
     public var createdAt: Double
     public var readAt: Double?
@@ -139,7 +128,7 @@ public struct OfficeInboxEvent: Codable, Identifiable, Hashable, Sendable {
     /// Local state only. Never serialize pending actions to the server.
     public var isPending = false
     enum CodingKeys: String, CodingKey {
-        case key, spaceId, type, source, botId, threadId, item, title, body, actions, answerable, urgent, href, createdAt, readAt, doneAt
+        case key, spaceId, type, source, botId, threadId, item, title, body, actions, answerable, href, createdAt, readAt, doneAt
     }
 }
 
@@ -160,7 +149,7 @@ public struct OfficeInboxCounts: Codable, Hashable, Sendable {
 public struct OfficeWorkingTask: Codable, Identifiable, Hashable, Sendable {
     public enum Status: String, Codable, Sendable { case working, waiting, review, done }
     public var id: String
-    public var botId: String?
+    public var botId: String
     public var title: String
     public var status: Status
     public var note: String?
@@ -187,18 +176,4 @@ public struct OfficeBotDesk: Codable, Sendable {
     public var directThreadId: String?
     public var profileHref: String
     public var memory: Memory?
-}
-
-public enum OfficeSchedule: String, Codable, Sendable, CaseIterable {
-    case hourly, daily, weekdays, weekly
-}
-
-public struct OfficeDirectMessageResult: Codable, Sendable {
-    public var conversationId: String
-    public var threadId: String
-}
-
-public struct OfficeDelegationResult: Codable, Sendable {
-    public var taskId: String
-    public var task: OfficeWorkingTask
 }

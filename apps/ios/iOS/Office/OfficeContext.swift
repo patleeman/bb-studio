@@ -11,11 +11,9 @@ final class OfficeContext {
     private(set) var home: HomeStore?
     private(set) var team: TeamStore?
     private(set) var work: WorkStore?
-    private(set) var tabs: TabsStore?
     /// Requests waiting on you in every Space; the Inbox tab's badge.
     var inboxBadge: Int { inbox.counts.bySpace.values.reduce(0) { $0 + $1.requests } }
     @ObservationIgnored private let client: BBClient
-    @ObservationIgnored private var realtime: BBRealtime?
 
     init(client: BBClient) {
         self.client = client
@@ -23,26 +21,12 @@ final class OfficeContext {
         inbox = InboxStore(client: client)
     }
 
-    func observe(_ realtime: BBRealtime) {
-        self.realtime = realtime
-        inbox.startObserving(realtime)
-        tabs?.startObserving(realtime)
-    }
-    func stopObserving() {
-        inbox.stopObserving()
-        tabs?.stopObserving()
-        realtime = nil
-    }
+    func observe(_ realtime: BBRealtime) { inbox.startObserving(realtime) }
+    func stopObserving() { inbox.stopObserving() }
 
     var currentSpace: OfficeSpace? { spaces.currentSpace }
 
     func load() async {
-        // Capability discovery belongs to the root office, not a screen the
-        // user may never open. Settings and cold deep links read this cache.
-        if let running = try? await client.runningPlugins() {
-            UserDefaults.standard.set(running.sorted().joined(separator: ","),
-                forKey: ServerScope.key("runningPlugins", serverURL: client.baseURL))
-        }
         await spaces.load()
         rebuild()
         async let current: Void = refreshCurrent()
@@ -60,8 +44,7 @@ final class OfficeContext {
         async let home: Void = self.home?.refresh() ?? ()
         async let team: Void = self.team?.refresh() ?? ()
         async let work: Void = self.work?.refresh() ?? ()
-        async let tabs: Void = self.tabs?.refresh() ?? ()
-        _ = await (home, team, work, tabs)
+        _ = await (home, team, work)
     }
 
     private func rebuild() {
@@ -70,9 +53,6 @@ final class OfficeContext {
         home = HomeStore(spaceId: id, client: client)
         team = TeamStore(spaceId: id, client: client)
         work = WorkStore(spaceId: id, client: client)
-        tabs?.stopObserving()
-        tabs = TabsStore(spaceId: id, client: client)
-        if let realtime { tabs?.startObserving(realtime) }
     }
 
     func bot(_ id: String?) -> OfficeTeamBot? {
@@ -88,8 +68,6 @@ struct Face: View {
     var avatar: String?
     var state: OfficeBotState = .idle
     var size: CGFloat = 36
-    /// Runs on an outside agent (Hermes, OpenClaw): a small globe at the corner.
-    var external: String? = nil
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -99,7 +77,6 @@ struct Face: View {
                 .overlay {
                     Text(avatar?.isEmpty == false ? avatar! : String(name.prefix(1)).uppercased())
                         .font(.system(size: size * 0.5))
-                        .accessibilityHidden(true)
                 }
                 .overlay {
                     if state == .working {
@@ -108,17 +85,6 @@ struct Face: View {
                             .padding(-3)
                     }
                 }
-            if let external, size >= 28 {
-                Image(systemName: "globe")
-                    .font(.system(size: size * 0.22, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: size * 0.36, height: size * 0.36)
-                    .background(Circle().fill(Color(.secondarySystemBackground)))
-                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1.5))
-                    .offset(x: 2, y: size - size * 0.36 + 2)
-                    .accessibilityHidden(true)
-                    .help("\(external) agent")
-            }
             if state == .needsYou, size >= 28 {
                 Circle()
                     .fill(Color.orange)
@@ -128,49 +94,30 @@ struct Face: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityAddTraits(.isImage)
-        .accessibilityIdentifier("officeFace")
-        .accessibilityLabel([name, external.map { "\($0) agent" }, state == .needsYou ? "needs you" : state == .working ? "working" : nil]
-            .compactMap { $0 }.joined(separator: ", "))
+        .accessibilityLabel(state == .needsYou ? "\(name), needs you" : state == .working ? "\(name), working" : name)
     }
 }
 
 extension Face {
     init(_ bot: OfficeTeamBot, size: CGFloat = 36) {
-        self.init(name: bot.name, avatar: bot.avatar, state: bot.state, size: size, external: bot.externalAgent)
+        self.init(name: bot.name, avatar: bot.avatar, state: bot.state, size: size)
     }
 }
 
-/// The Space's mark, like an Arc Space's: its emoji on a soft circle of its
-/// color, or a dot of that color when it has no emoji.
+/// The Space's mark: its emoji, or its initial on a rounded tile.
 struct SpaceMark: View {
     var space: OfficeSpace
     var size: CGFloat = 22
 
     var body: some View {
-        let color = space.tint
-        Group {
-            if let icon = space.icon, !icon.isEmpty {
-                Circle()
-                    .fill(color.opacity(0.3))
-                    .overlay { Text(icon).font(.system(size: size * 0.6)) }
-            } else {
-                Circle()
-                    .fill(color.opacity(0.3))
-                    .overlay { Circle().fill(color).padding(size * 0.3) }
+        RoundedRectangle(cornerRadius: size * 0.25)
+            .fill(Color(.secondarySystemFill))
+            .frame(width: size, height: size)
+            .overlay {
+                Text(space.icon?.isEmpty == false ? space.icon! : String(space.name.prefix(1)).uppercased())
+                    .font(.system(size: size * 0.6, weight: .semibold))
             }
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
-    }
-}
-
-extension OfficeSpace {
-    /// The Space's color, from its "#rrggbb"; the stock blue for older servers.
-    var tint: Color {
-        let hex = (color ?? "#3b82f6").dropFirst()
-        guard hex.count == 6, let value = UInt32(hex, radix: 16) else { return .blue }
-        return Color(red: Double((value >> 16) & 0xff) / 255, green: Double((value >> 8) & 0xff) / 255, blue: Double(value & 0xff) / 255)
+            .accessibilityHidden(true)
     }
 }
 
@@ -179,27 +126,6 @@ struct SpaceSwitcher: View {
     @Environment(OfficeContext.self) private var office
     @EnvironmentObject private var app: AppModel
     @State private var creating = false
-    @State private var renaming = false
-    @State private var deleting = false
-    @State private var draftName = ""
-    @State private var draftIcon = ""
-    @AppStorage(OfficeRouting.key) private var routing = OfficeRouting.current.rawValue
-
-    /// Arc's Space colors, by name, for the color menu.
-    private static let colors: [(name: String, hex: String)] = [
-        ("Blue", "#3b82f6"), ("Violet", "#8b5cf6"), ("Pink", "#ec4899"), ("Orange", "#f97316"), ("Green", "#22c55e"),
-        ("Teal", "#14b8a6"), ("Yellow", "#eab308"), ("Red", "#ef4444"), ("Slate", "#64748b"),
-    ]
-
-    private func update(_ input: [String: JSONValue]) {
-        guard let space = office.currentSpace else { return }
-        Task {
-            var body = input
-            body["spaceId"] = .string(space.id)
-            let _: JSONValue? = try? await app.client.rpc("studio", Studio.Method.space_update, .object(body))
-            await office.spaces.refresh()
-        }
-    }
 
     var body: some View {
         Menu {
@@ -216,33 +142,8 @@ struct SpaceSwitcher: View {
                     }
                 }
             }
-            if let space = office.currentSpace {
-                Section(space.name) {
-                    Button {
-                        draftName = space.name
-                        draftIcon = space.icon ?? ""
-                        renaming = true
-                    } label: { Label("Change Name and Icon…", systemImage: "pencil") }
-                    Menu {
-                        ForEach(Self.colors, id: \.hex) { color in
-                            Button {
-                                update(["color": .string(color.hex)])
-                            } label: {
-                                if space.color == color.hex { Label(color.name, systemImage: "checkmark") } else { Text(color.name) }
-                            }
-                        }
-                    } label: { Label("Color", systemImage: "paintpalette") }
-                    if !space.isDefault {
-                        Button(role: .destructive) { deleting = true } label: { Label("Delete Space…", systemImage: "trash") }
-                    }
-                }
-            }
             Button { creating = true } label: { Label("New Space", systemImage: "plus") }
             Button { app.tab = .settings } label: { Label("Space Settings", systemImage: "gearshape") }
-            // Space routing, as in Arc: something new opens in the Space it belongs to.
-            Toggle(isOn: Binding(get: { routing == OfficeRouting.own.rawValue }, set: { routing = ($0 ? OfficeRouting.own : .current).rawValue })) {
-                Label("Open Things in Their Own Space", systemImage: "arrow.triangle.branch")
-            }
         } label: {
             HStack(spacing: 6) {
                 if let space = office.currentSpace { SpaceMark(space: space, size: 20) }
@@ -252,33 +153,7 @@ struct SpaceSwitcher: View {
             .foregroundStyle(.primary)
         }
         .accessibilityLabel("Space: \(office.currentSpace?.name ?? "none"). Switch space")
-        .accessibilityIdentifier("officeSpaceSwitcher")
-        .accessibilityShowsLargeContentViewer {
-            Text(office.currentSpace?.name ?? "Spaces")
-        }
         .sheet(isPresented: $creating) { NewSpaceSheet() }
-        .alert("Change Space", isPresented: $renaming) {
-            TextField("Name", text: $draftName)
-            TextField("Icon (emoji)", text: $draftIcon)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") {
-                let name = draftName.trimmingCharacters(in: .whitespaces)
-                let icon = draftIcon.trimmingCharacters(in: .whitespaces)
-                var input: [String: JSONValue] = ["icon": icon.isEmpty ? .null : .string(icon)]
-                if !name.isEmpty { input["name"] = .string(name) }
-                update(input)
-            }
-        }
-        .confirmationDialog("Delete \(office.currentSpace?.name ?? "this Space")?", isPresented: $deleting, titleVisibility: .visible) {
-            Button("Delete Space", role: .destructive) {
-                guard let space = office.currentSpace else { return }
-                Task {
-                    try? await app.client.officeDeleteSpace(space.id)
-                    await office.spaces.refresh()
-                    if let fallback = office.spaces.spaces.first(where: \.isDefault) { await office.select(fallback.id) }
-                }
-            }
-        } message: { Text("Its folders move to your default Space.") }
     }
 }
 

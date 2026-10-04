@@ -42,7 +42,7 @@ final class PageEditingUITests: XCTestCase {
     }
 
     private func rpc(_ method: String, _ input: Any) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "\(StagedFixture.serverURL)/api/v1/plugins/excalidraw/rpc/\(method)")!)
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/excalidraw/rpc/\(method)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: input)

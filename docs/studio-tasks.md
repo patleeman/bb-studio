@@ -187,7 +187,7 @@ list.
 
 - **Plugin id `studio-tasks`.** BB ships a builtin plugin with the id
   `tasks`, and BB refuses to install another plugin with that id. So the
-  package is `@bb-studio/studio-tasks`, the CLI is `bb studio studio-tasks`, the
+  package is `@bb-studio/studio-tasks`, the CLI is `bb studio-tasks`, the
   skill is `studio-tasks`, and a task lives at
   `/plugins/studio-tasks/tasks/<id>`. The agent tools stay `tasks_list`,
   `tasks_get`, `tasks_create` and `tasks_update`, and the directive stays

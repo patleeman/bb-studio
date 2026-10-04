@@ -1,17 +1,5 @@
 # Native artifact preview runtime checks
 
-The Office suite now runs all 12 artifact cases through
-`apps/ios/scripts/ui-test.sh` when `BB_QA_DATA_DIR` is provided. It uses the
-configured staged project and consolidated Studio API, seeds readable and
-unavailable content, and starts an owned loopback proxy on a free port. The
-proxy controls initial lookup failure and delayed version responses, records
-clipboard/share verification, and allows restoration writes only for its fixture
-payloads. It is stopped on runner exit. Use
-`BB_UI_TEST_ONLY=BBStudioUITests/ArtifactRuntimeUITests` for a focused run.
-
-The fixed ports and paths below describe the earlier review evidence.
-
-
 The later [edge-case follow-up](edge-cases/README.md) verifies header-valid corrupt
 PDFs, password-locked PDFs, native PDF rendering/zoom, initial lookup Retry, and
 a controlled delayed text-version response. PDF previews now use PDFKit; HTML
