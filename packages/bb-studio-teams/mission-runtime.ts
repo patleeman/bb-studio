@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Attachment, Bot, Conversation, Job, PermissionMode } from "./contract";
 import { Store } from "./store";
+import { permissionModeFor } from "./external-agents";
 import { ChannelData } from "./channel-data";
 import { defaultLimits } from "./workspace-contract";
 import { publishChange } from "./realtime-server";
@@ -25,7 +26,7 @@ readonly onChanged = new Set<() => void>();
 readonly data: ChannelData;
 constructor(readonly bb: BbPluginApi, readonly store: Store) { this.data = new ChannelData(store); }
 changed(scope: "all"|"bots"|"channel"="all", id?:string) { publishChange(this.bb,scope,id); for(const fn of this.onChanged) fn(); }
-permissionMode(bot: Bot, _roomId?: string | null): Promise<PermissionMode> { return Promise.resolve(bot.permissionMode); }
+permissionMode(bot: Bot, _roomId?: string | null): Promise<PermissionMode> { return Promise.resolve(permissionModeFor(bot.providerId, bot.permissionMode)); }
 async locked<T>(id: string, work: () => Promise<T>): Promise<T> {
     const next = (this.locks.get(id) ?? Promise.resolve())
       .catch(() => {})
@@ -95,7 +96,7 @@ async conversation(
         ...(bot.model ? { model: "explicit" as const } : {}),
         reasoningLevel: "explicit",
       },
-      permissionMode: permissionMode ?? bot.permissionMode,
+      permissionMode: permissionModeFor(bot.providerId, permissionMode ?? bot.permissionMode),
       pluginMetadata: { botId: bot.id, conversationKey: key },
     });
     if (emptyDirectMessage) {

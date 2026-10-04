@@ -20,6 +20,8 @@ import { BotChat } from "./bot-chat";
 import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID, botHref } from "./studio-provider";
 import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FloatPanels, retainPanel, ICON_BUTTON, Icon as KitIcon, ItemHeader, ItemTile, openAppPath, PageColumn, studioPath, useStudioPresent } from "@bb-studio/kit/app";
 
+import { externalAgent } from "./external-agents";
+import { ExternalAgentBadge, useExternalHealth } from "./external-health";
 import "./styles.css";
 import { botTeamsIcons } from "./icons";
 
@@ -64,6 +66,7 @@ function BotDetail({ id, tab, href }: { id: string; tab: string; href: string })
     };
   }, [load]);
   useRealtime("scoped-changed", (event) => { if (affects(event, "bots", id)) load(); });
+  const externalHealth = useExternalHealth([data?.bot.providerId]);
   const action = async (fn: () => Promise<unknown>) => {
     setPending(true);
     setError(null);
@@ -151,6 +154,7 @@ function BotDetail({ id, tab, href }: { id: string; tab: string; href: string })
               @{bot.handle}
               {bot.description ? ` · ${bot.description}` : ""}
             </p>
+            {externalAgent(bot.providerId) && <ExternalAgentBadge className="mt-1.5" providerId={bot.providerId} health={externalHealth[bot.providerId]} />}
           </div>
         </div>
         <TabBar

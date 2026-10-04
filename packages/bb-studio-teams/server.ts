@@ -4,6 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { rpcContract } from "./client-contract";
+import { fitProfileToProvider } from "./external-agents";
 import { profileInput, botSchema, type Bot, type BotCreateRequest, type Conversation } from "./contract";
 import { Store, newId, document, migrateAgentsFile } from "./store";
 import { MIGRATIONS } from "./migrations";
@@ -47,7 +48,8 @@ export default async function plugin(bb: BbPluginApi) {
         );
       const now = Date.now(),
         id = newId();
-      const { mission, ...profile } = input;
+      const { mission, ...requested } = input;
+      const profile = fitProfileToProvider(requested);
       const slug =
         input.name
           .toLowerCase()
@@ -207,7 +209,7 @@ export default async function plugin(bb: BbPluginApi) {
       throw new Error(
         "This profile changed elsewhere. Reload the latest profile before saving.",
       );
-    const profile = { ...previous, ...patch };
+    const profile = fitProfileToProvider({ ...previous, ...patch });
     const bot = {
       ...previous,
       ...profile,

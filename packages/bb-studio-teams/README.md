@@ -26,6 +26,10 @@ The composer is BB's own prompt box, so it has the same editor, file attachments
 
 Busy messages use your global Smart Queue settings. Prefix a message with `/steer`, `/followup` or `/fork` to choose explicitly. Open a member thread for tools, approvals, queues, stopping work and model controls. The iOS app uses the same channels and composer behavior.
 
+## Outside agents
+
+A bot can run on an outside agent from the External Agents plugin: Hermes, OpenClaw, or Dot. Pick its provider in the bot's profile, or ask for one by name in the setup chat. These bots show a globe badge with the agent's name, and **Offline** when the plugin's health check can't reach the agent (checked once a minute). Dot runs only with full access; Hermes and OpenClaw run with accept edits (the default) or full access. Teams fits the permission mode to the provider when it saves a profile and when it starts a thread. Outside agents chat in their BB threads and work on their own side. They can't use BB tools such as the bots skill, Feed, or the `bb` CLI.
+
 ## Missions and schedules
 
 Mission and memory editors reject stale saves. A profile can configure a fallback model for managed mission work; a provider failure retries the mission once in a fresh thread. Ordinary threads keep BB's model and retry controls. Archiving a bot stops managed work and turns off its mission interval; its ordinary threads and history remain available.

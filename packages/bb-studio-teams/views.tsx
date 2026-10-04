@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { externalAgent } from "./external-agents";
+import { ExternalAgentBadge, useExternalHealth } from "./external-health";
 import { experimental_NewThreadComposer as NewThreadComposer, Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Icon, ItemTile, PageColumn, AddOnCollection, openAppPath, openCompanion, useCompanionNavigate, type ProviderCall } from "@bb-studio/kit/app";
 import { toast } from "sonner";
@@ -49,7 +51,7 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
   const matches = (text: string) => text.toLowerCase().includes(query.trim().toLowerCase());
   const ordered = <T extends { member: ViewMember }>(rows: T[]) => [...rows].sort((x, y) => Number(pinned.has(memberKey(y.member))) - Number(pinned.has(memberKey(x.member))));
   const sections = [
-    { label: "Bots", rows: ordered(bots.filter(b => !b.retired || pinned.has(`bot:${b.id}`)).map(b => ({ member: { kind: "bot" as const, id: b.id }, label: b.name, detail: `@${b.handle}`, icon: b.avatar || null, kindIcon: "Bot" })).filter(c => matches(`${c.label} ${c.detail}`))) },
+    { label: "Bots", rows: ordered(bots.filter(b => !b.retired || pinned.has(`bot:${b.id}`)).map(b => ({ member: { kind: "bot" as const, id: b.id }, label: b.name, detail: externalAgent(b.providerId) ? `@${b.handle} · ${externalAgent(b.providerId)!.name}, outside agent` : `@${b.handle}`, icon: b.avatar || null, kindIcon: "Bot" })).filter(c => matches(`${c.label} ${c.detail}`))) },
     { label: "Threads", rows: ordered(threads.map(t => ({ member: { kind: "thread" as const, id: t.id }, label: t.title, detail: "", icon: null, kindIcon: "MessageSquare" })).filter(c => matches(c.label))) },
   ].filter(section => section.rows.length);
   const save = async () => {
@@ -126,6 +128,7 @@ function ViewDetail({ id }: { id: string }) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
   const openThread = (threadId: string) => { if (!openCompanion({ kind: "thread", threadId })) navigate.toThread(threadId); };
   const [page, setPage] = useState<Page | null>(null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
+  const externalHealth = useExternalHealth(bots.map(b => b.providerId));
   const [reply, setReply] = useState<string | null>(null);
   const [layout, setLayout] = useState<ChannelLayout>(() => { try { return channelLayout(localStorage.getItem(`bot-teams:view-layout:${id}`)); } catch { return "merged"; } });
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
@@ -214,7 +217,7 @@ function ViewDetail({ id }: { id: string }) {
     </li>;
     const continued = previous?.role === "assistant" && previous.threadId === entry.threadId && entry.createdAt - previous.createdAt < 5 * 60_000;
     return <li key={entry.id} data-view-entry="assistant" data-replying={replying || undefined} className={`group/message rounded-lg px-2 transition-colors data-[replying]:bg-foreground/[0.04] data-[replying]:py-2 ${continued ? "-mt-2" : ""}`}>
-      {!continued && <div className="mb-1.5 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={bot?.avatar || null} kindIcon="Bot" size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => openThread(entry.threadId)}>{bot?.name || thread?.title || "Thread"}</button><time className="shrink-0 text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>{replying && <span className="text-xs text-subtle-foreground">· Replying</span>}</div>}
+      {!continued && <div className="mb-1.5 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={bot?.avatar || null} kindIcon="Bot" size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => openThread(entry.threadId)}>{bot?.name || thread?.title || "Thread"}</button><ExternalAgentBadge providerId={bot?.providerId} health={bot ? externalHealth[bot.providerId] : undefined} /><time className="shrink-0 text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>{replying && <span className="text-xs text-subtle-foreground">· Replying</span>}</div>}
       <div className="min-w-0 break-words text-sm leading-relaxed"><Markdown content={entry.text} /></div>
       <div className="mt-1">{actions}</div>
     </li>;

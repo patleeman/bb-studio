@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { readConfigDraft, writeConfigDraft, profileDraft, documentDraft } from "./config-draft";
 import { Modal } from "./channel-controls";
 import { COARSE_POINTER_HEADER_ICON_BUTTON_CLASS } from "@bb-studio/kit/ui";
+import { externalAgent, externalPermissionHint, externalToolsNote, permissionModeFor, reasoningLevelFor } from "./external-agents";
+import { ExternalAgentBadge, useExternalHealth } from "./external-health";
 import "./styles.css";
 
 export const message = (e: unknown) =>
@@ -230,6 +232,7 @@ export function ProfileForm({
       setPending(false);
     }
   };
+  const externalHealth = useExternalHealth([draft.providerId]);
   const schedules = [
     [0, "Only when messaged or woken manually"],
     [15, "Every 15 minutes"],
@@ -295,7 +298,8 @@ export function ProfileForm({
                 if (!draft.model && !baseline.model && v.providerId === draft.providerId) {
                   setResolved({ model: v.model, reasoningLevel: v.reasoningLevel });
                 } else setSaved(false);
-                setDraft((d) => ({ ...d, providerId: v.providerId, model: v.model, reasoningLevel: v.reasoningLevel }));
+                // Outside agents accept fewer permission modes and no reasoning level.
+                setDraft((d) => ({ ...d, providerId: v.providerId, model: v.model, reasoningLevel: reasoningLevelFor(v.providerId, v.reasoningLevel), permissionMode: permissionModeFor(v.providerId, d.permissionMode) }));
               }}
               routing={{ kind: "host", hostId: bot.hostId }}
             />
@@ -339,14 +343,22 @@ export function ProfileForm({
                 setSaved(false);
               }}>Add fallback model</Button>}
           </FormRow>
-          <FormRow label="Permissions">
+          {externalAgent(draft.providerId) && (
+            <FormRow label="Outside agent">
+              <div className="space-y-1.5">
+                <ExternalAgentBadge providerId={draft.providerId} health={externalHealth[draft.providerId]} />
+                <p className="text-xs leading-[1.45] text-muted-foreground">{externalToolsNote(draft.providerId)}</p>
+              </div>
+            </FormRow>
+          )}
+          <FormRow label="Permissions" hint={externalPermissionHint(draft.providerId) ?? undefined}>
             <PermissionModePicker
               disabled={pending}
               className="profile-picker-control max-w-[360px]"
               align="start"
               providerId={draft.providerId}
               value={draft.permissionMode}
-              onChange={(v) => set("permissionMode", v)}
+              onChange={(v) => set("permissionMode", permissionModeFor(draft.providerId, v))}
               routing={{ kind: "host", hostId: bot.hostId }}
             />
           </FormRow>

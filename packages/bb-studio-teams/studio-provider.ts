@@ -4,6 +4,7 @@ import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@b
 import { snippets } from "@bb-studio/kit/format";
 import { registerStudioProvider } from "@bb-studio/kit/server";
 import type { Bot } from "./contract";
+import { externalAgent } from "./external-agents";
 import type { ThreadView } from "./view-contract";
 
 export const PLUGIN_ID = "bot-teams";
@@ -65,7 +66,7 @@ export function toStudioItem(bot: Bot, activity: BotActivity | undefined): Studi
     updatedAt: bot.updatedAt,
     updatedBy: null,
     preview: bot.description.trim() || `@${bot.handle}`,
-    facts: [{ id: "model", value: bot.model || bot.providerId, sort: null }],
+    facts: [{ id: "model", value: externalAgent(bot.providerId) ? `${externalAgent(bot.providerId)!.name}, outside agent${bot.model && bot.model !== bot.providerId ? ` (${bot.model})` : ""}` : bot.model || bot.providerId, sort: null }],
     badge: bot.error
       ? { label: "Error", tone: "danger" }
       : activity?.working
@@ -133,6 +134,6 @@ export function registerStudio(
 /** A key that changes when anything Studio shows about the bots does. */
 export function botsSignature(bots: readonly Bot[], activity: Map<string, BotActivity>): string {
   return JSON.stringify(
-    bots.map((bot) => [bot.id, bot.name, bot.avatar, bot.description, bot.model, bot.retired, bot.error, bot.updatedAt, activity.get(bot.id)?.working]),
+    bots.map((bot) => [bot.id, bot.name, bot.avatar, bot.description, bot.providerId, bot.model, bot.retired, bot.error, bot.updatedAt, activity.get(bot.id)?.working]),
   );
 }

@@ -3,6 +3,7 @@ import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { decisionsClient, type Question } from "@bb-studio/kit/decisions";
 import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type ViewMember, type ViewThread, type ViewEntry, type ViewSend, type ViewDelivery, type ViewPermissionMode } from "./view-contract";
 import type { Store } from "./store";
+import { permissionModeFor } from "./external-agents";
 import type { ThreadProfiles } from "./thread-profiles";
 import { missingThread } from "./mission-runtime";
 import { isBroadcastHandle } from "./mentions";
@@ -325,7 +326,9 @@ export class ThreadViews {
         const { targets, threads } = await this.recipients(view, input);
         const resolved: string[] = [], modes: Record<string, ViewPermissionMode> = {};
         for (const target of targets) {
-          const mode = input.memberPermissionModes.find(m => m.member.kind === target.kind && m.member.id === target.id)?.mode ?? input.permissionMode;
+          const requestedMode = input.memberPermissionModes.find(m => m.member.kind === target.kind && m.member.id === target.id)?.mode ?? input.permissionMode;
+          // Outside agents accept fewer modes; a channel-wide mode can't push one they refuse.
+          const mode = requestedMode && target.kind === "bot" ? permissionModeFor(this.store.get(target.id).providerId, requestedMode) : requestedMode;
           let id = target.id;
           if (target.kind === "bot") {
             const bot = this.store.get(target.id);
