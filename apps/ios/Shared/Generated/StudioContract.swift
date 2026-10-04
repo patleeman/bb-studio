@@ -2815,9 +2815,11 @@ public enum Studio {
 
   public struct CreateInSpaceOutput: Sendable, Hashable, Codable {
     public var href: String?
+    public var title: String?
 
-    public init(href: String? = nil) {
+    public init(href: String? = nil, title: String? = nil) {
       self.href = href
+      self.title = title
     }
   }
 
