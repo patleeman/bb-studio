@@ -11,6 +11,11 @@ public enum Pages {
     public static let linkPreview = "linkPreview"
     public static let studioItems = "studioItems"
     public static let artifactView = "artifactView"
+    public static let checklistHandOff = "checklistHandOff"
+    public static let checklistHandoffs = "checklistHandoffs"
+    public static let migrateBoards = "migrateBoards"
+    public static let whiteboardGet = "whiteboardGet"
+    public static let whiteboardSave = "whiteboardSave"
     public static let studioCreate = "studioCreate"
     public static let tableGet = "tableGet"
     public static let tableUpdate = "tableUpdate"
@@ -67,6 +72,16 @@ public enum Pages {
   public typealias StudioItems = StudioItemsOutput
 
   public typealias ArtifactView = ArtifactViewOutput
+
+  public typealias ChecklistHandOff = ChecklistHandOffOutput
+
+  public typealias ChecklistHandoffs = ChecklistHandoffsOutput
+
+  public typealias MigrateBoards = MigrateBoardsOutput
+
+  public typealias WhiteboardGet = WhiteboardGetOutput
+
+  public typealias WhiteboardSave = WhiteboardSaveOutput
 
   public typealias StudioCreate = StudioCreateOutput
 
@@ -548,6 +563,234 @@ public enum Pages {
 
     public init(view: ArtifactViewOutputView? = nil) {
       self.view = view
+    }
+  }
+
+  public struct ChecklistHandOffInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var blockId: String?
+    public var note: String?
+
+    public init(id: String? = nil, blockId: String? = nil, note: String? = nil) {
+      self.id = id
+      self.blockId = blockId
+      self.note = note
+    }
+  }
+
+  public struct ChecklistHandOffOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct ChecklistHandoffsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ChecklistHandoffsOutputHandoffsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var blockId: String?
+    public var title: String?
+    public var state: String?
+    public var note: String?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, blockId: String? = nil, title: String? = nil, state: String? = nil, note: String? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.blockId = blockId
+      self.title = title
+      self.state = state
+      self.note = note
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct ChecklistHandoffsOutput: Sendable, Hashable, Codable {
+    public var handoffs: [ChecklistHandoffsOutputHandoffsItem]?
+
+    public init(handoffs: [ChecklistHandoffsOutputHandoffsItem]? = nil) {
+      self.handoffs = handoffs
+    }
+  }
+
+  public struct MigrateBoardsInput: Sendable, Hashable, Codable {
+    public var dryRun: Bool?
+    public var includeArchived: Bool?
+
+    public init(dryRun: Bool? = nil, includeArchived: Bool? = nil) {
+      self.dryRun = dryRun
+      self.includeArchived = includeArchived
+    }
+  }
+
+  public enum MigrateBoardsOutputBoardsItemStatus: Sendable, Hashable, Codable {
+    case created
+    case exists
+    case would_create
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "created": self = .created
+      case "exists": self = .exists
+      case "would-create": self = .would_create
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .created: try container.encode("created")
+      case .exists: try container.encode("exists")
+      case .would_create: try container.encode("would-create")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct MigrateBoardsOutputBoardsItem: Sendable, Hashable, Codable {
+    public var boardId: String?
+    public var title: String?
+    public var pageId: String?
+    public var tasks: Double?
+    public var status: MigrateBoardsOutputBoardsItemStatus?
+
+    public init(boardId: String? = nil, title: String? = nil, pageId: String? = nil, tasks: Double? = nil, status: MigrateBoardsOutputBoardsItemStatus? = nil) {
+      self.boardId = boardId
+      self.title = title
+      self.pageId = pageId
+      self.tasks = tasks
+      self.status = status
+    }
+  }
+
+  public struct MigrateBoardsOutput: Sendable, Hashable, Codable {
+    public var boards: [MigrateBoardsOutputBoardsItem]?
+
+    public init(boards: [MigrateBoardsOutputBoardsItem]? = nil) {
+      self.boards = boards
+    }
+  }
+
+  public struct WhiteboardGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct WhiteboardGetOutputWhiteboard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var updatedAt: Double?
+    public var viewBox: [StudioJSONValue]?
+    public var markup: String?
+
+    public init(id: String? = nil, name: String? = nil, updatedAt: Double? = nil, viewBox: [StudioJSONValue]? = nil, markup: String? = nil) {
+      self.id = id
+      self.name = name
+      self.updatedAt = updatedAt
+      self.viewBox = viewBox
+      self.markup = markup
+    }
+  }
+
+  public struct WhiteboardGetOutput: Sendable, Hashable, Codable {
+    public var whiteboard: WhiteboardGetOutputWhiteboard?
+
+    public init(whiteboard: WhiteboardGetOutputWhiteboard? = nil) {
+      self.whiteboard = whiteboard
+    }
+  }
+
+  public enum WhiteboardSaveInputAddItemColor: Sendable, Hashable, Codable {
+    case _1e1e1e
+    case _e03131
+    case _1971c2
+    case _2f9e44
+    case _f08c00
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "#1e1e1e": self = ._1e1e1e
+      case "#e03131": self = ._e03131
+      case "#1971c2": self = ._1971c2
+      case "#2f9e44": self = ._2f9e44
+      case "#f08c00": self = ._f08c00
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case ._1e1e1e: try container.encode("#1e1e1e")
+      case ._e03131: try container.encode("#e03131")
+      case ._1971c2: try container.encode("#1971c2")
+      case ._2f9e44: try container.encode("#2f9e44")
+      case ._f08c00: try container.encode("#f08c00")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct WhiteboardSaveInputAddItem: Sendable, Hashable, Codable {
+    public var points: [[StudioJSONValue]]?
+    public var color: WhiteboardSaveInputAddItemColor?
+    public var width: Double?
+
+    public init(points: [[StudioJSONValue]]? = nil, color: WhiteboardSaveInputAddItemColor? = nil, width: Double? = nil) {
+      self.points = points
+      self.color = color
+      self.width = width
+    }
+  }
+
+  public struct WhiteboardSaveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var add: [WhiteboardSaveInputAddItem]?
+    public var erase: [String]?
+
+    public init(id: String? = nil, add: [WhiteboardSaveInputAddItem]? = nil, erase: [String]? = nil) {
+      self.id = id
+      self.add = add
+      self.erase = erase
+    }
+  }
+
+  public struct WhiteboardSaveOutputWhiteboard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var updatedAt: Double?
+    public var viewBox: [StudioJSONValue]?
+    public var markup: String?
+
+    public init(id: String? = nil, name: String? = nil, updatedAt: Double? = nil, viewBox: [StudioJSONValue]? = nil, markup: String? = nil) {
+      self.id = id
+      self.name = name
+      self.updatedAt = updatedAt
+      self.viewBox = viewBox
+      self.markup = markup
+    }
+  }
+
+  public struct WhiteboardSaveOutput: Sendable, Hashable, Codable {
+    public var whiteboard: WhiteboardSaveOutputWhiteboard?
+
+    public init(whiteboard: WhiteboardSaveOutputWhiteboard? = nil) {
+      self.whiteboard = whiteboard
     }
   }
 
