@@ -11,9 +11,11 @@ import { rpcErrorStatus } from "@bb-studio/kit/server";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { NewThreadRequestInput, SpaceLeadView, SpaceOverviewView, SpaceRun } from "./contract";
+import { spaceRunSchema } from "./contract";
 import type { HubItem } from "./hub";
 import { backgroundKinds } from "./query";
 import { pageHref, PAGES_PLUGIN_ID } from "./space-page";
+import { spaceThreadStatus } from "./space-status";
 import { inSpace, PERSONAL_PROJECT_ID, spacePath, THREAD_REF, type Space, type SpaceStore } from "./spaces";
 
 type Sdk = BbPluginApi["sdk"];
@@ -147,12 +149,12 @@ export class SpaceLeads {
     return { threadId: thread.id };
   }
 
-  setRun(spaceId: string, input: { enabled: boolean; cadence: SpaceRun["cadence"]; time?: string }): Promise<SpaceLeadView> {
+  setRun(spaceId: string, input: { enabled: boolean; cadence: SpaceRun["cadence"]; time?: string; cron?: string }): Promise<SpaceLeadView> {
     this.space(spaceId);
     return this.serial(spaceId, async () => {
       const current = await this.read(spaceId);
       if (input.enabled && !current.leadThreadId) throw new Error("Start the space's lead before turning on its heartbeat.");
-      await this.runs.set(spaceId, current.leadThreadId, { enabled: input.enabled, cadence: input.cadence, time: input.time ?? current.run?.time ?? "09:00" });
+      await this.runs.set(spaceId, current.leadThreadId, { enabled: input.enabled, cadence: input.cadence, time: input.time ?? current.run?.time ?? "09:00", cron: input.cron ?? current.run?.cron });
       return this.read(spaceId);
     });
   }
@@ -176,7 +178,7 @@ export class SpaceLeads {
     const owners = this.deps.spaces.threads.all();
     const [byProject, added, { items, providers }] = await Promise.all([
       Promise.all(space.projectIds.map((projectId) => this.list({ projectId, archived: false }))),
-      Promise.all(space.threadIds.map((threadId) => this.thread(threadId).catch(() => null))),
+      Promise.all([...new Set([...space.threadIds, ...(leadThreadId ? [leadThreadId] : [])])].map((threadId) => this.thread(threadId).catch(() => null))),
       this.deps.hub.overview(),
     ]);
     const found = new Map<string, Thread | Listed>();
@@ -193,7 +195,8 @@ export class SpaceLeads {
       .filter((item) => !item.archived && item.pluginId !== "studio" && !background.has(`${item.pluginId}:${item.kind}`) && inSpace(space, item) && !(item.pluginId === PAGES_PLUGIN_ID && item.id === space.pageId))
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .map((item) => ({ ref: `${item.pluginId}:${item.id}`, title: item.title || "Untitled", kind: item.kind, href: item.href, icon: item.icon ?? null, updatedAt: item.updatedAt }));
-    return { threads, items: held };
+    const enriched = await spaceThreadStatus(this.deps.sdk, threads);
+    return { ...enriched, items: held };
   }
 
   private async list(args: { projectId?: string; archived?: boolean }): Promise<Listed[]> {
@@ -293,7 +296,7 @@ export function leadInstructions(space: Space, pageId: string, projectId: string
   ].join("\n\n");
 }
 
-type RunRow = SpaceRun & { space_id: string; enabled: number | boolean; automation_id: string | null; automation_project_id: string | null };
+type RunRow = Omit<SpaceRun, "cron"> & { cron: string | null; space_id: string; enabled: number | boolean; automation_id: string | null; automation_project_id: string | null };
 const automation = z.object({ id: z.string(), name: z.string() });
 
 /** Automations owns the schedule; this table keeps its settings and identity. */
@@ -302,12 +305,12 @@ export class SpaceRuns {
   constructor(private db: Database.Database, private sdk: Sdk, private changed: () => void) {}
 
   private row(spaceId: string) {
-    return this.db.prepare("SELECT * FROM space_runs WHERE space_id = ?").get(spaceId) as RunRow | undefined;
+    return this.db.prepare("SELECT space_id, enabled, cadence, time, cron, automation_id, automation_project_id FROM space_runs WHERE space_id = ?").get(spaceId) as RunRow | undefined;
   }
 
   get(spaceId: string): SpaceRun | null {
     const row = this.row(spaceId);
-    return row ? { enabled: !!row.enabled, cadence: row.cadence, time: row.time } : null;
+    return row ? { enabled: !!row.enabled, cadence: row.cadence, time: row.time, ...(row.cron == null ? {} : { cron: row.cron }) } : null;
   }
 
   private call<T>(method: string, input: unknown, outputSchema: z.ZodType<T>) {
@@ -322,22 +325,23 @@ export class SpaceRuns {
   }
 
   private async provision(spaceId: string, leadThreadId: string | null, run: SpaceRun) {
+    // Validate before any stored state or existing automation is changed, even when off.
+    run = spaceRunSchema.parse(run);
+    if (run.cadence === "custom" && !run.cron) throw new Error("Custom check-ins require a valid five-field cron expression.");
     const row = this.row(spaceId);
     if (!run.enabled || !leadThreadId) {
       if (row?.automation_id) {
         await this.call("automations_delete", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
       }
       this.db
-        .prepare("INSERT INTO space_runs VALUES (?, 0, ?, ?, NULL, NULL) ON CONFLICT (space_id) DO UPDATE SET enabled = 0, cadence = excluded.cadence, time = excluded.time, automation_id = NULL, automation_project_id = NULL")
-        .run(spaceId, run.cadence, run.time);
+        .prepare("INSERT INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 0, ?, ?, ?, NULL, NULL) ON CONFLICT (space_id) DO UPDATE SET enabled = 0, cadence = excluded.cadence, time = excluded.time, cron = excluded.cron, automation_id = NULL, automation_project_id = NULL")
+        .run(spaceId, run.cadence, run.time, run.cron ?? null);
       this.changed();
       return;
     }
-    this.db.prepare("INSERT OR IGNORE INTO space_runs VALUES (?, 0, ?, ?, NULL, NULL)").run(spaceId, run.cadence, run.time);
     const [thread, defaults] = await Promise.all([this.sdk.threads.get({ threadId: leadThreadId }), this.sdk.threads.defaultExecutionOptions({ threadId: leadThreadId })]);
     if (!thread.providerId || !defaults?.model) throw new Error("Choose a provider and model for the lead before turning on its heartbeat.");
-    const [hour, minute] = run.time.split(":");
-    const cron = run.cadence === "hourly" ? `${Number(minute)} * * * *` : `${Number(minute)} ${Number(hour)} * * ${run.cadence === "weekdays" ? "1-5" : "*"}`;
+    const cron = heartbeatCron(run);
     const trigger = { triggerType: "schedule", cron, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
     const execution = {
       mode: "agent", providerId: thread.providerId, model: defaults.model, reasoningLevel: defaults.reasoningLevel ?? "medium",
@@ -356,11 +360,28 @@ export class SpaceRuns {
       const existing = (await this.call("automations_list", { projectId: thread.projectId }, z.array(automation))).filter((each) => each.name === name);
       if (existing.length > 1) throw new Error("This space has more than one heartbeat automation.");
       automationId = existing[0]?.id ?? (await this.call("automations_create", { projectId: thread.projectId, name, enabled: false, origin: "app", trigger, execution }, automation)).id;
+      this.db.prepare("INSERT OR IGNORE INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 0, ?, ?, ?, NULL, NULL)").run(spaceId, run.cadence, run.time, run.cron ?? null);
       this.db.prepare("UPDATE space_runs SET automation_id = ?, automation_project_id = ? WHERE space_id = ?").run(automationId, thread.projectId, spaceId);
     }
     await this.call("automations_update", { projectId: thread.projectId, automationId, trigger, execution }, z.unknown());
     await this.call("automations_resume", { projectId: thread.projectId, automationId }, z.unknown());
-    this.db.prepare("UPDATE space_runs SET enabled = 1, cadence = ?, time = ? WHERE space_id = ?").run(run.cadence, run.time, spaceId);
+    this.db.prepare("UPDATE space_runs SET enabled = 1, cadence = ?, time = ?, cron = ? WHERE space_id = ?").run(run.cadence, run.time, run.cron ?? null, spaceId);
     this.changed();
+  }
+}
+
+function heartbeatCron(run: SpaceRun): string {
+  const [hour, minute] = run.time.split(":").map(Number);
+  switch (run.cadence) {
+    case "every5minutes": return "*/5 * * * *";
+    case "every15minutes": return "*/15 * * * *";
+    case "every30minutes": return "*/30 * * * *";
+    case "every2hours": return `${minute} */2 * * *`;
+    case "every6hours": return `${minute} */6 * * *`;
+    case "hourly": return `${minute} * * * *`;
+    case "daily": return `${minute} ${hour} * * *`;
+    case "weekdays": return `${minute} ${hour} * * 1-5`;
+    case "weekly": return `${minute} ${hour} * * 1`;
+    case "custom": return run.cron!;
   }
 }

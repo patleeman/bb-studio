@@ -1,8 +1,5 @@
-// A Space at a glance, on its dashboard: what needs
-// you, what's running, and every thread in it with sub-threads under their
-// parent, then its newest items. The plan itself lives on the Space's page.
+// The Space's status belongs beside the lead chat. BB owns the workbench tabs.
 import {
-  ThreadChat,
   type PluginNavPanelProps,
   experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreads as useSidebarThreads,
@@ -10,157 +7,81 @@ import {
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { GHOST_BUTTON, Icon, openAppPath } from "@bb-studio/kit/app";
-import { useState, type ReactNode } from "react";
-import { useSpaceLead, useSpaceOf, useSpaceOverview, type OverviewItem, type OverviewThread } from "./data";
+import { useState } from "react";
+import { useSpaceLead, useSpaceOf, useSpaceOverview } from "./data";
 import { cn } from "./styles";
 import { spaceIdOf } from "./routes";
 import { StartThreadDialog } from "./SpaceView";
 
-export const RUNNING = new Set(["running", "starting", "active"]);
-const ITEMS_SHOWN = 8;
+import { RUNNING, stateOf } from "./status";
+export { RUNNING } from "./status";
 
-/** A thread's state where BB draws it: needs you, running, unread, or nothing. */
 export function ThreadGlyph({ thread }: { thread: PluginSidebarThread | undefined }) {
   if (thread?.hasPendingInteraction) return <span aria-label="Needs you" className="size-2 rounded-full bg-warning-foreground" />;
-  if (thread && RUNNING.has(thread.runtimeStatus)) return <span aria-label="Running" className="size-3 rounded-full border-[1.5px] border-muted-foreground/60 border-r-transparent motion-safe:animate-spin" />;
-  if (thread?.isUnread) return <span aria-label="Unread" className="size-1.5 rounded-full bg-foreground" />;
-  return <span aria-hidden className="size-1 rounded-full bg-muted-foreground/30" />;
+  if (thread && RUNNING.has(thread.runtimeStatus)) return <span aria-label="Working" className="size-3 rounded-full border-[1.5px] border-muted-foreground/60 border-r-transparent motion-safe:animate-spin" />;
+  return <span aria-hidden className="size-1.5 rounded-full bg-muted-foreground/40" />;
 }
 
-export interface OverviewRow { id: string; title: string; status?: string; updatedAt?: number; live: PluginSidebarThread | undefined }
-export interface OverviewView {
-  needsYou: OverviewRow[];
-  running: OverviewRow[];
-  failed: OverviewRow[];
-  tree: { row: OverviewRow; children: OverviewRow[] }[];
+function relative(at: number) {
+  const minutes = Math.max(0, Math.floor((Date.now() - at) / 60_000));
+  if (minutes < 1) return "Now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(at);
 }
 
-/** Groups a Space's threads; `live` supplies BB's live state (needs you, running, unread). */
-export function overviewOf(threads: readonly OverviewThread[], live: ReadonlyMap<string, PluginSidebarThread>): OverviewView {
-  const rows = threads.filter((thread) => !thread.isLead).map((thread) => ({ thread, row: { id: thread.id, title: live.get(thread.id)?.displayTitle ?? thread.title, status: thread.status, updatedAt: thread.updatedAt, live: live.get(thread.id) } }));
-  const ids = new Set(rows.map(({ thread }) => thread.id));
-  const leadIds = new Set(threads.filter((thread) => thread.isLead).map((thread) => thread.id));
-  const newest = (a: { thread: OverviewThread }, b: { thread: OverviewThread }) => b.thread.updatedAt - a.thread.updatedAt;
-  // A sub-thread of the lead is top-level here: the lead is the view you're in.
-  const isRoot = ({ thread }: { thread: OverviewThread }) => !thread.parentThreadId || leadIds.has(thread.parentThreadId) || !ids.has(thread.parentThreadId);
-  return {
-    needsYou: rows.filter(({ row }) => row.live?.hasPendingInteraction).sort(newest).map(({ row }) => row),
-    running: rows.filter(({ row }) => !row.live?.hasPendingInteraction && row.live && RUNNING.has(row.live.runtimeStatus)).sort(newest).map(({ row }) => row),
-    failed: rows.filter(({ row }) => row.status === "error" || row.status === "failed").sort(newest).map(({ row }) => row),
-    tree: rows.filter(isRoot).sort(newest).map(({ thread, row }) => ({ row, children: rows.filter((child) => child.thread.parentThreadId === thread.id).sort(newest).map((child) => child.row) })),
-  };
-}
-
-function Section({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
-  return (
-    <section aria-label={title} className="px-2 pt-3">
-      <h2 className="flex h-7 items-center justify-between px-2 text-xs font-medium text-muted-foreground">{title}{action}</h2>
-      <div className="space-y-px">{children}</div>
-    </section>
-  );
-}
-
-function ThreadLine({ row, nested, onOpen }: { row: OverviewRow; nested?: boolean; onOpen: () => void }) {
-  return (
-    <button type="button" onClick={onOpen} className={cn("flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-state-hover", nested && "pl-7")}>
-      <span className="inline-flex size-4 shrink-0 items-center justify-center"><ThreadGlyph thread={row.live} /></span>
-      <span className={cn("min-w-0 flex-1 truncate", row.live?.isUnread && "font-medium")}>{row.title}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">{row.live?.hasPendingInteraction ? "Needs you" : row.live && RUNNING.has(row.live.runtimeStatus) ? "Running" : row.status === "error" || row.status === "failed" ? "Failed" : "Idle"}</span>
-    </button>
-  );
-}
-
-function ItemLine({ item }: { item: OverviewItem }) {
-  return (
-    <button type="button" onClick={() => openAppPath(item.href)} className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-state-hover">
-      <span className="inline-flex size-4 shrink-0 items-center justify-center text-muted-foreground">{item.icon && !/^[A-Za-z]/.test(item.icon) ? item.icon : <Icon name={item.kind === "page" ? "FileText" : "File"} className="size-4" />}</span>
-      <span className="min-w-0 flex-1 truncate">{item.title || "Untitled"}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(item.updatedAt)}</span>
-    </button>
-  );
-}
 
 export function SpaceOverview({ spaceId, onOpenThread, onNewThread }: { spaceId: string; onOpenThread?: (threadId: string) => boolean; onNewThread?: () => void }) {
   const overview = useSpaceOverview(spaceId);
-  const lead = useSpaceLead(spaceId);
   const { threads } = useSidebarThreads();
-  const threadActions = useSidebarThreadActions();
+  const actions = useSidebarThreadActions();
   const live = new Map(threads.map((thread) => [thread.id, thread]));
-  const view = overviewOf(overview.data?.threads ?? [], live);
-  const items = overview.data?.items ?? [];
-  const run = lead.data?.run?.enabled ? lead.data.run : null;
-  const open = (threadId: string) => { if (!onOpenThread?.(threadId)) threadActions.open(threadId); };
-  return (
-    <div className="pb-4">
-      {overview.error ? <p role="alert" className="px-4 py-2 text-sm text-destructive">{overview.error} <button type="button" onClick={overview.refresh} className="underline">Retry</button></p> : null}
-      {overview.loading && !overview.data ? <p role="status" className="px-4 py-2 text-sm text-muted-foreground">Loading space activity…</p> : null}
-      {overview.data ? <p className="px-4 pt-4 text-sm text-muted-foreground">{view.needsYou.length ? `${view.needsYou.length} ${view.needsYou.length === 1 ? "thread needs" : "threads need"} your input. ` : "No threads waiting for your input. "}{view.running.length ? `${view.running.length} ${view.running.length === 1 ? "thread is" : "threads are"} working.` : "No worker threads running."}</p> : null}
-      {run
-        ? <p className="flex items-center gap-2 px-4 pt-3 text-xs text-muted-foreground"><Icon name="Repeat" className="size-3.5" />The lead checks in {run.cadence === "hourly" ? "every hour" : run.cadence === "daily" ? "every day" : "on weekdays"} and reports to your Inbox.</p>
-        : null}
-      {view.needsYou.length ? <Section title="Needs you">{view.needsYou.map((row) => <ThreadLine key={row.id} row={row} onOpen={() => open(row.id)} />)}</Section> : null}
-      {view.running.length ? <Section title="Running">{view.running.map((row) => <ThreadLine key={row.id} row={row} onOpen={() => open(row.id)} />)}</Section> : null}
-      {view.failed.length ? <Section title="Failed">{view.failed.map((row) => <ThreadLine key={row.id} row={row} onOpen={() => open(row.id)} />)}</Section> : null}
-      <Section
-        title="Threads"
-        action={onNewThread ? <button type="button" aria-label="New thread in this Space" title="New thread in this Space" onClick={onNewThread} className="inline-flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-4" /></button> : undefined}
-      >
-        {view.tree.map(({ row, children }) => (
-          <div key={row.id} className="space-y-px">
-            <ThreadLine row={row} onOpen={() => open(row.id)} />
-            {children.map((child) => <ThreadLine key={child.id} row={child} nested onOpen={() => open(child.id)} />)}
-          </div>
-        ))}
-        {overview.data && !view.tree.length ? <p className="px-2 py-2 text-xs text-muted-foreground">No other threads yet. The lead starts them as the work needs, or start one with +.</p> : null}
-      </Section>
-      {items.length
-        ? <Section title="Recently updated">{items.slice(0, ITEMS_SHOWN).map((item) => <ItemLine key={item.ref} item={item} />)}</Section>
-        : null}
-    </div>
-  );
+  const rows = (overview.data?.threads ?? []).map((thread) => ({ thread, live: live.get(thread.id), state: stateOf(thread, live.get(thread.id)) }))
+    .sort((a, b) => a.state.order - b.state.order || Number(b.thread.isLead) - Number(a.thread.isLead) || b.thread.updatedAt - a.thread.updatedAt);
+  const attention = rows.filter((row) => row.state.order === 0).length;
+  const working = rows.filter((row) => row.state.order === 1).length;
+  const open = (id: string) => { if (!onOpenThread?.(id)) actions.open(id); };
+  return <div className="mx-auto w-full max-w-4xl px-5 py-6 sm:px-7">
+    <header className="flex items-center justify-between gap-3">
+      <h1 className="text-xl font-semibold">Space status</h1>
+      <button type="button" onClick={overview.refresh} aria-label="Refresh space status" className={GHOST_BUTTON}><Icon name="RefreshCw" className="size-4" /></button>
+    </header>
+    {overview.error ? <p role="alert" className="mt-3 text-sm text-destructive">Couldn’t update space status. {overview.data ? "Showing the last loaded status." : ""} <button type="button" onClick={overview.refresh} className="underline">Retry</button></p> : null}
+    {overview.loading && !overview.data ? <p role="status" className="mt-4 text-sm text-muted-foreground">Loading space activity…</p> : null}
+    {overview.data ? <p className="mt-2 mb-6 text-sm text-muted-foreground">{attention ? `${attention} ${attention === 1 ? "thread needs" : "threads need"} attention. ` : "No threads need attention. "}{working ? `${working} ${working === 1 ? "thread is" : "threads are"} working.` : "No threads are running."}</p> : null}
+    <section aria-labelledby="space-threads-heading">
+      <div className="mb-3 flex items-center justify-between gap-2"><h2 id="space-threads-heading" className="text-sm font-semibold">Threads</h2>{onNewThread ? <button type="button" onClick={onNewThread} className={GHOST_BUTTON}><Icon name="Plus" className="size-3.5" />New thread</button> : null}</div>
+      <div className="overflow-hidden rounded-lg border border-border">
+        <div aria-hidden className="grid grid-cols-[minmax(0,1fr)_5rem] gap-3 border-b border-border bg-muted/30 px-4 py-2 text-xs text-muted-foreground sm:grid-cols-[minmax(0,1fr)_5rem_4rem]"><span>Thread / latest progress</span><span>State</span><span className="hidden text-right sm:block">Updated</span></div>
+        {rows.map(({ thread, live: current, state }) => <button key={thread.id} type="button" onClick={() => open(thread.id)} className="grid w-full grid-cols-[minmax(0,1fr)_5rem] items-start gap-3 border-b border-border px-4 py-3.5 text-left last:border-b-0 hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring sm:grid-cols-[minmax(0,1fr)_5rem_4rem]">
+          <span className="min-w-0"><span className="flex items-center gap-2 text-sm font-medium"><span className="truncate">{current?.displayTitle ?? thread.title}</span>{thread.isLead ? <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">Lead</span> : null}</span><span className={cn("mt-1 block line-clamp-2 break-words text-xs leading-relaxed", state.order === 0 ? state.tone : "text-muted-foreground")}>{state.reason}</span></span>
+          <span className={cn("flex items-center gap-1.5 pt-0.5 text-xs", state.tone)}><span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", state.order === 0 ? "bg-current" : state.order === 1 ? "bg-current motion-safe:animate-pulse" : "bg-muted-foreground/40")} />{state.label}</span>
+          <time dateTime={new Date(thread.progressAt ?? thread.updatedAt).toISOString()} className="hidden pt-0.5 text-right text-xs text-muted-foreground sm:block">{relative(thread.progressAt ?? thread.updatedAt)}</time>
+        </button>)}
+        {overview.data && !rows.length ? <p className="px-4 py-6 text-sm text-muted-foreground">No threads yet. Start a thread to give this Space some work.</p> : null}
+      </div>
+    </section>
+    {overview.data?.activity?.length ? <section aria-labelledby="space-activity-heading" className="mt-7"><h2 id="space-activity-heading" className="mb-4 text-sm font-semibold">Recent activity</h2><ol className="space-y-4">{overview.data.activity.slice(0, 12).map((event) => <li key={event.id} className="flex items-start gap-3"><span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" /><div className="min-w-0 flex-1"><button type="button" onClick={() => open(event.threadId)} className="max-w-full text-left text-sm hover:underline">{event.summary}</button><p className="mt-1 truncate text-xs text-muted-foreground">{event.title}</p></div><time dateTime={new Date(event.at).toISOString()} className="shrink-0 pt-0.5 text-xs text-muted-foreground">{relative(event.at)}</time></li>)}</ol></section> : null}
+    {overview.data?.items.length ? <section aria-label="Space items" className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-sm font-semibold">Space items</h2><div className="flex flex-wrap gap-2">{overview.data.items.slice(0, 6).map((item) => <button key={item.ref} type="button" onClick={() => openAppPath(item.href)} className={cn(GHOST_BUTTON, "max-w-full border border-border")}><Icon name={item.kind === "page" ? "FileText" : "File"} className="size-3.5 shrink-0" /><span className="truncate">{item.title}</span></button>)}</div></section> : null}
+  </div>;
 }
 
-/** Thread panel: the overview of the thread's Space, from any of its threads. */
 export function ThreadSpaceOverview({ threadId }: PluginThreadPanelProps) {
   const spaceOf = useSpaceOf();
   const spaceId = spaceOf(threadId);
-  return spaceId ? <SpaceOverview spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">This thread isn't in a Space.</p>;
+  return spaceId ? <SpaceOverview spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">This thread isn’t in a Space.</p>;
 }
 
-/** The right-hand dashboard stays beside the lead chat, including opened worker tabs. */
 export function SpaceDashboardTab({ subPath }: PluginNavPanelProps) {
   const spaceId = spaceIdOf(subPath);
-  return spaceId ? <SpaceDashboard key={spaceId} spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">Open a Space to see its dashboard.</p>;
+  return spaceId ? <SpaceDashboard key={spaceId} spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">Open a Space to see its status.</p>;
 }
 
 function SpaceDashboard({ spaceId }: { spaceId: string }) {
   const lead = useSpaceLead(spaceId);
-  const { threads } = useSidebarThreads();
-  const [openThreads, setOpenThreads] = useState<string[]>([]);
-  const [activeThread, setActiveThread] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const leadLive = threads.find((thread) => thread.id === lead.data?.leadThreadId);
-  const openThread = (threadId: string) => {
-    setOpenThreads((current) => current.includes(threadId) ? current : [...current, threadId]);
-    setActiveThread(threadId);
-    return true;
-  };
-  const closeThread = (threadId: string) => {
-    setOpenThreads((current) => current.filter((id) => id !== threadId));
-    if (activeThread === threadId) setActiveThread(null);
-  };
-  return <div className="flex h-full min-h-0 flex-col">
-    {openThreads.length ? <nav aria-label="Space activity tabs" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border px-2 py-1">
-      <button type="button" aria-current={activeThread === null ? "page" : undefined} onClick={() => setActiveThread(null)} className={cn(GHOST_BUTTON, activeThread === null && "bg-state-hover")}>Status</button>
-      {openThreads.map((id) => <div key={id} className={cn("flex shrink-0 items-center rounded-md", activeThread === id && "bg-state-hover")}>
-        <button type="button" aria-current={activeThread === id ? "page" : undefined} onClick={() => setActiveThread(id)} className={cn(GHOST_BUTTON, "max-w-56")}><span className="truncate">{threads.find((thread) => thread.id === id)?.displayTitle ?? "Thread"}</span></button>
-        <button type="button" aria-label={`Close ${threads.find((thread) => thread.id === id)?.displayTitle ?? "thread"} tab`} onClick={() => closeThread(id)} className="rounded p-1 text-muted-foreground hover:bg-state-hover"><Icon name="X" className="size-3.5" /></button>
-      </div>)}
-    </nav> : null}
-    {activeThread ? <ThreadChat key={activeThread} threadId={activeThread} variant="full" layout="contained" permissionPolicy="inherit" className="min-h-0 flex-1" /> : <div className="min-h-0 flex-1 overflow-y-auto">
-      <p className="flex items-center gap-2 px-4 pt-4 text-sm"><ThreadGlyph thread={leadLive} />{leadLive?.hasPendingInteraction ? "Lead needs you" : leadLive && RUNNING.has(leadLive.runtimeStatus) ? "Lead is working" : "Lead is idle"}</p>
-      <SpaceOverview spaceId={spaceId} onOpenThread={openThread} onNewThread={() => setStarting(true)} />
-    </div>}
+  return <div className="h-full min-h-0 overflow-y-auto">
+    <SpaceOverview spaceId={spaceId} onNewThread={() => setStarting(true)} />
     {starting ? <StartThreadDialog spaceId={spaceId} name={lead.data?.name ?? "this Space"} defaultProjectId={lead.data?.defaultProjectId ?? null} onClose={() => setStarting(false)} /> : null}
   </div>;
 }

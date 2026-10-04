@@ -102,7 +102,7 @@ export function useLive<T>(method: string, input: unknown, options: { enabled?: 
   return { ...state, refresh };
 }
 
-export type Cadence = "hourly" | "daily" | "weekdays";
+export type Cadence = "hourly" | "daily" | "weekdays" | "every5minutes" | "every15minutes" | "every30minutes" | "every2hours" | "every6hours" | "weekly" | "custom";
 
 export interface SpaceLead {
   spaceId: string;
@@ -113,10 +113,11 @@ export interface SpaceLead {
   pageId: string | null;
   pageHref: string | null;
   defaultProjectId: string | null;
-  run: { enabled: boolean; cadence: Cadence; time?: string | null } | null;
+  run: { enabled: boolean; cadence: Cadence; time?: string | null; cron?: string | null } | null;
 }
 
-export interface OverviewThread { id: string; title: string; status: string; updatedAt: number; parentThreadId: string | null; isLead: boolean }
+export interface OverviewThread { id: string; title: string; status: string; updatedAt: number; parentThreadId: string | null; isLead: boolean; progress?: string | null; progressAt?: number | null; blockedReason?: string | null; failureReason?: string | null }
+export interface OverviewActivity { id: string; threadId: string; title: string; summary: string; at: number; kind: string }
 export interface OverviewItem { ref: string; title: string; kind: string; href: string; icon: string | null; updatedAt: number }
 
 export function useSpaces() {
@@ -136,5 +137,5 @@ export function useSpaceOf() {
 }
 
 export function useSpaceOverview(spaceId: string | null) {
-  return useLive<{ threads: OverviewThread[]; items: OverviewItem[] }>("space_overview", { spaceId }, { enabled: spaceId !== null, pollMs: 30_000 });
+  return useLive<{ threads: OverviewThread[]; items: OverviewItem[]; activity: OverviewActivity[] }>("space_overview", { spaceId }, { enabled: spaceId !== null, pollMs: 30_000 });
 }

@@ -1,6 +1,7 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
+import { spaceRunSchema, type SpaceRun } from "./contract";
 import type { HubItem } from "./hub";
 import { SpaceLeads } from "./space-lead";
 import { SpaceStore, THREAD_REF } from "./spaces";
@@ -13,7 +14,7 @@ const request = {
   executionInputSources: {}, environment: { type: "project-default" }, input: [{ type: "text", text: "Grow tomatoes", mentions: [] }],
 } as never;
 
-async function setup() {
+async function setup(migrations = MIGRATIONS) {
   const project = (id: string, kind: "personal" | "standard" = "standard") => ({ id, name: id, kind, sources: [], gitRemoteUrl: null, createdAt: 1, updatedAt: 1 });
   const threads = new Map<string, ReturnType<typeof makeThreadResponse>>();
   let count = 0;
@@ -49,7 +50,7 @@ async function setup() {
   } });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  bb.storage.migrate(db, migrations);
   const spaces = new SpaceStore(db);
   const garden = spaces.create({ name: "Garden", defaultProjectId: "p" });
   const kitchen = spaces.create({ name: "Kitchen", defaultProjectId: "q" });
@@ -62,8 +63,80 @@ async function setup() {
   const items: HubItem[] = [];
   const changed = vi.fn();
   const leads = new SpaceLeads({ db, sdk: bb.sdk, spaces, ensurePage, hub: { overview: async () => ({ items, providers: [] }) }, changed });
-  return { db, spaces, leads, threads, spawn, get, archive, callRpc, automations, ensurePage, items, changed, garden, kitchen };
+  return { bb, db, spaces, leads, threads, spawn, get, archive, callRpc, automations, ensurePage, items, changed, garden, kitchen };
 }
+
+it.each<[SpaceRun["cadence"], string]>([
+  ["every5minutes", "*/5 * * * *"], ["every15minutes", "*/15 * * * *"], ["every30minutes", "*/30 * * * *"],
+  ["every2hours", "30 */2 * * *"], ["every6hours", "30 */6 * * *"], ["weekly", "30 8 * * 1"],
+  ["hourly", "30 * * * *"], ["daily", "30 8 * * *"], ["weekdays", "30 8 * * 1-5"],
+  ["custom", "5,35 8-18/2 * JAN,MAR MON-FRI"],
+])("schedules %s and reuses its automation when settings change", async (cadence, cron) => {
+  const x = await setup();
+  await x.leads.setup(x.garden.id, request);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily", time: "08:30" });
+  const run = { enabled: true, cadence, ...(cadence === "custom" ? { cron: `  ${cron}  ` } : {}) };
+  expect(await x.leads.setRun(x.garden.id, run)).toMatchObject({ run: { enabled: true, cadence, time: "08:30", ...(cadence === "custom" ? { cron } : {}) } });
+  const update = x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_update").at(-1)![0];
+  expect(update.input).toMatchObject({ trigger: { cron }, automationId: "a1" });
+  expect(x.automations).toHaveLength(1);
+  expect(x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_create")).toHaveLength(1);
+});
+
+it("retains custom cron when switched off and uses it when enabled again", async () => {
+  const x = await setup();
+  await x.leads.setup(x.garden.id, request);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "custom", cron: "*/15 9-17 * * 1-5" });
+  expect(await x.leads.setRun(x.garden.id, { enabled: false, cadence: "custom" })).toMatchObject({ run: { enabled: false, cadence: "custom", cron: "*/15 9-17 * * 1-5" } });
+  expect(x.automations).toHaveLength(0);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "custom" });
+  const update = x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_update").at(-1)![0];
+  expect(update.input).toMatchObject({ trigger: { cron: "*/15 9-17 * * 1-5" } });
+});
+
+it("migrates legacy settings and automation identity without changing them", async () => {
+  const x = await setup(MIGRATIONS.slice(0, -1));
+  x.db.prepare("INSERT INTO space_runs (space_id, enabled, cadence, time, automation_id, automation_project_id) VALUES (?, 1, 'weekdays', '08:30', 'legacy', 'p')").run(x.garden.id);
+  x.bb.storage.migrate(x.db, MIGRATIONS);
+  expect(x.leads.runs.get(x.garden.id)).toEqual({ enabled: true, cadence: "weekdays", time: "08:30" });
+  expect(x.db.prepare("SELECT automation_id, automation_project_id, cron FROM space_runs WHERE space_id = ?").get(x.garden.id)).toEqual({ automation_id: "legacy", automation_project_id: "p", cron: null });
+  await x.leads.setup(x.garden.id, request);
+  x.callRpc.mockClear();
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "every6hours" });
+  expect(x.callRpc.mock.calls.some(([arg]) => arg.method === "automations_create")).toBe(false);
+  expect(x.callRpc.mock.calls.find(([arg]) => arg.method === "automations_update")![0].input).toMatchObject({ automationId: "legacy", trigger: { cron: "30 */6 * * *" } });
+});
+
+it.each([undefined, "", "not a cron expression", "* * * *", "0 * * * * *", "60 * * * *", "0 24 * * *", "0 9 0 * *", "0 9 * 13 *", "0 9 * * 8", "*/0 * * * *", "5-1 * * * *", "1,,2 * * * *", "0 9 * * FUNDAY", "0 9 * * 1/garbage"])("rejects invalid custom cron %s before changing storage or automations", async (cron) => {
+  const x = await setup();
+  await x.leads.setup(x.garden.id, request);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
+  const before = x.leads.runs.get(x.garden.id);
+  x.callRpc.mockClear();
+  for (const enabled of [true, false]) {
+    await expect(x.leads.setRun(x.garden.id, { enabled, cadence: "custom", cron })).rejects.toThrow(/cron/i);
+    expect(x.leads.runs.get(x.garden.id)).toEqual(before);
+    expect(x.callRpc).not.toHaveBeenCalled();
+    expect(x.automations).toHaveLength(1);
+  }
+});
+
+it("accepts valid cron lists, ranges, names and steps at the contract boundary", () => {
+  for (const cron of ["*/5 * * * *", "0,30 9-17/2 1,15 1-12 0-7", "0 9 * jan,dec mon-fri"]) {
+    expect(spaceRunSchema.parse({ enabled: false, cadence: "custom", time: "09:00", cron }).cron).toBe(cron);
+  }
+});
+
+it("keeps saved settings when Automations rejects a custom schedule", async () => {
+  const x = await setup();
+  await x.leads.setup(x.garden.id, request);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily", time: "08:30" });
+  const before = x.leads.runs.get(x.garden.id);
+  x.callRpc.mockRejectedValueOnce(new Error("Automation schedule validation failed"));
+  await expect(x.leads.setRun(x.garden.id, { enabled: true, cadence: "custom", cron: "0 9 31 2 *" })).rejects.toThrow("schedule validation");
+  expect(x.leads.runs.get(x.garden.id)).toEqual(before);
+  expect(x.automations).toHaveLength(1);
+});
 
 it("sets up one lead per space, serialized and idempotent, and recreates a deleted lead", async () => {
   const x = await setup();

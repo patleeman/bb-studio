@@ -115,4 +115,5 @@ export const MIGRATIONS = [
        old_thread_id TEXT PRIMARY KEY, new_thread_id TEXT NOT NULL, space_id TEXT,
        lead INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0
      );`,
+  `ALTER TABLE space_runs ADD COLUMN cron TEXT;`,
 ];

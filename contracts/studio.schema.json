@@ -4311,12 +4311,24 @@
                     "enum": [
                       "hourly",
                       "daily",
-                      "weekdays"
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
                     ]
                   },
                   "time": {
                     "type": "string",
                     "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
                   }
                 },
                 "required": [
@@ -4603,12 +4615,24 @@
                     "enum": [
                       "hourly",
                       "daily",
-                      "weekdays"
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
                     ]
                   },
                   "time": {
                     "type": "string",
                     "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
                   }
                 },
                 "required": [
@@ -4897,6 +4921,30 @@
                 },
                 "isLead": {
                   "type": "boolean"
+                },
+                "progress": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "progressAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "failureReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "blockedReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -4906,6 +4954,50 @@
                 "updatedAt",
                 "parentThreadId",
                 "isLead"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "isLead": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "progress",
+                    "failure",
+                    "blocked"
+                  ]
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "threadId",
+                "title",
+                "isLead",
+                "kind",
+                "summary",
+                "at"
               ],
               "additionalProperties": false
             }
@@ -4951,6 +5043,7 @@
         },
         "required": [
           "threads",
+          "activity",
           "items"
         ],
         "additionalProperties": false
@@ -4995,8 +5088,20 @@
             "enum": [
               "hourly",
               "daily",
-              "weekdays"
+              "weekdays",
+              "every5minutes",
+              "every15minutes",
+              "every30minutes",
+              "every2hours",
+              "every6hours",
+              "weekly",
+              "custom"
             ]
+          },
+          "cron": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "spaceId": {
             "type": "string",
@@ -5070,12 +5175,24 @@
                     "enum": [
                       "hourly",
                       "daily",
-                      "weekdays"
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
                     ]
                   },
                   "time": {
                     "type": "string",
                     "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
                   }
                 },
                 "required": [

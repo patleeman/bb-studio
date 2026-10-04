@@ -2890,6 +2890,13 @@ public enum Studio {
     case hourly
     case daily
     case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -2898,6 +2905,13 @@ public enum Studio {
       case "hourly": self = .hourly
       case "daily": self = .daily
       case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
       default: self = .unknown(value)
       }
     }
@@ -2908,6 +2922,13 @@ public enum Studio {
       case .hourly: try container.encode("hourly")
       case .daily: try container.encode("daily")
       case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -2917,11 +2938,13 @@ public enum Studio {
     public var enabled: Bool?
     public var cadence: SpaceLeadOutputRunCadence?
     public var time: String?
+    public var cron: String?
 
-    public init(enabled: Bool? = nil, cadence: SpaceLeadOutputRunCadence? = nil, time: String? = nil) {
+    public init(enabled: Bool? = nil, cadence: SpaceLeadOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
       self.enabled = enabled
       self.cadence = cadence
       self.time = time
+      self.cron = cron
     }
   }
 
@@ -3218,6 +3241,13 @@ public enum Studio {
     case hourly
     case daily
     case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -3226,6 +3256,13 @@ public enum Studio {
       case "hourly": self = .hourly
       case "daily": self = .daily
       case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
       default: self = .unknown(value)
       }
     }
@@ -3236,6 +3273,13 @@ public enum Studio {
       case .hourly: try container.encode("hourly")
       case .daily: try container.encode("daily")
       case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -3245,11 +3289,13 @@ public enum Studio {
     public var enabled: Bool?
     public var cadence: SpaceLeadSetupOutputRunCadence?
     public var time: String?
+    public var cron: String?
 
-    public init(enabled: Bool? = nil, cadence: SpaceLeadSetupOutputRunCadence? = nil, time: String? = nil) {
+    public init(enabled: Bool? = nil, cadence: SpaceLeadSetupOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
       self.enabled = enabled
       self.cadence = cadence
       self.time = time
+      self.cron = cron
     }
   }
 
@@ -3565,14 +3611,69 @@ public enum Studio {
     public var updatedAt: Double?
     public var parentThreadId: String?
     public var isLead: Bool?
+    public var progress: String?
+    public var progressAt: Double?
+    public var failureReason: String?
+    public var blockedReason: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, updatedAt: Double? = nil, parentThreadId: String? = nil, isLead: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, updatedAt: Double? = nil, parentThreadId: String? = nil, isLead: Bool? = nil, progress: String? = nil, progressAt: Double? = nil, failureReason: String? = nil, blockedReason: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
       self.updatedAt = updatedAt
       self.parentThreadId = parentThreadId
       self.isLead = isLead
+      self.progress = progress
+      self.progressAt = progressAt
+      self.failureReason = failureReason
+      self.blockedReason = blockedReason
+    }
+  }
+
+  public enum SpaceOverviewOutputActivityItemKind: Sendable, Hashable, Codable {
+    case progress
+    case failure
+    case blocked
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "progress": self = .progress
+      case "failure": self = .failure
+      case "blocked": self = .blocked
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .progress: try container.encode("progress")
+      case .failure: try container.encode("failure")
+      case .blocked: try container.encode("blocked")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceOverviewOutputActivityItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var threadId: String?
+    public var title: String?
+    public var isLead: Bool?
+    public var kind: SpaceOverviewOutputActivityItemKind?
+    public var summary: String?
+    public var at: Double?
+
+    public init(id: String? = nil, threadId: String? = nil, title: String? = nil, isLead: Bool? = nil, kind: SpaceOverviewOutputActivityItemKind? = nil, summary: String? = nil, at: Double? = nil) {
+      self.id = id
+      self.threadId = threadId
+      self.title = title
+      self.isLead = isLead
+      self.kind = kind
+      self.summary = summary
+      self.at = at
     }
   }
 
@@ -3596,10 +3697,12 @@ public enum Studio {
 
   public struct SpaceOverviewOutput: Sendable, Hashable, Codable {
     public var threads: [SpaceOverviewOutputThreadsItem]?
+    public var activity: [SpaceOverviewOutputActivityItem]?
     public var items: [SpaceOverviewOutputItemsItem]?
 
-    public init(threads: [SpaceOverviewOutputThreadsItem]? = nil, items: [SpaceOverviewOutputItemsItem]? = nil) {
+    public init(threads: [SpaceOverviewOutputThreadsItem]? = nil, activity: [SpaceOverviewOutputActivityItem]? = nil, items: [SpaceOverviewOutputItemsItem]? = nil) {
       self.threads = threads
+      self.activity = activity
       self.items = items
     }
   }
@@ -3622,6 +3725,13 @@ public enum Studio {
     case hourly
     case daily
     case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -3630,6 +3740,13 @@ public enum Studio {
       case "hourly": self = .hourly
       case "daily": self = .daily
       case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
       default: self = .unknown(value)
       }
     }
@@ -3640,6 +3757,13 @@ public enum Studio {
       case .hourly: try container.encode("hourly")
       case .daily: try container.encode("daily")
       case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -3648,12 +3772,14 @@ public enum Studio {
   public struct SpaceSetRunInput: Sendable, Hashable, Codable {
     public var enabled: Bool?
     public var cadence: SpaceSetRunInputCadence?
+    public var cron: String?
     public var spaceId: String?
     public var time: String?
 
-    public init(enabled: Bool? = nil, cadence: SpaceSetRunInputCadence? = nil, spaceId: String? = nil, time: String? = nil) {
+    public init(enabled: Bool? = nil, cadence: SpaceSetRunInputCadence? = nil, cron: String? = nil, spaceId: String? = nil, time: String? = nil) {
       self.enabled = enabled
       self.cadence = cadence
+      self.cron = cron
       self.spaceId = spaceId
       self.time = time
     }
@@ -3663,6 +3789,13 @@ public enum Studio {
     case hourly
     case daily
     case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -3671,6 +3804,13 @@ public enum Studio {
       case "hourly": self = .hourly
       case "daily": self = .daily
       case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
       default: self = .unknown(value)
       }
     }
@@ -3681,6 +3821,13 @@ public enum Studio {
       case .hourly: try container.encode("hourly")
       case .daily: try container.encode("daily")
       case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -3690,11 +3837,13 @@ public enum Studio {
     public var enabled: Bool?
     public var cadence: SpaceSetRunOutputRunCadence?
     public var time: String?
+    public var cron: String?
 
-    public init(enabled: Bool? = nil, cadence: SpaceSetRunOutputRunCadence? = nil, time: String? = nil) {
+    public init(enabled: Bool? = nil, cadence: SpaceSetRunOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
       self.enabled = enabled
       self.cadence = cadence
       self.time = time
+      self.cron = cron
     }
   }
 

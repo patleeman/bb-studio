@@ -138,8 +138,41 @@ const treeSpace = z.object({
 });
 export type SpaceTreeView = z.infer<typeof treeSpace>;
 
-/** A space's heartbeat: an automation that wakes its lead. Time is HH:MM; hourly uses its minute. */
-export const spaceRunSchema = z.object({ enabled: z.boolean(), cadence: z.enum(["hourly", "daily", "weekdays"]), time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/) });
+/** Portable five-field cron: numbers/names, wildcards, lists, ranges and positive steps. */
+function validCron(cron: string): boolean {
+  const fields = cron.split(/\s+/u);
+  const bounds = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]] as const;
+  const months = "JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC".split(" ");
+  const days = "SUN MON TUE WED THU FRI SAT".split(" ");
+  return fields.length === 5 && fields.every((field, index) => {
+    const [min, max] = bounds[index]!;
+    const number = (token: string): number => {
+      if (/^\d+$/u.test(token)) return Number(token);
+      const names = index === 3 ? months : index === 4 ? days : [];
+      const found = names.indexOf(token.toUpperCase());
+      return found < 0 ? NaN : found + (index === 3 ? 1 : 0);
+    };
+    return field.split(",").every((part) => {
+      const pieces = part.split("/");
+      if (pieces.length > 2) return false;
+      if (pieces.length === 2 && (!/^\d+$/u.test(pieces[1]!) || Number(pieces[1]) < 1 || Number(pieces[1]) > max)) return false;
+      if (pieces[0] === "*") return true;
+      const range = pieces[0]!.split("-");
+      if (range.length > 2) return false;
+      const start = number(range[0]!);
+      const end = range.length === 2 ? number(range[1]!) : start;
+      return start >= min && end <= max && start <= end;
+    });
+  });
+}
+
+/** A space's heartbeat. Weekly runs Monday; hour intervals use time's minute. */
+export const spaceRunSchema = z.object({
+  enabled: z.boolean(),
+  cadence: z.enum(["hourly", "daily", "weekdays", "every5minutes", "every15minutes", "every30minutes", "every2hours", "every6hours", "weekly", "custom"]),
+  time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
+  cron: z.string().trim().min(1).max(100).refine(validCron, "Use a valid five-field cron expression (minute hour day month weekday).").optional(),
+});
 export type SpaceRun = z.infer<typeof spaceRunSchema>;
 /** A space as a meta-project: its lead thread works beside the space's page. */
 const spaceLead = z.object({
@@ -158,7 +191,15 @@ export type SpaceLeadView = z.infer<typeof spaceLead>;
 const newThreadRequest = conversationRequestSchema(z);
 export type NewThreadRequestInput = z.output<typeof newThreadRequest>;
 const spaceOverview = z.object({
-  threads: z.array(z.object({ id: z.string(), title: z.string(), status: z.string(), updatedAt: z.number(), parentThreadId: z.string().nullable(), isLead: z.boolean() })),
+  threads: z.array(z.object({
+    id: z.string(), title: z.string(), status: z.string(), updatedAt: z.number(), parentThreadId: z.string().nullable(), isLead: z.boolean(),
+    progress: z.string().nullable().optional(), progressAt: z.number().nullable().optional(),
+    failureReason: z.string().nullable().optional(), blockedReason: z.string().nullable().optional(),
+  })),
+  activity: z.array(z.object({
+    id: z.string(), threadId: z.string(), title: z.string(), isLead: z.boolean(),
+    kind: z.enum(["progress", "failure", "blocked"]), summary: z.string(), at: z.number(),
+  })),
   /** `ref` is `<plugin>:<id>`. */
   items: z.array(z.object({ ref: z.string(), title: z.string(), kind: z.string(), href: z.string(), icon: z.string().nullable(), updatedAt: z.number() })),
 });

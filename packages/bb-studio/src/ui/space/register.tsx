@@ -17,7 +17,7 @@ export function registerSpaces(app: PluginAppBuilder): void {
     path: SPACES_PANEL,
     component: retainPanel(SPACES_PANEL, SpacesPanel),
     fixedTabs: [
-      { panelId: SPACES_PANEL, id: "overview", title: "Dashboard", icon: "Folder", component: SpaceDashboardTab, layout: "flush" },
+      { panelId: SPACES_PANEL, id: "overview", title: "Status", icon: "Activity", component: SpaceDashboardTab, layout: "flush" },
       { panelId: SPACES_PANEL, id: "page", title: "Page", icon: "FileText", component: SpacePageTab, layout: "flush" },
     ],
   });

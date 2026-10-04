@@ -56,35 +56,70 @@ function SpaceList() {
   );
 }
 
-const RUN_LABELS: Record<Cadence, string> = { hourly: "Hourly", daily: "Daily", weekdays: "Weekdays" };
+const RUN_LABELS: Record<Cadence, string> = {
+  every5minutes: "Every 5 minutes", every15minutes: "Every 15 minutes", every30minutes: "Every 30 minutes",
+  hourly: "Every hour", every2hours: "Every 2 hours", every6hours: "Every 6 hours",
+  daily: "Daily", weekdays: "Weekdays", weekly: "Weekly", custom: "Custom",
+};
 
-/** Off, or a heartbeat: the lead checks the Space on a cadence and reports to the Inbox. */
+/** A heartbeat schedules future lead turns; it never interrupts a worker. */
 function RunMenu({ lead, onChanged }: { lead: SpaceLead; onChanged: () => void }) {
   const call = useCall();
   const run = lead.run?.enabled ? lead.run : null;
-  const set = (cadence: Cadence | null) => {
-    void call("space_set_run", { spaceId: lead.spaceId, enabled: cadence !== null, cadence: cadence ?? run?.cadence ?? "daily" }).then(onChanged, onChanged);
+  const [custom, setCustom] = useState(false);
+  const [frequency, setFrequency] = useState(10);
+  const [unit, setUnit] = useState("minutes");
+  const [time, setTime] = useState(lead.run?.time ?? "09:00");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const save = async (cadence: Cadence | null, cron?: string) => {
+    setSaving(true); setError(null);
+    try {
+      await call("space_set_run", { spaceId: lead.spaceId, enabled: cadence !== null, cadence: cadence ?? lead.run?.cadence ?? "daily", time, ...(cron ? { cron } : {}) });
+      onChanged(); setCustom(false);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setSaving(false); }
   };
-  return (
+  const saveCustom = () => {
+    const base = unit === "minutes" ? 60 : 24;
+    if (!Number.isInteger(frequency) || frequency < 1 || frequency > base || base % frequency !== 0) {
+      setError(unit === "minutes" ? "Choose an interval that divides an hour evenly: 1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30 or 60 minutes." : "Choose 1, 2, 3, 4, 6, 8, 12 or 24 hours."); return;
+    }
+    const cron = unit === "minutes" ? (frequency === 60 ? "0 * * * *" : `*/${frequency} * * * *`) : (frequency === 24 ? "0 0 * * *" : `0 */${frequency} * * *`);
+    void save("custom", cron);
+  };
+  return <>
     <Menu.Root>
-      <Menu.Trigger className={GHOST_BUTTON} title="Schedule the lead's check-ins">
-        <Icon name="Repeat" className="size-4" />{run ? `${RUN_LABELS[run.cadence]} check-ins` : "Check-ins"}
+      <Menu.Trigger disabled={saving} className={GHOST_BUTTON} title={run ? `Heartbeat: ${RUN_LABELS[run.cadence]}` : "Heartbeat is off"}>
+        <Icon name="Repeat" className="size-4" />Heartbeat
       </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
-          <p className="max-w-64 px-2 pt-1 pb-1.5 text-xs text-muted-foreground">Schedule the lead to check in and report to your Inbox. Turning check-ins off does not stop running threads.</p>
-          <Menu.RadioGroup value={run?.cadence ?? "off"} onValueChange={(value) => set(value === "off" ? null : value as Cadence)}>
-            {(["off", "hourly", "daily", "weekdays"] as const).map((value) => (
-              <Menu.RadioItem key={value} value={value} className={MENU_ITEM}>
-                <span className="inline-flex size-3.5 items-center justify-center"><Menu.ItemIndicator><Icon name="Check" /></Menu.ItemIndicator></span>
-                {value === "off" ? "Off" : RUN_LABELS[value]}
-              </Menu.RadioItem>
-            ))}
-          </Menu.RadioGroup>
-        </Menu.Content>
-      </Menu.Portal>
+      <Menu.Portal><Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
+        <p className="max-w-64 px-2 pt-1 pb-2 text-xs text-muted-foreground">The lead checks the Space and reports to your Inbox. Turning this off leaves running threads working.</p>
+        <Menu.RadioGroup value={run?.cadence ?? "off"} onValueChange={(value) => value === "custom" ? setCustom(true) : void save(value === "off" ? null : value as Cadence)}>
+          {(["off", ...Object.keys(RUN_LABELS)] as (Cadence | "off")[]).map((value) => <Menu.RadioItem key={value} value={value} className={MENU_ITEM}>
+            <span className="inline-flex size-3.5 items-center justify-center"><Menu.ItemIndicator><Icon name="Check" /></Menu.ItemIndicator></span>
+            {value === "off" ? "Off" : value === "custom" ? "Custom…" : RUN_LABELS[value]}
+          </Menu.RadioItem>)}
+        </Menu.RadioGroup>
+        <Menu.Separator className={MENU_SEPARATOR} />
+        <label className="flex items-center justify-between gap-3 px-2 py-1 text-xs">Daily / weekly time
+          <input type="time" value={time} onChange={(event) => setTime(event.target.value)} onBlur={() => { if (run) void save(run.cadence); }} className="rounded border border-border bg-background px-2 py-1" />
+        </label>
+        {error ? <p role="alert" className="max-w-64 px-2 py-1 text-xs text-destructive">{error}</p> : null}
+      </Menu.Content></Menu.Portal>
     </Menu.Root>
-  );
+    <Dialog open={custom} onOpenChange={setCustom}><DialogContent className="sm:max-w-md">
+      <DialogTitle>Custom heartbeat</DialogTitle>
+      <DialogDescription>Choose how often the lead checks the Space. Scheduled times use your BB host’s timezone.</DialogDescription>
+      <div className="flex items-center gap-3 py-4">
+        <label htmlFor="heartbeat-frequency">Every</label>
+        <input id="heartbeat-frequency" type="number" min="1" max={unit === "minutes" ? 60 : 24} value={frequency} onChange={(event) => setFrequency(Number(event.target.value))} className="w-20 rounded border border-border bg-background px-3 py-2" />
+        <select aria-label="Heartbeat interval unit" value={unit} onChange={(event) => setUnit(event.target.value)} className="rounded border border-border bg-background px-3 py-2"><option value="minutes">minutes</option><option value="hours">hours</option></select>
+      </div>
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      <button type="button" disabled={saving} onClick={saveCustom} className={GHOST_BUTTON}>{saving ? "Saving…" : "Save heartbeat"}</button>
+    </DialogContent></Dialog>
+  </>;
 }
 
 /** "New thread" in a Space: BB's composer; the server starts it in the Space's folder and adds it to the Space. */
