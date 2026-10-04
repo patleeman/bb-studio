@@ -852,49 +852,11 @@ public enum Talk {
     }
   }
 
-  public enum RecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "me": self = .me
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RecordingsListOutputRecordingsItemMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
-    public var title: String?
-    public var assignee: RecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee?
-
-    public init(title: String? = nil, assignee: RecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee? = nil) {
-      self.title = title
-      self.assignee = assignee
-    }
-  }
-
   public struct RecordingsListOutputRecordingsItemMeetingNotes: Sendable, Hashable, Codable {
     public var summary: String?
-    public var decisions: [String]?
-    public var actionItems: [RecordingsListOutputRecordingsItemMeetingNotesActionItemsItem]?
 
-    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingsListOutputRecordingsItemMeetingNotesActionItemsItem]? = nil) {
+    public init(summary: String? = nil) {
       self.summary = summary
-      self.decisions = decisions
-      self.actionItems = actionItems
     }
   }
 
@@ -1042,49 +1004,11 @@ public enum Talk {
     }
   }
 
-  public enum RecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "me": self = .me
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RecordingGetOutputRecordingMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
-    public var title: String?
-    public var assignee: RecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee?
-
-    public init(title: String? = nil, assignee: RecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee? = nil) {
-      self.title = title
-      self.assignee = assignee
-    }
-  }
-
   public struct RecordingGetOutputRecordingMeetingNotes: Sendable, Hashable, Codable {
     public var summary: String?
-    public var decisions: [String]?
-    public var actionItems: [RecordingGetOutputRecordingMeetingNotesActionItemsItem]?
 
-    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingGetOutputRecordingMeetingNotesActionItemsItem]? = nil) {
+    public init(summary: String? = nil) {
       self.summary = summary
-      self.decisions = decisions
-      self.actionItems = actionItems
     }
   }
 
@@ -1322,49 +1246,11 @@ public enum Talk {
     }
   }
 
-  public enum RecordingCreateOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "me": self = .me
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RecordingCreateOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
-    public var title: String?
-    public var assignee: RecordingCreateOutputMeetingNotesActionItemsItemAssignee?
-
-    public init(title: String? = nil, assignee: RecordingCreateOutputMeetingNotesActionItemsItemAssignee? = nil) {
-      self.title = title
-      self.assignee = assignee
-    }
-  }
-
   public struct RecordingCreateOutputMeetingNotes: Sendable, Hashable, Codable {
     public var summary: String?
-    public var decisions: [String]?
-    public var actionItems: [RecordingCreateOutputMeetingNotesActionItemsItem]?
 
-    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingCreateOutputMeetingNotesActionItemsItem]? = nil) {
+    public init(summary: String? = nil) {
       self.summary = summary
-      self.decisions = decisions
-      self.actionItems = actionItems
     }
   }
 
@@ -1506,49 +1392,11 @@ public enum Talk {
     }
   }
 
-  public enum RecordingRenameOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "me": self = .me
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RecordingRenameOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
-    public var title: String?
-    public var assignee: RecordingRenameOutputMeetingNotesActionItemsItemAssignee?
-
-    public init(title: String? = nil, assignee: RecordingRenameOutputMeetingNotesActionItemsItemAssignee? = nil) {
-      self.title = title
-      self.assignee = assignee
-    }
-  }
-
   public struct RecordingRenameOutputMeetingNotes: Sendable, Hashable, Codable {
     public var summary: String?
-    public var decisions: [String]?
-    public var actionItems: [RecordingRenameOutputMeetingNotesActionItemsItem]?
 
-    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingRenameOutputMeetingNotesActionItemsItem]? = nil) {
+    public init(summary: String? = nil) {
       self.summary = summary
-      self.decisions = decisions
-      self.actionItems = actionItems
     }
   }
 
@@ -1717,49 +1565,11 @@ public enum Talk {
     }
   }
 
-  public enum RecordingStateOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "me": self = .me
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RecordingStateOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
-    public var title: String?
-    public var assignee: RecordingStateOutputMeetingNotesActionItemsItemAssignee?
-
-    public init(title: String? = nil, assignee: RecordingStateOutputMeetingNotesActionItemsItemAssignee? = nil) {
-      self.title = title
-      self.assignee = assignee
-    }
-  }
-
   public struct RecordingStateOutputMeetingNotes: Sendable, Hashable, Codable {
     public var summary: String?
-    public var decisions: [String]?
-    public var actionItems: [RecordingStateOutputMeetingNotesActionItemsItem]?
 
-    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingStateOutputMeetingNotesActionItemsItem]? = nil) {
+    public init(summary: String? = nil) {
       self.summary = summary
-      self.decisions = decisions
-      self.actionItems = actionItems
     }
   }
 
@@ -1976,49 +1786,11 @@ public enum Talk {
     }
   }
 
-  public enum RecordingRetryOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "me": self = .me
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RecordingRetryOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
-    public var title: String?
-    public var assignee: RecordingRetryOutputMeetingNotesActionItemsItemAssignee?
-
-    public init(title: String? = nil, assignee: RecordingRetryOutputMeetingNotesActionItemsItemAssignee? = nil) {
-      self.title = title
-      self.assignee = assignee
-    }
-  }
-
   public struct RecordingRetryOutputMeetingNotes: Sendable, Hashable, Codable {
     public var summary: String?
-    public var decisions: [String]?
-    public var actionItems: [RecordingRetryOutputMeetingNotesActionItemsItem]?
 
-    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingRetryOutputMeetingNotesActionItemsItem]? = nil) {
+    public init(summary: String? = nil) {
       self.summary = summary
-      self.decisions = decisions
-      self.actionItems = actionItems
     }
   }
 
@@ -2158,49 +1930,11 @@ public enum Talk {
     }
   }
 
-  public enum MeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "me": self = .me
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct MeetingRegenerateOutputRecordingMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
-    public var title: String?
-    public var assignee: MeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee?
-
-    public init(title: String? = nil, assignee: MeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee? = nil) {
-      self.title = title
-      self.assignee = assignee
-    }
-  }
-
   public struct MeetingRegenerateOutputRecordingMeetingNotes: Sendable, Hashable, Codable {
     public var summary: String?
-    public var decisions: [String]?
-    public var actionItems: [MeetingRegenerateOutputRecordingMeetingNotesActionItemsItem]?
 
-    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [MeetingRegenerateOutputRecordingMeetingNotesActionItemsItem]? = nil) {
+    public init(summary: String? = nil) {
       self.summary = summary
-      self.decisions = decisions
-      self.actionItems = actionItems
     }
   }
 
@@ -2382,49 +2116,11 @@ public enum Talk {
     }
   }
 
-  public enum RecordingKeepOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "me": self = .me
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RecordingKeepOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
-    public var title: String?
-    public var assignee: RecordingKeepOutputMeetingNotesActionItemsItemAssignee?
-
-    public init(title: String? = nil, assignee: RecordingKeepOutputMeetingNotesActionItemsItemAssignee? = nil) {
-      self.title = title
-      self.assignee = assignee
-    }
-  }
-
   public struct RecordingKeepOutputMeetingNotes: Sendable, Hashable, Codable {
     public var summary: String?
-    public var decisions: [String]?
-    public var actionItems: [RecordingKeepOutputMeetingNotesActionItemsItem]?
 
-    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingKeepOutputMeetingNotesActionItemsItem]? = nil) {
+    public init(summary: String? = nil) {
       self.summary = summary
-      self.decisions = decisions
-      self.actionItems = actionItems
     }
   }
 

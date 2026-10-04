@@ -16,7 +16,7 @@ import { z } from "zod";
 import type { PostView } from "./contract";
 import { feedInstructions } from "./prompt";
 import { FeedService, type NotifyMode, type Origin } from "./service";
-import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, EXPLORE_PLUGIN_ID, cardLine, firstLink, parseAttributes, studioRefs, postDirective, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
+import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, EXPLORE_PLUGIN_ID, cardLine, firstLink, parseAttributes, studioRefs, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
 import { FeedStore, MIGRATIONS, type PostRow } from "./store";
 import { fetchPreview } from "./unfurl";
 import { startDiscussion } from "./discussion";
@@ -241,12 +241,10 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     post: async ({ postId }: { postId: string }) => ({ post: await one(store.get(postId)) }),
     discussion: ({ postId, request }: { postId: string; request: NewThreadRequest }) => startDiscussion(postId, request, id => store.get(id), input => bb.sdk.threads.spawn(input)),
     story: async ({ story }: { story: string }) => ({ posts: await views(store.story(story)) }),
-    // A card's post: `::post{id="…"}` names it; an older `::post{title="…"}` line published it.
+    // A card's post, named by its `::post{id="…"}` line (the iOS app sends the line).
     forDirective: async ({ source }: { source: string }) => {
-      const attributes = parseAttributes(source);
-      if (attributes.id) return { post: await one(store.get(attributes.id)) };
-      const title = postDirective(attributes)?.title;
-      return { post: await one(store.byDirective(source) ?? (title ? store.byTitle(title) : null)) };
+      const id = parseAttributes(source).id;
+      return { post: id ? await one(store.get(id)) : null };
     },
     topics: () => ({ topics: store.topics() }),
     edit: async ({ postId, resolved, ...patch }: { postId: string; title?: string; body?: string; topic?: string | null; priority?: (typeof PRIORITIES)[number]; resolved?: boolean }) => {

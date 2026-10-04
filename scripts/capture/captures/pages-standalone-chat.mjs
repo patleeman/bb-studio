@@ -13,13 +13,8 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
     const attachment = join(directory, "release-review.txt");
     await writeFile(attachment, "Review the release window before publishing.\n");
     const threads = [];
-    let disabled = false, legacyInstalled = false, sidebarToggle = null;
-    const install = async ref => {
-      await bbCli(["plugin", "remove", "pages", "--yes"]);
-      await bbCli(["plugin", "install", `git:github.com/patleeman/bb-studio@${ref}`, "--plugin", "pages", "--yes"]);
-    };
+    let disabled = false, sidebarToggle = null;
     const forget = async () => {
-      if (legacyInstalled) await install(process.env.BB_CAPTURE_PAGES_REF);
       if (disabled) await bbCli(["plugin", "enable", "studio-chat", "--json"]);
       for (const id of threads) await bbCli(["thread", "delete", id, "--yes", "--json"]);
       await cleanup();
@@ -52,34 +47,14 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
     };
     try {
       await bbCli(["plugin", "disable", "studio-chat", "--json"]); disabled = true;
-      const legacyRef = !mobile && process.env.BB_CAPTURE_PAGES_LEGACY_REF;
-      if (legacyRef) {
-        if (!process.env.BB_CAPTURE_PAGES_REF) throw new Error("Set BB_CAPTURE_PAGES_REF to restore Pages after the migration check");
-        await install(legacyRef); legacyInstalled = true;
-      }
       const { threadId } = await pluginRpc("pages", "work", { id: page.id, request: {
         projectId, providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "medium", permissionMode: "full",
         executionInputSources: {}, environment: { type: "project-default" },
         input: [{ type: "text", text: "Review the offline launch checklist.", mentions: [] }], sendAt: Date.now() + 30 * 86400000,
       }}); threads.push(threadId);
-      if (legacyRef) {
-        await client.navigate(`/plugins/pages/pages/${page.id}`);
-        await client.waitForText("Launch checklist");
-        await newConversation();
-        const oldPrompt = '[role=dialog] [data-promptbox] [contenteditable=true]';
-        await client.waitForSelector(oldPrompt);
-        await client.dragBy(oldPrompt, 0, 0);
-        await client.command("Input.insertText", { text: "Keep this page conversation draft." });
-        await attach('[role=dialog]');
-        await sleep(1500);
-        await client.clickElementWithTextAndPointer('[role=dialog] button', "Close");
-        await install(process.env.BB_CAPTURE_PAGES_REF); legacyInstalled = false;
-      }
-      if (!legacyRef) {
-        await client.navigate(`/plugins/pages/pages/${page.id}`);
-        await client.waitForText("Launch checklist");
-        await client.waitForSelector(`[data-studio-tab="pages:${page.id}"] a[aria-current="page"]`);
-      }
+      await client.navigate(`/plugins/pages/pages/${page.id}`);
+      await client.waitForText("Launch checklist");
+      await client.waitForSelector(`[data-studio-tab="pages:${page.id}"] a[aria-current="page"]`);
       await client.navigate(`/plugins/pages/pages/${notes.id}`);
       await client.waitForText("Offline sync for every team");
       await client.waitForSelector(`[data-studio-tab="pages:${notes.id}"] a[aria-current="page"]`);
@@ -100,14 +75,12 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
       await client.clickElementWithTextAndPointer('[data-studio-item-header] button', "Chat");
       await client.waitForSelector(`[data-float-window="thread:${threadId}"] [data-promptbox]`);
       const chats = await pluginRpc("pages", "chats", { pageId: page.id });
-      if (chats.chats.length !== 1 || chats.chats[0].threadId !== threadId) throw new Error("Continuing a legacy page conversation created a duplicate");
+      if (chats.chats.length !== 1 || chats.chats[0].threadId !== threadId) throw new Error("Continuing a page conversation created a duplicate");
       if (await client.evaluate("!!document.querySelector('.pages-chat')")) throw new Error("Pages still renders its separate chat card");
       await newConversation(); await client.waitForSelector(prompt);
-      if (!legacyRef) {
-        await client.dragBy(prompt, 0, 0);
-        await client.command("Input.insertText", { text: "Keep this page conversation draft." });
-        await attach(root);
-      }
+      await client.dragBy(prompt, 0, 0);
+      await client.command("Input.insertText", { text: "Keep this page conversation draft." });
+      await attach(root);
       await client.waitForText("release-review.txt");
       await client.evaluate(`(() => { window.bbPageDraft = document.querySelector(${JSON.stringify(prompt)}); return true; })()`);
       await retained(true);

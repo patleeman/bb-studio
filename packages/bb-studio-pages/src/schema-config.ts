@@ -49,8 +49,7 @@ export const htmlConfig = {
 /** The longest HTML source an ```html fence may hold; longer ones stay code. */
 export const MAX_HTML_CHARS = 200_000;
 
-/** "task" and "board" embedded the retired Studio Tasks; they stay so pages that have them still open. */
-export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "task", "board", "table", "item", "space"] as const;
+export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "table", "item", "space"] as const;
 export type EmbedKind = (typeof EMBED_KINDS)[number];
 
 /**

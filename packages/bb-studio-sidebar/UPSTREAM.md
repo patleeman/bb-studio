@@ -34,7 +34,6 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/app/list/ThreadListVisibility.tsx` | Expose the section key a component renders in. |
 | `source/app/list/useSidebarModeSectionOrder.ts` | Leave By space out of the stored section orders; it follows Studio's order. |
 | `source/app/model/sidebar-section-id.ts`, `sidebar-section-order.ts`, and `source/app/dnd/useSectionThreadDnd.ts` (group ids) | Accept `space:` section ids. |
-| `source/server.ts` | Migrate the old Background preference on start. |
 | `source/app/rows/ThreadActionsMenu.tsx` | Insert Float after Open in split. |
 | `source/app/rows/ThreadRow.tsx` | Show a Studio app's badge, such as a bot's avatar, and the automated thread mark before the title. |
 | `source/app/dnd/useSectionThreadDnd.ts` | Offer channel creation beside nesting when threads are dropped together. |

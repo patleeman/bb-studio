@@ -95,7 +95,7 @@ export interface NewPost {
   projectId?: string | null;
   channelId?: string | null;
   channelName?: string | null;
-  /** Identifies the post for its keys; older posts kept the `::post` line they came from. */
+  /** Identifies the post for its keys. */
   source: string;
   at?: number;
 }
@@ -114,20 +114,6 @@ export class FeedStore {
 
   get(id: string): PostRow | null {
     return (this.db.prepare("SELECT * FROM feed_posts WHERE id = ?").get(id) as PostRow | undefined) ?? null;
-  }
-
-  /** The newest post written with this directive line. */
-  byDirective(source: string): PostRow | null {
-    return (
-      (this.db
-        .prepare("SELECT * FROM feed_posts WHERE directive_key = ? ORDER BY created_at DESC LIMIT 1")
-        .get(directiveKey(source)) as PostRow | undefined) ?? null
-    );
-  }
-
-  /** The newest post with this title: a card's fallback when its line was rewritten on the way. */
-  byTitle(title: string): PostRow | null {
-    return (this.db.prepare("SELECT * FROM feed_posts WHERE title = ? ORDER BY created_at DESC LIMIT 1").get(title) as PostRow | undefined) ?? null;
   }
 
   insert(post: NewPost): PostRow {

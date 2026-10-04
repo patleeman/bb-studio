@@ -46,11 +46,6 @@ export default async function plugin(bb: BbPluginApi) {
     });
 
   const linkKey = (ref: ItemRef) => `link:${itemKey(ref)}`;
-  for (const key of await bb.storage.kv.list("link:")) {
-    const ref = parseItemKey(key.slice("link:".length));
-    const link = ref ? await bb.storage.kv.get<Link>(key) : null;
-    if (ref && link?.threadId) void services.linkThread({ threadId: link.threadId, ref, role: "chat", state: "idle", createdAt: link.at, updatedAt: link.at, metadata: {} }).catch(() => { /* Studio is optional. */ });
-  }
   const setLink = async (ref: ItemRef, threadId: string) => {
     const at = Date.now();
     await bb.storage.kv.set(linkKey(ref), { threadId, at } satisfies Link);

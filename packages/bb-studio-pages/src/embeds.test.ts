@@ -5,8 +5,6 @@ import { codeLanguageId } from "./ui/code";
 describe("studio embeds", () => {
   it("maps embeds to add-on items and back", () => {
     expect(studioRef("drawing", "drw_1")).toEqual({ pluginId: "excalidraw", id: "drw_1" });
-    // Embeds of the retired Studio Tasks still parse, as nothing.
-    expect(studioRef("task", "tsk_1")).toBeNull();
     expect(studioRef("item", "notes:nt_1:a")).toEqual({ pluginId: "notes", id: "nt_1:a" });
     expect(studioRef("item", "notes:")).toBeNull();
     expect(studioRef("drawing", "")).toBeNull();

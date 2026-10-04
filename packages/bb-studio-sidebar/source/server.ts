@@ -20,7 +20,6 @@ import {
   type PreferenceValue,
   type PreferenceValues,
 } from "./shared/preferences.js";
-import { migrateBackgroundPreference } from "./app/studio/background-migration.js";
 
 const PREFERENCE_KV_PREFIX = "preference:";
 const MIGRATION_KV_KEY = "migration:ui-preferences:v1";
@@ -292,12 +291,6 @@ export default async function threadListPlugin(bb: BbPluginApi) {
       },
     }),
   );
-
-  const automatedMode = await migrateBackgroundPreference(bb.storage.kv).catch((error: unknown) => {
-    bb.log.warn(`could not migrate the Background preference: ${error instanceof Error ? error.message : String(error)}`);
-    return null;
-  });
-  if (automatedMode) bb.log.info(`migrated Background threads to Automated threads: ${automatedMode}`);
 
   const { migrated } = await migrateFromUiPreferences(bb);
   if (migrated.length > 0) {

@@ -5,7 +5,7 @@ import { parseRecordingSummary, recordingSummaryPrompt } from "./meetings";
 describe("recording summaries", () => {
   it("parses a general summary without a meeting template", () => {
     expect(parseRecordingSummary('```json\n{"summary":"  I want to prototype the garden planner. "}\n```'))
-      .toEqual({ summary: "I want to prototype the garden planner.", decisions: [], actionItems: [] });
+      .toEqual({ summary: "I want to prototype the garden planner." });
     expect(() => parseRecordingSummary('{"summary":"  "}')).toThrow("recording summary was empty");
     expect(() => parseRecordingSummary('{"decisions":[]}')).toThrow();
   });
@@ -22,7 +22,7 @@ describe("recording summaries", () => {
     const { store } = memoryStore();
     const id = "rec_aaaaaaaa";
     store.create({ id, kind: "recording", projectId: null, threadId: null });
-    const notes = { summary: "Plan agreed.", decisions: ["Ship beta"], actionItems: [{ title: "Draft note", assignee: "agent" as const }] };
+    const notes = { summary: "Plan agreed." };
     expect(store.saveMeetingNotes(id, notes)).toBe(false);
     addSegment(store, id, "sessiona", 0, 100);
     store.markTranscribed(id, "sessiona-0", "We agreed to ship beta.");

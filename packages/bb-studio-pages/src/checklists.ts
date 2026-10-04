@@ -52,12 +52,11 @@ export interface ChecklistHandoffRow {
   updated_at: number;
 }
 
-/** A checklist item's text, without agent mentions (and task links on pages made from Studio Tasks boards). */
+/** A checklist item's text, without agent mentions. */
 export function checklistTitle(title: string): string {
   return title
     .replace(/\s*@\[[^\]]*\]\(thread:[^)]+\)/g, "")
     .replace(/\s*@$/, "")
-    .replace(/\s*@?\[[^\]]*\]\(item:studio-tasks:[^)]+\)/g, "")
     .replace(/^↳\s*/, "")
     .trim();
 }

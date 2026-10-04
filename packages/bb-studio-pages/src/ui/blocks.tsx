@@ -380,7 +380,6 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
   const [draft, setDraft] = useState(target);
 
   if (kind === "space") return <SpaceEmbed target={target} />;
-  if (kind === "task" || kind === "board") return <p className="text-sm text-muted-foreground">This embed showed a Studio Tasks {kind}, which is no longer available.</p>;
   if (isStudioEmbed(kind)) {
     if (editing && onEdit) {
       return (

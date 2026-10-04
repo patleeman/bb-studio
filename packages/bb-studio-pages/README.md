@@ -60,13 +60,6 @@ BB_CAPTURE_STANDALONE_CHAT=1 \
   node scripts/capture-plugin-screenshots.mjs --plugin pages
 ```
 
-To verify migration from the previous dialog, also set
-`BB_CAPTURE_PAGES_LEGACY_REF=19924123c7b66a787ff9a4eafc6761fa2b3cd212` and
-`BB_CAPTURE_PAGES_REF=258d801d4000c27538d62de817e1fb8b5a7d3d59`. The desktop
-capture saves a draft and file in the old dialog, installs the new Pages
-plugin, and verifies that the companion restores them using the same draft
-key. Both versions run inside the isolated staged BB.
-
 ![The Pages Comments panel with a microphone in the reply box](assets/comments.png)
 
 This staged page has an anchored comment and a reply. The capture checks real

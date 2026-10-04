@@ -37,8 +37,6 @@ type LastDelivery = { at: string; apns: number; expo: number; errors: string[]; 
 const LAST_DELIVERY_KEY = "last-delivery";
 /** Option buttons on a question notification; iOS shows about this many before it gets cramped. */
 const MAX_CHOICES = 6;
-/** Retired Live Activity state: the per-phone status activity, then per-thread ones. Ended once on upgrade. */
-const RETIRED_LIVE_KEYS = ["live", "live-threads", "live-start", "thread-activities"];
 /** Thread ids whose notifications BB Studio shouldn't get. */
 const MUTED_KEY = "muted-threads";
 const MAX_MUTED = 500;
@@ -213,7 +211,6 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   async function deliver(messages: ExpoMessage[]): Promise<ExpoTicket[]> {
-    void retireLiveActivities();
     const tickets: ExpoTicket[] = new Array(messages.length);
     const expoIndexes: number[] = [];
     const apnsIndexes: number[] = [];
@@ -385,39 +382,6 @@ export default async function plugin(bb: BbPluginApi) {
     },
     { auth: "token" },
   );
-
-  /**
-   * Ends the Live Activities earlier versions showed (one per phone, then one
-   * per thread) and forgets their tokens. Waits for APNs to be configured.
-   */
-  let retired = false;
-  async function retireLiveActivities() {
-    if (retired) return;
-    const apns = await apnsConfig();
-    if ("missing" in apns) return;
-    retired = true;
-    try {
-      await endRetiredActivities(apns);
-    } catch (error) {
-      retired = false;
-      bb.log.warn(`retiring Live Activities: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  async function endRetiredActivities(apns: { config: ApnsConfig; token: ProviderToken }) {
-    const legacy = await bb.storage.kv.get<{ activity: { token: string } | null }>("live");
-    const threads = (await bb.storage.kv.get<Record<string, { activity: { token: string } | null }>>("thread-activities")) ?? {};
-    const tokens = [legacy?.activity?.token, ...Object.values(threads).map((record) => record.activity?.token)].filter(
-      (token): token is string => Boolean(token),
-    );
-    const payload = JSON.stringify({ aps: { timestamp: Math.floor(Date.now() / 1000), event: "end", "dismissal-date": 0, "content-state": {} } });
-    for (const deviceToken of tokens) {
-      const result = await sendApns({ deviceToken, payload, pushType: "liveactivity", priority: 10 }, apns.config, apns.token, sender.send);
-      if (result.status !== 200) bb.log.warn(`ending a retired Live Activity failed: ${result.reason ?? result.status}`);
-    }
-    for (const key of RETIRED_LIVE_KEYS) await bb.storage.kv.delete(key);
-  }
-  void retireLiveActivities();
 
   bb.rpc.register(mobileContract, {
     async notify(input) {

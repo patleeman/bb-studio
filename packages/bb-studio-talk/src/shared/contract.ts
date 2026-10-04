@@ -32,8 +32,6 @@ export type RecordingKind = z.infer<typeof recordingKindSchema>;
 
 export const meetingNotesSchema = z.object({
   summary: z.string(),
-  decisions: z.array(z.string()),
-  actionItems: z.array(z.object({ title: z.string(), assignee: z.enum(["me", "agent"]).nullable() })),
 });
 export type MeetingNotes = z.infer<typeof meetingNotesSchema>;
 

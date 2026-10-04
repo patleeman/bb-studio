@@ -99,9 +99,7 @@ By space is stored like the other organizations, in the synced
 Automated threads choices are the synced `automatedThreads` preference: a
 section key (`threads`, `project:<id>`, `section:<id>`, `machine:<id>`,
 `space:<id>`) to `all`, `updates`, or `hidden`, with `*` for every section
-without its own choice. The old `backgroundThreads` and `backgroundCollapsed`
-preferences are migrated once on start: Hide becomes `{"*": "hidden"}`, Show
-with other threads becomes `{"*": "all"}`, and the rest keep the default.
+without its own choice.
 
 Studio and this package talk without the kit. This package writes the
 organization it shows to `localStorage["bb-studio:sidebar-organization"]` and

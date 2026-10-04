@@ -4,12 +4,11 @@ import { primaryHostId } from "@bb-studio/kit/server";
 import type { ModelSelection } from "@bb-studio/kit/decisions-contract";
 import { meetingNotesSchema, type MeetingNotes } from "../shared/contract";
 
-/** Keep the existing storage/RPC shape so saved recordings and older clients still work. */
 export function parseRecordingSummary(text: string): MeetingNotes {
   const json = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  const { summary } = meetingNotesSchema.pick({ summary: true }).parse(JSON.parse(json));
+  const { summary } = meetingNotesSchema.parse(JSON.parse(json));
   if (!summary.trim()) throw new Error("The recording summary was empty.");
-  return { summary: summary.trim(), decisions: [], actionItems: [] };
+  return { summary: summary.trim() };
 }
 
 export function recordingSummaryPrompt(transcript: string): string {

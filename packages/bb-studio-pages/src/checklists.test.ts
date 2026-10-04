@@ -41,10 +41,8 @@ describe("checklists", () => {
     expect(nextChecklistState("replied", "idle")).toBeNull();
     expect(nextChecklistState("archived", "unarchived")).toBe("replied");
     expect(nextChecklistState("working", "unarchived")).toBeNull();
-    expect(checklistTitle("Ship it [Task](item:studio-tasks:tsk_b) @[Agent · working](thread:thr_b)")).toBe("Ship it");
-    expect(checklistTitle("↳ Check links [Task](item:studio-tasks:tsk_c)")).toBe("Check links");
-    // Pages writes a task link back as a mention, and kit's parser leaves its "@".
-    expect(checklistTitle("Draft notes @[Task](item:studio-tasks:tsk_a)")).toBe("Draft notes");
+    expect(checklistTitle("Ship it @[Agent · working](thread:thr_b)")).toBe("Ship it");
+    expect(checklistTitle("↳ Check links")).toBe("Check links");
     expect(checklistTitle("Draft notes @")).toBe("Draft notes");
     const prompt = checklistPrompt({ id: "pg_1", title: "Plan" }, "Ship it", null);
     expect(prompt.text.slice(prompt.mentions[0]!.start, prompt.mentions[0]!.end)).toBe("@Plan");

@@ -9,7 +9,7 @@ export const FEED_ICON = "feed/feed";
 export const INBOX_ICON = "feed/inbox";
 export const INBOX_TITLE = "Inbox";
 
-/** The card directive a reply ends with: `::post{id="post_…"}` (older replies: `::post{title="…"}`). */
+/** The card directive a reply ends with: `::post{id="post_…"}`. */
 export const DIRECTIVE = "post";
 
 export const PRIORITIES = ["urgent", "normal", "low"] as const;
@@ -39,13 +39,6 @@ export const discussionPrompt = (post: { id: string; title: string; author: stri
 export const discussionContext = (post: { id: string; title: string; author: string; channelName: string | null }) =>
   `The user is discussing this feed post: "${post.title}" (${post.channelName ? `${post.author} in #${post.channelName}` : post.author}). Read it first with feed_read id ${post.id}.\n\n`;
 
-export interface PostDirective {
-  title: string;
-  topic: string | null;
-  story: string | null;
-  priority: Priority;
-}
-
 const ATTRIBUTE = /([A-Za-z][\w-]*)\s*=\s*"([^"]*)"/g;
 
 export function parseAttributes(text: string): Record<string, string> {
@@ -53,11 +46,6 @@ export function parseAttributes(text: string): Record<string, string> {
   for (const [, key, value] of text.matchAll(ATTRIBUTE)) attributes[key!] = value!;
   return attributes;
 }
-
-const clean = (value: string | undefined, max: number) => {
-  const text = value?.replace(/\s+/g, " ").trim().slice(0, max).trim();
-  return text ? text : null;
-};
 
 /** A story key: lowercase words joined by dashes, so "Harlem Line" and "harlem-line" are one story. */
 export function storyKey(value: string | null | undefined): string | null {
@@ -73,18 +61,6 @@ export function storyKey(value: string | null | undefined): string | null {
 export function priority(value: string | null | undefined): Priority {
   const lower = value?.trim().toLowerCase();
   return (PRIORITIES as readonly string[]).includes(lower ?? "") ? (lower as Priority) : "normal";
-}
-
-/** The directive's attributes, validated. Null without a title. */
-export function postDirective(attributes: Readonly<Record<string, string>>): PostDirective | null {
-  const title = clean(attributes.title, MAX_TITLE);
-  if (!title) return null;
-  return {
-    title,
-    topic: clean(attributes.topic, MAX_TOPIC),
-    story: storyKey(attributes.story),
-    priority: priority(attributes.priority),
-  };
 }
 
 /** One line of plain text from Markdown, for previews and notifications. */

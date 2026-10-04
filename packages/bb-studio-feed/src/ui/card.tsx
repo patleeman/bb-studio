@@ -15,21 +15,22 @@ import { feedEvent, useDiscuss, useMinuteTick, type PostView } from "./feed";
 const RETRY_MS = 1_500;
 const RETRIES = 8;
 
-export function PostCard({ attributes, source }: PluginMessageDirectiveProps) {
+export function PostCard({ attributes }: PluginMessageDirectiveProps) {
   const rpc = useRpc<typeof rpcContract>();
   const discuss = useDiscuss();
   useMinuteTick();
   const [post, setPost] = useState<PostView | null | undefined>(undefined);
   const [tries, setTries] = useState(0);
 
-  // `::post{id="…"}` names a post feed_post made; an older `::post{title="…"}` line published one itself.
+  // `::post{id="…"}` names the post feed_post made.
   const postId = attributes.id;
   const load = useCallback(() => {
-    (postId ? rpc.call("post", { postId }) : rpc.call("forDirective", { source })).then(
+    if (!postId) { setPost(null); return; }
+    rpc.call("post", { postId }).then(
       (result) => setPost(result.post),
       () => setPost(null),
     );
-  }, [rpc, source, postId]);
+  }, [rpc, postId]);
   useEffect(load, [load]);
   useEffect(() => {
     if (post !== null || tries >= RETRIES) return;

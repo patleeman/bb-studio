@@ -460,19 +460,6 @@ index 13d58a8..ed16125 100644
 @@ -595,0 +598,2 @@ function ThreadRowComponent({
 +              <StudioThreadBadge threadId={thread.id} />
 +              <AutomatedThreadMark threadId={thread.id} />
-diff --git a/source/server.ts b/source/server.ts
-index 9e4c290..dbd743d 100644
---- a/source/server.ts
-+++ b/source/server.ts
-@@ -22,0 +23 @@ import {
-+import { migrateBackgroundPreference } from "./app/studio/background-migration.js";
-@@ -294,0 +296,6 @@ export default async function threadListPlugin(bb: BbPluginApi) {
-+  const automatedMode = await migrateBackgroundPreference(bb.storage.kv).catch((error: unknown) => {
-+    bb.log.warn(`could not migrate the Background preference: ${error instanceof Error ? error.message : String(error)}`);
-+    return null;
-+  });
-+  if (automatedMode) bb.log.info(`migrated Background threads to Automated threads: ${automatedMode}`);
-+
 diff --git a/source/shared/preferences.ts b/source/shared/preferences.ts
 index 98a5200..bb03ef0 100644
 --- a/source/shared/preferences.ts

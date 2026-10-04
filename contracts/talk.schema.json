@@ -610,48 +610,10 @@
                       "properties": {
                         "summary": {
                           "type": "string"
-                        },
-                        "decisions": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "actionItems": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "title": {
-                                "type": "string"
-                              },
-                              "assignee": {
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "enum": [
-                                      "me",
-                                      "agent"
-                                    ]
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              }
-                            },
-                            "required": [
-                              "title",
-                              "assignee"
-                            ],
-                            "additionalProperties": false
-                          }
                         }
                       },
                       "required": [
-                        "summary",
-                        "decisions",
-                        "actionItems"
+                        "summary"
                       ],
                       "additionalProperties": false
                     },
@@ -798,48 +760,10 @@
                     "properties": {
                       "summary": {
                         "type": "string"
-                      },
-                      "decisions": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "actionItems": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "title": {
-                              "type": "string"
-                            },
-                            "assignee": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "me",
-                                    "agent"
-                                  ]
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            }
-                          },
-                          "required": [
-                            "title",
-                            "assignee"
-                          ],
-                          "additionalProperties": false
-                        }
                       }
                     },
                     "required": [
-                      "summary",
-                      "decisions",
-                      "actionItems"
+                      "summary"
                     ],
                     "additionalProperties": false
                   },
@@ -1083,48 +1007,10 @@
                 "properties": {
                   "summary": {
                     "type": "string"
-                  },
-                  "decisions": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "actionItems": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "title": {
-                          "type": "string"
-                        },
-                        "assignee": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "me",
-                                "agent"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "title",
-                        "assignee"
-                      ],
-                      "additionalProperties": false
-                    }
                   }
                 },
                 "required": [
-                  "summary",
-                  "decisions",
-                  "actionItems"
+                  "summary"
                 ],
                 "additionalProperties": false
               },
@@ -1267,48 +1153,10 @@
                 "properties": {
                   "summary": {
                     "type": "string"
-                  },
-                  "decisions": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "actionItems": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "title": {
-                          "type": "string"
-                        },
-                        "assignee": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "me",
-                                "agent"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "title",
-                        "assignee"
-                      ],
-                      "additionalProperties": false
-                    }
                   }
                 },
                 "required": [
-                  "summary",
-                  "decisions",
-                  "actionItems"
+                  "summary"
                 ],
                 "additionalProperties": false
               },
@@ -1454,48 +1302,10 @@
                 "properties": {
                   "summary": {
                     "type": "string"
-                  },
-                  "decisions": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "actionItems": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "title": {
-                          "type": "string"
-                        },
-                        "assignee": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "me",
-                                "agent"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "title",
-                        "assignee"
-                      ],
-                      "additionalProperties": false
-                    }
                   }
                 },
                 "required": [
-                  "summary",
-                  "decisions",
-                  "actionItems"
+                  "summary"
                 ],
                 "additionalProperties": false
               },
@@ -1737,48 +1547,10 @@
                 "properties": {
                   "summary": {
                     "type": "string"
-                  },
-                  "decisions": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "actionItems": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "title": {
-                          "type": "string"
-                        },
-                        "assignee": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "me",
-                                "agent"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "title",
-                        "assignee"
-                      ],
-                      "additionalProperties": false
-                    }
                   }
                 },
                 "required": [
-                  "summary",
-                  "decisions",
-                  "actionItems"
+                  "summary"
                 ],
                 "additionalProperties": false
               },
@@ -1918,48 +1690,10 @@
                     "properties": {
                       "summary": {
                         "type": "string"
-                      },
-                      "decisions": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "actionItems": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "title": {
-                              "type": "string"
-                            },
-                            "assignee": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "me",
-                                    "agent"
-                                  ]
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            }
-                          },
-                          "required": [
-                            "title",
-                            "assignee"
-                          ],
-                          "additionalProperties": false
-                        }
                       }
                     },
                     "required": [
-                      "summary",
-                      "decisions",
-                      "actionItems"
+                      "summary"
                     ],
                     "additionalProperties": false
                   },
@@ -2167,48 +1901,10 @@
                 "properties": {
                   "summary": {
                     "type": "string"
-                  },
-                  "decisions": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "actionItems": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "title": {
-                          "type": "string"
-                        },
-                        "assignee": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "me",
-                                "agent"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "title",
-                        "assignee"
-                      ],
-                      "additionalProperties": false
-                    }
                   }
                 },
                 "required": [
-                  "summary",
-                  "decisions",
-                  "actionItems"
+                  "summary"
                 ],
                 "additionalProperties": false
               },
