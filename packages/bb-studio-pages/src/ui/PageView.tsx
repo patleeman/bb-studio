@@ -205,8 +205,16 @@ function PresenceStack({ presence }: { presence: Presence[] }) {
   );
 }
 
+/** Saved and online is the normal state: the badge only shows when something needs you. */
+export function persistenceVisible(connection: PageConnection | null): boolean {
+  if (!connection) return false;
+  const quiet = connection.serverSave === "confirmed" && connection.status !== "offline" && connection.status !== "missing"
+    && connection.localSave !== "failed";
+  return !quiet;
+}
+
 export function PersistenceBadge({ connection }: { connection: PageConnection | null }) {
-  if (!connection) return null;
+  if (!connection || !persistenceVisible(connection)) return null;
   const local = connection.localSave === "saved";
   const failed = connection.localSave === "failed" || connection.serverSave === "failed";
   const missing = connection.status === "missing";
@@ -437,7 +445,7 @@ export function PageView({
   return (
     // Floating chrome, the comments card and the chat are placed against this box.
     <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
-      <div className="shrink-0 px-4 pt-14 pb-2"><PersistenceBadge connection={connection} /></div>
+      {persistenceVisible(connection) ? <div className="shrink-0 px-4 pt-14 pb-2"><PersistenceBadge connection={connection} /></div> : null}
       <div className="min-h-0 flex-1 overflow-auto">
         <div className={cn("mx-auto w-full max-w-[828px] pt-4 pb-40", sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
           <div className="group/title px-[54px] max-md:px-4">

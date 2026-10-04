@@ -8,7 +8,7 @@ import type { BotView, PageMetaView, rpcContract } from "../contract";
 import { PagesUiContext } from "./context";
 import { PageEditor } from "./PageEditor";
 import { usePagesData, usePagesUiValue } from "./PagesPanel";
-import { PersistenceBadge, useConnection } from "./PageView";
+import { PersistenceBadge, persistenceVisible, useConnection } from "./PageView";
 
 /** A page's metadata, kept current: undefined while loading, null once it's gone. */
 export function usePanelPage(pageId: string | null): { page: PageMetaView | null | undefined; refetch(): void } {
@@ -81,7 +81,7 @@ function PanelEditor({ page, pages, bots, footer }: { page: PageMetaView; pages:
   const { connection, status, ready } = useConnection(page.id);
   return (
     <>
-    <div className="shrink-0 px-4 py-2"><PersistenceBadge connection={connection} /></div>
+    {persistenceVisible(connection) ? <div className="shrink-0 px-4 py-2"><PersistenceBadge connection={connection} /></div> : null}
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="flex pt-3 pb-6">
         {connection && ready && status !== "missing" ? (
