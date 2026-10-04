@@ -21,7 +21,7 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | File | Reason |
 | --- | --- |
 | `source/app.tsx` | Mount Studio section anchors above the thread list, name the provider Studio Sidebar, and move thread reveal into ProjectList so new automated results do not expand their collapsed groups. |
-| `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, filter empty project rows, apply each section's Automated threads choice, render By space, and export the grouped-mode helpers By space reuses. |
+| `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, filter empty project rows, apply each section's Automated threads choice, render By space with each Space's Studio items, and export the grouped-mode helpers By space reuses. |
 | `source/app/list/useSidebarThreadReveal.ts` | Keep ancestor reveal while new automated results leave their collapsed group alone; By space reveals its own sections. |
 | `source/app/list/SidebarHeaderControls.tsx` | Add the project action to the creation context. |
 | `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, empty project, By space, and per-section Automated threads menu items. |
@@ -30,7 +30,7 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/app/list/SidebarHeaderControls.test.tsx` | Check the empty project menu toggle. |
 | `source/app/list/ProjectList.modes.test.tsx`, `ProjectList.sectionCreate.test.tsx`, and `useSidebarThreadReveal.test.tsx` | Leave By space out of the stored-order probe, count the Automated threads divider, and check that an automated thread's group expands only when opened. |
 | `source/server.test.ts` | Check the new preference default and parsing. |
-| `source/app/list/TopLevelSidebarSection.tsx` | Add a label mark and a clickable label for Space sections, and end each section with the hidden automated threads row. |
+| `source/app/list/TopLevelSidebarSection.tsx` | Add a label mark and a clickable label for Space sections, highlight the label of the open Space, and end each section with the hidden automated threads row. |
 | `source/app/list/ThreadListVisibility.tsx` | Expose the section key a component renders in. |
 | `source/app/list/useSidebarModeSectionOrder.ts` | Leave By space out of the stored section orders; it follows Studio's order. |
 | `source/app/model/sidebar-section-id.ts`, `sidebar-section-order.ts`, and `source/app/dnd/useSectionThreadDnd.ts` (group ids) | Accept `space:` section ids. |

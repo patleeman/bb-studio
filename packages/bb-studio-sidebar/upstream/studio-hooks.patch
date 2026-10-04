@@ -46,7 +46,7 @@ index 39258e5..3492076 100644
 @@ -1408,0 +1423 @@ export function useSectionThreadDnd({
 +    dropDialog: channelDrop.dialog,
 diff --git a/source/app/list/ProjectList.tsx b/source/app/list/ProjectList.tsx
-index afa82d9..3dbaa0e 100644
+index afa82d9e..c6ef11d9 100644
 --- a/source/app/list/ProjectList.tsx
 +++ b/source/app/list/ProjectList.tsx
 @@ -45,0 +46,7 @@ import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
@@ -221,7 +221,7 @@ index afa82d9..3dbaa0e 100644
 @@ -1733,0 +1843,2 @@ function ProjectListComponent({
 +        onNewProject: projectCreation.openDialog,
 +        isCreatingProject: projectCreation.isCreating,
-@@ -1740 +1851,33 @@ function ProjectListComponent({
+@@ -1740 +1851,34 @@ function ProjectListComponent({
 -          mode={organizationMode}
 +          mode={effectiveMode}
 +          renderSpace={() => spaceData && (
@@ -229,6 +229,7 @@ index afa82d9..3dbaa0e 100644
 +              spaces={spaceData.spaces}
 +              spaceOf={spaceData.spaceOf}
 +              leads={spaceData.leads}
++              items={spaceData.items}
 +              threads={threads}
 +              draftThreadIds={draftThreadIds}
 +              effectivePinnedThreadIds={
@@ -256,11 +257,11 @@ index afa82d9..3dbaa0e 100644
 +              onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
 +            />
 +          )}
-@@ -1804,0 +1948 @@ function ProjectListComponent({
+@@ -1804,0 +1949 @@ function ProjectListComponent({
 +              createdProjectId={projectCreation.createdProjectId}
-@@ -1860,0 +2005 @@ function ProjectListComponent({
+@@ -1860,0 +2006 @@ function ProjectListComponent({
 +      {projectCreation.dialog}
-@@ -1861,0 +2007 @@ function ProjectListComponent({
+@@ -1861,0 +2008 @@ function ProjectListComponent({
 +    </AutomatedThreadsProvider>
 diff --git a/source/app/list/ProjectRow.tsx b/source/app/list/ProjectRow.tsx
 index 11c1c06..636f525 100644
@@ -325,22 +326,26 @@ index 3b0cf9e..35ba05d 100644
 +}
 +
 diff --git a/source/app/list/TopLevelSidebarSection.tsx b/source/app/list/TopLevelSidebarSection.tsx
-index 74dd671..0f8327e 100644
+index 74dd6718..5a4e90fe 100644
 --- a/source/app/list/TopLevelSidebarSection.tsx
 +++ b/source/app/list/TopLevelSidebarSection.tsx
 @@ -47,0 +48 @@ import { usePluginThreadRowStatusForThreads } from "./groupRollups.js";
 +import { AutomatedHiddenRow } from "../studio/AutomatedThreads.js";
-@@ -62,0 +64,5 @@ export interface TopLevelSidebarSectionProps {
+@@ -62,0 +64,6 @@ export interface TopLevelSidebarSectionProps {
 +  /** Studio: a mark before the label, such as a Space's emoji. */
 +  labelMark?: ReactNode;
 +  /** Studio: clicking the label opens what the section stands for. */
 +  onLabelClick?: () => void;
 +  labelClickLabel?: string;
-@@ -85,0 +92,3 @@ export function TopLevelSidebarSection({
++  labelSelected?: boolean;
+@@ -85,0 +93,4 @@ export function TopLevelSidebarSection({
 +  labelMark,
 +  onLabelClick,
 +  labelClickLabel,
-@@ -207 +216,17 @@ export function TopLevelSidebarSection({
++  labelSelected = false,
+@@ -199,0 +211 @@ export function TopLevelSidebarSection({
++          labelSelected && "bg-sidebar-accent text-sidebar-accent-foreground",
+@@ -207 +219,18 @@ export function TopLevelSidebarSection({
 -          {labelEditor ?? (
 +          {labelEditor ? null : labelMark}
 +          {labelEditor ?? (onLabelClick ? (
@@ -349,6 +354,7 @@ index 74dd671..0f8327e 100644
 +              className="min-w-0 cursor-pointer truncate rounded-sm text-left outline-none hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 +              title={label}
 +              aria-label={labelClickLabel ?? label}
++              aria-current={labelSelected ? "page" : undefined}
 +              onPointerDown={(event) => event.stopPropagation()}
 +              onClick={(event) => {
 +                event.preventDefault();
@@ -359,10 +365,10 @@ index 74dd671..0f8327e 100644
 +              {label}
 +            </button>
 +          ) : (
-@@ -223 +248 @@ export function TopLevelSidebarSection({
+@@ -223 +252 @@ export function TopLevelSidebarSection({
 -          )}
 +          ))}
-@@ -297 +322,4 @@ export function TopLevelSidebarSection({
+@@ -297 +326,4 @@ export function TopLevelSidebarSection({
 -        <div className="mt-1">{children}</div>
 +        <div className="mt-1">
 +          {children}
