@@ -4,7 +4,8 @@
 
 Studio opens on the collection: everything the Studio add-ons make, including pages, Talk
 recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
-kind, project and tag, and hand any of them to an agent. Anything that needs you sits above it.
+kind, project and tag, and hand any of them to an agent. Spaces gather projects and
+threads into one place, each with a page and an optional lead thread.
 
 ## Staged preview
 
@@ -27,12 +28,6 @@ The **+** beside Studio opens a menu of the installed add-ons' creation actions.
 The staged capture checks keyboard opening, creates a page in the open thread's
 project, and checks that the plus stays visible while its menu is open.
 
-![Live BB screenshot of Needs you above the Studio collection](assets/needs-you.png)
-
-The Studio landing page with two seeded tasks: one in review and one due today
-appear in the **Needs you** strip above the collection, with the staged bots
-and the task board below.
-
 ![Live BB screenshot of a space's page](assets/space-page.png)
 
 A staged "Launch" space's page in Pages: its brief, with the space's purpose
@@ -42,9 +37,8 @@ status is the lead's Status tab, not the page.
 ![Live BB screenshot of Studio search](assets/search.png)
 
 Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
-"offline sync": a task matches on its title, and another task, an HTML
-artifact, the task board and two pages match on their content, each showing
-the matching text with the match in bold.
+"offline sync": an HTML artifact and two pages match on their title or
+content, each showing the matching text with the match in bold.
 
 ## What you get
 
@@ -75,16 +69,12 @@ The fallback capture deletes its synthetic space and re-enables Pages during
 cleanup. It runs only against the matching isolated capture environment.
 
 
-- **Needs you** sits above the collection, only when something does: pending
-  thread approvals and questions, Teams attention, review and due tasks, and
-  unresolved comment replies or mentions. Rows open their source; simple
-  approvals and single-text questions can be answered in place. This is a live
-  view of the sources, with no separate read or done state.
 - **Activity** (Studio's **…** menu) shows measured thread turns, duration and
   failures, Teams bot usage and configured limits, and recent Studio changes.
-  Choose 1, 7 or 30 days. The `home` RPC returns this data, plus due and review
-  tasks, active threads and bots, recent items and today's automations, for
-  other clients such as the iOS app's Today view.
+  Choose 1, 7 or 30 days. The `home` RPC returns this data, plus what needs
+  you (pending approvals and questions, and unresolved comment replies or
+  mentions), active threads and bots, recent items and today's automations,
+  for other clients such as the iOS app's Today view.
 - **One collection** (sidebar → Studio): every add-on's items in one list,
   with search over titles and content, filters by kind, project, space and
   tag, and an Archived view. **Display** groups the list by kind, project,
@@ -96,18 +86,21 @@ cleanup. It runs only against the matching isolated capture environment.
   out of All and Home; their own pill and search still show them.
 - **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search everything**
   in the command palette, Cmd/Ctrl+Shift+P) opens a quick-open box over any
-  page. Studio indexes titles and text from current add-ons, then searches BB threads and Studio Teams channels live. The palette also has recent items and commands for creating items, opening Studio, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —
-  page text, transcripts, drawing text, artifact files, task notes, bot
-  descriptions — and the row shows the text that matched. With nothing typed
+  page. Studio indexes titles and text from current add-ons, then searches BB threads live. The palette also has recent items and commands for creating items, opening Studio, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —
+  page text, transcripts, drawing text, artifact files, table rows — and the row shows the text that matched. With nothing typed
   it lists recently changed items. ↑↓ and ↵ open one.
-- **Tags** group items across add-ons: a page, a drawing and a task can all
+- **Tags** group items across add-ons: a page, a drawing and a table can all
   be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
   The tag menu also renames and deletes the active tag.
-- **Spaces fill themselves.** What a thread in a space makes joins the space:
-  its agent's pages, drawings, boards, tasks, tables and new artifacts, and
-  items made from a thread's side panel. A sub-page made under a space's page,
-  or under an item in a space, joins it too, once; taking it out sticks.
+- **Spaces are meta-projects.** Each BB project belongs to one space, and
+  items and threads follow their project; projects nobody filed, and items
+  with no project, are in the default space, Personal. A new space gets its
+  own catch-all project under `~/Spaces`, where its new threads and items go.
+  A thread can also be added to a space by itself, which moves it there.
+  Opening a space opens its lead thread, with the Space's Status tab beside it (see
+  [`docs/space-leads.md`](../../docs/space-leads.md)). Deleting a space hands
+  its projects and threads back to Personal and archives its page.
 - **Shared actions**: select items (shift-click for a range) to start a
   **New thread** that mentions them, move them to a project, archive, or
   delete. Actions an add-on defines, like Talk's "Copy transcripts" or Draw's
@@ -149,13 +142,14 @@ bb studio reindex
   [`@bb-studio/kit`](../bb-studio-kit), and publish them for RPC discovery.
   Studio finds them with `bb.sdk.plugins.experimental_discoverRpc` and calls
   them with `callRpc`. Any plugin can join the suite this way.
-- Studio keeps an FTS5 index of item titles and `studio_read` text. `studio_changed` updates changed items; `bb studio reindex` rebuilds the index. Older v1 add-ons use `studio_search` as a fallback. The `searchAll` RPC returns ranked items, thread matches and channel messages with snippet ranges.
+- Studio keeps an FTS5 index of item titles and `studio_read` text. `studio_changed` updates changed items; `bb studio reindex` rebuilds the index. The `searchAll` RPC returns ranked items and thread matches with snippet ranges.
 - An add-on tells Studio when its items change (`studio_changed`); Studio
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the
   collection.
-- Studio stores only tags and open tabs, keyed by `<plugin id>:<item id>`, so add-ons
-  don't need to know about them. Tags on items an add-on no longer lists are
+- Studio stores tags, open tabs, saved views and spaces itself, keyed by
+  `<plugin id>:<item id>` where items are involved, so add-ons don't need to
+  know about them. Tags on items an add-on no longer lists are
   dropped. Each add-on owns its data, editors, tools, CLI and mentions.
 
 See [`docs/studio.md`](../../docs/studio.md) for the design.
@@ -174,6 +168,6 @@ workspace), because BB's Git install runs `npm install` from it.
 
 ## Templates and export
 
-Pages, drawings, and tasks can be saved as templates from an item's menu. The New menu lists those templates.
+Pages and drawings can be saved as templates from an item's menu. The New menu lists those templates.
 
 The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `exportItem`, and `exportBulk` RPCs. `exportBulk` returns a base64 ZIP containing the provider's files. Individual exports use the item's menu. Template fields use `{{name}}` style variables; unknown variables remain visible.

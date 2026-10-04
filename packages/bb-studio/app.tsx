@@ -21,7 +21,7 @@ function StudioRoot({ subPath }: { subPath: string }) {
 }
 
 export default definePluginApp((app) => {
-  // Spaces as projects: a lead, its page beside it (docs/spaces-as-projects.md).
+  // Spaces as projects: a lead, its page beside it (docs/space-leads.md).
   registerSpaces(app);
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // Shows the panel in Float windows open on its paths.

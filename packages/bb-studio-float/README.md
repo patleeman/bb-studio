@@ -132,12 +132,10 @@ BB_CAPTURE_MAIN_THREAD=1 BB_CAPTURE_ONLY=float-native-main-thread \
 ## What you get
 
 - **Float from the sidebar.** **Float** is in the menu of every thread row (with
-  [Studio Sidebar](../bb-studio-sidebar)), every channel row (with
-  [Studio Teams](../bb-studio-teams)), and every Studio tab (with
-  [Studio](../bb-studio)).
+  [Studio Sidebar](../bb-studio-sidebar)).
 - **Move any item in one gesture.** This works on Studio items and threads
   anywhere: a collection row, a mention or embed on a page, a table's item
-  chip, a task's link, a Space's rows, Home, a Feed post's item, and any link
+  chip, a Space's rows, a Feed post's item, and any link
   into a plugin view or a thread.
   - **Shift-click** floats it, and **⌘-click** (Ctrl-click) opens it in a
     split.
@@ -211,7 +209,7 @@ into the panel through a portal. Main routes use Kit's `retainPanel` wrapper;
 the app overlay owns the view before its first companion move. The same
 editor or player moves into Float, leaving a Show companion action in the
 main route. The shared kit's `FloatPanels` does this
-(`packages/bb-studio-kit/src/app/float.tsx`). Pages, Draw, Tables, Tasks,
+(`packages/bb-studio-kit/src/app/float.tsx`). Pages, Draw, Tables,
 Talk, Artifacts and Studio render it, so their items and views can float.
 Other plugins open tabs with the kit's `openFloat`.
 

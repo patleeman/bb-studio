@@ -9,7 +9,7 @@ agent.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. Home for what needs you today, plus one collection for pages, recordings, drawings, artifacts, tables and bots, with search, tags, project filters, templates and tabs. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, artifacts and tables, with search, tags, project filters and templates, and Spaces: areas of work, each with a lead thread and a brief. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents, with checklists you hand to agents, inline whiteboards, and Explore: pages explaining what an agent noticed along the way. |
 | [Studio Feed](packages/bb-studio-feed/) | `feed` | One feed of what your agents report. An agent ends a reply with a `::post` line, from any thread, channel or automation; read it on desktop and phone and discuss any post. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
@@ -19,8 +19,8 @@ agent.
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bot profiles and saved views of ordinary threads, with shared memory and missions. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | One Chat action opens an item's linked conversation or a new composer. Choose or start another from its menu. |
 | [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, channel, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
-| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
-| [Studio Navigation](packages/bb-studio-navigation/) | `studio-navigation` | Replaces BB's sidebar navigation with one that leaves out the Studio rows Studio and Studio Sidebar already open. Rows from BB and other plugins stay. |
+| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that adds Studio apps' sections above your threads and can organize threads by Space. |
+| [Studio Navigation](packages/bb-studio-navigation/) | `studio-navigation` | Replaces BB's sidebar navigation with one that leaves out the add-on rows Studio already opens. Rows from BB and other plugins stay. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread, and chooses recipients in Studio Teams views. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
@@ -63,7 +63,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
      or dragged anywhere
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list
    - studio-navigation: Studio Navigation; it replaces BB's sidebar navigation
-     without the Studio rows that Studio and Studio Sidebar already open
+     without the add-on rows that Studio already opens
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue and
      Studio Teams routing; needed by bot-teams

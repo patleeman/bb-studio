@@ -2,7 +2,7 @@
 
 `pnpm gen:contracts` generates JSON schemas and Swift models from each included
 plugin's actual RPC contract. Feed is included alongside Studio, Pages, Draw,
-Talk, Tasks, Chat, Teams, Tables, Artifacts, Mobile and Decisions.
+Talk, Chat, Teams, Tables, Artifacts, Mobile and Decisions.
 
 `pnpm check:contracts` also checks the generated
 [native RPC inventory](../contracts/native-rpc-inventory.json). It scans the
@@ -29,14 +29,11 @@ then call the real Swift wrappers, decode their serialized transport requests,
 compare them with those same fixtures, and check response decoding:
 
 - Talk recording creation, audio segment upload and transcript reads.
-- Tasks creation, nullable handoff fields and integer reminder timestamps.
 - Bots document revision tokens and channel delivery failures.
 - Tables text, number, boolean, list, relation and null cell values.
 - Feed read state, priority and pagination; Studio Chat's start envelope.
 
-The reminder case reproduced a rejected native request: fractional epoch
-milliseconds violated Tasks' integer schema. The wrapper now rounds to the
-nearest millisecond before serialization. Existing Feed and Studio Chat tests
+Existing Feed and Studio Chat tests
 also cover older responses and linked/unlinked items.
 
 These are transport fixtures, not live server integration or exhaustive method

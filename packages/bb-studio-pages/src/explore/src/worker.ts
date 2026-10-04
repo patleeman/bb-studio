@@ -122,7 +122,7 @@ export function exploreWorkers(bb: BbPluginApi, options: { timeoutMs?: () => num
       const inherited = (await bb.sdk.threads.output({ threadId: workerId, signal }).catch(() => null))?.output ?? null;
       while (!signal.aborted) {
         const elapsed = Date.now() - started;
-        if (elapsed > timeoutMs) throw new Error("The explainer reached its time limit. Increase it in Studio Explore settings or try again.");
+        if (elapsed > timeoutMs) throw new Error("The explainer reached its time limit. Increase it in Studio Pages settings (Explore: Explainer time limit) or try again.");
         const event = settled.get(workerId);
         settled.delete(workerId);
         const thread = await bb.sdk.threads.get({ threadId: workerId, signal });
