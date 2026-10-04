@@ -10,12 +10,21 @@ the Studio rows that another surface already opens:
 | --- | --- |
 | Pages, Drawings, Artifacts, Recordings, Tasks, Tables | Studio's row is there, since the Studio hub lists and opens every add-on. |
 | New channel | [Studio Sidebar](../bb-studio-sidebar) shows sections, since the Channels section has its own New channel. |
+| Explore | Always. [Studio Explore](../bb-studio-explore) is folded into Studio Pages. |
+| Companions | Always. [Float](../bb-studio-float)'s dock and toggle open it. |
+| Home | Always. It is [Studio](../bb-studio)'s legacy office panel. |
+| Chat | Always. [Studio Chat](../bb-studio-chat) starts chats from Studio items and its overlay. |
 
-Everything else stays: BB's own rows (New thread, Search threads, Plugins,
-Skills, Automations), Studio, Teams, and every panel from a plugin outside
-BB Studio. Hide, reorder, **More**, and **Customize sidebar** work as in BB's
+Left-out rows are in neither the rows nor **More**; their plugins still run
+and their links still open. Everything else stays: BB's own rows (New thread,
+Search threads, Plugins, Skills, Automations), Inbox
+([Studio Feed](../bb-studio-feed)), Studio, Teams, and every panel from a
+plugin outside BB Studio. Hide, reorder, **More**, and **Customize sidebar** work as in BB's
 Navigation. A row Studio Navigation leaves out keeps its place in BB's saved
-order, so it comes back where it was if you switch back.
+order, so it comes back where it was if you switch back. Row order is always
+BB's saved order: BB passes it without saying whether you saved it, so Studio
+Navigation can't set a default order without overriding yours. Drag Inbox
+under Search threads to put it there.
 
 Installing it makes it the sidebar navigation, unless you picked a provider
 under **Settings → Appearance → Navigation**. Choose **Navigation** there to

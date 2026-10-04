@@ -1,6 +1,6 @@
-// Which navigation rows Studio Navigation leaves out. A Studio panel goes only
-// when another surface on screen already reaches it; bb's own rows and every
-// other plugin's panels stay.
+// Which navigation rows Studio Navigation leaves out. A Studio panel goes
+// when another surface already reaches it or Studio retired it; bb's own rows
+// and every other plugin's panels stay.
 import type { ExperimentalSidebarNavigationItem } from "@get-bb/plugin-sdk/app";
 
 export const STUDIO_HUB = "studio/studio";
@@ -16,6 +16,23 @@ export const HUB_PANELS = [
   "bot-teams/channels",
 ];
 
+/**
+ * Studio panels that never get a row, in the rows or in More. Their plugins
+ * still run and their links still open.
+ */
+export const RETIRED_PANELS = [
+  // Studio Explore, folded into Studio Pages.
+  "explore/explainers",
+  // Float's Companions panel; Float's dock and toggle reach it.
+  "float/companions",
+  // Studio's legacy office panel ("Home").
+  "studio/office",
+  // Studio Chat's panel; chats start from Studio items and the overlay.
+  "studio-chat/chats",
+  // Old /views links redirect to channels; the row would only repeat Channels.
+  "bot-teams/former-views",
+];
+
 export function studioNavigationItems(
   items: readonly ExperimentalSidebarNavigationItem[],
 ): ExperimentalSidebarNavigationItem[] {
@@ -23,8 +40,7 @@ export function studioNavigationItems(
   const hubReachable = hub !== undefined && !hub.isDisabled && !hub.isLoading;
   return items.filter(
     (item) =>
-      // Old /views links redirect to channels; the row would only repeat Channels.
-      item.id !== "bot-teams/former-views" &&
+      !RETIRED_PANELS.includes(item.id) &&
       !(hubReachable && HUB_PANELS.includes(item.id)),
   );
 }

@@ -96,6 +96,31 @@ describe("Studio Navigation", () => {
     ]);
   });
 
+  it("leaves out retired Studio panels, visible or hidden", () => {
+    const retired = [
+      item("explore/explainers", "Explore"),
+      item("float/companions", "Companions"),
+      item("studio/office", "Home"),
+      item("studio-chat/chats", "Chat", { isVisible: false }),
+    ];
+    renderNavigation([...ITEMS, ...retired]);
+    for (const entry of retired) {
+      expect(rowOrder()).not.toContain(entry.id);
+    }
+    expect(document.body.textContent).not.toContain("Companions");
+    // Chat is hidden but not in More: with nothing else hidden, no More menu.
+    expect(
+      document.querySelector('[aria-label="More sidebar navigation"]'),
+    ).toBeNull();
+    cleanup();
+
+    // Without the Studio hub they still stay out.
+    renderNavigation([...ITEMS.filter((entry) => entry !== STUDIO), ...retired]);
+    for (const entry of retired) {
+      expect(rowOrder()).not.toContain(entry.id);
+    }
+  });
+
   it("reaches channels through Studio, with a standalone fallback", () => {
     const channels = item("bot-teams/channels", "Channels");
     const formerViews = item("bot-teams/former-views", "Channels");
