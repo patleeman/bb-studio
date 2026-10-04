@@ -4,7 +4,7 @@ import { z } from "zod";
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { threadViewSchema } from "../view-contract";
 import type { Bot } from "../contract";
-import { botsSignature, registerStudio, type BotActivity } from "../studio-provider";
+import { registerStudio, type BotActivity } from "../studio-provider";
 
 const bot = (patch: Partial<Bot> = {}): Bot =>
   ({
@@ -79,12 +79,11 @@ test("archives by retiring, and refuses move and delete", async () => {
   assert.deepEqual((await call("studio_search", { query: "@" })).ids, []);
 });
 
-test("the change signature ignores activity Studio doesn't show", () => {
-  const scout = bot();
-  const quiet = botsSignature([scout], new Map([[scout.id, { working: false, lastActivityAt: 1 }]]));
-  assert.equal(quiet, botsSignature([scout], new Map([[scout.id, { working: false, lastActivityAt: 9 }]])));
-  assert.notEqual(quiet, botsSignature([scout], new Map([[scout.id, { working: true, lastActivityAt: 9 }]])));
-  assert.notEqual(quiet, botsSignature([bot({ name: "Scout 2" })], new Map()));
+test("bots and channels stay out of Studio: the provider isn't discoverable", () => {
+  let options: unknown = "unset";
+  const bb = { rpc: { register: (_contract: unknown, _handlers: unknown, registered?: unknown) => { options = registered; } } };
+  registerStudio(bb as never, studioSchemas(z), { bots: () => [], views: () => [], createView: async () => view, archiveView: async () => {}, deleteView: async () => {}, readView: async () => "", activity: () => new Map(), retire: async () => {} });
+  assert.equal((options as { experimental_discoverable?: boolean } | undefined)?.experimental_discoverable ?? false, false);
 });
 
 test("saved views are Studio items with ordinary view links and lifecycle actions", async () => {

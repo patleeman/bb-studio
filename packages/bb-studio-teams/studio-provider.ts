@@ -2,7 +2,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { snippets } from "@bb-studio/kit/format";
-import { registerStudioProvider } from "@bb-studio/kit/server";
 import type { Bot } from "./contract";
 import { externalAgent } from "./external-agents";
 import type { ThreadView } from "./view-contract";
@@ -96,8 +95,16 @@ export function registerStudio(
     const activity = deps.activity();
     return [...deps.bots().map((bot) => toStudioItem(bot, activity.get(bot.id))), ...deps.views().map(viewStudioItem)];
   };
-  registerStudioProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "bots", kinds: [BOT_KIND, VIEW_KIND] }),
+  // Bots and channels have their own pages and aren't Studio items. Those pages are
+  // built on the Studio collection, so the provider methods stay, but undiscoverable:
+  // Studio and Pages collect items only from discoverable providers.
+  const unsupported = () => { throw new Error("Bots and channels don't support this."); };
+  bb.rpc.register(schemas.provider, {
+    studio_duplicate: unsupported,
+    studio_template: unsupported,
+    studio_instantiate: unsupported,
+    studio_export: unsupported,
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2 as const, panel: "bots", kinds: [BOT_KIND, VIEW_KIND] }),
     studio_get: ({ ids }) => ({ items: items().filter((item) => ids.includes(item.id)) }),
     studio_read: async ({ id }) => {
       if (deps.views().some(view => view.id === id)) return { content: await deps.readView(id) };
@@ -129,11 +136,4 @@ export function registerStudio(
       throw new Error(`Unknown action "${action}".`);
     },
   });
-}
-
-/** A key that changes when anything Studio shows about the bots does. */
-export function botsSignature(bots: readonly Bot[], activity: Map<string, BotActivity>): string {
-  return JSON.stringify(
-    bots.map((bot) => [bot.id, bot.name, bot.avatar, bot.description, bot.providerId, bot.model, bot.retired, bot.error, bot.updatedAt, activity.get(bot.id)?.working]),
-  );
 }

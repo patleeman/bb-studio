@@ -15,9 +15,9 @@ import { ThreadProfiles } from "./thread-profiles";
 import { ThreadViews } from "./thread-views";
 import { botHandlers } from "./rpc-bots";
 import { directThreadIndicator } from "./direct-status";
-import { personalProjectId, createStudioNotifier } from "@bb-studio/kit/server";
+import { personalProjectId } from "@bb-studio/kit/server";
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { PLUGIN_ID as STUDIO_PROVIDER_ID, botsSignature, registerStudio } from "./studio-provider";
+import { registerStudio } from "./studio-provider";
 import { registerViewMentions } from "./view-mentions";
 import { registerTeamsCli } from "./teams-cli";
 import { migrateViews } from "./view-migration";
@@ -359,11 +359,8 @@ export default async function plugin(bb: BbPluginApi) {
     }),
   };
   bb.rpc.register(rpcContract, handlers);
-  // Bots and saved views in the Studio collection. Studio hears about a change only when
-  // something it shows does, not on every message.
-  const studio = studioSchemas(z);
-  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: STUDIO_PROVIDER_ID, schemas: studio });
-  registerStudio(bb, studio, {
+  // The Bots and Channels pages' collections (not Studio items; see studio-provider.ts).
+  registerStudio(bb, studioSchemas(z), {
     bots: () => store.all(),
     activity: () => store.botActivitySummary(),
     views: () => views.all(),
@@ -378,27 +375,6 @@ export default async function plugin(bb: BbPluginApi) {
       return [`# ${page.view.name}`, ...page.entries.map(entry => `${entry.role === "user" ? "You" : "Reply"}: ${entry.text}`)].join("\n\n");
     },
     retire: (id, retired) => runtime.retire(id, retired),
-  });
-  const itemSignature = () => botsSignature(store.all(), store.botActivitySummary()) + JSON.stringify(views.all());
-  let studioSignature = itemSignature();
-  let studioCheck: ReturnType<typeof setTimeout> | undefined;
-  const notifyStudio = () => {
-    // Changes come in bursts; compare once per burst.
-    studioCheck ??= setTimeout(() => {
-      studioCheck = undefined;
-      const next = itemSignature();
-      if (next === studioSignature) return;
-      studioSignature = next;
-      studioNotifier.changed();
-    }, 500);
-  };
-  runtime.onChanged.add(notifyStudio);
-  views.onChanged.add(notifyStudio);
-  bb.onDispose(() => {
-    runtime.onChanged.delete(notifyStudio);
-    views.onChanged.delete(notifyStudio);
-    clearTimeout(studioCheck);
-    studioNotifier.dispose();
   });
   const tools = registerTeamsCli(bb, store, handlers, approveBotCreate);
   registerViewMentions(bb, store, views);
