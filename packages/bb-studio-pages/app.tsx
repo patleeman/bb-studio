@@ -5,6 +5,7 @@ import { PagePanel } from "./src/ui/PagePanel";
 import { PagesPanel } from "./src/ui/PagesPanel";
 import { ThreadPageLink } from "./src/ui/ThreadPageLink";
 import { pageIdFromField, TALK_OPEN_FIELD_EVENT } from "./src/ui/talk";
+import { registerExploreApp } from "./src/explore/app";
 import "./styles.css";
 
 /** Opens a page when Talk's "Go back" asks for a dictation field of ours. */
@@ -25,6 +26,8 @@ function TalkBridge() {
 }
 
 export default definePluginApp((app) => {
+  // Explore is part of Pages; it stays hidden while the standalone Explore plugin is enabled.
+  registerExploreApp(app);
   // Shows the panel in Float windows open on its paths.
   app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="pages" render={(subPath) => <PagesPanel subPath={subPath} />} /> });
   app.slots.navPanel({ id: "pages", title: "Pages", icon: "pages/pages", path: "pages", component: retainPanel("pages", PagesPanel) });

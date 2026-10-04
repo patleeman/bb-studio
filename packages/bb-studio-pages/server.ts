@@ -22,10 +22,11 @@ import { MIGRATIONS, PageStore } from "./src/store";
 import { registerStudio } from "./src/studio";
 import { outgoingStudioLinks } from "./src/studio-links";
 import { agentConfiguration, registerTools } from "./src/tools";
+import { registerPagesWithExplore } from "./src/explore/integration";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
-export default async function plugin(bb: BbPluginApi) {
+async function registerPages(bb: BbPluginApi) {
   const settings = bb.settings.define({
     snapshotsPerPage: {
       type: "number",
@@ -550,4 +551,8 @@ export default async function plugin(bb: BbPluginApi) {
     service.hub.flushAll();
     service.dispose();
   });
+}
+
+export default async function plugin(bb: BbPluginApi) {
+  await registerPagesWithExplore(bb, registerPages);
 }

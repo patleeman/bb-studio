@@ -261,3 +261,9 @@ run `pnpm tailwind:blocknote` to regenerate it.
 ## Templates and export
 
 Studio can duplicate a page with its subpages, mark a page as a template, and instantiate it with `{{name}}` variables. The provider exports Markdown with uploaded assets, printable HTML with those assets, or a text PDF. Use Studio's New menu to start from a saved template.
+
+## Explore
+
+[Explore](../bb-studio-explore/README.md) is built into Pages. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page. The directive, the `explore_explain` tool, the Explore panel and the thread tab work as they do in the standalone plugin. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate`.
+
+The standalone Studio Explore plugin can stay installed. While it is enabled it stays in charge and Explore in Pages stays hidden. To switch, disable Studio Explore and reload Pages: on that first load Pages copies Explore's database into its own `explore.db` (an SQLite backup, read-only on the original) and copies its saved settings once. The standalone plugin's files are never changed, so enabling it again goes back to its own data.
