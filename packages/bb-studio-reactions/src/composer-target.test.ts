@@ -19,8 +19,13 @@ describe("pickComposer", () => {
     expect(pickComposer([side, other], "thr_c")).toBe(side);
   });
 
-  it("returns null when no composer writes to the thread", () => {
-    expect(pickComposer([other, main], "thr_z")).toBeNull();
+  it("falls back to a new-thread composer, such as a channel's, but never another thread's", () => {
+    expect(pickComposer([other, main], "thr_z")).toBe(main);
+    expect(pickComposer([main, other], "thr_z")).toBe(main);
+  });
+
+  it("returns null when only other threads' composers are mounted", () => {
+    expect(pickComposer([other, floated], "thr_z")).toBeNull();
   });
 
   it("returns null when no composer is mounted", () => {

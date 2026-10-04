@@ -110,7 +110,11 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           try {
             await seed();
             await showBySpace(client);
-            await client.clickAriaButtonWithPointer("Show 1 automated thread");
+            // Launch's own Show: another Space can hide an automated thread too.
+            // It can sit under the sidebar's footer, so bring it into view first.
+            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.launch.id}"] button[aria-label="Show 1 automated thread"]')?.scrollIntoView({ block: "center" })`);
+            await sleep(200);
+            await client.clickElementWithTextAndPointer(`[data-sidebar-section-id="space:${fixture.spaces.launch.id}"] button[aria-label="Show 1 automated thread"]`, "Show");
             await client.waitForSelector(`[data-automated-thread-id="${fixture.threads.digest}"][data-sidebar-automated-mark="automation"] [data-icon="Clock"]`);
             await client.waitForText("Showing 1 automated thread");
             await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.research.id}"]')?.scrollIntoView({ block: 'end' })`);
