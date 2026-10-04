@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { AddOnCollection, FLOATING_BUTTON, ICON_BUTTON, Icon, ItemHeader, ItemMenu, openAppPath, ThreadItemsPanel, useAddOnPanel } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { TABLES_CHANNEL, TABLES_PANEL, TABLES_PLUGIN_ID, parseTableSubPath, tableHref, tableSubPath, type Table, type TableTarget, type TablesContract } from "@bb-studio/kit/tables";
+import { TABLES_CHANNEL, TABLES_PANEL, TABLES_PLUGIN_ID, parseTableSubPath, tableHref, tableSubPath, type TableTarget, type TablesContract } from "@bb-studio/kit/tables";
 import { TableView, type TableApi, type TableHost, type TableItem } from "@bb-studio/kit/table-grid";
 import { toast } from "sonner";
 import { loadTable, type TableLoad } from "./load-table";

@@ -1,5 +1,5 @@
 import { subcommand, takeOption } from "@bb-studio/kit/cli";
-import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
+import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
 // bb-studio-talk — durable long-form dictation.
 //
 // The browser captures audio in short segments and uploads each one over RPC
@@ -106,7 +106,6 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   const changed = (id: string) => changeBus.changed(id);
-  const services = studioServices(bb.sdk);
   const models = talkModels(bb);
 
   // Empty recordings are never kept: one that finishes without a word

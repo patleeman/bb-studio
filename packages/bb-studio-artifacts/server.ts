@@ -1,4 +1,4 @@
-import { parseFlags, subcommand } from "@bb-studio/kit/cli";
+import { parseFlags } from "@bb-studio/kit/cli";
 export { parseFlags } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
 import { errorMessage } from "@bb-studio/kit/format";

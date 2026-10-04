@@ -24,7 +24,6 @@ export const FEED_TOOLS = ["feed_post", "feed_list", "feed_read", "feed_edit", "
 
 const TEAMS_PLUGIN_ID = "bot-teams";
 const MOBILE_PLUGIN_ID = "mobile";
-const CHANNEL_PROVIDER_ID = "bot-teams-channel";
 /** How long Teams' bots and channels are trusted before asking again. */
 const TEAMS_CACHE_MS = 30_000;
 const RPC_TIMEOUT_MS = 10_000;

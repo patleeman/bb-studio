@@ -17,7 +17,7 @@ import "@blocknote/shadcn/style.css";
 import { itemReferenceFrom } from "@bb-studio/kit/app";
 import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";

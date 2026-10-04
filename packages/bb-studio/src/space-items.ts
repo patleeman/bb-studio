@@ -1,27 +1,12 @@
 // Spaces as Studio items: the kind Studio itself provides, so a space lists,
 // searches and opens as a tab like any add-on's item.
-import { STUDIO_PLUGIN_ID, type StudioKind } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
 import { plural } from "@bb-studio/kit/format";
 import type { HubItem } from "./hub";
-import { NEW_SPACE_EVENT } from "./ids";
 import { pageHref } from "./space-page";
 import { spacePath, type Space } from "./spaces";
 
 export const SPACE_KIND = "space";
-
-export const spaceKind: StudioKind = {
-  id: SPACE_KIND,
-  label: "Space",
-  plural: "Spaces",
-  icon: "Layers",
-  columns: [{ id: "members", label: "Holds" }],
-  actions: [],
-  create: { mode: "event", event: NEW_SPACE_EVENT },
-  canArchive: false,
-  capabilities: { create: true, move: false, archive: false, delete: true, rename: false, duplicate: false, export: false, comments: false, versions: false, links: false },
-  mentionProviderId: null,
-  blurb: "A home for a piece of work: its documents, projects, threads and channels.",
-};
 
 export function spaceItem(space: Space): HubItem {
   const holds = [

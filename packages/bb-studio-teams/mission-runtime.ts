@@ -667,16 +667,12 @@ async driveJob( bot: Bot, job: Job, forkJob: boolean) {
     job.dispatchStartedAt = Date.now();
     this.store.putJob(job);
     try {
-      let projectId = bot.projectId;
       let c = this.store
         .conversations(bot.id)
         .find((candidate) => candidate.key === job.conversationKey);
       if (c) {
         try {
-          const thread = await this.bb.sdk.threads.get({
-            threadId: c.threadId,
-          });
-          projectId = thread.projectId;
+          await this.bb.sdk.threads.get({ threadId: c.threadId });
         } catch (cause) {
           if (!missingThread(cause)) throw cause;
           this.store.deleteConversation(c.threadId);

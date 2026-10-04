@@ -4,7 +4,6 @@ import { botSetupThreadRequest } from "./bot-creation-contract";
 import { z } from "zod";
 import { sendModes } from "./send-mode";
 export const sendModeSchema = z.enum(sendModes);
-import { channelAutomationCreate, channelAutomationList, channelAutomationUpdate, channelAutomationAction, channelAutomationView, channelAutomationRuns, channelAutomationRunPage } from "./automation-contract";
 export const idSchema = z.string().regex(/^bot_[a-f0-9]{16}$/);
 export const permissionModeSchema = z.enum(["accept-edits", "auto", "full"]);
 export type PermissionMode = z.infer<typeof permissionModeSchema>;
@@ -384,17 +383,6 @@ export const runSchema = z.object({
   finalMessageId: z.string().optional(),
 });
 export type RoomRun = z.infer<typeof runSchema>;
-const transcriptPageSchema = z.object({
-  messages: z.array(messageSchema),
-  parents: z.array(messageSchema),
-  hasOlder: z.boolean(),
-  hasNewer: z.boolean(),
-});
-const roomInput = z.object({
-  responseBehavior: responseBehavior.optional(),
-  name: z.string().trim().min(1).max(80),
-  memberIds: z.array(idSchema).max(16),
-});
 export const rpcContract = {
   createBotSetupThread: {
     input: botSetupThreadRequest,
