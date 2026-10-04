@@ -4,7 +4,7 @@ import { startDiscussion } from "./discussion";
 import { discussionHref, discussionPrompt } from "./shared";
 import type { PostRow } from "./store";
 
-const post = { id: "post_release", title: "Updated release window", author: "Atlas", channel_name: "launch", project_id: "source_project" } as PostRow;
+const post = { id: "post_release", title: "Updated release window", author: "Atlas", project_id: "source_project" } as PostRow;
 const request = {
   projectId: "selected_project", providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "high", permissionMode: "auto",
   serviceTier: "fast", executionInputSources: { model: "explicit", providerId: "explicit" }, environment: {}, sendAt: 1_900_000_000_000,
@@ -21,7 +21,7 @@ describe("Feed discussion creation", () => {
     expect(sent).toEqual({ ...request, input: [...request.input, expect.objectContaining({ type: "text", text: expect.stringContaining(`feed_read id ${post.id}`) })] });
     const context = sent.input.at(-1) as { text: string };
     expect(context.text).toContain("Updated release window");
-    expect(context.text).toContain("Atlas in #launch");
+    expect(context.text).toContain("(Atlas)");
     for (let i = 0; i < request.input.length; i++) expect(sent.input[i]).toBe(request.input[i]);
     expect(sent.projectId).toBe("selected_project");
   });
@@ -40,6 +40,6 @@ describe("Feed discussion creation", () => {
 
   it("gives each post a canonical discussion route and keeps tool instructions out of the draft", () => {
     expect(discussionHref(post.id)).toBe("/plugins/feed/feed/post_release/discussion");
-    expect(discussionPrompt({ id: post.id, title: post.title, author: post.author, channelName: post.channel_name })).toBe('Let\'s discuss "Updated release window".\n\n');
+    expect(discussionPrompt({ title: post.title })).toBe('Let\'s discuss "Updated release window".\n\n');
   });
 });

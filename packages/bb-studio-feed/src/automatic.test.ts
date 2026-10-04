@@ -38,20 +38,21 @@ describe("automatic Inbox persistence", () => {
 
 const disposals: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const dispose of disposals.splice(0)) await dispose(); });
-async function setup(options: { profile?: boolean; recurring?: boolean; choice?: string; unavailable?: boolean; notify?: boolean; decisionWait?: () => Promise<void>; fallback?: string } = {}) {
+async function setup(options: { profile?: boolean; recurring?: boolean; choice?: string; unavailable?: boolean; notify?: boolean; fallback?: string; listFails?: boolean } = {}) {
   let thread = makeThreadResponse({ id: "t", projectId: "p", title: "Watcher", status: "idle", environmentId: "env_test", visibility: "visible", latestAttentionAt: 1000, lastReadAt: null });
+  let gone = false;
   const notifications: unknown[] = [];
   const decisions: unknown[] = [];
   const fallbackRequests: { prompt: string; hostId: string }[] = [];
   const { bb, harness } = createFakePluginHost({ pluginId: "feed", settings: { automaticNotify: options.notify ?? false }, sdk: {
-    threads: { get: async () => thread, list: async () => [] },
+    threads: { get: async () => { if (gone) throw new Error("Thread not found"); return thread; },
+      list: async () => { if (options.listFails) throw new Error("Host restarting"); return []; } },
     plugins: { callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
       if (method === "automations_overview") return { automations: [] };
       if (method === "threadProfile") return { botId: options.profile ? "bot_a" : null };
       if (method === "automations_list") return options.recurring ? [{ id: "a", name: "Check", projectId: "p", trigger: { triggerType: "schedule" }, execution: { mode: "agent", targetThreadId: "t" } }] : [];
       if (method === "systemOne.ask") {
         decisions.push(input);
-        await options.decisionWait?.();
         if (options.unavailable) throw new Error("Offline");
         return { ok: true, answers: { disposition: { type: "choice", choice: options.choice ?? "show", confidence: 0.99, probabilities: {} } }, via: "test", ms: 1 };
       }
@@ -74,7 +75,8 @@ async function setup(options: { profile?: boolean; recurring?: boolean; choice?:
     await harness.behavior.emitThreadEvent("thread.idle", { thread, lastAssistantText: text });
   };
   const settled = async () => { await vi.waitFor(() => expect(bb.storage.database().prepare("SELECT count(*) AS n FROM inbox_jobs").get()).toEqual({ n: 0 }), { timeout: 3000 }); };
-  return { harness, result, emit, settled, notifications, decisions, fallbackRequests, read: (at: number) => { thread = { ...thread, lastReadAt: at }; } };
+  return { harness, result, emit, settled, notifications, decisions, fallbackRequests, read: (at: number) => { thread = { ...thread, lastReadAt: at }; },
+    remove: () => { gone = true; }, rows: () => bb.storage.database().prepare("SELECT count(*) AS n FROM inbox_updates").get() };
 }
 
 describe("automatic Inbox lifecycle", () => {
@@ -88,14 +90,18 @@ describe("automatic Inbox lifecycle", () => {
     await f.harness.behavior.callRpc("seen", {});
     expect((await f.result()).updates[0]?.read).toBe(true);
   });
-  it("follows recurring threads, but requires opt-in for ordinary threads", async () => {
+  it("collects recurring threads and leaves ordinary threads out", async () => {
     const scheduled = await setup({ recurring: true }); await scheduled.emit(); await scheduled.settled();
     expect((await scheduled.result()).updates).toHaveLength(1);
     const plain = await setup(); await plain.emit(); await plain.settled();
     expect((await plain.result()).updates).toHaveLength(0);
-    await plain.harness.behavior.callRpc("inbox.follow", { threadId: "t", followed: true });
-    await plain.emit("A useful result", 2000); await plain.settled();
-    expect((await plain.result()).updates).toHaveLength(1);
+  });
+  it("keeps triaging when startup recovery fails, and prunes results of deleted threads", async () => {
+    const f = await setup({ profile: true, listFails: true }); await f.emit(); await f.settled();
+    expect((await f.result()).updates).toHaveLength(1);
+    f.remove();
+    expect((await f.result()).updates).toHaveLength(0);
+    expect(f.rows()).toEqual({ n: 0 });
   });
   it("suppresses quiet runs, repeated replies and explicit reports without a second model call", async () => {
     const f = await setup({ profile: true });
@@ -118,24 +124,6 @@ describe("automatic Inbox lifecycle", () => {
     const on = await setup({ profile: true, choice: "urgent", notify: true }); await on.emit(); await on.settled();
     expect(on.notifications).toHaveLength(1);
   });
-  it("honors unfollow for bots", async () => {
-    const f = await setup({ profile: true });
-    expect(await f.harness.behavior.callRpc("inbox.follow", { threadId: "t", followed: false })).toMatchObject({ automatic: true, followed: false });
-    await f.emit(); await f.settled();
-    expect((await f.result()).updates).toHaveLength(0);
-  });
-  it("does not publish after an ordinary thread is unfollowed during triage", async () => {
-    let release!: () => void;
-    const wait = new Promise<void>(resolve => { release = resolve; });
-    const f = await setup({ decisionWait: () => wait });
-    await f.harness.behavior.callRpc("inbox.follow", { threadId: "t", followed: true });
-    await f.emit();
-    await vi.waitFor(() => expect(f.decisions).toHaveLength(1), { timeout: 3000 });
-    await f.harness.behavior.callRpc("inbox.follow", { threadId: "t", followed: null });
-    release(); await f.settled();
-    expect((await f.result()).updates).toHaveLength(0);
-  });
-
   it("uses the configured fallback when Jev fails, with a bounded result-only payload", async () => {
     const f = await setup({ profile: true, unavailable: true, fallback: '{"choice":"show","confidence":0.99}' });
     await f.emit("A".repeat(15000)); await f.settled();

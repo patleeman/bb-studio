@@ -10,10 +10,8 @@ import { FeedStore, type ListedRow, type PostPatch, type PostRow } from "./store
 export interface Origin {
   author: string;
   botId: string | null;
-  threadId: string;
+  threadId: string | null;
   projectId: string | null;
-  channelId: string | null;
-  channelName: string | null;
 }
 
 export type NotifyMode = "urgent" | "all" | "off";
@@ -48,7 +46,7 @@ export function view(row: PostRow | ListedRow, storyPosts?: number): PostView {
     link: null,
     embeds: [],
     explorable: row.story?.startsWith(EXPLORE_STORY_PREFIX) ?? false,
-    threadTitle: row.channel_name ? `#${row.channel_name}` : null,
+    threadTitle: null,
     read: row.read_at !== null,
     topic: row.topic,
     story: row.story,
@@ -58,8 +56,6 @@ export function view(row: PostRow | ListedRow, storyPosts?: number): PostView {
     botId: row.bot_id,
     threadId: row.thread_id,
     projectId: row.project_id,
-    channelId: row.channel_id,
-    channelName: row.channel_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     editedBy: row.edited_by,
@@ -130,11 +126,10 @@ export class FeedService {
     const mode = this.deps.notifyMode();
     if (mode === "off" || (mode === "urgent" && row.priority !== "urgent")) return;
     const earlier = row.story ? this.deps.store.story(row.story).length - 1 : 0;
-    const from = row.channel_name ? `${row.author} in #${row.channel_name}` : row.author;
     try {
       await this.deps.notify({
         title: row.title,
-        body: `${earlier ? "Update · " : ""}${from}${row.body ? ` · ${lede(row.body, 300)}` : ""}`,
+        body: `${earlier ? "Update · " : ""}${row.author}${row.body ? ` · ${lede(row.body, 300)}` : ""}`,
         threadId: row.thread_id,
         projectId: row.project_id,
         path: postHref(row.id),

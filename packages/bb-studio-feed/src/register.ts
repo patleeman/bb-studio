@@ -3,7 +3,7 @@
 // with the post's card line.
 //
 //   - FeedService (service.ts) publishes and notifies; this file
-//     gives it BB: who a thread is (its bot and channel, from Studio Teams
+//     gives it BB: who a thread is (its bot, from Studio Teams
 //     when it's installed), realtime, and phone notifications (Studio Mobile).
 //   - It adds the RPC handlers, the feed_* tools, the instructions for
 //     `bb.agents.configure`, and `bb feed …`.
@@ -88,8 +88,6 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       botId,
       threadId,
       projectId: thread.projectId ?? null,
-      channelId: null,
-      channelName: null,
     };
   }
 
@@ -258,7 +256,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
         topic: input.topic?.trim() || null,
         story: storyKey(input.story),
         priority: input.priority ?? "normal",
-        origin: { author: input.author, botId: null, threadId: input.threadId ?? "", projectId: input.projectId ?? null, channelId: null, channelName: null },
+        origin: { author: input.author, botId: null, threadId: input.threadId ?? null, projectId: input.projectId ?? null },
       });
       return { post: (await one(row))! };
     },
@@ -283,11 +281,10 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
 
   // Agents ---------------------------------------------------------------------
 
-  const from = (post: PostView) => (post.channelName ? `${post.author} in #${post.channelName}` : post.author);
   const summary = (post: PostView) =>
     [
       `- ${post.title} (id ${post.id}${post.story ? `, story ${post.story}, ${post.storyPosts} post${post.storyPosts === 1 ? "" : "s"}` : ""})`,
-      `  ${[from(post), post.topic, relativeTime(post.createdAt), post.priority === "urgent" ? "urgent" : null, post.resolvedAt ? "resolved" : null].filter(Boolean).join(" · ")}`,
+      `  ${[post.author, post.topic, relativeTime(post.createdAt), post.priority === "urgent" ? "urgent" : null, post.resolvedAt ? "resolved" : null].filter(Boolean).join(" · ")}`,
       post.preview ? `  ${post.preview}` : "",
     ]
       .filter(Boolean)
@@ -295,7 +292,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
   const full = (post: PostView) =>
     [
       `# ${post.title}`,
-      `id ${post.id} · ${from(post)}${post.topic ? ` · ${post.topic}` : ""} · ${new Date(post.createdAt).toISOString()}${post.priority !== "normal" ? ` · ${post.priority}` : ""}${post.resolvedAt ? " · resolved" : ""}`,
+      `id ${post.id} · ${post.author}${post.topic ? ` · ${post.topic}` : ""} · ${new Date(post.createdAt).toISOString()}${post.priority !== "normal" ? ` · ${post.priority}` : ""}${post.resolvedAt ? " · resolved" : ""}`,
       post.threadId ? `Thread: ${post.threadId}` : "",
       "",
       post.body || "(no body)",
@@ -327,7 +324,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
         topic: topic?.trim() || null,
         story: storyKey(story),
         priority: urgent ? "urgent" : "normal",
-        origin: where ?? { author: "Agent", botId: null, threadId: context.threadId, projectId: context.projectId ?? null, channelId: null, channelName: null },
+        origin: where ?? { author: "Agent", botId: null, threadId: context.threadId, projectId: context.projectId ?? null },
       });
       const updates = row.story ? store.story(row.story).length : 1;
       return [
@@ -417,7 +414,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
   // CLI: `bb feed …` ---------------------------------------------------------------
 
   const line = (post: PostView) =>
-    [post.id, relativeTime(post.createdAt), post.priority === "urgent" ? "urgent" : "", post.topic ?? "", from(post), post.title, post.story ? `${post.story} (${post.storyPosts})` : ""].join("\t");
+    [post.id, relativeTime(post.createdAt), post.priority === "urgent" ? "urgent" : "", post.topic ?? "", post.author, post.title, post.story ? `${post.story} (${post.storyPosts})` : ""].join("\t");
 
   async function cli(argv: string[], ctx: PluginCliContext): Promise<PluginCliResult> {
     const { command, rest } = subcommand(argv);
@@ -453,7 +450,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
           priority: flags.values.urgent !== undefined ? "urgent" : priority(flags.values.priority),
           origin: threadOrigin
             ? { ...threadOrigin, author: author || threadOrigin.author }
-            : { author: author || "CLI", botId: null, threadId: ctx.threadId ?? "", projectId: ctx.projectId ?? null, channelId: null, channelName: null },
+            : { author: author || "CLI", botId: null, threadId: ctx.threadId ?? null, projectId: ctx.projectId ?? null },
         });
         // Inside a thread, the card line, for the reply to end with.
         return { exitCode: 0, stdout: `${line(service.view(row))}\n${ctx.threadId ? `\nEnd your reply with this line to show the post as a card:\n${cardLine(row.id)}\n` : ""}` };

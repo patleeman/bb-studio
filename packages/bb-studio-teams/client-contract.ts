@@ -12,8 +12,6 @@ export const rpcContract = {
   update: botContract.update,
   swapModel: botContract.swapModel,
   retire: botContract.retire,
-  retryJob: botContract.retryJob,
-  cancelJob: botContract.cancelJob,
   profiles: botContract.profiles,
   threadProfile: botContract.threadProfile,
   threadBots: botContract.threadBots,
@@ -27,7 +25,6 @@ export const rpcContract = {
   wake: botContract.wake,
   conversation: botContract.conversation,
   newConversation: botContract.newConversation,
-  handoffSource: botContract.handoffSource,
   usage: { ...botContract.usage, input: botContract.usage.input.extend({ kind: z.literal("bot") }) },
   saveLimits: { ...botContract.saveLimits, input: botContract.saveLimits.input.extend({ kind: z.literal("bot") }) },
 };

@@ -284,11 +284,9 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
     };
   }, [load]);
   useRealtime("scoped-changed", (event) => { if (affects(event, "bots")) load(); });
-  const [id, section, rest] = subPath.split("/");
-  if (id === "new" && section === "space")
-    return <BotCreationThread key={`space:${rest}`} spaceId={rest ? decodeURIComponent(rest) : undefined} />;
+  const [id, section] = subPath.split("/");
   if (id === "new")
-    return <BotCreationThread key="standalone" />;
+    return <BotCreationThread />;
   if (id)
     return (
       <BotDetail
@@ -305,9 +303,8 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
   return <BotList requests={data?.botCreateRequests ?? null} error={error} onResolved={load} />;
 }
 /**
- * The bots as a Studio collection, like every add-on's page. With Studio
- * installed it hands over to Studio's, except while bot creation requests,
- * which Studio can't show, are waiting.
+ * The bots as a collection, like every add-on's page. It never hands over
+ * to Studio, which doesn't list bots.
  */
 function BotList({
   requests,
@@ -331,20 +328,18 @@ function BotList({
         </div>
       ) : null}
       <div className="min-h-0 flex-1">
-        <AddOnCollection pluginId={PLUGIN_ID} title="Bots" kind={BOT_KIND.id} call={call} refreshKey={version} handOver={!requests?.length} />
+        <AddOnCollection pluginId={PLUGIN_ID} title="Bots" kind={BOT_KIND.id} call={call} refreshKey={version} handOver={false} />
       </div>
     </div>
   );
 }
-/** Studio's New ▾ → Bot opens the bot setup chat. */
+/** The Bots collection's New button opens the bot setup chat. */
 function NewBotListener() {
   const navigate = useBbNavigate();
   useEffect(() => {
     const open = (event: Event) => {
       event.preventDefault();
-      // A space's page passes its space, so the new bot joins it.
-      const spaceId = (event as CustomEvent<{ spaceId?: unknown } | null>).detail?.spaceId;
-      navigate.toPluginPanel("bots", { subPath: typeof spaceId === "string" && spaceId ? `new/space/${encodeURIComponent(spaceId)}` : "new" });
+      navigate.toPluginPanel("bots", { subPath: "new" });
     };
     window.addEventListener(NEW_BOT_EVENT, open);
     return () => window.removeEventListener(NEW_BOT_EVENT, open);

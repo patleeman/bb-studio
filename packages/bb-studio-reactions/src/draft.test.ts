@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   composeReactionDraft,
-  DEFAULT_QUOTE_POSITION,
   parseQuotePosition,
 } from "./draft";
 
@@ -11,11 +10,11 @@ describe("parseQuotePosition", () => {
     expect(parseQuotePosition("after")).toBe("after");
   });
 
-  it("falls back to the default for anything else", () => {
-    expect(parseQuotePosition(undefined)).toBe(DEFAULT_QUOTE_POSITION);
-    expect(parseQuotePosition("")).toBe(DEFAULT_QUOTE_POSITION);
-    expect(parseQuotePosition("sideways")).toBe(DEFAULT_QUOTE_POSITION);
-    expect(parseQuotePosition(42)).toBe(DEFAULT_QUOTE_POSITION);
+  it("falls back to before for anything else", () => {
+    expect(parseQuotePosition(undefined)).toBe("before");
+    expect(parseQuotePosition("")).toBe("before");
+    expect(parseQuotePosition("sideways")).toBe("before");
+    expect(parseQuotePosition(42)).toBe("before");
   });
 });
 

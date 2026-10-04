@@ -276,7 +276,6 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true as const };
     },
     retire: ({ id, retired }) => runtime.retire(id, retired),
-    retryJob: ({ id }) => runtime.retryJob(id),
     update: ({ id, expectedUpdatedAt, ...patch }) =>
       updateBot(id, expectedUpdatedAt, patch),
     swapModel: ({ id, expectedUpdatedAt }) =>
@@ -293,7 +292,7 @@ export default async function plugin(bb: BbPluginApi) {
           fallbackReasoningLevel: bot.reasoningLevel,
         });
       }),
-    ...botHandlers(bb, store, runtime, profiles),
+    ...botHandlers(store, runtime, profiles),
     profiles: () =>
       store.all().filter((bot) => !bot.retired)
         .sort((a, b) => a.name.localeCompare(b.name)),
@@ -350,12 +349,6 @@ export default async function plugin(bb: BbPluginApi) {
       return { bots: bots.map(bot => ({ ...bot, working: activity.get(bot.id)?.working ?? false, lastActivityAt: activity.get(bot.id)?.lastActivityAt ?? null })), views: views.all(), directConversations, directThreads, directThreadInfo,
         botCreateRequests: store.botCreateRequests().map(r => ({ ...r.input, id: r.id, requesterBotId: r.requesterBotId, requesterName: r.requesterName, channelName: null, mission: r.input.mission.slice(0,4000), missionTruncated: r.input.mission.length > 4000, createdAt: r.createdAt, expiresAt: r.expiresAt })) };
     },
-    cancelJob: ({ id }) => runtime.locked("cancel", async () => {
-      const job = store.job(id);
-      if (!job) throw new Error("Work item not found.");
-      if (!["queued", "dispatching", "running"].includes(job.status)) return { cancelled: false };
-      await runtime.cancel(job, "Cancelled by the owner."); return { cancelled: true };
-    }),
   };
   bb.rpc.register(rpcContract, handlers);
   // The Bots and Channels pages' collections (not Studio items; see studio-provider.ts).
@@ -395,7 +388,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   for (const event of ["thread.created", "thread.active", "thread.idle", "thread.failed", "thread.archived", "thread.unarchived"] as const)
     bb.events.on(event, () => views.changed());
-  bb.events.on("thread.deleted", ({ thread }) => { store.deleteConversation(thread.id); runtime.changed(); views.changed(); });
+  bb.events.on("thread.deleted", ({ thread }) => { store.deleteConversation(thread.id); views.forgetThread(thread.id); runtime.changed(); views.changed(); });
   bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
     const c = store.byThread(thread.id);
     if (!c) return;

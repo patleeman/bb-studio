@@ -42,7 +42,7 @@ function useViewing(rpc: Rpc, path: string): Viewed | null {
     if (!path.startsWith("/plugins/")) return setViewed({ path, item: null });
     let live = true;
     rpc.call("viewing", { path }).then(
-      ({ item }) => live && setViewed({ path, item: item?.pluginId === "bot-teams" && item.kind === "view" ? null : item }),
+      ({ item }) => live && setViewed({ path, item }),
       () => live && setViewed({ path, item: null }),
     );
     return () => {
@@ -229,8 +229,10 @@ export function ChatOverlay() {
           return;
         }
         const path = saved ? quoteDraftPath(saved.id) : itemDraftPath(current.item);
-        if (openCompanion({ kind: "path", path, title: `Chat: ${untitled(current.item.title)}`, icon: CHAT_ICON })) close(current.request);
-        else setFallbackRequest(current.request);
+        if (openCompanion({ kind: "path", path, title: `Chat: ${untitled(current.item.title)}`, icon: CHAT_ICON })) return close(current.request);
+        // The overlay composer keeps the quote in memory; the saved copy has no reader.
+        if (saved) void quoteDrafts.remove(saved.id).catch(() => {});
+        setFallbackRequest(current.request);
       } catch (cause) {
         if (live && isCurrent(current.request)) { reportError(cause); setFallbackRequest(current.request); }
       }

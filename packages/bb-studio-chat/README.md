@@ -1,6 +1,6 @@
 # Studio Chat
 
-> **Studio Chat** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
+> **Studio Chat** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, working with bots, and keeping what your agents make. See the [suite overview](../../README.md).
 
 One **Chat** action in a Studio item's header opens its linked conversation
 or a new composer. Its menu lets you start another conversation, choose an
@@ -72,8 +72,9 @@ its saved route. See [plain/main](assets/chat-plain-companion-transfers-stable.p
   linked conversation until you choose one.
 - **Viewing chip.** Float thread tabs name the Studio item in the main pane.
   That label does not add it to the conversation automatically.
-- **Saved views.** Teams views contain their own chat. Chat leaves their
-  composer unobstructed and does not discover another item conversation.
+- **Bots and channels.** Studio Teams bots and channels have their own chat.
+  Chat leaves their composer unobstructed and does not discover another item
+  conversation.
 
 ## Limits
 

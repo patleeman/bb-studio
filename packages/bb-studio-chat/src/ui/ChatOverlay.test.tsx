@@ -137,6 +137,17 @@ describe("item Chat actions", () => {
     expect(state.float).toHaveBeenCalledWith(expect.objectContaining({ title: "Chat: Main page" }));
   });
 
+  it("removes the saved quote when Float can't open it and composes in the overlay", async () => {
+    state.available = true;
+    state.float.mockReturnValue(false);
+    vi.spyOn(quoteDrafts, "save").mockResolvedValue({ id: "unopened" } as any);
+    const remove = vi.spyOn(quoteDrafts, "remove").mockResolvedValue();
+    await render();
+    await actHost(host => host.send(companion, quote));
+    expect(remove).toHaveBeenCalledWith("unopened");
+    expect(state.composer.initialPrompt).toContain(quote.text);
+  });
+
   it("keeps an image quote in the submission without Float", async () => {
     const image = "data:image/png;base64,aGVsbG8=";
     await actHost(host => host.send(companion, { ...quote, image }));
@@ -252,14 +263,5 @@ describe("item Chat actions", () => {
     await actHost((host) => host.choose(companion));
     await act(async () => { state.picker.onPick("picked_thread"); });
     expect(state.navigate.toThread).toHaveBeenCalledWith("picked_thread");
-  });
-
-  it("leaves Teams saved views' own chat and Send button unobstructed", async () => {
-    state.path = "/plugins/bot-teams/views/launch";
-    state.rpc.call.mockClear();
-    state.rpc.call.mockResolvedValue({ item: { ...main, pluginId: "bot-teams", id: "launch", kind: "view", href: state.path } });
-    await render();
-    expect(container.children).toHaveLength(0);
-    expect(state.rpc.call.mock.calls.map(([method]) => method)).toEqual(["viewing"]);
   });
 });

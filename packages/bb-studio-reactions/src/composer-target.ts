@@ -3,7 +3,8 @@
 // More than one composer can be mounted at once (the main view plus a
 // floating chat, a side chat, a split). A reaction belongs in the composer
 // that writes to the thread whose message it came from. If none is mounted
-// for that thread, the most recently mounted composer takes it, as before.
+// for that thread, there is no target: drafting into another thread's
+// composer would send the reaction to the wrong conversation.
 
 import type { PluginComposerScope } from "@get-bb/plugin-sdk/app";
 
@@ -21,8 +22,8 @@ function scopeThread(scope: PluginComposerScope): string | null {
 }
 
 /**
- * Pick from `mounted` (oldest first) the composer for `threadId`: the newest
- * one writing to that thread, else the newest one of any kind.
+ * Pick from `mounted` (oldest first) the newest composer writing to
+ * `threadId`, or null when none does.
  */
 export function pickComposer<T extends { scope: PluginComposerScope }>(
   mounted: readonly T[],
@@ -31,5 +32,5 @@ export function pickComposer<T extends { scope: PluginComposerScope }>(
   for (let index = mounted.length - 1; index >= 0; index -= 1) {
     if (scopeThread(mounted[index].scope) === threadId) return mounted[index];
   }
-  return mounted.at(-1) ?? null;
+  return null;
 }

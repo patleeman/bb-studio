@@ -7,8 +7,8 @@ import { loadFeedWindow } from "./window";
 import { emptyFilters, filterInput } from "./reader-state";
 
 const ORIGINS: Record<string, Origin> = {
-  bot: { author: "Commute Bot", botId: "bot_1", threadId: "thr_bot", projectId: "proj_1", channelId: "room_1", channelName: "command-center" },
-  plain: { author: "Morning research", botId: null, threadId: "thr_plain", projectId: "proj_1", channelId: null, channelName: null },
+  bot: { author: "Commute Bot", botId: "bot_1", threadId: "thr_bot", projectId: "proj_1" },
+  plain: { author: "Morning research", botId: null, threadId: "thr_plain", projectId: "proj_1" },
 };
 
 function setup(options: { mode?: NotifyMode } = {}) {
@@ -71,7 +71,7 @@ describe("FeedService", () => {
     await urgent.post("Harlem Line delays cleared", CLEARED);
     await urgent.post("Building alarm", { body: "Fire alarm.", priority: "urgent", from: "bot" });
     expect(urgent.notifications.map((item) => item.title)).toEqual(["Building alarm"]);
-    expect(urgent.notifications[0]).toMatchObject({ projectId: "proj_1", threadId: "thr_bot", body: "Commute Bot in #command-center · Fire alarm." });
+    expect(urgent.notifications[0]).toMatchObject({ projectId: "proj_1", threadId: "thr_bot", body: "Commute Bot · Fire alarm." });
 
     const all = setup({ mode: "all" });
     await all.post("Harlem Line delays cleared", CLEARED);
@@ -94,17 +94,6 @@ describe("FeedService", () => {
     expect(service.remove(row.id)).toBe(true);
     expect(store.get(row.id)).toBeNull();
     expect(events.at(-1)).toEqual({ type: "removed", postId: row.id });
-  });
-
-  it("counts unread stories since the read mark", async () => {
-    const { service, store, advance, post } = setup();
-    await post("Harlem Line delays cleared", CLEARED);
-    advance(10);
-    service.seen();
-    advance(10);
-    await post("Update", { story: "harlem-line" });
-    await post("Other");
-    expect(store.countSince(store.lastSeenAt())).toBe(2);
   });
 
   it("reads a story at once, and marks everything read", async () => {

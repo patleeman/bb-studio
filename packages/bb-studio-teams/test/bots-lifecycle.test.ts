@@ -18,31 +18,6 @@ import { type Bot, type Conversation } from "../contract";
 
 import { setup } from "./bots-fixture";
 
-test("cancel RPC reloads a registered job before stopping its thread", async () => {
-  const x = setup();
-  await plugin(x.bb);
-  try {
-    x.runtime.enqueue(x.a, {
-      id: "cancel-race",
-      text: "work",
-      conversationKey: "mission",
-      status: "running",
-      threadId: "thr_registered",
-    });
-    await x.harness.behavior.callRpc("cancelJob", {
-      id: "cancel-race",
-    });
-    assert.equal(x.store.job("cancel-race")!.status, "cancelled");
-    assert.equal(x.store.job("cancel-race")!.threadId, "thr_registered");
-    assert.deepEqual(
-      x.harness.inspection.sdk.callsTo("threads.stop").at(-1)?.[0],
-      { threadId: "thr_registered" },
-    );
-  } finally {
-    await x.close();
-  }
-});
-
 test("dispatch recovery finds accepted work beyond the first thread page", async () => {
   const x = setup();
   try {

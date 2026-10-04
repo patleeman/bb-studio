@@ -93,8 +93,6 @@ export interface NewPost {
   botId?: string | null;
   threadId?: string | null;
   projectId?: string | null;
-  channelId?: string | null;
-  channelName?: string | null;
   /** Identifies the post for its keys. */
   source: string;
   at?: number;
@@ -129,8 +127,8 @@ export class FeedStore {
       bot_id: post.botId ?? null,
       thread_id: post.threadId ?? null,
       project_id: post.projectId ?? null,
-      channel_id: post.channelId ?? null,
-      channel_name: post.channelName ?? null,
+      channel_id: null,
+      channel_name: null,
       content_key: contentKey(post.source, post.body),
       directive_key: directiveKey(post.source),
       created_at: at,
@@ -294,13 +292,5 @@ export class FeedStore {
     const next = Math.max(this.lastSeenAt(), at);
     this.setMeta("last_seen_at", String(next));
     return next;
-  }
-
-  /** Stories (or loose posts) with a post since then. */
-  countSince(since: number): number {
-    const row = this.db
-      .prepare("SELECT COUNT(DISTINCT COALESCE(story, id)) AS count FROM feed_posts WHERE created_at > ?")
-      .get(since) as { count: number };
-    return row.count;
   }
 }

@@ -133,6 +133,19 @@ test("a steer decision sends the held row into the running turn", async () => {
   assert.equal(calls.records.length, 1);
 });
 
+test("a failed recheck after a follow-up decision warns instead of rejecting", async () => {
+  const warnings: string[] = [];
+  const { queue } = harness(followup, {
+    recheck: async () => {
+      throw new Error("hook offline");
+    },
+    warn: (message) => warnings.push(message),
+  });
+  queue.queued(row());
+  await settle();
+  assert.ok(warnings.some((message) => message.includes("hook offline")));
+});
+
 test("a follow-up decision keeps the row held until the thread is free", async () => {
   const { queue, calls } = harness(followup);
   queue.queued(row());

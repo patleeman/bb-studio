@@ -55,15 +55,3 @@ export function parseEmojiItems(raw: string | undefined): EmojiItem[] {
     .map(parseEmojiItem)
     .filter((item) => item.emoji.length > 0 || item.label.length > 0);
 }
-
-/** Serialize items back into the comma-separated settings string. */
-export function serializeEmojiItems(items: readonly EmojiItem[]): string {
-  return items
-    .map((item) => {
-      const trimmed = item.text.trim();
-      return trimmed.length > 0 ? trimmed : `${item.emoji} ${item.label}`.trim();
-    })
-    .filter((text) => text.length > 0)
-    .slice(0, MAX_EMOJI_ITEMS)
-    .join(", ");
-}

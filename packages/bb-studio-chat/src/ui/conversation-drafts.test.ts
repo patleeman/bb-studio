@@ -1,6 +1,6 @@
 import { IDBFactory } from "fake-indexeddb";
 import { describe, expect, it } from "vitest";
-import { draftRoute, itemDraftPath, quoteDraftPath, QuoteDrafts } from "./conversation-drafts";
+import { draftRoute, itemDraftPath, quoteDraftPath, QuoteDrafts, STALE_DRAFT_MS } from "./conversation-drafts";
 
 const item = { pluginId: "artifacts", id: "a/slash:percent%2F" };
 const selection = { text: "Keep this", note: "Fix it", where: "top left", image: "data:image/png;base64,aGVsbG8=" };
@@ -29,6 +29,18 @@ describe("restorable conversation drafts", () => {
     await store.remove(first.id);
     expect(await reloaded.get(first.id)).toBeNull();
     expect(await reloaded.get(second.id)).toEqual(second);
+  });
+
+  it("drops stale drafts when the store opens", async () => {
+    const factory = new IDBFactory();
+    let now = 1_000;
+    const store = new QuoteDrafts(() => factory, () => now);
+    const old = await store.save(item, selection);
+    now += STALE_DRAFT_MS;
+    const fresh = await store.save(item, selection);
+    const reloaded = new QuoteDrafts(() => factory, () => now + 1);
+    expect(await reloaded.get(old.id)).toBeNull();
+    expect(await reloaded.get(fresh.id)).toEqual(fresh);
   });
 
   it("doesn't discard large image selections because session storage is full", async () => {

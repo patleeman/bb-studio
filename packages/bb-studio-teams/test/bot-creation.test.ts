@@ -77,10 +77,3 @@ test("bot setup creates a visible thread with the composer's selections and inpu
     await harness.lifecycle.dispose();
   }
 });
-
-test("bot setup from a space asks the agent to add the bot to it", () => {
-  const prompt = botCreationPrompt("spc_launch");
-  assert.match(prompt, /space ID: "spc_launch"/);
-  assert.match(prompt, /studio_space_items/);
-  assert.doesNotMatch(botCreationPrompt(), /studio_space_items/);
-});

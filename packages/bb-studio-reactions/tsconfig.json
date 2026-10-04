@@ -1,19 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
-  },
   "include": [
     "server.ts",
     "app.tsx",
     "src",
-    "types",
-    "components",
-    "lib",
-    "hooks"
+    "types"
   ]
 }

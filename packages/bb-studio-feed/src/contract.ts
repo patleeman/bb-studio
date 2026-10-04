@@ -43,7 +43,7 @@ export const postSchema = z.object({
   ),
   /** A finding Explore (in Studio Pages) saved here: Explore can write a page explaining it. */
   explorable: z.boolean(),
-  /** What the thread it came from is called: "#channel", or the thread's title. */
+  /** The title of the thread it came from. */
   threadTitle: z.string().nullable(),
   read: z.boolean(),
   topic: z.string().nullable(),
@@ -56,8 +56,6 @@ export const postSchema = z.object({
   botId: z.string().nullable(),
   threadId: z.string().nullable(),
   projectId: z.string().nullable(),
-  channelId: z.string().nullable(),
-  channelName: z.string().nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
   /** Who last edited it: an agent's thread, or "you". */

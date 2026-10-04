@@ -4,6 +4,5 @@ import type { ChangeEvent } from "./realtime";
 
 export function publishChange(bb: BbPluginApi, scope: ChangeEvent["scope"] = "all", id?: string) {
   const event: ChangeEvent = { revision: randomUUID(), scope, ...(id ? { id } : {}) };
-  bb.realtime.publish("changed", event);
   bb.realtime.publish("scoped-changed", event);
 }

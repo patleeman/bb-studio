@@ -78,8 +78,8 @@ less.
 
 Smart Queue acts only on messages you send yourself to a busy thread. It
 ignores messages from agents and other threads, plugin submissions, retries,
-scheduled messages, hidden threads, and Studio Teams threads (Studio Teams routes
-those itself).
+scheduled messages, and hidden threads. Visible Studio Teams bot threads use
+the same queue as any other thread.
 
 Smart Queue holds the message. The queued card shows *Smart Queue is deciding
 whether to steer or follow up*. Then either the message joins the turn, or the

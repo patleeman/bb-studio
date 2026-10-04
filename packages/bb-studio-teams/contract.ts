@@ -292,7 +292,6 @@ export const rpcContract = {
     input: z.object({ id: idSchema, retired: z.boolean() }),
     output: botSchema,
   },
-  retryJob: { input: z.object({ id: z.string() }), output: jobSchema },
   get: {
     input: z.object({ id: idSchema }),
     output: z.object({
@@ -360,17 +359,5 @@ export const rpcContract = {
       archived: z.boolean(),
       updatedAt: z.number(),
     })),
-  },
-  handoffSource: {
-    input: z.object({ threadId: z.string().min(1).max(200) }),
-    output: z.object({
-      threadId: z.string(),
-      projectId: z.string(),
-      title: z.string(),
-    }),
-  },
-  cancelJob: {
-    input: z.object({ id: z.string() }),
-    output: z.object({ cancelled: z.boolean() }),
   },
 } satisfies Parameters<typeof defineRpcContract>[0];

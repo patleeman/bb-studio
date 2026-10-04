@@ -21,10 +21,7 @@ export function useMinuteTick(): number {
   return tick;
 }
 
-/** "Commute Bot in #command-center". */
-export const from = (post: Pick<PostView, "author" | "channelName">) => (post.channelName ? `${post.author} in #${post.channelName}` : post.author);
-
-/** Where Discuss goes: the thread or channel it came from, or a new thread about it. */
+/** Where Discuss goes: the thread it came from, or a new thread about it. */
 export function useDiscuss() {
   const open = useOpenCompanion();
   return {

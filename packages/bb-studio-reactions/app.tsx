@@ -133,7 +133,7 @@ function SmartReactions({ attributes, message }: PluginMessageDirectiveProps) {
             const composer = pickComposer(mountedComposers, message.threadId);
             if (composer === null) {
               toast.error(
-                "Open this thread's composer to react, in the main view or Studio Chat.",
+                "Open this thread's composer to react, in the main view or Float.",
               );
               return;
             }
@@ -203,7 +203,7 @@ export default definePluginApp((app) => {
           const composer = pickComposer(mountedComposers, context.threadId);
           if (composer === null) {
             toast.error(
-              "Open this thread's composer to react, in the main view or Studio Chat.",
+              "Open this thread's composer to react, in the main view or Float.",
             );
             return;
           }

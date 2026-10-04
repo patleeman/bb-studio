@@ -34,10 +34,10 @@ export const cardLine = (postId: string) => `::${DIRECTIVE}{id="${postId}"}`;
 export const postHref = (id: string) => `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${encodeURIComponent(id)}`;
 
 export const discussionHref = (id: string) => `${postHref(id)}/discussion`;
-export const discussionPrompt = (post: { id: string; title: string; author: string; channelName: string | null }) =>
+export const discussionPrompt = (post: { title: string }) =>
   `Let's discuss "${post.title}".\n\n`;
-export const discussionContext = (post: { id: string; title: string; author: string; channelName: string | null }) =>
-  `The user is discussing this feed post: "${post.title}" (${post.channelName ? `${post.author} in #${post.channelName}` : post.author}). Read it first with feed_read id ${post.id}.\n\n`;
+export const discussionContext = (post: { id: string; title: string; author: string }) =>
+  `The user is discussing this feed post: "${post.title}" (${post.author}). Read it first with feed_read id ${post.id}.\n\n`;
 
 const ATTRIBUTE = /([A-Za-z][\w-]*)\s*=\s*"([^"]*)"/g;
 

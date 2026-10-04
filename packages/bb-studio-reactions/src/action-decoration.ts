@@ -30,6 +30,8 @@ export function mountActionDecoration(settings: MenuSettings, signal: AbortSigna
 
   const sweep = () => {
     if (disposed) return;
+    // Buttons the host unmounted have nothing left to restore.
+    for (const button of edited.keys()) if (!button.isConnected) edited.delete(button);
     for (const icon of document.querySelectorAll(ICON)) {
       const button = icon.closest("button");
       if (!button || edited.has(button)) continue;

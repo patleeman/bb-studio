@@ -19,8 +19,8 @@ describe("pickComposer", () => {
     expect(pickComposer([side, other], "thr_c")).toBe(side);
   });
 
-  it("falls back to the newest composer when none writes to the thread", () => {
-    expect(pickComposer([other, main], "thr_z")).toBe(main);
+  it("returns null when no composer writes to the thread", () => {
+    expect(pickComposer([other, main], "thr_z")).toBeNull();
   });
 
   it("returns null when no composer is mounted", () => {

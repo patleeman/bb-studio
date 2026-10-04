@@ -1,38 +1,75 @@
 import { GHOST_BUTTON, SECTION_TITLE, cn } from "@bb-studio/kit/app";
 import { relativeTime, errorMessage } from "@bb-studio/kit/format";
 import { experimental_useSidebarThreads as useSidebarThreads, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import type { rpcContract } from "../contract";
 import type { AutomaticUpdate } from "../automatic-contract";
 import { REALTIME_CHANNEL } from "../shared";
 
+type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
+type Snapshot = { updates: AutomaticUpdate[]; failures: { id: string; name: string; error: string }[]; degraded: boolean; error: string | null };
+
+// One shared copy for every surface (the sidebar count, the Inbox page, Float):
+// one timer and one inbox.updates call per change, however many are mounted.
+const shared = {
+  snapshot: { updates: [], failures: [], degraded: false, error: null } as Snapshot,
+  listeners: new Set<() => void>(),
+  rpc: null as Rpc | null,
+  timer: null as ReturnType<typeof setInterval> | null,
+  scheduled: false,
+  loading: false,
+  again: false,
+};
+function emit(next: Partial<Snapshot>) {
+  shared.snapshot = { ...shared.snapshot, ...next };
+  for (const listener of shared.listeners) listener();
+}
+function fetchUpdates() {
+  const rpc = shared.rpc;
+  if (!rpc) return;
+  if (shared.loading) { shared.again = true; return; }
+  shared.loading = true;
+  rpc.call("inbox.updates", {}).then(
+    result => emit({ updates: result.updates, failures: result.failures, degraded: result.degraded, error: null }),
+    cause => emit({ error: errorMessage(cause) }),
+  ).finally(() => {
+    shared.loading = false;
+    if (shared.again) { shared.again = false; fetchUpdates(); }
+  });
+}
+/** Coalesces reloads requested in the same tick, such as one realtime event seen by every mounted surface. */
+function reload() {
+  if (shared.scheduled) return;
+  shared.scheduled = true;
+  setTimeout(() => { shared.scheduled = false; fetchUpdates(); }, 0);
+}
+function subscribe(rpc: Rpc, listener: () => void) {
+  shared.rpc = rpc;
+  shared.listeners.add(listener);
+  if (shared.listeners.size === 1) {
+    reload();
+    // Automation failures have no lifecycle event in the stable SDK.
+    shared.timer = setInterval(reload, 60_000);
+  }
+  return () => {
+    shared.listeners.delete(listener);
+    if (!shared.listeners.size && shared.timer) { clearInterval(shared.timer); shared.timer = null; }
+  };
+}
+
 export function useAutomaticUpdates() {
   const rpc = useRpc<typeof rpcContract>();
   const { threads } = useSidebarThreads();
-  const [updates, setUpdates] = useState<AutomaticUpdate[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [failures, setFailures] = useState<{ id: string; name: string; error: string }[]>([]);
-  const [degraded, setDegraded] = useState(false);
-  const load = useCallback(() => {
-    let cancelled = false;
-    rpc.call("inbox.updates", {}).then(result => {
-      if (cancelled) return;
-      setUpdates(result.updates); setFailures(result.failures); setDegraded(result.degraded); setError(null);
-    }, cause => { if (!cancelled) setError(errorMessage(cause)); });
-    return () => { cancelled = true; };
-  }, [rpc]);
-  useEffect(load, [load]);
-  // Automation failures have no lifecycle event in the stable SDK.
-  useEffect(() => { const timer = setInterval(load, 60_000); return () => clearInterval(timer); }, [load]);
+  const { updates, failures, error, degraded } = useSyncExternalStore(useCallback(listener => subscribe(rpc, listener), [rpc]), () => shared.snapshot);
   useRealtime(REALTIME_CHANNEL, (payload) => {
-    if (payload && typeof payload === "object" && "type" in payload && payload.type === "automatic") load();
+    if (payload && typeof payload === "object" && "type" in payload && payload.type === "automatic") reload();
   });
   // Reading in another pane immediately clears the badge, without polling.
   const live = new Map(threads.map(t => [t.id, t]));
   return { failures, updates: updates.filter(row => {
     const thread = live.get(row.threadId);
     return !thread || (!thread.isArchived && !thread.isHidden);
-  }).map(row => ({ ...row, read: row.read || (live.get(row.threadId)?.lastReadAt ?? 0) >= row.at })), error, degraded, load };
+  }).map(row => ({ ...row, read: row.read || (live.get(row.threadId)?.lastReadAt ?? 0) >= row.at })), error, degraded, load: reload };
 }
 
 export function AutomaticUpdates() {

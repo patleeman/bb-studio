@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import { errorMessage } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { personalProjectId } from "@bb-studio/kit/server";
@@ -271,9 +272,15 @@ export default async function plugin(bb: BbPluginApi) {
   }
   const queueEnabled = async () => (await config()).enabled && !(await standaloneQueueOn());
 
+  // One read-modify-write at a time, so concurrent decisions don't drop each other.
+  let recording: Promise<unknown> = Promise.resolve();
   async function record(entry: DecisionRecord) {
-    const recent = (await bb.storage.kv.get<DecisionRecord[]>(recentKey)) ?? [];
-    await bb.storage.kv.set(recentKey, [entry, ...recent].slice(0, recentLimit));
+    const write = recording.then(async () => {
+      const recent = (await bb.storage.kv.get<DecisionRecord[]>(recentKey)) ?? [];
+      await bb.storage.kv.set(recentKey, [entry, ...recent].slice(0, recentLimit));
+    });
+    recording = write.catch(() => {});
+    await write;
     bb.log.info(
       `Smart Queue chose ${entry.verdict.action} for ${entry.queuedMessageId} in ${entry.threadId} (${describeVerdict(entry.verdict)}).`,
     );
@@ -321,7 +328,13 @@ export default async function plugin(bb: BbPluginApi) {
         // Sent the way the composer steers, so the dispatch hook sees it.
         await bb.sdk.threads.send({ ...message, mode: "steer-if-active" });
       } catch (error) {
-        await bb.sdk.threads.queuedMessages.create(message);
+        try {
+          await bb.sdk.threads.queuedMessages.create(message);
+        } catch (restoreError) {
+          bb.log.error(
+            `Smart Queue lost a message in ${row.threadId}: sending failed (${String(error)}) and re-queueing failed (${String(restoreError)}). Message: ${rowText(row)}`,
+          );
+        }
         throw error;
       }
     },
@@ -385,18 +398,17 @@ export default async function plugin(bb: BbPluginApi) {
         } catch (error) {
           if (!signal.aborted) bb.log.warn(`Studio Decisions could not read queued messages: ${String(error)}`);
         }
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, watchIntervalMs);
-          signal.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
-        });
+        await sleep(watchIntervalMs, undefined, { signal }).catch(() => {});
       }
     },
   });
 
   bb.background.service("recovery", {
     async start() {
-      // Remove model sessions a previous load left behind.
-      for (let offset = 0; ; offset += 100) {
+      // Remove model sessions a previous load left behind. List every page
+      // first: deleting while paging by offset would skip threads.
+      const stale: string[] = [];
+      for (let offset = 0, page = 0; page < 100; offset += 100, page++) {
         const threads = await bb.sdk.threads.list({
           originPluginId: bb.pluginId,
           includeHidden: true,
@@ -404,10 +416,10 @@ export default async function plugin(bb: BbPluginApi) {
           offset,
         });
         for (const thread of threads)
-          if (thread.title?.startsWith(sessionTitlePrefix) && !sessions.has(thread.id))
-            await discardSession(bb, thread.id, new Set());
+          if (thread.title?.startsWith(sessionTitlePrefix) && !sessions.has(thread.id)) stale.push(thread.id);
         if (threads.length < 100) break;
       }
+      for (const threadId of stale) await discardSession(bb, threadId, new Set());
       // Rows this plugin held before a reload lost their decisions: release or re-hold them.
       await bb.experimental_hooks.recheck("message.dispatch");
     },

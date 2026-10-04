@@ -81,6 +81,11 @@ export class ThreadViews {
     this.store.db.prepare("INSERT OR REPLACE INTO thread_views VALUES (?,?)").run(view.id, JSON.stringify(view));
     this.changed(); return view;
   }
+  /** Drops a deleted thread's channel links and cached entries. */
+  forgetThread(threadId: string) {
+    this.store.db.prepare("DELETE FROM view_threads WHERE thread_id=?").run(threadId);
+    this.store.db.prepare("DELETE FROM view_entries WHERE thread_id=?").run(threadId);
+  }
   addThread(viewId: string, threadId: string, botId: string | null = null) {
     this.store.db.prepare("INSERT OR IGNORE INTO view_threads VALUES (?,?,?)").run(viewId, threadId, botId);
   }
@@ -89,9 +94,13 @@ export class ThreadViews {
     this.locks.set(key, next);
     try { return await next; } finally { if (this.locks.get(key) === next) this.locks.delete(key); }
   }
-  async validate(members: ViewMember[]) {
-    if (new Set(members.map(m => `${m.kind}:${m.id}`)).size !== members.length) throw new Error("Choose distinct members.");
+  /** Checks members are distinct and that new ones exist; `current` members were checked when added. */
+  async validate(members: ViewMember[], current: ViewMember[] = []) {
+    const key = (m: ViewMember) => `${m.kind}:${m.id}`;
+    if (new Set(members.map(key)).size !== members.length) throw new Error("Choose distinct members.");
+    const existing = new Set(current.map(key));
     for (const m of members) {
+      if (existing.has(key(m))) continue;
       if (m.kind === "bot") { if (this.store.get(m.id).retired) throw new Error("Restore this bot before adding it."); }
       else await this.bb.sdk.threads.get({ threadId: m.id });
     }
@@ -384,13 +393,14 @@ export class ThreadViews {
       viewUpdate: input => this.locked(input.id, async () => {
         const view = this.get(input.id);
         if (input.expectedUpdatedAt !== view.updatedAt) throw new Error("This channel changed elsewhere. Reload before saving.");
-        await this.validate(input.members);
+        await this.validate(input.members, view.members);
         for (const m of input.members) if (m.kind === "thread") this.addThread(input.id, m.id, this.store.byThread(m.id)?.botId);
         return this.put({ ...view, name: input.name, members: input.members, archived: input.archived, updatedAt: Math.max(Date.now(), view.updatedAt + 1) });
       }),
       viewDelete: ({ id }) => this.locked(id, async () => {
         const deleted = this.store.db.prepare("DELETE FROM thread_views WHERE id=?").run(id).changes > 0;
         this.store.db.prepare("DELETE FROM view_threads WHERE view_id=?").run(id);
+        this.store.db.prepare("DELETE FROM view_sends WHERE view_id=?").run(id);
         this.changed(); return { deleted };
       }),
       view: ({ id, before, limit, beforeId }) => this.page(id, before, limit, beforeId),

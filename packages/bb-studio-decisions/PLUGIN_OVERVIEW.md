@@ -37,4 +37,4 @@ or to the fallback model's provider. Studio Teams sends the channel message,
 recent channel messages, and the bot roster. That provider bills the usage.
 
 Smart Queue acts only on messages you type. It leaves agent messages, plugin
-messages, retries, scheduled sends, and Studio Teams threads alone.
+messages, retries, scheduled sends, and hidden threads alone.

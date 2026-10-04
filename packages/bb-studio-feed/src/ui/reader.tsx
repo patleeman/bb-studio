@@ -15,7 +15,7 @@ import type { rpcContract } from "../contract";
 import { FEED_ICON, INBOX_TITLE, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
 import { AutomaticUpdates, useAutomaticUpdates } from "./automatic";
 import { inboxBadge, waitingThreads, failedThreads } from "../inbox";
-import { feedEvent, from, useDiscuss, useMinuteTick, type PostView } from "./feed";
+import { feedEvent, useDiscuss, useMinuteTick, type PostView } from "./feed";
 import { PostDiscussion } from "./discussion";
 import { loadFeedWindow } from "../window";
 import { emptyFilters, filterError, filterInput, readReaderState, writeReaderState, type ReaderFilters } from "../reader-state";
@@ -795,7 +795,7 @@ function PostPage({ postId }: { postId: string }) {
           <h1 className={cn(ITEM_TITLE, "text-balance")}>{post.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
             <Avatar post={post} />
-            <span className="font-medium text-foreground">{from(post)}</span>
+            <span className="font-medium text-foreground">{post.author}</span>
             {post.topic ? <span>· {post.topic}</span> : null}
             <span>·</span>
             <time dateTime={new Date(post.createdAt).toISOString()}>{shortDateTime(post.createdAt)}</time>

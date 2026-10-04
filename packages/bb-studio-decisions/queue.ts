@@ -379,7 +379,8 @@ export class SmartQueue {
       this.deps.warn(`Smart Queue could not record a decision: ${String(error)}`);
     }
     // Refresh the queued card's reason, or release the row if the turn ended meanwhile.
-    if (verdict.action === "followup") await this.deps.recheck();
+    if (verdict.action === "followup")
+      await this.deps.recheck().catch((error) => this.deps.warn(`Smart Queue could not release ${row.threadId}: ${String(error)}`));
   }
 
   /** `message.dispatched` and `message.cancelled`. */

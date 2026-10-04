@@ -4,7 +4,6 @@ import {
   MAX_EMOJI_ITEMS,
   parseEmojiItem,
   parseEmojiItems,
-  serializeEmojiItems,
   splitEmojiItemList,
 } from "./emoji-items";
 
@@ -82,31 +81,5 @@ describe("parseEmojiItems", () => {
       (_, index) => `${index + 1} item`,
     ).join(", ");
     expect(parseEmojiItems(many)).toHaveLength(MAX_EMOJI_ITEMS);
-  });
-});
-
-describe("serializeEmojiItems", () => {
-  it("round-trips parsed items", () => {
-    const items = parseEmojiItems(DEFAULT_EMOJI_ITEMS);
-    expect(serializeEmojiItems(items)).toBe(DEFAULT_EMOJI_ITEMS);
-  });
-
-  it("joins with commas and drops empty rows", () => {
-    expect(
-      serializeEmojiItems([
-        { emoji: "👍", label: "Agree", text: "👍 Agree" },
-        { emoji: "", label: "", text: "" },
-        { emoji: "🎉", label: "", text: "🎉" },
-      ]),
-    ).toBe("👍 Agree, 🎉");
-  });
-
-  it("caps at MAX_EMOJI_ITEMS", () => {
-    const many = Array.from({ length: MAX_EMOJI_ITEMS + 3 }, (_, index) => ({
-      emoji: String(index),
-      label: "item",
-      text: `${index} item`,
-    }));
-    expect(serializeEmojiItems(many).split(", ")).toHaveLength(MAX_EMOJI_ITEMS);
   });
 });

@@ -9,8 +9,6 @@
 
 export type QuotePosition = "before" | "after";
 
-export const DEFAULT_QUOTE_POSITION: QuotePosition = "before";
-
 /** Parse a stored settings value into a valid QuotePosition. */
 export function parseQuotePosition(raw: unknown): QuotePosition {
   return raw === "after" ? "after" : "before";

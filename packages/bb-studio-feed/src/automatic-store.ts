@@ -16,14 +16,6 @@ export type Update = Job & { headline: string; urgent: number; read_at: number |
 
 export class AutomaticStore {
   constructor(readonly db: Database.Database) {}
-  preference(id: string): boolean | null {
-    const row = this.db.prepare("SELECT followed FROM inbox_preferences WHERE thread_id = ?").get(id) as { followed: number } | undefined;
-    return row ? !!row.followed : null;
-  }
-  follow(id: string, value: boolean | null) {
-    if (value === null) this.db.prepare("DELETE FROM inbox_preferences WHERE thread_id = ?").run(id);
-    else this.db.prepare("INSERT INTO inbox_preferences VALUES (?, ?) ON CONFLICT(thread_id) DO UPDATE SET followed = excluded.followed").run(id, Number(value));
-  }
   enqueue(job: Job) {
     this.db.prepare(`INSERT INTO inbox_jobs (thread_id, at, body) SELECT @thread_id, @at, @body
       WHERE @at > COALESCE((SELECT at FROM inbox_checkpoints WHERE thread_id = @thread_id), 0)
@@ -50,6 +42,7 @@ export class AutomaticStore {
   }
   read(id: string, at: number) { this.db.prepare("UPDATE inbox_updates SET read_at = ? WHERE thread_id = ? AND at <= ?").run(at, id, at); }
   remove(id: string) {
-    for (const table of ["inbox_jobs", "inbox_updates"]) this.db.prepare(`DELETE FROM ${table} WHERE thread_id = ?`).run(id);
+    // inbox_preferences is no longer read; clear any old rows with the rest.
+    for (const table of ["inbox_jobs", "inbox_updates", "inbox_checkpoints", "inbox_preferences"]) this.db.prepare(`DELETE FROM ${table} WHERE thread_id = ?`).run(id);
   }
 }

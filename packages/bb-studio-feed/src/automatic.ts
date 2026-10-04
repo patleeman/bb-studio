@@ -15,6 +15,8 @@ export function quietReply(body: string): boolean {
   return !body || /^(?:nothing (?:new|changed|to report)|no (?:new (?:updates|findings|results)|changes|updates)|all clear|heartbeat[_ ]ok)[.!\s]*$/i.test(body);
 }
 const visible = (thread: Pick<ThreadResponse, "archivedAt" | "deletedAt" | "visibility">) => !thread.archivedAt && !thread.deletedAt && thread.visibility !== "hidden";
+const missing = (error: unknown) => (error as { status?: unknown } | null)?.status === 404 ||
+  /\b(?:thread not found|thread does not exist|HTTP 404)\b/i.test(String(error));
 const stamp = (thread: Pick<ThreadResponse, "latestAttentionAt" | "updatedAt">) => thread.latestAttentionAt || thread.updatedAt;
 
 export function registerAutomatic(bb: BbPluginApi, db: Database.Database, options: { notify: () => boolean }) {
@@ -23,8 +25,7 @@ export function registerAutomatic(bb: BbPluginApi, db: Database.Database, option
   let degraded = false;
   const changed = () => bb.realtime.publish(REALTIME_CHANNEL, { type: "automatic" });
   const signal = () => AbortSignal.any([abort.signal, AbortSignal.timeout(20_000)]);
-  async function eligible(thread: ThreadResponse) {
-    const override = store.preference(thread.id);
+  async function eligible(thread: ThreadResponse): Promise<boolean> {
     const errors: unknown[] = [];
     const optional = (error: unknown) => {
       if (!/not (?:installed|found|enabled)|unknown plugin|disabled/i.test(String(error))) errors.push(error);
@@ -38,12 +39,12 @@ export function registerAutomatic(bb: BbPluginApi, db: Database.Database, option
         outputSchema: z.array(automation), signal: signal() }).catch(error => { optional(error); return []; });
       automatic = schedules.some(a => recurringThread(a, thread.id));
     }
-    if (!automatic && override === null && errors.length) throw errors[0];
-    return { automatic, override, followed: override ?? automatic };
+    if (!automatic && errors.length) throw errors[0];
+    return automatic;
   }
   async function process(job: Job) {
     const thread = await bb.sdk.threads.get({ threadId: job.thread_id });
-    if (!visible(thread) || !(await eligible(thread)).followed) { store.finish(job); return; }
+    if (!visible(thread) || !(await eligible(thread))) { store.finish(job); return; }
     const body = cleanReply(job.body);
     const previous = store.get(thread.id);
     if (quietReply(body) || previous?.body === body || /::post\{/.test(job.body)) { store.finish(job); return; }
@@ -89,9 +90,9 @@ export function registerAutomatic(bb: BbPluginApi, db: Database.Database, option
     }
     abort.signal.throwIfAborted();
     if (!store.current(job)) return;
-    // A user can archive, unfollow or read while the model is answering.
+    // A user can archive, change the bot or read while the model is answering.
     const latest = await bb.sdk.threads.get({ threadId: thread.id });
-    if (!visible(latest) || !(await eligible(latest)).followed) { store.finish(job); return; }
+    if (!visible(latest) || !(await eligible(latest))) { store.finish(job); return; }
     if (choice === "drop") { store.finish(job); return; }
     const readAt = (latest.lastReadAt ?? 0) >= job.at ? latest.lastReadAt : null;
     const saved = store.finish({ ...job, body }, { headline: headline(body), urgent, readAt, filtered: !degraded });
@@ -117,12 +118,22 @@ export function registerAutomatic(bb: BbPluginApi, db: Database.Database, option
     const meta = db.prepare("SELECT value FROM feed_meta WHERE key = 'inbox_started'").get() as { value: string } | undefined;
     const started = Number(meta?.value ?? Date.now());
     if (!meta) db.prepare("INSERT INTO feed_meta VALUES ('inbox_started', ?)").run(String(started));
+    // Recovery is best effort: a failure must never keep the triage loop from running.
     for (let offset = 0; !combined.aborted; offset += 100) {
-      const threads = await bb.sdk.threads.list({ limit: 100, offset });
+      const threads = await bb.sdk.threads.list({ limit: 100, offset }).catch(error => {
+        bb.log.warn(`Inbox could not list threads to recover missed results: ${String(error)}`);
+        return null;
+      });
+      if (!threads) break;
       for (const thread of threads) {
+        if (combined.aborted) break;
         if (visible(thread) && thread.status === "idle" && stamp(thread) >= started && stamp(thread) > store.processed(thread.id)) {
-          const { output } = await bb.sdk.threads.output({ threadId: thread.id, signal: combined });
-          if (output) store.enqueue({ thread_id: thread.id, at: stamp(thread), body: output.slice(0, 16_000) });
+          try {
+            const { output } = await bb.sdk.threads.output({ threadId: thread.id, signal: combined });
+            if (output) store.enqueue({ thread_id: thread.id, at: stamp(thread), body: output.slice(0, 16_000) });
+          } catch (error) {
+            if (!combined.aborted) bb.log.warn(`Inbox could not recover ${thread.id}: ${String(error)}`);
+          }
         }
       }
       if (threads.length < 100) break;
@@ -143,18 +154,17 @@ export function registerAutomatic(bb: BbPluginApi, db: Database.Database, option
     }
   } });
   return {
-    "inbox.follow": async ({ threadId, followed }: { threadId: string; followed?: boolean | null }) => {
-      const thread = await bb.sdk.threads.get({ threadId });
-      if (followed !== undefined) store.follow(threadId, followed);
-      const state = await eligible(thread);
-      if (followed !== undefined) { if (!state.followed) store.remove(threadId); changed(); }
-      return state;
-    },
     "inbox.updates": async () => {
       const updates: AutomaticUpdate[] = [];
+      const rows = store.list();
       // Read the host's current read state; having a pane open is not a read mark.
-      for (const row of store.list()) {
-        const thread = await bb.sdk.threads.get({ threadId: row.thread_id }).catch(() => null);
+      const threads = await Promise.all(rows.map(row => bb.sdk.threads.get({ threadId: row.thread_id }).catch((error: unknown) => {
+        // A thread that no longer exists never comes back; drop its result.
+        if (missing(error)) store.remove(row.thread_id);
+        return null;
+      })));
+      for (const [index, row] of rows.entries()) {
+        const thread = threads[index];
         if (!thread || !visible(thread)) continue;
         if ((thread.lastReadAt ?? 0) >= row.at) store.read(thread.id, thread.lastReadAt!);
         updates.push({ threadId: thread.id, title: thread.title || thread.titleFallback || "Untitled thread", headline: row.headline,

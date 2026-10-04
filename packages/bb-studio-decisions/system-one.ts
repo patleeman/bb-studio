@@ -1,8 +1,6 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import { z } from "zod";
 import { answerSchema, type Questions, type Answers } from "@bb-studio/kit/decisions-contract";
-export { questionSchema, questionsSchema, answerSchema } from "@bb-studio/kit/decisions-contract";
-export type { Question, Questions, Answer, Answers } from "@bb-studio/kit/decisions-contract";
 import { describeHttpFailure, jevRoutes, type JevProviderSettings, type JevRoute } from "./jev-providers";
 import { commandToken, forgetCommandToken, hasCommandToken } from "./key-command";
 

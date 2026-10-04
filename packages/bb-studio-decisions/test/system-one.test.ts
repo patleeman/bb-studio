@@ -2,7 +2,8 @@ import { test, vi, afterEach } from "vitest";
 afterEach(() => vi.restoreAllMocks());
 import assert from "node:assert/strict";
 import { publicContract } from "../contract";
-import { askSystemOne, JevUnavailableError, UnavailableError, type Questions } from "../system-one";
+import type { Questions } from "@bb-studio/kit/decisions-contract";
+import { askSystemOne, JevUnavailableError, UnavailableError } from "../system-one";
 
 const signal = () => AbortSignal.timeout(1000);
 /** No ambient keys: tests must not depend on the machine running them. */

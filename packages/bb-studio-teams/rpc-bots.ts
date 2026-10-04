@@ -1,13 +1,12 @@
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
+import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { rpcContract } from "./contract";
 import type { Runtime } from "./mission-runtime";
 import { document, saveDocument, type Store } from "./store";
 import type { ThreadProfiles } from "./thread-profiles";
 
-type BotMethod = "documentHistory" | "get" | "document" | "saveDocument" | "wake" | "conversation" | "newConversation" | "handoffSource";
+type BotMethod = "documentHistory" | "get" | "document" | "saveDocument" | "wake" | "conversation" | "newConversation";
 
 export function botHandlers(
-  bb: BbPluginApi,
   store: Store,
   runtime: Pick<Runtime, "locked" | "data" | "changed" | "wake">,
   profiles: ThreadProfiles,
@@ -43,13 +42,5 @@ export function botHandlers(
       runtime.locked(id, () => profiles.latestThread(store.get(id))),
     newConversation: ({ id }) =>
       runtime.locked(id, () => profiles.newThread(store.get(id))),
-    handoffSource: async ({ threadId }) => {
-      const thread = await bb.sdk.threads.get({ threadId });
-      return {
-        threadId: thread.id,
-        projectId: thread.projectId,
-        title: thread.title?.trim() || thread.titleFallback?.trim() || `Thread ${thread.id.slice(0, 8)}`,
-      };
-    },
   };
 }

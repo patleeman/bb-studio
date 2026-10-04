@@ -18,7 +18,7 @@ function OutsideAgents() {
   );
 }
 
-export function BotCreationThread({ spaceId }: { spaceId?: string }) {
+export function BotCreationThread() {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +36,8 @@ export function BotCreationThread({ spaceId }: { spaceId?: string }) {
       {(
         <NewThreadComposer
           className="mx-auto min-h-0 w-full max-w-5xl flex-1 px-4 pb-4"
-          draftKey={`bot-creation:${spaceId ? `space:${spaceId}` : "standalone"}`}
-          initialPrompt={botCreationPrompt(spaceId)}
+          draftKey="bot-creation:standalone"
+          initialPrompt={botCreationPrompt()}
           focusRequest={1}
           onSubmit={async (request) => {
             setError(null);

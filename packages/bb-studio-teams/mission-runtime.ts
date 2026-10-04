@@ -740,7 +740,6 @@ async retire(id:string, retired:boolean):Promise<Bot> { return this.locked(id, a
  }
  const next={...bot,retired,intervalMinutes:0,updatedAt:Math.max(Date.now(),bot.updatedAt+1)};this.store.put(next);this.changed();return next;
 }); }
-async retryJob(id:string):Promise<Job> { const job=this.store.job(id); if(!job || job.roomId) throw new Error("Open the ordinary thread to retry this work."); return this.locked(job.botId,async()=>{ if(!["error","cancelled"].includes(job.status)||job.cancellationPending) throw new Error("Wait for this mission to stop before retrying."); const retryId=`retry:${id}`; if(!this.store.job(retryId)) this.enqueue(this.store.get(job.botId),{id:retryId,retryOf:id,text:job.text,conversationKey:"mission"}); return this.store.job(retryId)!; }); }
 async tickMissions() { for(const bot of this.store.all()) await this.locked(bot.id,async()=>{
  try { const cleanup=this.store.work(bot.id).filter(j=>j.cancellationPending); for(const job of cleanup) await this.driveJob(bot,job,false);
  if(bot.retired)return; if(bot.intervalMinutes && Date.now()-bot.lastWakeAt>=bot.intervalMinutes*60000)this.wake(bot);
@@ -748,7 +747,7 @@ async tickMissions() { for(const bot of this.store.all()) await this.locked(bot.
  if(bot.error){this.store.put({...this.store.get(bot.id),error:null});this.changed();}
  }catch(cause){const error=errorText(cause);if(bot.error!==error){this.store.put({...this.store.get(bot.id),error});this.changed();}}
  }); }
-async drive(bot:Bot){ for(const job of this.store.work(bot.id)) if(!job.roomId)await this.driveJob(bot,job,false); }
+async drive(bot:Bot){ for(const job of this.store.work(bot.id)) await this.driveJob(bot,job,false); }
 async tick(){
  for(const bot of this.store.all()) for(const c of this.store.conversations(bot.id).filter(c=>c.kind==="admin")) {
   try{await this.bb.sdk.threads.get({threadId:c.threadId});}catch(cause){if(missingThread(cause))this.store.deleteConversation(c.threadId);else throw cause;}

@@ -102,7 +102,7 @@ describe("retained new-conversation tabs", () => {
     } finally { second.remove(); }
   });
 
-  it("restores quote context, includes its image once, and keeps it after a send failure", async () => {
+  it("restores quote context, includes its image once, keeps it after a send failure, and removes it once the thread starts", async () => {
     const id = "1a0fdc3e-8eb5-4652-b596-424a021e409b";
     vi.spyOn(quoteDrafts, "get").mockResolvedValue({ id, item: ref, quote, createdAt: 1 });
     const remove = vi.spyOn(quoteDrafts, "remove").mockResolvedValue();
@@ -119,7 +119,7 @@ describe("retained new-conversation tabs", () => {
     expect(body.textContent).toContain("Connection lost");
     await act(async () => { await state.submit.get(draftKey)!(request); });
     expect(state.rpc.call).toHaveBeenLastCalledWith("start", { item: ref, request: { input: [...request.input, { type: "image", url: quote.image }] } });
-    expect(remove).not.toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledWith(id);
     expect(navigate).toHaveBeenCalledWith("quote", { kind: "thread", threadId: "created" });
   });
 

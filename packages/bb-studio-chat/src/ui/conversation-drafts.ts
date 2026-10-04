@@ -7,6 +7,8 @@ export const CHAT_ICON = "MessageSquare";
 export const CONVERSATION_STARTED = "bb-studio-chat:started";
 const ROOT = `/plugins/studio-chat/${CHATS_PATH}`;
 const STORE = "quotes";
+/** Quote drafts never sent or whose tab was closed are dropped after this long. */
+export const STALE_DRAFT_MS = 7 * 24 * 60 * 60 * 1000;
 const savedQuote = z.object({ id: z.uuid(), item: ref, quote, createdAt: z.number() });
 export type QuoteDraft = z.infer<typeof savedQuote>;
 
@@ -33,7 +35,10 @@ export function draftRoute(subPath: string | undefined): { kind: "plain" } | { k
 export class QuoteDrafts {
   private db: Promise<IDBDatabase> | null = null;
 
-  constructor(private readonly factory: () => IDBFactory = () => indexedDB) {}
+  constructor(
+    private readonly factory: () => IDBFactory = () => indexedDB,
+    private readonly now: () => number = Date.now,
+  ) {}
 
   private open(): Promise<IDBDatabase> {
     if (!this.db) {
@@ -44,6 +49,7 @@ export class QuoteDrafts {
         request.onsuccess = () => {
           if (blocked) { request.result.close(); return; }
           request.result.onversionchange = () => { request.result.close(); this.db = null; };
+          this.prune(request.result);
           resolve(request.result);
         };
         request.onerror = () => reject(request.error);
@@ -51,6 +57,23 @@ export class QuoteDrafts {
       }).catch((error: unknown) => { this.db = null; throw error; });
     }
     return this.db;
+  }
+
+  /** Best effort: later transactions on the store wait for this one. */
+  private prune(db: IDBDatabase): void {
+    const cutoff = this.now() - STALE_DRAFT_MS;
+    try {
+      const transaction = db.transaction(STORE, "readwrite");
+      transaction.onerror = event => event.preventDefault();
+      const cursor = transaction.objectStore(STORE).openCursor();
+      cursor.onsuccess = () => {
+        const entry = cursor.result;
+        if (!entry) return;
+        const createdAt = (entry.value as { createdAt?: unknown } | undefined)?.createdAt;
+        if (typeof createdAt !== "number" || createdAt < cutoff) entry.delete();
+        entry.continue();
+      };
+    } catch {}
   }
 
   private async run<T>(mode: IDBTransactionMode, operation: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
@@ -65,7 +88,7 @@ export class QuoteDrafts {
   }
 
   async save(item: ItemRef, selection: ItemQuote): Promise<QuoteDraft> {
-    const draft = savedQuote.parse({ id: crypto.randomUUID(), item, quote: selection, createdAt: Date.now() });
+    const draft = savedQuote.parse({ id: crypto.randomUUID(), item, quote: selection, createdAt: this.now() });
     await this.run("readwrite", store => store.put(draft));
     return draft;
   }

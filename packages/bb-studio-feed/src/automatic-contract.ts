@@ -4,11 +4,9 @@ export const automaticUpdate = z.object({
   threadId: z.string(), title: z.string(), headline: z.string(), body: z.string(),
   at: z.number(), urgent: z.boolean(), read: z.boolean(), author: z.string().nullable(),
 });
-export const followState = z.object({ followed: z.boolean(), automatic: z.boolean(), override: z.boolean().nullable() });
 export const automationFailure = z.object({ id: z.string(), name: z.string(), error: z.string() });
 export const automaticContract = {
   "inbox.updates": { input: z.object({}), output: z.object({ updates: z.array(automaticUpdate), degraded: z.boolean(), failures: z.array(automationFailure) }) },
-  "inbox.follow": { input: z.object({ threadId: z.string().min(1), followed: z.boolean().nullable().optional() }), output: followState },
   "inbox.read": { input: z.object({ threadId: z.string().min(1), at: z.number() }), output: z.object({ ok: z.literal(true) }) },
 };
 export type AutomaticUpdate = z.infer<typeof automaticUpdate>;

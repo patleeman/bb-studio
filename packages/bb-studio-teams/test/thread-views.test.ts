@@ -141,6 +141,33 @@ test("views share references, include descendants, and deleting a view leaves th
     expect(x.views.get(two.id).name).toBe("Two");
   } finally { await x.close(); }
 });
+test("archiving a channel keeps members that are now retired or deleted, but still checks new ones", async () => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Old", [{ kind: "bot", id: x.a.id }, { kind: "thread", id: "thr_gone" }]);
+    x.store.put({ ...x.store.get(x.a.id), retired: true });
+    x.harness.inspection.sdk.stub("threads.get", async ({ threadId }) => { if (threadId === "thr_gone") throw new Error("Thread not found"); return makeThreadResponse({ id: threadId, status: "idle" }); });
+    const archived = await x.views.handlers().viewUpdate({ id: view.id, name: "Old", members: view.members, archived: true, expectedUpdatedAt: view.updatedAt });
+    expect(archived.archived).toBe(true);
+    x.store.put({ ...x.store.get(x.b.id), retired: true });
+    await expect(x.views.handlers().viewUpdate({ id: view.id, name: "Old", members: [...view.members, { kind: "bot", id: x.b.id }], archived: true, expectedUpdatedAt: archived.updatedAt })).rejects.toThrow("Restore this bot");
+  } finally { await x.close(); }
+});
+
+test("deleting a channel drops its sends; deleting a thread drops its links and entries", async () => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Gone", [{ kind: "thread", id: "thr_member" }]);
+    x.store.db.prepare("INSERT INTO view_sends VALUES (?,?,?)").run("req", view.id, "{}");
+    x.store.db.prepare("INSERT INTO view_entries VALUES (?,?,?,?)").run("e1", "thr_member", 1, "{}");
+    x.views.forgetThread("thr_member");
+    expect(x.store.db.prepare("SELECT * FROM view_threads WHERE thread_id=?").all("thr_member")).toEqual([]);
+    expect(x.store.db.prepare("SELECT * FROM view_entries WHERE thread_id=?").all("thr_member")).toEqual([]);
+    await x.views.handlers().viewDelete({ id: view.id });
+    expect(x.store.db.prepare("SELECT * FROM view_sends WHERE view_id=?").all(view.id)).toEqual([]);
+  } finally { await x.close(); }
+});
+
 test("uncertain addressing and out-of-view targets don't dispatch anything", async () => {
   const x = fixture();
   try {

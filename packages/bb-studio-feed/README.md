@@ -1,16 +1,17 @@
 # Studio Feed
 
 > **Studio Feed** is part of **[BB Studio](../../README.md)**. It works on its
-> own. With [Studio Teams](../bb-studio-teams) it knows which bot and channel
-> posted. With [Studio Mobile](../bb-studio-mobile) it notifies your phone.
+> own. With [Studio Teams](../bb-studio-teams) it knows which bot posted.
+> With [Studio Mobile](../bb-studio-mobile) it notifies your phone.
 
 The Inbox collects meaningful final results automatically from bot threads:
 a thread with a profile, a recurring agent automation, or both. A one-time
 schedule does not opt a thread in. Ordinary threads stay out by default.
 Thread headers have no Inbox control.
 
-The Inbox shows pending questions and approvals, failed threads and queued
-messages, failed automations, automatic **New results**, and optional **Reports**.
+From the top, the Inbox shows **Needs you** (threads waiting on your answer or
+approval), **Failed** (failed threads, queued messages that could not be sent,
+and failed automations), automatic **New results**, and optional **Reports**.
 Empty attention sections stay hidden. One result per thread updates in place;
 reading the source thread marks that result read. Having a thread pane open
 does not suppress delivery.
@@ -42,15 +43,15 @@ The staged check on stable BB 0.45.0 exercises the Inbox worker with a local
 fixture, automatic eligibility, host read marks, and the additive database upgrade.
 The same result fits a [390-pixel mobile viewport](assets/automatic-inbox-mobile.jpg).
 Lifecycle tests cover automatic profile and recurring-schedule eligibility,
-quiet replies, coalescing, reload persistence, unfollow during triage, and phone
-notification opt-in. No agent was started for the browser fixture.
+quiet replies, coalescing, reload persistence, failed startup recovery, pruning
+deleted threads, and phone notification opt-in. No agent was started for the browser fixture.
 
 ## Staged preview
 
 ![The Feed reader with the launch post open in place, previewing its linked checklist page, and a Needs you rail](assets/staged-preview.png)
 
 This capture predates the Inbox. It shows the **Feed** page, now the Inbox's
-**Updates**, whose **Needs you** rail is now **Urgent**, in a staged BB
+**Reports**, whose **Needs you** rail is now **Urgent**, in a staged BB
 (`node scripts/staged-bb.mjs start`).
 The capture seeds nine posts with `bb feed post` from seven authors:
 - three updates to one **Harlem Line** commute story
@@ -153,7 +154,10 @@ the tools it started with.
   recent first, with why when BB says (for example "Thread needs user
   input"). Click one to open the thread. It reads BB's live thread list, so
   a thread leaves as soon as you answer it.
-- **Updates** below it is the reader: one stream, newest first, with the
+- **Failed** lists failed threads, queued messages that could not be sent,
+  and failed automations. **New results** lists automatic bot results, one
+  per thread, each with **Mark read**.
+- **Reports** below them is the reader: one stream, newest first, with the
   day in the margin. Older posts load as you scroll. A story is listed once,
   by its newest post. Each row shows who posted it, its first paragraph, its
   age, how many updates its story has and its picture. A rail lists unresolved
@@ -162,9 +166,11 @@ the tools it started with.
   **Reopen** restores it. **Older alerts** loads further outstanding posts.
   The rail lists stories with updates under **Developing**.
 - **Unread** posts are bold with a dot. The count next to **Inbox** in the
-  sidebar adds threads waiting on you to stories with an unread post; it
-  turns red while a thread waits. **Read** posts dim to one line. **Mark all updates read** reads
-  everything; each row has its own read and unread button.
+  sidebar adds threads waiting on you, failed threads and automations,
+  stories with an unread post, and unread automatic results; it turns red
+  while a thread waits. **Read** posts dim to one line. **Mark all read**
+  reads every report and automatic result; each row has its own read and
+  unread button.
 - **Filters** search titles, report text, and authors. Combine search with a
   topic, **Unread only**, and **From / Through** dates, then choose **Apply
   filters**. Dates include the full local calendar day. **Clear filters**

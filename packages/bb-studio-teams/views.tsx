@@ -287,5 +287,5 @@ function ViewCollection() {
   const call = useCallback<ProviderCall>((method, input) => rpc.call(method, input as never) as never, [rpc]);
   const [version, setVersion] = useState(0);
   useRealtime("views-changed", () => setVersion(value => value + 1));
-  return <AddOnCollection pluginId={PLUGIN_ID} title="Channels" kind={VIEW_KIND.id} call={call} refreshKey={version} />;
+  return <AddOnCollection pluginId={PLUGIN_ID} title="Channels" kind={VIEW_KIND.id} call={call} refreshKey={version} handOver={false} />;
 }

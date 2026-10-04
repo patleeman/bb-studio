@@ -37,7 +37,7 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const navigateCompanion = useCompanionNavigate();
-  const [loaded, setLoaded] = useState<{ item: Viewed | null; quote?: ItemQuote; draftKey: string } | null>(null);
+  const [loaded, setLoaded] = useState<{ item: Viewed | null; quote?: ItemQuote; quoteId?: string; draftKey: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const load = useCallback(async () => {
@@ -52,7 +52,7 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
     return {
       item,
       draftKey: saved ? `studio-chat:${itemKey(item)}:quote:${saved.id}` : `studio-chat:${itemKey(item)}`,
-      ...(saved ? { quote: saved.quote } : {}),
+      ...(saved ? { quote: saved.quote, quoteId: saved.id } : {}),
     };
   }, [rpc, subPath]);
   useEffect(() => {
@@ -63,8 +63,10 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
   }, [load, attempt]);
   if (error) return <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center text-sm"><p>{error}</p><button type="button" onClick={() => setAttempt(value => value + 1)} className={OUTLINE_BUTTON}>Retry</button></div>;
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading conversation…</p>;
-  return <ConversationComposer key={loaded.draftKey} {...loaded} href={panelHref("studio-chat", "chats", subPath)} focusRequest={1} onSubmit={async request => {
+  const { quoteId, ...composer } = loaded;
+  return <ConversationComposer key={loaded.draftKey} {...composer} href={panelHref("studio-chat", "chats", subPath)} focusRequest={1} onSubmit={async request => {
     const { threadId } = await rpc.call("start", { item: loaded.item ? { pluginId: loaded.item.pluginId, id: loaded.item.id } : null, request });
+    if (quoteId) void quoteDrafts.remove(quoteId).catch(() => {});
     if (loaded.item) window.dispatchEvent(new CustomEvent(CONVERSATION_STARTED, { detail: { pluginId: loaded.item.pluginId, id: loaded.item.id } }));
     const target = { kind: "thread" as const, threadId };
     if (!navigateCompanion(target) && !openCompanion(target, { tag: "studio-chat:item" })) navigate.toThread(threadId);
