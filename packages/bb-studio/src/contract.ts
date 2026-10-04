@@ -109,6 +109,8 @@ const treeSpace = z.object({
   items: z.array(tab.extend({ updatedAt: z.number(), parentId: z.string().nullable(), depth: z.number() })),
   /** Every item it holds; `items` stops at a cap. */
   itemCount: z.number(),
+  /** Its items open as tabs, in the order they were opened. */
+  open: z.array(tab),
 });
 export type SpaceTreeView = z.infer<typeof treeSpace>;
 

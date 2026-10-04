@@ -8,6 +8,7 @@ import type { BbNavigate, JsonValue } from "@get-bb/plugin-sdk/app";
 export const SPACE_STATUS_ACTION = "space-overview";
 export const SPACE_THREAD_ACTION = "space-thread";
 export const SPACE_ITEM_ACTION = "space-item";
+export const SPACE_ITEMS_ACTION = "space-items";
 
 export interface ThreadTabParams { threadId: string }
 export interface ItemTabParams { path: string; title: string }
@@ -68,4 +69,9 @@ export function saveDraftItem(draft: string, item: ItemTabParams): void {
 
 export function newDraftId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** The Space's Studio items that aren't open, to pick from. */
+export function openItemsTab(navigate: BbNavigate): boolean {
+  return navigate.openThreadPanel({ actionId: SPACE_ITEMS_ACTION, title: "Studio" });
 }

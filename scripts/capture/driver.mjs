@@ -80,11 +80,21 @@ export class CdpClient {
     await sleep(900);
   }
 
+  /** Evaluates for a poll; a page that navigates mid-poll just isn't ready yet. */
+  async poll(expression) {
+    try {
+      return await this.evaluate(expression);
+    } catch (error) {
+      if (/navigated or closed|context was destroyed|Cannot find context/i.test(String(error?.message))) return null;
+      throw error;
+    }
+  }
+
   async waitForText(text, timeoutMs = 15000) {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
-      const bodyText = await this.evaluate("document.body?.innerText ?? \"\"");
-      if (bodyText.includes(text)) return;
+      const bodyText = await this.poll("document.body?.innerText ?? \"\"");
+      if (bodyText?.includes(text)) return;
       await sleep(250);
     }
     const bodyText = await this.evaluate("document.body?.innerText ?? \"\"");
@@ -94,7 +104,7 @@ export class CdpClient {
   async waitForSelector(selector, timeoutMs = 15000) {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
-      if (await this.evaluate(`Boolean(document.querySelector(${JSON.stringify(selector)}))`)) return;
+      if (await this.poll(`Boolean(document.querySelector(${JSON.stringify(selector)}))`)) return;
       await sleep(250);
     }
     throw new Error(`Timed out waiting for selector ${JSON.stringify(selector)}`);

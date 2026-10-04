@@ -53,13 +53,14 @@ export function createStudioNotifier(options: {
     ids.clear();
     const reset = full;
     full = false;
-    options.plugins
-      .callRpc({
+    // Studio may be absent; a host that throws instead of rejecting is the same.
+    Promise.resolve()
+      .then(() => options.plugins.callRpc({
         pluginId: STUDIO_PLUGIN_ID,
         method: STUDIO_CHANGED_METHOD,
         input: { pluginId: options.pluginId, ...(!reset && changedIds.length ? { ids: changedIds } : {}) },
         outputSchema: options.schemas.changed.output,
-      })
+      }))
       .catch(() => {});
   };
   return {

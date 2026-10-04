@@ -5,13 +5,18 @@ import {
   ThreadChat,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbNavigate,
+  useRealtime,
+  useRpc,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { cn, GHOST_BUTTON, Icon } from "@bb-studio/kit/app";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { rpcContract } from "../../contract";
+import { TABS_CHANNEL } from "../../ids";
 import { useSpaceLead, useSpaceOf, useSpaceOverview } from "./data";
 import { ItemEmbed } from "./ItemEmbed";
-import { NewInSpacePicker, type CreatedItem } from "./NewInSpace";
+import { NewInSpaceMenu, NewInSpacePicker, type CreatedItem } from "./NewInSpace";
+import { ItemRow } from "./Overview";
 import { stateOf } from "./status";
 import { StartThreadDialog } from "./SpaceView";
 import { SPACE_ITEM_ACTION, draftItem, draftParams, itemParams, openItemTab, openThreadTab, saveDraftItem, threadParams } from "./tabs";
@@ -89,4 +94,51 @@ export function SpaceItemTab({ threadId, params }: PluginThreadPanelProps) {
     navigate.openThreadPanel({ actionId: SPACE_ITEM_ACTION, title: created.title, params: { draft: draft.draft } });
   };
   return <NewInSpacePicker spaceId={spaceId} spaceName={lead.data?.name ?? "this Space"} onCreated={onCreated} />;
+}
+
+/** The Space's Studio items that aren't open; picking one opens it beside the lead, where it lists as open. */
+export function SpaceItemsTab({ threadId }: PluginThreadPanelProps) {
+  const spaceId = useSpaceOf()(threadId);
+  const lead = useSpaceLead(spaceId);
+  const overview = useSpaceOverview(spaceId);
+  const navigate = useBbNavigate();
+  const rpc = useRpc<typeof rpcContract>();
+  const [open, setOpen] = useState<ReadonlySet<string> | null>(null);
+  const [query, setQuery] = useState("");
+  const refresh = useCallback(() => {
+    rpc.call("tabs", null).then(({ tabs }) => setOpen(new Set(tabs.map((tab) => `${tab.pluginId}:${tab.id}`))), () => setOpen(new Set()));
+  }, [rpc]);
+  useEffect(refresh, [refresh]);
+  useRealtime(TABS_CHANNEL, refresh);
+  if (!spaceId) return <NotInSpace />;
+  const name = lead.data?.name ?? "this Space";
+  const needle = query.trim().toLowerCase();
+  const closed = (overview.data?.items ?? []).filter((item) => !open?.has(item.ref));
+  const rows = needle ? closed.filter((item) => item.title.toLowerCase().includes(needle)) : closed;
+  const loading = !overview.data || !open;
+  return (
+    <div className="mx-auto w-full max-w-xl px-6 py-8">
+      <div className="flex items-center gap-2">
+        <h1 className="flex-1 text-lg font-semibold">Studio in {name}</h1>
+        <NewInSpaceMenu spaceId={spaceId} onCreated={(item) => openItemTab(navigate, item)} />
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">Items in this Space that aren't open. Open one to keep it in the sidebar.</p>
+      {closed.length > 6 ? (
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Filter by title"
+          aria-label="Filter items"
+          className="mt-4 h-8 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      ) : null}
+      <div className="-mx-2 mt-4">
+        {rows.map((item) => <ItemRow key={item.ref} item={item} onOpen={() => openItemTab(navigate, item)} />)}
+      </div>
+      {loading ? <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+        : !closed.length ? <p className="text-sm text-muted-foreground">{overview.data?.items.length ? `Everything in ${name} is open.` : `No pages, drawings or tables yet. Anything you make here stays in ${name}.`}</p>
+          : !rows.length ? <p className="text-sm text-muted-foreground">Nothing matches.</p> : null}
+    </div>
+  );
 }

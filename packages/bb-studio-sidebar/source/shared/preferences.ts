@@ -60,9 +60,6 @@ const hiddenGroupsSchema = z
   .max(LIST_MAX_LENGTH)
   .transform((value) => [...new Set(value)]);
 
-export const automatedThreadsModeSchema = z.enum(["all", "updates", "hidden"]);
-export type AutomatedThreadsMode = z.infer<typeof automatedThreadsModeSchema>;
-
 function definePreference<Schema extends z.ZodTypeAny>(
   schema: Schema,
   defaultValue: z.infer<Schema>,
@@ -73,12 +70,10 @@ function definePreference<Schema extends z.ZodTypeAny>(
 }
 
 export const preferenceDefinitions = {
-  automatedThreads: definePreference(
-    z
-      .record(listItemSchema, automatedThreadsModeSchema)
-      .refine((value) => Object.keys(value).length <= LIST_MAX_LENGTH),
-    {},
-    'How each section shows bot and automation threads, by section key (threads, project:<id>, section:<id>, machine:<id>, space:<id>, or "*" for every section without its own choice): all, updates (the default), or hidden.',
+  hiddenThreads: definePreference(
+    stringListSchema,
+    [],
+    "Thread ids hidden from every section unless pinned or open.",
     null,
   ),
   showProviderIcons: definePreference(

@@ -5,7 +5,7 @@
 // leave the request in session storage for it to pick up once it mounts.
 // Studio Sidebar copies these names (its studio/openInSpace.ts).
 import type { BbNavigate } from "@get-bb/plugin-sdk/app";
-import { SPACE_ITEM_ACTION, newDraftId, openItemTab, openStatusTab, openThreadTab } from "./tabs";
+import { SPACE_ITEM_ACTION, newDraftId, openItemTab, openItemsTab, openStatusTab, openThreadTab } from "./tabs";
 
 export const OPEN_IN_SPACE_EVENT = "bb-studio:open-in-space";
 const PENDING_KEY = "bb-studio:open-in-space";
@@ -14,6 +14,7 @@ export type OpenInSpaceRequest =
   | { kind: "item"; path: string; title: string }
   | { kind: "thread"; threadId: string; title: string }
   | { kind: "new-item" }
+  | { kind: "items" }
   | { kind: "status" };
 
 export interface OpenInSpaceDetail { threadId: string; request: OpenInSpaceRequest }
@@ -25,7 +26,7 @@ function valid(value: unknown): value is OpenInSpaceDetail {
   switch (request.kind) {
     case "item": return typeof request.path === "string" && request.path.startsWith("/") && typeof request.title === "string";
     case "thread": return typeof request.threadId === "string" && typeof request.title === "string";
-    case "new-item": case "status": return true;
+    case "new-item": case "items": case "status": return true;
     default: return false;
   }
 }
@@ -35,6 +36,7 @@ export function performOpen(navigate: BbNavigate, request: OpenInSpaceRequest): 
     case "item": openItemTab(navigate, { href: request.path, title: request.title }); break;
     case "thread": openThreadTab(navigate, { id: request.threadId, title: request.title }); break;
     case "new-item": navigate.openThreadPanel({ actionId: SPACE_ITEM_ACTION, title: "New in Space", params: { draft: newDraftId() } }); break;
+    case "items": openItemsTab(navigate); break;
     case "status": openStatusTab(navigate); break;
   }
 }

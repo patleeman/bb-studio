@@ -70,3 +70,15 @@ export function spaceTreeItems(
   for (const item of shown) visit(item, 0, null);
   return { items: out, count: held.length };
 }
+
+export interface OpenItem { pluginId: string; id: string; title: string; icon: string | null; kindIcon: string; href: string }
+
+/** The Space's items among the open tabs, in tab order; archived and missing ones drop out. */
+export function spaceOpenItems<T extends TreeSource>(space: Space, tabs: readonly { pluginId: string; id: string }[], items: readonly T[], kindIcon: (item: T) => string): OpenItem[] {
+  const byKey = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item]));
+  return tabs.flatMap((tab) => {
+    const item = byKey.get(`${tab.pluginId}:${tab.id}`);
+    if (!item || item.archived || !inSpace(space, item)) return [];
+    return [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: kindIcon(item), href: item.href }];
+  });
+}

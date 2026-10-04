@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Space } from "./spaces";
-import { spaceTreeItems, type TreeSource } from "./space-tree";
+import { spaceOpenItems, spaceTreeItems, type TreeSource } from "./space-tree";
 
 const space: Space = { id: "s1", isDefault: false, name: "Launch", color: "#000", icon: null, description: "", defaultProjectId: null, projectIds: ["proj_app"], threadIds: [], itemKeys: [], pageId: "home", createdAt: 0, updatedAt: 0 };
 const item = (pluginId: string, id: string, updatedAt: number, extra: Partial<TreeSource> = {}): TreeSource => ({ pluginId, id, kind: "page", title: id, icon: null, href: `/${id}`, updatedAt, projectId: "proj_app", parentId: null, archived: false, ...extra });
@@ -34,5 +34,13 @@ describe("spaceTreeItems", () => {
     const { items } = spaceTreeItems(space, [...chain, ...cycle], options);
     expect(items.map((each) => each.depth)).toEqual([0, 1, 2, 3, 3, 0, 1]);
     expect(items.at(-2)!.title).toBe("x");
+  });
+});
+
+describe("spaceOpenItems", () => {
+  it("keeps the Space's open items in tab order, dropping archived ones and other Spaces' items", () => {
+    const items = [item("pages", "a", 1), item("pages", "b", 2), item("pages", "gone", 3, { archived: true }), item("pages", "elsewhere", 4, { projectId: "proj_other" })];
+    const tabs = ["b", "elsewhere", "gone", "missing", "a"].map((id) => ({ pluginId: "pages", id }));
+    expect(spaceOpenItems(space, tabs, items, () => "File").map((each) => each.id)).toEqual(["b", "a"]);
   });
 });

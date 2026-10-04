@@ -45,7 +45,7 @@ import {
 import { SplitPaneMiniMap } from "../rows/SplitPaneMiniMap.js";
 import { COARSE_POINTER_ROW_ACTION_SIZE_CLASS } from "@/components/ui/coarse-pointer-sizing";
 import { usePluginThreadRowStatusForThreads } from "./groupRollups.js";
-import { AutomatedHiddenRow } from "../studio/AutomatedThreads.js";
+import { HiddenThreadsRow } from "../studio/HiddenThreads.js";
 
 const EMPTY_SPLIT_INDICATOR_THREADS: readonly ThreadSplitIndicatorTarget[] = [];
 
@@ -325,7 +325,7 @@ export function TopLevelSidebarSection({
       {collapseControl?.isCollapsed || children == null ? null : (
         <div className="mt-1">
           {children}
-          <AutomatedHiddenRow />
+          <HiddenThreadsRow />
         </div>
       )}
     </SidebarStickyGroup>

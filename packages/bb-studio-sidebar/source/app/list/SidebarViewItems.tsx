@@ -1,6 +1,5 @@
 import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
 import { HideEmptyProjectsMenuItems } from "../studio/HideEmptyProjectsMenuItems.js";
-import { AutomatedThreadsMenuItems } from "../studio/AutomatedThreads.js";
 import { SpaceOrganizeHint, useSpaceOrganizeAvailable } from "../studio/SpaceOrganizeOption.js";
 import type { ReactNode } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
@@ -134,7 +133,6 @@ export function SidebarHeaderMenuContents({
       ) : (
         <ThreadListVisibilityMenuItems />
       )}
-      <AutomatedThreadsMenuItems sectionKey={anchorSectionId} />
     </>
   );
 }

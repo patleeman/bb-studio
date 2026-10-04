@@ -5327,6 +5327,44 @@
                 },
                 "itemCount": {
                   "type": "number"
+                },
+                "open": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "pluginId": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "icon": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "kindIcon": {
+                        "type": "string"
+                      },
+                      "href": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pluginId",
+                      "id",
+                      "title",
+                      "icon",
+                      "kindIcon",
+                      "href"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -5336,7 +5374,8 @@
                 "color",
                 "href",
                 "items",
-                "itemCount"
+                "itemCount",
+                "open"
               ],
               "additionalProperties": false
             }

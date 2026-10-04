@@ -1,6 +1,6 @@
 # Studio Sidebar
 
-> **Studio Sidebar** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Chat](../bb-studio-chat), and [Studio Teams](../bb-studio-teams).
+> **Studio Sidebar** is part of **BB Studio**, a suite of plugins for writing, talking, drawing and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Feed](../bb-studio-feed), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tables](../bb-studio-tables), [Studio Chat](../bb-studio-chat), [Studio Teams](../bb-studio-teams) and [Float](../bb-studio-float).
 
 Studio Sidebar replaces BB's Thread List sidebar provider. It keeps the thread
 list and its organization controls, and adds:
@@ -15,8 +15,8 @@ list and its organization controls, and adds:
   accepts a folder path, creates the project through BB's Plugin SDK, and
   opens it.
 - **Hide empty projects** in **Filter → Projects** removes project groups with no visible threads. Selected, newly created, and renamed projects remain visible.
-- **By space** in **Threads ⋯ → Organize**, next to By project, By machine, and Custom. Each [Studio](../bb-studio) Space gets a section, in Studio's order, marked with its emoji or colour. Click a Space's name, or **Open Space** in its ⋯ menu, to open the Space on its lead thread; the lead isn't listed in the section. Inside, **Studio** lists the Space's items and **Threads** its other threads (a child thread stays with its root). Studio items open beside the lead; **Show more** reveals the rest of the items Studio sends, and past those a row opens the Space. **Studio**'s **+** makes any kind of Studio item in the Space; **Threads**' **+** starts a thread in the Space's default project, and Studio decides whether it joins the Space. Threads in no Space, or in a Space that no longer exists, go in a final **Threads** section. Space sections follow Studio's order, so they don't reorder by dragging, but threads still nest when dropped onto each other. While By space is on, Studio's own **Spaces** section steps aside. By space needs a Studio with Spaces: until Studio answers, the option is disabled with a hint, and a list already set to By space shows By project.
-- **Automated threads** stay in their usual section with a small mark: a clock for threads attached to an automation, a bot for threads that work as a bot (BB shows a lightning bolt if it doesn't know the icon). Each section's ⋯ menu sets **Automated threads** to **Show all**, **Only with updates** (the default), or **Hide**. Updates are requests for input, unread finished results, failed queued messages, and running work. A section that hides any ends with a row such as "4 automated threads hidden · Show"; **Show** reveals them in that section until the window reloads, and **Hide** puts them away again. Pinned threads and the open thread always show, as do Space leads in By space. BB's **Hide from list** still hides a whole section. Threads attached to bots or automations are detected on load, on window focus, and every 30 seconds.
+- **By space** in **Threads ⋯ → Organize**, next to By project, By machine, and Custom. Each [Studio](../bb-studio) Space gets a section, in Studio's order, marked with its emoji or colour. Click a Space's name, or **Open Space** in its ⋯ menu, to open the Space on its lead thread; the lead isn't listed in the section. Inside, **Studio** lists the Space's open items, like tabs, and **Threads** its other threads (a child thread stays with its root). Opening any of the Space's items, from the collection or beside the lead, adds it; × closes it here without touching the item. Studio items open beside the lead. Click **Studio**, or the last row (**All N in Space**, or **Browse N items** when none is open), to open a Studio tab beside the lead listing the Space's items that aren't open. **Studio**'s **+** makes any kind of Studio item in the Space; **Threads**' **+** starts a thread in the Space's default project, and Studio decides whether it joins the Space. Threads in no Space, or in a Space that no longer exists, go in a final **Threads** section. Space sections follow Studio's order, so they don't reorder by dragging, but threads still nest when dropped onto each other. While By space is on, Studio's own **Spaces** section steps aside. By space needs a Studio with Spaces: until Studio answers, the option is disabled with a hint, and a list already set to By space shows By project.
+- **Hidden threads**: right-click a thread (or use its ⋯ menu) and choose **Hide**, and it leaves every section. A section that hides any ends with a quiet row such as "2 hidden · Show"; **Show** reveals them in that section until the window reloads, and **Hide** puts them away again. A revealed hidden thread's menu offers **Unhide**. Pinned threads and the open thread always show, as do Space leads in By space. BB's **Hide from list** still hides a whole section.
 - **Float** in each thread's menu, after **Open in split**, while
   [Float](../bb-studio-float) is installed. It opens the thread in a window
   along the bottom of the screen.
@@ -47,20 +47,19 @@ section sits above Threads, and that it has no scroll area of its own.
 ![Threads organized by Studio Space](assets/by-space.png)
 
 The By space capture creates two Spaces, Launch (🚀) and Research, and adds
-"Launch plan", "Launch checklist", and "Release digest" (attached to a paused
-automation) to Launch, and "Paper notes" and "Atlas weekly sync" (working as
-the Atlas bot) to Research. The demo project's threads sit in Studio's
-Personal Space, which comes first in Studio's order. Research is set to show
-all automated threads, so
-Atlas weekly sync shows its bot mark; Launch keeps the default, so it ends with
-"1 automated thread hidden · Show". The live check verifies the section order,
-each Space's threads, the marks, and that Studio's own Spaces section is gone
-while By space shows. No automation or agent runs during this capture.
+"Launch plan", "Launch checklist", and "Release digest" to Launch, and "Paper
+notes" and "Atlas weekly sync" to Research. The demo project's threads sit in
+Studio's Personal Space, which comes first in Studio's order. The live check
+verifies the section order, each Space's threads, the Launch emoji, and that
+Studio's own Spaces section is gone while By space shows. No agent runs during
+this capture.
 
-![An automated thread revealed with its clock mark](assets/automated-threads.png)
+![A hidden thread revealed in its Space](assets/hidden-threads.png)
 
-The same fixture after **Show** in Launch: Release digest appears with its
-clock mark, and the row reads "Showing 1 automated thread · Hide".
+The same fixture after hiding Release digest from its row's right-click menu:
+the capture checks that it leaves Launch and that Launch ends with
+"1 hidden · Show", then clicks **Show**. Release digest is back and the row
+reads "Showing 1 hidden · Hide".
 
 ![New project folder dialog](assets/project-dialog.png)
 
@@ -96,10 +95,9 @@ Only threads with a badge show one; other rows keep their usual inset.
 By space is stored like the other organizations, in the synced
 `organizationMode` preference (now `project`, `chronological`, `machine`, or
 `space`), because this package owns its copy of BB's preference schema.
-Automated threads choices are the synced `automatedThreads` preference: a
-section key (`threads`, `project:<id>`, `section:<id>`, `machine:<id>`,
-`space:<id>`) to `all`, `updates`, or `hidden`, with `*` for every section
-without its own choice.
+Hidden threads are the synced `hiddenThreads` preference, a list of thread
+ids, so they follow across windows. Set it with
+`bb thread-list-plus prefs set hiddenThreads '["thr_…"]'`.
 
 Studio and this package talk without the kit. This package writes the
 organization it shows to `localStorage["bb-studio:sidebar-organization"]` and

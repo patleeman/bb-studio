@@ -45,8 +45,8 @@ import { cn } from "@/lib/utils";
 import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
 import { useProjectCreation } from "../studio/useProjectCreation.js";
 import { visibleProjects } from "../studio/visibleProjects.js";
-import { AutomatedThreadsProvider, useAutomatedThreads } from "../studio/useAutomatedThreads.js";
-import { createSectionKeyResolver } from "../studio/automated-threads.js";
+import { HiddenThreadsProvider, useHiddenThreads } from "../studio/useHiddenThreads.js";
+import { createSectionKeyResolver } from "../studio/hidden-threads.js";
 import { SpaceModeSections } from "../studio/SpaceModeSections.js";
 import { publishSidebarOrganization, useStudioSpaces, useStudioSpacesSync } from "../studio/studioSpaces.js";
 import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
@@ -1440,8 +1440,8 @@ function ProjectListComponent({
     }),
     [effectiveMode, personalProjectId, spaceData],
   );
-  const automated = useAutomatedThreads({ projects: allProjects, sectionKeyOf, keepIds });
-  const projects = automated.projects;
+  const hiddenThreads = useHiddenThreads({ projects: allProjects, sectionKeyOf, keepIds });
+  const projects = hiddenThreads.projects;
   const threads = useMemo<SidebarThread[]>(
     () => projects.flatMap((project) => project.threads),
     [projects],
@@ -1456,7 +1456,7 @@ function ProjectListComponent({
     threadsReady: status === "ready",
     preferencesReady,
     personalProjectId,
-    automatedThreadIds: automated.automatedIds,
+    hiddenThreadIds: hiddenThreads.hiddenIds,
   });
   const [isPinnedReorderPending, setIsPinnedReorderPending] = useState(false);
   const [isCreateThreadSectionPending, setIsCreateThreadSectionPending] =
@@ -1837,7 +1837,7 @@ function ProjectListComponent({
   }
 
   return (
-    <AutomatedThreadsProvider value={automated.state}>
+    <HiddenThreadsProvider value={hiddenThreads.state}>
     <SidebarHeaderActionsProvider
       value={{
         onNewProject: projectCreation.openDialog,
@@ -2005,7 +2005,7 @@ function ProjectListComponent({
       {sectionDeleteDialogContent}
       {projectCreation.dialog}
     </SidebarHeaderActionsProvider>
-    </AutomatedThreadsProvider>
+    </HiddenThreadsProvider>
   );
 }
 

@@ -26,6 +26,7 @@ import { TABS_CHANNEL } from "../ids";
 import { itemAtPath } from "../tabs";
 import { SidebarItemRow } from "./SidebarItemRow";
 import { SidebarCreateMenu } from "./SidebarCreateMenu";
+import { useBySpace } from "./space/SidebarSpacesSection";
 
 const REFETCH_DEBOUNCE_MS = 300;
 const APP_NAMES: Record<string, string> = {
@@ -70,6 +71,7 @@ export function SidebarTabs() {
   const path = usePathname();
   const { tabs, setTabs, error, refetch, rpc } = useTabs(hosted);
   const navigated = useSidebarNavigated();
+  const bySpace = useBySpace();
   const [display, setDisplay] = useSidebarDisplay(
     "studio:sidebar-tabs-display",
     { organization: "none", sort: "opened", direction: "ascending" },
@@ -121,7 +123,9 @@ export function SidebarTabs() {
       : [{ label: null, tabs: sorted }];
 
   // Nothing open, nothing to show: the section only appears once an item is open.
-  if (tabs && !tabs.length && !error) return null;
+  // By Space, each Space lists its own open items, so this section steps aside
+  // while it keeps recording visits.
+  if (bySpace || (tabs && !tabs.length && !error)) return null;
   return (
     <SidebarPortal id="tabs" title="Studio" order={0}>
       <SidebarSection

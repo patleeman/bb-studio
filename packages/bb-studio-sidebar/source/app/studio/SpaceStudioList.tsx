@@ -16,19 +16,18 @@ import {
   SIDEBAR_ROW_BASE_CLASS,
   SIDEBAR_ROW_GLYPH_SLOT_CLASS,
   SIDEBAR_ROW_INTERACTIVE_STATE_CLASS,
-  getSidebarThreadRowPaddingLeft,
 } from "../rows/sidebarRowClasses.js";
 import type { OpenInSpaceRequest } from "./openInSpace.js";
 import type { SpaceItems } from "./studioSpaces.js";
 
-/** Rows before "Show more": enough to see what's there without burying Threads. */
-const COLLAPSED_ITEMS = 6;
-
-/** "Studio" or "Threads" inside a Space, with its own + on hover. */
-export function SpaceSubheading({ title, count, action }: { title: string; count?: number; action?: ReactNode }) {
+/** "Studio" or "Threads" inside a Space, with its own + on hover; a title with `onOpen` opens its view. */
+export function SpaceSubheading({ title, count, action, onOpen, openLabel }: { title: string; count?: number; action?: ReactNode; onOpen?(): void; openLabel?: string }) {
+  const label = <>{title}{count ? <span className="ml-1.5 tabular-nums opacity-70">{count}</span> : null}</>;
   return (
     <div className={cn("group/sub flex h-7 items-center gap-1 pr-0.5 pl-2 text-xs", SIDEBAR_GROUP_TEXT_CLASS)}>
-      <span className="min-w-0 flex-1 truncate">{title}{count ? <span className="ml-1.5 tabular-nums opacity-70">{count}</span> : null}</span>
+      {onOpen
+        ? <span className="min-w-0 flex-1 truncate"><button type="button" onClick={onOpen} aria-label={openLabel} title={openLabel} className="max-w-full truncate rounded-sm text-left hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{label}</button></span>
+        : <span className="min-w-0 flex-1 truncate">{label}</span>}
       {action ? <span className="opacity-0 transition-opacity group-hover/sub:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">{action}</span> : null}
     </div>
   );
@@ -102,62 +101,72 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
 }
 
 /**
- * A Space's Studio items: pages, drawings, tables… Each opens beside the lead.
- * Studio sends only the first items; past those, a row opens the Space.
+ * A Space's open Studio items, like tabs: each opens beside the lead, and ×
+ * closes it here without touching the item. Opening any of the Space's items
+ * adds it; the Studio label, or a last row, opens the rest in a Studio tab.
  */
-export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, onOpen, onOpenSpace }: {
+export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, onOpen }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
   items: SpaceItems | undefined;
   onOpen(request: OpenInSpaceRequest): void;
-  onOpenSpace(): void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const list = items?.items ?? [];
-  const shown = expanded ? list : list.slice(0, COLLAPSED_ITEMS);
-  const hidden = list.length - shown.length;
-  const total = items?.count ?? list.length;
+  const sdk = useSdk();
+  // Closed here until Studio's next list catches up.
+  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  const key = (item: { pluginId: string; id: string }) => `${item.pluginId}:${item.id}`;
+  const open = (items?.open ?? []).filter((item) => !closed.has(key(item)));
+  const total = items?.count ?? 0;
+  const close = (item: SpaceItems["open"][number]) => {
+    setClosed((current) => new Set(current).add(key(item)));
+    void sdk.plugins.callRpc({ pluginId: "studio", method: "closeTabs", input: { items: [{ pluginId: item.pluginId, id: item.id }] } as never, outputSchema: z.object({ ok: z.boolean() }), signal: AbortSignal.timeout(15_000) })
+      .catch(() => setClosed((current) => { const next = new Set(current); next.delete(key(item)); return next; }));
+  };
+  const quietRow = cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pl-2 text-left text-muted-foreground");
   return (
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
         title="Studio"
-        count={items?.count}
+        count={open.length || undefined}
+        onOpen={() => onOpen({ kind: "items" })}
+        openLabel={`All Studio items in ${spaceName}`}
         action={<NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={onOpen} />}
       />
-      {shown.map((item) => (
-        <button
-          key={`${item.pluginId}:${item.id}`}
-          type="button"
-          title={item.title}
-          onClick={() => onOpen({ kind: "item", path: item.href, title: item.title })}
-          className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "text-left")}
-          style={{ paddingLeft: getSidebarThreadRowPaddingLeft(item.depth) }}
-        >
-          <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}>
-            {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
-          </span>
-          <span className="min-w-0 flex-1 truncate">{item.title}</span>
-        </button>
+      {open.map((item) => (
+        <div key={key(item)} className="group/item relative" data-space-studio-item={key(item)}>
+          <button
+            type="button"
+            title={item.title}
+            onClick={() => onOpen({ kind: "item", path: item.href, title: item.title })}
+            className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pr-8 pl-2 text-left")}
+          >
+            <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}>
+              {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{item.title}</span>
+          </button>
+          <button
+            type="button"
+            aria-label={`Close ${item.title}`}
+            title="Close"
+            onClick={() => close(item)}
+            className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "absolute top-1/2 right-0.5 inline-flex -translate-y-1/2 items-center justify-center opacity-0 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100 max-md:pointer-coarse:opacity-100")}
+          >
+            <Icon name="X" className="size-3.5" />
+          </button>
+        </div>
       ))}
-      {!list.length ? (
-        <button
-          type="button"
-          onClick={() => onOpen({ kind: "new-item" })}
-          className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pl-2 text-left text-muted-foreground")}
-        >
+      {!open.length && !total ? (
+        <button type="button" onClick={() => onOpen({ kind: "new-item" })} className={quietRow}>
           <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}><Icon name="Plus" className="size-3.5" /></span>
           <span className="truncate">New page, drawing or table</span>
         </button>
       ) : null}
-      {hidden > 0 || expanded ? (
-        <button type="button" onClick={() => setExpanded((value) => !value)} className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, "h-7 pl-8 text-left text-xs text-muted-foreground")}>
-          {expanded ? "Show less" : `Show ${hidden} more`}
-        </button>
-      ) : null}
-      {hidden === 0 && total > list.length ? (
-        <button type="button" onClick={onOpenSpace} className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, "h-7 pl-8 text-left text-xs text-muted-foreground")}>
-          {`All ${total} in ${spaceName}`}
+      {total > open.length ? (
+        <button type="button" onClick={() => onOpen({ kind: "items" })} className={open.length ? cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, "h-7 pl-8 text-left text-xs text-muted-foreground") : quietRow}>
+          {open.length ? null : <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}><Icon name="Layers" className="size-3.5" /></span>}
+          <span className="truncate">{open.length ? `All ${total} in ${spaceName}` : `Browse ${total} ${total === 1 ? "item" : "items"}`}</span>
         </button>
       ) : null}
     </div>

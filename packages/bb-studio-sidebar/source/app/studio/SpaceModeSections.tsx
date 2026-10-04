@@ -328,7 +328,6 @@ export function SpaceModeSections({
                   defaultProjectId={group.space.defaultProjectId}
                   items={items[group.space.id]}
                   onOpen={(request) => openBeside(group.space, group.leadThreadId, request)}
-                  onOpenSpace={() => openSpace(group.space, group.leadThreadId)}
                 />
                 <SpaceSubheading
                   title="Threads"

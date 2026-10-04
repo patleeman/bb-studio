@@ -463,6 +463,7 @@ describe("ThreadRow", () => {
       "Customize row actions",
       "---",
       "Archive",
+      "Hide",
       "Delete",
     ]);
     fireEvent.click(

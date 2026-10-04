@@ -14,7 +14,7 @@ import { useSpaceLead, useSpaceOf, useSpaceOverview, type OverviewItem, type Ove
 import { NewInSpaceMenu } from "./NewInSpace";
 import { RUN_LABELS, StartThreadDialog } from "./SpaceView";
 import { RUNNING, startedByLead, stateOf } from "./status";
-import { openItemTab, openThreadTab } from "./tabs";
+import { openItemsTab, openItemTab, openThreadTab } from "./tabs";
 
 export { RUNNING } from "./status";
 
@@ -84,7 +84,7 @@ function ThreadRow({ row, onOpen, live }: { row: Row; onOpen(): void; live: Plug
   );
 }
 
-function ItemRow({ item, onOpen }: { item: OverviewItem; onOpen(): void }) {
+export function ItemRow({ item, onOpen }: { item: OverviewItem; onOpen(): void }) {
   return (
     <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
       <span className="inline-flex size-4 shrink-0 items-center justify-center text-muted-foreground">
@@ -170,7 +170,10 @@ export function SpaceStatus({ spaceId }: { spaceId: string }) {
 
           <Section title="Studio" count={items.length} action={<NewInSpaceMenu spaceId={spaceId} label="New" onCreated={(item) => openItemTab(navigate, item)} />}>
             {items.length
-              ? <div className="-mx-2">{items.slice(0, 8).map((item) => <ItemRow key={item.ref} item={item} onOpen={() => openItemTab(navigate, item)} />)}</div>
+              ? <div className="-mx-2">
+                  {items.slice(0, 8).map((item) => <ItemRow key={item.ref} item={item} onOpen={() => openItemTab(navigate, item)} />)}
+                  {items.length > 8 ? <button type="button" onClick={() => openItemsTab(navigate)} className="px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:underline">All {items.length}</button> : null}
+                </div>
               : <p className="text-sm text-muted-foreground">No pages, drawings or tables yet. Anything you make here stays in {name}.</p>}
           </Section>
 

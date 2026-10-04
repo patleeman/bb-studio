@@ -1,31 +1,7 @@
 import type { SidebarThread } from "../model/sidebar-thread.js";
 import { NO_MACHINE_GROUP_KEY } from "../model/machine-thread-groups.js";
-import type { AutomatedThreadsMode, OrganizationMode } from "../../shared/preferences.js";
+import type { OrganizationMode } from "../../shared/preferences.js";
 import { createSpaceResolver, spaceSectionKey } from "./space-groups.js";
-
-/** What attaches a thread to a schedule or a bot; picks the row's mark. */
-export type AutomatedKind = "automation" | "bot";
-
-/** The `automatedThreads` entry that applies to sections without their own. */
-export const ALL_SECTIONS_KEY = "*";
-export const DEFAULT_AUTOMATED_MODE: AutomatedThreadsMode = "updates";
-
-/**
- * Threads attached to a bot or an automation, from the public RPCs, or
- * spawned by those plugins. A thread with both shows the automation's mark.
- */
-export function automatedThreadKinds(
-  threads: readonly SidebarThread[],
-  botIds: ReadonlySet<string>,
-  automationIds: ReadonlySet<string>,
-): Map<string, AutomatedKind> {
-  const kinds = new Map<string, AutomatedKind>();
-  for (const thread of threads) {
-    if (automationIds.has(thread.id) || thread.originPluginId === "automations") kinds.set(thread.id, "automation");
-    else if (botIds.has(thread.id) || thread.originPluginId === "bot-teams") kinds.set(thread.id, "bot");
-  }
-  return kinds;
-}
 
 /** Keep a thread tree together, including children of explicitly pinned roots. */
 function withDescendants(threads: readonly SidebarThread[], roots: Iterable<string>): Set<string> {
@@ -49,30 +25,15 @@ function withDescendants(threads: readonly SidebarThread[], roots: Iterable<stri
 }
 
 /**
- * The threads a section's automated filter applies to: marked threads and
- * their children. Pinned threads, and everything under them, always show.
+ * The threads to hide: the user's hidden threads and their children, so a
+ * child is never orphaned. Pinned threads, and everything under them, always show.
  */
-export function automatedThreadIds(threads: readonly SidebarThread[], kinds: ReadonlyMap<string, AutomatedKind>): Set<string> {
-  const result = withDescendants(threads, kinds.keys());
+export function hiddenThreadIds(threads: readonly SidebarThread[], hidden: readonly string[]): Set<string> {
+  const known = new Set(threads.map((thread) => thread.id));
+  const result = withDescendants(threads, hidden.filter((id) => known.has(id)));
   const pinned = threads.filter((thread) => thread.isPinned).map((thread) => thread.id);
   for (const id of withDescendants(threads, pinned)) result.delete(id);
   return result;
-}
-
-const RUNNING_STATUSES = new Set(["starting", "active", "stopping"]);
-
-/** Needs input, an unread result, a failed queued message, or running now. */
-export function hasAutomatedUpdate(thread: SidebarThread): boolean {
-  return thread.hasPendingInteraction || thread.queuedWork === "failed" ||
-    RUNNING_STATUSES.has(thread.status) ||
-    (thread.isUnread && (thread.status === "idle" || thread.status === "error"));
-}
-
-export function automatedModeFor(
-  preferences: Readonly<Record<string, AutomatedThreadsMode>>,
-  sectionKey: string,
-): AutomatedThreadsMode {
-  return preferences[sectionKey] ?? preferences[ALL_SECTIONS_KEY] ?? DEFAULT_AUTOMATED_MODE;
 }
 
 export interface SectionKeyContext {
@@ -123,29 +84,28 @@ export function createSectionKeyResolver(
   };
 }
 
-export interface AutomatedFilterInput {
+export interface HiddenFilterInput {
   threads: readonly SidebarThread[];
-  automatedIds: ReadonlySet<string>;
+  hiddenIds: ReadonlySet<string>;
   sectionKeyOf: (thread: SidebarThread) => string;
-  modeFor: (sectionKey: string) => AutomatedThreadsMode;
   /** Sections whose hidden threads the user revealed for now. */
   revealed: ReadonlySet<string>;
   /** Always shown, such as the open thread and Space leads. */
   keepIds: ReadonlySet<string>;
 }
 
-export interface AutomatedFilterResult {
+export interface HiddenFilterResult {
   /** Threads to list, in the input's order. */
   visible: SidebarThread[];
-  /** Per section: how many automated threads its filter hides (or would, while revealed). */
+  /** Per section: how many threads it hides (or would, while revealed). */
   hidden: Map<string, number>;
 }
 
 /**
- * Applies each section's Automated threads choice. "updates" keeps threads
- * with an update and their ancestors, so a child is never orphaned.
+ * Drops hidden threads from each section unless the section is revealed.
+ * A kept thread keeps its ancestors, so a child is never orphaned.
  */
-export function filterAutomatedThreads({ threads, automatedIds, sectionKeyOf, modeFor, revealed, keepIds }: AutomatedFilterInput): AutomatedFilterResult {
+export function filterHiddenThreads({ threads, hiddenIds, sectionKeyOf, revealed, keepIds }: HiddenFilterInput): HiddenFilterResult {
   const byId = new Map(threads.map((thread) => [thread.id, thread]));
   const kept = new Set<string>();
   const keepWithAncestors = (thread: SidebarThread) => {
@@ -157,14 +117,8 @@ export function filterAutomatedThreads({ threads, automatedIds, sectionKeyOf, mo
   };
   const keys = new Map<string, string>();
   for (const thread of threads) {
-    if (!automatedIds.has(thread.id)) {
-      keepWithAncestors(thread);
-      continue;
-    }
-    const key = sectionKeyOf(thread);
-    keys.set(thread.id, key);
-    const mode = modeFor(key);
-    if (mode === "all" || keepIds.has(thread.id) || (mode === "updates" && hasAutomatedUpdate(thread))) keepWithAncestors(thread);
+    if (!hiddenIds.has(thread.id) || keepIds.has(thread.id)) keepWithAncestors(thread);
+    else keys.set(thread.id, sectionKeyOf(thread));
   }
   const hidden = new Map<string, number>();
   const visible = threads.filter((thread) => {

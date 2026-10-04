@@ -22,11 +22,13 @@ opens a page that starts one.
   in the chat.
 - **New in Space**: makes a Studio item in the Space's folder; the tab becomes
   the item.
+- **Studio**: the Space's items that aren't open, to open one beside the lead.
+  The sidebar's Studio label opens it.
 - **Space page**: the brief.
 
 The lead's thread header holds the Heartbeat and the Space menu. In the
-sidebar (Studio Sidebar's By space), each Space lists its Studio items and its
-threads, each with its own +; the lead isn't listed, since the Space's heading
+sidebar (Studio Sidebar's By space), each Space lists its open Studio items
+(× closes one) and its threads, each with its own +; the lead isn't listed, since the Space's heading
 opens it. Other plugins open an item or thread beside the lead through
 `src/ui/space/open-in-space.ts`.
 

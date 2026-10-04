@@ -30,7 +30,7 @@ import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
 import { spaceViewHref } from "./src/ui/space/routes";
 import { SpaceFolders } from "./src/space-folders";
-import { spaceTreeItems } from "./src/space-tree";
+import { spaceOpenItems, spaceTreeItems } from "./src/space-tree";
 import { PAGES_PLUGIN_ID, pageHref, spacePageMarkdown } from "./src/space-page";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
@@ -458,6 +458,7 @@ export default async function plugin(bb: BbPluginApi) {
       const { items, providers } = await hub.overview();
       const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
       const options = { background: backgroundKinds(providers), pagesPluginId: PAGES_PLUGIN_ID, kindIcon: (item: HubItem) => kindsOf.get(`${item.pluginId}:${item.kind}`)?.icon ?? "File" };
+      const open = tabs.list();
       return {
         spaces: all.map((space) => {
           const tree = spaceTreeItems(space, items, options);
@@ -469,6 +470,7 @@ export default async function plugin(bb: BbPluginApi) {
             href: space.pageId ? pageHref(space.pageId) : spaceViewHref(space.id),
             items: tree.items,
             itemCount: tree.count,
+            open: spaceOpenItems(space, open, items, options.kindIcon),
           };
         }),
       };

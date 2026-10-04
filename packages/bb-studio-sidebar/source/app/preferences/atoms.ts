@@ -1,7 +1,7 @@
 import { atom } from "jotai";
 import { createSyncedPreferenceAtom } from "./synced-preference-atom.js";
 
-export const sidebarAutomatedThreadsAtom = createSyncedPreferenceAtom("automatedThreads");
+export const sidebarHiddenThreadsAtom = createSyncedPreferenceAtom("hiddenThreads");
 export const sidebarCollapsedSpacesAtom = createSyncedPreferenceAtom("collapsedSpaces");
 
 export const collapsedProjectIdsAtom =

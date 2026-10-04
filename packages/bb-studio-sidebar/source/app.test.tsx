@@ -126,7 +126,7 @@ function renderList(
       }),
       setPreference: (input: unknown) => input,
     },
-    sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots" ? [] : { automations: [] })() } },
+    sdk: { plugins: { callRpc: () => sdkResult({})() } },
     ...options,
   });
 }
@@ -153,59 +153,33 @@ afterEach(() => {
 });
 
 describe("thread-list plugin", () => {
-  it("keeps automated threads in their section with a mark, hiding read ones by default", async () => {
-    renderList({ organizationMode: "project" }, {
-      sidebarThreads: { projects: PROJECTS, sections: [], threads: [
-        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Atlas scheduled work", originPluginId: "bot-teams", isUnread: true, status: "idle" }),
-        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false, status: "idle" }),
-        makeSidebarThread({ id: "thr_normal", projectId: "proj_web", title: "My work", isUnread: false }),
-        makeSidebarThread({ id: "thr_pinned_run", projectId: "proj_web", title: "Pinned digest", originPluginId: "automations", isUnread: false, isPinned: true, pinnedAt: 1, pinSortKey: "a" }),
-      ] },
-    });
-    await screen.findByText("Atlas scheduled work");
-    expect(sectionHeaders()).not.toContain("Background");
+  it("hides a thread from its row's menu, with Show and Unhide", async () => {
+    const { rpcCalls } = renderList({ organizationMode: "project" });
+    await screen.findByText("Later thread");
+    const web = () => screen.getByTitle("Web").closest("[data-sidebar-sticky-group]") as HTMLElement;
+    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_later"]')!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Hide" }));
+    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "hiddenThreads", value: ["thr_later"] } }));
+    await waitFor(() => expect(threadIds()).not.toContain("thr_later"));
+    expect(web().querySelector('[data-sidebar-hidden-threads="project:proj_web"]')?.textContent).toContain("1 hidden");
+    fireEvent.click(within(web()).getByRole("button", { name: "Show 1 hidden" }));
+    await screen.findByText("Later thread");
+    expect(web().querySelector("[data-sidebar-hidden-threads]")?.textContent).toContain("Showing 1 hidden");
+    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_later"]')!);
+    expect(await screen.findByRole("menuitem", { name: "Unhide" })).not.toBeNull();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    fireEvent.click(within(web()).getByRole("button", { name: "Hide 1 hidden" }));
+    await waitFor(() => expect(threadIds()).not.toContain("thr_later"));
+  });
+
+  it("hides stored hidden threads and their children, but never pinned ones", async () => {
+    renderList({ organizationMode: "project", hiddenThreads: ["thr_parent", "thr_pinned", "thr_gone"] });
+    await screen.findByText("Pinned thread");
+    expect(threadIds()).not.toContain("thr_parent");
+    expect(threadIds()).not.toContain("thr_child");
     const app = screen.getByTitle("App").closest("[data-sidebar-sticky-group]") as HTMLElement;
-    expect(within(app).getByText("Atlas scheduled work")).not.toBeNull();
-    expect(document.querySelector('[data-automated-thread-id="thr_bot"][data-sidebar-automated-mark="bot"]')).not.toBeNull();
-    expect(document.querySelector('[data-automated-thread-id="thr_pinned_run"][data-sidebar-automated-mark="automation"]')).not.toBeNull();
-    expect(threadIds()).not.toContain("thr_read");
-    const row = app.querySelector('[data-sidebar-automated-hidden="project:proj_app"]');
-    expect(row?.textContent).toContain("1 automated thread hidden");
-    fireEvent.click(within(app).getByRole("button", { name: "Show 1 automated thread" }));
-    await screen.findByText("Read digest");
-    expect(app.querySelector('[data-sidebar-automated-hidden]')?.textContent).toContain("Showing 1 automated thread");
-    fireEvent.click(within(app).getByRole("button", { name: "Hide 1 automated thread" }));
-    await waitFor(() => expect(threadIds()).not.toContain("thr_read"));
-  });
-
-  it.each([
-    [{ "project:proj_app": "hidden" }, ["thr_normal"], 2],
-    [{ "*": "all" }, ["thr_bot", "thr_read", "thr_normal"], 0],
-    [{}, ["thr_bot", "thr_normal"], 1],
-  ] as const)("applies the Automated threads choice %j", async (automatedThreads, visible, hiddenCount) => {
-    renderList({ organizationMode: "project", automatedThreads }, {
-      sidebarThreads: { projects: PROJECTS, sections: [], threads: [
-        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Bot result", originPluginId: "bot-teams", isUnread: true, status: "idle", updatedAt: 3 }),
-        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false, status: "idle", updatedAt: 2 }),
-        makeSidebarThread({ id: "thr_normal", projectId: "proj_web", title: "My work", isUnread: false }),
-      ] },
-    });
-    await screen.findByText("My work");
-    expect(threadIds()).toEqual(visible);
-    const row = document.querySelector('[data-sidebar-automated-hidden="project:proj_app"]');
-    if (hiddenCount) expect(row?.textContent).toContain(`${hiddenCount} automated thread${hiddenCount === 1 ? "" : "s"} hidden`);
-    else expect(row).toBeNull();
-  });
-
-  it("identifies existing bot and automation targets through their public RPCs", async () => {
-    renderList({ organizationMode: "project", automatedThreads: { "*": "all" } }, {
-      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots"
-        ? [{ threadId: "thr_parent" }]
-        : { automations: [{ automation: { execution: { targetThreadId: "thr_later" } } }] })() } },
-    });
-    await waitFor(() => expect(document.querySelector('[data-automated-thread-id="thr_parent"][data-sidebar-automated-mark="bot"]')).not.toBeNull());
-    expect(document.querySelector('[data-automated-thread-id="thr_later"][data-sidebar-automated-mark="automation"]')).not.toBeNull();
-    expect(document.querySelector('[data-automated-thread-id="thr_child"]')).toBeNull();
+    expect(app.querySelector('[data-sidebar-hidden-threads="project:proj_app"]')?.textContent).toContain("2 hidden");
+    expect(document.querySelector("[data-sidebar-hidden-threads=pinned]")).toBeNull();
   });
 
   it("groups threads and Studio items by Space, leaving the lead to its heading", async () => {
@@ -222,15 +196,15 @@ describe("thread-list plugin", () => {
       space_of_threads: () => ({ threads: { thr_parent: "sp_alpha", thr_lead: "sp_alpha", thr_later: "sp_beta", thr_personal: "sp_gone" } }),
       space_lead: (input) => ({ leadThreadId: (input as { spaceId: string }).spaceId === "sp_alpha" ? "thr_lead" : null }),
       spaceTree: () => ({ spaces: [
-        { id: "sp_alpha", itemCount: 1, items: [{ pluginId: "pages", id: "pg_1", title: "Launch plan", icon: null, kindIcon: "FileText", href: "/plugins/pages/pages/pg_1", depth: 0 }] },
-        { id: "sp_beta", itemCount: 0, items: [] },
+        { id: "sp_alpha", itemCount: 1, open: [{ pluginId: "pages", id: "pg_1", title: "Launch plan", icon: null, kindIcon: "FileText", href: "/plugins/pages/pages/pg_1" }] },
+        { id: "sp_beta", itemCount: 0, open: [] },
       ] }),
     };
     const { inspection } = renderList({ organizationMode: "space" }, {
       sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads },
       sdk: { plugins: { callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
         if (pluginId === "studio" && studio[method]) return studio[method]!(input) as never;
-        return (method === "threadBots" ? [] : { automations: [] }) as never;
+        return {} as never;
       } } },
     });
     await screen.findByTitle("Alpha");
@@ -246,6 +220,9 @@ describe("thread-list plugin", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Alpha" }));
     expect(window.location.pathname).toBe("/threads/thr_lead");
     // An item opens beside the lead: the request waits for the lead's page.
+    expect(within(alpha).getByRole("button", { name: "Close Launch plan" })).not.toBeNull();
+    const beta = screen.getByTitle("Beta").closest("[data-sidebar-sticky-group]") as HTMLElement;
+    expect(within(beta).getByRole("button", { name: "New page, drawing or table" })).not.toBeNull();
     fireEvent.click(within(alpha).getByRole("button", { name: "Launch plan" }));
     expect(JSON.parse(sessionStorage.getItem("bb-studio:open-in-space") ?? "null")).toEqual({ threadId: "thr_lead", request: { kind: "item", path: "/plugins/pages/pages/pg_1", title: "Launch plan" } });
     // A Space without a lead still opens on Studio's Space page.
@@ -260,14 +237,10 @@ describe("thread-list plugin", () => {
     expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("project");
   });
 
-  it("sets a section's Automated threads choice and offers By space only with Studio's Spaces", async () => {
-    const { rpcCalls } = renderList({ organizationMode: "project" });
+  it("offers By space only with Studio's Spaces", async () => {
+    renderList({ organizationMode: "project" });
     await screen.findByText("Pinned thread");
     fireEvent.keyDown(screen.getByRole("button", { name: /^Threads actions/ }), { key: "Enter" });
-    const updates = await screen.findByRole("menuitemradio", { name: "Only with updates" });
-    expect(updates.getAttribute("aria-checked")).toBe("true");
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Hide" }));
-    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "automatedThreads", value: { threads: "hidden" } } }));
     fireEvent.keyDown(screen.getByRole("menuitem", { name: "Organize" }), { key: "ArrowRight" });
     const bySpace = await screen.findByRole("menuitemradio", { name: /By space/ });
     expect(bySpace.getAttribute("aria-disabled")).toBe("true");

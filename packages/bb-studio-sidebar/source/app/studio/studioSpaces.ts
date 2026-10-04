@@ -45,19 +45,18 @@ const treeSchema = z.object({
   spaces: z.array(z.object({
     id: z.string(),
     itemCount: z.number().catch(0),
-    items: z.array(z.object({
+    open: z.array(z.object({
       pluginId: z.string(),
       id: z.string(),
       title: z.string(),
       icon: z.string().nullable().catch(null),
       kindIcon: z.string().catch("File"),
       href: z.string(),
-      depth: z.number().catch(0),
     }).passthrough()).catch([]),
   }).passthrough()),
 });
 
-/** A Studio item a Space holds, as the sidebar's Studio list shows it. */
+/** A Space's open Studio item, as the sidebar's Studio list shows it. */
 export interface SpaceSidebarItem {
   pluginId: string;
   id: string;
@@ -65,12 +64,12 @@ export interface SpaceSidebarItem {
   icon: string | null;
   kindIcon: string;
   href: string;
-  depth: number;
 }
 
 export interface SpaceItems {
-  items: SpaceSidebarItem[];
-  /** Every item the Space holds; `items` stops at Studio's cap. */
+  /** The Space's items open as tabs, in the order they were opened. */
+  open: SpaceSidebarItem[];
+  /** Every item the Space holds, open or not. */
   count: number;
 }
 
@@ -129,7 +128,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
           spaceOf = of.threads;
           leads = Object.fromEntries(leadRows);
           items = Object.fromEntries(tree.spaces.map((space) => [space.id, {
-            items: space.items.map(({ pluginId, id, title, icon, kindIcon, href, depth }) => ({ pluginId, id, title, icon, kindIcon, href, depth })),
+            open: space.open.map(({ pluginId, id, title, icon, kindIcon, href }) => ({ pluginId, id, title, icon, kindIcon, href })),
             count: space.itemCount,
           }]));
         }

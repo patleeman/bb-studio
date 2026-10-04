@@ -3989,6 +3989,24 @@ public enum Studio {
     }
   }
 
+  public struct SpaceTreeOutputSpacesItemOpenItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var title: String?
+    public var icon: String?
+    public var kindIcon: String?
+    public var href: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.title = title
+      self.icon = icon
+      self.kindIcon = kindIcon
+      self.href = href
+    }
+  }
+
   public struct SpaceTreeOutputSpacesItem: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3997,8 +4015,9 @@ public enum Studio {
     public var href: String?
     public var items: [SpaceTreeOutputSpacesItemItemsItem]?
     public var itemCount: Double?
+    public var `open`: [SpaceTreeOutputSpacesItemOpenItem]?
 
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, href: String? = nil, items: [SpaceTreeOutputSpacesItemItemsItem]? = nil, itemCount: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, href: String? = nil, items: [SpaceTreeOutputSpacesItemItemsItem]? = nil, itemCount: Double? = nil, `open`: [SpaceTreeOutputSpacesItemOpenItem]? = nil) {
       self.id = id
       self.name = name
       self.icon = icon
@@ -4006,6 +4025,7 @@ public enum Studio {
       self.href = href
       self.items = items
       self.itemCount = itemCount
+      self.`open` = `open`
     }
   }
 

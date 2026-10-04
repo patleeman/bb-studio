@@ -1,9 +1,8 @@
 export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep }) => [
   ...(() => {
-    // By space and Automated threads share one seeded fixture: two Spaces,
-    // their threads, one thread attached to a paused automation, and one that
-    // works as the Atlas bot. Nothing runs during the capture.
-    const fixture = { spaces: {}, threads: {}, automations: [], preferences: null, active: 0 };
+    // By space and Hidden threads share one seeded fixture: two Spaces and
+    // their threads. Nothing runs during the capture.
+    const fixture = { spaces: {}, threads: {}, preferences: null, active: 0 };
     const spawn = async (title) => JSON.parse(await bbCli(["thread", "spawn", "--project", projectId, "--title", title, "--prompt", "Staged screenshot fixture. Do not run.", "--send-at", "30d", "--json"])).id;
     const seed = async () => {
       fixture.active += 1;
@@ -16,16 +15,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         fixture.spaces[key] = existing.find((space) => space.name === spec.name) ?? (await pluginRpc("studio", "createSpace", spec)).space;
       }
       for (const [key, title] of Object.entries({ plan: "Launch plan", checklist: "Launch checklist", digest: "Release digest", notes: "Paper notes", atlas: "Atlas weekly sync", loose: "Loose idea" })) fixture.threads[key] = await spawn(title);
-      const automation = await pluginRpc("automations", "automations_create", {
-        projectId, name: "Release digest", enabled: false, origin: "human",
-        trigger: { triggerType: "schedule", cron: "0 9 * * *", timezone: "UTC" },
-        execution: { mode: "agent", prompt: "Staged screenshot fixture. Do not run.", providerId: "codex", model: "gpt-6-luna", reasoningLevel: "low", permissionMode: "auto", environment: { type: "project-default" }, targetThreadId: fixture.threads.digest },
-      });
-      fixture.automations.push(automation.id);
-      const { bots } = await pluginRpc("bot-teams", "list", null);
-      const atlas = bots.find((bot) => bot.handle === "atlas");
-      if (!atlas) throw new Error("Seed the Atlas bot before capturing.");
-      await pluginRpc("bot-teams", "setThreadProfile", { threadId: fixture.threads.atlas, botId: atlas.id });
       const member = (key) => ({ pluginId: "bb-thread", id: fixture.threads[key] });
       await pluginRpc("studio", "spaceMembers", { id: fixture.spaces.launch.id, add: ["plan", "checklist", "digest"].map(member) });
       await pluginRpc("studio", "spaceMembers", { id: fixture.spaces.research.id, add: ["notes", "atlas"].map(member) });
@@ -39,14 +28,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     const cleanup = async () => {
       fixture.active -= 1;
       if (fixture.active > 0 || !fixture.preferences) return;
-      for (const automationId of fixture.automations) await pluginRpc("automations", "automations_delete", { projectId, automationId }).catch(() => {});
       for (const id of Object.values(fixture.threads)) await bbCli(["thread", "delete", id, "--yes"]).catch(() => {});
-      for (const key of ["organizationMode", "automatedThreads"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: fixture.preferences[key] });
-      Object.assign(fixture, { spaces: {}, threads: {}, automations: [], preferences: null });
+      for (const key of ["organizationMode", "hiddenThreads"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: fixture.preferences[key] });
+      Object.assign(fixture, { spaces: {}, threads: {}, preferences: null });
     };
     const showBySpace = async (client) => {
       await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: "project" });
-      await pluginRpc("thread-list-plus", "setPreference", { key: "automatedThreads", value: { [`space:${fixture.spaces.research.id}`]: "all" } });
+      await pluginRpc("thread-list-plus", "setPreference", { key: "hiddenThreads", value: [] });
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
       // Studio's own Spaces section shows until the list is organized by Space.
       await client.waitForSelector('[data-studio-sidebar-anchor="studio:spaces"]');
@@ -62,17 +50,14 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           labels,
           launch: ids(section("space:${fixture.spaces.launch.id}")),
           research: ids(section("space:${fixture.spaces.research.id}")),
-          hiddenRow: section("space:${fixture.spaces.launch.id}")?.querySelector('[data-sidebar-automated-hidden]')?.textContent ?? null,
-          botMark: Boolean(sidebar.querySelector('[data-automated-thread-id="${fixture.threads.atlas}"][data-sidebar-automated-mark="bot"] [data-icon="Bot"]')),
           studioSpaces: Boolean(document.querySelector('[data-studio-sidebar-anchor="studio:spaces"]')),
           emoji: section("space:${fixture.spaces.launch.id}")?.querySelector('[data-sidebar-space-mark]')?.textContent ?? null,
         };
       })())`));
       const order = ["Launch", "Research"].map((label) => layout.labels.indexOf(label));
       if (order.some((index) => index < 0) || order.some((index, i) => i > 0 && index < order[i - 1])) throw new Error(`By space sections are out of order: ${JSON.stringify(layout)}`);
-      if (!layout.launch.includes(fixture.threads.plan) || layout.launch.includes(fixture.threads.digest)) throw new Error(`Launch shows the wrong threads: ${JSON.stringify(layout)}`);
-      if (!layout.research.includes(fixture.threads.atlas) || !layout.botMark) throw new Error(`Research lacks the marked bot thread: ${JSON.stringify(layout)}`);
-      if (!layout.hiddenRow?.includes("1 automated thread hidden")) throw new Error(`Launch lacks the hidden-count row: ${JSON.stringify(layout)}`);
+      if (!["plan", "checklist", "digest"].every((key) => layout.launch.includes(fixture.threads[key]))) throw new Error(`Launch shows the wrong threads: ${JSON.stringify(layout)}`);
+      if (!["notes", "atlas"].every((key) => layout.research.includes(fixture.threads[key]))) throw new Error(`Research shows the wrong threads: ${JSON.stringify(layout)}`);
       if (layout.studioSpaces) throw new Error("Studio's Spaces section still shows in By space");
       if (layout.emoji !== "🚀") throw new Error(`Launch lacks its emoji: ${JSON.stringify(layout)}`);
     };
@@ -102,21 +87,36 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         clip,
       },
       {
-        id: "thread-list-plus-automated",
+        id: "thread-list-plus-hidden",
         packageDir: "bb-studio-sidebar",
-        fileName: "automated-threads.png",
+        fileName: "hidden-threads.png",
         showSidebar: true,
         setup: async (client) => {
           try {
             await seed();
             await showBySpace(client);
-            // Launch's own Show: another Space can hide an automated thread too.
-            // It can sit under the sidebar's footer, so bring it into view first.
-            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.launch.id}"] button[aria-label="Show 1 automated thread"]')?.scrollIntoView({ block: "center" })`);
+            const launch = `[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]`;
+            const digest = `${launch} [data-sidebar-thread-id="${fixture.threads.digest}"]`;
+            const hiddenRow = `${launch} [data-sidebar-hidden-threads]`;
+            const rowText = () => client.evaluate(`document.querySelector(${JSON.stringify(hiddenRow)})?.textContent ?? null`);
+            const waitFor = async (check, message) => {
+              for (let started = Date.now(); Date.now() - started < 15000; await sleep(250)) if (await check()) return;
+              throw new Error(message);
+            };
+            const shown = () => client.evaluate(`Boolean(document.querySelector(${JSON.stringify(digest)}))`);
+            // Hide Release digest from its row's real right-click menu.
+            await client.openContextMenu(digest);
+            await client.waitForSelector('[role="menuitem"]');
+            await client.clickElementWithTextAndPointer('[role="menuitem"]', "Hide");
+            await waitFor(async () => !(await shown()), "Release digest still shows after Hide");
+            await waitFor(async () => (await rowText())?.includes("1 hidden") && (await rowText())?.includes("Show"), "Launch lacks the \"1 hidden · Show\" row");
+            // The row can sit under the sidebar's footer, so bring it into view first.
+            const show = `${launch} [data-sidebar-hidden-threads] button[aria-label="Show 1 hidden"]`;
+            await client.evaluate(`document.querySelector(${JSON.stringify(show)})?.scrollIntoView({ block: "center" })`);
             await sleep(200);
-            await client.clickElementWithTextAndPointer(`[data-sidebar-section-id="space:${fixture.spaces.launch.id}"] button[aria-label="Show 1 automated thread"]`, "Show");
-            await client.waitForSelector(`[data-automated-thread-id="${fixture.threads.digest}"][data-sidebar-automated-mark="automation"] [data-icon="Clock"]`);
-            await client.waitForText("Showing 1 automated thread");
+            await client.clickElementWithTextAndPointer(show, "Show");
+            await waitFor(shown, "Release digest didn't come back after Show");
+            await waitFor(async () => (await rowText())?.includes("Showing 1 hidden"), "Launch lacks the \"Showing 1 hidden\" row");
             await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.research.id}"]')?.scrollIntoView({ block: 'end' })`);
             await sleep(350);
           } catch (error) { await cleanup(); throw error; }

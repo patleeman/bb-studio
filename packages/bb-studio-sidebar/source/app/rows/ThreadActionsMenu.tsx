@@ -50,6 +50,7 @@ import {
 } from "./ThreadSectionMoveProvider.js";
 import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
 import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
+import { HideThreadItem } from "../studio/HiddenThreads.js";
 import { useCustomizeThreadRowActions } from "../list/customizeRowActionsContext.js";
 
 interface ThreadActionsMenuBaseProps {
@@ -326,6 +327,7 @@ function ThreadActionsMenuItems({
             onRename={onRename}
             variant={menuVariant}
           />
+          {id === "archive" ? <HideThreadItem threadId={thread.id} surface={surface} /> : null}
           {id === "split" && floatAvailable ? (
             <FloatItem threadId={thread.id} surface={surface} />
           ) : null}

@@ -80,14 +80,14 @@ function setup(
 }
 
 describe("useSidebarThreadReveal", () => {
-  it("does not expand an automated thread's project on an update, only when opened", () => {
-    const rows = [thread("first"), thread("automated", { projectId: "proj_app", originPluginId: "automations" })];
-    const { store, update } = setup(rows, { selectedThreadId: undefined, automatedThreadIds: new Set(["automated"]) });
+  it("does not expand a hidden thread's project on an update, only when opened", () => {
+    const rows = [thread("first"), thread("hidden", { projectId: "proj_app" })];
+    const { store, update } = setup(rows, { selectedThreadId: undefined, hiddenThreadIds: new Set(["hidden"]) });
     store.set(sidebarOrganizationModeAtom, "project");
     store.set(collapsedProjectIdsAtom, ["proj_app"]);
-    update({ threads: rows.map((row) => row.id === "automated" ? { ...row, isUnread: true } : row) });
+    update({ threads: rows.map((row) => row.id === "hidden" ? { ...row, isUnread: true } : row) });
     expect(store.get(collapsedProjectIdsAtom)).toEqual(["proj_app"]);
-    update({ selectedThreadId: "automated" });
+    update({ selectedThreadId: "hidden" });
     expect(store.get(collapsedProjectIdsAtom)).toEqual([]);
   });
   it("requires leaving and returning before revealing a manually collapsed open thread", () => {

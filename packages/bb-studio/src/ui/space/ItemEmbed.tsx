@@ -3,13 +3,18 @@
 // published for it. An item whose add-on can't show outside its own page gets
 // a link instead.
 import { floatPanelFor, floatWindowKey, GHOST_BUTTON, Icon, openAppPath, publishFloatBody, type FloatTarget } from "@bb-studio/kit/app";
+import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { rpcContract } from "../../contract";
 
 /** Add-ons register as they load; give them a moment before offering the link. */
 const REGISTER_GRACE_MS = 1500;
 
 export function ItemEmbed({ path, title }: { path: string; title?: string }) {
   const element = useRef<HTMLDivElement>(null);
+  const rpc = useRpc<typeof rpcContract>();
+  // Open beside a lead, it's open like any other: it lists under its Space.
+  useEffect(() => { rpc.call("visitTab", { path }).catch(() => {}); }, [path, rpc]);
   const target = useMemo<FloatTarget>(() => ({ kind: "path", path, ...(title ? { title } : {}) }), [path, title]);
   const [unsupported, setUnsupported] = useState(false);
   useLayoutEffect(() => {

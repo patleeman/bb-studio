@@ -21,7 +21,7 @@ import {
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { useMemo, useSyncExternalStore } from "react";
-import { NEW_SPACE_EVENT } from "../../ids";
+import { NEW_SPACE_EVENT, TABS_CHANNEL } from "../../ids";
 import { useSpaceOf, useSpaces } from "./data";
 import { RUNNING } from "./Overview";
 import { SPACES_PANEL, spaceViewHref } from "./routes";
@@ -101,11 +101,19 @@ function readOrganization(): string | null {
   try { return localStorage.getItem(ORGANIZATION_KEY); } catch { return null; }
 }
 
+/** Whether the Studio Sidebar organizes threads by Space; then each Space lists its own items. */
+export function useBySpace(): boolean {
+  return useSyncExternalStore(subscribeOrganization, readOrganization, () => null) === "space";
+}
+
 /** Renders nothing itself; portals the Spaces section into the Studio Sidebar, above the tabs. */
 export function SidebarSpacesSection() {
   const hosted = useSidebarHosted();
-  const bySpace = useSyncExternalStore(subscribeOrganization, readOrganization, () => null) === "space";
-  useRealtime(STUDIO_REALTIME_CHANNEL, () => window.dispatchEvent(new CustomEvent(STUDIO_CHANGED_EVENT)));
+  const bySpace = useBySpace();
+  const changed = () => window.dispatchEvent(new CustomEvent(STUDIO_CHANGED_EVENT));
+  useRealtime(STUDIO_REALTIME_CHANNEL, changed);
+  // A Space's open items are its tabs.
+  useRealtime(TABS_CHANNEL, changed);
   if (bySpace) return null;
   return (
     <SidebarPortal id="spaces" title="Spaces" order={-10}>

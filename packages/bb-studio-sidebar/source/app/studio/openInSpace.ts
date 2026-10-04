@@ -14,6 +14,7 @@ export type OpenInSpaceRequest =
   | { kind: "item"; path: string; title: string }
   | { kind: "thread"; threadId: string; title: string }
   | { kind: "new-item" }
+  | { kind: "items" }
   | { kind: "status" };
 
 export function threadPath(threadId: string): string {

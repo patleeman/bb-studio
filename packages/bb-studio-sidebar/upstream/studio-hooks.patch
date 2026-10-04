@@ -46,14 +46,14 @@ index 39258e5..3492076 100644
 @@ -1408,0 +1423 @@ export function useSectionThreadDnd({
 +    dropDialog: channelDrop.dialog,
 diff --git a/source/app/list/ProjectList.tsx b/source/app/list/ProjectList.tsx
-index afa82d9e..c6ef11d9 100644
+index afa82d9..2541e80 100644
 --- a/source/app/list/ProjectList.tsx
 +++ b/source/app/list/ProjectList.tsx
 @@ -45,0 +46,7 @@ import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
 +import { useProjectCreation } from "../studio/useProjectCreation.js";
 +import { visibleProjects } from "../studio/visibleProjects.js";
-+import { AutomatedThreadsProvider, useAutomatedThreads } from "../studio/useAutomatedThreads.js";
-+import { createSectionKeyResolver } from "../studio/automated-threads.js";
++import { HiddenThreadsProvider, useHiddenThreads } from "../studio/useHiddenThreads.js";
++import { createSectionKeyResolver } from "../studio/hidden-threads.js";
 +import { SpaceModeSections } from "../studio/SpaceModeSections.js";
 +import { publishSidebarOrganization, useStudioSpaces, useStudioSpacesSync } from "../studio/studioSpaces.js";
 +import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
@@ -189,8 +189,8 @@ index afa82d9e..c6ef11d9 100644
 +    }),
 +    [effectiveMode, personalProjectId, spaceData],
 +  );
-+  const automated = useAutomatedThreads({ projects: allProjects, sectionKeyOf, keepIds });
-+  const projects = automated.projects;
++  const hiddenThreads = useHiddenThreads({ projects: allProjects, sectionKeyOf, keepIds });
++  const projects = hiddenThreads.projects;
 @@ -1359 +1452,9 @@ function ProjectListComponent({
 -  const selectedThreadId = activeThreadId ?? undefined;
 +  const allThreads = useMemo(() => allProjects.flatMap((project) => project.threads), [allProjects]);
@@ -200,7 +200,7 @@ index afa82d9e..c6ef11d9 100644
 +    threadsReady: status === "ready",
 +    preferencesReady,
 +    personalProjectId,
-+    automatedThreadIds: automated.automatedIds,
++    hiddenThreadIds: hiddenThreads.hiddenIds,
 +  });
 @@ -1411,0 +1513,8 @@ function ProjectListComponent({
 +  // A Space's new thread starts in its default project; Studio decides
@@ -217,7 +217,7 @@ index afa82d9e..c6ef11d9 100644
 -  if (threadListStatus === "loading" || !preferencesReady) {
 +  if (threadListStatus === "loading" || !preferencesReady || (spaceMode && !spaceData)) {
 @@ -1731,0 +1840 @@ function ProjectListComponent({
-+    <AutomatedThreadsProvider value={automated.state}>
++    <HiddenThreadsProvider value={hiddenThreads.state}>
 @@ -1733,0 +1843,2 @@ function ProjectListComponent({
 +        onNewProject: projectCreation.openDialog,
 +        isCreatingProject: projectCreation.isCreating,
@@ -262,7 +262,7 @@ index afa82d9e..c6ef11d9 100644
 @@ -1860,0 +2006 @@ function ProjectListComponent({
 +      {projectCreation.dialog}
 @@ -1861,0 +2008 @@ function ProjectListComponent({
-+    </AutomatedThreadsProvider>
++    </HiddenThreadsProvider>
 diff --git a/source/app/list/ProjectRow.tsx b/source/app/list/ProjectRow.tsx
 index 11c1c06..636f525 100644
 --- a/source/app/list/ProjectRow.tsx
@@ -283,36 +283,33 @@ index ec076ad..fe95274 100644
 +  onNewProject?: () => void;
 +  isCreatingProject?: boolean;
 diff --git a/source/app/list/SidebarViewItems.tsx b/source/app/list/SidebarViewItems.tsx
-index 063bfec..a4811ba 100644
+index 063bfec..5a6e174 100644
 --- a/source/app/list/SidebarViewItems.tsx
 +++ b/source/app/list/SidebarViewItems.tsx
-@@ -0,0 +1,4 @@
+@@ -0,0 +1,3 @@
 +import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
 +import { HideEmptyProjectsMenuItems } from "../studio/HideEmptyProjectsMenuItems.js";
-+import { AutomatedThreadsMenuItems } from "../studio/AutomatedThreads.js";
 +import { SpaceOrganizeHint, useSpaceOrganizeAvailable } from "../studio/SpaceOrganizeOption.js";
-@@ -29,0 +34 @@ const SIDEBAR_ORGANIZE_OPTIONS = [
+@@ -29,0 +33 @@ const SIDEBAR_ORGANIZE_OPTIONS = [
 +  { label: "By space", mode: "space" },
-@@ -74,0 +80 @@ export function SidebarHeaderMenuContents({
+@@ -74,0 +79 @@ export function SidebarHeaderMenuContents({
 +      <StudioNewProjectItem onSelect={creation.onNewProject} disabled={creation.isCreatingProject} />
-@@ -81,0 +88 @@ export function SidebarHeaderMenuContents({
+@@ -81,0 +87 @@ export function SidebarHeaderMenuContents({
 +      <HiddenStudioSectionItems />
-@@ -129,0 +137 @@ export function SidebarHeaderMenuContents({
-+      <AutomatedThreadsMenuItems sectionKey={anchorSectionId} />
-@@ -144,0 +153 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
+@@ -144,0 +151 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
 +  const spacesAvailable = useSpaceOrganizeAvailable();
-@@ -147 +156,2 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
+@@ -147 +154,2 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
 -      <DropdownMenuGroup aria-label="Filter">
 +      <>
 +        <DropdownMenuGroup aria-label="Filter">
-@@ -174 +184,3 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
+@@ -174 +182,3 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
 -      </DropdownMenuGroup>
 +        </DropdownMenuGroup>
 +        <HideEmptyProjectsMenuItems />
 +      </>
-@@ -186,0 +199 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
+@@ -186,0 +197 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
 +              disabled={option.mode === "space" && !spacesAvailable && organization !== "space"}
-@@ -192 +205 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
+@@ -192 +203 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
 -              {option.label}
 +              {option.mode === "space" ? <SpaceOrganizeHint label={option.label} /> : option.label}
 diff --git a/source/app/list/ThreadListVisibility.tsx b/source/app/list/ThreadListVisibility.tsx
@@ -326,11 +323,11 @@ index 3b0cf9e..35ba05d 100644
 +}
 +
 diff --git a/source/app/list/TopLevelSidebarSection.tsx b/source/app/list/TopLevelSidebarSection.tsx
-index 74dd6718..5a4e90fe 100644
+index 74dd671..7ba5359 100644
 --- a/source/app/list/TopLevelSidebarSection.tsx
 +++ b/source/app/list/TopLevelSidebarSection.tsx
 @@ -47,0 +48 @@ import { usePluginThreadRowStatusForThreads } from "./groupRollups.js";
-+import { AutomatedHiddenRow } from "../studio/AutomatedThreads.js";
++import { HiddenThreadsRow } from "../studio/HiddenThreads.js";
 @@ -62,0 +64,6 @@ export interface TopLevelSidebarSectionProps {
 +  /** Studio: a mark before the label, such as a Space's emoji. */
 +  labelMark?: ReactNode;
@@ -372,7 +369,7 @@ index 74dd6718..5a4e90fe 100644
 -        <div className="mt-1">{children}</div>
 +        <div className="mt-1">
 +          {children}
-+          <AutomatedHiddenRow />
++          <HiddenThreadsRow />
 +        </div>
 diff --git a/source/app/list/useSidebarModeSectionOrder.ts b/source/app/list/useSidebarModeSectionOrder.ts
 index 5ca0d61..6ae884a 100644
@@ -389,7 +386,7 @@ index 5ca0d61..6ae884a 100644
 -  mode: SidebarOrganizationMode;
 +  mode: OrderedOrganizationMode;
 diff --git a/source/app/list/useSidebarThreadReveal.ts b/source/app/list/useSidebarThreadReveal.ts
-index b2ccb13..4a491fc 100644
+index b2ccb13..4b26725 100644
 --- a/source/app/list/useSidebarThreadReveal.ts
 +++ b/source/app/list/useSidebarThreadReveal.ts
 @@ -69,0 +70,3 @@ export function getThreadSidebarExpansion({
@@ -397,15 +394,15 @@ index b2ccb13..4a491fc 100644
 +  if (organizationMode === "space") return {};
 +
 @@ -113,0 +117 @@ export interface SidebarThreadRevealInputs {
-+  automatedThreadIds?: ReadonlySet<string>;
++  hiddenThreadIds?: ReadonlySet<string>;
 @@ -121,0 +126 @@ export function useSidebarThreadRevealCore({
-+  automatedThreadIds,
++  hiddenThreadIds,
 @@ -210,0 +216,3 @@ export function useSidebarThreadRevealCore({
-+      // New automated results must not expand their collapsed group.
++      // Updates in hidden threads must not expand their collapsed group.
 +      // Ancestors still expand when navigating directly to a child thread.
-+      if (automatedThreadIds?.has(thread.id) && thread.id !== selectedThreadId) continue;
++      if (hiddenThreadIds?.has(thread.id) && thread.id !== selectedThreadId) continue;
 @@ -252,0 +261 @@ export function useSidebarThreadRevealCore({
-+    automatedThreadIds,
++    hiddenThreadIds,
 diff --git a/source/app/model/sidebar-section-id.ts b/source/app/model/sidebar-section-id.ts
 index c0bbdbc..7b39176 100644
 --- a/source/app/model/sidebar-section-id.ts
@@ -426,42 +423,42 @@ index 0915245..4fef2e5 100644
 +    value.startsWith("machine:") ||
 +    value.startsWith("space:")
 diff --git a/source/app/preferences/atoms.ts b/source/app/preferences/atoms.ts
-index aa949ec..0af0067 100644
+index aa949ec..f940ba6 100644
 --- a/source/app/preferences/atoms.ts
 +++ b/source/app/preferences/atoms.ts
 @@ -3,0 +4,3 @@ import { createSyncedPreferenceAtom } from "./synced-preference-atom.js";
-+export const sidebarAutomatedThreadsAtom = createSyncedPreferenceAtom("automatedThreads");
++export const sidebarHiddenThreadsAtom = createSyncedPreferenceAtom("hiddenThreads");
 +export const sidebarCollapsedSpacesAtom = createSyncedPreferenceAtom("collapsedSpaces");
 +
 @@ -46,0 +50,2 @@ export const sidebarShowProviderIconsAtom =
 +export const sidebarHideEmptyProjectsAtom =
 +  createSyncedPreferenceAtom("hideEmptyProjects");
 diff --git a/source/app/rows/ThreadActionsMenu.tsx b/source/app/rows/ThreadActionsMenu.tsx
-index c9f9497..e122491 100644
+index c9f9497..dc9a494 100644
 --- a/source/app/rows/ThreadActionsMenu.tsx
 +++ b/source/app/rows/ThreadActionsMenu.tsx
-@@ -51,0 +52 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
+@@ -51,0 +52,2 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
 +import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
-@@ -257,0 +259 @@ function ThreadActionsMenuItems({
++import { HideThreadItem } from "../studio/HiddenThreads.js";
+@@ -257,0 +260 @@ function ThreadActionsMenuItems({
 +  const floatAvailable = useFloatAvailable();
-@@ -327 +329,4 @@ function ThreadActionsMenuItems({
+@@ -327 +330,5 @@ function ThreadActionsMenuItems({
 -          {id === "split" && onOpenInSplit ? separator : null}
++          {id === "archive" ? <HideThreadItem threadId={thread.id} surface={surface} /> : null}
 +          {id === "split" && floatAvailable ? (
 +            <FloatItem threadId={thread.id} surface={surface} />
 +          ) : null}
 +          {id === "split" && (onOpenInSplit || floatAvailable) ? separator : null}
 diff --git a/source/app/rows/ThreadRow.tsx b/source/app/rows/ThreadRow.tsx
-index 13d58a8..ed16125 100644
+index 13d58a8..0eaeab6 100644
 --- a/source/app/rows/ThreadRow.tsx
 +++ b/source/app/rows/ThreadRow.tsx
-@@ -97,0 +98,2 @@ import {
+@@ -97,0 +98 @@ import {
 +import { StudioThreadBadge } from "../studio/StudioThreadBadge.js";
-+import { AutomatedThreadMark } from "../studio/AutomatedThreads.js";
-@@ -595,0 +598,2 @@ function ThreadRowComponent({
+@@ -595,0 +597 @@ function ThreadRowComponent({
 +              <StudioThreadBadge threadId={thread.id} />
-+              <AutomatedThreadMark threadId={thread.id} />
 diff --git a/source/shared/preferences.ts b/source/shared/preferences.ts
-index 98a5200..bb03ef0 100644
+index 98a5200..60b7169 100644
 --- a/source/shared/preferences.ts
 +++ b/source/shared/preferences.ts
 @@ -12,0 +13 @@ export const organizationModeSchema = z.enum([
@@ -469,33 +466,27 @@ index 98a5200..bb03ef0 100644
 @@ -56 +57 @@ const hiddenGroupsSchema = z
 -      listItemSchema.regex(/^(project|section|machine):\S+$/),
 +      listItemSchema.regex(/^(project|section|machine|space):\S+$/),
-@@ -61,0 +63,3 @@ const hiddenGroupsSchema = z
-+export const automatedThreadsModeSchema = z.enum(["all", "updates", "hidden"]);
-+export type AutomatedThreadsMode = z.infer<typeof automatedThreadsModeSchema>;
-+
-@@ -71,0 +76,8 @@ export const preferenceDefinitions = {
-+  automatedThreads: definePreference(
-+    z
-+      .record(listItemSchema, automatedThreadsModeSchema)
-+      .refine((value) => Object.keys(value).length <= LIST_MAX_LENGTH),
-+    {},
-+    'How each section shows bot and automation threads, by section key (threads, project:<id>, section:<id>, machine:<id>, space:<id>, or "*" for every section without its own choice): all, updates (the default), or hidden.',
+@@ -71,0 +73,6 @@ export const preferenceDefinitions = {
++  hiddenThreads: definePreference(
++    stringListSchema,
++    [],
++    "Thread ids hidden from every section unless pinned or open.",
 +    null,
 +  ),
-@@ -77,0 +90,6 @@ export const preferenceDefinitions = {
+@@ -77,0 +85,6 @@ export const preferenceDefinitions = {
 +  hideEmptyProjects: definePreference(
 +    z.boolean(),
 +    false,
 +    "Hide projects with no visible threads from the sidebar.",
 +    null,
 +  ),
-@@ -91 +109 @@ export const preferenceDefinitions = {
+@@ -91 +104 @@ export const preferenceDefinitions = {
 -    "How the list groups threads: by project, chronologically with custom sections, or by machine.",
 +    "How the list groups threads: by project, chronologically with custom sections, by machine, or by Studio Space.",
-@@ -133 +151 @@ export const preferenceDefinitions = {
+@@ -133 +146 @@ export const preferenceDefinitions = {
 -    "Groups moved into More: threads, project:<id>, section:<id>, or machine:<id>.",
 +    "Groups moved into More: threads, project:<id>, section:<id>, machine:<id>, or space:<id>.",
-@@ -183,0 +202,6 @@ export const preferenceDefinitions = {
+@@ -183,0 +197,6 @@ export const preferenceDefinitions = {
 +  collapsedSpaces: definePreference(
 +    stringListSchema,
 +    [],
