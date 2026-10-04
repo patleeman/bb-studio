@@ -8,13 +8,12 @@ import {
   type PluginSidebarThread,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
+import { BAR_BUTTON, cn, Icon } from "@bb-studio/kit/app";
 import { useMemo, useState, type ReactNode } from "react";
 import { useSpaceLead, useSpaceOf, useSpaceOverview, type OverviewItem, type OverviewThread, type SpaceLead } from "./data";
 import { NewInSpaceMenu } from "./NewInSpace";
 import { RUN_LABELS, StartThreadDialog } from "./SpaceView";
 import { RUNNING, startedByLead, stateOf } from "./status";
-import { cn } from "./styles";
 import { openItemTab, openThreadTab } from "./tabs";
 
 export { RUNNING } from "./status";

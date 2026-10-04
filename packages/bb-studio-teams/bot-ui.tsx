@@ -1,4 +1,4 @@
-import { EmptyState, PILL } from "@bb-studio/kit/app";
+import { EmptyState, PILL, SECTION_TITLE } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { RevisionList, type Revision } from "./revision-list";
 import { MarkdownEditor } from "./markdown-editor";
@@ -65,7 +65,7 @@ export function Section({
 }) {
   return (
     <section className="flex min-w-0 flex-col gap-2">
-      <h2 className={`text-xs font-semibold ${tone === "danger" ? "text-destructive" : "text-muted-foreground"}`}>{title}</h2>
+      <h2 className={`${SECTION_TITLE}${tone === "danger" ? " text-destructive" : ""}`}>{title}</h2>
       <div className="min-w-0 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">{children}</div>
     </section>
   );

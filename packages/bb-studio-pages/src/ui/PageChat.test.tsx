@@ -7,7 +7,8 @@ import { PageChat, PageConversation, pageConversationPath } from "./PageChat";
 
 const state = vi.hoisted(() => ({ open: vi.fn(), rpc: { call: vi.fn() }, composer: null as any, closeMenu: null as any }));
 vi.mock("@bb-studio/kit/app", () => ({
-  FLOATING: "", useOpenCompanion: () => state.open,
+  useOpenCompanion: () => state.open,
+  ChatButton: ({ title, onOpen, items }: any) => <div><button title={title} onClick={onOpen}>Chat</button>{items.map((item: any, index: number) => <button key={index} onClick={item.onSelect}>{item.label}</button>)}</div>,
   NewConversationComposer: (props: any) => { state.composer = props; return <textarea aria-label="Page draft" />; },
 }));
 vi.mock("@bb-studio/kit/ui", () => ({

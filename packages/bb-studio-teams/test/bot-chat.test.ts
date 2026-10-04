@@ -9,6 +9,9 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({ useRpc: () => ({ call: state.call }),
 vi.mock("../bot-ui", () => ({ message: (error: unknown) => error instanceof Error ? error.message : String(error) }));
 vi.mock("@bb-studio/kit/app", () => ({
   Icon: () => null, openCompanion: state.companion,
+  ChatButton: ({ title, disabled, onOpen, items }: any) => React.createElement("div", null,
+    React.createElement("button", { title, disabled, onClick: onOpen }, "Chat"),
+    ...items.map((item: any, index: number) => React.createElement("button", { key: index, disabled, onClick: item.onSelect }, item.label))),
   DropdownMenu: ({ children }: any) => children,
   DropdownMenuTrigger: ({ children }: any) => children,
   DropdownMenuContent: ({ children }: any) => children,

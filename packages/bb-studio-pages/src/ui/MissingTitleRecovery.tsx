@@ -1,3 +1,4 @@
+import { SECTION_TITLE } from "@bb-studio/kit/app";
 import { useEffect, useMemo, useState } from "react";
 import { TitleRecovery } from "./page-title";
 
@@ -49,7 +50,7 @@ export function MissingTitleRecovery({ pageId }: { pageId: string }) {
 
   return (
     <section aria-label="Title recovery" className="space-y-3 rounded-md border border-border p-3 text-sm">
-      <h3 className="font-medium">Title recovery</h3>
+      <h3 className={SECTION_TITLE}>Title recovery</h3>
       {snapshot.drafts.map(draft => <p key={draft.id} className="break-words"><span className="text-muted-foreground">Retained title: </span>{draft.title || "(Untitled)"}</p>)}
       {snapshot.error ? <p role="status">Could not read all title recovery data. Available records can still be downloaded; retry reading to check the rest.</p> : null}
       {snapshot.unpersisted ? <p role="status">Keep this view open until you download the title recovery file or retry local title recovery successfully. Some titles are only kept in this open browser.</p> : null}

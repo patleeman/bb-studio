@@ -15,7 +15,7 @@ export {
 export { AddOnCollection, type ProviderCall } from "./add-on";
 export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
 export { ThreadItemsPanel } from "./thread-items";
-export { BarCrumb, BarSeparator, BarTitle, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, ViewMoveMenu, openNewItemThread, useNewItemThread, type ItemThread } from "./item-header";
+export { BarCrumb, BarSeparator, BarTitle, ChatButton, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, ViewMoveMenu, openNewItemThread, useNewItemThread, type ChatMenuItem, type ItemThread } from "./item-header";
 export { RelatedPanel, type RelatedRef } from "./related-panel";
 export { SpaceMark, SpaceMenuItems, SpacePicker, type MenuSpace } from "./space-picker";
 export { spaceMembership, type SpaceHolder, type SpaceMembership } from "./space-state";
@@ -35,11 +35,14 @@ export {
   Highlight,
   ICON_BUTTON,
   ItemTile,
+  ITEM_TITLE,
   OUTLINE_BUTTON,
   PageColumn,
+  PAGE_TITLE,
   PILL,
   PRIMARY_BUTTON,
   projectName,
+  SECTION_TITLE,
   THUMBNAIL,
   useProjects,
   type Project,

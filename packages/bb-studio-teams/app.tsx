@@ -18,7 +18,7 @@ import { BotCreateRequests } from "./bot-create-requests";
 import { BotCreationThread } from "./bot-creation-thread";
 import { BotChat } from "./bot-chat";
 import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID, botHref } from "./studio-provider";
-import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FloatPanels, retainPanel, ICON_BUTTON, Icon as KitIcon, ItemHeader, ItemTile, openAppPath, PageColumn, studioPath, useStudioPresent } from "@bb-studio/kit/app";
+import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FloatPanels, retainPanel, ICON_BUTTON, Icon as KitIcon, ItemHeader, ItemTile, ITEM_TITLE, openAppPath, PageColumn, SECTION_TITLE, studioPath, useStudioPresent } from "@bb-studio/kit/app";
 
 import { externalAgent } from "./external-agents";
 import { ExternalAgentBadge, useExternalHealth } from "./external-health";
@@ -152,7 +152,7 @@ function BotDetail({ id, tab, href }: { id: string; tab: string; href: string })
         <div className="flex items-center gap-4 pb-4">
           <ItemTile icon={bot.avatar || null} kindIcon="Bot" size="xl" />
           <div className="min-w-0">
-            <h1 className="truncate text-[32px] leading-tight font-semibold tracking-tight max-md:text-[28px]">{bot.name}</h1>
+            <h1 className={`truncate ${ITEM_TITLE}`}>{bot.name}</h1>
             <p className="mt-0.5 truncate text-sm text-muted-foreground">
               @{bot.handle}
               {bot.description ? ` · ${bot.description}` : ""}
@@ -235,7 +235,7 @@ function BotDetail({ id, tab, href }: { id: string; tab: string; href: string })
           {tab === "activity" && (
             <>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">
+                <h2 className={SECTION_TITLE}>
                   Activity
                 </h2>
                 <Button

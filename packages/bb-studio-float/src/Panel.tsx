@@ -18,6 +18,7 @@ import {
   Icon,
   openFloat,
   openAppPath,
+  OUTLINE_BUTTON,
   publishFloatBody,
   publishFloatLeading,
   studioTargetAt,
@@ -137,7 +138,7 @@ function PathBody({ tab }: { tab: FloatTab }) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
         <p>This can't show in a window right now.</p>
-        <button type="button" className="rounded-md border border-border px-3 py-1.5 text-foreground hover:bg-state-hover" onClick={() => openAppPath(path, { main: true })}>
+        <button type="button" className={OUTLINE_BUTTON} onClick={() => openAppPath(path, { main: true })}>
           Open it
         </button>
       </div>

@@ -291,51 +291,65 @@ export function ItemHeader({
   );
 }
 
-/** The thread this item's chat and quotes go to, from Studio Chat. */
-function HomeThreadChip({ item }: { item: ItemChatRef }) {
-  const host = useItemChat();
-  const home = useHomeThread(item);
-  const openingDialog = useRef<(() => void) | null>(null);
-  if (!host) return null;
+export interface ChatMenuItem { label: ReactNode; icon: string; onSelect(): void }
+
+/**
+ * An item's Chat: open its conversation, or pick from the menu. Menu
+ * actions run once the menu has closed, so one that opens a dialog or a
+ * companion takes focus cleanly.
+ */
+export function ChatButton({ title, disabled = false, onOpen, items, ...rest }: {
+  title: string;
+  disabled?: boolean;
+  onOpen(): void;
+  items: readonly ChatMenuItem[];
+} & Omit<React.HTMLAttributes<HTMLDivElement>, "title">) {
+  const afterMenu = useRef<(() => void) | null>(null);
   return (
-    <div data-studio-chat-item={`${item.pluginId}:${item.id}`} className="flex h-7 shrink-0 items-center rounded-md text-sm text-muted-foreground">
-      <button
-        type="button"
-        className="flex h-full items-center gap-1.5 rounded-l-md pr-1.5 pl-2 hover:bg-state-hover hover:text-foreground disabled:opacity-50"
-        title={home ? `Continue "${home.title}"` : "Start a conversation about this item"}
-        disabled={home === undefined}
-        onClick={() => host.open(item)}
-      >
+    <div {...rest} className="flex h-7 shrink-0 items-center rounded-md text-sm text-muted-foreground">
+      <button type="button" className="flex h-full items-center gap-1.5 rounded-l-md pr-1.5 pl-2 hover:bg-state-hover hover:text-foreground disabled:opacity-50" title={title} disabled={disabled} onClick={onOpen}>
         <Icon name="MessageSquare" className="size-4 shrink-0" /> Chat
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Chat options" className="flex h-full shrink-0 items-center rounded-r-md px-1 hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active">
+          <button type="button" aria-label="Chat options" disabled={disabled} className="flex h-full shrink-0 items-center rounded-r-md px-1 hover:bg-state-hover hover:text-foreground disabled:opacity-50 data-[state=open]:bg-state-active">
             <Icon name="ChevronDown" className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56" onCloseAutoFocus={(event) => {
-          const launch = openingDialog.current;
-          openingDialog.current = null;
+          const launch = afterMenu.current;
+          afterMenu.current = null;
           if (!launch) return;
           event.preventDefault();
           launch();
         }}>
-          {home ? <DropdownMenuItem onSelect={() => host.open(item)}>
-            <Icon name="MessageSquare" className="size-4" /> <span className="truncate">{home.title}</span>
-          </DropdownMenuItem> : null}
-          <DropdownMenuItem onSelect={() => { openingDialog.current = () => host.start(item); }}>
-            <Icon name="MessageSquarePlus" className="size-4" /> New conversation
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => { openingDialog.current = () => host.choose(item); }}>
-            <Icon name="MoveTo" className="size-4" /> Choose conversation…
-          </DropdownMenuItem>
-          {home ? <DropdownMenuItem onSelect={() => void host.unlink(item)}>
-            <Icon name="CircleX" className="size-4" /> Unlink
-          </DropdownMenuItem> : null}
+          {items.map((item, index) => <DropdownMenuItem key={index} onSelect={() => { afterMenu.current = item.onSelect; }}>
+            <Icon name={item.icon} className="size-4" /> {item.label}
+          </DropdownMenuItem>)}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+/** The thread this item's chat and quotes go to, from Studio Chat. */
+function HomeThreadChip({ item }: { item: ItemChatRef }) {
+  const host = useItemChat();
+  const home = useHomeThread(item);
+  if (!host) return null;
+  return (
+    <ChatButton
+      data-studio-chat-item={`${item.pluginId}:${item.id}`}
+      title={home ? `Continue "${home.title}"` : "Start a conversation about this item"}
+      disabled={home === undefined}
+      onOpen={() => host.open(item)}
+      items={[
+        ...(home ? [{ label: <span className="truncate">{home.title}</span>, icon: "MessageSquare", onSelect: () => host.open(item) }] : []),
+        { label: "New conversation", icon: "MessageSquarePlus", onSelect: () => host.start(item) },
+        { label: "Choose conversation…", icon: "MoveTo", onSelect: () => host.choose(item) },
+        ...(home ? [{ label: "Unlink", icon: "CircleX", onSelect: () => void host.unlink(item) }] : []),
+      ]}
+    />
   );
 }
 

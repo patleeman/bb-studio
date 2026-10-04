@@ -1,8 +1,7 @@
 // Make a Studio item inside a Space: it goes in the Space's own folder, so it
 // belongs to the Space, and opens beside the lead. Shared by the status tab's
 // New menu and the "New in Space" tab in the workbench's New tab menu.
-import * as Menu from "@radix-ui/react-dropdown-menu";
-import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
+import { BAR_BUTTON, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon } from "@bb-studio/kit/app";
 import type { StudioCreateEventDetail } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
@@ -10,7 +9,6 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { ProviderView, rpcContract } from "../../contract";
 import { useSpaceLead } from "./data";
-import { MENU, MENU_ITEM, PORTAL_SCOPE } from "./styles";
 
 export type SpaceKind = ProviderView["kinds"][number] & { pluginId: string; providerName: string };
 export interface CreatedItem { href: string; title: string }
@@ -71,21 +69,19 @@ export function NewInSpaceMenu({ spaceId, onCreated, label = "New" }: { spaceId:
   const { kinds, error, load } = useSpaceKinds();
   const create = useCreateInSpace(spaceId);
   return (
-    <Menu.Root onOpenChange={(open) => { if (open) load(); }}>
-      <Menu.Trigger className={BAR_BUTTON} title="New Studio item in this Space"><Icon name="Plus" className="size-4" />{label}</Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
+    <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
+      <DropdownMenuTrigger className={BAR_BUTTON} title="New Studio item in this Space"><Icon name="Plus" className="size-4" />{label}</DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
           {(kinds ?? []).map((kind) => (
-            <Menu.Item key={`${kind.pluginId}:${kind.id}`} className={MENU_ITEM} onSelect={() => void create(kind).then((item) => { if (item) onCreated(item); })}>
-              <Icon name={kind.icon} />{kind.label}
-            </Menu.Item>
+            <DropdownMenuItem key={`${kind.pluginId}:${kind.id}`} onSelect={() => void create(kind).then((item) => { if (item) onCreated(item); })}>
+              <Icon name={kind.icon} className="size-4" />{kind.label}
+            </DropdownMenuItem>
           ))}
-          {error ? <Menu.Item className={MENU_ITEM} onSelect={(event) => { event.preventDefault(); load(); }} title={error}>Retry loading</Menu.Item>
-            : kinds === null ? <Menu.Item className={MENU_ITEM} disabled>Loading…</Menu.Item>
-              : !kinds.length ? <Menu.Item className={MENU_ITEM} disabled>Nothing to create</Menu.Item> : null}
-        </Menu.Content>
-      </Menu.Portal>
-    </Menu.Root>
+          {error ? <DropdownMenuItem onSelect={(event) => { event.preventDefault(); load(); }} title={error}>Retry loading</DropdownMenuItem>
+            : kinds === null ? <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
+              : !kinds.length ? <DropdownMenuItem disabled>Nothing to create</DropdownMenuItem> : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

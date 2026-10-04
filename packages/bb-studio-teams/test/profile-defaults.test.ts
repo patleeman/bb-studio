@@ -21,7 +21,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 vi.mock("../markdown-editor", () => ({ MarkdownEditor: () => null }));
 vi.mock("../revision-list", () => ({ RevisionList: () => null }));
 vi.mock("../channel-controls", () => ({ Modal: () => null }));
-vi.mock("@bb-studio/kit/app", () => ({ EmptyState: () => null, PILL: "" }));
+vi.mock("@bb-studio/kit/app", () => ({ EmptyState: () => null, PILL: "", SECTION_TITLE: "" }));
 vi.mock("@bb-studio/kit/ui", () => ({
   Button: ({ children, ...props }: any) => React.createElement("button", props, children),
   Input: (props: any) => React.createElement("input", props),

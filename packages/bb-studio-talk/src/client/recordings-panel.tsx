@@ -19,6 +19,8 @@ import {
   openNewItemThread,
   OUTLINE_BUTTON,
   PageColumn,
+  PAGE_TITLE,
+  SECTION_TITLE,
   openAppPath,
   studioPath,
   useStudioPresent,
@@ -133,7 +135,7 @@ function UnsentAudio() {
     <div className="relative h-full">
       <ItemHeader backLabel={studio ? "Studio" : "Recordings"} onBack={toCollection} />
       <PageColumn className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight">Unsent audio</h1>
+        <h1 className={PAGE_TITLE}>Unsent audio</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           The server refused these pieces of audio, so Talk kept them on this device instead of losing them. Retry
           after updating Talk, download them, or discard them.
@@ -518,7 +520,7 @@ function RecordingDetail({ id }: { id: string }) {
         ) : null}
 
         <div className="mt-8 flex flex-wrap items-center gap-2">
-          <h2 className="mr-auto font-semibold">Transcript</h2>
+          <h2 className={cn("mr-auto", SECTION_TITLE)}>Transcript</h2>
           <button type="button" className={OUTLINE_BUTTON} disabled={cleaning !== null || recording.status !== "done" || recording.pendingCount > 0 || recording.failedCount > 0 || !recording.wordCount || hasCleaned} onClick={() => void cleanUp()}>
             {cleaning !== null ? <Icon name="Loading" className="animate-spin motion-reduce:animate-none" /> : null} {cleaning !== null ? "Cleaning…" : hasCleaned ? "Cleanup saved" : "Clean up transcript"}
           </button>

@@ -1,6 +1,6 @@
 import { untitled } from "@bb-studio/kit/format";
 import { ThreadTitle, useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, useFloatAvailable, useInFloat, useStudioChatPresent, useOpenCompanion } from "@bb-studio/kit/app";
+import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, ITEM_TITLE, useFloatAvailable, useInFloat, useStudioChatPresent, useOpenCompanion } from "@bb-studio/kit/app";
 import { FLOAT_RIGHT_VAR } from "@bb-studio/kit/contract";
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -85,7 +85,7 @@ function TitleField(props: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement
       rows={1}
       placeholder="Untitled"
       aria-label="Page title"
-      className="block w-full resize-none overflow-hidden bg-transparent text-[32px] leading-tight font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50 max-md:text-[28px]"
+      className={cn("block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-muted-foreground/50", ITEM_TITLE)}
       {...props}
     />
   );

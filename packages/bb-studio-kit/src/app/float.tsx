@@ -8,6 +8,7 @@ import { experimental_usePluginId } from "@get-bb/plugin-sdk/app";
 import { createContext, useContext, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { panelHref } from "./nav";
+import { OUTLINE_BUTTON } from "./pieces";
 import {
   floatBodies,
   mainBodies,
@@ -97,7 +98,7 @@ function MainPanel({ path, subPath, children }: { path: string; subPath: string;
   return <div ref={element} data-studio-main-view={href} className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
     {!ready ? children : moved ? <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
       <p>This view is open in a companion.</p>
-      <button type="button" className="rounded-md border border-border px-3 py-1.5 text-foreground hover:bg-state-hover" onClick={() => openFloat({ kind: "path", path: href })}>Show companion</button>
+      <button type="button" className={OUTLINE_BUTTON} onClick={() => openFloat({ kind: "path", path: href })}>Show companion</button>
     </div> : null}
   </div>;
 }

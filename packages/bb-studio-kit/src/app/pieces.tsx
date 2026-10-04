@@ -21,22 +21,36 @@ export const ICON_BUTTON =
 export const BAR_BUTTON =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-state-active aria-pressed:text-foreground data-[state=open]:bg-state-active data-[state=open]:text-foreground [&_svg]:size-4";
 
+/**
+ * Page controls are 32px (bars are 28px). The one filled action in a view;
+ * keep it to one per view where possible.
+ */
 export const PRIMARY_BUTTON =
-  "flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-foreground px-4 text-sm font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-foreground/90 [&_svg]:size-4";
+  "flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-foreground/90 [&_svg]:size-4";
 
-/** Secondary actions in toolbars. */
+/** Secondary actions in a page body. */
 export const OUTLINE_BUTTON =
   "flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-foreground hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-4";
 
 export const DANGER_BUTTON =
   "flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-destructive px-3 text-sm font-medium text-white hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4";
 
+/** Quiet actions in a page body (Cancel, Show more). */
 export const GHOST_BUTTON =
   "flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4";
 
 /** Filter pills. */
 export const PILL =
   "h-8 shrink-0 rounded-md px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground aria-pressed:bg-state-active aria-pressed:text-foreground";
+
+/** The title of the item a view shows, in its body (a page, a recording, a bot, a post). */
+export const ITEM_TITLE = "text-[32px] leading-tight font-semibold tracking-tight max-md:text-[28px]";
+
+/** The heading of a view that isn't an item and needs one in its body (setup flows, pickers). */
+export const PAGE_TITLE = "text-xl leading-tight font-semibold tracking-tight";
+
+/** A section heading inside a view. */
+export const SECTION_TITLE = "text-sm font-semibold";
 
 /** The page-width column every Studio page sits in. */
 export function PageColumn({ children, className }: { children: ReactNode; className?: string }) {

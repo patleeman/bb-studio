@@ -7,7 +7,7 @@ import {
   useBbNavigate,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import { GHOST_BUTTON, Icon } from "@bb-studio/kit/app";
+import { cn, GHOST_BUTTON, Icon } from "@bb-studio/kit/app";
 import { useState } from "react";
 import { useSpaceLead, useSpaceOf, useSpaceOverview } from "./data";
 import { ItemEmbed } from "./ItemEmbed";
@@ -15,7 +15,6 @@ import { NewInSpacePicker, type CreatedItem } from "./NewInSpace";
 import { stateOf } from "./status";
 import { StartThreadDialog } from "./SpaceView";
 import { SPACE_ITEM_ACTION, draftItem, draftParams, itemParams, openItemTab, openThreadTab, saveDraftItem, threadParams } from "./tabs";
-import { cn } from "./styles";
 
 function NotInSpace() {
   return <p className="p-4 text-sm text-muted-foreground">This thread isn't in a Space.</p>;

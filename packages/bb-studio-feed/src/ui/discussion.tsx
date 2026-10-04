@@ -1,4 +1,4 @@
-import { NewConversationComposer, useOpenCompanion } from "@bb-studio/kit/app";
+import { NewConversationComposer, OUTLINE_BUTTON, useOpenCompanion } from "@bb-studio/kit/app";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useEffect, useState } from "react";
@@ -20,7 +20,7 @@ export function PostDiscussion({ postId }: { postId: string }) {
     );
     return () => { live = false; };
   }, [rpc, postId, attempt]);
-  if (error) return <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-4 text-sm"><p>{error}</p><button type="button" className="rounded border border-border px-3 py-1.5 hover:bg-state-hover" onClick={() => setAttempt(value => value + 1)}>Retry</button></div>;
+  if (error) return <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-4 text-sm"><p>{error}</p><button type="button" className={OUTLINE_BUTTON} onClick={() => setAttempt(value => value + 1)}>Retry</button></div>;
   if (!post) return <p className="p-4 text-sm text-muted-foreground">Loading conversation…</p>;
   return <NewConversationComposer key={post.id} title={`Chat about "${post.title}"`} composerClassName="feed-discussion-composer"
     moveTarget={{ href: `${postHref(post.id)}/discussion`, title: `Chat about "${post.title}"` }}

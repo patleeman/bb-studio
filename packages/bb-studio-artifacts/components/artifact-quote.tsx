@@ -4,7 +4,7 @@
 // thread through Studio Chat; without Studio Chat, BB's composer opens with it.
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { toast } from "sonner";
-import { GHOST_BUTTON, Icon, PRIMARY_BUTTON, cn, useHomeThread, useItemChat } from "@bb-studio/kit/app";
+import { GHOST_BUTTON, Icon, PRIMARY_BUTTON, useHomeThread, useItemChat } from "@bb-studio/kit/app";
 import { mentionPrompt } from "@bb-studio/kit/contract";
 import { errorMessage, quoteMessage, type ItemQuote } from "@bb-studio/kit/format";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
@@ -271,7 +271,7 @@ export function QuoteCard({
         <button type="button" className={GHOST_BUTTON} onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className={cn(PRIMARY_BUTTON, "h-8 px-3")} disabled={sending} onClick={() => void send()}>
+        <button type="button" className={PRIMARY_BUTTON} disabled={sending} onClick={() => void send()}>
           {sending ? "Sending…" : "Send"}
         </button>
       </div>

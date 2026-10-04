@@ -801,7 +801,7 @@ export function CollectionPage({
         {filter ? (
           <div className="min-w-0 flex-1">{filter.bar}</div>
         ) : (
-          <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm focus-within:border-foreground/30 @3xl/page:max-w-sm">
+          <label className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm focus-within:border-foreground/30 @3xl/page:max-w-sm">
             <Icon name="Search" className="size-4 shrink-0 text-muted-foreground" />
             <input
               aria-label={`Search ${title.toLowerCase()}`}

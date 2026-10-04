@@ -9,7 +9,7 @@ import { STUDIO_PLUGIN_ID, type StudioSchemas } from "../contract";
 import { errorMessage, relativeTime, untitled } from "../format";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
-import { ItemTile, THUMBNAIL } from "./pieces";
+import { ItemTile, PRIMARY_BUTTON, THUMBNAIL } from "./pieces";
 import { studioItemProps } from "./studio-item";
 
 type Provider = StudioSchemas["provider"];
@@ -144,7 +144,7 @@ export function ThreadItemsPanel({
         </div>
         <button
           type="button"
-          className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-50 [&_svg]:size-4"
+          className={PRIMARY_BUTTON}
           // New waits for the thread, so the item lands in its project.
           disabled={creating || !thread || !kind?.create || kind.create.mode !== "rpc"}
           onClick={() => void create()}

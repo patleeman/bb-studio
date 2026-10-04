@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { CompanionPlacement } from "@bb-studio/kit/app";
+import { OUTLINE_BUTTON, type CompanionPlacement } from "@bb-studio/kit/app";
 
 interface View { element: HTMLDivElement; home: HTMLDivElement; placement: CompanionPlacement }
 interface Outlet { id: string; token: symbol; element: HTMLDivElement; order: number }
@@ -73,7 +73,7 @@ export function LegacyCompanionOutlet({ id }: { id: string }) {
     };
   }, [id, token]);
   return <div ref={element} className="flex h-full min-h-0 flex-1 flex-col" data-legacy-companion-outlet={id}>
-    {!owns ? <button className="m-auto rounded-md border border-border px-3 py-2 text-sm" onClick={focus}>Show companion here</button> : null}
+    {!owns ? <button type="button" className={`m-auto ${OUTLINE_BUTTON}`} onClick={focus}>Show companion here</button> : null}
   </div>;
 }
 

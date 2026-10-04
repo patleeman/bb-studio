@@ -2,6 +2,7 @@
 // can't show them, so the Teams page stays (above the collection) while any do.
 import { useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
+import { SECTION_TITLE } from "@bb-studio/kit/app";
 import { Button } from "@bb-studio/kit/ui";
 import type { BotCreateRequestView, rpcContract } from "./contract";
 import { ErrorMessage, message } from "./bot-ui";
@@ -28,7 +29,7 @@ export function BotCreateRequests({
         <div>
           <h2
             id="bot-creation-approvals"
-            className="text-sm font-semibold"
+            className={SECTION_TITLE}
           >
             Pending bot approvals
           </h2>

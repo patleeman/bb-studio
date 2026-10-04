@@ -2,7 +2,6 @@
 // the left, and the Space's status, threads and items as workbench tabs on
 // the right. This panel only sends you there, or starts the lead of a Space
 // that has none. Its root lists every Space.
-import * as Menu from "@radix-ui/react-dropdown-menu";
 import {
   experimental_NewThreadComposer as NewThreadComposer,
   experimental_useSidebarThreads as useSidebarThreads,
@@ -12,13 +11,12 @@ import {
   type PluginThreadHeaderActionProps,
 } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@bb-studio/kit/ui";
-import { BAR_BUTTON, ICON_BUTTON, Icon, openAppPath, PageColumn, PRIMARY_BUTTON } from "@bb-studio/kit/app";
+import { BAR_BUTTON, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, ICON_BUTTON, Icon, openAppPath, PageColumn, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { useEffect, useState } from "react";
 import { NEW_SPACE_EVENT, SPACE_DIALOG_EVENT } from "../../ids";
 import { useCall, useSpaceLead, useSpaceOf, useSpaces, type Cadence, type SpaceLead } from "./data";
 import { HandoffDialog } from "./Handoff";
 import { SPACES_PANEL, spaceIdOf } from "./routes";
-import { cn, MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE } from "./styles";
 
 /** BB's title bar for the panel: New Space on the list of Spaces. */
 export function SpacesHeader({ subPath }: PluginNavPanelProps) {
@@ -90,25 +88,26 @@ export function RunMenu({ lead, onChanged }: { lead: SpaceLead; onChanged: () =>
     void save("custom", cron);
   };
   return <>
-    <Menu.Root>
-      <Menu.Trigger disabled={saving} aria-label="Heartbeat" aria-pressed={Boolean(run)} className={ICON_BUTTON} title={run ? `Heartbeat: ${RUN_LABELS[run.cadence]}` : "Heartbeat is off"}>
+    <DropdownMenu>
+      <DropdownMenuTrigger disabled={saving} aria-label="Heartbeat" aria-pressed={Boolean(run)} className={ICON_BUTTON} title={run ? `Heartbeat: ${RUN_LABELS[run.cadence]}` : "Heartbeat is off"}>
         <Icon name="Repeat" className="size-4" />
-      </Menu.Trigger>
-      <Menu.Portal><Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
-        <p className="max-w-64 px-2 pt-1 pb-2 text-xs text-muted-foreground">The lead checks the Space and reports to your Inbox. Turning this off leaves running threads working.</p>
-        <Menu.RadioGroup value={run?.cadence ?? "off"} onValueChange={(value) => value === "custom" ? setCustom(true) : void save(value === "off" ? null : value as Cadence)}>
-          {(["off", ...Object.keys(RUN_LABELS)] as (Cadence | "off")[]).map((value) => <Menu.RadioItem key={value} value={value} className={MENU_ITEM}>
-            <span className="inline-flex size-3.5 items-center justify-center"><Menu.ItemIndicator><Icon name="Check" /></Menu.ItemIndicator></span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">The lead checks the Space and reports to your Inbox. Turning this off leaves running threads working.</DropdownMenuLabel>
+        {(["off", ...Object.keys(RUN_LABELS)] as (Cadence | "off")[]).map((value) => {
+          const chosen = (run?.cadence ?? "off") === value;
+          return <DropdownMenuItem key={value} onSelect={() => value === "custom" ? setCustom(true) : void save(value === "off" ? null : value as Cadence)}>
             {value === "off" ? "Off" : value === "custom" ? "Custom…" : RUN_LABELS[value]}
-          </Menu.RadioItem>)}
-        </Menu.RadioGroup>
-        <Menu.Separator className={MENU_SEPARATOR} />
+            {chosen ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
+          </DropdownMenuItem>;
+        })}
+        <DropdownMenuSeparator />
         <label className="flex items-center justify-between gap-3 px-2 py-1 text-xs">Daily / weekly time
           <input type="time" value={time} onChange={(event) => setTime(event.target.value)} onBlur={() => { if (run) void save(run.cadence); }} className="rounded border border-border bg-background px-2 py-1" />
         </label>
-        {error ? <p role="alert" className="max-w-64 px-2 py-1 text-xs text-destructive">{error}</p> : null}
-      </Menu.Content></Menu.Portal>
-    </Menu.Root>
+        {error ? <p role="alert" className="px-2 py-1 text-xs text-destructive">{error}</p> : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
     <Dialog open={custom} onOpenChange={setCustom}><DialogContent className="sm:max-w-md">
       <DialogTitle>Custom heartbeat</DialogTitle>
       <DialogDescription>Choose how often the lead checks the Space. Scheduled times use your BB host’s timezone.</DialogDescription>
@@ -160,20 +159,18 @@ const threadPath = (threadId: string) => `/threads/${encodeURIComponent(threadId
 /** Space options, for the lead's thread header and the setup page. */
 function SpaceOptions({ spaceId, onHandOff }: { spaceId: string; onHandOff?: () => void }) {
   return (
-    <Menu.Root>
-      <Menu.Trigger aria-label="Space options" title="Space options" className={ICON_BUTTON}><Icon name="MoreHorizontal" className="size-4" /></Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
-          {onHandOff ? <Menu.Item className={MENU_ITEM} onSelect={onHandOff}><Icon name="Fork" />Hand off lead…</Menu.Item> : null}
-          <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "edit")}><Icon name="Edit" />Edit Space</Menu.Item>
-          <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "threads")}><Icon name="MessageSquare" />Manage threads</Menu.Item>
-          <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "items")}><Icon name="FileText" />Manage items</Menu.Item>
-          <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "projects")}><Icon name="Folder" />Manage folders</Menu.Item>
-          <Menu.Separator className={MENU_SEPARATOR} />
-          <Menu.Item className={`${MENU_ITEM} text-destructive [&_svg]:text-destructive`} onSelect={() => spaceDialog(spaceId, "delete")}><Icon name="Trash2" />Delete Space…</Menu.Item>
-        </Menu.Content>
-      </Menu.Portal>
-    </Menu.Root>
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label="Space options" title="Space options" className={ICON_BUTTON}><Icon name="MoreHorizontal" className="size-4" /></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        {onHandOff ? <DropdownMenuItem onSelect={onHandOff}><Icon name="Fork" className="size-4" />Hand off lead…</DropdownMenuItem> : null}
+        <DropdownMenuItem onSelect={() => spaceDialog(spaceId, "edit")}><Icon name="Edit" className="size-4" />Edit Space</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => spaceDialog(spaceId, "threads")}><Icon name="MessageSquare" className="size-4" />Manage threads</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => spaceDialog(spaceId, "items")}><Icon name="FileText" className="size-4" />Manage items</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => spaceDialog(spaceId, "projects")}><Icon name="Folder" className="size-4" />Manage folders</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={() => spaceDialog(spaceId, "delete")}><Icon name="Trash2" className="size-4" />Delete Space…</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

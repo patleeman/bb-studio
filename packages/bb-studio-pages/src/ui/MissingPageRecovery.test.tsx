@@ -21,7 +21,7 @@ vi.mock("./connection", () => ({ PageConnection: class {
   retryRecovery = state.read;
 } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toPluginPanel: vi.fn() }), useRpc: () => ({ call: vi.fn() }) }));
-vi.mock("@bb-studio/kit/app", () => ({ ThreadItemsPanel: () => null }));
+vi.mock("@bb-studio/kit/app", () => ({ PAGE_TITLE: "", SECTION_TITLE: "", ThreadItemsPanel: () => null }));
 vi.mock("@bb-studio/kit/ui", () => ({ Icon: () => null }));
 vi.mock("./shared", () => ({ relativeTime: () => "now" }));
 vi.mock("./PanelShell", () => ({

@@ -3,7 +3,7 @@
 // picking a drawing submits its id to the waiting backend call, which then
 // uploads the rendered image for the thread.
 import type { PluginPendingInteractionProps } from "@get-bb/plugin-sdk/app";
-import { EmptyState, GHOST_BUTTON } from "@bb-studio/kit/app";
+import { EmptyState, GHOST_BUTTON, PAGE_TITLE } from "@bb-studio/kit/app";
 import { DRAW_ICON } from "../src/shared";
 import { DrawingCard, drawingName, type DrawingMeta } from "./drawing-card";
 
@@ -17,7 +17,7 @@ export function ExcalidrawPicker({ interaction, submit, cancel }: PluginPendingI
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-4 p-4">
           <header>
-            <h1 className="text-lg font-semibold tracking-tight">Attach a drawing</h1>
+            <h1 className={PAGE_TITLE}>Attach a drawing</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">Pick one to attach as an image.</p>
           </header>
           {drawings.length === 0 ? (

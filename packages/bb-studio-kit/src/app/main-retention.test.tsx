@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FloatPanels, openFloat, retainPanel, useCompanionNavigate, useInFloat } from "./float";
 import { publishFloatBody, setFloatHost } from "./float-registry";
 
-vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_usePluginId: () => "pages" }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_Icon: () => null, experimental_usePluginId: () => "pages" }));
 let roots: Root[];
 let elements: HTMLDivElement[];
 function mount(element: React.ReactNode) {

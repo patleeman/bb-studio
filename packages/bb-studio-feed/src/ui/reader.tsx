@@ -6,7 +6,7 @@
 // or starts a new thread. A rail lists urgent posts and the stories still
 // developing. A post's own page (feed/<id>) is where notifications and reply
 // cards go.
-import { BAR_BUTTON, BarCrumb, BarSeparator, Badge, CopyReferenceMenuItem, StudioBar, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, ViewMoveMenu, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
+import { BarCrumb, BarSeparator, Badge, CopyReferenceMenuItem, StudioBar, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, ITEM_TITLE, OUTLINE_BUTTON, PageColumn, SECTION_TITLE, ViewMoveMenu, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { Markdown, experimental_useSidebarThreads as useSidebarThreads, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -279,26 +279,26 @@ function FeedReader() {
       <FailedThreads />
       <AutomaticUpdates />
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h2 className="mr-auto text-lg font-semibold">Reports</h2>
+        <h2 className={cn("mr-auto", SECTION_TITLE)}>Reports</h2>
         {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread shown</span> : null}
-        <button type="button" className={BAR_BUTTON} disabled={posts === null} onClick={markAllRead}>
+        <button type="button" className={GHOST_BUTTON} disabled={posts === null} onClick={markAllRead}>
           <Icon name="feed/mark-read" /> Mark all read
         </button>
       </div>
       <form role="search" aria-label="Filter updates" className="mb-4 flex flex-wrap items-end gap-3" noValidate onSubmit={(event) => { event.preventDefault(); applyFilters(draft); }}>
         <label className="min-w-40 flex-1 text-xs text-muted-foreground">Search updates
           <input type="search" maxLength={200} value={draft.query} onChange={(event) => setDraft({ ...draft, query: event.target.value })}
-            placeholder="Title, report, or author" className="mt-1 block h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
+            placeholder="Title, report, or author" className="mt-1 block h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
         </label>
         <label className="text-xs text-muted-foreground">From
           <input type="date" value={draft.from} onChange={(event) => setDraft({ ...draft, from: event.target.value })}
-            className="mt-1 block h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
+            className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
         </label>
         <label className="text-xs text-muted-foreground">Through
           <input type="date" value={draft.through} onChange={(event) => setDraft({ ...draft, through: event.target.value })}
-            className="mt-1 block h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
+            className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
         </label>
-        <label className="flex h-9 items-center gap-2 text-sm"><input type="checkbox" checked={draft.unread} onChange={(event) => setDraft({ ...draft, unread: event.target.checked })} /> Unread only</label>
+        <label className="flex h-8 items-center gap-2 text-sm"><input type="checkbox" checked={draft.unread} onChange={(event) => setDraft({ ...draft, unread: event.target.checked })} /> Unread only</label>
         <button type="submit" className={OUTLINE_BUTTON}>Apply filters</button>
         {JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? <button type="button" className={GHOST_BUTTON} onClick={() => applyFilters(emptyFilters())}>Clear filters</button> : null}
         {filtersError ? <p role="alert" className="w-full text-sm text-destructive">{filtersError}</p> : null}
@@ -706,7 +706,7 @@ function EarlierUpdates({ post }: { post: PostView }) {
   if (!earlier.length) return null;
   return (
     <section className="mt-6">
-      <h3 className="mb-3 text-sm font-semibold">Earlier updates</h3>
+      <h3 className={cn("mb-3", SECTION_TITLE)}>Earlier updates</h3>
       <ol className="space-y-3">
         {earlier.map((each) => (
           <li key={each.id} className="grid grid-cols-[6rem_minmax(0,1fr)] gap-3">
@@ -728,7 +728,7 @@ function EarlierUpdates({ post }: { post: PostView }) {
 function RailBox({ title, tone, children }: { title: string; tone?: "danger"; children: ReactNode }) {
   return (
     <section className="rounded-lg bg-foreground/[0.04] p-4">
-      <h2 className={cn("mb-2 text-sm font-semibold", tone === "danger" && "text-destructive")}>{title}</h2>
+      <h2 className={cn("mb-2", SECTION_TITLE, tone === "danger" && "text-destructive")}>{title}</h2>
       <ol className="space-y-3">{children}</ol>
     </section>
   );
@@ -792,7 +792,7 @@ function PostPage({ postId }: { postId: string }) {
         <EmptyState icon={FEED_ICON} title="This post was removed" />
       ) : (
         <article>
-          <h1 className="text-2xl leading-tight font-semibold text-balance">{post.title}</h1>
+          <h1 className={cn(ITEM_TITLE, "text-balance")}>{post.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
             <Avatar post={post} />
             <span className="font-medium text-foreground">{from(post)}</span>
@@ -823,7 +823,7 @@ function NeedsYou() {
   if (!waiting.length && status !== "error") return null;
   return (
     <section aria-labelledby="inbox-needs-you" className="mb-8">
-      <h2 id="inbox-needs-you" className="mb-2 flex items-center gap-2 text-lg font-semibold">
+      <h2 id="inbox-needs-you" className={cn("mb-2 flex items-center gap-2", SECTION_TITLE)}>
         Needs you
         {waiting.length ? <span className="rounded-full bg-destructive/10 px-2 text-xs font-medium text-destructive tabular-nums">{waiting.length}</span> : null}
       </h2>
@@ -883,7 +883,7 @@ function FailedThreads() {
   const { failures } = useAutomaticUpdates();
   if (!failed.length && !failures.length) return null;
   return <section aria-labelledby="inbox-failed" className="mb-8">
-    <h2 id="inbox-failed" className="mb-2 text-lg font-semibold">Failed</h2>
+    <h2 id="inbox-failed" className={cn("mb-2", SECTION_TITLE)}>Failed</h2>
     <ol className="divide-y divide-border/60">{failed.map(thread => <li key={thread.id}>
       <a href={thread.href} className="block rounded py-2 text-sm focus-visible:outline focus-visible:outline-2">
         <span className="font-medium">{thread.title}</span>

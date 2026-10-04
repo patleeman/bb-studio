@@ -4,7 +4,7 @@
 // (when it was written, Regenerate, Open in Pages) with its follow-up
 // findings below. A Markdown explainer opens in Pages instead.
 import { errorMessage, shortDateTime } from "@bb-studio/kit/format";
-import { ViewMoveMenu } from "@bb-studio/kit/app";
+import { OUTLINE_BUTTON, ViewMoveMenu } from "@bb-studio/kit/app";
 import { useBbNavigate, useRealtime, type PluginNavPanelProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
@@ -86,7 +86,7 @@ function ThreadExplainerRows({ threadId }: { threadId?: string }) {
     const timer = setInterval(load, POLL_MS);
     return () => clearInterval(timer);
   }, [running, load]);
-  if (error) return <PanelMessage title="Couldn't load explainers" detail={error}><button type="button" className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-state-hover" onClick={load}>Retry</button></PanelMessage>;
+  if (error) return <PanelMessage title="Couldn't load explainers" detail={error}><button type="button" className={OUTLINE_BUTTON} onClick={load}>Retry</button></PanelMessage>;
   if (explainers === null) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
   if (!explainers.length) {
     return <PanelMessage title={threadId ? "Nothing explored in this thread yet" : "Nothing explored yet"} detail="Click a finding under an answer to write a page explaining it." />;

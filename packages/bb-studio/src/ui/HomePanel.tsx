@@ -1,4 +1,4 @@
-import { BarCrumb, BarSeparator, PageColumn, StudioBar, ViewMoveMenu, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
+import { BarCrumb, BarSeparator, PageColumn, SECTION_TITLE, StudioBar, ViewMoveMenu, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -30,7 +30,7 @@ function useHome(periodDays: number) {
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="min-w-0"><h2 className="mb-2 text-sm font-semibold">{title}</h2><div className="divide-y divide-border rounded-md border border-border">{children}</div></section>;
+  return <section className="min-w-0"><h2 className={`mb-2 ${SECTION_TITLE}`}>{title}</h2><div className="divide-y divide-border rounded-md border border-border">{children}</div></section>;
 }
 
 function Row({ title, detail, href }: { title: string; detail?: string; href?: string }) {

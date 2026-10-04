@@ -1,3 +1,4 @@
+import { PAGE_TITLE } from "@bb-studio/kit/app";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { PageConnection } from "./connection";
 import { MissingTitleRecovery } from "./MissingTitleRecovery";
@@ -24,7 +25,7 @@ export function MissingPageRecovery({ pageId, onBack, onRetryPage, backLabel = "
   return (
     <div className="h-full overflow-auto bg-background p-6 text-foreground">
       <div className="mx-auto flex max-w-md flex-col gap-3 text-center">
-        <h2 className="text-lg font-semibold">Page unavailable</h2>
+        <h2 className={PAGE_TITLE}>Page unavailable</h2>
         <p className="text-sm text-muted-foreground">It may have been deleted, or BB could not load its details.</p>
         <div role="status" className="space-y-2 text-sm">
           {loading ? <p>Checking local recovery…</p> : recovered ? (

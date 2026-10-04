@@ -1,4 +1,4 @@
-import { GHOST_BUTTON, cn } from "@bb-studio/kit/app";
+import { GHOST_BUTTON, SECTION_TITLE, cn } from "@bb-studio/kit/app";
 import { relativeTime, errorMessage } from "@bb-studio/kit/format";
 import { experimental_useSidebarThreads as useSidebarThreads, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
@@ -41,7 +41,7 @@ export function AutomaticUpdates() {
   const [actionError, setActionError] = useState<string | null>(null);
   if (!updates.length && !error) return null;
   return <section aria-labelledby="inbox-results" className="mb-8">
-    <h2 id="inbox-results" className="mb-2 text-lg font-semibold">New results</h2>
+    <h2 id="inbox-results" className={cn("mb-2", SECTION_TITLE)}>New results</h2>
     {error || actionError ? <p role="alert" className="text-sm text-destructive">{error || actionError}</p> : null}
     {degraded ? <p className="mb-2 text-xs text-muted-foreground">Smart filtering is unavailable. Results are still delivered.</p> : null}
     <ol className="divide-y divide-border/60">

@@ -7,7 +7,7 @@ import { FloatPanels, useCompanionNavigate, useInFloat } from "./float";
 import { publishFloatBody, setFloatHost } from "./float-registry";
 
 const sdkNavigate = vi.hoisted(() => ({ toThread: vi.fn() }));
-vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_usePluginId: () => "pages", useBbNavigate: () => sdkNavigate }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_Icon: () => null, experimental_usePluginId: () => "pages", useBbNavigate: () => sdkNavigate }));
 
 let root: Root;
 let container: HTMLDivElement;

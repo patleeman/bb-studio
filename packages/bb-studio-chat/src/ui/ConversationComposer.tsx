@@ -1,5 +1,5 @@
 import { useBbNavigate, useRpc, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { NewConversationComposer, openCompanion, panelHref, useCompanionNavigate, type ConversationSubmit } from "@bb-studio/kit/app";
+import { NewConversationComposer, openCompanion, OUTLINE_BUTTON, panelHref, useCompanionNavigate, type ConversationSubmit } from "@bb-studio/kit/app";
 import { errorMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useState } from "react";
 import type { rpcContract, Viewed } from "../contract";
@@ -61,7 +61,7 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
     load().then(result => { if (live) setLoaded(result); }, cause => { if (live) setError(errorMessage(cause)); });
     return () => { live = false; };
   }, [load, attempt]);
-  if (error) return <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center text-sm"><p>{error}</p><button type="button" onClick={() => setAttempt(value => value + 1)} className="rounded border border-border px-3 py-1.5 hover:bg-state-hover">Retry</button></div>;
+  if (error) return <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center text-sm"><p>{error}</p><button type="button" onClick={() => setAttempt(value => value + 1)} className={OUTLINE_BUTTON}>Retry</button></div>;
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading conversation…</p>;
   return <ConversationComposer key={loaded.draftKey} {...loaded} href={panelHref("studio-chat", "chats", subPath)} focusRequest={1} onSubmit={async request => {
     const { threadId } = await rpc.call("start", { item: loaded.item ? { pluginId: loaded.item.pluginId, id: loaded.item.id } : null, request });
