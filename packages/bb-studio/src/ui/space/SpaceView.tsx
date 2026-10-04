@@ -67,12 +67,12 @@ function RunMenu({ lead, onChanged }: { lead: SpaceLead; onChanged: () => void }
   };
   return (
     <Menu.Root>
-      <Menu.Trigger className={GHOST_BUTTON} title="Keep this Space running on a heartbeat">
-        <Icon name={run ? "Repeat" : "Pause"} className="size-4" />{run ? `Runs ${RUN_LABELS[run.cadence].toLowerCase()}` : "Keep running"}
+      <Menu.Trigger className={GHOST_BUTTON} title="Schedule the lead's check-ins">
+        <Icon name="Repeat" className="size-4" />{run ? `${RUN_LABELS[run.cadence]} check-ins` : "Check-ins"}
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
-          <p className="px-2 pt-1 pb-1.5 text-xs text-muted-foreground">The lead checks in on its own and reports to your Inbox.</p>
+          <p className="max-w-64 px-2 pt-1 pb-1.5 text-xs text-muted-foreground">Schedule the lead to check in and report to your Inbox. Turning check-ins off does not stop running threads.</p>
           <Menu.RadioGroup value={run?.cadence ?? "off"} onValueChange={(value) => set(value === "off" ? null : value as Cadence)}>
             {(["off", "hourly", "daily", "weekdays"] as const).map((value) => (
               <Menu.RadioItem key={value} value={value} className={MENU_ITEM}>
@@ -148,14 +148,12 @@ function SpaceView({ spaceId }: { spaceId: string }) {
         <span className="mr-1 inline-flex size-5 items-center justify-center"><SpaceMarkGlyph icon={lead.data?.icon ?? space?.icon ?? null} color={lead.data?.color ?? space?.color} /></span>
         <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</h1>
         {lead.data && leadThreadId ? <RunMenu lead={lead.data} onChanged={lead.refresh} /> : null}
-        {leadThreadId
-          ? <button type="button" onClick={() => setHandingOff(true)} title="Hand the lead to another agent" className={GHOST_BUTTON}><Icon name="Fork" className="size-4" />Hand off</button>
-          : null}
         <button type="button" onClick={() => setStarting(true)} className={GHOST_BUTTON}><Icon name="MessageSquarePlus" className="size-4" />New thread</button>
         <Menu.Root>
           <Menu.Trigger aria-label="Space options" title="Space options" className={GHOST_BUTTON}><Icon name="MoreHorizontal" className="size-4" /></Menu.Trigger>
           <Menu.Portal>
             <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
+              {leadThreadId ? <Menu.Item className={MENU_ITEM} onSelect={() => setHandingOff(true)}><Icon name="Fork" />Hand off lead…</Menu.Item> : null}
               <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "edit")}><Icon name="Edit" />Edit Space</Menu.Item>
               <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "threads")}><Icon name="MessageSquare" />Manage threads</Menu.Item>
               <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "items")}><Icon name="FileText" />Manage items</Menu.Item>
