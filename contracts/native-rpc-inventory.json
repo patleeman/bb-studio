@@ -1052,6 +1052,12 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/iOS/Office/OfficeContext.swift",
+      "plugin": "studio",
+      "method": "space_update",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/iOS/Office/TeamTab.swift",
       "plugin": "studio",
       "method": "teams_create",

@@ -1,3 +1,5 @@
+> **Superseded** by [work-model.md](work-model.md): the web sidebar no longer has tabs. The backend tab RPCs below remain for the iOS app until it moves to the work model.
+
 # Office tabs: the Arc-style sidebar
 
 Status: building. Prototype: thread storage `reports/arc-prototype.html` (thr_hzjd32mmb6).

@@ -1,10 +1,9 @@
 // One thing addressed to you: a request you act on in place, a report you
-// read and clear, or a comment. Shared by Home and the Inbox.
+// read and clear, or a comment.
 import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PRIMARY_BUTTON, openAppPath } from "@bb-studio/kit/app";
 import { useState } from "react";
 import { Face } from "./Face";
-import { SpaceMark } from "./SpaceSwitcher";
-import { useCall, type InboxEvent, type Space, type TeamBot } from "./model";
+import { useCall, type InboxEvent, type TeamBot } from "./model";
 import { cn } from "./styles";
 import { plainPreview } from "./text";
 
@@ -30,11 +29,9 @@ function when(at: number): string {
     : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
 }
 
-export function InboxRow({ event, bot, space, onChanged }: {
+export function InboxRow({ event, bot, onChanged }: {
   event: InboxEvent;
   bot: TeamBot | undefined;
-  /** Shown in the All spaces view. */
-  space?: Space | undefined;
   onChanged: () => void;
 }) {
   const call = useCall();
@@ -67,7 +64,6 @@ export function InboxRow({ event, bot, space, onChanged }: {
           >
             {plainPreview(event.title)}
           </button>
-          {space ? <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><SpaceMark space={space} size="sm" />{space.name}</span> : null}
           <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{when(event.createdAt)}</span>
         </div>
         <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">

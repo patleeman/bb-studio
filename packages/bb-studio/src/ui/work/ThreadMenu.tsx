@@ -1,6 +1,6 @@
 // A thread row's actions, from right-click or the row's ⋯ button: the same
-// set BB's own sidebar offers (favorite, read state, rename, split, archive,
-// delete), so moving to the office sidebar loses nothing.
+// set BB's own sidebar offers (pin, read state, rename, split, archive,
+// delete), so this sidebar loses nothing BB's has.
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import {
@@ -18,7 +18,7 @@ function useThreadItems(thread: PluginSidebarThread, onRename: () => void): Item
   return [
     [
       { id: "split", label: "Open in split", icon: "Columns2", run: () => actions.open(thread.id, { split: true }) },
-      { id: "pin", label: thread.isPinned ? "Remove from favorites" : "Add to favorites", icon: "Star", run: () => void actions.setPinned(thread.id, !thread.isPinned) },
+      { id: "pin", label: thread.isPinned ? "Unpin" : "Pin", icon: thread.isPinned ? "PinOff" : "Pin", run: () => void actions.setPinned(thread.id, !thread.isPinned) },
       { id: "read", label: thread.isUnread ? "Mark as read" : "Mark as unread", icon: thread.isUnread ? "MailOpen" : "Mail", run: () => void actions.setRead(thread.id, thread.isUnread) },
       { id: "rename", label: "Rename", icon: "Edit", run: onRename },
     ],
