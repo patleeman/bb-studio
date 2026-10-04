@@ -204,7 +204,7 @@ it("overviews implicit and explicit threads and the space's items", async () => 
   expect(threads.map((t) => t.id)).toEqual(["visitor", "t1", "child", "implicit"]);
   expect(threads.find((t) => t.id === "t1")).toMatchObject({ isLead: true, title: "Garden · lead" });
   expect(threads.find((t) => t.id === "child")).toMatchObject({ parentThreadId: "implicit", isLead: false });
-  expect(items).toEqual([{ ref: "pages:note", title: "note", kind: "page", href: "/p/note", icon: null, updatedAt: 10, kindLabel: "page", kindIcon: "File", preview: null, thumbnailUrl: null, updatedBy: null }]);
+  expect(items).toEqual([{ ref: "pages:note", title: "note", kind: "page", href: "/p/note", icon: null, updatedAt: 10, kindLabel: "page", kindIcon: "File", preview: null, updatedBy: null }]);
   const map = await x.leads.spaceOfThreads();
   expect(map).toMatchObject({ t1: x.garden.id, implicit: x.garden.id, moved: x.kitchen.id, visitor: x.garden.id });
   expect(map.archived).toBeUndefined();

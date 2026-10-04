@@ -120,7 +120,7 @@ export interface OverviewThread { id: string; title: string; status: string; upd
 export interface OverviewActivity { id: string; threadId: string; title: string; summary: string; at: number; kind: string }
 export interface OverviewItem {
   ref: string; title: string; kind: string; href: string; icon: string | null; updatedAt: number;
-  kindLabel: string; kindIcon: string; preview: string | null; thumbnailUrl: string | null; updatedBy: "user" | "agent" | null;
+  kindLabel: string; kindIcon: string; preview: string | null; updatedBy: "user" | "agent" | null;
 }
 
 export function useSpaces() {

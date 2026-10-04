@@ -208,7 +208,7 @@ export class SpaceLeads {
         return {
           ref: `${item.pluginId}:${item.id}`, title: item.title || "Untitled", kind: item.kind, href: item.href, icon: item.icon ?? null, updatedAt: item.updatedAt,
           kindLabel: kind?.label ?? item.kind, kindIcon: kind?.icon ?? "File",
-          preview: item.preview ?? null, thumbnailUrl: item.thumbnailUrl ?? null, updatedBy: item.updatedBy ?? null,
+          preview: item.preview ?? null, updatedBy: item.updatedBy ?? null,
         };
       });
     const enriched = await spaceThreadStatus(this.deps.sdk, threads);

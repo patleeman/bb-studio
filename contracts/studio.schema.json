@@ -4676,12 +4676,6 @@
                     "null"
                   ]
                 },
-                "thumbnailUrl": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
                 "updatedBy": {
                   "anyOf": [
                     {
@@ -4707,7 +4701,6 @@
                 "kindLabel",
                 "kindIcon",
                 "preview",
-                "thumbnailUrl",
                 "updatedBy"
               ],
               "additionalProperties": false

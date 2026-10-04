@@ -203,12 +203,17 @@ function PresenceStack({ presence }: { presence: Presence[] }) {
   );
 }
 
-/** Saved and online is the normal state: the badge only shows when something needs you. */
+/** The badge only shows when something needs you: a failed save, offline, or a deleted page. Saving as you type is the dot in the bar. */
 export function persistenceVisible(connection: PageConnection | null): boolean {
   if (!connection) return false;
-  const quiet = connection.serverSave === "confirmed" && connection.status !== "offline" && connection.status !== "missing"
-    && connection.localSave !== "failed";
-  return !quiet;
+  return connection.status === "offline" || connection.status === "missing" || connection.localSave === "failed" || connection.serverSave === "failed";
+}
+
+/** A quiet dot in the bar while edits are on their way to BB; nothing once they're saved. */
+export function SavingDot({ connection, titleSaving }: { connection: PageConnection | null; titleSaving: boolean }) {
+  const saving = titleSaving || (!!connection && !persistenceVisible(connection) && connection.serverSave !== "confirmed");
+  if (!saving) return null;
+  return <span role="status" aria-label="Saving" title="Saving to BB" className="ml-1.5 inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />;
 }
 
 export function PersistenceBadge({ connection }: { connection: PageConnection | null }) {
@@ -481,7 +486,7 @@ export function PageView({
                 }}
               />
             </div>
-            {titleSave.status !== "saved" || titleSave.localError || titleSave.alternatives.length ? (
+            {titleSave.status === "failed" || titleSave.status === "conflict" || titleSave.status === "recovered" || titleSave.localError || titleSave.alternatives.length ? (
               <div className="mt-3 rounded-md border border-border px-3 py-2 text-sm">
                 <p role="status" aria-live="polite" className={cn(titleSave.status === "failed" || titleSave.status === "conflict" || titleSave.localError ? "text-destructive" : "text-muted-foreground")}>
                   {titleSave.status === "conflict" ? "The title changed in BB. Your title draft is kept here."
@@ -552,7 +557,10 @@ export function PageView({
         backLabel={backLabel}
         onBack={onBack}
         item={{ title: title || "Untitled", href: `/plugins/pages/pages/${page.id}` }}
-        leading={inFloat ? undefined : <Breadcrumbs page={shown} pages={pages} />}
+        leading={<>
+          {inFloat ? null : <Breadcrumbs page={shown} pages={pages} />}
+          <SavingDot connection={connection} titleSaving={titleSave.status === "pending" || titleSave.status === "saving"} />
+        </>}
         chatAction={studioChat === false ? <PageChat page={page} threadId={chatThread ?? chats[0]?.threadId ?? null} /> : undefined}
         trailing={
           <>

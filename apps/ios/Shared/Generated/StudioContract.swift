@@ -3440,10 +3440,9 @@ public enum Studio {
     public var kindLabel: String?
     public var kindIcon: String?
     public var preview: String?
-    public var thumbnailUrl: String?
     public var updatedBy: SpaceOverviewOutputItemsItemUpdatedBy?
 
-    public init(ref: String? = nil, title: String? = nil, kind: String? = nil, href: String? = nil, icon: String? = nil, updatedAt: Double? = nil, kindLabel: String? = nil, kindIcon: String? = nil, preview: String? = nil, thumbnailUrl: String? = nil, updatedBy: SpaceOverviewOutputItemsItemUpdatedBy? = nil) {
+    public init(ref: String? = nil, title: String? = nil, kind: String? = nil, href: String? = nil, icon: String? = nil, updatedAt: Double? = nil, kindLabel: String? = nil, kindIcon: String? = nil, preview: String? = nil, updatedBy: SpaceOverviewOutputItemsItemUpdatedBy? = nil) {
       self.ref = ref
       self.title = title
       self.kind = kind
@@ -3453,7 +3452,6 @@ public enum Studio {
       self.kindLabel = kindLabel
       self.kindIcon = kindIcon
       self.preview = preview
-      self.thumbnailUrl = thumbnailUrl
       self.updatedBy = updatedBy
     }
   }
