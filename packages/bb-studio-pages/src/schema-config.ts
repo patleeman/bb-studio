@@ -49,7 +49,7 @@ export const htmlConfig = {
 /** The longest HTML source an ```html fence may hold; longer ones stay code. */
 export const MAX_HTML_CHARS = 200_000;
 
-export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "table", "item", "space"] as const;
+export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "table", "item"] as const;
 export type EmbedKind = (typeof EMBED_KINDS)[number];
 
 /**
@@ -90,15 +90,6 @@ export function studioRef(kind: string, target: string): { pluginId: string; id:
 export function studioEmbedFor(pluginId: string, id: string): { kind: StudioEmbedKind | "item"; target: string } {
   const kind = (Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).find((each) => isEmbedKindItem(each, pluginId));
   return kind ? { kind, target: id } : { kind: "item", target: `${pluginId}:${id}` };
-}
-
-/** What a space widget shows; its target is `<space id>/<section>`. */
-export const SPACE_SECTIONS = ["actions", "recent", "threads", "channels", "projects"] as const;
-export type SpaceSection = (typeof SPACE_SECTIONS)[number];
-
-export function parseSpaceTarget(target: string): { spaceId: string; section: SpaceSection } {
-  const [spaceId = "", section = ""] = target.split("/");
-  return { spaceId, section: (SPACE_SECTIONS as readonly string[]).includes(section) ? (section as SpaceSection) : "recent" };
 }
 
 export const embedConfig = {

@@ -138,12 +138,6 @@ extension BBClient {
         try await rpc("studio", Studio.Method.spaceWidget, ["id": .string(id)])
     }
 
-    /// Puts back the widgets the space's page lacks; how many it added.
-    public func restoreSpaceWidgets(_ id: String) async throws -> Int {
-        let result: Studio.RestoreSpaceWidgetsOutput = try await rpc("studio", Studio.Method.restoreSpaceWidgets, ["id": .string(id)])
-        return Int(result.added ?? 0)
-    }
-
     /// An item made in the space's default project and added to the space; its path.
     public func createInSpace(_ id: String, pluginId: String, kind: String) async throws -> String {
         let result: Studio.CreateInSpaceOutput = try await rpc("studio", Studio.Method.createInSpace, [

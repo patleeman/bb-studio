@@ -99,21 +99,6 @@ export function SpaceDialog({
   const [project, setProject] = useState(space ? (space.defaultProjectId ?? "") : (defaultProjectId ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [restored, setRestored] = useState<string | null>(null);
-
-  const restore = async () => {
-    if (!space) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const { added } = await rpc.call("restoreSpaceWidgets", { id: space.id });
-      setRestored(added ? `Added ${added} ${added === 1 ? "widget" : "widgets"} to the page.` : "The page has every widget.");
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const save = async () => {
     setBusy(true);
@@ -180,17 +165,6 @@ export function SpaceDialog({
             </select>
             <span className="text-xs text-muted-foreground">New items go here, and it joins the space with its items and threads.</span>
           </label>
-          {space?.pageId ? (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Page</span>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void restore()}>
-                  Restore missing widgets
-                </Button>
-                <span className="text-xs text-muted-foreground">{restored ?? "Puts back widgets taken off the space's page."}</span>
-              </div>
-            </div>
-          ) : null}
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
           <DialogFooter>
             {space && onDelete ? (

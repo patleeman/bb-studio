@@ -292,7 +292,6 @@ export const rpcContract = defineRpcContract({
   /** What a space page's widgets show, for Pages. */
   spaceWidget: { input: z.object({ id: spaceId }), output: spaceWidget },
   /** Puts back the widgets the space's page lacks. */
-  restoreSpaceWidgets: { input: z.object({ id: spaceId }), output: z.object({ added: z.number() }) },
   /** An item made in a space's default project and added to the space. */
   createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string(), title: z.string().optional() }) },
   /** Open threads, channels and direct messages to pick from when adding one to a space. */

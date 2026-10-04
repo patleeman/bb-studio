@@ -18,7 +18,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { studioItemProps, studioThreadProps } from "@bb-studio/kit/app";
+import { PRIMARY_BUTTON, studioItemProps, studioThreadProps } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { chartSpecSchema, parseJsonWith, resolveChart, statItemsSchema, type StatItem } from "../chart-spec";
@@ -29,7 +29,6 @@ import { codeBlockSpec } from "./code";
 import { usePagesUi } from "./context";
 import { HtmlBlock } from "./html";
 import { MermaidBlock } from "./mermaid";
-import { SpaceEmbed } from "./space-embeds";
 import { StudioEmbed, StudioPicker, useStudioItem } from "./studio-embeds";
 
 // React renderers for the custom blocks. Configs come from schema-config.ts so
@@ -379,7 +378,6 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
   const [editing, setEditing] = useState(!target);
   const [draft, setDraft] = useState(target);
 
-  if (kind === "space") return <SpaceEmbed target={target} />;
   if (isStudioEmbed(kind)) {
     if (editing && onEdit) {
       return (
@@ -417,7 +415,7 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => event.stopPropagation()}
         />
-        <button type="submit" className="rounded-md bg-foreground px-3 text-xs text-background">
+        <button type="submit" className={PRIMARY_BUTTON}>
           Embed
         </button>
       </form>
@@ -456,7 +454,7 @@ const EmbedBlock = createReactBlockSpec(embedConfig, {
     <div
       className={cn(
         "pages-embed my-1 w-full rounded-lg border border-border bg-card/50",
-        (block.props.kind === "bookmark" && block.props.target) || isStudioEmbed(block.props.kind) || block.props.kind === "space" ? "overflow-hidden" : "p-2",
+        (block.props.kind === "bookmark" && block.props.target) || isStudioEmbed(block.props.kind) ? "overflow-hidden" : "p-2",
       )}
       contentEditable={false}
     >

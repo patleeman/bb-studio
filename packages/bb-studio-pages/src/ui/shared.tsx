@@ -19,7 +19,7 @@ export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 export { useProjects } from "@bb-studio/kit/app";
 export type { Project } from "@bb-studio/kit/app";
 import { CopyReferenceMenuItem, type Project } from "@bb-studio/kit/app";
-import { spaceDialog } from "./space-embeds";
+import { spaceDialog } from "./space-dialog";
 export type BotsState = { available: boolean; reason: string | null; bots: BotView[] };
 
 // Shared with every Studio plugin, so the chrome matches.

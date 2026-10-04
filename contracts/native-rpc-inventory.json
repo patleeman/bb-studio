@@ -604,12 +604,6 @@
     {
       "file": "apps/ios/Shared/Spaces.swift",
       "plugin": "studio",
-      "method": "restoreSpaceWidgets",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
       "method": "createInSpace",
       "coverage": "generated method"
     },

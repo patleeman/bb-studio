@@ -32,7 +32,7 @@ import { spaceViewHref } from "./src/ui/space/routes";
 import { SpaceFolders } from "./src/space-folders";
 import { spaceItem } from "./src/space-items";
 import { spaceTreeItems, TREE_THREADS } from "./src/space-tree";
-import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, type SpaceWidget } from "./src/space-page";
+import { PAGES_PLUGIN_ID, pageHref, spacePageMarkdown } from "./src/space-page";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
@@ -286,24 +286,7 @@ export default async function plugin(bb: BbPluginApi) {
   const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean(), title: z.string().optional(), icon: z.string().optional() }).nullable() });
   const callPages = <T extends z.ZodType>(method: string, input: unknown, outputSchema: T) =>
     bb.sdk.plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) }) as Promise<z.infer<T>>;
-  const pageMarkdown = z.object({ markdown: z.string() });
   /** Appends the widgets in `sections` that the space's page lacks, and says how many. */
-  const addWidgets = async (space: Space, sections: readonly SpaceWidget[]): Promise<number> => {
-    if (!space.pageId || !sections.length) return 0;
-    for (let attempt = 0; ; attempt++) {
-      const { markdown } = await callPages("editableMarkdown", { id: space.pageId }, pageMarkdown);
-      const present = pageWidgets(markdown, space.id);
-      const missing = sections.filter((section) => !present.has(section));
-      if (!missing.length) return 0;
-      try {
-        // Pages appends only if the page is still what was read.
-        await callPages("editBlock", { id: space.pageId, expected: markdown, markdown: widgetsMarkdown(space, missing) }, pageMarkdown);
-        return missing.length;
-      } catch (cause) {
-        if (attempt) throw cause;
-      }
-    }
-  };
   const making = new Map<string, Promise<string | null>>();
   /** A space's home page, made from the space template if it has none; null without Pages. */
   const spacePage = (id: string): Promise<string | null> => {
@@ -529,10 +512,6 @@ export default async function plugin(bb: BbPluginApi) {
     spacePage: async ({ id }) => {
       const pageId = await spacePage(id);
       return { href: pageId ? pageHref(pageId) : null };
-    },
-    restoreSpaceWidgets: async ({ id }) => {
-      if (!(await spacePage(id))) throw new Error("Pages isn't available.");
-      return { added: await addWidgets(spaces.get(id)!, SPACE_WIDGETS) };
     },
     spaceWidget: async ({ id }) => {
       const space = spaces.get(id);

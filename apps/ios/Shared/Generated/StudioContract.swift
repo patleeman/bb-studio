@@ -37,7 +37,6 @@ public enum Studio {
     public static let pendingThreadSpaces = "pendingThreadSpaces"
     public static let spacePage = "spacePage"
     public static let spaceWidget = "spaceWidget"
-    public static let restoreSpaceWidgets = "restoreSpaceWidgets"
     public static let createInSpace = "createInSpace"
     public static let recentThreads = "recentThreads"
     public static let space_lead = "space_lead"
@@ -152,8 +151,6 @@ public enum Studio {
   public typealias SpacePage = SpacePageOutput
 
   public typealias SpaceWidget = SpaceWidgetOutput
-
-  public typealias RestoreSpaceWidgets = RestoreSpaceWidgetsOutput
 
   public typealias CreateInSpace = CreateInSpaceOutput
 
@@ -2777,22 +2774,6 @@ public enum Studio {
       self.projects = projects
       self.kinds = kinds
       self.threadPrompt = threadPrompt
-    }
-  }
-
-  public struct RestoreSpaceWidgetsInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct RestoreSpaceWidgetsOutput: Sendable, Hashable, Codable {
-    public var added: Double?
-
-    public init(added: Double? = nil) {
-      self.added = added
     }
   }
 

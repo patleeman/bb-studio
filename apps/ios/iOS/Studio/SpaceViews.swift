@@ -456,7 +456,6 @@ struct SpaceSettingsSheet: View {
     @State private var defaultProjectId = ""
     @State private var busy = false
     @State private var error: String?
-    @State private var message: String?
     @State private var confirmingDelete = false
 
     private var current: StudioSpace? { space ?? loaded }
@@ -498,14 +497,6 @@ struct SpaceSettingsSheet: View {
                     Text("New items and threads made in the space go to this project.")
                 }
                 if let current, !isNew {
-                    if current.pageId != nil {
-                        Section {
-                            Button("Restore Missing Widgets") { Task { await restore(current) } }
-                                .disabled(busy)
-                        } footer: {
-                            Text(message ?? "Puts back the widgets you removed from the space's page.")
-                        }
-                    }
                     Section {
                         Button("Delete Space", role: .destructive) { confirmingDelete = true }.disabled(busy)
                     } footer: {
@@ -572,17 +563,6 @@ struct SpaceSettingsSheet: View {
             await studio.load(client)
             operation.complete(on: app) { dismiss() }
             operation.complete(on: app) { done(saved) }
-        } catch {
-            self.error = BBClient.describe(error, server: client.baseURL)
-        }
-    }
-
-    private func restore(_ space: StudioSpace) async {
-        busy = true
-        defer { busy = false }
-        do {
-            let added = try await client.restoreSpaceWidgets(space.id)
-            message = added == 0 ? "The page has every widget." : "Added \(added) widget\(added == 1 ? "" : "s") to the page."
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }

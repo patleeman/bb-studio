@@ -90,12 +90,6 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
           studioItems.current = null;
           return result.table;
         }),
-      space: (id) => rpc.call("spaceView", { id }).then((result) => result.view),
-      createInSpace: (input) =>
-        rpc.call("spaceCreate", input).then((result) => {
-          studioItems.current = null;
-          return result;
-        }),
       compose: (prompt) => navigate.toCompose({ initialPrompt: prompt, focusPrompt: true }),
     }),
     [pages, bots.bots, openPage, navigate, rpc],

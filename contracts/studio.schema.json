@@ -4095,35 +4095,6 @@
         "additionalProperties": false
       }
     },
-    "restoreSpaceWidgets": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "added": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "added"
-        ],
-        "additionalProperties": false
-      }
-    },
     "createInSpace": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

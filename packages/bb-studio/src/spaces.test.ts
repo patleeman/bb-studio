@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { inSpace, linkedSpaceIds, PERSONAL_PROJECT_ID, PROJECT_REF, spaceAssignments, SpaceStore, THREAD_REF } from "./spaces";
 import { spaceViewHref } from "./ui/space/routes";
-import { pageWidgets, spacePageMarkdown, widgetsMarkdown } from "./space-page";
+import { spacePageMarkdown } from "./space-page";
 import { TagStore } from "./tags";
 import { firstThreadSpaceIds } from "./thread-item-refs";
 
@@ -41,24 +41,13 @@ describe("spaces", () => {
     expect(() => spaces.remove(personal.id)).toThrow("can't be deleted");
   });
 
-  it("keep their page, and start it with every widget", () => {
+  it("keep their page, and start it as a brief", () => {
     const { spaces } = stores();
     const launch = spaces.create({ name: "Launch", description: "Q4 launch" });
     expect(launch.pageId).toBeNull();
     spaces.setPage(launch.id, "pg_1");
     expect(spaces.get(launch.id)!.pageId).toBe("pg_1");
-    const markdown = spacePageMarkdown(launch);
-    expect(markdown.startsWith("Q4 launch")).toBe(true);
-    for (const section of ["actions", "recent", "threads", "channels", "projects"]) expect(markdown).toContain(`{"kind":"space","target":"${launch.id}/${section}"}`);
-  });
-
-  it("know which widgets a page holds", () => {
-    const { spaces } = stores();
-    const launch = spaces.create({ name: "Launch" });
-    const other = ["```embed", '{"kind":"space","target":"spc_other/threads"}', "```"].join("\n");
-    const page = [widgetsMarkdown(launch, ["actions", "recent"]), other].join("\n\n");
-    expect([...pageWidgets(page, launch.id)]).toEqual(["actions", "recent"]);
-    expect(widgetsMarkdown(launch, ["threads"])).toMatch(/^## Threads\n\n```embed/);
+    expect(spacePageMarkdown(launch)).toBe("Q4 launch\n\n## Plan\n\n## Decisions");
   });
 
   it("are kept apart from tags, and have unique names", () => {
