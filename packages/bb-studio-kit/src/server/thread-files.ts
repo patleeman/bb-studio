@@ -2,6 +2,8 @@
 // it's inside that thread's workspace or its thread storage, and we read it
 // with the root set so the host refuses symlinks that lead outside it.
 import { posix } from "node:path";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { errorMessage } from "../format";
 
 export interface SourceRoot {
   kind: "workspace" | "storage";
@@ -60,4 +62,29 @@ export function displayPath(source: ResolvedSource): string {
   const base = posix.normalize(source.root.path).replace(/\/+$/, "");
   const relative = source.path.slice(base.length + 1);
   return source.root.kind === "storage" ? `thread-storage/${relative}` : relative;
+}
+
+/** The thread's workspace and thread storage, whichever are reachable. */
+export async function threadRoots(bb: Pick<BbPluginApi, "sdk">, threadId: string): Promise<{ projectId: string | null; roots: SourceRoot[]; storageError: string | null }> {
+  const thread = (await bb.sdk.threads.get({ threadId, include: "environment" })) as {
+    projectId: string | null;
+    environment?: { hostId: string; path: string | null } | null;
+  };
+  const roots: SourceRoot[] = [];
+  if (thread.environment?.path) roots.push({ kind: "workspace", hostId: thread.environment.hostId, path: thread.environment.path });
+  let storageError: string | null = null;
+  try {
+    const storage = await bb.sdk.threads.storageLocation({ threadId });
+    roots.push({ kind: "storage", hostId: storage.hostId, path: storage.storageRootPath });
+  } catch (error) {
+    storageError = errorMessage(error);
+  }
+  return { projectId: thread.projectId ?? null, roots, storageError };
+}
+
+/** Reads a resolved file from its root's host, so the host refuses symlinks out of the root. */
+export async function readThreadFile(bb: Pick<BbPluginApi, "sdk">, source: ResolvedSource): Promise<{ bytes: Uint8Array; mime: string | undefined }> {
+  const file = await bb.sdk.files.read({ hostId: source.root.hostId, rootPath: source.root.path, path: source.path });
+  const bytes = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64") : Buffer.from(file.content, "utf8");
+  return { bytes: new Uint8Array(bytes), mime: file.mimeType };
 }

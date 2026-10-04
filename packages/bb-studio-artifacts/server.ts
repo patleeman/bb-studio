@@ -1,5 +1,5 @@
 import { parseFlags } from "@bb-studio/kit/cli";
-import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
+import { defineItemMention, displayPath, readThreadFile, resolveSource, serveBytes, threadRoots as rootsOf, type ResolvedSource } from "@bb-studio/kit/server";
 import { errorMessage } from "@bb-studio/kit/format";
 // Studio Artifacts (plugin id `artifacts`): keep the files agents make.
 //
@@ -18,7 +18,6 @@ import { mentionContext } from "./lib/mention";
 import { contentHeaders, withQuoteScript } from "./src/server/content";
 import { importedFile } from "./src/server/import-file";
 import { pageMarkdown } from "./src/server/page";
-import { displayPath, resolveSource, type ResolvedSource, type SourceRoot } from "./src/server/source";
 import { artifactText, registerStudio } from "./src/server/studio";
 import {
   ArtifactStore,
@@ -213,29 +212,8 @@ export default async function plugin(bb: BbPluginApi) {
     return artifact;
   }
 
-  /** The thread's workspace and thread storage, whichever are reachable. */
-  async function threadRoots(threadId: string): Promise<{ projectId: string | null; roots: SourceRoot[]; storageError: string | null }> {
-    const thread = (await bb.sdk.threads.get({ threadId, include: "environment" })) as {
-      projectId: string | null;
-      environment?: { hostId: string; path: string | null } | null;
-    };
-    const roots: SourceRoot[] = [];
-    if (thread.environment?.path) roots.push({ kind: "workspace", hostId: thread.environment.hostId, path: thread.environment.path });
-    let storageError: string | null = null;
-    try {
-      const storage = await bb.sdk.threads.storageLocation({ threadId });
-      roots.push({ kind: "storage", hostId: storage.hostId, path: storage.storageRootPath });
-    } catch (error) {
-      storageError = errorMessage(error);
-    }
-    return { projectId: thread.projectId ?? null, roots, storageError };
-  }
-
-  async function readSource(source: ResolvedSource): Promise<{ bytes: Uint8Array; mime: string | undefined }> {
-    const file = await bb.sdk.files.read({ hostId: source.root.hostId, rootPath: source.root.path, path: source.path });
-    const bytes = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64") : Buffer.from(file.content, "utf8");
-    return { bytes: new Uint8Array(bytes), mime: file.mimeType };
-  }
+  const threadRoots = (threadId: string) => rootsOf(bb, threadId);
+  const readSource = (source: ResolvedSource) => readThreadFile(bb, source);
 
   /** Whether a file is there. A read that fails counts as no file; a write would fail the same way. */
   async function exists(source: ResolvedSource): Promise<boolean> {

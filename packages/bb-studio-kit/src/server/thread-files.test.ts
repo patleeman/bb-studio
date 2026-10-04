@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayPath, resolveSource, type SourceRoot } from "./source";
+import { displayPath, resolveSource, type SourceRoot } from "./thread-files";
 
 const workspace: SourceRoot = { kind: "workspace", hostId: "h", path: "/work/repo" };
 const storage: SourceRoot = { kind: "storage", hostId: "h", path: "/data/thread-storage/thr_1" };

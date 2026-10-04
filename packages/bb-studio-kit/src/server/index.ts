@@ -7,5 +7,6 @@ export { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type Prov
 export { actorName, type Actor } from "./actor";
 export { studioServices, type StudioActivity, type StudioLink, type StudioRef } from "./studio-services";
 
+export { displayPath, readThreadFile, resolveSource, threadRoots, type ResolvedSource, type SourceRoot } from "./thread-files";
 export { personalProjectId, primaryHostId } from "./project";
 export { indexItem, studioIndex, type StudioIndexItem } from "./studio-index";

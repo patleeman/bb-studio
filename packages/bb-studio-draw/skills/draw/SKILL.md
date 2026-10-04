@@ -35,6 +35,9 @@ bb excalidraw merge <id> <scene-file.json>      # array of elements or a full sc
 bb excalidraw remove-elements <id> <element-id…>
 ```
 
+In a thread, `merge` reads the scene file from the thread's workspace or thread
+storage, on the thread's host.
+
 ## Working on a drawing
 
 1. Read the latest scene first (`excalidraw_get_drawing` or `show`); the user

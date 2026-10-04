@@ -1,5 +1,5 @@
 import { subcommand } from "@bb-studio/kit/cli";
-import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
+import { defineItemMention, readThreadFile, resolveSource, serveBytes, studioServices, threadRoots } from "@bb-studio/kit/server";
 import { errorMessage } from "@bb-studio/kit/format";
 // Studio Draw (plugin id `excalidraw`): create, edit, and attach Excalidraw
 // drawings.
@@ -133,6 +133,19 @@ export default async function plugin(bb: BbPluginApi) {
   const store = new DrawingStore(db);
   const services = studioServices(bb.sdk);
   /** Tells Studio an agent made a drawing, so it joins the thread's spaces. */
+  // In a thread, the file is on the thread's host, inside its workspace or
+  // thread storage; from a terminal with no thread, it's a local file.
+  async function readSceneFile(filePath: string, ctx: { threadId?: string | null; cwd?: string | null }): Promise<string> {
+    if (!ctx.threadId) {
+      const { readFile } = await import("node:fs/promises");
+      const { resolve } = await import("node:path");
+      return readFile(resolve(ctx.cwd ?? process.cwd(), filePath), "utf8");
+    }
+    const { roots } = await threadRoots(bb, ctx.threadId);
+    const source = resolveSource(filePath, roots, ctx.cwd);
+    if ("error" in source) throw new Error(source.error);
+    return Buffer.from((await readThreadFile(bb, source)).bytes).toString("utf8");
+  }
   const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Studio is optional. */ });
 
   const studio = studioSchemas(z);
@@ -595,12 +608,7 @@ export default async function plugin(bb: BbPluginApi) {
           }
           let parsed: unknown;
           try {
-            parsed = JSON.parse(
-              await (await import("node:fs/promises")).readFile(
-                (await import("node:path")).resolve(ctx.cwd ?? process.cwd(), filePath),
-                "utf8",
-              ),
-            );
+            parsed = JSON.parse(await readSceneFile(filePath, ctx));
           } catch (error) {
             return {
               exitCode: 1,
