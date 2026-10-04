@@ -33,6 +33,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
 import type { rpcContract, SpaceThreadView, SpaceView } from "../contract";
+import { spaceViewHref } from "./space/routes";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -61,9 +62,9 @@ export function spaceHref(id: string): string {
   return `/plugins/studio/studio/space/${encodeURIComponent(id)}`;
 }
 
-/** Where a space opens: its page, or Studio's route for it, which makes one. */
+/** Where a space opens: the Space view, its lead with the page beside it (ui/space). */
 export function spaceLink(space: SpaceView): string {
-  return space.pageId ? `/plugins/pages/pages/${encodeURIComponent(space.pageId)}` : spaceHref(space.id);
+  return spaceViewHref(space.id);
 }
 
 /** A composer draft that files the new thread in the space. */

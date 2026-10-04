@@ -40,6 +40,7 @@ import { NeedsYou } from "./HomePanel";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
 import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceGlyph, SpaceHome, useSpaceThreads, type ThreadKind } from "./Spaces";
+import { spaceViewHref } from "./space/routes";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
 type SpaceDialogState = { type: "edit" | "items" | "delete"; space: SpaceView } | { type: "threads"; space: SpaceView; kind: ThreadKind } | null;
@@ -222,20 +223,13 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   }, [data, spaceId, space, openSpace]);
 
   const [query, setQuery] = useStoredQuery("studio:query:all");
-  // A space opens its page; without Pages, the home below.
+  // A space opens the Space view (its lead, page beside it); space/<id>/items lists it here.
   const listSpace = segments[2] === "items";
-  const [homeless, setHomeless] = useState<string | null>(null);
+  const [homeless] = useState<string | null>(null);
   useEffect(() => {
     if (!spaceId || listSpace) return;
-    let live = true;
-    rpc.call("spacePage", { id: spaceId }).then(
-      ({ href }) => live && (href ? openAppPath(href, { replace: true }) : setHomeless(spaceId)),
-      () => live && setHomeless(spaceId),
-    );
-    return () => {
-      live = false;
-    };
-  }, [rpc, spaceId, listSpace]);
+    openAppPath(spaceViewHref(spaceId), { replace: true });
+  }, [spaceId, listSpace]);
   useEffect(() => {
     if (!listSpace || !space) return;
     setQuery({ filters: [{ field: "space", value: space.name }], text: "" });
