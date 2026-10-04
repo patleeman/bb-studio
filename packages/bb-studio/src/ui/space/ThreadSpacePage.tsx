@@ -25,7 +25,7 @@ function opened(): Set<string> {
 
 /**
  * Renders nothing; opens the Space page tab once per Space thread. Mounted
- * from the thread header (Handoff.tsx): that surface knows its thread and has
+ * from the thread header slot: that surface knows its thread and has
  * the side panel, where an app overlay has neither.
  */
 export function OpenSpacePage({ threadId }: { threadId: string }) {
