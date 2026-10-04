@@ -125,6 +125,8 @@ export function SidebarTabs() {
       ? [...new Set(sorted.map((tab) => tab.pluginId))].map((pluginId) => ({ label: APP_NAMES[pluginId] ?? pluginId, tabs: sorted.filter((tab) => tab.pluginId === pluginId) }))
       : [{ label: null, tabs: sorted }];
 
+  // Nothing open, nothing to show: the section only appears once an item is open.
+  if (tabs && !tabs.length && !error) return null;
   return (
     <SidebarPortal id="tabs" title="Studio" order={0}>
       <SidebarSection
@@ -162,7 +164,6 @@ export function SidebarTabs() {
         }
       >
         {error && !tabs ? <SidebarNote tone="danger">{error}</SidebarNote> : null}
-        {tabs && !tabs.length ? <SidebarNote icon="GridView">No open items</SidebarNote> : null}
         {groups.filter((group) => group.tabs.length).map((group) => (
           <div key={group.label ?? "all"} className="flex flex-col gap-px">
             {group.label ? <SidebarGroupHeading>{group.label}</SidebarGroupHeading> : null}
