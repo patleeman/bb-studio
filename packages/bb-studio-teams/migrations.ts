@@ -1,5 +1,3 @@
-import type Database from "better-sqlite3";
-
 /** Append-only schema history. Each statement is safe on databases created before migrations. */
 export const MIGRATIONS = [
   // store.ts
@@ -79,8 +77,3 @@ export const MIGRATIONS = [
    CREATE TABLE IF NOT EXISTS view_sends (id TEXT PRIMARY KEY, view_id TEXT NOT NULL, json TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS view_migrations (room_id TEXT PRIMARY KEY, completed_at INTEGER NOT NULL);`,
 ];
-
-/** Used by isolated store tests; production uses bb.storage.migrate. */
-export function migrateTestDatabase(db: Database.Database) {
-  for (const sql of MIGRATIONS) db.exec(sql);
-}

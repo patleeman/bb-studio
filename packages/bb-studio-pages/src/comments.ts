@@ -87,10 +87,6 @@ export function listThreads(doc: Y.Doc, options: { includeResolved?: boolean } =
     .sort((a, b) => a.updatedAt - b.updatedAt);
 }
 
-export function getThread(doc: Y.Doc, threadId: string): ThreadView | null {
-  return listThreads(doc, { includeResolved: true }).find((thread) => thread.id === threadId) ?? null;
-}
-
 export async function createThread(
   doc: Y.Doc,
   author: string,

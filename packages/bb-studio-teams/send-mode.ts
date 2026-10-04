@@ -9,22 +9,6 @@ export const sendModeLabels: Record<SendMode, string> = {
   fork: "Fork",
 };
 
-/** Commands are parsed once at the send boundary, never from quoted chat history. */
-export function parseSendMode(text: string, mode: SendMode = "auto") {
-  const match = /^\/(fork|steer|followup|follow-up|queue)(?=\s|$)\s*/iu.exec(
-    text.trim(),
-  );
-  if (!match) return { text: text.trim(), mode };
-  const command = match[1]!.toLowerCase();
-  const action: DispatchAction =
-    command === "fork" || command === "steer" ? command : "followup";
-  if (mode !== "auto" && mode !== action)
-    throw new Error(
-      `The /${command} command conflicts with the selected ${sendModeLabels[mode]} mode.`,
-    );
-  return { text: text.trim().slice(match[0].length).trim(), mode: action };
-}
-
 export type RoutingDecision = { botId: string; action: DispatchAction };
 export type RoutingPlan = {
   coordinatorId: string | null;

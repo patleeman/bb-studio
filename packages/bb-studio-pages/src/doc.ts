@@ -390,11 +390,6 @@ export function blockTextType(doc: Y.Doc, blockId: string): Y.XmlText | Y.XmlEle
   return walk(fragmentOf(doc));
 }
 
-export function blockIds(doc: Y.Doc): string[] {
-  const root = yXmlFragmentToProseMirrorRootNode(fragmentOf(doc), pmSchema());
-  return blockContainers(root).map((block) => block.id);
-}
-
 /** Every mention inline node in the doc, with the block it sits in. */
 export function mentionsIn(doc: Y.Doc): { blockId: string; kind: string; target: string; label: string; text: string }[] {
   const root = yXmlFragmentToProseMirrorRootNode(fragmentOf(doc), pmSchema());

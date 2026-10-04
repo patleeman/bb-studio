@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from "@bb-studio/kit/ui";
 import { Icon } from "@bb-studio/kit/ui";
-import { cn } from "@bb-studio/kit/ui";
 import { PLUGIN_ID } from "../constants";
 import type { BotView, PageMetaView, rpcContract } from "../contract";
 
@@ -33,22 +32,6 @@ export function actorName(key: string, bots: BotView[]): string {
   if (key.startsWith("agent:")) return "an agent";
   if (key === "cli") return "the CLI";
   return key;
-}
-
-export const editedByAgent = (key: string) => key.startsWith("bot:") || key.startsWith("agent:");
-
-/** The page's icon on a soft tile, or a document glyph when it has none. */
-export function IconTile({ page, size = "md" }: { page: PageMetaView; size?: "md" | "lg" }) {
-  return (
-    <span
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06] leading-none",
-        size === "lg" ? "size-10 text-xl" : "size-8 text-base",
-      )}
-    >
-      {page.icon || <Icon name="FileText" className="size-4 text-muted-foreground" />}
-    </span>
-  );
 }
 
 export function PageMenu({

@@ -1,7 +1,7 @@
 // Shared Excalidraw scene helpers, dark-mode detection, and scene→PNG
 // rendering (pure data in, image out — no editor mount required).
 import { useEffect, useState } from "react";
-import { exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
+import { exportToBlob } from "@excalidraw/excalidraw";
 
 export type StoredScene = {
   elements: unknown[];
@@ -93,35 +93,6 @@ export async function renderSceneToPng(scene: StoredScene | null): Promise<Blob>
     mimeType: "image/png",
     exportBackground: true,
   });
-}
-
-/** Render a stored scene to an SVG element (used for thumbnails). */
-export async function renderSceneToSvg(
-  scene: StoredScene | null,
-): Promise<SVGSVGElement> {
-  const elements = (scene?.elements ?? []).filter(
-    (el) => !(el as { isDeleted?: boolean }).isDeleted,
-  );
-  return exportToSvg({
-    elements: elements as never,
-    appState: sanitizeAppStateForStorage(scene?.appState ?? {}) as never,
-    files: (scene?.files ?? null) as never,
-    exportBackground: true,
-    skipInliningFonts: true,
-  });
-}
-
-export function svgToDataUrl(svg: SVGSVGElement): string {
-  const xml = new XMLSerializer().serializeToString(svg);
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
-}
-
-export function sceneHasElements(scene: StoredScene | null): boolean {
-  return (
-    (scene?.elements ?? []).some(
-      (el) => !(el as { isDeleted?: boolean }).isDeleted,
-    ) ?? false
-  );
 }
 
 export function blobToBase64(blob: Blob): Promise<string> {

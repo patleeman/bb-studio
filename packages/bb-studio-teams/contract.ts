@@ -345,12 +345,6 @@ export const approvalSchema = z.object({
   createdAt: z.number(),
 });
 export type ChannelApproval = z.infer<typeof approvalSchema>;
-export const notifyInput = z.object({
-  channelId: z.string().uuid(),
-  requestId: z.string().uuid(),
-  reason: attentionReason,
-  text: z.string().trim().min(1).max(2000),
-});
 /** Scheduled prompts are execution records, not chat messages. */
 export const isAutomationTrigger = (
   message: Pick<RoomMessage, "automationId" | "botId">,

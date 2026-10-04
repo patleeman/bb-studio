@@ -1,11 +1,10 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import type { Bot } from "./contract";
 import { Button } from "@bb-studio/kit/ui";
-import { Input } from "@bb-studio/kit/ui";
 import { matchingBroadcastMentions, type BroadcastMention } from "./mentions";
 
 export function Menu({
@@ -215,35 +214,4 @@ export function matchingBots(bots: Bot[], memberIds: string[], query: string) {
         Number(memberIds.includes(b.id)) - Number(memberIds.includes(a.id)) ||
         a.name.localeCompare(b.name),
     );
-}
-export function InvitePicker({
-  bots,
-  memberIds,
-  onSelect,
-  onCreate,
-}: {
-  bots: Bot[];
-  memberIds: string[];
-  onSelect: (bot: Bot) => void;
-  onCreate: () => void;
-}) {
-  const [query, setQuery] = useState("");
-  return (
-    <>
-      <Input
-        autoFocus
-        aria-label="Find a bot"
-        placeholder="Find a bot…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      <BotOptions
-        bots={bots}
-        memberIds={memberIds}
-        query={query}
-        onSelect={onSelect}
-        onCreate={onCreate}
-      />
-    </>
-  );
 }
