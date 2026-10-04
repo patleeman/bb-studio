@@ -500,42 +500,6 @@
   margin: 4px 0;
   height: 28px;
 }
-.channel-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  font-size: var(--text-sm);
-}
-
-.channel-rename-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-/* The channel name mounts in BB's native title drag area. Hide the default
-   panel title, leaving its focus tab and pointer handler around the name. */
-[data-testid="app-page-header-content-row"]:has(.channel-header)
-  > div:first-child
-  div:has(> p):has(> [data-icon-root]) {
-  display: none;
-}
-/* BB marks its macOS header actions as no-drag. A channel header fills that area,
-   so restore window dragging there and carve out the controls. */
-[data-testid="app-page-header-content-row"]
-  > div[class~="[app-region:no-drag]"]:has([data-view-header]) {
-  app-region: drag;
-  -webkit-app-region: drag;
-}
-[data-testid="app-page-header-content-row"]
-  > div[class~="[app-region:no-drag]"]:has([data-view-header])
-  :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"]) {
-  app-region: no-drag;
-  -webkit-app-region: no-drag;
-}
-.channel-header > button {
-  height: 28px;
-}
 .channel-avatar {
   position: relative;
   display: inline-flex;
@@ -756,7 +720,6 @@
   .channel-nav-row {
     min-height: 36px;
   }
-  .channel-header > button,
   .channel-menu-row,
   .channel-member-row > button.channel-member-remove {
     min-width: 36px;
@@ -1247,54 +1210,13 @@
 [data-view-composer] [aria-label="Send options"],
 [data-view-composer] [data-promptbox-shell] > form ~ div { display: none; }
 
-/* An open view's name and menu take the title bar's left side, where a
-   thread's title sits, in place of the panel's fixed "Views" label. If BB's
-   header changes shape, the header content still shows on the right. */
-[data-testid="app-page-header-content-row"]:has([data-view-header]) > div:first-child { display: none; }
-[data-testid="app-page-header-content-row"]:has([data-view-header]) > div:last-child,
-[data-testid="app-page-header-content-row"]:has([data-view-header]) > div:last-child > div:first-child,
-[data-bb-plugin-root]:has(> [data-view-header]) { flex: 1 1 auto; min-width: 0; }
-.channel-layout-toolbar {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--border);
-}
-.channel-layout-picker {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 7px;
-  background: var(--surface-recessed, var(--muted));
-}
-.channel-layout-picker > button {
-  display: inline-flex;
-  height: 26px;
-  align-items: center;
-  gap: 6px;
-  border-radius: 5px;
-  padding: 0 10px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  white-space: nowrap;
-}
-.channel-layout-picker > button:hover { color: var(--foreground); }
-.channel-layout-picker > button[aria-pressed="true"] {
-  color: var(--foreground);
-  background: var(--state-active, var(--background));
-  box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgb(0 0 0 / 0.12);
-}
-.channel-layout-picker > button:focus-visible,
 .channel-pane-action:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
 
 /* Status: a dot and a word. Only states that matter get color. */
-.channel-thread-layout,
-.channel-layout-picker { --channel-working: #4f8ff7; }
+.channel-thread-layout { --channel-working: #4f8ff7; }
 .channel-status {
   display: inline-flex;
   flex: 0 0 auto;
@@ -1639,8 +1561,6 @@
 .channel-stage-empty > p { max-width: 380px; }
 
 @media (max-width: 700px) {
-  .channel-layout-toolbar { padding: 6px 8px; overflow-x: auto; }
-  .channel-layout-picker > button { height: 32px; padding: 0 10px; }
   .channel-thread-stage {
     grid-template-columns: minmax(0, 1fr);
     grid-auto-rows: minmax(420px, 70svh);

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { externalAgent } from "./external-agents";
 import { ExternalAgentBadge, useExternalHealth } from "./external-health";
 import { experimental_NewThreadComposer as NewThreadComposer, Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { Icon, ItemTile, PageColumn, AddOnCollection, openAppPath, openCompanion, useCompanionNavigate, type ProviderCall } from "@bb-studio/kit/app";
+import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, ItemTile, PageColumn, AddOnCollection, StudioBar, openAppPath, openCompanion, useCompanionNavigate, type ProviderCall } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { Button, Checkbox, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Input } from "@bb-studio/kit/ui";
 import { Modal } from "./channel-controls";
@@ -98,31 +98,38 @@ function useStoredPermissions(id: string) {
   useEffect(() => { localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
   return [value, setValue] as const;
 }
-/** The view's title bar: its name and menu where a thread's title sits, members on the right. */
-export function ViewHeader({ subPath }: PluginNavPanelProps) {
-  const rpc = useRpc<Contract>();
-  const id = subPath.split("/")[0];
-  const [views, setViews] = useState<ThreadView[]>([]), [bots, setBots] = useState<Bot[]>([]);
-  const load = useCallback(() => { void rpc.call("views", {}).then(setViews, () => undefined); void rpc.call("profiles", {}).then(setBots, () => undefined); }, [rpc]);
-  useEffect(load, [load]);
-  useRealtime("views-changed", load);
-  const view = views.find(v => v.id === id);
-  if (!view) return null;
-  const edit = () => window.dispatchEvent(new CustomEvent(EDIT_VIEW_EVENT, { detail: { id } }));
-  const archive = () => void rpc.call("viewUpdate", { ...view, archived: !view.archived, expectedUpdatedAt: view.updatedAt }).then(load, e => toast.error(message(e)));
-  return <div data-view-header className="flex min-w-0 flex-1 items-center gap-2">
-    <p className="min-w-0 truncate text-sm font-semibold">{view.name}</p>
-    {view.archived && <span className="shrink-0 rounded bg-foreground/[0.08] px-1.5 text-[11px] text-muted-foreground">Archived</span>}
-    <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Channel options" className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"><Icon name="MoreHorizontal" className="size-4" /></button></DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-44">
-        <DropdownMenuItem onSelect={edit}><Icon name="Edit" />Edit channel</DropdownMenuItem>
-        <DropdownMenuItem onSelect={archive}><Icon name="Archive" />{view.archived ? "Restore" : "Archive"}</DropdownMenuItem>
-      </DropdownMenuContent></DropdownMenu>
-    <button type="button" aria-label="Edit channel" title="Members" onClick={edit} className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground">
-      <span className="flex -space-x-1.5">{view.members.slice(0, 4).map(m => <span key={memberKey(m)} className="rounded-lg bg-background ring-2 ring-background"><ItemTile icon={m.kind === "bot" ? bots.find(b => b.id === m.id)?.avatar || null : null} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /></span>)}</span>
-      <span className="max-sm:sr-only">{view.members.length || "Add"} {view.members.length === 1 ? "member" : "members"}</span>
-    </button>
-  </div>;
+/**
+ * The channel's bar, in the panel's title bar: Channels, then its name, with
+ * its layout, members and menu on the right.
+ */
+function ChannelBar({ view, bots, layout, onLayout, onEdit, onArchive }: {
+  view: ThreadView; bots: Bot[]; layout: ChannelLayout;
+  onLayout(layout: ChannelLayout): void; onEdit(): void; onArchive(): void;
+}) {
+  const navigate = useBbNavigate();
+  const members = view.members.length;
+  return <StudioBar>
+    <nav data-view-header aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
+      <BarCrumb onClick={() => navigate.toPluginPanel("channels")} title="Back to Channels">Channels</BarCrumb>
+      <BarSeparator />
+      <BarCrumb current><span className="truncate">{view.name}</span></BarCrumb>
+      {view.archived && <span className="ml-1 shrink-0 rounded bg-foreground/[0.08] px-1.5 text-[11px] text-muted-foreground">Archived</span>}
+    </nav>
+    <div className="flex shrink-0 items-center gap-0.5">
+      <ChannelLayoutPicker value={layout} onChange={onLayout} />
+      <span aria-hidden className="mx-1 h-4 w-px bg-border" />
+      <button type="button" aria-label="Edit channel" title={`${members || "No"} ${members === 1 ? "member" : "members"}`} onClick={onEdit} className={members ? "flex h-7 shrink-0 items-center rounded-md px-1 hover:bg-state-hover" : ICON_BUTTON}>
+        {members
+          ? <span className="flex -space-x-1.5">{view.members.slice(0, 4).map(m => <span key={memberKey(m)} className="rounded-lg bg-background ring-2 ring-background"><ItemTile icon={m.kind === "bot" ? bots.find(b => b.id === m.id)?.avatar || null : null} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /></span>)}</span>
+          : <Icon name="UserRoundPlus" className="size-4" />}
+      </button>
+      <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Channel options" title="Channel options" className={ICON_BUTTON}><Icon name="MoreHorizontal" className="size-4" /></button></DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem onSelect={onEdit}><Icon name="Edit" />Edit channel</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onArchive}><Icon name="Archive" />{view.archived ? "Restore" : "Archive"}</DropdownMenuItem>
+        </DropdownMenuContent></DropdownMenu>
+    </div>
+  </StudioBar>;
 }
 function ViewDetail({ id }: { id: string }) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
@@ -233,7 +240,8 @@ function ViewDetail({ id }: { id: string }) {
   const approvalTitle = `Approval mode: ${permissions.all ? modeLabel(permissions.all) : "each thread keeps its own"}${overrides.map(m => `\n${memberLabel(m)}: ${modeLabel(permissions.members[memberKey(m)]!)}`).join("")}`;
   const avatars = (members: ViewMember[]) => <span className="flex -space-x-1.5">{members.slice(0, 4).map(m => <span key={memberKey(m)} className="rounded-lg bg-background ring-2 ring-background"><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /></span>)}</span>;
   return <div className="relative flex h-full min-h-0 flex-col" data-thread-view>
-    <div className="channel-layout-toolbar"><ChannelLayoutPicker value={layout} onChange={setLayout} /></div>
+    <ChannelBar view={page.view} bots={bots} layout={layout} onLayout={setLayout} onEdit={() => setEditing(true)}
+      onArchive={() => void rpc.call("viewUpdate", { ...page.view, archived: !page.view.archived, expectedUpdatedAt: page.view.updatedAt }).then(load, e => toast.error(message(e)))} />
     {layout === "merged" ? <div data-view-timeline ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col px-4 pt-6 pb-8">
       {page.hasOlder && <Button className="mb-4 self-center" variant="ghost" size="sm" onClick={() => void rpc.call("view", { id, before: page.entries[0]?.createdAt, beforeId: page.entries[0]?.id }).then(older => setPage(current => current ? { ...current, entries: [...older.entries, ...current.entries], hasOlder: older.hasOlder } : older), e => setError(message(e)))}>Earlier replies</Button>}
       {!page.entries.length && <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">

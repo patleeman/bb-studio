@@ -1,7 +1,7 @@
 // bb-studio-float frontend: the panel of floated tabs, and commands to float
 // what's on screen and to put the panel away.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
-import { floatPanelFor } from "@bb-studio/kit/app";
+import { floatPanelFor, StudioBarSlot } from "@bb-studio/kit/app";
 import { Dock } from "./src/Dock";
 import { MainView } from "./src/MainView";
 import { update } from "./src/store";
@@ -15,7 +15,7 @@ function currentTarget(threadId: string | null) {
 }
 
 export default definePluginApp((app) => {
-  app.slots.navPanel({ id: "companions", path: "companions", title: "Companions", icon: "LayoutPanelLeft", component: ({ subPath }) => <MainView subPath={subPath ?? ""} /> });
+  app.slots.navPanel({ id: "companions", path: "companions", title: "Companions", icon: "PanelRight", component: ({ subPath }) => <MainView subPath={subPath ?? ""} />, headerContent: StudioBarSlot });
   app.slots.experimental_appOverlay({ id: "dock", component: Dock });
   app.commands.register({
     id: "float-view",

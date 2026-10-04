@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { ThreadChat, useRpc } from "@get-bb/plugin-sdk/app";
-import { Icon, ItemTile } from "@bb-studio/kit/app";
+import { ICON_BUTTON, Icon, ItemTile } from "@bb-studio/kit/app";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
 import type { ThreadView, ViewThread } from "./view-contract";
@@ -11,11 +11,11 @@ const PANE_DRAG = "application/x-bb-channel-pane";
 const readOrder = (key: string): string[] => { try { const value = JSON.parse(localStorage.getItem(key) ?? "[]"); return Array.isArray(value) ? value.filter(id => typeof id === "string") : []; } catch { return []; } };
 const time = (at: number) => at ? new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(at) : "";
 
-/** Segmented switcher for the channel's four layouts. */
+/** The channel's four layouts, as toggles in its bar. */
 export function ChannelLayoutPicker({ value, onChange }: { value: ChannelLayout; onChange(layout: ChannelLayout): void }) {
-  return <div className="channel-layout-picker" role="group" aria-label="Channel view">
-    {CHANNEL_LAYOUTS.map(choice => <button key={choice.id} type="button" data-layout={choice.id} aria-pressed={value === choice.id} title={choice.detail} onClick={() => onChange(choice.id)}>
-      <Icon name={LAYOUT_ICONS[choice.id]} className="size-3.5" aria-hidden />{choice.label}
+  return <div className="flex items-center gap-0.5" role="group" aria-label="Channel view">
+    {CHANNEL_LAYOUTS.map(choice => <button key={choice.id} type="button" data-layout={choice.id} aria-label={choice.label} aria-pressed={value === choice.id} title={`${choice.label}: ${choice.detail}`} className={ICON_BUTTON} onClick={() => onChange(choice.id)}>
+      <Icon name={LAYOUT_ICONS[choice.id]} className="size-4" aria-hidden />
     </button>)}
   </div>;
 }

@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
   floatPanelFor,
   floatWindowKey,
+  ICON_BUTTON,
   Icon,
   openFloat,
   openAppPath,
@@ -60,8 +61,6 @@ import {
   type Size,
 } from "./stack";
 
-const HEADER_BUTTON =
-  "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground";
 
 /** A path tab's title when its opener gave none: the plugin's name. */
 export function pathTitle(path: string): string {
@@ -243,7 +242,7 @@ function TabStrip({ state }: { state: FloatState }) {
             data-float-tab={tab.key}
             title={tab.target.title}
             className={cn(
-              "float-tab group flex h-8 min-w-0 cursor-default items-center gap-1.5 rounded-md px-2 text-sm select-none",
+              "float-tab group flex h-7 min-w-0 cursor-default items-center gap-1.5 rounded-md px-2 text-sm select-none",
               active ? "bg-state-active font-medium text-foreground" : "text-muted-foreground hover:bg-state-hover hover:text-foreground",
               dragging && "opacity-60",
             )}
@@ -318,7 +317,7 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
       {anchor}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Floating tab actions" className={HEADER_BUTTON}>
+          <button type="button" aria-label="Floating tab actions" className={ICON_BUTTON}>
             <Icon name="MoreHorizontal" className="size-4" />
           </button>
         </DropdownMenuTrigger>
@@ -574,7 +573,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
         >
           <Icon name="DragDropVertical" className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
           {active.back?.length && !state.collapsed ? (
-            <button type="button" aria-label="Back" title="Back" className={HEADER_BUTTON} onClick={() => update((next) => goBack(next, active.key))}>
+            <button type="button" aria-label="Back" title="Back" className={ICON_BUTTON} onClick={() => update((next) => goBack(next, active.key))}>
               <Icon name="ChevronLeft" className="size-4" />
             </button>
           ) : null}
@@ -582,7 +581,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           <button
             type="button"
             aria-label={state.collapsed ? "Open floating tabs" : "Fold floating tabs"}
-            className={HEADER_BUTTON}
+            className={ICON_BUTTON}
             onClick={() => update(toggleCollapsed)}
           >
             <Icon name={state.collapsed ? "ChevronUp" : "Minus"} className="size-4" />

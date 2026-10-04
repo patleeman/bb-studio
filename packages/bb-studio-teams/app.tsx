@@ -1,4 +1,4 @@
-import { ViewHeader, ViewsPage } from "./views";
+import { ViewsPage } from "./views";
 import { affects } from "./realtime";
 import { UsagePanel } from "./channel-workbench";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -366,11 +366,11 @@ export default definePluginApp((app) => {
     component: retainPanel("bots", BotsPage),
     headerContent: StudioBarSlot,
   });
-  app.slots.navPanel({ id: "channels", title: "Channels", icon: "MessageSquare", path: "channels", component: retainPanel("channels", ViewsPage), headerContent: ViewHeader });
+  app.slots.navPanel({ id: "channels", title: "Channels", icon: "MessageSquare", path: "channels", component: retainPanel("channels", ViewsPage), headerContent: StudioBarSlot });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
   app.slots.experimental_appOverlay({ id: "companions", component: () => <>
     <FloatPanels path="bots" render={subPath => <BotsPage subPath={subPath} />} />
-    <FloatPanels path="channels" render={(subPath, { companion }) => <div className="flex h-full min-h-0 flex-col">{companion ? <div className="flex shrink-0 items-center px-3 py-2"><ViewHeader subPath={subPath} /></div> : null}<div className="min-h-0 flex-1"><ViewsPage subPath={subPath} /></div></div>} />
+    <FloatPanels path="channels" render={(subPath) => <ViewsPage subPath={subPath} />} />
   </> });
 });
