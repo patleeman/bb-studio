@@ -58,6 +58,18 @@ it("copies a disabled standalone plugin's database and settings once, leaving th
   original.close();
 });
 
+it("imports the standalone data into an explore.db Pages made before it had any", async () => {
+  const first = await fixture();
+  seedLegacy(first.dataDir);
+  await first.host.harness.lifecycle.dispose();
+  const host = createFakePluginHost({ pluginId: "pages", dataDir: first.dataDir, sdk: { plugins: { list: async () => ({ plugins: [{ id: "explore", enabled: false }] }) } } as never });
+  cleanups.push(async () => { await host.harness.lifecycle.dispose(); });
+  await registerPagesWithExplore(host.bb, async () => {});
+  const copy = new Database(join(first.dataDir, "plugins/pages/explore.db"), { readonly: true });
+  expect(copy.prepare("SELECT value FROM marker").pluck().get()).toBe("legacy explainer");
+  copy.close();
+});
+
 it("stays off while the standalone Explore plugin is enabled", async () => {
   const { host, dataDir } = await fixture({ enabledLegacy: true, seed: true });
   expect(await host.harness.behavior.callRpc("exploreStatus", null)).toEqual({ active: false, legacyInstalled: true });

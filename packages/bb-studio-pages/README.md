@@ -280,8 +280,8 @@ told not to.
 ### Boards to pages
 
 `bb pages migrate-boards` makes one page of checklists for each Studio Tasks
-board: a heading per column, an item per task (subtasks nested, done tasks
-checked), and the task's agent thread mentioned on its item. Each item links
+board: a heading per column, an item per task (subtasks right after their
+task, marked ↳; done tasks checked), and the task's agent thread mentioned on its item. Each item links
 its task, so checking it moves the task to Done, and moving the task to Done
 checks it. It runs once per board: a board whose page exists is skipped. The
 boards and tasks are left as they are; the only change in Studio Tasks is a

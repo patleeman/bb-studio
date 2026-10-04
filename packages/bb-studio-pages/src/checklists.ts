@@ -62,7 +62,9 @@ export interface ChecklistHandoffRow {
 export function checklistTitle(title: string): string {
   return title
     .replace(/\s*@\[[^\]]*\]\(thread:[^)]+\)/g, "")
-    .replace(/\s*\[[^\]]*\]\(item:studio-tasks:[^)]+\)/g, "")
+    .replace(/\s*@$/, "")
+    .replace(/\s*@?\[[^\]]*\]\(item:studio-tasks:[^)]+\)/g, "")
+    .replace(/^↳\s*/, "")
     .trim();
 }
 
@@ -91,7 +93,7 @@ const taskSchema = z.object({
 });
 type BoardTask = z.infer<typeof taskSchema>;
 
-/** A board as checklists: a heading per column, subtasks nested under their task. */
+/** A board as checklists: a heading per column, subtasks right after their task. */
 export function boardMarkdown(board: { title: string; columns: { id: string; label: string }[] }, tasks: BoardTask[]): string {
   const live = tasks.filter((task) => !task.archived);
   const ids = new Set(live.map((task) => task.id));
@@ -99,9 +101,12 @@ export function boardMarkdown(board: { title: string; columns: { id: string; lab
   for (const task of live) {
     if (task.parentId && ids.has(task.parentId)) children.set(task.parentId, [...(children.get(task.parentId) ?? []), task]);
   }
+  // Subtasks follow their task as items of their own, not nested: Studio
+  // Tasks rewrites an item's line when its task moves, which would drop
+  // nested items.
   const line = (task: BoardTask, depth: number): string[] => {
     const mention = task.handoff ? ` @[${checklistLabel(toState(task.handoff.state))}](thread:${task.handoff.threadId})` : "";
-    const own = `${"  ".repeat(depth)}- [${task.status === "done" ? "x" : " "}] ${inline(task.title)} [Task](item:studio-tasks:${task.id})${mention}`;
+    const own = `- [${task.status === "done" ? "x" : " "}] ${depth ? "↳ " : ""}${inline(task.title)} [Task](item:studio-tasks:${task.id})${mention}`;
     return [own, ...(children.get(task.id) ?? []).flatMap((child) => line(child, depth + 1))];
   };
   const top = live.filter((task) => !task.parentId || !ids.has(task.parentId));

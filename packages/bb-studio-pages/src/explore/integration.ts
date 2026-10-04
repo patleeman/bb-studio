@@ -19,6 +19,7 @@ import explore, { EXPLORE_SETTINGS } from "./server";
 export const LEGACY_PLUGIN_ID = "explore";
 const PREFIX = "explore_";
 const RPC_PREFIX = "explore_";
+const IMPORT_TABLE = "pages_explore_import";
 
 type Configure = (context: PluginAgentConfigurationContext) => PluginAgentConfiguration;
 type Handlers = PluginRpcHandlers<PluginRpcContract>;
@@ -35,15 +36,33 @@ async function validate(schema: StandardSchemaV1, value: unknown): Promise<unkno
  */
 export async function importExploreDatabase(dataDir: string, pluginId: string, open: (path: string, options?: Database.Options) => Database.Database): Promise<{ path: string; imported: boolean }> {
   const target = join(dataDir, "plugins", pluginId, "explore.db");
-  if (existsSync(target)) return { path: target, imported: false };
-  mkdirSync(dirname(target), { recursive: true });
   const source = join(dataDir, "plugins", LEGACY_PLUGIN_ID, "data.db");
+  mkdirSync(dirname(target), { recursive: true });
+  if (!existsSync(source)) return { path: target, imported: false };
+  // Pages may have started Explore before the standalone plugin had data
+  // (it loaded first, say). Its own file is replaced only while it holds no
+  // explainers and was never an import.
+  if (existsSync(target)) {
+    const existing = open(target, { readonly: true, fileMustExist: true });
+    let replaceable = false;
+    try {
+      const has = (table: string) => !!existing.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+      replaceable = !has(IMPORT_TABLE) && (!has("explore_explainers") || !existing.prepare("SELECT 1 FROM explore_explainers LIMIT 1").get());
+    } finally { existing.close(); }
+    if (!replaceable) return { path: target, imported: false };
+  }
   const temporary = `${target}.importing`;
   for (const suffix of ["", "-wal", "-shm"]) rmSync(temporary + suffix, { force: true });
-  if (!existsSync(source)) return { path: target, imported: false };
   // Read-only: the standalone plugin's file is left exactly as it was.
   const legacy = open(source, { readonly: true, fileMustExist: true });
   try { await legacy.backup(temporary); } finally { legacy.close(); }
+  const copy = open(temporary);
+  try {
+    copy.exec(`CREATE TABLE IF NOT EXISTS ${IMPORT_TABLE} (source TEXT NOT NULL, imported_at INTEGER NOT NULL)`);
+    copy.prepare(`INSERT INTO ${IMPORT_TABLE} VALUES (?, ?)`).run(source, Date.now());
+    copy.pragma("wal_checkpoint(TRUNCATE)");
+  } finally { copy.close(); }
+  for (const suffix of ["-wal", "-shm"]) rmSync(target + suffix, { force: true });
   renameSync(temporary, target);
   return { path: target, imported: true };
 }

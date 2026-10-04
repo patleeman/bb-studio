@@ -44,9 +44,9 @@ function setup(rpc: (method: string, input: unknown) => unknown) {
 }
 
 describe("checklists", () => {
-  it("turns a board into checklists grouped by column, subtasks nested, each linking its task", () => {
+  it("turns a board into checklists grouped by column, subtasks after their task, each linking its task", () => {
     const markdown = boardMarkdown(board, tasks);
-    expect(markdown).toContain("## To do\n\n- [ ] Write \\[notes\\] [Task](item:studio-tasks:tsk_a)\n  - [x] Check links [Task](item:studio-tasks:tsk_c)");
+    expect(markdown).toContain("## To do\n\n- [ ] Write \\[notes\\] [Task](item:studio-tasks:tsk_a)\n- [x] ↳ Check links [Task](item:studio-tasks:tsk_c)");
     expect(markdown).toContain("## In progress\n\n- [ ] Ship it [Task](item:studio-tasks:tsk_b) @[Agent · working](thread:thr_b)");
     expect(markdown).not.toContain("## Done");
     expect(markdown).not.toContain("Old");
@@ -59,6 +59,10 @@ describe("checklists", () => {
     expect(nextChecklistState("archived", "unarchived")).toBe("replied");
     expect(nextChecklistState("working", "unarchived")).toBeNull();
     expect(checklistTitle("Ship it [Task](item:studio-tasks:tsk_b) @[Agent · working](thread:thr_b)")).toBe("Ship it");
+    expect(checklistTitle("↳ Check links [Task](item:studio-tasks:tsk_c)")).toBe("Check links");
+    // Pages writes a task link back as a mention, and kit's parser leaves its "@".
+    expect(checklistTitle("Draft notes @[Task](item:studio-tasks:tsk_a)")).toBe("Draft notes");
+    expect(checklistTitle("Draft notes @")).toBe("Draft notes");
     const prompt = checklistPrompt({ id: "pg_1", title: "Plan" }, "Ship it", null);
     expect(prompt.text.slice(prompt.mentions[0]!.start, prompt.mentions[0]!.end)).toBe("@Plan");
   });
