@@ -4,15 +4,21 @@
 > own. With [Studio Teams](../bb-studio-teams) it knows which bot and channel
 > posted. With [Studio Mobile](../bb-studio-mobile) it notifies your phone.
 
-One feed of what your agents report: morning briefings, alerts, research
-digests, automation results. Any agent can post to it from any thread, Teams
-channel or automation. You read it as one list on desktop and phone.
+One Inbox for what needs you and what your agents report. At the top,
+**Needs you** lists threads waiting on you. Below it, **Updates** is the feed:
+morning briefings, alerts, research digests, automation results. Any agent
+can post to it from any thread, Teams channel or automation. You read it as
+one list on desktop and phone. The sidebar row is **Inbox**; the plugin is
+still Studio Feed, with the id `feed`, the `bb feed` CLI and the `feed_*`
+tools, so existing posts and links keep working.
 
 ## Staged preview
 
 ![The Feed reader with the launch post open in place, previewing its linked checklist page, and a Needs you rail](assets/staged-preview.png)
 
-This is the **Feed** page in a staged BB (`node scripts/staged-bb.mjs start`).
+This capture predates the Inbox. It shows the **Feed** page, now the Inbox's
+**Updates**, whose **Needs you** rail is now **Urgent**, in a staged BB
+(`node scripts/staged-bb.mjs start`).
 The capture seeds nine posts with `bb feed post` from seven authors:
 - three updates to one **Harlem Line** commute story
 - an urgent Ops alert
@@ -33,7 +39,7 @@ each shows "just now".
 
 A separate live check at `3979fe1` seeds 129 posts. Search, topic, unread,
 and inclusive From/Through dates combine to select 12 posts, including both
-ends of the day. **Needs you** still shows the older outstanding alert.
+ends of the day. The urgent rail still shows the older outstanding alert.
 The same controls fit a 390-pixel viewport. Filters survive reload; after
 loading 120 posts, the open post and exact reading position survive a visit
 to its discussion and a reload. The check also exercises `j`, `k`, and `m`.
@@ -87,7 +93,7 @@ and the tool returns a card line for it:
 The agent ends its reply with that line, and the reply shows the post as a
 card where it was written, in the thread or the channel. The card shows the
 title, an **Urgent** badge, the topic, which update of a story it is, and
-whether you've read it, with **Open in Feed** and **Mark read**.
+whether you've read it, with **Open in Inbox** and **Mark read**.
 
 Agents post when their task, their automation's prompt, or you ask them to.
 They also post the result of a scheduled or automated run on their own when
@@ -112,21 +118,27 @@ longer publishes anything; cards in older replies still find their posts.
 
 ## Reading
 
-- **Feed** in the sidebar opens a reader: one stream, newest first, with the
+- **Inbox** in the sidebar opens the Inbox. **Needs you** at the top lists
+  threads whose agent is waiting on you for an approval or an answer, most
+  recent first, with why when BB says (for example "Thread needs user
+  input"). Click one to open the thread. It reads BB's live thread list, so
+  a thread leaves as soon as you answer it.
+- **Updates** below it is the reader: one stream, newest first, with the
   day in the margin. Older posts load as you scroll. A story is listed once,
   by its newest post. Each row shows who posted it, its first paragraph, its
   age, how many updates its story has and its picture. A rail lists unresolved
-  urgent posts under **Needs you**, independently of the topic filter and older
+  urgent posts under **Urgent**, independently of the topic filter and older
   feed pages. Reading an alert leaves it there; **Resolve** closes that post and
   **Reopen** restores it. **Older alerts** loads further outstanding posts.
   The rail lists stories with updates under **Developing**.
-- **Unread** posts are bold with a dot, and the count next to **Feed** in the
-  sidebar counts them. **Read** posts dim to one line. **Mark entire feed read** reads
+- **Unread** posts are bold with a dot. The count next to **Inbox** in the
+  sidebar adds threads waiting on you to stories with an unread post; it
+  turns red while a thread waits. **Read** posts dim to one line. **Mark all updates read** reads
   everything; each row has its own read and unread button.
 - **Filters** search titles, report text, and authors. Combine search with a
   topic, **Unread only**, and **From / Through** dates, then choose **Apply
   filters**. Dates include the full local calendar day. **Clear filters**
-  returns to the full feed. **Needs you** always shows outstanding alerts,
+  returns to the full feed. **Urgent** always shows outstanding alerts,
   regardless of these filters. Opening an unread result keeps it visible while
   you read; reloading the filtered results excludes posts now marked read.
 - **Return to your place.** Filters, the open post, and reading position survive

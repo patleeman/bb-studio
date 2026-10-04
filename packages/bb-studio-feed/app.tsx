@@ -1,21 +1,22 @@
 // Studio Feed — frontend entry.
 //
 // Surfaces:
-//   - navPanel "Feed": every post, newest first, and a post's page at
-//     feed/<id>. New stories since you last looked show next to it.
+//   - navPanel "Inbox": threads waiting on you, then every post, newest
+//     first, and a post's page at feed/<id>. Waiting threads plus unread
+//     stories show next to it.
 //   - messageDirective `::post{id="…"}`: the post a reply made, as a
 //     card in its thread or channel.
 import { FloatPanels, retainPanel } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
-import { DIRECTIVE, FEED_ICON, PANEL_PATH } from "./src/shared";
+import { DIRECTIVE, INBOX_ICON, INBOX_TITLE, PANEL_PATH } from "./src/shared";
 import { PostCard } from "./src/ui/card";
 import { FeedPanel, UnreadCount } from "./src/ui/reader";
 
 export default definePluginApp((app) => {
   app.slots.navPanel({
     id: "feed",
-    title: "Feed",
-    icon: FEED_ICON,
+    title: INBOX_TITLE,
+    icon: INBOX_ICON,
     path: PANEL_PATH,
     component: retainPanel(PANEL_PATH, FeedPanel),
     experimental_sidebarAccessory: UnreadCount,

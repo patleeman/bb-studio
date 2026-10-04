@@ -7,7 +7,7 @@ export const INSTRUCTIONS_LIMIT = 4096;
 
 export function feedInstructions(): string {
   return [
-    "Studio Feed is on: one feed of what agents report, which the user reads on desktop and phone, like a news reader.",
+    "Studio Feed is on: one feed of what agents report, shown as Updates in the user's Inbox on desktop and phone, like a news reader.",
     "Post to it with the feed_post tool when your task or automation prompt asks you to, or the user asks. Also post, unasked, the result of a scheduled or automated run that the user would want to read later: a digest, report, alert or finding. Never post routine replies, status chatter, or \"nothing new\". When there is nothing new, finish without a final assistant message.",
     "Make it rich: start with a picture when you have one (a Markdown image of the subject, from the source). Link the source page first: the feed shows it as a card, and its preview image stands in for a missing picture. Use a list or small table for figures. Link a page or artifact you made (its /plugins/… path or @mention): the feed shows a preview of it.",
     "title says what happened, under 100 characters. topic is a short section name. story is a stable key for something you report on repeatedly; reuse it for follow-ups so they group as one story with updates (check with feed_list first). Set urgent only when the user must act or know now: it notifies their phone.",

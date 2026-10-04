@@ -28,7 +28,7 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
     } },
     { id: "feed", packageDir: "bb-studio-feed", seed: async () => {
       const { post, cleanup } = await seedPost();
-      return { path: "/plugins/feed/feed", ready: 'form[aria-label="Filter feed"] input[type="search"]', draft: "Unapplied feed filter", visibleText: post.title, cleanup };
+      return { path: "/plugins/feed/feed", ready: 'form[aria-label="Filter updates"] input[type="search"]', draft: "Unapplied feed filter", visibleText: post.title, cleanup };
     } },
     { id: "feed-post", packageDir: "bb-studio-feed", seed: async () => {
       const { post, cleanup } = await seedPost();

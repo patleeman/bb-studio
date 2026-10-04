@@ -12,7 +12,7 @@ export async function verifyFeedFilters(client, {
   assert.ok(manifest.includes(`export BB_DATA_DIR=${JSON.stringify(dataDir)}`));
   assert.ok(manifest.includes(`export BB_SERVER_URL=${process.env.BB_SERVER_URL}`));
   await client.navigate("/plugins/feed/feed");
-  await client.waitForSelector('form[aria-label="Filter feed"]');
+  await client.waitForSelector('form[aria-label="Filter updates"]');
   await client.evaluate(`(() => {
     const clear = [...document.querySelectorAll('button')].find(button => button.textContent === 'Clear filters');
     clear?.click();
@@ -25,7 +25,7 @@ export async function verifyFeedFilters(client, {
   })()`);
   await sleep(300);
   await client.evaluate(`(() => {
-    const inputs = document.querySelector('form[aria-label="Filter feed"]').querySelectorAll('input');
+    const inputs = document.querySelector('form[aria-label="Filter updates"]').querySelectorAll('input');
     for (const [index, value] of ${JSON.stringify([[0, query], [1, from], [2, through]])}) {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inputs[index], value);
       inputs[index].dispatchEvent(new Event('input', { bubbles: true }));
@@ -55,7 +55,7 @@ export async function verifyFeedFilters(client, {
     await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await sleep(500);
     result.mobile = await client.evaluate(`({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth,
-      controls: [...document.querySelectorAll('form[aria-label="Filter feed"] input, form[aria-label="Filter feed"] button')]
+      controls: [...document.querySelectorAll('form[aria-label="Filter updates"] input, form[aria-label="Filter updates"] button')]
         .map(element => ({ left: element.getBoundingClientRect().left, right: element.getBoundingClientRect().right })) })`);
     assert.equal(result.mobile.scrollWidth, 390);
     assert.ok(result.mobile.controls.every(control => control.left >= 0 && control.right <= 390));

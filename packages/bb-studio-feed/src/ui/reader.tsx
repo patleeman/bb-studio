@@ -1,17 +1,19 @@
-// The Feed page, read like an RSS reader: one continuous stream, newest
+// The Inbox: threads waiting on you at the top, then the feed's posts as
+// Updates, read like an RSS reader: one continuous stream, newest
 // first, one row per story, the day in the margin. Unread is bold; read is
 // dimmed. A row opens in place to the whole post, and reading it marks it
 // read. Each row opens the thread it came from, marks itself read or unread,
-// or starts a new thread. A rail lists what needs you and the stories still
+// or starts a new thread. A rail lists urgent posts and the stories still
 // developing. A post's own page (feed/<id>) is where notifications and reply
 // cards go.
 import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, ViewMoveMenu, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
-import { Markdown, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { Markdown, experimental_useSidebarThreads as useSidebarThreads, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, useLayoutEffect, useMemo, type ReactNode } from "react";
 import type { rpcContract } from "../contract";
-import { FEED_ICON, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
+import { FEED_ICON, INBOX_TITLE, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
+import { inboxBadge, waitingThreads } from "../inbox";
 import { feedEvent, from, useDiscuss, useMinuteTick, type PostView } from "./feed";
 import { PostDiscussion } from "./discussion";
 import { loadFeedWindow } from "../window";
@@ -269,15 +271,19 @@ function FeedReader() {
     <PageColumn className="max-w-6xl">
     <div ref={readerRoot} onClickCapture={() => capturePosition.current()} className="min-w-0">
       <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h1 className="mr-auto text-[28px] leading-tight font-semibold tracking-tight">Feed</h1>
-        <ViewMoveMenu item={{ href: "/plugins/feed/feed", title: "Feed" }} />
+        <h1 className="mr-auto text-[28px] leading-tight font-semibold tracking-tight">{INBOX_TITLE}</h1>
+        <ViewMoveMenu item={{ href: "/plugins/feed/feed", title: INBOX_TITLE }} />
+      </header>
+      <NeedsYou />
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <h2 className="mr-auto text-lg font-semibold">Updates</h2>
         {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread shown</span> : null}
         <button type="button" className={OUTLINE_BUTTON} disabled={posts === null} onClick={markAllRead}>
-          <Icon name="feed/mark-read" /> Mark entire feed read
+          <Icon name="feed/mark-read" /> Mark all updates read
         </button>
-      </header>
-      <form role="search" aria-label="Filter feed" className="mb-4 flex flex-wrap items-end gap-3" noValidate onSubmit={(event) => { event.preventDefault(); applyFilters(draft); }}>
-        <label className="min-w-40 flex-1 text-xs text-muted-foreground">Search feed
+      </div>
+      <form role="search" aria-label="Filter updates" className="mb-4 flex flex-wrap items-end gap-3" noValidate onSubmit={(event) => { event.preventDefault(); applyFilters(draft); }}>
+        <label className="min-w-40 flex-1 text-xs text-muted-foreground">Search updates
           <input type="search" maxLength={200} value={draft.query} onChange={(event) => setDraft({ ...draft, query: event.target.value })}
             placeholder="Title, report, or author" className="mt-1 block h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
         </label>
@@ -315,7 +321,7 @@ function FeedReader() {
         <div className={cn("grid items-start gap-x-10 gap-y-6", rail && "@5xl/page:grid-cols-[minmax(0,1fr)_17rem]")}>
           <main className="min-w-0">
             {posts.length === 0 ? <EmptyState icon={FEED_ICON} title={JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "No posts match these filters" : "Nothing posted yet"}>
-              {JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "Change or clear the filters to see more posts. Needs you still shows outstanding alerts." : "Ask an agent to post a report to the feed."}
+              {JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "Change or clear the filters to see more posts. Urgent still shows outstanding alerts." : "Ask an agent to post a report to the Inbox."}
             </EmptyState> : null}
             {days.map((group) => {
               const marker = dayMarker(group.at);
@@ -345,7 +351,7 @@ function FeedReader() {
           {rail ? (
             <aside className="space-y-4 pt-5 @5xl/page:sticky @5xl/page:top-0">
               {showAttention ? (
-                <RailBox title="Needs you" tone="danger">
+                <RailBox title="Urgent" tone="danger">
                   {attention.map((post) => (
                     <RailItem key={post.id} post={post} detail={`${post.author} · ${relativeTime(post.createdAt)}`} onOpen={() => {
                       const listed = posts.find((each) => each.id === post.id);
@@ -772,7 +778,7 @@ function PostPage({ postId }: { postId: string }) {
     <PageColumn className="max-w-3xl">
       <div className="mb-6 flex items-center justify-between gap-3">
       <button type="button" className={cn(GHOST_BUTTON, "-ml-3")} onClick={back}>
-        <Icon name="ArrowLeft" /> Feed
+        <Icon name="ArrowLeft" /> {INBOX_TITLE}
       </button>
       {post ? <ViewMoveMenu item={{ href: postHref(post.id), title: post.title }} onBack={back} /> : null}
       </div>
@@ -800,9 +806,50 @@ function PostPage({ postId }: { postId: string }) {
   );
 }
 
-/** Stories with an unread post, next to Feed in the sidebar. */
+/** Threads waiting on the user, from the sidebar's live thread view. */
+function useWaitingThreads() {
+  const { threads, status } = useSidebarThreads();
+  return { waiting: useMemo(() => waitingThreads(threads), [threads]), status };
+}
+
+/** The top of the Inbox: threads whose agent is blocked on you. */
+function NeedsYou() {
+  const { waiting, status } = useWaitingThreads();
+  useMinuteTick();
+  return (
+    <section aria-labelledby="inbox-needs-you" className="mb-8">
+      <h2 id="inbox-needs-you" className="mb-2 flex items-center gap-2 text-lg font-semibold">
+        Needs you
+        {waiting.length ? <span className="rounded-full bg-destructive/10 px-2 text-xs font-medium text-destructive tabular-nums">{waiting.length}</span> : null}
+      </h2>
+      {status === "error" ? (
+        <p className="text-sm text-destructive" role="alert">Couldn't load threads.</p>
+      ) : waiting.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{status === "loading" ? "Loading threads…" : "No thread is waiting on you."}</p>
+      ) : (
+        <ol className="divide-y divide-border/60 rounded-lg border border-border/60">
+          {waiting.map((thread) => (
+            <li key={thread.id}>
+              <a href={thread.href} className="flex items-center gap-3 px-3 py-2.5 hover:bg-foreground/[0.04] focus-visible:outline focus-visible:outline-2">
+                <span aria-hidden className="size-2 shrink-0 rounded-full bg-destructive" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{thread.title}</span>
+                  {thread.why ? <span className="block truncate text-xs text-muted-foreground">{thread.why}</span> : null}
+                </span>
+                {thread.at ? <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{relativeTime(thread.at)}</span> : null}
+              </a>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/** Threads that need you plus stories with an unread post, next to Inbox in the sidebar. */
 export function UnreadCount() {
   const rpc = useRpc<typeof rpcContract>();
+  const { waiting } = useWaitingThreads();
   const [count, setCount] = useState(0);
   const load = useCallback(() => {
     rpc.call("unread", {}).then((result) => setCount(result.count), () => undefined);
@@ -811,5 +858,12 @@ export function UnreadCount() {
   useRealtime(REALTIME_CHANNEL, (payload) => {
     if (feedEvent(payload)) load();
   });
-  return count ? <span className="text-xs text-muted-foreground tabular-nums">{count > 99 ? "99+" : count}</span> : null;
+  const badge = inboxBadge(waiting.length, count);
+  if (!badge) return null;
+  const label = `${waiting.length} waiting on you, ${count} unread`;
+  return (
+    <span title={label} aria-label={label} className={cn("text-xs tabular-nums", waiting.length ? "font-medium text-destructive" : "text-muted-foreground")}>
+      {badge}
+    </span>
+  );
 }

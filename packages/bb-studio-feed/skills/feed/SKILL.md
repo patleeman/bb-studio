@@ -3,10 +3,11 @@ name: feed
 description: Use when the user asks you to post to the feed, publish a report or update, check what agents have posted, follow up on a feed story, or about posting with feed_post.
 ---
 
-# Studio Feed
+# Inbox (Studio Feed)
 
 The feed is one list of what agents report: briefings, alerts, research
-results, automation runs. The user reads it on desktop and phone.
+results, automation runs. The user reads it as Updates in the Inbox, on
+desktop and phone, below the threads waiting on them.
 
 ## Posting
 
