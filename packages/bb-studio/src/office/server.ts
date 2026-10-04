@@ -61,7 +61,11 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
     },
   });
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-  const officeProjects = new OfficeProjects(db, bb.sdk, changed);
+  const officeProjects = new OfficeProjects(db, bb.sdk, changed, hub);
+  bb.agents.contributeInstructions(({ threadId }) => {
+    const lead = db.prepare("SELECT project_id FROM office_projects WHERE lead_thread_id=?").get(threadId) as { project_id: string } | undefined;
+    return lead ? officeProjects.links.context(lead.project_id).slice(0, 4096) : null;
+  });
   const botProjects = new BotProjects(db, bb.sdk, officeProjects, options.moduleServices, changed);
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
   const inbox = new Inbox(db, [interactionSource(bb.sdk), legacyAttentionSource(db), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
@@ -72,6 +76,15 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   const { home: _homeContract, ...registeredContract } = officeContract;
   bb.rpc.register(registeredContract, {
     ...tabHandlers,
+    projects_list: () => officeProjects.list(),
+    project_membership: () => officeProjects.links.all(),
+    project_create: input => officeProjects.create(input),
+    project_update: input => officeProjects.update(input),
+    project_reorder: input => officeProjects.store.reorder(input),
+    project_archive: ({ projectId, archived }) => officeProjects.archive(projectId, archived),
+    project_start: input => officeProjects.start(input),
+    project_link: ({ projectId, refs }) => officeProjects.membershipMutation(projectId, refs),
+    project_unlink: ({ refs }) => officeProjects.membershipMutation(null, refs),
     project_set_run: input => officeProjects.setRun(input),
     thread_handoff: input => officeProjects.handoff(input),
     bots_overview: () => botProjects.overview(),

@@ -140,4 +140,19 @@ export const MIGRATIONS = [
    CREATE TABLE office_thread_handoffs (
      old_thread_id TEXT PRIMARY KEY, new_thread_id TEXT NOT NULL, project_id TEXT, archived INTEGER NOT NULL DEFAULT 0
    );`,
+  `CREATE TABLE studio_projects (
+     id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, position INTEGER NOT NULL,
+     archived_at INTEGER, bb_project_id TEXT UNIQUE, role TEXT NOT NULL,
+     legacy_bb_project_id TEXT UNIQUE
+   );
+   CREATE UNIQUE INDEX studio_projects_chief ON studio_projects(role) WHERE role='chief-of-staff';
+   CREATE TABLE studio_project_migrations (id TEXT PRIMARY KEY);
+   CREATE TABLE office_project_unlinked (ref TEXT PRIMARY KEY);
+   CREATE TABLE office_project_links (
+     project_id TEXT NOT NULL, ref TEXT NOT NULL PRIMARY KEY, added_at INTEGER NOT NULL
+   );
+   CREATE INDEX office_project_links_project ON office_project_links(project_id,added_at);
+   CREATE TABLE office_project_link_targets (
+     ref TEXT PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL, href TEXT NOT NULL, icon TEXT
+   );`,
 ];

@@ -1,3 +1,4 @@
+import { legacyStudioId } from "./studio-projects";
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -38,7 +39,7 @@ function fixture() {
   const createProject = vi.fn(async () => project("new"));
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     projects: { get: async ({ projectId }) => project(projectId), list: async () => [project("p"), project("personal"), project("new")], create: createProject },
-    threads: { spawn, archive, get: async ({ threadId }) => { const t = threads.get(threadId); if (!t) throw Object.assign(new Error("missing"), { status: 404 }); return t; }, unpin: async () => ({ ok: true }), output: async () => ({ output: "Latest progress: tests pass" }) as never, defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never, updatePluginMetadata: async () => ({}) },
+    threads: { spawn, archive, list: async ({ offset = 0, limit = 200 } = {}) => [...threads.values()].slice(offset, offset + limit), get: async ({ threadId }) => { const t = threads.get(threadId); if (!t) throw Object.assign(new Error("missing"), { status: 404 }); return t; }, unpin: async () => ({ ok: true }), output: async () => ({ output: "Latest progress: tests pass" }) as never, defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never, updatePluginMetadata: async () => ({}) },
     plugins: { callRpc: callRpc as never },
   } });
   cleanups.push(() => harness.lifecycle.dispose());
@@ -138,11 +139,11 @@ it("overviews and imports bots idempotently, adopts DM, converts schedules and r
   const x = fixture(); const b = bots(x);
   expect((await b.service.overview()).bots[0]).toMatchObject({ name: "Gardener", hasMemory: true, schedules: 1, suggestion: "project" });
   const first = await b.service.migrate({ botId: b.id });
-  expect(first).toMatchObject({ projectId: "new", leadThreadId: "dm", run: { enabled: true, cadence: "hourly" } });
+  expect(first).toMatchObject({ projectId: legacyStudioId("p"), leadThreadId: "dm", run: { enabled: true, cadence: "hourly" } });
   expect(x.pages.get(first.pageId!)).toContain("No pesticides");
   expect(x.pages.get(first.pageId!)).toContain("Grow food");
   expect(await b.service.migrate({ botId: b.id })).toEqual(first);
-  expect(x.createProject).toHaveBeenCalledTimes(1);
+  expect(x.createProject).not.toHaveBeenCalled();
   expect(x.pages.size).toBe(1);
   expect(x.automations).toHaveLength(1);
   expect(b.call).toHaveBeenCalledWith("setThreadProfile", { threadId: "dm", botId: null });
@@ -155,7 +156,7 @@ it("merges Chief of Staff into Personal and preserves its existing page and lead
   const x = fixture(); const existing = await x.projects.setup({ projectId: "personal", request });
   const b = bots(x, true);
   const migrated = await b.service.migrate({ botId: b.id, projectId: "new" });
-  expect(migrated).toMatchObject({ projectId: "personal", role: "chief-of-staff", leadThreadId: existing.leadThreadId, pageId: existing.pageId });
+  expect(migrated).toMatchObject({ projectId: legacyStudioId("chief-of-staff"), role: "chief-of-staff", leadThreadId: existing.leadThreadId, pageId: existing.pageId });
   expect(x.pages.get(existing.pageId!)).toContain("Do my work");
   expect(x.pages.get(existing.pageId!)).toContain("No pesticides");
   expect(x.createProject).not.toHaveBeenCalled();
@@ -203,4 +204,12 @@ it("pauses original bot schedules after its project heartbeat is enabled", async
   expect(result.run).toEqual({ enabled: true, cadence: "weekdays", time: "08:30" });
   expect(x.automations.find(a => a.id === "old").enabled).toBe(false);
   expect(x.automations.filter(a => a.enabled)).toHaveLength(1);
+});
+
+it("preserves one-off status across handoff even inside a connected BB project", async () => {
+  const x = fixture();
+  x.threads.set("alone", makeThreadResponse({ id: "alone", projectId: "p" }));
+  await x.projects.membershipMutation(null, ["thread:alone"]);
+  const next = await x.projects.handoff({ threadId: "alone", request });
+  expect((await x.projects.links.all()).threads[next.threadId]).toBeUndefined();
 });

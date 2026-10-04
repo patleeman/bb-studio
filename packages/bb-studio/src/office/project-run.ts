@@ -11,7 +11,7 @@ export const HEARTBEAT = "Heartbeat: check the project against its page; act if 
 /** Automations owns scheduling; this table remembers configuration and identity. */
 export class ProjectRuns {
   private pending = new Map<string, Promise<void>>();
-  constructor(private db: Database.Database, private sdk: BbPluginApi["sdk"], private changed: () => void) {}
+  constructor(private db: Database.Database, private sdk: BbPluginApi["sdk"], private changed: () => void, private context: (projectId: string) => Promise<string> = async () => "") {}
   private row(projectId: string) { return this.db.prepare("SELECT * FROM office_project_runs WHERE project_id=?").get(projectId) as Row | undefined; }
   get(projectId: string): ProjectRun | null {
     const row = this.row(projectId);
@@ -47,7 +47,7 @@ export class ProjectRuns {
     const cron = run.cadence === "hourly" ? `${Number(minute)} * * * *` : `${Number(minute)} ${Number(hour)} * * ${run.cadence === "weekdays" ? "1-5" : "*"}`;
     const trigger = { triggerType: "schedule", cron, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
     const execution = { mode: "agent", providerId: thread.providerId, model: defaults.model, reasoningLevel: defaults.reasoningLevel ?? "medium", permissionMode: defaults.permissionMode ?? "accept-edits", environment: { type: "project-default" }, targetThreadId: leadThreadId,
-      prompt: `${HEARTBEAT}\nProject hub: /plugins/studio/projects/${encodeURIComponent(projectId)}. Read project_get for its current page and Memory.`, };
+      prompt: `${HEARTBEAT}\nProject hub: /plugins/studio/projects/${encodeURIComponent(projectId)}. Read project_get for its current page and Memory.\n${await this.context(projectId)}`, };
     const name = `Studio project heartbeat ${projectId}`;
     let automationId = row?.automation_id;
     if (automationId && row?.automation_project_id !== thread.projectId) {

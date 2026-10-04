@@ -1,87 +1,119 @@
-# Project hubs
+# Studio projects
 
-Every BB project has an on-demand page and lead. Personal is the Chief of Staff:
-its role is `chief-of-staff`, its display name is `Chief of Staff`, and its page
-has What I watch, Handed off, and Memory. Other projects have role `project` and
-pages with Brief, Plan, Decisions, Memory, and Links.
+Studio owns projects independently of BB projects. A project needs no folder or
+repository. It may connect to one non-Personal BB project through `bbProjectId`.
+Chief of Staff is one special Studio project, independent of BB Personal.
 
-## RPCs
+## Shape and RPCs
 
-The project shape is `{ projectId, name, role, leadThreadId, pageId, pageHref,
-run }`. The three reference fields are nullable. `run` is null or
+`StudioProject` is `{ id, projectId, name, icon, position, archivedAt, bbProjectId,
+role, leadThreadId, pageId, pageHref, run }`. IDs start with `sp_`; `projectId` is
+an alias of `id` for existing clients. Icon, archive time, connection, lead and
+page fields are nullable. Role is `project` or `chief-of-staff`. Run is null or
 `{ enabled, cadence: "hourly" | "daily" | "weekdays", time: "HH:MM" }`.
 
-- `project_get({ projectId })` returns the project shape and clears confirmed
-  deleted references. Transport errors preserve references.
-- `project_setup({ projectId, request })` returns the shape. The native composer
-  request is the same as `office_start`. Setup creates only missing objects,
-  preserves attachments and execution settings, and overrides request.projectId
-  with the hub's project. The user's text supplies Brief (What I watch for CoS).
+- `projects_list({})` returns `{ projects: StudioProject[] }` in position order,
+  including archived projects. Clients can filter on archivedAt.
+- `project_get({ projectId })` returns StudioProject, clearing confirmed deleted
+  lead/page references. Transport errors preserve references.
+- `project_create({ name, bbProjectId? })` returns StudioProject without starting
+  a lead or creating a page. It never creates folders or changes BB projects.
+- `project_update({ projectId, name?, bbProjectId?, icon? })` returns StudioProject.
+  Null disconnects the BB project or clears the icon. A BB project has at most
+  one Studio connection, so implicit membership has one owner. Connecting
+  Personal is rejected: projects without connections already execute there.
+- `project_reorder({ projectId, previousProjectId, nextProjectId })` returns
+  `{ ok: true }`. Neighbors are nullable; stale/nonadjacent neighbors fail.
+- `project_archive({ projectId, archived })` returns StudioProject. Archive
+  disables its heartbeat, retaining its page, threads, membership and files.
+  Restore leaves Run disabled. Chief of Staff cannot be archived.
+- `project_setup({ projectId, request })` returns StudioProject, creating only
+  the missing lead/page. Request is the native composer request from office_start.
+- `project_start({ projectId, request })` returns `{ threadId }` for a new worker.
+  Setup and start spawn in the connected BB project, otherwise Personal, then
+  explicitly link the new thread. Archived projects must be restored first.
 - `project_threads({ projectId })` returns `{ threads: [{ id, title, status,
-  updatedAt, isLead }] }`. Title may be null. BB's default thread visibility
-  applies; top-level threads are paginated and sorted newest first by updatedAt.
-- `project_set_run({ projectId, enabled, cadence, time? })` returns the shape.
-  Time defaults to 09:00 in the server's local timezone. Hourly uses its minute.
-  A lead must exist. Disabling deletes the heartbeat automation and retains the
-  disabled cadence in Studio.
-- `thread_handoff({ threadId, request })` returns `{ threadId }` for the successor.
-  Request is the full composer request, optionally extended with `prompt` for a
-  note. Its input and attachments are preserved, even when its text is empty.
-- `bots_overview({})` returns `{ bots: [{ id, name, avatar, providerId, projectId,
-  mission, hasMemory, schedules, suggestion }] }`. Suggestion is `retire` for
-  retired bots, `chief-of-staff` for an exact Chief of Staff name or
-  `chief-of-staff` handle, otherwise `project`. Schedules counts stored agent
-  automations targeting profile threads plus an enabled interval heartbeat.
-- `bot_to_project({ botId, projectId? })` returns the shape. Without a target it
-  creates a named BB project using the bot's existing home directory and host.
-  Chief of Staff bots always merge into Personal. `bot_retire({ botId })` returns
-  `{ ok: true }` and uses the bot runtime's retirement operation, retaining history.
+  updatedAt, linked, isLead }] }`, sorted newest first. Title may be null.
+  Implicit members are top-level threads; explicitly linked children are included.
+- `project_link({ projectId, refs })` and `project_unlink({ refs })` return
+  `{ ok: true }`. References are `thread:<id>` or `item:<pluginId>:<itemId>`.
+- `project_membership({})` returns `{ threads: Record<threadId, studioProjectId>,
+  items: [{ ref, projectId, title, kind, href, icon }] }`.
 
-## Instructions and handoff
+## Membership and Library
 
-Lead instructions use the SDK's `visibility: "agent-only"` input part; the visible
-chat starts with the user's text. They establish shared project memory, worker
-coordination, and Inbox reporting. Chief of Staff also creates projects, calls
-project_setup to staff them, and sends work to project leads.
+Each ref has one explicit owner. Linking elsewhere moves it atomically, without
+changing the underlying thread or item. Every thread in a connected BB project
+belongs implicitly unless an explicit owner overrides it. Unlink records an
+exclusion so an implicit member really becomes a one-off. Relinking clears the
+exclusion. Linking to Chief of Staff is ordinary membership, not an unlink.
+Archived Studio projects retain ownership. BB's default thread archive filter
+applies to implicit membership; explicit links persist until unlinked.
 
-The SDK fork request cannot select a provider. Handoff therefore spawns in the
-old thread's project with the requested execution settings, an agent-only excerpt
-of its latest response (up to 12,000 characters), an old-thread link, and the
-project page/Memory pointer. The excerpt is context, not a generated summary of
-the full conversation; the successor is told to read more history if needed.
-The lead mapping and heartbeat target move before archiving the old thread. A
-saved successor allows retries to finish archive/schedule operations without
-spawning another thread. This action creates no new project page.
+Membership reads use one paginated BB thread list and local item metadata,
+without provider fan-out. Item titles/icons are snapshots taken when linked;
+relinking refreshes them. Linking validates targets before committing the batch.
+Mutations publish Studio realtime. Lead preambles and heartbeat prompts list
+member titles/refs. Dynamic lead instructions include explicit membership on the
+next runtime resolution; live sessions are not interrupted. Instructions tell
+agents to read project_membership for current ownership.
 
-## Bot migration and scheduling
+Pages can remain standalone: Pages create accepts `projectId: null` and
+`parentId: null`, stores null, and lists the page in the Library. A child page
+inherits its parent's project. Creating a Studio project page uses its optional
+BB connection or null, then links the page explicitly. Linking any existing
+page/item does not change its stored project or remove it from the Library.
 
-Bot mission and memory are imported without overwriting existing page content.
-Existing pages receive marked Brief/Memory sections using Pages' optimistic
-editDocument RPC. Existing leads are preserved; otherwise the bot's existing DM
-is adopted and detached from its bot profile. No DM means no lead is spawned.
+## Migration
 
-The SDK has no thread-move API. Adopted DMs stay in their original BB project,
-with the destination hub pointing to them. They are not included in the new
-project's top-level thread listing. Their heartbeat belongs to their original
-project, which owns the execution target. Bot histories and original files stay.
+On first use, each existing non-Personal BB project gets a deterministic Studio
+ID and connection. Existing office_projects lead/page references, Run settings,
+bot-import mappings and handoff mappings move to that ID. Existing leads/pages
+also receive explicit membership. Existing Chief of Staff moves to the special
+Studio project; its BB connection remains null. The transaction has a durable
+completion marker, so restart does not recreate projects or overwrite edits.
+BB projects created later need an explicit Studio connection.
 
-One project heartbeat replaces active bot schedules. The first active cron
-supplies a supported cadence/time (weekday cron remains weekdays); otherwise an
-interval of at most an hour becomes hourly, and other intervals become daily.
-Unsupported cron shapes fall back to daily at 09:00. Original automations are
-paused, not deleted, and the old bot interval is disabled. With no DM the cadence
-is retained pending lead setup. Existing enabled Run configuration wins on merge.
+Legacy BB IDs resolve through migration aliases only. Responses always return
+Studio IDs. These aliases keep old Inbox/project URLs usable during transition.
+No BB project, thread, page, directory or history is deleted by migration.
 
-Automations owns timing; Studio stores configuration and automation identity.
-Creation starts disabled and is reconciled by a stable name before enablement.
-Retries can recover a lost creation response. Setup and mutations serialize per
-hub in the running service. SQLite and external calls cannot share a transaction:
-a crash between external page/thread/project creation and saving its ID can leave
-an unlinked object. Migration markers avoid reimporting unchanged documents.
+## Run mode, handoff and bots
 
-## Inbox links
+`project_set_run({ projectId, enabled, cadence, time? })` returns StudioProject.
+Time defaults to 09:00 in the server timezone; hourly uses its minute. Disabling
+removes the automation and retains the disabled setting. Automations owns timing;
+Studio stores identity/configuration. Creation starts disabled and reconciles by
+stable name, so a lost creation response can be retried.
 
-At source and read time, removed Office and channel routes resolve to the event's
-thread, else item, else `/plugins/studio/projects/<projectId>`, else null. Existing
-valid links, including the Inbox panel itself, remain intact. Stored legacy
-attention events receive the same mapping without rewriting history.
+`thread_handoff({ threadId, request })` returns `{ threadId }`. Request is the
+full composer request, optionally extended with `prompt` for a note. The SDK
+fork API cannot change providers, so it spawns in the old thread's BB project,
+with an agent-only latest-response excerpt, old-thread link, and the owning
+Studio project's page/Memory pointer. It links the successor to that Studio
+project, moves any lead mapping and heartbeat, then archives the old thread.
+A durable successor record makes retries safe after partial failure.
+
+Lead and Chief-of-Staff preambles use `visibility: "agent-only"`; the visible
+chat begins with the user's input. They establish shared memory, worker
+coordination and Inbox reporting. CoS also creates and staffs Studio projects.
+
+`bots_overview({})` returns `{ bots: [{ id, name, avatar, providerId, projectId,
+mission, hasMemory, schedules, suggestion }] }`. Project IDs are Studio IDs or
+null. `bot_to_project({ botId, projectId? })` returns StudioProject. With no target,
+it creates a Studio project connected to the bot's BB project, or reuses the
+existing Studio connection. Personal bots get an unconnected Studio project.
+Chief-of-Staff bots always merge into the special Studio project.
+
+Mission and memory merge through Pages' optimistic editDocument RPC without
+replacing existing content. Existing leads win; otherwise the DM is adopted and
+explicitly linked, retaining its original BB project. No DM means no spawned
+lead. Active bot schedules consolidate to one project heartbeat; originals are
+paused, and the bot interval is disabled. Without a lead the cadence stays
+pending until setup. Supported cron times are preserved; unsupported shapes
+become daily at 09:00. `bot_retire({ botId })` returns `{ ok: true }`, preserving
+history through the bot runtime's retirement operation.
+
+SQLite and external creation cannot share a transaction. A crash between
+creating a page/thread and recording its ID can leave an unlinked object;
+completed IDs and migration markers make normal retries idempotent.

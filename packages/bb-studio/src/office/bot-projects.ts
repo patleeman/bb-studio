@@ -30,11 +30,12 @@ export class BotProjects {
     return { bot, mission, memory, schedules };
   }
   async overview() {
+    await this.projects.store.ensure();
     if (!this.modules?.has("bot-teams")) return { bots: [] };
     const roster = z.object({ bots: z.array(z.object({ id: z.string() })) }).parse(await this.call("list", null));
     return { bots: await Promise.all(roster.bots.map(async ({ id }) => {
       const { bot, mission, memory, schedules } = await this.details(id);
-      return { id, name: bot.name, avatar: bot.avatar || null, providerId: bot.providerId, projectId: bot.projectId, mission, hasMemory: !!memory.trim(), schedules: schedules.length + (bot.intervalMinutes > 0 ? 1 : 0), suggestion: bot.retired ? "retire" as const : chief(bot) ? "chief-of-staff" as const : "project" as const };
+      return { id, name: bot.name, avatar: bot.avatar || null, providerId: bot.providerId, projectId: (this.db.prepare("SELECT project_id FROM office_bot_projects WHERE bot_id=?").get(bot.id) as { project_id: string } | undefined)?.project_id ?? this.projects.store.rows().find(p => p.bb_project_id === bot.projectId)?.id ?? null, mission, hasMemory: !!memory.trim(), schedules: schedules.length + (bot.intervalMinutes > 0 ? 1 : 0), suggestion: bot.retired ? "retire" as const : chief(bot) ? "chief-of-staff" as const : "project" as const };
     })) };
   }
   migrate(input: { botId: string; projectId?: string | null }) {
@@ -45,20 +46,23 @@ export class BotProjects {
     return next;
   }
   private async import({ botId, projectId }: { botId: string; projectId?: string | null }) {
+    await this.projects.store.ensure();
     const { bot, mission, memory, schedules } = await this.details(botId);
+    if (projectId) projectId = this.projects.store.resolve(projectId).id;
     const saved = this.db.prepare("SELECT project_id FROM office_bot_projects WHERE bot_id=?").get(botId) as { project_id: string } | undefined;
     if (chief(bot)) {
-      projectId = (await this.sdk.projects.list({ includePersonal: true })).find(p => p.kind === "personal")?.id;
+      projectId = this.projects.store.rows().find(p => p.role === "chief-of-staff")?.id;
       if (!projectId) throw new Error("Personal project unavailable.");
     }
     if (saved && projectId && projectId !== saved.project_id) throw new Error("This bot has already been imported into another project.");
     projectId = saved?.project_id ?? projectId;
     if (!projectId) {
-      // A bot's existing home is a safe existing directory on its known host.
-      const project = await this.sdk.projects.create({ name: bot.name, source: { type: "local_path", hostId: bot.hostId, path: bot.home } });
-      projectId = project.id;
+      const bbProject = await this.sdk.projects.get({ projectId: bot.projectId });
+      const bbProjectId = bbProject.kind === "personal" ? null : bbProject.id;
+      const existing = bbProjectId ? this.projects.store.rows().find(p => p.bb_project_id === bbProjectId) : undefined;
+      projectId = existing?.id ?? (await this.projects.create({ name: bot.name, bbProjectId })).id;
     }
-    await this.sdk.projects.get({ projectId });
+    this.projects.store.resolve(projectId);
     this.db.prepare("INSERT OR IGNORE INTO office_bot_projects(bot_id,project_id) VALUES (?,?)").run(botId, projectId);
     const direct = z.object({ threadId: z.string().nullable() }).parse(await this.call("office_direct", { botId }));
     const result = await this.projects.importBot(projectId, { id: botId, name: bot.name, mission, memory, threadId: direct.threadId });
