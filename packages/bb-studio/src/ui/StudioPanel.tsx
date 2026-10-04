@@ -36,7 +36,6 @@ import { toast } from "sonner";
 import type { ProviderView, rpcContract, SavedViewView, SidebarView, SpaceView, TagView } from "../contract";
 import { applyItemChanges } from "../partial";
 import { backgroundKinds, compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
-import { NeedsYou } from "./HomePanel";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
 import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceGlyph, SpaceHome, useSpaceThreads, type ThreadKind } from "./Spaces";
@@ -441,7 +440,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   );
   const notice = (
     <>
-      <NeedsYou />
       {searchText ? <SearchFreshness {...freshness} /> : null}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
