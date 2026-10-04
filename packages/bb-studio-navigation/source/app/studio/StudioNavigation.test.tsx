@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DragEndEvent } from "@dnd-kit/core";
 import type {

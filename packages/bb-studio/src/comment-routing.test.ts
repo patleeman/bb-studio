@@ -9,7 +9,7 @@ it("routes an explicit bot mention to that bot's conversation", async () => {
     if (method === "conversation") return { id: "room-a" };
     return {};
   }) } };
-  await routeCommentMentions(sdk as never, { pluginId: "artifacts", id: "a" }, "@Atlas check this", "/plugins/artifacts/a/a");
+  await routeCommentMentions(sdk as never, "@Atlas check this", "/plugins/artifacts/a/a");
   expect(calls.map((call) => call.method)).toEqual(["list", "conversation", "send"]);
   expect(calls[2]?.input).toMatchObject({ id: "room-a", text: expect.stringContaining("/plugins/artifacts/a/a") });
 });

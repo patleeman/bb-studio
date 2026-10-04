@@ -1,6 +1,4 @@
-import type { Room } from "./contract";
-
-export function botCreationPrompt(room?: Pick<Room, "id" | "name">, spaceId?: string): string {
+export function botCreationPrompt(spaceId?: string): string {
   return [
     "Help me create a persistent bot in BB Studio Teams through this conversation.",
     "Use the Bots skill and `bb bots` CLI to create it. If I have not described what the bot should do, ask me that one question first. Keep setup conversational: no forms or questionnaires. Choose a fitting name, avatar, role, mission, and available provider/model from my description and BB defaults. Ask only when a missing decision materially changes the bot’s purpose or access.",

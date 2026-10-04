@@ -35,7 +35,7 @@ test("bot setup creates a visible thread with the composer's selections and inpu
       input: [
         {
           type: "text",
-          text: botCreationPrompt({ id: "channel-a", name: "Research" }),
+          text: botCreationPrompt(),
           mentions: [],
         },
         { type: "localFile", path: "/tmp/brief.md", name: "brief.md" },
@@ -79,7 +79,7 @@ test("bot setup creates a visible thread with the composer's selections and inpu
 });
 
 test("bot setup from a space asks the agent to add the bot to it", () => {
-  const prompt = botCreationPrompt(undefined, "spc_launch");
+  const prompt = botCreationPrompt("spc_launch");
   assert.match(prompt, /space ID: "spc_launch"/);
   assert.match(prompt, /studio_space_items/);
   assert.doesNotMatch(botCreationPrompt(), /studio_space_items/);

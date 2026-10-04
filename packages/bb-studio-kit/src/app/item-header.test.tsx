@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React, { act, useEffect, useRef, useState } from "react";
+import { act, useEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ItemHeader, ViewMoveMenu } from "./item-header";

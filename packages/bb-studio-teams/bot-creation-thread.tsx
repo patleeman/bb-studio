@@ -37,7 +37,7 @@ export function BotCreationThread({ spaceId }: { spaceId?: string }) {
         <NewThreadComposer
           className="mx-auto min-h-0 w-full max-w-5xl flex-1 px-4 pb-4"
           draftKey={`bot-creation:${spaceId ? `space:${spaceId}` : "standalone"}`}
-          initialPrompt={botCreationPrompt(undefined, spaceId)}
+          initialPrompt={botCreationPrompt(spaceId)}
           focusRequest={1}
           onSubmit={async (request) => {
             setError(null);

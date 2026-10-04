@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React, { act, useState } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompanionView, companionWorkbenchAvailable, openCompanion, useOpenCompanion, type CompanionViewProps } from "./companion";

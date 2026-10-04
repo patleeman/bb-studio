@@ -69,7 +69,6 @@ export const threadStatusViewSchema = z.object({
   indicator: directThreadIndicatorSchema,
   status: z.enum(["pending", "starting", "active", "stopping", "idle", "error"]),
 });
-export const directThreadViewSchema = threadStatusViewSchema;
 export type ThreadStatusView = z.infer<typeof threadStatusViewSchema>;
 export type DirectThreadView = ThreadStatusView;
 export const roomWorkSchema = z.object({
@@ -414,7 +413,7 @@ export const rpcContract = {
       bots: z.array(botListItemSchema),
       rooms: z.array(roomSchema),
       activeRoomIds: z.array(z.string()),
-      directThreads: z.record(idSchema, directThreadViewSchema),
+      directThreads: z.record(idSchema, threadStatusViewSchema),
       directConversations: z.record(idSchema, z.array(conversationSchema)),
       directThreadInfo: z.record(z.string(), directThreadInfoSchema),
       roomThreads: z.record(z.string(), z.array(threadStatusViewSchema)),

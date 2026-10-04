@@ -781,7 +781,7 @@ export default async function plugin(bb: BbPluginApi) {
       const comment = delegated ?? services.addComment(input);
       if (!delegated) {
         const item = (await hub.get(input.ref.pluginId, [input.ref.id]))[0];
-        void routeCommentMentions(bb.sdk, input.ref, input.body, item?.href ?? `${input.ref.pluginId}:${input.ref.id}`).catch(() => { /* Teams is optional. */ });
+        void routeCommentMentions(bb.sdk, input.body, item?.href ?? `${input.ref.pluginId}:${input.ref.id}`).catch(() => { /* Teams is optional. */ });
       }
       changes.append(null);
       bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });

@@ -395,7 +395,7 @@ export class TalkController {
 
   /** Whether the user is looking at the page the capture started from. */
   isAtSource(): boolean {
-    const { kind, phase, threadId, recordingId } = this.state;
+    const { kind, phase, recordingId } = this.state;
     if (phase === "idle") return true;
     if (kind === "recording") return this.viewing === recordingId;
     if (this.state.field) return findField(this.state.field.key) !== null;

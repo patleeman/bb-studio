@@ -1,13 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { Ref } from "./services";
 
 type Sdk = { plugins: { callRpc<T>(args: { pluginId: string; method: string; input: never; outputSchema: z.ZodType<T>; signal?: AbortSignal }): Promise<T> } };
 const botsSchema = z.object({ bots: z.array(z.object({ id: z.string(), name: z.string(), handle: z.string().optional(), retired: z.boolean().optional() })) });
 const conversationSchema = z.object({ id: z.string() });
 
 /** Send a comment's explicit @bot mentions to each bot's direct conversation. */
-export async function routeCommentMentions(sdk: Sdk, ref: Ref, body: string, href: string): Promise<void> {
+export async function routeCommentMentions(sdk: Sdk, body: string, href: string): Promise<void> {
   if (!body.includes("@")) return;
   const call = <T>(method: string, input: unknown, outputSchema: z.ZodType<T>) =>
     sdk.plugins.callRpc({ pluginId: "bot-teams", method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) });

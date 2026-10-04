@@ -1,4 +1,4 @@
-import { test, vi, afterEach } from "vitest";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import type { MessageDispatchHookContext } from "@get-bb/plugin-sdk";
 import type { Verdict } from "../classifier";

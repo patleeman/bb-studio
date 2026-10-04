@@ -1,4 +1,3 @@
-import { errorMessage } from "@bb-studio/kit/format";
 import { AddOnCollection, navigateFromFloat, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -14,15 +13,9 @@ import { useProjects, type BotsState, type Rpc } from "./shared";
 export function usePagesData(rpc: Rpc) {
   const [pages, setPages] = useState<PageMetaView[] | null>(null);
   const [bots, setBots] = useState<BotsState>({ available: false, reason: null, bots: [] });
-  const [error, setError] = useState<string | null>(null);
+  // The collection reports its own load errors; a failed refresh keeps the last list.
   const refetch = useCallback(() => {
-    rpc.call("tree", {}).then(
-      (result) => {
-        setPages(result.pages);
-        setError(null);
-      },
-      (cause: unknown) => setError(errorMessage(cause)),
-    );
+    rpc.call("tree", {}).then((result) => setPages(result.pages), () => {});
   }, [rpc]);
   const refetchBots = useCallback(() => {
     rpc.call("bots", null).then(setBots, () => {});
@@ -44,7 +37,7 @@ export function usePagesData(rpc: Rpc) {
       document.removeEventListener("visibilitychange", poll);
     };
   }, [refetchBots]);
-  return { pages, bots, error, refetch };
+  return { pages, bots, refetch };
 }
 
 /** What the page's blocks and mentions need to open things, shared by every view of a page. */
@@ -119,7 +112,7 @@ export function PagesPanel({ subPath }: { subPath: string }) {
   const projects = useProjects();
   // `<page id>/chat/<thread id>` opens the page with that chat's card showing.
   const [pageId = null, section, chatThreadId = null] = subPath.split("/").filter(Boolean);
-  const { pages, bots, error, refetch } = usePagesData(rpc);
+  const { pages, bots, refetch } = usePagesData(rpc);
 
   const [pageMeta, setPageMeta] = useState<PageMetaView | null | undefined>(undefined);
   const pageRequest = useRef(0);
