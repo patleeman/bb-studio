@@ -1,5 +1,4 @@
 import type { SidebarThread } from "../model/sidebar-thread.js";
-import type { ProjectThreadItem, ThreadComparator } from "../model/project-thread-groups.js";
 
 /** The parts of a Studio Space the sidebar shows. */
 export interface StudioSpace {
@@ -13,6 +12,9 @@ export interface StudioSpace {
 export interface SpaceThreadGroup {
   space: StudioSpace;
   leadThreadId: string | null;
+  /** The lead, when it's listed. It lives on the Space's dashboard, so it isn't in `threads`. */
+  lead: SidebarThread | null;
+  /** Every other thread in the Space; the lead's workers show at the top level. */
   threads: SidebarThread[];
 }
 
@@ -53,8 +55,8 @@ export function createSpaceResolver(
 }
 
 /**
- * One group per Space in Studio's order, each with its threads, and the
- * threads in no (known) Space for the closing Threads section.
+ * One group per Space in Studio's order, each with its threads apart from the
+ * lead, and the threads in no (known) Space for the closing Threads section.
  */
 export function buildSpaceThreadGroups(
   threads: readonly SidebarThread[],
@@ -76,30 +78,16 @@ export function buildSpaceThreadGroups(
     else bySpace.set(spaceId, [thread]);
   }
   return {
-    groups: spaces.map((space) => ({
-      space,
-      leadThreadId: leads[space.id] ?? null,
-      threads: bySpace.get(space.id) ?? [],
-    })),
+    groups: spaces.map((space) => {
+      const leadThreadId = leads[space.id] ?? null;
+      const held = bySpace.get(space.id) ?? [];
+      return {
+        space,
+        leadThreadId,
+        lead: held.find((thread) => thread.id === leadThreadId) ?? null,
+        threads: held.filter((thread) => thread.id !== leadThreadId),
+      };
+    }),
     loose,
   };
-}
-
-/** Sort a Space's lead above its other threads, then as the list sorts. */
-export function leadFirst(compare: ThreadComparator, leadThreadId: string | null): ThreadComparator {
-  if (!leadThreadId) return compare;
-  const comparator: ThreadComparator = (left, right) => {
-    if (left.id === leadThreadId && right.id !== leadThreadId) return -1;
-    if (right.id === leadThreadId && left.id !== leadThreadId) return 1;
-    return compare(left, right);
-  };
-  const compareItems = compare.compareItems;
-  if (compareItems) {
-    const isLead = (item: ProjectThreadItem) => item.kind === "thread" && item.node.thread.id === leadThreadId;
-    comparator.compareItems = (left, right) => {
-      if (isLead(left) !== isLead(right)) return isLead(left) ? -1 : 1;
-      return compareItems(left, right);
-    };
-  }
-  return comparator;
 }

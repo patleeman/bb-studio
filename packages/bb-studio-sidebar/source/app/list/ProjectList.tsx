@@ -1854,6 +1854,7 @@ function ProjectListComponent({
               spaces={spaceData.spaces}
               spaceOf={spaceData.spaceOf}
               leads={spaceData.leads}
+              items={spaceData.items}
               threads={threads}
               draftThreadIds={draftThreadIds}
               effectivePinnedThreadIds={

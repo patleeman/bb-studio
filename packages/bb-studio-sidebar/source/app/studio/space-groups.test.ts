@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeSidebarThread } from "../testing/fixtures.js";
 import { buildProjectThreadGroups, compareStandardThreads } from "../model/project-thread-groups.js";
-import { getSidebarThreadComparator } from "../list/ProjectList.js";
-import { buildSpaceThreadGroups, leadFirst, spaceHref, type StudioSpace } from "./space-groups.js";
+import { buildSpaceThreadGroups, spaceHref, type StudioSpace } from "./space-groups.js";
 
 const spaces: StudioSpace[] = [
   { id: "sp_b", name: "Beta", color: "#00f", icon: null, defaultProjectId: null },
@@ -22,9 +21,9 @@ describe("By space grouping", () => {
 
   it("keeps Studio's order, puts children with their root, and sends unknown Spaces to Threads", () => {
     const { groups, loose } = buildSpaceThreadGroups(rows, spaces, spaceOf, { sp_a: "lead" });
-    expect(groups.map((group) => [group.space.id, group.leadThreadId, group.threads.map((thread) => thread.id)])).toEqual([
-      ["sp_b", null, ["beta"]],
-      ["sp_a", "lead", ["newest", "lead", "child"]],
+    expect(groups.map((group) => [group.space.id, group.leadThreadId, group.lead?.id ?? null, group.threads.map((thread) => thread.id)])).toEqual([
+      ["sp_b", null, null, ["beta"]],
+      ["sp_a", "lead", "lead", ["newest", "child"]],
     ]);
     expect(loose.map((thread) => thread.id)).toEqual(["none", "gone"]);
   });
@@ -35,12 +34,10 @@ describe("By space grouping", () => {
     expect(loose).toEqual([]);
   });
 
-  it("sorts the lead first under any sort", () => {
+  it("lists the lead's workers at the top level, since the lead lives on the dashboard", () => {
     const threads = buildSpaceThreadGroups(rows, spaces, spaceOf, { sp_a: "lead" }).groups[1]!.threads;
-    for (const compare of [compareStandardThreads, getSidebarThreadComparator("alpha"), getSidebarThreadComparator("created")]) {
-      const items = buildProjectThreadGroups(threads, leadFirst(compare, "lead"), new Set(), false);
-      expect(items.map((item) => item.kind === "thread" ? item.node.thread.id : item.kind)).toEqual(["lead", "newest"]);
-    }
+    const items = buildProjectThreadGroups(threads, compareStandardThreads, new Set(), false);
+    expect(items.map((item) => item.kind === "thread" ? item.node.thread.id : item.kind)).toEqual(["newest", "child"]);
   });
 
   it("opens a Space at Studio's Space path", () => {

@@ -41,6 +41,38 @@ const spacesSchema = z.object({
 });
 const spaceOfSchema = z.object({ threads: z.record(z.string(), z.string()) });
 const leadSchema = z.object({ leadThreadId: z.string().nullable() }).passthrough();
+const treeSchema = z.object({
+  spaces: z.array(z.object({
+    id: z.string(),
+    itemCount: z.number().catch(0),
+    items: z.array(z.object({
+      pluginId: z.string(),
+      id: z.string(),
+      title: z.string(),
+      icon: z.string().nullable().catch(null),
+      kindIcon: z.string().catch("File"),
+      href: z.string(),
+      depth: z.number().catch(0),
+    }).passthrough()).catch([]),
+  }).passthrough()),
+});
+
+/** A Studio item a Space holds, as the sidebar's Studio list shows it. */
+export interface SpaceSidebarItem {
+  pluginId: string;
+  id: string;
+  title: string;
+  icon: string | null;
+  kindIcon: string;
+  href: string;
+  depth: number;
+}
+
+export interface SpaceItems {
+  items: SpaceSidebarItem[];
+  /** Every item the Space holds; `items` stops at Studio's cap. */
+  count: number;
+}
 
 export type StudioSpacesState =
   | { status: "loading" }
@@ -51,6 +83,8 @@ export type StudioSpacesState =
     /** Thread id to Space id; empty until `threadsLoaded`. */
     spaceOf: Record<string, string>;
     leads: Record<string, string | null>;
+    /** Each Space's Studio items; empty until `threadsLoaded`. */
+    items: Record<string, SpaceItems>;
     threadsLoaded: boolean;
   };
 
@@ -62,8 +96,8 @@ export function useStudioSpaces(): StudioSpacesState {
 
 /**
  * Loads Studio's Spaces. Outside By space it only checks they exist, for the
- * Organize menu; in By space it also loads each thread's Space and each
- * Space's lead. A Studio without Spaces leaves the state unavailable.
+ * Organize menu; in By space it also loads each thread's Space, each Space's
+ * lead, and each Space's Studio items. A Studio without Spaces leaves the state unavailable.
  */
 export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): void {
   const sdk = useSdk();
@@ -83,17 +117,24 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
         const { spaces } = await call("spaces", null, spacesSchema);
         let spaceOf: Record<string, string> = {};
         let leads: Record<string, string | null> = {};
+        let items: Record<string, SpaceItems> = {};
         if (spaceMode) {
-          const [of, leadRows] = await Promise.all([
+          const [of, leadRows, tree] = await Promise.all([
             call("space_of_threads", {}, spaceOfSchema),
             Promise.all(spaces.map((space) => call("space_lead", { spaceId: space.id }, leadSchema)
               .then((lead) => [space.id, lead.leadThreadId] as const, () => [space.id, null] as const))),
+            // Items are a nicety: a failure leaves the lists empty, not the sidebar.
+            call("spaceTree", { threadsFor: [] }, treeSchema).catch(() => ({ spaces: [] })),
           ]);
           spaceOf = of.threads;
           leads = Object.fromEntries(leadRows);
+          items = Object.fromEntries(tree.spaces.map((space) => [space.id, {
+            items: space.items.map(({ pluginId, id, title, icon, kindIcon, href, depth }) => ({ pluginId, id, title, icon, kindIcon, href, depth })),
+            count: space.itemCount,
+          }]));
         }
         const list = spaces.map(({ id, name, color, icon, defaultProjectId }) => ({ id, name, color, icon, defaultProjectId }));
-        if (active) setState({ status: "ready", spaces: list, spaceOf, leads, threadsLoaded: spaceMode });
+        if (active) setState({ status: "ready", spaces: list, spaceOf, leads, items, threadsLoaded: spaceMode });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         // Keep the last good load through a passing failure.
