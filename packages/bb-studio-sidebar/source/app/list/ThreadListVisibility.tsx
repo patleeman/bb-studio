@@ -214,6 +214,11 @@ export function ThreadListVisibility({
   );
 }
 
+/** The visibility group (section key) a component renders inside, if any. */
+export function useThreadListVisibilityGroupId(): string | null {
+  return useContext(GroupContext);
+}
+
 export function ThreadListVisibilityGroupScope({
   id,
   children,

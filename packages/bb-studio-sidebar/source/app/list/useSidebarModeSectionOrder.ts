@@ -15,8 +15,11 @@ import {
   type LegacySidebarEntityAnchor,
 } from "../model/sidebar-section-order.js";
 
+// Studio's By space order follows Studio's Spaces and is not stored here.
+export type OrderedOrganizationMode = Exclude<SidebarOrganizationMode, "space">;
+
 const MODE_SECTION_ORDER_CONFIG: Record<
-  SidebarOrganizationMode,
+  OrderedOrganizationMode,
   {
     atom: typeof sidebarSectionOrderAtom;
     entityKind: "project" | "section" | "machine";
@@ -43,7 +46,7 @@ const MODE_SECTION_ORDER_CONFIG: Record<
 interface UseSidebarModeSectionOrderArgs {
   entitySectionIds: readonly SidebarSectionId[];
   hasThreadsSection?: boolean;
-  mode: SidebarOrganizationMode;
+  mode: OrderedOrganizationMode;
   showPinnedSection: boolean;
 }
 

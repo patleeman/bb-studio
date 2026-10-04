@@ -126,7 +126,8 @@ describe("creating a sidebar section", () => {
     const menu = screen
       .getByRole("menuitem", { name: "Hide from list" })
       .closest('[role="menu"]');
-    expect(menu?.querySelectorAll('[role="separator"]')).toHaveLength(2);
+    // Studio adds Automated threads after the visibility actions.
+    expect(menu?.querySelectorAll('[role="separator"]')).toHaveLength(3);
   });
 
   it("places the new section directly below the section it was created from", async () => {

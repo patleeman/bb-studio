@@ -45,8 +45,10 @@ import { cn } from "@/lib/utils";
 import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
 import { useProjectCreation } from "../studio/useProjectCreation.js";
 import { visibleProjects } from "../studio/visibleProjects.js";
-import { useBackgroundThreads } from "../studio/useBackgroundThreads.js";
-import { BackgroundThreadsSection } from "../studio/BackgroundThreadsSection.js";
+import { AutomatedThreadsProvider, useAutomatedThreads } from "../studio/useAutomatedThreads.js";
+import { createSectionKeyResolver } from "../studio/automated-threads.js";
+import { SpaceModeSections } from "../studio/SpaceModeSections.js";
+import { publishSidebarOrganization, useStudioSpaces, useStudioSpacesSync } from "../studio/studioSpaces.js";
 import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
 import {
   ConfirmDeleteDialog,
@@ -146,7 +148,7 @@ interface ProjectListNavigationLoadingRowProps {
 
 export { PROJECT_LIST_ACTION_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
 
-type ThreadListStatus = "loading" | "ready" | "unavailable";
+export type ThreadListStatus = "loading" | "ready" | "unavailable";
 
 interface ProjectThreadListStateArgs {
   status: ThreadListStatus;
@@ -158,7 +160,7 @@ interface ToggleCollapsedIdListArgs {
   id: string;
 }
 
-type ToggleCollapsedId = (id: string) => void;
+export type ToggleCollapsedId = (id: string) => void;
 type ToggleCollapsedSidebarSectionId = (
   id: CollapsibleSidebarSectionId,
 ) => void;
@@ -177,7 +179,7 @@ const EMPTY_PROJECT_THREAD_LIST_STATE: ProjectThreadListState = {
 const EMPTY_THREAD_LIST: SidebarThread[] = [];
 const EMPTY_SECTION_DEFINITIONS: readonly SidebarSectionDefinition[] = [];
 
-function getProjectThreadListState({
+export function getProjectThreadListState({
   status,
   threads,
 }: ProjectThreadListStateArgs): ProjectThreadListState {
@@ -194,7 +196,7 @@ function getProjectThreadListState({
   }
 }
 
-function toggleCollapsedIdList({
+export function toggleCollapsedIdList({
   current,
   id,
 }: ToggleCollapsedIdListArgs): string[] {
@@ -398,7 +400,7 @@ function ProjectListSectionMoveScope({
   );
 }
 
-interface BuiltInSectionRenderState {
+export interface BuiltInSectionRenderState {
   collapsedSectionIds: ReadonlySet<CollapsibleSidebarSectionId>;
   onToggleCollapsed: (id: CollapsibleSidebarSectionId) => void;
   showPinnedSection: boolean;
@@ -409,6 +411,7 @@ interface ActiveSidebarModeSectionsProps {
   renderChronological: () => ReactNode;
   renderMachine: () => ReactNode;
   renderProject: () => ReactNode;
+  renderSpace?: () => ReactNode;
 }
 
 export function ActiveSidebarModeSections({
@@ -416,13 +419,15 @@ export function ActiveSidebarModeSections({
   renderChronological,
   renderMachine,
   renderProject,
+  renderSpace,
 }: ActiveSidebarModeSectionsProps) {
+  if (mode === "space" && renderSpace) return renderSpace();
   if (mode === "machine") return renderMachine();
   if (mode === "chronological") return renderChronological();
   return renderProject();
 }
 
-interface GroupedModePinnedProps {
+export interface GroupedModePinnedProps {
   pinnedReorderPending: boolean;
   pinnedRootItems: readonly ProjectThreadItem[];
   pinnedRootNodes: readonly ProjectThreadNode[];
@@ -432,7 +437,7 @@ interface GroupedModePinnedProps {
   >;
 }
 
-function buildGroupSectionItem(
+export function buildGroupSectionItem(
   id: string,
   key: SidebarSectionId,
   name: string,
@@ -460,7 +465,7 @@ function buildGroupSectionItem(
   };
 }
 
-function useGroupedModeThreadDnd({
+export function useGroupedModeThreadDnd({
   collapsedThreadIds,
   compareThreads,
   draftThreadIds,
@@ -1410,8 +1415,33 @@ function ProjectListComponent({
   const sidebarActions = experimental_useSidebarThreadActions();
   const { status, sections, projects: allProjects, personalProject, archived } =
     useSidebarData();
-  const { projects, background } = useBackgroundThreads(allProjects);
   const personalProjectId = personalProject?.id ?? null;
+  const selectedThreadId = activeThreadId ?? undefined;
+  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
+  const threadCount = useMemo(() => allProjects.reduce((count, project) => count + project.threads.length, 0), [allProjects]);
+  useStudioSpacesSync(organizationMode === "space", threadCount);
+  const studioSpaces = useStudioSpaces();
+  // By space falls back to By project while Studio's Spaces can't load.
+  const spaceMode = organizationMode === "space" && studioSpaces.status !== "unavailable";
+  const effectiveMode: SidebarOrganizationMode = organizationMode === "space" && !spaceMode ? "project" : organizationMode;
+  const spaceData = studioSpaces.status === "ready" && studioSpaces.threadsLoaded ? studioSpaces : null;
+  useEffect(() => publishSidebarOrganization(effectiveMode), [effectiveMode]);
+  const keepIds = useMemo(() => {
+    const ids = new Set<string>(selectedThreadId ? [selectedThreadId] : []);
+    for (const lead of Object.values(spaceData?.leads ?? {})) if (lead) ids.add(lead);
+    return ids;
+  }, [selectedThreadId, spaceData]);
+  const sectionKeyOf = useCallback(
+    (threads: readonly SidebarThread[]) => createSectionKeyResolver(threads, {
+      mode: effectiveMode,
+      personalProjectId,
+      spaceOf: spaceData?.spaceOf ?? {},
+      spaceIds: new Set(spaceData?.spaces.map((space) => space.id) ?? []),
+    }),
+    [effectiveMode, personalProjectId, spaceData],
+  );
+  const automated = useAutomatedThreads({ projects: allProjects, sectionKeyOf, keepIds });
+  const projects = automated.projects;
   const threads = useMemo<SidebarThread[]>(
     () => projects.flatMap((project) => project.threads),
     [projects],
@@ -1419,16 +1449,14 @@ function ProjectListComponent({
   const draftThreadIds = useSidebarThreadDraftIds();
   const preferencesReady = usePreferencesReady();
   const threadListStatus = toThreadListStatus(status);
-  const selectedThreadId = activeThreadId ?? undefined;
   const allThreads = useMemo(() => allProjects.flatMap((project) => project.threads), [allProjects]);
-  const backgroundIds = useMemo(() => new Set(background.map((thread) => thread.id)), [background]);
   useSidebarThreadRevealCore({
     selectedThreadId,
     threads: allThreads,
     threadsReady: status === "ready",
     preferencesReady,
     personalProjectId,
-    backgroundThreadIds: backgroundIds,
+    automatedThreadIds: automated.automatedIds,
   });
   const [isPinnedReorderPending, setIsPinnedReorderPending] = useState(false);
   const [isCreateThreadSectionPending, setIsCreateThreadSectionPending] =
@@ -1482,6 +1510,14 @@ function ProjectListComponent({
   const handleCreateProjectlessThread = useCallback(() => {
     openRootComposeForProject(personalProjectId);
   }, [openRootComposeForProject, personalProjectId]);
+  // A Space's new thread starts in its default project; Studio decides
+  // whether the thread joins the Space (by the project), not this list.
+  const handleCreateThreadInProject = useCallback(
+    (projectId: string | null) => {
+      openRootComposeForProject(projectId ?? personalProjectId);
+    },
+    [openRootComposeForProject, personalProjectId],
+  );
   const handleCreateThreadInSection = useCallback(
     (sectionId: string) => {
       openRootComposeForProject(null, sectionId);
@@ -1636,7 +1672,6 @@ function ProjectListComponent({
   };
   const isSectionDisplayOptionsOpen = (sectionId: SidebarSectionId) =>
     openSidebarMenu === `displayOptions:${sectionId}`;
-  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
   const groupThreadsByEnvironment = useAtomValue(
     sidebarGroupThreadsByEnvironmentAtom,
   );
@@ -1793,7 +1828,7 @@ function ProjectListComponent({
     </ConfirmDeleteDialog>
   );
 
-  if (threadListStatus === "loading" || !preferencesReady) {
+  if (threadListStatus === "loading" || !preferencesReady || (spaceMode && !spaceData)) {
     return (
       <ProjectListShell>
         <ProjectListNavigationLoadingState />
@@ -1802,6 +1837,7 @@ function ProjectListComponent({
   }
 
   return (
+    <AutomatedThreadsProvider value={automated.state}>
     <SidebarHeaderActionsProvider
       value={{
         onNewProject: projectCreation.openDialog,
@@ -1812,7 +1848,39 @@ function ProjectListComponent({
     >
       <ProjectListSectionMoveScope sections={sections}>
         <ActiveSidebarModeSections
-          mode={organizationMode}
+          mode={effectiveMode}
+          renderSpace={() => spaceData && (
+            <SpaceModeSections
+              spaces={spaceData.spaces}
+              spaceOf={spaceData.spaceOf}
+              leads={spaceData.leads}
+              threads={threads}
+              draftThreadIds={draftThreadIds}
+              effectivePinnedThreadIds={
+                pinnedSidebarState.effectivePinnedThreadIds
+              }
+              status={threadListStatus}
+              showPinnedSection={hasPinnedSection}
+              pinnedSection={pinnedSection}
+              pinnedReorderPending={isPinnedReorderPending}
+              pinnedRootItems={pinnedSidebarState.rootItems}
+              pinnedRootNodes={pinnedSidebarState.rootNodes}
+              pinnedThreads={pinnedRootThreads}
+              onReorderPinnedThread={handleReorderPinnedRoot}
+              threadsSection={threadsSection}
+              selectedThreadId={selectedThreadId}
+              collapsedSectionIds={collapsedSidebarSectionIds}
+              collapsedThreadIds={collapsedThreadIds}
+              collapsedEnvironmentIds={collapsedEnvironmentIds}
+              compareThreads={sidebarThreadComparator}
+              onCreateThread={handleCreateProjectlessThread}
+              onCreateThreadInProject={handleCreateThreadInProject}
+              onProjectSelect={onProjectSelect}
+              onToggleCollapsed={toggleSidebarSectionCollapsed}
+              onToggleThreadCollapsed={toggleThreadCollapsed}
+              onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
+            />
+          )}
           renderMachine={() => (
             <MachineModeSections
               threads={threads}
@@ -1905,16 +1973,6 @@ function ProjectListComponent({
             />
           )}
         />
-        <BackgroundThreadsSection
-          threads={background}
-          selectedThreadId={selectedThreadId}
-          compareThreads={sidebarThreadComparator}
-          collapsedThreadIds={collapsedThreadIds}
-          collapsedEnvironmentIds={collapsedEnvironmentIds}
-          onProjectSelect={onProjectSelect}
-          onToggleThreadCollapsed={toggleThreadCollapsed}
-          onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
-        />
         {archived !== null && (
           <>
             {status === "ready" && archived.status !== "ready" && (
@@ -1946,6 +2004,7 @@ function ProjectListComponent({
       {sectionDeleteDialogContent}
       {projectCreation.dialog}
     </SidebarHeaderActionsProvider>
+    </AutomatedThreadsProvider>
   );
 }
 

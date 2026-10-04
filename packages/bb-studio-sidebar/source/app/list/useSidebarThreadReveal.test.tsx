@@ -80,15 +80,15 @@ function setup(
 }
 
 describe("useSidebarThreadReveal", () => {
-  it("does not expand a background thread's former project on an update", () => {
-    const rows = [thread("first"), thread("background", { projectId: "proj_app", originPluginId: "automations" })];
-    const { store, update } = setup(rows, { selectedThreadId: undefined, backgroundThreadIds: new Set(["background"]) });
+  it("does not expand an automated thread's project on an update, only when opened", () => {
+    const rows = [thread("first"), thread("automated", { projectId: "proj_app", originPluginId: "automations" })];
+    const { store, update } = setup(rows, { selectedThreadId: undefined, automatedThreadIds: new Set(["automated"]) });
     store.set(sidebarOrganizationModeAtom, "project");
     store.set(collapsedProjectIdsAtom, ["proj_app"]);
-    update({ threads: rows.map((row) => row.id === "background" ? { ...row, isUnread: true } : row) });
+    update({ threads: rows.map((row) => row.id === "automated" ? { ...row, isUnread: true } : row) });
     expect(store.get(collapsedProjectIdsAtom)).toEqual(["proj_app"]);
-    update({ selectedThreadId: "background" });
-    expect(store.get(collapsedProjectIdsAtom)).toEqual(["proj_app"]);
+    update({ selectedThreadId: "automated" });
+    expect(store.get(collapsedProjectIdsAtom)).toEqual([]);
   });
   it("requires leaving and returning before revealing a manually collapsed open thread", () => {
     const { store, update } = setup([thread("first"), thread("second")]);

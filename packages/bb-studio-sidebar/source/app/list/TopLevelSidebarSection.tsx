@@ -45,6 +45,7 @@ import {
 import { SplitPaneMiniMap } from "../rows/SplitPaneMiniMap.js";
 import { COARSE_POINTER_ROW_ACTION_SIZE_CLASS } from "@/components/ui/coarse-pointer-sizing";
 import { usePluginThreadRowStatusForThreads } from "./groupRollups.js";
+import { AutomatedHiddenRow } from "../studio/AutomatedThreads.js";
 
 const EMPTY_SPLIT_INDICATOR_THREADS: readonly ThreadSplitIndicatorTarget[] = [];
 
@@ -60,6 +61,11 @@ interface TopLevelSidebarSectionCollapseControl {
 export interface TopLevelSidebarSectionProps {
   label: string;
   labelEditor?: ReactNode;
+  /** Studio: a mark before the label, such as a Space's emoji. */
+  labelMark?: ReactNode;
+  /** Studio: clicking the label opens what the section stands for. */
+  onLabelClick?: () => void;
+  labelClickLabel?: string;
   onRename?: () => void;
   children: ReactNode;
   dropParentKey?: string;
@@ -83,6 +89,9 @@ export interface TopLevelSidebarSectionProps {
 export function TopLevelSidebarSection({
   label,
   labelEditor,
+  labelMark,
+  onLabelClick,
+  labelClickLabel,
   onRename,
   children,
   dropParentKey,
@@ -204,7 +213,23 @@ export function TopLevelSidebarSection({
         {...(dragBindings?.listeners ?? {})}
       >
         <span className="relative z-10 flex min-w-0 flex-1 items-center gap-1 text-left">
-          {labelEditor ?? (
+          {labelEditor ? null : labelMark}
+          {labelEditor ?? (onLabelClick ? (
+            <button
+              type="button"
+              className="min-w-0 cursor-pointer truncate rounded-sm text-left outline-none hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              title={label}
+              aria-label={labelClickLabel ?? label}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onLabelClick();
+              }}
+            >
+              {label}
+            </button>
+          ) : (
             <span
               className="min-w-0 truncate"
               title={label}
@@ -220,7 +245,7 @@ export function TopLevelSidebarSection({
             >
               {label}
             </span>
-          )}
+          ))}
           {collapseControl ? (
             <button
               type="button"
@@ -294,7 +319,10 @@ export function TopLevelSidebarSection({
         ) : null}
       </SidebarStickyTier>
       {collapseControl?.isCollapsed || children == null ? null : (
-        <div className="mt-1">{children}</div>
+        <div className="mt-1">
+          {children}
+          <AutomatedHiddenRow />
+        </div>
       )}
     </SidebarStickyGroup>
   );

@@ -1,6 +1,7 @@
 import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
 import { HideEmptyProjectsMenuItems } from "../studio/HideEmptyProjectsMenuItems.js";
-import { BackgroundThreadsMenuItems } from "../studio/BackgroundThreadsMenuItems.js";
+import { AutomatedThreadsMenuItems } from "../studio/AutomatedThreads.js";
+import { SpaceOrganizeHint, useSpaceOrganizeAvailable } from "../studio/SpaceOrganizeOption.js";
 import type { ReactNode } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Icon } from "@/components/ui/icon";
@@ -30,6 +31,7 @@ import {
 const SIDEBAR_ORGANIZE_OPTIONS = [
   { label: "By project", mode: "project" },
   { label: "By machine", mode: "machine" },
+  { label: "By space", mode: "space" },
   { label: "Custom", mode: "chronological" },
 ] as const;
 
@@ -132,6 +134,7 @@ export function SidebarHeaderMenuContents({
       ) : (
         <ThreadListVisibilityMenuItems />
       )}
+      <AutomatedThreadsMenuItems sectionKey={anchorSectionId} />
     </>
   );
 }
@@ -147,6 +150,7 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
     sidebarShowProviderIconsAtom,
   );
   const selectedSort = sort === "none" ? "updated" : sort;
+  const spacesAvailable = useSpaceOrganizeAvailable();
   if (page === "filter") {
     return (
       <>
@@ -179,7 +183,6 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
         })}
         </DropdownMenuGroup>
         <HideEmptyProjectsMenuItems />
-        <BackgroundThreadsMenuItems />
       </>
     );
   }
@@ -193,12 +196,13 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
               key={option.mode}
               role="menuitemradio"
               aria-checked={organization === option.mode}
+              disabled={option.mode === "space" && !spacesAvailable && organization !== "space"}
               onSelect={(event) => {
                 event.preventDefault();
                 setOrganization(option.mode);
               }}
             >
-              {option.label}
+              {option.mode === "space" ? <SpaceOrganizeHint label={option.label} /> : option.label}
               <span className="ml-auto inline-flex size-4 shrink-0 items-center justify-center">
                 {organization === option.mode && (
                   <Icon name="Check" className="size-4" />

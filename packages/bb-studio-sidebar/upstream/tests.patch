@@ -1,5 +1,5 @@
 diff --git a/source/app.test.tsx b/source/app.test.tsx
-index 4d15df5..572dbf5 100644
+index 4d15df5..91588f1 100644
 --- a/source/app.test.tsx
 +++ b/source/app.test.tsx
 @@ -4,0 +5 @@ import { afterEach, describe, expect, it, vi } from "vitest";
@@ -7,65 +7,125 @@ index 4d15df5..572dbf5 100644
 @@ -11 +12 @@ import {
 -import { makePluginProject, makeSidebarThread } from "./app/model/fixtures.js";
 +import { makePluginProject, makeSidebarThread, sdkResult } from "./app/testing/fixtures.js";
-@@ -125,0 +127 @@ function renderList(
+@@ -15,0 +17,2 @@ import {
++import { getDefaultStore } from "jotai";
++import { studioSpacesAtom } from "./app/studio/studioSpaces.js";
+@@ -125,0 +129 @@ function renderList(
 +    sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots" ? [] : { automations: [] })() } },
-@@ -150,0 +153,72 @@ describe("thread-list plugin", () => {
-+  it.each(["project", "chronological", "machine"] as const)("collapses bot and automation threads in %s mode", async (organizationMode) => {
-+    renderList({ organizationMode }, {
-+      sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads: [
-+        ...THREADS,
-+        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Atlas scheduled work", originPluginId: "bot-teams" }),
-+        makeSidebarThread({ id: "thr_run", projectId: "proj_web", title: "Daily digest", originPluginId: "automations" }),
+@@ -145,0 +150 @@ afterEach(() => {
++  getDefaultStore().set(studioSpacesAtom, { status: "loading" });
+@@ -150,0 +156,127 @@ describe("thread-list plugin", () => {
++  it("keeps automated threads in their section with a mark, hiding read ones by default", async () => {
++    renderList({ organizationMode: "project" }, {
++      sidebarThreads: { projects: PROJECTS, sections: [], threads: [
++        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Atlas scheduled work", originPluginId: "bot-teams", isUnread: true, status: "idle" }),
++        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false, status: "idle" }),
++        makeSidebarThread({ id: "thr_normal", projectId: "proj_web", title: "My work", isUnread: false }),
++        makeSidebarThread({ id: "thr_pinned_run", projectId: "proj_web", title: "Pinned digest", originPluginId: "automations", isUnread: false, isPinned: true, pinnedAt: 1, pinSortKey: "a" }),
 +      ] },
 +    });
-+    await screen.findByRole("button", { name: "Expand Background section" });
-+    expect(threadIds()).not.toContain("thr_bot");
-+    expect(threadIds()).not.toContain("thr_run");
-+    fireEvent.click(screen.getByRole("button", { name: "Expand Background section" }));
 +    await screen.findByText("Atlas scheduled work");
-+    expect(threadIds().filter((id) => id === "thr_bot")).toHaveLength(1);
-+    expect(threadIds().filter((id) => id === "thr_run")).toHaveLength(1);
-+    expect(threadIds()).toContain("thr_pinned");
++    expect(sectionHeaders()).not.toContain("Background");
++    const app = screen.getByTitle("App").closest("[data-sidebar-sticky-group]") as HTMLElement;
++    expect(within(app).getByText("Atlas scheduled work")).not.toBeNull();
++    expect(document.querySelector('[data-automated-thread-id="thr_bot"][data-sidebar-automated-mark="bot"]')).not.toBeNull();
++    expect(document.querySelector('[data-automated-thread-id="thr_pinned_run"][data-sidebar-automated-mark="automation"]')).not.toBeNull();
++    expect(threadIds()).not.toContain("thr_read");
++    const row = app.querySelector('[data-sidebar-automated-hidden="project:proj_app"]');
++    expect(row?.textContent).toContain("1 automated thread hidden");
++    fireEvent.click(within(app).getByRole("button", { name: "Show 1 automated thread" }));
++    await screen.findByText("Read digest");
++    expect(app.querySelector('[data-sidebar-automated-hidden]')?.textContent).toContain("Showing 1 automated thread");
++    fireEvent.click(within(app).getByRole("button", { name: "Hide 1 automated thread" }));
++    await waitFor(() => expect(threadIds()).not.toContain("thr_read"));
 +  });
 +
-+  it("identifies existing bot and automation targets through their public RPCs", async () => {
-+    renderList({ organizationMode: "project" }, {
-+      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots"
-+        ? [{ threadId: "thr_parent" }]
-+        : { automations: [{ automation: { execution: { targetThreadId: "thr_later" } } }] })() } },
-+    });
-+    await screen.findByRole("button", { name: "Expand Background section" });
-+    expect(threadIds()).not.toContain("thr_parent");
-+    expect(threadIds()).not.toContain("thr_child");
-+    expect(threadIds()).not.toContain("thr_later");
-+    fireEvent.click(screen.getByRole("button", { name: "Expand Background section" }));
-+    await screen.findByText("Parent thread");
-+    expect(threadIds()).toContain("thr_child");
-+    expect(threadIds()).toContain("thr_later");
-+  });
-+
-+  it.each(["updates", "hidden", "all"] as const)("applies background visibility: %s", async (backgroundThreads) => {
-+    renderList({ organizationMode: "project", backgroundThreads, backgroundCollapsed: false }, {
++  it.each([
++    [{ "project:proj_app": "hidden" }, ["thr_normal"], 2],
++    [{ "*": "all" }, ["thr_bot", "thr_read", "thr_normal"], 0],
++    [{}, ["thr_bot", "thr_normal"], 1],
++  ] as const)("applies the Automated threads choice %j", async (automatedThreads, visible, hiddenCount) => {
++    renderList({ organizationMode: "project", automatedThreads }, {
 +      sidebarThreads: { projects: PROJECTS, sections: [], threads: [
-+        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false }),
-+        makeSidebarThread({ id: "thr_unread", projectId: "proj_app", title: "New digest", originPluginId: "automations" }),
++        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Bot result", originPluginId: "bot-teams", isUnread: true, status: "idle", updatedAt: 3 }),
++        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false, status: "idle", updatedAt: 2 }),
 +        makeSidebarThread({ id: "thr_normal", projectId: "proj_web", title: "My work", isUnread: false }),
 +      ] },
 +    });
 +    await screen.findByText("My work");
-+    if (backgroundThreads === "hidden") {
-+      expect(threadIds()).toEqual(["thr_normal"]);
-+      expect(sectionHeaders()).not.toContain("Background");
-+    } else if (backgroundThreads === "updates") {
-+      await screen.findByText("New digest");
-+      expect(threadIds()).not.toContain("thr_read");
-+      expect(sectionHeaders()).toContain("Background");
-+    } else {
-+      await screen.findByText("Read digest");
-+      expect(threadIds()).toContain("thr_unread");
-+      expect(sectionHeaders()).not.toContain("Background");
-+    }
++    expect(threadIds()).toEqual(visible);
++    const row = document.querySelector('[data-sidebar-automated-hidden="project:proj_app"]');
++    if (hiddenCount) expect(row?.textContent).toContain(`${hiddenCount} automated thread${hiddenCount === 1 ? "" : "s"} hidden`);
++    else expect(row).toBeNull();
 +  });
++
++  it("identifies existing bot and automation targets through their public RPCs", async () => {
++    renderList({ organizationMode: "project", automatedThreads: { "*": "all" } }, {
++      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots"
++        ? [{ threadId: "thr_parent" }]
++        : { automations: [{ automation: { execution: { targetThreadId: "thr_later" } } }] })() } },
++    });
++    await waitFor(() => expect(document.querySelector('[data-automated-thread-id="thr_parent"][data-sidebar-automated-mark="bot"]')).not.toBeNull());
++    expect(document.querySelector('[data-automated-thread-id="thr_later"][data-sidebar-automated-mark="automation"]')).not.toBeNull();
++    expect(document.querySelector('[data-automated-thread-id="thr_child"]')).toBeNull();
++  });
++
++  it("groups threads by Studio Space, lead first, with the rest in Threads", async () => {
++    localStorage.removeItem("bb-studio:sidebar-organization");
++    const threads = [
++      ...THREADS,
++      makeSidebarThread({ id: "thr_lead", projectId: "proj_web", title: "Alpha lead", createdAt: 1, updatedAt: 1, latestAttentionAt: 1, isUnread: false }),
++    ];
++    const studio: Record<string, (input: unknown) => unknown> = {
++      spaces: () => ({ spaces: [
++        { id: "sp_alpha", name: "Alpha", color: "#f00", icon: "🚀", defaultProjectId: "proj_web", projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
++        { id: "sp_beta", name: "Beta", color: "#00f", icon: null, defaultProjectId: null, projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
++      ] }),
++      space_of_threads: () => ({ threads: { thr_parent: "sp_alpha", thr_lead: "sp_alpha", thr_later: "sp_beta", thr_personal: "sp_gone" } }),
++      space_lead: (input) => ({ leadThreadId: (input as { spaceId: string }).spaceId === "sp_alpha" ? "thr_lead" : null }),
++    };
++    const { inspection } = renderList({ organizationMode: "space" }, {
++      sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads },
++      sdk: { plugins: { callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
++        if (pluginId === "studio" && studio[method]) return studio[method]!(input) as never;
++        return (method === "threadBots" ? [] : { automations: [] }) as never;
++      } } },
++    });
++    await screen.findByTitle("Alpha");
++    expect(sectionHeaders()).toEqual(["Pinned", "Alpha", "Beta", "Threads"]);
++    const alpha = screen.getByTitle("Alpha").closest("[data-sidebar-sticky-group]") as HTMLElement;
++    expect(Array.from(alpha.querySelectorAll("[data-sidebar-thread-id]"), (el) => el.getAttribute("data-sidebar-thread-id"))).toEqual(["thr_lead", "thr_parent", "thr_child"]);
++    expect(alpha.querySelector("[data-sidebar-space-mark]")?.textContent).toBe("🚀");
++    const rest = screen.getByTitle("Threads").closest("[data-sidebar-sticky-group]") as HTMLElement;
++    expect(within(rest).getByText("Personal thread")).not.toBeNull();
++    expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("space");
++    fireEvent.click(screen.getByRole("button", { name: "New thread in Alpha" }));
++    expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_web", focusPrompt: true } });
++    fireEvent.click(screen.getByRole("button", { name: "Open Alpha" }));
++    expect(window.location.pathname).toBe("/plugins/studio/spaces/sp_alpha");
++  });
++
++  it("falls back to By project while Studio has no Spaces", async () => {
++    renderList({ organizationMode: "space" });
++    await screen.findByText("Pinned thread");
++    expect(sectionHeaders()).toEqual(["Pinned", "App", "Web", "Threads"]);
++    expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("project");
++  });
++
++  it("sets a section's Automated threads choice and offers By space only with Studio's Spaces", async () => {
++    const { rpcCalls } = renderList({ organizationMode: "project" });
++    await screen.findByText("Pinned thread");
++    fireEvent.keyDown(screen.getByRole("button", { name: /^Threads actions/ }), { key: "Enter" });
++    const updates = await screen.findByRole("menuitemradio", { name: "Only with updates" });
++    expect(updates.getAttribute("aria-checked")).toBe("true");
++    fireEvent.click(screen.getByRole("menuitemradio", { name: "Hide" }));
++    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "automatedThreads", value: { threads: "hidden" } } }));
++    fireEvent.keyDown(screen.getByRole("menuitem", { name: "Organize" }), { key: "ArrowRight" });
++    const bySpace = await screen.findByRole("menuitemradio", { name: /By space/ });
++    expect(bySpace.getAttribute("aria-disabled")).toBe("true");
++    expect(bySpace.textContent).toContain("Needs Studio with Spaces");
++  });
++
 +  it("places Studio sections above threads and hides them when requested", async () => {
 +    const unregister = registerSection({ pluginId: "pages", id: "tabs", title: "Studio", order: 0 });
 +    try {
@@ -82,7 +142,7 @@ index 4d15df5..572dbf5 100644
 +      unregister();
 +    }
 +  });
-@@ -303,0 +378,15 @@ describe("thread-list plugin", () => {
+@@ -303,0 +436,15 @@ describe("thread-list plugin", () => {
 +  it("opens the New project dialog from Threads", async () => {
 +    setPreferencesMirrorStorageForTest(null);
 +    renderList({ organizationMode: "project" }, {
@@ -106,12 +166,28 @@ index 4c66844..d768d3a 100644
 -} from "../model/fixtures.js";
 +} from "../testing/fixtures.js";
 diff --git a/source/app/dnd/useSectionThreadDnd.projection.test.tsx b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
-index cfeb6de..073f1d4 100644
+index cfeb6de..231d3b4 100644
 --- a/source/app/dnd/useSectionThreadDnd.projection.test.tsx
 +++ b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
+@@ -3 +3 @@
+-import { act, cleanup } from "@testing-library/react";
++import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 @@ -15 +15 @@ import {
 -} from "../model/fixtures.js";
 +} from "../testing/fixtures.js";
+@@ -138 +138 @@ function renderSectionThreadDnd(
+-    return null;
++    return result.current!.dropDialog;
+@@ -143 +143 @@ function renderSectionThreadDnd(
+-    { sdk: { threads: { update: updateThreadFake } } },
++    { sdk: { threads: { update: updateThreadFake }, plugins: { callRpc: async <TOutput,>() => [] as TOutput } } },
+@@ -617,0 +618,6 @@ describe("useSectionThreadDnd settled drop cleanup", () => {
++    expect(updateThreadDeferred).toBeNull();
++    view.result.current!.consumeClickSuppression();
++    fireEvent.click(screen.getByRole("button", { name: "Nest threads" }));
++    await flushTasks();
++    expect(screen.queryByRole("alert")?.textContent ?? null).toBeNull();
++    expect(view.inspection.sdkCalls.filter(call => call.method === "threads.update")).toHaveLength(1);
 diff --git a/source/app/dnd/useSectionThreadDnd.test.ts b/source/app/dnd/useSectionThreadDnd.test.ts
 index a697435..80efb32 100644
 --- a/source/app/dnd/useSectionThreadDnd.test.ts
@@ -120,19 +196,31 @@ index a697435..80efb32 100644
 -} from "../model/fixtures.js";
 +} from "../testing/fixtures.js";
 diff --git a/source/app/list/ProjectList.modes.test.tsx b/source/app/list/ProjectList.modes.test.tsx
-index edd8510..31b8562 100644
+index edd8510..c61839b 100644
 --- a/source/app/list/ProjectList.modes.test.tsx
 +++ b/source/app/list/ProjectList.modes.test.tsx
 @@ -46 +46 @@ import {
 -} from "../model/fixtures.js";
 +} from "../testing/fixtures.js";
+@@ -63,0 +64 @@ const { useSidebarModeSectionOrder } = await import(
++type OrderedOrganizationMode = import("./useSidebarModeSectionOrder.js").OrderedOrganizationMode;
+@@ -67 +68 @@ const mockBuildMachineThreadGroups = vi.mocked(buildMachineThreadGroups);
+-function getModeOrderProbeConfig(mode: SidebarOrganizationMode): {
++function getModeOrderProbeConfig(mode: OrderedOrganizationMode): {
+@@ -81 +82 @@ function getModeOrderProbeConfig(mode: SidebarOrganizationMode): {
+-function ModeOrderProbe({ mode }: { mode: SidebarOrganizationMode }) {
++function ModeOrderProbe({ mode }: { mode: OrderedOrganizationMode }) {
 diff --git a/source/app/list/ProjectList.sectionCreate.test.tsx b/source/app/list/ProjectList.sectionCreate.test.tsx
-index 0c6322a..a795e7c 100644
+index 0c6322a..3af7996 100644
 --- a/source/app/list/ProjectList.sectionCreate.test.tsx
 +++ b/source/app/list/ProjectList.sectionCreate.test.tsx
 @@ -16 +16 @@ import {
 -} from "../model/fixtures.js";
 +} from "../testing/fixtures.js";
+@@ -129 +129,2 @@ describe("creating a sidebar section", () => {
+-    expect(menu?.querySelectorAll('[role="separator"]')).toHaveLength(2);
++    // Studio adds Automated threads after the visibility actions.
++    expect(menu?.querySelectorAll('[role="separator"]')).toHaveLength(3);
 diff --git a/source/app/list/ProjectListSectionHeader.test.tsx b/source/app/list/ProjectListSectionHeader.test.tsx
 index ba682fd..f95e297 100644
 --- a/source/app/list/ProjectListSectionHeader.test.tsx
@@ -155,31 +243,14 @@ index dce3458..3f198ab 100644
 -import { makeSidebarThread } from "../model/fixtures.js";
 +import { makeSidebarThread } from "../testing/fixtures.js";
 diff --git a/source/app/list/SidebarHeaderControls.test.tsx b/source/app/list/SidebarHeaderControls.test.tsx
-index 738d0ad..41c800e 100644
+index 738d0ad..7c4b9c3 100644
 --- a/source/app/list/SidebarHeaderControls.test.tsx
 +++ b/source/app/list/SidebarHeaderControls.test.tsx
-@@ -23,0 +24,3 @@ import {
+@@ -23,0 +24 @@ import {
 +  sidebarHideEmptyProjectsAtom,
-+  sidebarBackgroundThreadsAtom,
-+  sidebarBackgroundCollapsedAtom,
-@@ -50,0 +54 @@ function setup(
+@@ -50,0 +52 @@ function setup(
 +  store.set(sidebarHideEmptyProjectsAtom, false);
-@@ -92,0 +97,27 @@ describe("sidebar header controls", () => {
-+  it("changes background visibility in Filter and expands updates", async () => {
-+    const { store } = setup();
-+    store.set(sidebarBackgroundThreadsAtom, "grouped");
-+    store.set(sidebarBackgroundCollapsedAtom, true);
-+    await openMenu();
-+    await openSubmenu("Filter");
-+    const updates = await screen.findByRole("menuitemradio", { name: "Only show updates" });
-+    fireEvent.click(updates);
-+    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("updates");
-+    expect(store.get(sidebarBackgroundCollapsedAtom)).toBe(false);
-+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Hide background threads" }));
-+    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("hidden");
-+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Show with other threads" }));
-+    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("all");
-+  });
+@@ -92,0 +95,12 @@ describe("sidebar header controls", () => {
 +  it("toggles Hide empty projects in Filter", async () => {
 +    const { store } = setup();
 +    await openMenu();
@@ -192,7 +263,7 @@ index 738d0ad..41c800e 100644
 +    expect(store.get(sidebarHideEmptyProjectsAtom)).toBe(true);
 +    expect(toggle.getAttribute("aria-checked")).toBe("true");
 +  });
-@@ -174 +205 @@ describe("sidebar header controls", () => {
+@@ -174 +188 @@ describe("sidebar header controls", () => {
 -    ).toEqual(["New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
 +    ).toEqual(["New project", "New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
 diff --git a/source/app/list/sortComparator.test.ts b/source/app/list/sortComparator.test.ts
@@ -203,7 +274,7 @@ index 411fa38..312b1cc 100644
 -} from "../model/fixtures.js";
 +} from "../testing/fixtures.js";
 diff --git a/source/app/list/useSidebarThreadReveal.test.tsx b/source/app/list/useSidebarThreadReveal.test.tsx
-index 23ad9d0..14f467e 100644
+index 23ad9d0..ee4bfd4 100644
 --- a/source/app/list/useSidebarThreadReveal.test.tsx
 +++ b/source/app/list/useSidebarThreadReveal.test.tsx
 @@ -12 +12 @@ import {
@@ -212,15 +283,15 @@ index 23ad9d0..14f467e 100644
 @@ -14,0 +15 @@ import {
 +  collapsedProjectIdsAtom,
 @@ -81,0 +83,10 @@ describe("useSidebarThreadReveal", () => {
-+  it("does not expand a background thread's former project on an update", () => {
-+    const rows = [thread("first"), thread("background", { projectId: "proj_app", originPluginId: "automations" })];
-+    const { store, update } = setup(rows, { selectedThreadId: undefined, backgroundThreadIds: new Set(["background"]) });
++  it("does not expand an automated thread's project on an update, only when opened", () => {
++    const rows = [thread("first"), thread("automated", { projectId: "proj_app", originPluginId: "automations" })];
++    const { store, update } = setup(rows, { selectedThreadId: undefined, automatedThreadIds: new Set(["automated"]) });
 +    store.set(sidebarOrganizationModeAtom, "project");
 +    store.set(collapsedProjectIdsAtom, ["proj_app"]);
-+    update({ threads: rows.map((row) => row.id === "background" ? { ...row, isUnread: true } : row) });
++    update({ threads: rows.map((row) => row.id === "automated" ? { ...row, isUnread: true } : row) });
 +    expect(store.get(collapsedProjectIdsAtom)).toEqual(["proj_app"]);
-+    update({ selectedThreadId: "background" });
-+    expect(store.get(collapsedProjectIdsAtom)).toEqual(["proj_app"]);
++    update({ selectedThreadId: "automated" });
++    expect(store.get(collapsedProjectIdsAtom)).toEqual([]);
 +  });
 diff --git a/source/app/model/machine-thread-groups.test.ts b/source/app/model/machine-thread-groups.test.ts
 index d1bb637..873c8bf 100644
@@ -287,23 +358,3 @@ index 9e138f7..77e538a 100644
 +    expect(defaultPreferences().hideEmptyProjects).toBe(false);
 +    expect(parsePreferenceValue("hideEmptyProjects", true)).toEqual({ success: true, value: true });
 +    expect(parsePreferenceValue("hideEmptyProjects", "true").success).toBe(false);
-diff --git a/source/app/dnd/useSectionThreadDnd.projection.test.tsx b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
-index 073f1d4..231d3b4 100644
---- a/source/app/dnd/useSectionThreadDnd.projection.test.tsx
-+++ b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
-@@ -3 +3 @@
--import { act, cleanup } from "@testing-library/react";
-+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
-@@ -138 +138 @@ function renderSectionThreadDnd(
--    return null;
-+    return result.current!.dropDialog;
-@@ -143 +143 @@ function renderSectionThreadDnd(
--    { sdk: { threads: { update: updateThreadFake } } },
-+    { sdk: { threads: { update: updateThreadFake }, plugins: { callRpc: async <TOutput,>() => [] as TOutput } } },
-@@ -617,0 +618,6 @@ describe("useSectionThreadDnd settled drop cleanup", () => {
-+    expect(updateThreadDeferred).toBeNull();
-+    view.result.current!.consumeClickSuppression();
-+    fireEvent.click(screen.getByRole("button", { name: "Nest threads" }));
-+    await flushTasks();
-+    expect(screen.queryByRole("alert")?.textContent ?? null).toBeNull();
-+    expect(view.inspection.sdkCalls.filter(call => call.method === "threads.update")).toHaveLength(1);

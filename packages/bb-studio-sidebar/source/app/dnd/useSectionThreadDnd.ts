@@ -209,7 +209,8 @@ function parseGroupSectionId(key: string): SidebarSectionId {
   if (
     key.startsWith("project:") ||
     key.startsWith("section:") ||
-    key.startsWith("machine:")
+    key.startsWith("machine:") ||
+    key.startsWith("space:")
   ) {
     return key as SidebarSectionId;
   }

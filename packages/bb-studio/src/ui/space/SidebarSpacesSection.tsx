@@ -12,13 +12,15 @@ import {
   useSidebarNavigated,
   usePathname,
 } from "@bb-studio/kit/app";
+import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import {
   experimental_useSidebarThreads as useSidebarThreads,
   useBbContext,
   useBbNavigate,
+  useRealtime,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { NEW_SPACE_EVENT } from "../../ids";
 import { useSpaceOf, useSpaces } from "./data";
 import { RUNNING } from "./Overview";
@@ -76,9 +78,35 @@ function SpacesList() {
   );
 }
 
+// Shared with Studio Sidebar without the kit (see its studioSpaces.ts): the
+// sidebar writes its organization here, and its By space lists every Space
+// itself, so this section steps aside. The same window hears the event,
+// other windows the storage event. Studio's changes go the other way as a
+// window event, since this plugin's realtime channel doesn't reach the sidebar.
+const ORGANIZATION_KEY = "bb-studio:sidebar-organization";
+const ORGANIZATION_EVENT = "bb-studio:sidebar-organization";
+const STUDIO_CHANGED_EVENT = "bb-studio:studio-changed";
+
+function subscribeOrganization(onChange: () => void) {
+  const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === ORGANIZATION_KEY) onChange(); };
+  window.addEventListener(ORGANIZATION_EVENT, onChange);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(ORGANIZATION_EVENT, onChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+function readOrganization(): string | null {
+  try { return localStorage.getItem(ORGANIZATION_KEY); } catch { return null; }
+}
+
 /** Renders nothing itself; portals the Spaces section into the Studio Sidebar, above the tabs. */
 export function SidebarSpacesSection() {
   const hosted = useSidebarHosted();
+  const bySpace = useSyncExternalStore(subscribeOrganization, readOrganization, () => null) === "space";
+  useRealtime(STUDIO_REALTIME_CHANNEL, () => window.dispatchEvent(new CustomEvent(STUDIO_CHANGED_EVENT)));
+  if (bySpace) return null;
   return (
     <SidebarPortal id="spaces" title="Spaces" order={-10}>
       {hosted ? <SpacesList /> : null}

@@ -14,6 +14,8 @@ import {
   resetPreferencesSyncForTest,
   setPreferencesMirrorStorageForTest,
 } from "./app/preferences/preferences-sync.js";
+import { getDefaultStore } from "jotai";
+import { studioSpacesAtom } from "./app/studio/studioSpaces.js";
 import {
   defaultPreferences,
   type PreferenceValues,
@@ -145,67 +147,123 @@ function threadIds(): string[] {
 
 afterEach(() => {
   cleanup();
+  getDefaultStore().set(studioSpacesAtom, { status: "loading" });
   resetPreferencesSyncForTest();
   setPreferencesMirrorStorageForTest(undefined);
 });
 
 describe("thread-list plugin", () => {
-  it.each(["project", "chronological", "machine"] as const)("collapses bot and automation threads in %s mode", async (organizationMode) => {
-    renderList({ organizationMode }, {
-      sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads: [
-        ...THREADS,
-        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Atlas scheduled work", originPluginId: "bot-teams" }),
-        makeSidebarThread({ id: "thr_run", projectId: "proj_web", title: "Daily digest", originPluginId: "automations" }),
+  it("keeps automated threads in their section with a mark, hiding read ones by default", async () => {
+    renderList({ organizationMode: "project" }, {
+      sidebarThreads: { projects: PROJECTS, sections: [], threads: [
+        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Atlas scheduled work", originPluginId: "bot-teams", isUnread: true, status: "idle" }),
+        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false, status: "idle" }),
+        makeSidebarThread({ id: "thr_normal", projectId: "proj_web", title: "My work", isUnread: false }),
+        makeSidebarThread({ id: "thr_pinned_run", projectId: "proj_web", title: "Pinned digest", originPluginId: "automations", isUnread: false, isPinned: true, pinnedAt: 1, pinSortKey: "a" }),
       ] },
     });
-    await screen.findByRole("button", { name: "Expand Background section" });
-    expect(threadIds()).not.toContain("thr_bot");
-    expect(threadIds()).not.toContain("thr_run");
-    fireEvent.click(screen.getByRole("button", { name: "Expand Background section" }));
     await screen.findByText("Atlas scheduled work");
-    expect(threadIds().filter((id) => id === "thr_bot")).toHaveLength(1);
-    expect(threadIds().filter((id) => id === "thr_run")).toHaveLength(1);
-    expect(threadIds()).toContain("thr_pinned");
+    expect(sectionHeaders()).not.toContain("Background");
+    const app = screen.getByTitle("App").closest("[data-sidebar-sticky-group]") as HTMLElement;
+    expect(within(app).getByText("Atlas scheduled work")).not.toBeNull();
+    expect(document.querySelector('[data-automated-thread-id="thr_bot"][data-sidebar-automated-mark="bot"]')).not.toBeNull();
+    expect(document.querySelector('[data-automated-thread-id="thr_pinned_run"][data-sidebar-automated-mark="automation"]')).not.toBeNull();
+    expect(threadIds()).not.toContain("thr_read");
+    const row = app.querySelector('[data-sidebar-automated-hidden="project:proj_app"]');
+    expect(row?.textContent).toContain("1 automated thread hidden");
+    fireEvent.click(within(app).getByRole("button", { name: "Show 1 automated thread" }));
+    await screen.findByText("Read digest");
+    expect(app.querySelector('[data-sidebar-automated-hidden]')?.textContent).toContain("Showing 1 automated thread");
+    fireEvent.click(within(app).getByRole("button", { name: "Hide 1 automated thread" }));
+    await waitFor(() => expect(threadIds()).not.toContain("thr_read"));
   });
 
-  it("identifies existing bot and automation targets through their public RPCs", async () => {
-    renderList({ organizationMode: "project" }, {
-      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots"
-        ? [{ threadId: "thr_parent" }]
-        : { automations: [{ automation: { execution: { targetThreadId: "thr_later" } } }] })() } },
-    });
-    await screen.findByRole("button", { name: "Expand Background section" });
-    expect(threadIds()).not.toContain("thr_parent");
-    expect(threadIds()).not.toContain("thr_child");
-    expect(threadIds()).not.toContain("thr_later");
-    fireEvent.click(screen.getByRole("button", { name: "Expand Background section" }));
-    await screen.findByText("Parent thread");
-    expect(threadIds()).toContain("thr_child");
-    expect(threadIds()).toContain("thr_later");
-  });
-
-  it.each(["updates", "hidden", "all"] as const)("applies background visibility: %s", async (backgroundThreads) => {
-    renderList({ organizationMode: "project", backgroundThreads, backgroundCollapsed: false }, {
+  it.each([
+    [{ "project:proj_app": "hidden" }, ["thr_normal"], 2],
+    [{ "*": "all" }, ["thr_bot", "thr_read", "thr_normal"], 0],
+    [{}, ["thr_bot", "thr_normal"], 1],
+  ] as const)("applies the Automated threads choice %j", async (automatedThreads, visible, hiddenCount) => {
+    renderList({ organizationMode: "project", automatedThreads }, {
       sidebarThreads: { projects: PROJECTS, sections: [], threads: [
-        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false }),
-        makeSidebarThread({ id: "thr_unread", projectId: "proj_app", title: "New digest", originPluginId: "automations" }),
+        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Bot result", originPluginId: "bot-teams", isUnread: true, status: "idle", updatedAt: 3 }),
+        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false, status: "idle", updatedAt: 2 }),
         makeSidebarThread({ id: "thr_normal", projectId: "proj_web", title: "My work", isUnread: false }),
       ] },
     });
     await screen.findByText("My work");
-    if (backgroundThreads === "hidden") {
-      expect(threadIds()).toEqual(["thr_normal"]);
-      expect(sectionHeaders()).not.toContain("Background");
-    } else if (backgroundThreads === "updates") {
-      await screen.findByText("New digest");
-      expect(threadIds()).not.toContain("thr_read");
-      expect(sectionHeaders()).toContain("Background");
-    } else {
-      await screen.findByText("Read digest");
-      expect(threadIds()).toContain("thr_unread");
-      expect(sectionHeaders()).not.toContain("Background");
-    }
+    expect(threadIds()).toEqual(visible);
+    const row = document.querySelector('[data-sidebar-automated-hidden="project:proj_app"]');
+    if (hiddenCount) expect(row?.textContent).toContain(`${hiddenCount} automated thread${hiddenCount === 1 ? "" : "s"} hidden`);
+    else expect(row).toBeNull();
   });
+
+  it("identifies existing bot and automation targets through their public RPCs", async () => {
+    renderList({ organizationMode: "project", automatedThreads: { "*": "all" } }, {
+      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots"
+        ? [{ threadId: "thr_parent" }]
+        : { automations: [{ automation: { execution: { targetThreadId: "thr_later" } } }] })() } },
+    });
+    await waitFor(() => expect(document.querySelector('[data-automated-thread-id="thr_parent"][data-sidebar-automated-mark="bot"]')).not.toBeNull());
+    expect(document.querySelector('[data-automated-thread-id="thr_later"][data-sidebar-automated-mark="automation"]')).not.toBeNull();
+    expect(document.querySelector('[data-automated-thread-id="thr_child"]')).toBeNull();
+  });
+
+  it("groups threads by Studio Space, lead first, with the rest in Threads", async () => {
+    localStorage.removeItem("bb-studio:sidebar-organization");
+    const threads = [
+      ...THREADS,
+      makeSidebarThread({ id: "thr_lead", projectId: "proj_web", title: "Alpha lead", createdAt: 1, updatedAt: 1, latestAttentionAt: 1, isUnread: false }),
+    ];
+    const studio: Record<string, (input: unknown) => unknown> = {
+      spaces: () => ({ spaces: [
+        { id: "sp_alpha", name: "Alpha", color: "#f00", icon: "🚀", defaultProjectId: "proj_web", projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
+        { id: "sp_beta", name: "Beta", color: "#00f", icon: null, defaultProjectId: null, projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
+      ] }),
+      space_of_threads: () => ({ threads: { thr_parent: "sp_alpha", thr_lead: "sp_alpha", thr_later: "sp_beta", thr_personal: "sp_gone" } }),
+      space_lead: (input) => ({ leadThreadId: (input as { spaceId: string }).spaceId === "sp_alpha" ? "thr_lead" : null }),
+    };
+    const { inspection } = renderList({ organizationMode: "space" }, {
+      sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads },
+      sdk: { plugins: { callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
+        if (pluginId === "studio" && studio[method]) return studio[method]!(input) as never;
+        return (method === "threadBots" ? [] : { automations: [] }) as never;
+      } } },
+    });
+    await screen.findByTitle("Alpha");
+    expect(sectionHeaders()).toEqual(["Pinned", "Alpha", "Beta", "Threads"]);
+    const alpha = screen.getByTitle("Alpha").closest("[data-sidebar-sticky-group]") as HTMLElement;
+    expect(Array.from(alpha.querySelectorAll("[data-sidebar-thread-id]"), (el) => el.getAttribute("data-sidebar-thread-id"))).toEqual(["thr_lead", "thr_parent", "thr_child"]);
+    expect(alpha.querySelector("[data-sidebar-space-mark]")?.textContent).toBe("🚀");
+    const rest = screen.getByTitle("Threads").closest("[data-sidebar-sticky-group]") as HTMLElement;
+    expect(within(rest).getByText("Personal thread")).not.toBeNull();
+    expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("space");
+    fireEvent.click(screen.getByRole("button", { name: "New thread in Alpha" }));
+    expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_web", focusPrompt: true } });
+    fireEvent.click(screen.getByRole("button", { name: "Open Alpha" }));
+    expect(window.location.pathname).toBe("/plugins/studio/spaces/sp_alpha");
+  });
+
+  it("falls back to By project while Studio has no Spaces", async () => {
+    renderList({ organizationMode: "space" });
+    await screen.findByText("Pinned thread");
+    expect(sectionHeaders()).toEqual(["Pinned", "App", "Web", "Threads"]);
+    expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("project");
+  });
+
+  it("sets a section's Automated threads choice and offers By space only with Studio's Spaces", async () => {
+    const { rpcCalls } = renderList({ organizationMode: "project" });
+    await screen.findByText("Pinned thread");
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Threads actions/ }), { key: "Enter" });
+    const updates = await screen.findByRole("menuitemradio", { name: "Only with updates" });
+    expect(updates.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Hide" }));
+    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "automatedThreads", value: { threads: "hidden" } } }));
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: "Organize" }), { key: "ArrowRight" });
+    const bySpace = await screen.findByRole("menuitemradio", { name: /By space/ });
+    expect(bySpace.getAttribute("aria-disabled")).toBe("true");
+    expect(bySpace.textContent).toContain("Needs Studio with Spaces");
+  });
+
   it("places Studio sections above threads and hides them when requested", async () => {
     const unregister = registerSection({ pluginId: "pages", id: "tabs", title: "Studio", order: 0 });
     try {

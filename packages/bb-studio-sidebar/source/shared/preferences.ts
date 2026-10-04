@@ -10,6 +10,7 @@ export const organizationModeSchema = z.enum([
   "project",
   "chronological",
   "machine",
+  "space",
 ]);
 export type OrganizationMode = z.infer<typeof organizationModeSchema>;
 
@@ -53,11 +54,14 @@ const hiddenGroupsSchema = z
   .array(
     z.union([
       z.literal("threads"),
-      listItemSchema.regex(/^(project|section|machine):\S+$/),
+      listItemSchema.regex(/^(project|section|machine|space):\S+$/),
     ]),
   )
   .max(LIST_MAX_LENGTH)
   .transform((value) => [...new Set(value)]);
+
+export const automatedThreadsModeSchema = z.enum(["all", "updates", "hidden"]);
+export type AutomatedThreadsMode = z.infer<typeof automatedThreadsModeSchema>;
 
 function definePreference<Schema extends z.ZodTypeAny>(
   schema: Schema,
@@ -69,16 +73,12 @@ function definePreference<Schema extends z.ZodTypeAny>(
 }
 
 export const preferenceDefinitions = {
-  backgroundThreads: definePreference(
-    z.enum(["grouped", "updates", "hidden", "all"]),
-    "grouped",
-    "Show bot and automation threads in Background, only with updates, hide them, or show them inline.",
-    null,
-  ),
-  backgroundCollapsed: definePreference(
-    z.boolean(),
-    true,
-    "Collapse the Background section while keeping its activity indicator visible.",
+  automatedThreads: definePreference(
+    z
+      .record(listItemSchema, automatedThreadsModeSchema)
+      .refine((value) => Object.keys(value).length <= LIST_MAX_LENGTH),
+    {},
+    'How each section shows bot and automation threads, by section key (threads, project:<id>, section:<id>, machine:<id>, space:<id>, or "*" for every section without its own choice): all, updates (the default), or hidden.',
     null,
   ),
   showProviderIcons: definePreference(
@@ -106,7 +106,7 @@ export const preferenceDefinitions = {
   organizationMode: definePreference(
     organizationModeSchema,
     "chronological",
-    "How the list groups threads: by project, chronologically with custom sections, or by machine.",
+    "How the list groups threads: by project, chronologically with custom sections, by machine, or by Studio Space.",
     "sidebar.organizationMode",
   ),
   environmentGrouping: definePreference(
@@ -148,7 +148,7 @@ export const preferenceDefinitions = {
   hiddenGroups: definePreference(
     hiddenGroupsSchema,
     [],
-    "Groups moved into More: threads, project:<id>, section:<id>, or machine:<id>.",
+    "Groups moved into More: threads, project:<id>, section:<id>, machine:<id>, or space:<id>.",
     "sidebar.hiddenGroups",
   ),
   rowActions: definePreference(
@@ -198,6 +198,12 @@ export const preferenceDefinitions = {
     [],
     "Machine ids whose rows are collapsed.",
     "sidebar.collapsedMachines",
+  ),
+  collapsedSpaces: definePreference(
+    stringListSchema,
+    [],
+    "Studio Space ids whose sections are collapsed.",
+    null,
   ),
 } as const;
 

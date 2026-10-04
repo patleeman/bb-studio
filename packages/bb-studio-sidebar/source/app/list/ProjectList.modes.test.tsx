@@ -61,10 +61,11 @@ const { ActiveSidebarModeSections, MachineModeSections } = await import(
 const { useSidebarModeSectionOrder } = await import(
   "./useSidebarModeSectionOrder.js"
 );
+type OrderedOrganizationMode = import("./useSidebarModeSectionOrder.js").OrderedOrganizationMode;
 
 const mockBuildMachineThreadGroups = vi.mocked(buildMachineThreadGroups);
 
-function getModeOrderProbeConfig(mode: SidebarOrganizationMode): {
+function getModeOrderProbeConfig(mode: OrderedOrganizationMode): {
   entitySectionIds: SidebarSectionId[];
   hasThreadsSection?: boolean;
 } {
@@ -78,7 +79,7 @@ function getModeOrderProbeConfig(mode: SidebarOrganizationMode): {
   }
 }
 
-function ModeOrderProbe({ mode }: { mode: SidebarOrganizationMode }) {
+function ModeOrderProbe({ mode }: { mode: OrderedOrganizationMode }) {
   const config = getModeOrderProbeConfig(mode);
   const { order } = useSidebarModeSectionOrder({
     mode,
