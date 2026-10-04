@@ -68,6 +68,7 @@ function BotsToFold() {
   const call = useCall();
   const navigate = useBbNavigate();
   const bots = useLive<{ bots: BotSummary[] }>("bots_overview", {}, { pollMs: 0 });
+  const personalId = useSidebarThreads().projects.find((project) => project.isPersonal)?.id ?? null;
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const list = bots.data?.bots ?? [];
@@ -79,7 +80,7 @@ function BotsToFold() {
         if (!confirm(`Retire ${bot.name}? Its threads and history stay.`)) return;
         await call("bot_retire", { botId: bot.id });
       } else {
-        const project = await call("bot_to_project", { botId: bot.id }) as ProjectInfo;
+        const project = await call("bot_to_project", { botId: bot.id, ...(choice === "chief-of-staff" && personalId ? { projectId: personalId } : {}) }) as ProjectInfo;
         navigate.toPluginPanel(PROJECTS_PANEL, { subPath: project.projectId });
       }
       bots.refresh();
