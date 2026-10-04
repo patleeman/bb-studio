@@ -29,6 +29,9 @@ export default context => {
         await client.evaluate(`sessionStorage.removeItem(${JSON.stringify(STATE_KEY)})`).catch(() => {});
         await client.evaluate(`delete window.bbFloatCaptureRetained`).catch(() => {});
         await client.evaluate(`delete window.bbFloatMainEditor; delete window.bbFloatMainCanvas`).catch(() => {});
+        // Float keeps its tabs in memory too; reload so later captures start without them.
+        await client.command("Page.reload", {}).catch(() => {});
+        await client.waitForSelector("[data-sidebar=\"sidebar\"]", 60000).catch(() => {});
         await cleanup();
         await cleanupDrawing();
       };

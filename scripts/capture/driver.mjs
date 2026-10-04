@@ -304,9 +304,11 @@ export class CdpClient {
       button: "right",
       clickCount: 1,
     });
+    // Release clear of the menu: near the window's bottom it opens over the
+    // pointer, and releasing on an item picks it.
     await this.command("Input.dispatchMouseEvent", {
       type: "mouseReleased",
-      x: point.x,
+      x: point.x + 400,
       y: point.y,
       button: "right",
       clickCount: 1,

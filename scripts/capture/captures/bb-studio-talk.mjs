@@ -283,9 +283,9 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         const titleClear = await client.evaluate(`(() => {
           const input = document.querySelector('input[aria-label="Title"]');
           const title = input.getBoundingClientRect();
-          const surface = input.closest('.studio-root').parentElement;
-          const back = [...surface.querySelectorAll('button')].find(button => button.textContent.trim() === 'Studio').getBoundingClientRect();
-          return title.top >= back.bottom + 8;
+          // The Studio bar, in BB's title bar or atop the view.
+          const bars = [...document.querySelectorAll('[data-studio-bar]')].filter(bar => bar.checkVisibility()).map(bar => bar.closest('header') ?? bar);
+          return bars.length > 0 && bars.every(bar => title.top >= bar.getBoundingClientRect().bottom + 8);
         })()`);
         if (!titleClear) throw new Error("The mobile recording title is covered by the toolbar.");
         const setPausedPosition = `(() => {

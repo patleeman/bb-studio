@@ -134,14 +134,23 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>, enabled: boolea
   useLayoutEffect(() => {
     if (!enabled) { setSlot(null); return; }
     // The title bar and the view mount together; give the slot a few frames.
-    let frame = 0, tries = 0;
+    let frame = 0, tries = 0, current: HTMLElement | null = null;
     const look = () => {
       const found = anchor.current ? paneSlot(anchor.current) : null;
-      if (found || ++tries > 20) { setSlot(found); return; }
+      if (found || ++tries > 20) { current = found; setSlot(found); return; }
       frame = requestAnimationFrame(look);
     };
     look();
-    return () => cancelAnimationFrame(frame);
+    // BB swaps its title bar at the compact breakpoint: follow the slot to the new one.
+    const observer = new MutationObserver(() => {
+      if (!current || current.isConnected) return;
+      current = null;
+      tries = 0;
+      cancelAnimationFrame(frame);
+      look();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
   }, [anchor, enabled]);
   return slot;
 }

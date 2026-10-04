@@ -67,7 +67,7 @@ before capture.
 
 Captured from an isolated stable BB installed from the pushed Git revision. The Launch work channel shows deterministic ORBIT-42 replies from Atlas and Scribe, laid out like a regular BB thread: your messages on the right, each bot's reply under its name (which links to its ordinary thread), and BB's prompt box with the approval menu beneath it.
 
-The [compact preview](assets/staged-preview-mobile.png) shows the same live channel at 390 pixels wide, with its latest reply and composer visible. The [bot profile](assets/bot-profile.png) and [sidebar](assets/studio-sidebar.png) show profile settings and a channel open under Studio.
+The [compact preview](assets/staged-preview-mobile.png) shows the same live channel at 390 pixels wide, with its latest reply and composer visible. The [bot profile](assets/bot-profile.png) shows profile settings.
 
 ![The @channel broadcast suggestion in BB's mention menu](assets/channel-broadcasts.png)
 

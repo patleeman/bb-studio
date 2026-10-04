@@ -89,19 +89,6 @@ export default context => {
   }
  },
  {
-  id:"bots-sidebar",packageDir:"bb-studio-teams",fileName:"studio-sidebar.png",showSidebar:true,
-  setup:async client=>{
-   await launchRoomThread();
-   await client.navigate("/plugins/studio/studio/view");
-   await client.waitForSelector(`[data-studio-item="/plugins/bot-teams/channels/${getLaunchRoomId()}"]`);
-   await client.evaluate(`document.querySelector('[data-studio-item="/plugins/bot-teams/channels/${getLaunchRoomId()}"]').click()`);
-   await client.waitForSelector('[data-thread-view]');
-   await client.waitForSelector('section[aria-label="Studio"]');
-   await client.waitForSelector(`section[aria-label="Studio"] a[href="/plugins/bot-teams/channels/${getLaunchRoomId()}"]`);
-   await client.evaluate(`(()=>{if(document.querySelector('section[aria-label="Views"]'))throw new Error("Saved views still have a separate sidebar section");})()`);
-  }
- },
- {
   id:"bots-mobile",packageDir:"bb-studio-teams",fileName:"staged-preview-mobile.png",privateSidebar:false,
   setup:async client=>{
    await client.command("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
