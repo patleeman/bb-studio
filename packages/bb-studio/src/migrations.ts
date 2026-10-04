@@ -130,4 +130,14 @@ export const MIGRATIONS = [
      project_id TEXT PRIMARY KEY, lead_thread_id TEXT, page_id TEXT,
      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
    );`,
+  `CREATE TABLE office_project_runs (
+     project_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL, cadence TEXT NOT NULL,
+     time TEXT NOT NULL, automation_id TEXT, automation_project_id TEXT
+   );
+   CREATE TABLE office_bot_projects (
+     bot_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, imported_page_id TEXT
+   );
+   CREATE TABLE office_thread_handoffs (
+     old_thread_id TEXT PRIMARY KEY, new_thread_id TEXT NOT NULL, project_id TEXT, archived INTEGER NOT NULL DEFAULT 0
+   );`,
 ];

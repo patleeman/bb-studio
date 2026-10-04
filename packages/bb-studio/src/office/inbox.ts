@@ -1,3 +1,4 @@
+import { inboxHref } from "./inbox-links";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { InboxEvent } from "./inbox-contract";
@@ -28,7 +29,7 @@ export class Inbox {
   async events(): Promise<InboxEvent[]> {
     const state = new Map((this.db.prepare("SELECT * FROM inbox_state").all() as { key: string; read_at: number | null; done_at: number | null }[]).map(s => [s.key, s]));
     return (await this.records()).map(({ event: { projectId, ...event } }) => ({
-      ...event, spaceId: this.spaceForProject(projectId), readAt: (state.get(event.key)?.read_at ?? -1) >= event.createdAt ? state.get(event.key)!.read_at : null, doneAt: (state.get(event.key)?.done_at ?? -1) >= event.createdAt ? state.get(event.key)!.done_at : null,
+      ...event, href: inboxHref({ ...event, projectId }), spaceId: this.spaceForProject(projectId), readAt: (state.get(event.key)?.read_at ?? -1) >= event.createdAt ? state.get(event.key)!.read_at : null, doneAt: (state.get(event.key)?.done_at ?? -1) >= event.createdAt ? state.get(event.key)!.done_at : null,
     })).sort((a,b) => b.createdAt - a.createdAt || b.key.localeCompare(a.key));
   }
 

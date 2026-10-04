@@ -1,3 +1,4 @@
+import { BotProjects } from "./bot-projects";
 import { OfficeProjects } from "./projects";
 import { OfficeTabs } from "./tabs";
 import { officeTabHandlers } from "./tab-service";
@@ -61,6 +62,7 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   });
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   const officeProjects = new OfficeProjects(db, bb.sdk, changed);
+  const botProjects = new BotProjects(db, bb.sdk, officeProjects, options.moduleServices, changed);
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
   const inbox = new Inbox(db, [interactionSource(bb.sdk), legacyAttentionSource(db), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
   const search = options.searchIndex ?? new SearchIndex(db, hub, changed);
@@ -70,6 +72,11 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   const { home: _homeContract, ...registeredContract } = officeContract;
   bb.rpc.register(registeredContract, {
     ...tabHandlers,
+    project_set_run: input => officeProjects.setRun(input),
+    thread_handoff: input => officeProjects.handoff(input),
+    bots_overview: () => botProjects.overview(),
+    bot_to_project: input => botProjects.migrate(input),
+    bot_retire: ({ botId }) => botProjects.retire(botId),
     project_get: ({ projectId }) => officeProjects.get(projectId),
     project_setup: input => officeProjects.setup(input),
     project_threads: ({ projectId }) => officeProjects.threads(projectId),

@@ -70,6 +70,7 @@ export function moduleInboxSources(services: ModuleServices): InboxSource[] {
       const { bots, botCreateRequests } = roster.parse(await services.call("bot-teams", "list", null));
       return botCreateRequests.filter(r => r.expiresAt > Date.now()).map(r => ({
         ...base(`bot-create:${r.id}`, bots.find(b => b.id === r.requesterBotId)?.projectId ?? null, "bot-create"),
+        href: bots.find(b => b.id === r.requesterBotId)?.projectId ? `/plugins/studio/projects/${encodeURIComponent(bots.find(b => b.id === r.requesterBotId)!.projectId!)}` : null,
         type: "request" as const, title: `Create ${r.name}`, body: r.description || r.mission, botId: r.requesterBotId,
         createdAt: r.createdAt, actions: [{ id: "approve", label: "Approve", primary: true }, { id: "deny", label: "Deny" }],
       }));

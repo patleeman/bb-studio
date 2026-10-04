@@ -1,3 +1,4 @@
+import { inboxHref } from "./inbox-links";
 import type Database from "better-sqlite3";
 import type { InboxSource, SourceEvent } from "./inbox";
 
@@ -28,6 +29,7 @@ export function importLegacyAttention(core: Database.Database, teams: Database.D
         item: null, href: `/plugins/studio/channels/${row.room_id}`, createdAt: attention.createdAt,
         actions: [{ id: "resolve", label: "Resolve", primary: true }],
       };
+      event.href = inboxHref(event);
       const raw = JSON.stringify(row);
       const old = core.prepare("SELECT raw FROM office_legacy_attention WHERE id=?").get(row.id) as { raw: string } | undefined;
       // A changed legacy source can refresh the event; preserve a local resolution.
@@ -53,7 +55,7 @@ export function legacyAttentionSource(core: Database.Database): InboxSource {
     id: "team-attention", keyPrefix: "team-attention:",
     async list() {
       const rows = core.prepare("SELECT event FROM office_legacy_attention WHERE resolved_at IS NULL AND (status='open' OR (status='snoozed' AND snoozed_until<=?))").all(Date.now()) as { event: string }[];
-      return rows.map(r => JSON.parse(r.event) as SourceEvent);
+      return rows.map(r => { const event = JSON.parse(r.event) as SourceEvent; return { ...event, href: inboxHref(event) }; });
     },
     async act(event, actionId) {
       if (actionId !== "resolve") throw new Error("Unsupported attention action.");

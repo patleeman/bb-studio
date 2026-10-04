@@ -43,11 +43,11 @@ async function setup() {
 
 it("creates on demand and serializes idempotent setup with the composer's inputs", async () => {
   const x = await setup();
-  expect(await x.call("project_get")).toEqual({ projectId: "p", name: "Garden", leadThreadId: null, pageId: null, pageHref: null });
+  expect(await x.call("project_get")).toEqual({ projectId: "p", name: "Garden", leadThreadId: null, pageId: null, pageHref: null, role: "project", run: null });
   expect(x.db.prepare("SELECT * FROM office_projects").all()).toEqual([]);
   const [a, b] = await Promise.all([x.create(), x.create()]);
   expect(a).toEqual(b);
-  expect(a).toEqual({ projectId: "p", name: "Garden", leadThreadId: "t1", pageId: "pg_1", pageHref: "/plugins/pages/pages/pg_1" });
+  expect(a).toEqual({ projectId: "p", name: "Garden", leadThreadId: "t1", pageId: "pg_1", pageHref: "/plugins/pages/pages/pg_1", role: "project", run: null });
   expect(x.spawn).toHaveBeenCalledTimes(1);
   expect(x.callRpc.mock.calls.filter(([arg]) => arg.method === "create")).toHaveLength(1);
   expect(x.callRpc).toHaveBeenCalledWith(expect.objectContaining({ pluginId: "pages", method: "create", input: expect.objectContaining({ projectId: "p", parentId: null, title: "Garden", icon: "📁", markdown: expect.stringContaining("## Brief\n\nBuild a garden") }) }));
@@ -97,9 +97,9 @@ it("lists top-level project threads newest first, paginates and flags the lead",
   expect(x.list).toHaveBeenCalledWith({ projectId: "p", hasParent: false, limit: 100, offset: 100 });
 });
 
-it("rejects the personal workspace and invalid setup requests", async () => {
+it("supports the personal workspace and rejects invalid setup requests", async () => {
   const x = await setup();
-  await expect(x.call("project_get", { projectId: "personal" })).rejects.toThrow("personal workspace");
+  expect(await x.call("project_get", { projectId: "personal" })).toMatchObject({ name: "Chief of Staff", role: "chief-of-staff", run: null });
   await expect(x.call("project_setup", { projectId: "p", providerId: "codex", model: "x" })).rejects.toThrow();
   expect(x.spawn).not.toHaveBeenCalled();
 });
