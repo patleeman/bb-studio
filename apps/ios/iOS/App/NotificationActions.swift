@@ -43,18 +43,6 @@ enum NotificationActions {
     /// Runs a lock-screen action. Returns false when the app should open the thread instead.
     static func handle(_ response: UNNotificationResponse) async -> Bool {
         let info = response.notification.request.content.userInfo
-        if let key = info["inboxKey"] as? String {
-            let text = (response as? UNTextInputNotificationResponse)?.userText
-            guard let action = OfficeNotificationAction(key: key, identifier: response.actionIdentifier, text: text) else { return false }
-            do {
-                try await action.perform(client: BBClient(), serverId: info["serverId"] as? String)
-                await OfficePush.receive(info)
-            } catch {
-                await confirm(info["threadId"] as? String, "Didn't go through: \(BBClient.describe(error))",
-                              serverId: info["serverId"] as? String, inboxKey: key)
-            }
-            return true
-        }
         guard let threadId = info["threadId"] as? String else { return false }
         let interactionId = info["interactionId"] as? String
         guard [approve, deny, reply].contains(response.actionIdentifier) || response.actionIdentifier.hasPrefix(choicePrefix) else { return false }
@@ -120,14 +108,13 @@ enum NotificationActions {
     }
 
     /// A quiet follow-up notification when an action fails.
-    private static func confirm(_ threadId: String?, _ body: String, serverId: String?, inboxKey: String? = nil) async {
+    private static func confirm(_ threadId: String, _ body: String, serverId: String?) async {
         let content = UNMutableNotificationContent()
         content.title = "BB"
         content.body = body
-        if let threadId { content.userInfo["threadId"] = threadId }
-        if let inboxKey { content.userInfo["inboxKey"] = inboxKey }
+        content.userInfo = ["threadId": threadId]
         if let serverId { content.userInfo["serverId"] = serverId }
-        content.threadIdentifier = threadId ?? inboxKey ?? "office-inbox"
+        content.threadIdentifier = threadId
         try? await UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }

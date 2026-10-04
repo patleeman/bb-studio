@@ -76,7 +76,7 @@ export function OfficeHome({ space }: { space: Space }) {
         <span className="ml-auto text-sm text-muted-foreground">{today}</span>
       </header>
 
-      <div className="mt-6">
+      <div className="mt-6 rounded-lg border border-border bg-background">
         <NewThreadComposer
           layout="contained"
           draftKey={`office-home:${space.id}`}

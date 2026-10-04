@@ -2,14 +2,12 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { studioSchemas } from "../packages/bb-studio-kit/src/contract.ts";
-import { officeContract } from "../packages/bb-studio/src/office/contract.ts";
 import { nativeRpcInventory } from "./native-rpc-inventory.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const check = process.argv.includes("--check");
-const schemasOnly = process.argv.includes("--schemas-only");
-if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check" && arg !== "--schemas-only")) {
-  throw new Error("Usage: pnpm gen:contracts [--check] [--schemas-only]");
+if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check")) {
+  throw new Error("Usage: pnpm gen:contracts [--check]");
 }
 
 const plugins = [
@@ -143,7 +141,7 @@ const item = schemaOf(studioSchemas(z).item, "output");
 const documents = new Map();
 for (const [pluginId, namespace, path, exportName] of plugins) {
   const mod = await import(new URL(path, import.meta.url));
-  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract } : mod[exportName];
+  const contract = mod[exportName];
   if (!contract) throw new Error(`Missing ${exportName} in ${path}`);
   const methods = Object.fromEntries(Object.entries(contract).map(([name, value]) => [name, {
     input: schemaOf(value.input, "input"), output: schemaOf(value.output, "output"),
@@ -151,7 +149,7 @@ for (const [pluginId, namespace, path, exportName] of plugins) {
   const document = { pluginId, methods, ...(pluginId === "studio" ? { StudioItem: item } : {}) };
   documents.set(pluginId, { namespace, ...document });
   await output(`contracts/${pluginId}.schema.json`, `${JSON.stringify(document, null, 2)}\n`);
-  if (!schemasOnly) await output(`apps/ios/Shared/Generated/${namespace}Contract.swift`, swiftSource(namespace, document.methods, document.StudioItem));
+  await output(`apps/ios/Shared/Generated/${namespace}Contract.swift`, swiftSource(namespace, document.methods, document.StudioItem));
   console.log(`${check ? "Checked" : "Generated"} ${pluginId}: ${Object.keys(document.methods).length} methods`);
 }
 const native = await nativeRpcInventory(root, documents);

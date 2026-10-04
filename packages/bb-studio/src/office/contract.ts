@@ -1,11 +1,9 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { inboxEventSchema, inboxContract } from "./inbox-contract";
-export { inboxEventSchema, type InboxEvent } from "./inbox-contract";
 
 const id = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(100);
-export const trustSchema = z.enum(["ask", "act"]);
+export const trustSchema = z.enum(["read_only", "ask", "act"]);
 export const officeSpaceSchema = z.object({
   id, name, icon: z.string().max(100).nullable(), description: z.string(),
   isDefault: z.boolean(), defaultProjectId: id.nullable(),
@@ -33,11 +31,6 @@ const spaceInput = z.object({ name, icon: z.string().max(100).nullable().optiona
 /** Office RPCs use project ownership for Space membership. Legacy camelCase
  * RPCs remain separate while the existing UI is replaced. */
 export const officeContract = defineRpcContract({
-  ...inboxContract,
-  home: { input: z.object({ spaceId: id }), output: z.object({
-    needsYou: z.array(inboxEventSchema), reports: z.array(inboxEventSchema), recent: z.array(officeItemSchema),
-    working: z.array(z.object({ id, botId: id.nullable(), title: z.string(), status: z.enum(["working", "waiting", "review", "done"]), note: z.string().nullable(), recurring: z.string().nullable(), href: z.string(), updatedAt: z.number() })),
-  }) },
   spaces_list: { input: z.object({}), output: z.object({ spaces: z.array(officeSpaceSchema) }) },
   space_create: { input: spaceInput, output: z.object({ space: officeSpaceSchema }) },
   space_update: { input: spaceInput.partial().extend({ spaceId: id }), output: z.object({ space: officeSpaceSchema }) },

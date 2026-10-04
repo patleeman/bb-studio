@@ -75,16 +75,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        if userInfo["inboxKey"] is String || userInfo["inboxChanged"] as? Bool == true {
-            Task {
-                let changed = await OfficePush.receive(userInfo)
-                if let ids = userInfo["clearThreadIds"] as? [String], let serverId = userInfo["serverId"] as? String {
-                    await NotificationActions.clear(threadIds: Set(ids), serverId: serverId)
-                }
-                completionHandler(changed ? .newData : .noData)
-            }
-            return
-        }
         guard let threadIds = userInfo["clearThreadIds"] as? [String],
               let serverId = userInfo["serverId"] as? String, !serverId.isEmpty
         else { return completionHandler(.noData) }
@@ -92,7 +82,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             // Match both origin and thread locally. A clear for server A can
             // arrive while B is selected or Tailscale is offline.
             await NotificationActions.clear(threadIds: Set(threadIds), serverId: serverId)
-            await OfficePush.receive(userInfo)
             completionHandler(.newData)
         }
     }
@@ -112,7 +101,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        Task { await OfficePush.receive(notification.request.content.userInfo) }
         completionHandler([.banner, .sound])
     }
 
@@ -122,7 +110,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     ) {
         Task {
             let userInfo = response.notification.request.content.userInfo
-            await OfficePush.receive(userInfo)
             if await !NotificationActions.handle(response) {
                 let client = BBClient()
                 do {
@@ -138,8 +125,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     await MainActor.run { AppModel.shared.openFeedPost(id) }
                 } else if let threadId = userInfo["threadId"] as? String {
                     await MainActor.run { AppModel.shared.openThread(threadId) }
-                } else if userInfo["inboxKey"] is String {
-                    await MainActor.run { AppModel.shared.tab = .inbox }
                 }
             }
             completionHandler()

@@ -60,12 +60,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      fake-indexeddb:
-        specifier: 6.2.4
-        version: 6.2.4
-      jsdom:
-        specifier: 29.0.1
-        version: 29.0.1
       react:
         specifier: 19.2.4
         version: 19.2.4

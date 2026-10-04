@@ -20,8 +20,8 @@ it("registers root Space RPCs and derives folder membership from projects", asyn
   expect(result.spaces).toHaveLength(1);
   expect(result.spaces[0]!.projectIds).toEqual(["p1", "proj_personal"]);
   const id = result.spaces[0]!.id;
-  await harness.behavior.callRpc("space_settings_set", { spaceId: id, settings: { defaultTrust: "act" } });
-  expect(await harness.behavior.callRpc("space_settings_get", { spaceId: id })).toMatchObject({ settings: { defaultTrust: "act" } });
+  await harness.behavior.callRpc("space_settings_set", { spaceId: id, settings: { defaultTrust: "read_only" } });
+  expect(await harness.behavior.callRpc("space_settings_get", { spaceId: id })).toMatchObject({ settings: { defaultTrust: "read_only" } });
   const tree = await harness.behavior.callRpc("space_tree", { spaceId: id }) as { folders: unknown[] };
   expect(tree.folders).toHaveLength(2);
   await expect(harness.behavior.callRpc("space_delete", { spaceId: id })).rejects.toThrow("default Space");
