@@ -11,6 +11,7 @@ import {
 import { GHOST_BUTTON, Icon } from "@bb-studio/kit/app";
 import { useState } from "react";
 import { useCall } from "./model";
+import { OpenProjectPage } from "./ThreadProjectPage";
 import { PORTAL_SCOPE } from "./styles";
 
 export function HandoffDialog({ threadId, projectId, open, onOpenChange, onDone }: {
@@ -62,6 +63,7 @@ export function ThreadHandoffAction({ threadId, projectId, isCompactViewport }: 
         <Icon name="Fork" className="size-4" />{isCompactViewport ? null : "Hand off"}
       </button>
       <HandoffDialog threadId={threadId} projectId={projectId} open={open} onOpenChange={setOpen} />
+      <OpenProjectPage threadId={threadId} />
     </>
   );
 }

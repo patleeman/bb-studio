@@ -4,7 +4,6 @@
 // works with the page beside it.
 import {
   experimental_useSidebarThreads as useSidebarThreads,
-  useBbContext,
   useBbNavigate,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
@@ -35,9 +34,12 @@ function opened(): Set<string> {
   try { return new Set(JSON.parse(globalThis.sessionStorage?.getItem(OPENED_KEY) ?? "[]") as string[]); } catch { return new Set(); }
 }
 
-/** Renders nothing; opens the Project page tab once per project thread. */
-export function OpenProjectPage() {
-  const { threadId } = useBbContext();
+/**
+ * Renders nothing; opens the Project page tab once per project thread. Mounted
+ * from the thread header (Handoff.tsx): that surface knows its thread and has
+ * the side panel, where an app overlay has neither.
+ */
+export function OpenProjectPage({ threadId }: { threadId: string }) {
   const navigate = useBbNavigate();
   const project = useProject(useThreadProject(threadId));
   const pageId = project.data?.pageId ?? null;

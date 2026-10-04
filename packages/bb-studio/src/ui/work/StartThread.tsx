@@ -4,8 +4,8 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   experimental_NewThreadComposer as NewThreadComposer,
-  experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreads as useSidebarThreads,
+  useBbNavigate,
   type NewThreadRequest,
 } from "@get-bb/plugin-sdk/app";
 import { GHOST_BUTTON } from "@bb-studio/kit/app";
@@ -29,7 +29,7 @@ function StartThreadDialog({ projectId, onClose }: { projectId: string; onClose:
   const call = useCall();
   const work = useWork();
   const { projects: bbProjects } = useSidebarThreads();
-  const threadActions = useSidebarThreadActions();
+  const navigate = useBbNavigate();
   const [error, setError] = useState<string | null>(null);
   const project = useMemo(() => [work.chief, ...work.projects].find((entry) => entry?.id === projectId) ?? null, [work, projectId]);
   const startIn = project?.bbProjectId ?? bbProjects.find((entry) => entry.isPersonal)?.id;
@@ -37,9 +37,10 @@ function StartThreadDialog({ projectId, onClose }: { projectId: string; onClose:
     setError(null);
     try {
       const { threadId } = await call("project_thread_start", { projectId, request }) as { threadId: string };
-      onClose();
       work.refresh();
-      threadActions.open(threadId);
+      // The sidebar may not have the new thread yet; go by route.
+      navigate.toThread(threadId);
+      onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       throw cause;

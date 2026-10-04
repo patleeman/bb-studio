@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState, type DragEvent, type MouseEvent, type Rea
 import { usePathname } from "./location";
 import { useCall } from "./model";
 import { useProject } from "./ProjectPanel";
-import { extendSelection, nest, sortThreads, useWork, type ThreadSort, type WorkProject } from "./projects";
+import { extendSelection, nest, reorderNeighbours, sortThreads, useMoveThreads, useWork, type ThreadSort, type WorkProject } from "./projects";
 import { projectPath, PROJECTS_PANEL } from "./routes";
 import { useStartThread } from "./StartThread";
 import { MenuBody, RowMenu, ThreadMenu, type MenuEntry, type MoveTarget } from "./ThreadMenu";
@@ -28,7 +28,7 @@ import { MENU, PORTAL_SCOPE, ROW, ROW_ACTIVE, ROW_GLYPH, ROW_LABEL, SECTION, SEC
 
 export const RUNNING = new Set(["running", "starting", "active"]);
 const THREADS_SHOWN = 25;
-const THREADS_MIME = "application/x-studio-threads";
+export const THREADS_MIME = "application/x-studio-threads";
 const PROJECT_MIME = "application/x-studio-project";
 const SORT_KEY = "bb-studio.work.thread-sort";
 
@@ -289,7 +289,9 @@ export function Sidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
   const threadActions = useSidebarThreadActions();
   const navigate = useBbNavigate();
   const pathname = usePathname();
-  const work = useWork();
+  const { move, targets: moveTargets, work } = useMoveThreads();
+  const [problem, setProblem] = useState<string | null>(null);
+  const report = (cause: unknown) => { setProblem(cause instanceof Error ? cause.message : String(cause)); work.refresh(); };
   const [showAll, setShowAll] = useState(false);
   const [sort, setSortState] = useState<ThreadSort>(readSort);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -336,23 +338,11 @@ export function Sidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
 
   const openProject = (projectId: string) => { navigate.toPluginPanel(PROJECTS_PANEL, { subPath: projectId }); onNavigate(); };
   const moveThreads = (threadIds: string[], projectId: string | null) => {
-    if (!threadIds.length || !work.canOrganize) return;
-    const refs = threadIds.map((id) => `thread:${id}`);
-    void (projectId ? call("project_link", { projectId, refs }) : call("project_unlink", { refs })).then(work.refresh, work.refresh);
+    void move(threadIds, projectId).catch(report);
     setSelected(new Set());
   };
   const reorder = (draggedId: string, beforeId: string) => {
-    const ids = work.projects.map((project) => project.id).filter((id) => id !== draggedId);
-    const index = ids.indexOf(beforeId);
-    void call("project_reorder", { projectId: draggedId, previousProjectId: index > 0 ? ids[index - 1] : null, nextProjectId: beforeId }).then(work.refresh, work.refresh);
-  };
-  const moveTargets = (thread: PluginSidebarThread | null): MoveTarget[] | null => {
-    if (!work.canOrganize) return null;
-    const current = thread ? work.projectOf(thread) : undefined;
-    return [
-      ...work.projects.map((project) => ({ id: project.id, name: project.name, current: current === project.id })),
-      { id: null, name: "No project", current: current === null },
-    ];
+    void call("project_reorder", { projectId: draggedId, ...reorderNeighbours(work.order, draggedId, beforeId) }).then(work.refresh, report);
   };
   const clickThread = (thread: PluginSidebarThread) => (event: MouseEvent) => {
     // Shift selects (a range once something is selected); with a selection, ⌘ toggles one. Otherwise ⌘ opens in a split, as in BB.
@@ -447,6 +437,7 @@ export function Sidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
             moveMenu={work.canOrganize ? [moveTargets(null)!.map((target) => ({ id: target.id ?? "none", label: target.name, icon: target.id ? "Folder" : "MessageSquare", run: () => moveThreads([...selected], target.id) }))] : null}
           />
         : null}
+      {problem ? <p role="alert" className="mx-2 mt-2 flex items-start gap-2 text-xs text-destructive"><span className="flex-1">{problem}</span><button type="button" aria-label="Dismiss" onClick={() => setProblem(null)}><Icon name="X" className="size-3.5" /></button></p> : null}
       {startThread.dialog}
       <NewProjectDialog open={creating} onOpenChange={setCreating} onCreated={(id) => { work.refresh(); openProject(id); }} />
     </div>

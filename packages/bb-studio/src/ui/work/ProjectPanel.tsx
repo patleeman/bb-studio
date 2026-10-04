@@ -123,7 +123,7 @@ function ProjectList() {
   return (
     <PageColumn className="max-w-2xl">
       <h1 className="text-2xl font-semibold">Projects</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Each project has a lead you talk to, and a page it keeps current. Ask the Chief of Staff to start one, or make one from BB's project menu.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Each project has a lead you talk to, and a page it keeps current. Ask the Chief of Staff to start one, or press + next to Projects in the sidebar.</p>
       <div className="mt-6 space-y-1">
         {work.map((project) => {
           const count = threads.filter((thread) => projectOf(thread) === project.id && !thread.isArchived && !thread.isHidden).length;

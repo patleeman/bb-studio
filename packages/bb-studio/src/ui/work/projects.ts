@@ -7,8 +7,8 @@ import {
   experimental_useSidebarThreads as useSidebarThreads,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
-import { useMemo } from "react";
-import { useLive } from "./model";
+import { useCallback, useMemo } from "react";
+import { useCall, useLive } from "./model";
 
 export interface WorkProject {
   id: string;
@@ -33,6 +33,8 @@ export interface Work {
   items: MemberItem[];
   /** False while the server predates Studio projects: moving things between projects is off. */
   canOrganize: boolean;
+  /** Every project id in server order, including the Chief of Staff and archived ones; reorder neighbours come from here. */
+  order: string[];
   refresh: () => void;
 }
 
@@ -53,6 +55,7 @@ export function useWork(): Work {
         projectOf: (thread) => threads[thread.id] ?? null,
         items: membership.data?.items ?? [],
         canOrganize: true,
+        order: [...list.data!.projects].sort((a, b) => ((a as { position?: number }).position ?? 0) - ((b as { position?: number }).position ?? 0)).map((project) => project.id),
         refresh,
       };
     }
@@ -63,6 +66,7 @@ export function useWork(): Work {
       projectOf: (thread) => (thread.projectId === personal?.id ? null : thread.projectId),
       items: [],
       canOrganize: false,
+      order: [],
       refresh,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,4 +108,47 @@ export function extendSelection(order: readonly string[], selected: ReadonlySet<
   }
   if (next.has(id)) next.delete(id); else next.add(id);
   return next;
+}
+
+/** The ids to move with a thread: it and its sub-threads, so a parent doesn't leave its children behind. */
+export function withDescendants(ids: readonly string[], threads: readonly Pick<PluginSidebarThread, "id" | "parentThreadId">[]): string[] {
+  const out = new Set(ids);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const thread of threads) if (thread.parentThreadId && out.has(thread.parentThreadId) && !out.has(thread.id)) { out.add(thread.id); grew = true; }
+  }
+  return [...out];
+}
+
+/** Neighbours for putting `dragged` just before `before`, from the full server order. */
+export function reorderNeighbours(order: readonly string[], dragged: string, before: string): { previousProjectId: string | null; nextProjectId: string } {
+  const rest = order.filter((id) => id !== dragged);
+  const index = rest.indexOf(before);
+  return { previousProjectId: index > 0 ? rest[index - 1]! : null, nextProjectId: before };
+}
+
+/** Moving threads between projects, from any surface. Null moves them out of every project. */
+export function useMoveThreads() {
+  const call = useCall();
+  const work = useWork();
+  const { threads } = useSidebarThreads();
+  const move = useCallback(async (threadIds: readonly string[], projectId: string | null) => {
+    if (!threadIds.length || !work.canOrganize) return;
+    const refs = withDescendants(threadIds, threads).map((id) => `thread:${id}`);
+    try {
+      await (projectId ? call("project_link", { projectId, refs }) : call("project_unlink", { refs }));
+    } finally {
+      work.refresh();
+    }
+  }, [call, work, threads]);
+  const targets = useCallback((thread: Pick<PluginSidebarThread, "id" | "projectId"> | null) => {
+    if (!work.canOrganize) return null;
+    const current = thread ? work.projectOf(thread) : undefined;
+    return [
+      ...work.projects.map((project) => ({ id: project.id as string | null, name: project.name, current: current === project.id })),
+      { id: null, name: "No project", current: current === null },
+    ];
+  }, [work]);
+  return { move, targets, work };
 }

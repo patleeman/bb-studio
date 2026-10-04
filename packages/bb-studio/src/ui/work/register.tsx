@@ -12,7 +12,7 @@ import { ProjectPageTab, ProjectPanel } from "./ProjectPanel";
 import { PROJECTS_PANEL } from "./routes";
 import { Sidebar } from "./Sidebar";
 import { ThreadHandoffAction } from "./Handoff";
-import { OpenProjectPage, PROJECT_PAGE_ACTION, ThreadProjectPage } from "./ThreadProjectPage";
+import { PROJECT_PAGE_ACTION, ThreadProjectPage } from "./ThreadProjectPage";
 
 /**
  * `sidebar` and `navigation` are gated builders (modules/app.ts moduleApp):
@@ -38,8 +38,7 @@ export function registerWork(app: PluginAppBuilder, options: { sidebar: PluginAp
   // Every thread of a project gets the project's page beside it, opened once by itself.
   app.slots.threadPanelAction({ id: PROJECT_PAGE_ACTION, title: "Project page", icon: "FileText", layout: "flush", component: ThreadProjectPage });
   app.slots.threadPanelAction({ id: "project-overview", title: "Project overview", icon: "Folder", layout: "flush", component: ThreadProjectOverview });
-  app.slots.experimental_appOverlay({ id: "work-project-page", component: OpenProjectPage });
-  // Move a thread (or a project's lead) to another provider or model.
+  // Move a thread (or a project's lead) to another provider or model; also opens the project page beside project threads.
   app.slots.experimental_threadHeaderAction({ id: "handoff", title: "Hand off", component: ThreadHandoffAction });
   // Approvals for agents set to "Ask first" (office/trust.ts, rendererId office-trust).
   app.slots.pendingInteraction({ id: "office-trust", component: TrustRequest });

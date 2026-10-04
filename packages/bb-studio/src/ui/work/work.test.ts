@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isShown } from "./Navigation";
 import { inboxLink } from "./links";
 import { overviewOf } from "./Overview";
-import { extendSelection, nest, sortThreads } from "./projects";
+import { extendSelection, nest, reorderNeighbours, sortThreads, withDescendants } from "./projects";
 import { projectIdOf } from "./routes";
 
 describe("navigation", () => {
@@ -86,5 +86,17 @@ describe("thread list", () => {
     expect([...extendSelection(order, new Set(), null, "b", false)]).toEqual(["b"]);
     expect([...extendSelection(order, new Set(["b"]), null, "b", false)]).toEqual([]);
     expect([...extendSelection(order, new Set(["d"]), "d", "b", true)].sort()).toEqual(["b", "c", "d"]);
+  });
+});
+
+describe("moving", () => {
+  it("takes sub-threads along", () => {
+    const threads = [{ id: "a", parentThreadId: null }, { id: "a1", parentThreadId: "a" }, { id: "a11", parentThreadId: "a1" }, { id: "b", parentThreadId: null }];
+    expect(withDescendants(["a"], threads).sort()).toEqual(["a", "a1", "a11"]);
+  });
+  it("reorders against the server's full order, Chief of Staff and archived included", () => {
+    const order = ["chief", "orbit", "archived", "helios"];
+    expect(reorderNeighbours(order, "helios", "orbit")).toEqual({ previousProjectId: "chief", nextProjectId: "orbit" });
+    expect(reorderNeighbours(order, "orbit", "helios")).toEqual({ previousProjectId: "archived", nextProjectId: "helios" });
   });
 });

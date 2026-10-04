@@ -28,7 +28,7 @@ function useThreadItems(thread: PluginSidebarThread, onRename: () => void, moveT
   return [
     [{ id: "split", label: "Open in split", icon: "Columns2", run: () => actions.open(thread.id, { split: true }) }],
     [
-      { id: "link", label: "Copy thread link", icon: "Link", run: () => void navigator.clipboard?.writeText(threadLink(thread.id)) },
+      { id: "link", label: "Copy thread link", icon: "Copy", run: () => void navigator.clipboard?.writeText(threadLink(thread.id)) },
       { id: "read", label: thread.isUnread ? "Mark read" : "Mark unread", icon: thread.isUnread ? "MailOpen" : "Mail", run: () => void actions.setRead(thread.id, thread.isUnread) },
       { id: "pin", label: thread.isPinned ? "Unpin" : "Pin", icon: thread.isPinned ? "PinOff" : "Pin", run: () => void actions.setPinned(thread.id, !thread.isPinned) },
       ...(moveTargets

@@ -16,10 +16,11 @@ import type { ReactNode } from "react";
 import { inboxLink } from "./links";
 import { useCall, useLive, type InboxEvent } from "./model";
 import { useProject } from "./ProjectPanel";
-import { useWork } from "./projects";
+import { useMoveThreads, useWork } from "./projects";
 import { useStartThread } from "./StartThread";
 import { PROJECTS_PANEL, projectIdOf } from "./routes";
-import { RUNNING, ThreadGlyph } from "./Sidebar";
+import { RUNNING, THREADS_MIME, ThreadGlyph } from "./Sidebar";
+import { ThreadMenu } from "./ThreadMenu";
 import { plainPreview } from "./text";
 import { cn } from "./styles";
 
@@ -69,12 +70,24 @@ function Section({ title, children, action }: { title: string; children: ReactNo
   );
 }
 
+/** A thread with the sidebar's menu (so it can be moved out of the project) and drag to the sidebar. */
 function ThreadLine({ thread, nested, onOpen }: { thread: PluginSidebarThread; nested?: boolean; onOpen: () => void }) {
+  const { move, targets } = useMoveThreads();
   return (
-    <button type="button" onClick={onOpen} className={cn("flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-state-hover", nested && "pl-7")}>
-      <span className="inline-flex size-4 shrink-0 items-center justify-center"><ThreadGlyph thread={thread} /></span>
-      <span className={cn("min-w-0 flex-1 truncate", thread.isUnread && "font-medium")}>{thread.displayTitle}</span>
-    </button>
+    <ThreadMenu thread={thread} moveTargets={targets(thread)} onMove={(projectId) => void move([thread.id], projectId)}>
+      {() => (
+        <button
+          type="button"
+          draggable
+          onDragStart={(event) => { event.dataTransfer.setData(THREADS_MIME, JSON.stringify([thread.id])); event.dataTransfer.effectAllowed = "move"; }}
+          onClick={onOpen}
+          className={cn("flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-state-hover group-hover/thread:pr-14", nested && "pl-7")}
+        >
+          <span className="inline-flex size-4 shrink-0 items-center justify-center"><ThreadGlyph thread={thread} /></span>
+          <span className={cn("min-w-0 flex-1 truncate", thread.isUnread && "font-medium")}>{thread.displayTitle}</span>
+        </button>
+      )}
+    </ThreadMenu>
   );
 }
 
@@ -157,10 +170,11 @@ export function ProjectOverviewTab({ subPath }: PluginNavPanelProps) {
 }
 
 /** Workbench tab: the thread last opened from the Overview, beside the lead. */
-export function ProjectThreadTab(_props: PluginNavPanelProps) {
+export function ProjectThreadTab({ subPath }: PluginNavPanelProps) {
   const target = useFixedTabTarget(THREAD_TAB);
   const threadActions = useSidebarThreadActions();
-  const threadId = target?.target.threadId;
+  // The tab's target outlives the project; on the Projects index there's no thread to show.
+  const threadId = projectIdOf(subPath) ? target?.target.threadId : undefined;
   if (!threadId) return <p className="p-4 text-sm text-muted-foreground">Open a thread from the Overview and it shows here, beside the lead.</p>;
   return (
     <div className="flex h-full min-h-0 flex-col">
