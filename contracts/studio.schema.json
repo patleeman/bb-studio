@@ -510,7 +510,6 @@
                   "type": "string",
                   "enum": [
                     "ready",
-                    "outdated",
                     "offline"
                   ]
                 },
@@ -4082,9 +4081,6 @@
           },
           "threadPrompt": {
             "type": "string"
-          },
-          "itemsHref": {
-            "type": "string"
           }
         },
         "required": [
@@ -4094,8 +4090,7 @@
           "threads",
           "projects",
           "kinds",
-          "threadPrompt",
-          "itemsHref"
+          "threadPrompt"
         ],
         "additionalProperties": false
       }

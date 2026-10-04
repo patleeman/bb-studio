@@ -31,8 +31,8 @@ extension Route {
             self = .feed
             return
         }
-        if parts.count == 5, parts[0] == "plugins", parts[1...3] == ["studio", "studio", "space"] {
-            self = .space(id: parts[4].removingPercentEncoding ?? parts[4])
+        if parts.count == 4, parts[0...2] == ["plugins", "studio", "spaces"] {
+            self = .space(id: parts[3].removingPercentEncoding ?? parts[3])
             return
         }
         guard parts.count == 4, parts[0] == "plugins" else { return nil }

@@ -47,12 +47,7 @@ function threadPlace(thread: SpaceThreadView, projects: readonly Project[]) {
   return projectName(projects, thread.projectId);
 }
 
-/** The app path that opens a space; a new thread that links it joins it. */
-export function spaceHref(id: string): string {
-  return `/plugins/studio/studio/space/${encodeURIComponent(id)}`;
-}
-
-/** Where a space opens: the Space view, its lead with the page beside it (ui/space). */
+/** Where a space opens: the Space view, its lead with the page beside it (ui/space). A new thread that links it joins it. */
 export function spaceLink(space: SpaceView): string {
   return spaceViewHref(space.id);
 }

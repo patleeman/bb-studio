@@ -92,8 +92,7 @@ export const tablesContract = defineRpcContract({
   patchRows: { input: rowPatchSchema.extend({ id }), output: z.object({ table: tableSchema }) },
   query: { input: tableQuerySchema, output: z.object({
     rows: z.array(rowSchema), total: z.number(),
-    // Optional for clients connecting to an older Tables installation.
-    offset: z.number().optional(), nextOffset: z.number().nullable().optional(), revision: z.string().optional(),
+    offset: z.number(), nextOffset: z.number().nullable(), revision: z.string(),
   }) },
   exportCsv: { input: z.object({ id, viewId: id.optional() }), output: z.object({ csv: z.string() }) },
   importCsv: { input: z.object({ id, csv: z.string().max(2_000_000) }), output: z.object({ imported: z.number() }) },

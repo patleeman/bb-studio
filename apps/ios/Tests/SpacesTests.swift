@@ -12,9 +12,9 @@ final class SpacesTests: XCTestCase {
     }
 
     func testSpacePathsOpenTheSpace() {
-        XCTAssertEqual(Route(href: "/plugins/studio/studio/space/sp_1"), .space(id: "sp_1"))
+        XCTAssertEqual(Route(href: "/plugins/studio/spaces/sp_1"), .space(id: "sp_1"))
         XCTAssertEqual(Route(href: "/plugins/pages/pages/pg_1"), .page(id: "pg_1"))
-        XCTAssertNil(Route(href: "/plugins/studio/studio/space/sp_1/items"))
+        XCTAssertNil(Route(href: "/plugins/studio/spaces/sp_1/items"))
     }
 
     func testFeedPathsOpenTheFeed() {

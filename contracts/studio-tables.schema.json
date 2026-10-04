@@ -2832,7 +2832,10 @@
         },
         "required": [
           "rows",
-          "total"
+          "total",
+          "offset",
+          "nextOffset",
+          "revision"
         ],
         "additionalProperties": false
       }

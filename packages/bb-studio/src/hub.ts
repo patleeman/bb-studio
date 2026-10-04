@@ -1,10 +1,9 @@
 import { errorMessage as errorText } from "@bb-studio/kit/format";
 export { errorText };
 // Finds the Studio add-ons and fans Studio's requests out to them. Add-ons
-// publish `studio_describe` for discovery; the suite's own plugins are also
-// looked up by id, so an older version that predates Studio can be named.
+// publish `studio_describe` for discovery.
 import { STUDIO_PLUGIN_ID, type StudioItem, type StudioKind, type StudioProviderInfo } from "@bb-studio/kit/contract";
-import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, rpcErrorStatus, type ProviderItems } from "@bb-studio/kit/server";
+import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems } from "@bb-studio/kit/server";
 import type { z } from "zod";
 import type { ProviderView } from "./contract";
 import { schemas } from "./contract";
@@ -54,8 +53,6 @@ export class StudioHub {
   private localView(): ProviderView[] {
     return this.local ? [{ pluginId: STUDIO_PLUGIN_ID, name: "Studio", state: "ready", detail: null, panel: null, kinds: this.local.kinds }] : [];
   }
-
-  version(pluginId: string): 1 | 2 | null { return this.described.get(pluginId)?.info.version ?? null; }
 
   private inventoryMap(plugins: readonly PluginEntry[]): Map<string, string> {
     return new Map(plugins.filter(plugin => plugin.enabled && plugin.id !== STUDIO_PLUGIN_ID)
@@ -111,15 +108,11 @@ export class StudioHub {
     if (cached?.revision === revision && cached.expiresAt > Date.now() && entry.status !== "starting") return { ...base, state: "ready", detail: null, panel: cached.info.panel, kinds: cached.info.kinds };
     try {
       const info = await this.call(entry.id, "studio_describe", null);
-      if (info.version === 2 && info.kinds.some((kind) => !kind.capabilities || kind.mentionProviderId === undefined)) throw new Error("Studio provider v2 is missing capabilities or a mention provider id.");
-      if (info.version !== 1 && info.version !== 2) throw new Error(`Unsupported Studio provider version: ${info.version}`);
-      info.kinds = info.kinds.map((kind) => ({ ...kind, capabilities: kind.capabilities ?? { create: kind.create !== null, move: true, archive: kind.canArchive, delete: true, rename: true, duplicate: false, export: kind.actions.some((action) => action.id.startsWith("copy")), comments: false, versions: false, links: false }, mentionProviderId: kind.mentionProviderId ?? null }));
+      if (info.version !== 2) throw new Error(`Unsupported Studio provider version: ${info.version}`);
+      if (info.kinds.some((kind) => !kind.capabilities || kind.mentionProviderId === undefined)) throw new Error("Studio provider is missing capabilities or a mention provider id.");
       this.described.set(entry.id, { revision, expiresAt: Date.now() + 30_000, info });
       return { ...base, state: "ready", detail: null, panel: info.panel, kinds: info.kinds };
     } catch (error) {
-      if (rpcErrorStatus(error) === 404) {
-        return { ...base, state: "outdated", detail: `Update ${base.name} to see its items in Studio.` };
-      }
       return { ...base, state: "offline", detail: errorText(error) };
     }
   }
@@ -158,8 +151,7 @@ export class StudioHub {
     if (!info) return snapshot.discoveryComplete || !snapshot.installed.has(pluginId)
       ? { status: "absent" } : { status: "unavailable", error: "Provider discovery is unavailable." };
     if (info.state !== "ready") return { status: "unavailable", error: info.detail ?? "Provider unavailable." };
-    const result = await loadProviderItems(() => ids && this.version(pluginId) === 2
-      ? this.call(pluginId, "studio_get", { ids }) : this.call(pluginId, "studio_list", null));
+    const result = await loadProviderItems(() => ids ? this.call(pluginId, "studio_get", { ids }) : this.call(pluginId, "studio_list", null));
     return result.status === "ready" ? { ...result, items: result.items.filter((item) => !ids || ids.includes(item.id)).map((item) => ({ ...item, pluginId })) } : result;
   }
 
@@ -167,27 +159,6 @@ export class StudioHub {
     const result = await this.itemsResult(pluginId, ids);
     if (result.status === "unavailable") throw new Error(result.error);
     return result.status === "ready" ? result.items : [];
-  }
-
-  /**
-   * `<plugin>:<id>` keys whose content matches, and the matching text by key
-   * where the add-on gave it; providers that fail are skipped.
-   */
-  async search(query: string, v1Only = false): Promise<{ keys: string[]; snippets: Record<string, string> }> {
-    const ready = (await this.providers()).filter((provider) => provider.state === "ready" && provider.pluginId !== STUDIO_PLUGIN_ID && (!v1Only || this.version(provider.pluginId) === 1));
-    const results = await Promise.all(
-      ready.map((provider) =>
-        this.call(provider.pluginId, "studio_search", { query }).then(
-          ({ ids, snippets = {} }) => ids.map((id) => ({ key: `${provider.pluginId}:${id}`, snippet: snippets[id] })),
-          () => [],
-        ),
-      ),
-    );
-    const found = results.flat();
-    return {
-      keys: found.map((match) => match.key),
-      snippets: Object.fromEntries(found.flatMap((match) => (match.snippet ? [[match.key, match.snippet]] : []))),
-    };
   }
 
 }

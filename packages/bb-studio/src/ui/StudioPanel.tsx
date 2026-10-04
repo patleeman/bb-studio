@@ -1,10 +1,8 @@
 // The Studio collection: every add-on's items in one list, filtered by one
 // query (src/query.ts) from the bar above it and the rail beside it. The
 // panel's sub-path can start the query on a kind, so
-// /plugins/studio/studio/recording links to recordings; space/<id> opens a
-// space's page in Pages, or Studio's own home for it without Pages
-// (Spaces.tsx), and space/<id>/items lists the space's items here by
-// filtering on it.
+// /plugins/studio/studio/recording links to recordings. A space opens in the
+// Spaces panel (space/routes.ts); openCollectionQuery lists one here.
 import {
   CollectionPage,
   ViewMoveMenu,
@@ -47,6 +45,20 @@ const REFETCH_DEBOUNCE_MS = 300;
 const SEARCH_DEBOUNCE_MS = 200;
 const EMPTY_QUERY: Query = { filters: [], text: "" };
 
+const QUERY_KEY = "studio:query:all";
+const QUERY_EVENT = "studio:query";
+
+/** Opens the Studio collection on `query`, e.g. a space's items. */
+export function openCollectionQuery(navigate: ReturnType<typeof useBbNavigate>, query: Query): void {
+  try {
+    localStorage.setItem(QUERY_KEY, formatQuery(query));
+  } catch {
+    // Private windows can refuse storage; an open collection still hears the event.
+  }
+  window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: formatQuery(query) }));
+  navigate.toPluginPanel("studio", { subPath: "" });
+}
+
 /** The query, remembered across visits. */
 function useStoredQuery(key: string): [Query, (query: Query) => void] {
   const read = useCallback(() => {
@@ -72,6 +84,12 @@ function useStoredQuery(key: string): [Query, (query: Query) => void] {
     },
     [key],
   );
+  useEffect(() => {
+    if (key !== QUERY_KEY) return;
+    const onQuery = (event: Event) => setStored({ key, query: parseQuery((event as CustomEvent<string>).detail) });
+    window.addEventListener(QUERY_EVENT, onQuery);
+    return () => window.removeEventListener(QUERY_EVENT, onQuery);
+  }, [key]);
   return [query, set];
 }
 
@@ -207,37 +225,19 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     () => providers.filter((provider) => provider.state === "ready").flatMap((provider) => provider.kinds.map((kind) => ({ ...kind, pluginId: provider.pluginId }))),
     [providers],
   );
-  const segments = subPath.split("/").filter(Boolean);
-  const spaceId = segments[0] === "space" ? decodeSegment(segments[1] ?? "") || null : null;
-  const space = spaceId ? (data?.spaces.find((each) => each.id === spaceId) ?? null) : null;
-  const requested = (spaceId ? "" : decodeSegment(segments[0] ?? "")) || "all";
+  const requested = decodeSegment(subPath.split("/").filter(Boolean)[0] ?? "") || "all";
   const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
-  const openSpace = useCallback((id: string | null) => navigate.toPluginPanel("studio", { subPath: id ? `space/${encodeURIComponent(id)}` : "" }), [navigate]);
+  const openSpace = useCallback((id: string | null) => id ? openAppPath(spaceViewHref(id)) : navigate.toPluginPanel("studio", { subPath: "" }), [navigate]);
   const [spaceDialog, setSpaceDialog] = useState<SpaceDialogState>(null);
-  // A space deleted elsewhere falls back to everything.
-  useEffect(() => {
-    if (data && spaceId && !space) openSpace(null);
-  }, [data, spaceId, space, openSpace]);
 
-  const [query, setQuery] = useStoredQuery("studio:query:all");
-  // A space opens the Space view (its lead, page beside it); space/<id>/items lists it here.
-  const listSpace = segments[2] === "items";
-  useEffect(() => {
-    if (!spaceId || listSpace) return;
-    openAppPath(spaceViewHref(spaceId), { replace: true });
-  }, [spaceId, listSpace]);
-  useEffect(() => {
-    if (!listSpace || !space) return;
-    setQuery({ filters: [{ field: "space", value: space.name }], text: "" });
-    navigate.toPluginPanel("studio", { subPath: "", replace: true });
-  }, [listSpace, space, setQuery, navigate]);
+  const [query, setQuery] = useStoredQuery(QUERY_KEY);
   // A link to a kind starts the query on it.
   const seededKind = useRef<string | null>(null);
   useEffect(() => {
-    if (!data || !kinds.some((each) => each.id === requested) || seededKind.current === `${spaceId}/${requested}`) return;
-    seededKind.current = `${spaceId}/${requested}`;
+    if (!data || !kinds.some((each) => each.id === requested) || seededKind.current === requested) return;
+    seededKind.current = requested;
     setQuery({ ...query, filters: [...query.filters.filter((filter) => filter.field !== "kind"), { field: "kind", value: requested }] });
-  }, [data, kinds, requested, spaceId, query, setQuery]);
+  }, [data, kinds, requested, query, setQuery]);
   const vocabulary = useMemo<QueryVocabulary>(
     () => ({ kinds, projects: projects.map((project) => ({ id: project.id, name: project.name })), tags: data?.tags ?? [], spaces: data?.spaces ?? [] }),
     [kinds, projects, data?.tags, data?.spaces],
@@ -440,7 +440,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       {searchText ? <SearchFreshness {...freshness} /> : null}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-          <Icon name={provider.state === "outdated" ? "Info" : "AlertTriangle"} className="size-4 shrink-0" />
+          <Icon name="AlertTriangle" className="size-4 shrink-0" />
           {provider.detail ?? `${provider.name} isn't available.`}
         </p>
       ))}
@@ -485,7 +485,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         {providers.map((provider) => (
           <DropdownMenuItem key={provider.pluginId} disabled className="opacity-100">
             <span className="truncate">{provider.name}</span>
-            <span className="ml-auto text-xs text-muted-foreground">{provider.state === "ready" ? "Ready" : provider.state === "outdated" ? "Needs update" : "Offline"}</span>
+            <span className="ml-auto text-xs text-muted-foreground">{provider.state === "ready" ? "Ready" : "Offline"}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -563,35 +563,32 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   return (
     <>
-      {/* A space opens its own view (see the redirect above); the collection shows otherwise. */}
-      {space ? null : (
-        <CollectionPage
-          title="Studio"
-          kinds={kinds}
-          items={shownItems}
-          error={error && !data ? error : null}
-          projects={projects}
-          defaultProjectId={onlyProject ? onlyProject.id : (context.projectId ?? null)}
-          storageKey="studio:collection"
-          tags={data?.tags ?? []}
-          spaces={collectionSpaces}
-          extraCreateItems={extraCreateItems}
-          kind={onlyKind?.id ?? "all"}
-          onKindChange={setKind}
-          notice={notice}
-          headerActions={headerActions}
-          handlers={handlers}
-          filter={{
-            bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} onOpenFilters={() => setFiltersOpen(true)} loading={!data || !projects.length} />,
-            rail,
-            toolbar: spaceLinks.length ? <>{spaceLinks}</> : undefined,
-            text: searchText,
-            snippets,
-            archived: compiled.archived,
-            empty,
-          }}
-        />
-      )}
+      <CollectionPage
+        title="Studio"
+        kinds={kinds}
+        items={shownItems}
+        error={error && !data ? error : null}
+        projects={projects}
+        defaultProjectId={onlyProject ? onlyProject.id : (context.projectId ?? null)}
+        storageKey="studio:collection"
+        tags={data?.tags ?? []}
+        spaces={collectionSpaces}
+        extraCreateItems={extraCreateItems}
+        kind={onlyKind?.id ?? "all"}
+        onKindChange={setKind}
+        notice={notice}
+        headerActions={headerActions}
+        handlers={handlers}
+        filter={{
+          bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} onOpenFilters={() => setFiltersOpen(true)} loading={!data || !projects.length} />,
+          rail,
+          toolbar: spaceLinks.length ? <>{spaceLinks}</> : undefined,
+          text: searchText,
+          snippets,
+          archived: compiled.archived,
+          empty,
+        }}
+      />
       <FiltersDialog open={filtersOpen} onClose={() => setFiltersOpen(false)}>
         {rail}
       </FiltersDialog>

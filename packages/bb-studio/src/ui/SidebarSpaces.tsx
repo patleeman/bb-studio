@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNo
 import type { rpcContract, SpaceTreeView } from "../contract";
 import { itemAtPath } from "../tabs";
 import { SidebarItemRow } from "./SidebarItemRow";
-import { spaceHref } from "./Spaces";
+import { openCollectionQuery } from "./StudioPanel";
 
 const COLLAPSED_KEY = "studio:sidebar-spaces-collapsed";
 const REFETCH_DEBOUNCE_MS = 300;
@@ -121,7 +121,16 @@ export function SpaceMembers({ tree, spaceId, path, onNavigate }: { tree: SpaceT
           onOpen={() => open(item.href)}
         />
       ))}
-      {more > 0 ? <MoreRow label={`${more} more`} href={`${spaceHref(space.id)}/items`} onOpen={open} /> : null}
+      {more > 0 ? (
+        <MoreRow
+          label={`${more} more`}
+          href="/plugins/studio/studio"
+          onOpen={() => {
+            openCollectionQuery(navigate, { filters: [{ field: "space", value: space.name }], text: "" });
+            onNavigate();
+          }}
+        />
+      ) : null}
       {space.threads.map((thread) => (
         <a
           key={thread.id}

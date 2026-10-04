@@ -3,14 +3,14 @@
 // "Work with this…" bar), and the gestures that move Studio items around.
 import { floatWindowKey, publishFloatDock, setFloatHost } from "@bb-studio/kit/app";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { FLOAT_RIGHT_VAR, STUDIO_CHAT_FLOAT_EVENT } from "@bb-studio/kit/contract";
+import { FLOAT_RIGHT_VAR } from "@bb-studio/kit/contract";
 import { useEffect, useState } from "react";
 import { getFloat, update, useFloatState } from "./store";
 import { navigateTab, openTab } from "./stack";
 import { ItemGestures } from "./ItemMenu";
 import { Stack, useWidth } from "./Panel";
 
-/** Lets every plugin open tabs, and answers Studio Chat's older event. */
+/** Lets every plugin open tabs. */
 function useHost() {
   const navigate = useBbNavigate();
   useEffect(() => {
@@ -24,15 +24,7 @@ function useHost() {
       },
       navigate: (windowKey, target) => update((state) => navigateTab(state, windowKey, target)),
     });
-    const onLegacyFloat = (event: Event) => {
-      const threadId = (event as CustomEvent<{ threadId?: unknown }>).detail?.threadId;
-      if (typeof threadId === "string" && threadId) update((state) => openTab(state, { kind: "thread", threadId }));
-    };
-    window.addEventListener(STUDIO_CHAT_FLOAT_EVENT, onLegacyFloat);
-    return () => {
-      setFloatHost(null);
-      window.removeEventListener(STUDIO_CHAT_FLOAT_EVENT, onLegacyFloat);
-    };
+    return () => setFloatHost(null);
   }, [navigate]);
 }
 

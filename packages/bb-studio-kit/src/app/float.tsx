@@ -62,7 +62,7 @@ export function useCompanionNavigate(): (target: FloatTarget) => boolean {
   const key = useContext(CompanionKeyContext);
   return (target) => {
     const host = floatHost();
-    if (!key || !host?.navigate || (target.kind === "path" && !floatPanelFor(target.path))) return false;
+    if (!key || !host || (target.kind === "path" && !floatPanelFor(target.path))) return false;
     host.navigate(key, target);
     return true;
   };

@@ -76,7 +76,7 @@ describe("optional native companion host", () => {
   });
   it("keeps Chat usable on stable BB and only selects native placement when the complete host capability exists", () => {
     const open = vi.fn();
-    setFloatHost({ open });
+    setFloatHost({ open, navigate: () => {} });
     vi.stubGlobal("__bbPluginRuntime", { pluginSdkApp: {} });
     expect(companionWorkbenchAvailable()).toBe(false);
     expect(openCompanion({ kind: "thread", threadId: "a" })).toBe(true);
@@ -98,7 +98,7 @@ describe("optional native companion host", () => {
   });
 
   it("updates the item's placement context without unmounting its plugin portal or editor", () => {
-    setFloatHost({ open: () => {} });
+    setFloatHost({ open: () => {}, navigate: () => {} });
     const target = { kind: "path" as const, path: "/plugins/pages/pages/one" };
     function Editor() {
       const compact = useInFloat();

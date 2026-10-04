@@ -16,7 +16,8 @@ import type { HubItem } from "./hub";
 import { backgroundKinds } from "./query";
 import { pageHref, PAGES_PLUGIN_ID } from "./space-page";
 import { spaceThreadStatus } from "./space-status";
-import { inSpace, PERSONAL_PROJECT_ID, spacePath, THREAD_REF, type Space, type SpaceStore } from "./spaces";
+import { inSpace, PERSONAL_PROJECT_ID, THREAD_REF, type Space, type SpaceStore } from "./spaces";
+import { spaceViewHref } from "./ui/space/routes";
 
 type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
@@ -253,7 +254,7 @@ export class SpaceLeads {
         const summary = [
           `Continue the work from /threads/${encodeURIComponent(threadId)} (${threadTitle(old)}). Read that thread with bb thread if you need more context.`,
           `Latest response (excerpt):\n${(output ?? "No response yet.").slice(-12_000)}`,
-          space ? `This thread is in the space ${space.name} (${spacePath(space.id)}). The space page ${page} holds its brief, plan, decisions and memory; read it before acting.` : "",
+          space ? `This thread is in the space ${space.name} (${spaceViewHref(space.id)}). The space page ${page} holds its brief, plan, decisions and memory; read it before acting.` : "",
           ledSpace && space ? `You are now this space's lead. Keep its page current, steer the workers you start (read but don't steer threads the user started), and report through the Studio Feed.` : "",
         ].filter(Boolean).join("\n\n");
         const next = await this.deps.sdk.threads.spawn({
@@ -347,7 +348,7 @@ export class SpaceRuns {
     const execution = {
       mode: "agent", providerId: thread.providerId, model: defaults.model, reasoningLevel: defaults.reasoningLevel ?? "medium",
       permissionMode: defaults.permissionMode ?? "accept-edits", environment: { type: "project-default" }, targetThreadId: leadThreadId,
-      prompt: `${HEARTBEAT}\nSpace: ${spacePath(spaceId)}. Read the space page before acting.`,
+      prompt: `${HEARTBEAT}\nSpace: ${spaceViewHref(spaceId)}. Read the space page before acting.`,
     };
     const name = `Studio space heartbeat ${spaceId}`;
     let automationId = row?.automation_id ?? null;

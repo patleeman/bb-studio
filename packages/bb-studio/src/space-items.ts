@@ -4,7 +4,8 @@ import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
 import { plural } from "@bb-studio/kit/format";
 import type { HubItem } from "./hub";
 import { pageHref } from "./space-page";
-import { spacePath, type Space } from "./spaces";
+import { type Space } from "./spaces";
+import { spaceViewHref } from "./ui/space/routes";
 
 export const SPACE_KIND = "space";
 
@@ -30,7 +31,7 @@ export function spaceItem(space: Space): HubItem {
     badge: null,
     thumbnailUrl: null,
     // A space opens its page; one without a page yet opens Studio's, which makes it.
-    href: space.pageId ? pageHref(space.pageId) : spacePath(space.id),
+    href: space.pageId ? pageHref(space.pageId) : spaceViewHref(space.id),
     archived: false,
   };
 }

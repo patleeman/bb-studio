@@ -60,7 +60,6 @@ chat from inside the panel.
   an explicit Float action opens the panel again.
 - `--studio-float-right` on the root element moves the corner and a docked
   panel left; Pages sets it while its comments card is open.
-- The older `bb-studio:chat:float` window event still floats a thread.
 
 ## Moving items
 

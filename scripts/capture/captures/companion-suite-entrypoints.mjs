@@ -56,7 +56,7 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
       try {
         await bbCli(["plugin", "disable", "pages", "--json"]);
         ({ space } = await pluginRpc("studio", "createSpace", { name: "Release companion checks", description: "A staged fallback space with Pages disabled.", defaultProjectId: projectId }));
-        return { path: `/plugins/studio/studio/space/${space.id}`, ready: 'button[aria-label="Space options"]', visibleText: space.name, cleanup };
+        return { path: `/plugins/studio/spaces/${space.id}`, ready: 'button[aria-label="Space options"]', visibleText: space.name, cleanup };
       } catch (error) { await cleanup(); throw error; }
     } },
     { id: "chat-plain", packageDir: "bb-studio-chat", seed: async () => ({ path: "/plugins/studio-chat/chats", ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent general conversation", attachment: true, cleanup: async () => {} }) },

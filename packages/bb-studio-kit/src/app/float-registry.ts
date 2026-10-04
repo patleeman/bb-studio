@@ -29,8 +29,8 @@ export interface FloatOpenOptions {
 
 export interface FloatHost {
   open(target: FloatTarget, options?: FloatOpenOptions): void;
-  /** Shows `target` in the tab with `windowKey` instead of what it showed. Missing in older Float builds. */
-  navigate?(windowKey: string, target: FloatTarget): void;
+  /** Shows `target` in the tab with `windowKey` instead of what it showed. */
+  navigate(windowKey: string, target: FloatTarget): void;
 }
 
 /** A plugin's panel that can show in a window: paths under /plugins/<pluginId>/<path>. */
@@ -160,7 +160,7 @@ export function navigateFromFloat(target: FloatTarget): boolean {
   const host = registry().host;
   const origin = (globalThis as { event?: Event }).event?.target;
   const tab = origin instanceof Element ? origin.closest(`[${FLOAT_WINDOW_ATTRIBUTE}]`) : null;
-  if (!host?.navigate || !tab) return false;
+  if (!host || !tab) return false;
   if (target.kind === "path" && !floatPanelFor(target.path.split(/[?#]/)[0]!)) return false;
   host.navigate(tab.getAttribute(FLOAT_WINDOW_ATTRIBUTE)!, target);
   return true;

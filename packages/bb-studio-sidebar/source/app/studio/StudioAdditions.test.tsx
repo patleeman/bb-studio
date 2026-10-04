@@ -23,7 +23,7 @@ describe("Studio sidebar additions", () => {
 
   it("floats the selected thread", () => {
     const open = vi.fn();
-    setFloatHost({ open });
+    setFloatHost({ open, navigate: vi.fn() });
     try {
       render(<ContextMenu open><ContextMenuContent><FloatItem surface="context" threadId="thr_studio" /></ContextMenuContent></ContextMenu>);
       fireEvent.click(screen.getByRole("menuitem", { name: "Float" }));

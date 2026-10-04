@@ -212,9 +212,9 @@ function HomeThreadChip({ item }: { item: ItemChatRef }) {
           {home ? <DropdownMenuItem onSelect={() => host.open(item)}>
             <Icon name="MessageSquare" className="size-4" /> <span className="truncate">{home.title}</span>
           </DropdownMenuItem> : null}
-          {host.start ? <DropdownMenuItem onSelect={() => { openingDialog.current = () => host.start?.(item); }}>
+          <DropdownMenuItem onSelect={() => { openingDialog.current = () => host.start(item); }}>
             <Icon name="MessageSquarePlus" className="size-4" /> New conversation
-          </DropdownMenuItem> : null}
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => { openingDialog.current = () => host.choose(item); }}>
             <Icon name="ArrowLeftRight" className="size-4" /> Choose conversation…
           </DropdownMenuItem>

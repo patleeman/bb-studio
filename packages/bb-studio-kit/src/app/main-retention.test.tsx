@@ -206,7 +206,7 @@ it("keeps the original editor alive when Float this leaves the main route before
   let mounts = 0;
   function Editor() { useEffect(() => { mounts += 1; }, []); return <textarea defaultValue="Header move draft" />; }
   const Main = retainPanel("pages", Editor);
-  act(() => setFloatHost({ open: () => {} }));
+  act(() => setFloatHost({ open: () => {}, navigate: () => {} }));
   mount(<FloatPanels path="pages" render={() => <Editor />} />);
   const main = mount(<Main subPath="one" />);
   const input = main.host.querySelector("textarea")!;
@@ -223,7 +223,7 @@ it("keeps the original editor alive when Float this leaves the main route before
 it("parks the original embedded view while its main route leaves before a companion body exists", async () => {
   function Viewer() { return <iframe title="Embedded report" />; }
   const Main = retainPanel("pages", Viewer);
-  act(() => setFloatHost({ open: () => {} }));
+  act(() => setFloatHost({ open: () => {}, navigate: () => {} }));
   mount(<FloatPanels path="pages" render={() => <Viewer />} />);
   const main = mount(<Main subPath="one" />);
   const frame = main.host.querySelector("iframe")!;

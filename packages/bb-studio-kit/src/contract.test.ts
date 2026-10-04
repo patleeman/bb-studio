@@ -13,8 +13,8 @@ describe("Studio provider contract", () => {
     expect(schemas.kind.parse({ ...kind, hasOwnChat: true }).hasOwnChat).toBe(true);
     expect(schemas.kind.parse(kind).hasOwnChat).toBeUndefined();
   });
-  it("accepts v1 descriptions and v2 capabilities", () => {
-    expect(schemas.info.parse({ pluginId: "pages", version: 1, panel: null, kinds: [kind] }).kinds[0]?.capabilities).toBeUndefined();
+  it("accepts v2 capabilities and rejects other versions", () => {
+    expect(schemas.info.safeParse({ pluginId: "pages", version: 1, panel: null, kinds: [kind] }).success).toBe(false);
     const capabilities = { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: true, versions: true, links: true };
     const info = { pluginId: "pages", version: 2, panel: "pages", kinds: [{ ...kind, capabilities, mentionProviderId: "page" }] };
     expect(schemas.info.parse(info)).toEqual(info);

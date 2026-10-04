@@ -2,8 +2,9 @@ import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { inSpace, linkedSpaceIds, PERSONAL_PROJECT_ID, PROJECT_REF, spaceAssignments, SpaceStore, spacePath, THREAD_REF } from "./spaces";
-import { pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince } from "./space-page";
+import { inSpace, linkedSpaceIds, PERSONAL_PROJECT_ID, PROJECT_REF, spaceAssignments, SpaceStore, THREAD_REF } from "./spaces";
+import { spaceViewHref } from "./ui/space/routes";
+import { pageWidgets, spacePageMarkdown, widgetsMarkdown } from "./space-page";
 import { TagStore } from "./tags";
 import { firstThreadSpaceIds } from "./thread-item-refs";
 
@@ -51,18 +52,13 @@ describe("spaces", () => {
     for (const section of ["actions", "recent", "threads", "channels", "projects"]) expect(markdown).toContain(`{"kind":"space","target":"${launch.id}/${section}"}`);
   });
 
-  it("know which widgets a page holds, and which the template gained", () => {
+  it("know which widgets a page holds", () => {
     const { spaces } = stores();
     const launch = spaces.create({ name: "Launch" });
-    expect(spaces.pageTemplate(launch.id)).toBe(1);
-    spaces.setPage(launch.id, "pg_1", 3);
-    expect(spaces.pageTemplate(launch.id)).toBe(3);
     const other = ["```embed", '{"kind":"space","target":"spc_other/threads"}', "```"].join("\n");
     const page = [widgetsMarkdown(launch, ["actions", "recent"]), other].join("\n\n");
     expect([...pageWidgets(page, launch.id)]).toEqual(["actions", "recent"]);
     expect(widgetsMarkdown(launch, ["threads"])).toMatch(/^## Threads\n\n```embed/);
-    expect(widgetsSince(SPACE_TEMPLATE_VERSION)).toEqual([]);
-    expect(widgetsSince(0)).toEqual([...SPACE_WIDGETS]);
   });
 
   it("are kept apart from tags, and have unique names", () => {
@@ -126,7 +122,7 @@ describe("spaces", () => {
   });
 
   it("are joined by threads that link them", () => {
-    const link = spacePath("spc_0123456789abcdef");
+    const link = spaceViewHref("spc_0123456789abcdef");
     expect(linkedSpaceIds(`Work on ${link} and ${link}`)).toEqual(["spc_0123456789abcdef"]);
     expect(firstThreadSpaceIds([{ type: "client/thread/start", data: { input: [{ type: "text", text: `In ${link}` }] } }])).toEqual(["spc_0123456789abcdef"]);
     expect(firstThreadSpaceIds([])).toBeNull();

@@ -602,7 +602,6 @@ public enum Studio {
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
-    case outdated
     case offline
     case unknown(String)
 
@@ -610,7 +609,6 @@ public enum Studio {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
       case "ready": self = .ready
-      case "outdated": self = .outdated
       case "offline": self = .offline
       default: self = .unknown(value)
       }
@@ -620,7 +618,6 @@ public enum Studio {
       var container = encoder.singleValueContainer()
       switch self {
       case .ready: try container.encode("ready")
-      case .outdated: try container.encode("outdated")
       case .offline: try container.encode("offline")
       case .unknown(let value): try container.encode(value)
       }
@@ -2771,9 +2768,8 @@ public enum Studio {
     public var projects: [SpaceWidgetOutputProjectsItem]?
     public var kinds: [SpaceWidgetOutputKindsItem]?
     public var threadPrompt: String?
-    public var itemsHref: String?
 
-    public init(space: SpaceWidgetOutputSpace? = nil, recent: [SpaceWidgetOutputRecentItem]? = nil, itemCount: Double? = nil, threads: [SpaceWidgetOutputThreadsItem]? = nil, projects: [SpaceWidgetOutputProjectsItem]? = nil, kinds: [SpaceWidgetOutputKindsItem]? = nil, threadPrompt: String? = nil, itemsHref: String? = nil) {
+    public init(space: SpaceWidgetOutputSpace? = nil, recent: [SpaceWidgetOutputRecentItem]? = nil, itemCount: Double? = nil, threads: [SpaceWidgetOutputThreadsItem]? = nil, projects: [SpaceWidgetOutputProjectsItem]? = nil, kinds: [SpaceWidgetOutputKindsItem]? = nil, threadPrompt: String? = nil) {
       self.space = space
       self.recent = recent
       self.itemCount = itemCount
@@ -2781,7 +2777,6 @@ public enum Studio {
       self.projects = projects
       self.kinds = kinds
       self.threadPrompt = threadPrompt
-      self.itemsHref = itemsHref
     }
   }
 

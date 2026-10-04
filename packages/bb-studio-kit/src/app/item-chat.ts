@@ -25,8 +25,8 @@ export interface ItemChatHost {
   watch(ref: ItemChatRef): void;
   /** Shows the linked conversation, or a composer when the item has none. */
   open(ref: ItemChatRef): void;
-  /** Starts another conversation about the item; optional for older hosts. */
-  start?(ref: ItemChatRef): void;
+  /** Starts another conversation about the item. */
+  start(ref: ItemChatRef): void;
   /** Lets the user pick another thread as the item's home. */
   choose(ref: ItemChatRef): void;
   unlink(ref: ItemChatRef): Promise<void>;

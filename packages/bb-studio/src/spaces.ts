@@ -53,7 +53,7 @@ export type SpaceMember = ItemRef;
 
 type Row = {
   id: string; name: string; color: string; icon: string | null; description: string; default_project_id: string | null;
-  page_id: string | null; page_template: number | null; is_default: number; created_at: number; updated_at: number;
+  page_id: string | null; is_default: number; created_at: number; updated_at: number;
 };
 
 function spaceName(raw: string): string {
@@ -246,19 +246,10 @@ export class SpaceStore {
     }
   }
 
-  /** Sets or clears the space's home page, made from template `template`. */
-  setPage(id: string, pageId: string | null, template = 1): void {
+  /** Sets or clears the space's home page. */
+  setPage(id: string, pageId: string | null): void {
     this.require(id);
-    this.db.prepare("UPDATE spaces SET page_id = ?, page_template = ? WHERE id = ?").run(pageId, template, id);
-  }
-
-  /** The template version the space's page has caught up with. */
-  pageTemplate(id: string): number {
-    return (this.db.prepare("SELECT page_template FROM spaces WHERE id = ?").get(id) as { page_template: number | null } | undefined)?.page_template ?? 1;
-  }
-
-  setPageTemplate(id: string, template: number): void {
-    this.db.prepare("UPDATE spaces SET page_template = ? WHERE id = ?").run(template, id);
+    this.db.prepare("UPDATE spaces SET page_id = ? WHERE id = ?").run(pageId, id);
   }
 }
 
@@ -277,12 +268,7 @@ export function spaceAssignments(spaces: readonly Space[], items: readonly { plu
   return map;
 }
 
-/** Space ids a new thread's first input links to, as `/plugins/studio/studio/space/<id>`. */
+/** Space ids a new thread's first input links to, as `/plugins/studio/spaces/<id>` (spaceViewHref). */
 export function linkedSpaceIds(text: string): string[] {
-  return [...new Set([...text.matchAll(/\/plugins\/studio\/studio\/space\/(spc_[A-Za-z0-9]+)/g)].map((match) => match[1]!))];
-}
-
-/** The app path that opens a space in the Studio collection. */
-export function spacePath(id: string): string {
-  return `/plugins/studio/studio/space/${encodeURIComponent(id)}`;
+  return [...new Set([...text.matchAll(/\/plugins\/studio\/spaces\/(spc_[A-Za-z0-9]+)/g)].map((match) => match[1]!))];
 }

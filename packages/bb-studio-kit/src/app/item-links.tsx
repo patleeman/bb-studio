@@ -82,12 +82,12 @@ const LINK_ICONS: Record<string, string> = {
   "bot-teams/bots": "Bot",
   "bot-teams/channels": "MessageSquare",
   "feed/feed": "feed/feed",
+  "studio/spaces": "Layers",
 };
 
 /** The icon for the item a link opens, read from the link itself: /plugins/<plugin>/<panel>/<id>. */
 export function itemLinkIcon(href: string): string {
-  const [, , pluginId = "", panel = "", id = ""] = href.split(/[?#]/)[0]!.split("/");
-  if (pluginId === "studio" && id === "space") return "Layers";
+  const [, , pluginId = "", panel = ""] = href.split(/[?#]/)[0]!.split("/");
   return LINK_ICONS[`${pluginId}/${panel}`] ?? "GridView";
 }
 

@@ -27,11 +27,12 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
-import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, type Space } from "./src/spaces";
+import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
+import { spaceViewHref } from "./src/ui/space/routes";
 import { SpaceFolders } from "./src/space-folders";
 import { spaceItem } from "./src/space-items";
 import { spaceTreeItems, TREE_THREADS } from "./src/space-tree";
-import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince, type SpaceWidget } from "./src/space-page";
+import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, type SpaceWidget } from "./src/space-page";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
@@ -85,10 +86,9 @@ export default async function plugin(bb: BbPluginApi) {
   const contentSearch = async (query: string) => {
     await searchIndex.ensure();
     const indexed = searchIndex.search(query, { limit: 100 });
-    const fallback = await hub.search(query, true);
     return {
-      keys: [...new Set([...indexed.map((hit) => `${hit.ref.pluginId}:${hit.ref.id}`), ...fallback.keys])],
-      snippets: { ...fallback.snippets, ...Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])) },
+      keys: [...new Set(indexed.map((hit) => `${hit.ref.pluginId}:${hit.ref.id}`))],
+      snippets: Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])),
     };
   };
   const services = new StudioServices(db);
@@ -318,15 +318,7 @@ export default async function plugin(bb: BbPluginApi) {
         if (found === undefined) return space.pageId;
         // The page is the space, so an archived one comes back rather than a new one being made.
         if (found.page?.archived) await callPages("update", { id: space.pageId, archived: false }, pageResult).catch(() => {});
-        if (found.page) {
-          // A page from an older template gains the widgets added since, once.
-          const template = spaces.pageTemplate(id);
-          if (template < SPACE_TEMPLATE_VERSION) {
-            const caughtUp = await addWidgets(space, widgetsSince(template)).then(() => true, () => false);
-            if (caughtUp) spaces.setPageTemplate(id, SPACE_TEMPLATE_VERSION);
-          }
-          return space.pageId;
-        }
+        if (found.page) return space.pageId;
       }
       const made = await callPages(
         "create",
@@ -334,7 +326,7 @@ export default async function plugin(bb: BbPluginApi) {
         pageResult,
       ).catch(() => null);
       if (!made?.page) return null;
-      spaces.setPage(id, made.page.id, SPACE_TEMPLATE_VERSION);
+      spaces.setPage(id, made.page.id);
       tagsChanged();
       return made.page.id;
     })().finally(() => making.delete(id));
@@ -423,8 +415,8 @@ export default async function plugin(bb: BbPluginApi) {
   const itemForPath = async (path: string) => {
     const parts = path.split(/[?#]/)[0]!.split("/");
     const pluginId = parts[2];
-    // A space opens at /plugins/studio/studio/space/<id>.
-    const id = pluginId === STUDIO_PLUGIN_ID ? parts[5] : parts[4];
+    // A space opens at /plugins/studio/spaces/<id>.
+    const id = parts[4];
     if (!pluginId || !id) return null;
     // A space's page opens as the space.
     const home = pluginId === PAGES_PLUGIN_ID ? spaces.list().find((space) => space.pageId === decodeURIComponent(id)) : undefined;
@@ -463,20 +455,7 @@ export default async function plugin(bb: BbPluginApi) {
       const skip = query.trim() || kinds?.length ? [] : [...backgroundKinds(await hub.providers())];
       const studio = query.trim() ? searchIndex.search(query, { kinds, projectId, limit }) : searchIndex.recent(limit, { kinds, projectId, skip });
       const others = query.trim() ? await externalResults(bb, query, { kinds, projectId, limit }) : [];
-      const fallback = query.trim() ? await hub.search(query, true) : { keys: [], snippets: {} };
-      const groups = new Map<string, string[]>();
-      for (const key of fallback.keys) {
-        const split = key.indexOf(":");
-        const pluginId = key.slice(0, split), id = key.slice(split + 1);
-        groups.set(pluginId, [...(groups.get(pluginId) ?? []), id]);
-      }
-      const legacy = (await Promise.all([...groups].map(([pluginId, ids]) => hub.get(pluginId, ids).catch(() => [])))).flat()
-        .filter((item) => !item.archived && (!kinds?.length || kinds.includes(item.kind)) && (projectId === undefined || item.projectId === projectId)).map((item) => ({
-        ref: { pluginId: item.pluginId, id: item.id }, kind: item.kind, title: item.title,
-        snippet: { text: fallback.snippets[`${item.pluginId}:${item.id}`] ?? "", ranges: [] },
-        href: item.href, projectId: item.projectId, updatedAt: item.updatedAt, score: 1,
-      }));
-      return [...studio, ...legacy, ...others].sort((a, b) => b.score - a.score || b.updatedAt - a.updatedAt).slice(0, limit);
+      return [...studio, ...others].sort((a, b) => b.score - a.score || b.updatedAt - a.updatedAt).slice(0, limit);
     },
     create: ({ pluginId, kind, projectId }) => hub.call(pluginId, "studio_create", { kind, projectId }),
     duplicate: ({ pluginId, id, projectId, includeChildren }) => hub.call(pluginId, "studio_duplicate", { id, projectId, includeChildren }),
@@ -586,8 +565,7 @@ export default async function plugin(bb: BbPluginApi) {
               .filter((kind) => kind.create && (kind.capabilities?.create ?? true))
               .map((kind) => ({ pluginId: provider.pluginId, id: kind.id, label: kind.label, icon: kind.icon, event: kind.create?.mode === "event" ? kind.create.event : null })),
           ),
-        threadPrompt: `Space: ${space.name} (${spacePath(space.id)})\n\n`,
-        itemsHref: `${spacePath(space.id)}/items`,
+        threadPrompt: `Space: ${space.name} (${spaceViewHref(space.id)})\n\n`,
       };
     },
     spaceTree: async ({ threadsFor }) => {
@@ -609,7 +587,7 @@ export default async function plugin(bb: BbPluginApi) {
             name: space.name,
             icon: space.icon,
             color: space.color,
-            href: space.pageId ? pageHref(space.pageId) : spacePath(space.id),
+            href: space.pageId ? pageHref(space.pageId) : spaceViewHref(space.id),
             items: tree.items,
             itemCount: tree.count,
             threads: (held ?? []).slice(0, TREE_THREADS).map(({ id, title, status, kind }) => ({ id, title, status, kind })),
@@ -700,7 +678,7 @@ export default async function plugin(bb: BbPluginApi) {
     tabs: async () => ({ tabs: tabViews(await tabData()) }),
     visitTab: async ({ path }) => {
       // Studio's own pages aren't items, except a space's.
-      if (!path.startsWith("/plugins/") || (path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`) && !path.startsWith(spacePath("")))) return { tab: null };
+      if (!path.startsWith("/plugins/") || (path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`) && !path.startsWith(spaceViewHref("")))) return { tab: null };
       const item = await itemForPath(path);
       if (!item) return { tab: null };
       if (tabs.open(item)) tabsChanged();
@@ -912,7 +890,7 @@ export default async function plugin(bb: BbPluginApi) {
       const projects = space.projectIds.map((id) => projectNames.get(id) ?? id);
       return `- ${space.icon ? `${space.icon} ` : ""}${space.name}${current.some((each) => each.id === space.id) ? " (this thread)" : ""} — ${count} item${count === 1 ? "" : "s"}${
         projects.length ? `, projects: ${projects.join(", ")}` : ""
-      }${space.threadIds.length ? `, ${space.threadIds.length} added thread${space.threadIds.length === 1 ? "" : "s"}` : ""} (${spacePath(space.id)})${space.description ? `\n  ${space.description}` : ""}`;
+      }${space.threadIds.length ? `, ${space.threadIds.length} added thread${space.threadIds.length === 1 ? "" : "s"}` : ""} (${spaceViewHref(space.id)})${space.description ? `\n  ${space.description}` : ""}`;
     }).join("\n");
   };
 

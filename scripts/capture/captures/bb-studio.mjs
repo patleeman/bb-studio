@@ -170,8 +170,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         const { space } = await pluginRpc("studio", "createSpace", { name: "Launch", icon: "🚀", description: "Everything for the Orbit launch: plans, notes and the people working on it.", defaultProjectId: projectId });
         spaceId = space.id;
         if (!space.pageId) throw new Error("The new space didn't get a page");
-        // The space's Studio link opens its page.
-        await client.navigate(`/plugins/studio/studio/space/${space.id}`);
+        await client.navigate(`/plugins/pages/pages/${space.pageId}`);
         await client.waitForSelector('[data-space-widget="actions"]');
         for (const label of ["Recent", "Channels and messages", "Space settings", "Offline mode launch", "Add or remove projects", "Orbit"]) await client.waitForText(label);
         const widgets = await client.evaluate(`[...document.querySelectorAll("[data-space-widget]")].map((each) => each.dataset.spaceWidget).join(",")`);

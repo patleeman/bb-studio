@@ -20,8 +20,8 @@ export type SearchStatus = z.infer<typeof searchStatus>;
 const provider = z.object({
   pluginId: z.string(),
   name: z.string(),
-  /** ready: listed; outdated: installed without Studio support; offline: not running or failing. */
-  state: z.enum(["ready", "outdated", "offline"]),
+  /** ready: listed; offline: not running or failing. */
+  state: z.enum(["ready", "offline"]),
   detail: z.string().nullable(),
   panel: z.string().nullable(),
   kinds: z.array(schemas.kind),
@@ -100,8 +100,6 @@ const spaceWidget = z.object({
   kinds: z.array(z.object({ pluginId: z.string(), id: z.string(), label: z.string(), icon: z.string(), event: z.string().nullable() })),
   /** A composer draft that files a new thread in the space. */
   threadPrompt: z.string(),
-  /** Studio's collection, filtered to the space. */
-  itemsHref: z.string(),
 });
 export type SpaceWidgetView = z.infer<typeof spaceWidget>;
 const savedView = z.object({ id: z.string(), name: z.string(), query: z.string() });

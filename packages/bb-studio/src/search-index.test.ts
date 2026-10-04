@@ -28,7 +28,6 @@ describe("Studio search index", () => {
     inventoryChanges: async () => new Set<string>(),
       overview: async () => ({ providers: [{ pluginId: "pages", state: "ready" }], items, truncated: new Set() }),
       providers: async () => [{ pluginId: "pages", state: "ready" }],
-      version: () => 2,
       call: async (_pluginId: string, method: string, input: { id: string; ids: string[] }) => method === "studio_get" ? { items: items.filter((entry) => input.ids.includes(entry.id)) } : ({ content: content[input.id] }),
       itemsResult: async (_pluginId: string, ids: string[]) => ({ status: "ready", complete: true, items: items.filter((entry) => ids.includes(entry.id)) }),
     } as unknown as StudioHub;
@@ -57,7 +56,6 @@ function fixture() {
     inventoryChanges: async () => new Set<string>(),
     providers: async () => [{ pluginId: "pages", state: state.online ? "ready" : "offline" }],
     overview: async () => ({ providers: await hub.providers(), items: state.online ? [...state.items] : [], truncated: new Set(state.truncated ? ["pages"] : []) }),
-    version: () => 2,
     call: async (_pluginId: string, method: string, input: { id: string; ids: string[] }) => {
       if (!state.online || (method === "studio_read" && state.failRead)) throw new Error("Unavailable");
       return method === "studio_get" ? { items: state.items.filter((entry) => input.ids.includes(entry.id)) } : { content: "searchable body" };
@@ -181,8 +179,8 @@ it("keeps undiscovered providers through discovery failure, retries once due, an
       list: async () => ({ plugins: ["pages", ...(installed ? ["custom"] : [])].map((id) => ({ id, name: id, enabled: true, status: "running", statusDetail: null, version: "1" })) }),
       experimental_discoverRpc: discover,
       callRpc: async ({ pluginId, method, outputSchema }) => outputSchema.parse(method === "studio_describe"
-        ? { pluginId, version: 1, panel: null, kinds: [] }
-        : { items: [{ ...item("a", pluginId === "pages" ? pageTitle : customTitle), pluginId }] }),
+        ? { pluginId, version: 2, panel: null, kinds: [] }
+        : method === "studio_read" ? { content: "" } : { items: [{ ...item("a", pluginId === "pages" ? pageTitle : customTitle), pluginId }] }),
     } };
     await new SearchIndex(db, new StudioHub(sdk)).ensure();
     failDiscovery = true;
@@ -253,8 +251,8 @@ it("detects plugin disable and re-enable from inventory without a content-change
     return { plugins: ["pages", "talk"].map(id => ({ id, name: id, enabled: id !== "pages" || enabled, status: "running", statusDetail: null, version: "1" })) };
   });
   const read = vi.fn(async ({ pluginId, method, outputSchema }: Parameters<HubSdk["plugins"]["callRpc"]>[0]) => outputSchema.parse(method === "studio_describe"
-    ? { pluginId, version: 1, panel: null, kinds: [] }
-    : { items: [{ ...item("a", `Lifecycle ${pluginId}`), pluginId }] }));
+    ? { pluginId, version: 2, panel: null, kinds: [] }
+    : method === "studio_read" ? { content: "" } : { items: [{ ...item("a", `Lifecycle ${pluginId}`), pluginId }] }));
   const sdk: HubSdk = { plugins: { list, experimental_discoverRpc: async () => [{ pluginId: "pages" }, { pluginId: "talk" }], callRpc: read as HubSdk["plugins"]["callRpc"] } };
   const index = new SearchIndex(db, new StudioHub(sdk));
   try {

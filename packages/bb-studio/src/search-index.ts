@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
 import type { HubItem, StudioHub } from "./hub";
 import type { SearchStatus } from "./contract";
 
@@ -129,8 +130,8 @@ export class SearchIndex {
       .run(item.pluginId, item.id, item.kind, item.projectId, item.href, item.updatedAt, item.title, body);
   }
 
-  private async content(item: HubItem, v2: boolean): Promise<string | null> {
-    if (!v2 || item.archived) return "";
+  private async content(item: HubItem): Promise<string | null> {
+    if (item.archived || item.pluginId === STUDIO_PLUGIN_ID) return "";
     try {
       return (await this.hub.call(item.pluginId, "studio_read", { id: item.id, format: "text" })).content ?? "";
     } catch {
@@ -139,10 +140,10 @@ export class SearchIndex {
     }
   }
 
-  private async add(items: HubItem[], versions: Map<string, boolean>): Promise<void> {
+  private async add(items: HubItem[]): Promise<void> {
     for (let at = 0; at < items.length; at += 8) {
       const batch = items.slice(at, at + 8);
-      const bodies = await Promise.all(batch.map((item) => this.content(item, versions.get(item.pluginId) ?? false)));
+      const bodies = await Promise.all(batch.map((item) => this.content(item)));
       this.db.transaction(() => batch.forEach((item, i) => {
         // Keep the last searchable body through a temporary read failure.
         const previous = bodies[i] === null
@@ -164,7 +165,6 @@ export class SearchIndex {
     const result = await this.hub.overview(only);
     const discoveryComplete = result.discoveryComplete !== false;
     this.discoveryIncomplete = !discoveryComplete;
-    const versions = new Map(result.providers.map((provider) => [provider.pluginId, this.hub.version(provider.pluginId) === 2]));
     const installed = new Set(result.providers.map((provider) => provider.pluginId));
     const stored = this.db.prepare("SELECT DISTINCT plugin_id FROM studio_search_fts").all() as { plugin_id: string }[];
     for (const { plugin_id: pluginId } of stored) {
@@ -185,7 +185,7 @@ export class SearchIndex {
         const remove = this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?");
         this.db.transaction(() => { for (const row of rows) if (!live.has(row.item_id)) remove.run(pluginId, row.item_id); })();
       }
-      await this.add(items, versions);
+      await this.add(items);
     }
     this.ready = true;
     return result.items.length;
@@ -225,7 +225,7 @@ export class SearchIndex {
         const live = new Set(found.map((item) => item.id));
         if (result.status === "ready" && !result.complete) this.pending.add(pluginId);
         else for (const id of ids) if (!live.has(id)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
-        await this.add(found, new Map([[pluginId, this.hub.version(pluginId) === 2]]));
+        await this.add(found);
       }
     });
   }

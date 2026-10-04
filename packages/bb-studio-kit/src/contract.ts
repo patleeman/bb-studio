@@ -43,12 +43,6 @@ export const STUDIO_ITEM_AT_METHOD = "itemAt";
 export const STUDIO_CHAT_PLUGIN_ID = "studio-chat";
 /** Float, the windows along the bottom of the screen. */
 export const FLOAT_PLUGIN_ID = "float";
-/**
- * Window event that floats a thread; detail `{ threadId }`. Studio Chat's
- * card took it before Float existed; Float still answers it, so a plugin
- * built against an older kit keeps working. Use `openFloat` instead.
- */
-export const STUDIO_CHAT_FLOAT_EVENT = "bb-studio:chat:float";
 /** CSS variable on the root element that moves the windows left, e.g. past a comments card. */
 export const FLOAT_RIGHT_VAR = "--studio-float-right";
 
@@ -158,7 +152,7 @@ export interface StudioKind {
 export interface StudioProviderInfo {
   pluginId: string;
   /** Contract version, for future changes. */
-  version: 1 | 2;
+  version: 2;
   /** The add-on's own nav panel, which Studio offers to hide from the sidebar. */
   panel: string | null;
   kinds: StudioKind[];
@@ -233,7 +227,7 @@ export function studioSchemas(z: typeof Zod) {
     hasOwnChat: z.boolean().optional(),
     background: z.boolean().optional(),
   });
-  const info = z.object({ pluginId: z.string(), version: z.union([z.literal(1), z.literal(2)]), panel: z.string().nullable(), kinds: z.array(kind) });
+  const info = z.object({ pluginId: z.string(), version: z.literal(2), panel: z.string().nullable(), kinds: z.array(kind) });
   const ids = z.array(z.string().min(1).max(200)).min(1).max(500);
   const projectId = z.string().min(1).max(200).nullable();
   const results = z.object({

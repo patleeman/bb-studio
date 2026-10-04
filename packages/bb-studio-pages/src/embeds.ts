@@ -70,7 +70,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
           facts: [],
           badge: null,
           thumbnailUrl: null,
-          href: `/plugins/${STUDIO_PLUGIN_ID}/studio/space/${encodeURIComponent(space.id)}`,
+          href: `/plugins/${STUDIO_PLUGIN_ID}/spaces/${encodeURIComponent(space.id)}`,
           updatedAt: 0,
         })),
       () => [],
