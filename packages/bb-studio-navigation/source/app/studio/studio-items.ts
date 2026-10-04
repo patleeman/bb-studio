@@ -23,6 +23,8 @@ export const HUB_PANELS = [
 export const RETIRED_PANELS = [
   // Studio Explore, folded into Studio Pages.
   "explore/explainers",
+  // The same panel inside Pages; explainers open from their links.
+  "pages/explainers",
   // Float's Companions panel; Float's dock and toggle reach it.
   "float/companions",
   // Studio's legacy office panel ("Home").
