@@ -12,6 +12,7 @@ import {
 import { Icon } from "@bb-studio/kit/app";
 import { useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "./location";
+import { useProject } from "./ProjectPanel";
 import { projectPath, PROJECTS_PANEL } from "./routes";
 import { ThreadMenu } from "./ThreadMenu";
 import { ROW, ROW_ACTIVE, ROW_GLYPH, ROW_LABEL, SECTION, SECTION_ACTION, cn } from "./styles";
@@ -82,7 +83,11 @@ export function Sidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
   const latest = (projectId: string) => Math.max(0, ...(byProject.get(projectId) ?? []).map((thread) => thread.updatedAt));
   const work = projects.filter((project) => !project.isPersonal).sort((a, b) => latest(b.id) - latest(a.id) || a.name.localeCompare(b.name));
   const personal = projects.find((project) => project.isPersonal);
-  const oneOffs = [...(personal ? byProject.get(personal.id) ?? [] : [])].sort((a, b) => b.updatedAt - a.updatedAt);
+  // The Chief of Staff is the Personal project's lead: its own row, not a one-off.
+  const chief = useProject(personal?.id ?? null);
+  const chiefThreadId = chief.data?.leadThreadId ?? null;
+  const chiefThread = chiefThreadId ? threads.find((thread) => thread.id === chiefThreadId) : undefined;
+  const oneOffs = [...(personal ? byProject.get(personal.id) ?? [] : [])].filter((thread) => thread.id !== chiefThreadId).sort((a, b) => b.updatedAt - a.updatedAt);
   const shown = showAll ? oneOffs : oneOffs.slice(0, THREADS_SHOWN);
   const activeProject = threads.find((thread) => thread.id === activeThreadId)?.projectId ?? null;
 
@@ -91,6 +96,15 @@ export function Sidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
 
   return (
     <div className="flex flex-col px-2 pb-6">
+      {personal
+        ? <div className="mt-1 space-y-px">
+            <button type="button" onClick={() => openProject(personal.id)} aria-current={pathname === projectPath(personal.id) || (chiefThreadId !== null && activeThreadId === chiefThreadId) ? "page" : undefined} className={cn(ROW, (pathname === projectPath(personal.id) || (chiefThreadId !== null && activeThreadId === chiefThreadId)) && ROW_ACTIVE)}>
+              <span className={ROW_GLYPH}><Icon name="Bot" /></span>
+              <span className={ROW_LABEL}>Chief of Staff</span>
+              {chiefThread ? <ThreadGlyph thread={chiefThread} /> : null}
+            </button>
+          </div>
+        : null}
       <Section title="Projects">
         {work.map((project) => (
           <ProjectRow

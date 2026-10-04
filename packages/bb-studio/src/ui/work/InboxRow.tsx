@@ -1,8 +1,10 @@
 // One thing addressed to you: a request you act on in place, a report you
 // read and clear, or a comment.
 import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PRIMARY_BUTTON, openAppPath } from "@bb-studio/kit/app";
+import { experimental_useSidebarThreadActions as useSidebarThreadActions } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import { Face } from "./Face";
+import { inboxLink } from "./links";
 import { useCall, type InboxEvent, type TeamBot } from "./model";
 import { cn } from "./styles";
 import { plainPreview } from "./text";
@@ -44,7 +46,13 @@ export function InboxRow({ event, bot, onChanged }: {
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };
-  const open = event.href ?? event.item?.href ?? null;
+  const threadActions = useSidebarThreadActions();
+  const link = inboxLink(event);
+  const open = link ? () => {
+    void call("inbox_read", { keys: [event.key] }).catch(() => undefined);
+    if (link.kind === "path") openAppPath(link.path);
+    else threadActions.open(link.threadId);
+  } : null;
   const unreadReport = event.type !== "request" && event.readAt === null;
 
   return (
@@ -59,7 +67,7 @@ export function InboxRow({ event, bot, onChanged }: {
           <button
             type="button"
             disabled={!open}
-            onClick={() => { if (open) { void call("inbox_read", { keys: [event.key] }).catch(() => undefined); openAppPath(open); } }}
+            onClick={() => open?.()}
             className={cn("min-w-0 truncate text-left text-sm enabled:hover:underline", unreadReport || event.type === "request" ? "font-semibold" : "font-medium")}
           >
             {plainPreview(event.title)}
@@ -85,7 +93,7 @@ export function InboxRow({ event, bot, onChanged }: {
             </button>
           ))}
           {event.type !== "request" && open
-            ? <button type="button" onClick={() => { void call("inbox_read", { keys: [event.key] }).catch(() => undefined); openAppPath(open); }} className={OUTLINE_BUTTON}>Open</button>
+            ? <button type="button" onClick={open} className={OUTLINE_BUTTON}>Open</button>
             : null}
           <button type="button" disabled={busy} onClick={() => void run("inbox_done", { keys: [event.key] })} className={GHOST_BUTTON} aria-label={`Done: ${event.title}`}>
             {event.type === "request" ? "Dismiss" : "Done"}

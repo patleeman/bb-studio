@@ -12,19 +12,39 @@ import {
   type NewThreadRequest,
   type PluginNavPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import { GHOST_BUTTON, Icon, PageColumn, floatWindowKey, openAppPath, publishFloatBody, type FloatTarget } from "@bb-studio/kit/app";
+import * as Menu from "@radix-ui/react-dropdown-menu";
+import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PageColumn, floatWindowKey, openAppPath, publishFloatBody, type FloatTarget } from "@bb-studio/kit/app";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCall, useLive } from "./model";
 import { PROJECTS_PANEL, projectIdOf } from "./routes";
 import { ThreadGlyph } from "./Sidebar";
-import { cn } from "./styles";
+import { Face } from "./Face";
+import { HandoffDialog } from "./Handoff";
+import { MENU, MENU_ITEM, PORTAL_SCOPE, cn } from "./styles";
+
+export type Cadence = "hourly" | "daily" | "weekdays";
 
 export interface ProjectInfo {
   projectId: string;
   name: string;
+  /** The Personal project's lead is the Chief of Staff. */
+  role?: "chief-of-staff" | "project";
   leadThreadId: string | null;
   pageId: string | null;
   pageHref: string | null;
+  /** Run mode: the lead keeps going on a heartbeat and reports to the Inbox. */
+  run?: { enabled: boolean; cadence: Cadence; time?: string | null } | null;
+}
+
+interface BotSummary {
+  id: string;
+  name: string;
+  avatar: string | null;
+  providerId: string;
+  mission: string | null;
+  hasMemory: boolean;
+  schedules: number;
+  suggestion: "project" | "chief-of-staff" | "retire";
 }
 
 export function useProject(projectId: string | null) {
@@ -37,6 +57,62 @@ export function ProjectPanel({ subPath }: PluginNavPanelProps) {
   return projectId ? <ProjectView key={projectId} projectId={projectId} /> : <ProjectList />;
 }
 
+const SUGGESTIONS: Record<BotSummary["suggestion"], string> = {
+  project: "Make it a project",
+  "chief-of-staff": "Merge into Chief of Staff",
+  retire: "Retire",
+};
+
+/** Bots are being folded in: each becomes a project's lead, joins the Chief of Staff, or retires. */
+function BotsToFold() {
+  const call = useCall();
+  const navigate = useBbNavigate();
+  const bots = useLive<{ bots: BotSummary[] }>("bots_overview", {}, { pollMs: 0 });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const list = bots.data?.bots ?? [];
+  if (!list.length) return null;
+  const act = async (bot: BotSummary, choice: BotSummary["suggestion"]) => {
+    setBusy(bot.id); setError(null);
+    try {
+      if (choice === "retire") {
+        if (!confirm(`Retire ${bot.name}? Its threads and history stay.`)) return;
+        await call("bot_retire", { botId: bot.id });
+      } else {
+        const project = await call("bot_to_project", { botId: bot.id }) as ProjectInfo;
+        navigate.toPluginPanel(PROJECTS_PANEL, { subPath: project.projectId });
+      }
+      bots.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <section className="mt-10">
+      <h2 className="text-sm font-medium">Your bots</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Bots become projects: the bot's mission and memory go on the project's page, its chat becomes the lead, and its schedules keep it running.</p>
+      {error ? <p role="alert" className="mt-2 text-sm text-destructive">{error}</p> : null}
+      <ul className="mt-3 divide-y divide-border">
+        {list.map((bot) => (
+          <li key={bot.id} className="flex items-center gap-3 py-2.5">
+            <Face name={bot.name} avatar={bot.avatar} size="sm" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{bot.name}</div>
+              <div className="truncate text-xs text-muted-foreground">{[bot.mission, bot.hasMemory ? "has memory" : null, bot.schedules ? `${bot.schedules} schedule${bot.schedules === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ") || "No mission yet"}</div>
+            </div>
+            <button type="button" disabled={busy === bot.id} onClick={() => void act(bot, bot.suggestion)} className={OUTLINE_BUTTON}>{SUGGESTIONS[bot.suggestion]}</button>
+            {bot.suggestion !== "retire"
+              ? <button type="button" disabled={busy === bot.id} onClick={() => void act(bot, "retire")} className={GHOST_BUTTON}>Retire</button>
+              : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ProjectList() {
   const { projects, threads } = useSidebarThreads();
   const navigate = useBbNavigate();
@@ -44,7 +120,7 @@ function ProjectList() {
   return (
     <PageColumn className="max-w-2xl">
       <h1 className="text-2xl font-semibold">Projects</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Each project has a lead you talk to, and a page it keeps current. Make a new project from BB's project menu.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Each project has a lead you talk to, and a page it keeps current. Ask the Chief of Staff to start one, or make one from BB's project menu.</p>
       <div className="mt-6 space-y-1">
         {work.map((project) => {
           const count = threads.filter((thread) => thread.projectId === project.id && !thread.isArchived && !thread.isHidden).length;
@@ -57,7 +133,39 @@ function ProjectList() {
           );
         })}
       </div>
+      <BotsToFold />
     </PageColumn>
+  );
+}
+
+const RUN_LABELS: Record<Cadence, string> = { hourly: "Hourly", daily: "Daily", weekdays: "Weekdays" };
+
+/** Off, or a heartbeat: the lead checks the project on a cadence and reports to the Inbox. */
+function RunMenu({ project, onChanged }: { project: ProjectInfo; onChanged: () => void }) {
+  const call = useCall();
+  const run = project.run?.enabled ? project.run : null;
+  const set = (cadence: Cadence | null) => {
+    void call("project_set_run", { projectId: project.projectId, enabled: cadence !== null, cadence: cadence ?? run?.cadence ?? "daily" }).then(onChanged, onChanged);
+  };
+  return (
+    <Menu.Root>
+      <Menu.Trigger className={GHOST_BUTTON} title="Keep this project running on a heartbeat">
+        <Icon name={run ? "Repeat" : "Pause"} className="size-4" />{run ? `Runs ${RUN_LABELS[run.cadence].toLowerCase()}` : "Keep running"}
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
+          <p className="px-2 pt-1 pb-1.5 text-xs text-muted-foreground">The lead checks in on its own and reports to your Inbox.</p>
+          <Menu.RadioGroup value={run?.cadence ?? "off"} onValueChange={(value) => set(value === "off" ? null : value as Cadence)}>
+            {(["off", "hourly", "daily", "weekdays"] as const).map((value) => (
+              <Menu.RadioItem key={value} value={value} className={MENU_ITEM}>
+                <span className="inline-flex size-3.5 items-center justify-center"><Menu.ItemIndicator><Icon name="Check" /></Menu.ItemIndicator></span>
+                {value === "off" ? "Off" : RUN_LABELS[value]}
+              </Menu.RadioItem>
+            ))}
+          </Menu.RadioGroup>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
@@ -67,8 +175,10 @@ function ProjectView({ projectId }: { projectId: string }) {
   const { projects } = useSidebarThreads();
   const threadActions = useSidebarThreadActions();
   const [error, setError] = useState<string | null>(null);
+  const [handingOff, setHandingOff] = useState(false);
   const bbProject = projects.find((entry) => entry.id === projectId);
-  const name = project.data?.name ?? bbProject?.name ?? "Project";
+  const chief = project.data?.role === "chief-of-staff" || bbProject?.isPersonal === true;
+  const name = chief ? "Chief of Staff" : project.data?.name ?? bbProject?.name ?? "Project";
   const leadThreadId = project.data?.leadThreadId ?? null;
 
   const start = async (request: NewThreadRequest) => {
@@ -84,25 +194,34 @@ function ProjectView({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
-        <Icon name="FolderOpen" className="size-4 text-muted-foreground" />
+      <header className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-4">
+        <Icon name={chief ? "Bot" : "FolderOpen"} className="mr-1 size-4 text-muted-foreground" />
         <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</h1>
+        {project.data && leadThreadId ? <RunMenu project={project.data} onChanged={project.refresh} /> : null}
+        {leadThreadId
+          ? <button type="button" onClick={() => setHandingOff(true)} title="Hand the lead to another agent" className={GHOST_BUTTON}><Icon name="Fork" className="size-4" />Hand off</button>
+          : null}
         <button type="button" onClick={() => threadActions.openNewThread({ projectId, focusPrompt: true })} className={GHOST_BUTTON}>
           <Icon name="MessageSquarePlus" className="size-4" />New thread
         </button>
-        {bbProject ? <button type="button" aria-label="Project settings" title="Project settings" onClick={() => openAppPath(bbProject.settingsHref)} className={GHOST_BUTTON}><Icon name="Settings" className="size-4" /></button> : null}
+        {bbProject && !chief ? <button type="button" aria-label="Project settings" title="Project settings" onClick={() => openAppPath(bbProject.settingsHref)} className={GHOST_BUTTON}><Icon name="Settings" className="size-4" /></button> : null}
       </header>
       {leadThreadId
         ? <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6 pb-4">
             {/* "inherit": send with the lead thread's own permission, not the composer's default. */}
             <ThreadChat key={leadThreadId} threadId={leadThreadId} variant="full" layout="contained" permissionPolicy="inherit" className="min-h-0 flex-1" />
+            <HandoffDialog threadId={leadThreadId} projectId={projectId} open={handingOff} onOpenChange={setHandingOff} onDone={() => project.refresh()} />
           </div>
         : project.loading
           ? null
           : <div className="mx-auto w-full max-w-2xl px-6 pt-16">
-              <h2 className="text-xl font-semibold">Start {name}</h2>
-              <p className="mt-1 mb-5 text-sm text-muted-foreground">Tell the lead what this project is about. It writes the project's page and gets going; you talk to it here.</p>
-              <NewThreadComposer defaultProjectId={projectId} placeholder="What's this project about?" draftKey={`project-lead:${projectId}`} onSubmit={start} />
+              <h2 className="text-xl font-semibold">{chief ? "Meet your Chief of Staff" : `Start ${name}`}</h2>
+              <p className="mt-1 mb-5 text-sm text-muted-foreground">
+                {chief
+                  ? "It takes your one-offs, starts and staffs projects, and hands work to their leads. Tell it what you want handled."
+                  : "Tell the lead what this project is about. It writes the project's page and gets going; you talk to it here."}
+              </p>
+              <NewThreadComposer defaultProjectId={projectId} placeholder={chief ? "What should I take care of?" : "What's this project about?"} draftKey={`project-lead:${projectId}`} onSubmit={start} />
               {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
             </div>}
     </div>
@@ -114,7 +233,7 @@ function ProjectView({ projectId }: { projectId: string }) {
  * path is published as a float body (kit/float-registry), the same way it
  * draws into Float windows.
  */
-function PageEmbed({ pageId }: { pageId: string }) {
+export function PageEmbed({ pageId }: { pageId: string }) {
   const element = useRef<HTMLDivElement>(null);
   const target = useMemo<FloatTarget>(() => ({ kind: "path", path: `/plugins/pages/pages/${encodeURIComponent(pageId)}` }), [pageId]);
   useLayoutEffect(() => {

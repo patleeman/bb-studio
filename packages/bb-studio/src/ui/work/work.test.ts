@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isShown } from "./Navigation";
+import { inboxLink } from "./links";
 import { projectIdOf } from "./routes";
 
 describe("navigation", () => {
@@ -22,5 +23,17 @@ describe("project routes", () => {
     expect(projectIdOf("")).toBeNull();
     expect(projectIdOf("proj_abc")).toBe("proj_abc");
     expect(projectIdOf("/proj_abc/")).toBe("proj_abc");
+  });
+});
+
+describe("inboxLink", () => {
+  it("keeps live paths", () => {
+    expect(inboxLink({ href: "/plugins/pages/pages/pg_1", item: null, threadId: "thr_1" })).toEqual({ kind: "path", path: "/plugins/pages/pages/pg_1" });
+    expect(inboxLink({ href: "/plugins/studio/office-inbox", item: null, threadId: null })).toEqual({ kind: "path", path: "/plugins/studio/office-inbox" });
+  });
+  it("sends removed office paths to the thread, or nowhere", () => {
+    expect(inboxLink({ href: "/plugins/studio/office-team/bot_1", item: null, threadId: "thr_1" })).toEqual({ kind: "thread", threadId: "thr_1" });
+    expect(inboxLink({ href: "/plugins/studio/office", item: null, threadId: null })).toBeNull();
+    expect(inboxLink({ href: null, item: { ref: "x", title: "x", href: "/plugins/studio/office-conversation/c1" }, threadId: null })).toBeNull();
   });
 });
