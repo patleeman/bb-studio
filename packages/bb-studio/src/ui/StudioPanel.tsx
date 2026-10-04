@@ -35,10 +35,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ProviderView, rpcContract, SavedViewView, SidebarView, SpaceView, TagView } from "../contract";
 import { applyItemChanges } from "../partial";
-import { backgroundKinds, compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
+import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
-import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceGlyph, SpaceHome, useSpaceThreads, type ThreadKind } from "./Spaces";
+import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceGlyph, type ThreadKind } from "./Spaces";
 import { spaceViewHref } from "./space/routes";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
@@ -203,7 +203,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     rpc.call("templates", null).then(({ items }) => setTemplates(items), () => setTemplates([]));
   }, [rpc, data?.items]);
   const providers = useMemo(() => data?.providers ?? [], [data]);
-  const background = useMemo(() => backgroundKinds(providers), [providers]);
   const kinds = useMemo<CollectionKind[]>(
     () => providers.filter((provider) => provider.state === "ready").flatMap((provider) => provider.kinds.map((kind) => ({ ...kind, pluginId: provider.pluginId }))),
     [providers],
@@ -214,7 +213,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const requested = (spaceId ? "" : decodeSegment(segments[0] ?? "")) || "all";
   const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
   const openSpace = useCallback((id: string | null) => navigate.toPluginPanel("studio", { subPath: id ? `space/${encodeURIComponent(id)}` : "" }), [navigate]);
-  const spaceThreads = useSpaceThreads(rpc, space);
   const [spaceDialog, setSpaceDialog] = useState<SpaceDialogState>(null);
   // A space deleted elsewhere falls back to everything.
   useEffect(() => {
@@ -224,7 +222,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const [query, setQuery] = useStoredQuery("studio:query:all");
   // A space opens the Space view (its lead, page beside it); space/<id>/items lists it here.
   const listSpace = segments[2] === "items";
-  const [homeless] = useState<string | null>(null);
   useEffect(() => {
     if (!spaceId || listSpace) return;
     openAppPath(spaceViewHref(spaceId), { replace: true });
@@ -551,17 +548,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           ? "Nothing matches."
           : "No items yet.";
 
-  // New items go in the space's own folder; items follow their project, so that puts them in the space.
-  const createInSpace = async (target: CollectionKind, into: SpaceView) => {
-    if (target.create?.mode !== "rpc") return handlers.onCreate?.(target, into.defaultProjectId);
-    try {
-      const { href } = await rpc.call("createInSpace", { id: into.id, pluginId: target.pluginId, kind: target.id });
-      refetch();
-      openAppPath(href);
-    } catch (cause) {
-      toast.error(`Couldn't create a ${target.label.toLowerCase()}: ${errorMessage(cause)}`);
-    }
-  };
   const liveSpace = (each: SpaceView) => data?.spaces.find((candidate) => candidate.id === each.id) ?? each;
   const deleteSpace = async (target: SpaceView) => {
     setSpaceDialog(null);
@@ -577,26 +563,8 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   return (
     <>
-      {space && (listSpace || homeless !== space.id) ? null : space ? (
-        <SpaceHome
-          rpc={rpc}
-          space={space}
-          items={data?.items.filter((item) => !item.archived && !background.has(`${item.pluginId}:${item.kind}`) && item.spaces?.includes(space.id)) ?? []}
-          threads={spaceThreads}
-          kinds={kinds}
-          projects={projects}
-          onEdit={() => setSpaceDialog({ type: "edit", space })}
-          onDelete={() => setSpaceDialog({ type: "delete", space })}
-          onAddItems={() => setSpaceDialog({ type: "items", space })}
-          onAddThreads={(kind) => setSpaceDialog({ type: "threads", space, kind })}
-          onShowItems={() => {
-            setQuery({ filters: [{ field: "space", value: space.name }], text: "" });
-            openSpace(null);
-          }}
-          onCreate={(target) => void createInSpace(target, space)}
-          onChanged={refetch}
-        />
-      ) : (
+      {/* A space opens its own view (see the redirect above); the collection shows otherwise. */}
+      {space ? null : (
         <CollectionPage
           title="Studio"
           kinds={kinds}
