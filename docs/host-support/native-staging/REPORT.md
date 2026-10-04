@@ -29,7 +29,7 @@ Checks passed:
 - **8 scripts tests**, including worktree build-only option and existing environment isolation cases.
 - Formatting of changed code paths and `git diff --check`.
 
-Logs: [build-only](build-only.log), [typecheck](typecheck.log), [desktop tests](test.log), [scripts tests](scripts-test.log). [inspect-bundle.cjs](inspect-bundle.cjs) is a read-only repeatable assertion/digest helper.
+Logs: [build-only](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/host-support/native-staging/build-only.log), [typecheck](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/host-support/native-staging/typecheck.log), [desktop tests](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/host-support/native-staging/test.log), [scripts tests](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/host-support/native-staging/scripts-test.log). [inspect-bundle.cjs](inspect-bundle.cjs) is a read-only repeatable assertion/digest helper.
 
 ## Exact final bundle
 

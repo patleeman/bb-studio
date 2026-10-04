@@ -17,7 +17,7 @@ On the fresh iPhone 18 Pro / iOS 27 simulator, the button spans y=448 through
 is present in the [screenshot](note-keyboard-reachable.png); the
 [accessibility tree](note-keyboard-accessibility-tree.txt) names it Save note.
 The [initial screenshot](note-keyboard-initial.png) records the state before the
-test's optional scroll loop. The [run](run.log), [summary](summary.json) and
+test's optional scroll loop. The [run](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/note-keyboard/run.log), [summary](summary.json) and
 [verification record](verification.json) preserve assertions and source hash.
 
 The initial geometry probe passed. A second run added exact equality for all

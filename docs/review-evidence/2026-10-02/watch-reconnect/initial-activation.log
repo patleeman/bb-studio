@@ -1,6 +1,0 @@
-getpwuid_r did not find a match for uid 501
-Timestamp               Ty Process[PID:TID]
-2026-10-03 01:13:37.239 Df BBStudioWatch[59657:54a1da9] [com.apple.wcd:WC] -[WCSession _init] WCSession initialized
-2026-10-03 01:13:37.239 Df BBStudioWatch[59657:54a1da9] [com.apple.wcd:WC] -[WCSession setDelegate:] delegateSupportsAsyncActivate: YES, delegateSupportsActiveDeviceSwitch: NO
-2026-10-03 01:13:37.239 Df BBStudioWatch[59657:54a1da9] [com.apple.wcd:WC] -[WCSession activateSession]_block_invoke
-2026-10-03 01:13:37.239 Df BBStudioWatch[59657:54a1da9] [com.apple.wcd:WC] -[WCSession activateSession]_block_invoke informing daemon ready for session state

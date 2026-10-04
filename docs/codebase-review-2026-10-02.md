@@ -172,9 +172,9 @@ had zero elements, restored requests, clicked Retry save, and reloaded. The
 server and the reloaded canvas both retained the same rectangle. The failed
 save indicator was also checked for its red error state.
 
-![Drawing retained while its save request failed](review-evidence/2026-10-02/draw-save-error.png)
+![Drawing retained while its save request failed](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/draw-save-error.png?raw=true)
 
-![The saved drawing after a full reload](review-evidence/2026-10-02/draw-save-reloaded.png)
+![The saved drawing after a full reload](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/draw-save-reloaded.png?raw=true)
 
 The same pushed checkpoint passed Feed's live attention test: an urgent alert
 behind 41 newer ordinary posts remained visible in Needs you. Opening it marked
@@ -182,7 +182,7 @@ it read without dismissing it. Resolve removed it from attention; Reopen
 restored it while preserving its read state. Assertions checked both the
 rendered interface and stored state.
 
-![An older read alert remains actionable after reopening](review-evidence/2026-10-02/feed-alert-reopened.png)
+![An older read alert remains actionable after reopening](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/feed-alert-reopened.png?raw=true)
 
 The final plugin checkpoint passed **1,428 tests across 194 test files**, all
 package typechecks, and all plugin builds. `pnpm check` also passed stable SDK

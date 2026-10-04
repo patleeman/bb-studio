@@ -83,7 +83,7 @@ No Capture or unrelated fixture screenshot was collected in this lane.
 | Localization, attempt 2 | [Screenshot](settings-detection-position-2.png), [tree](settings-detection-position-2-accessibility-tree.txt) |
 | Localization, attempt 3 | [Screenshot](settings-detection-position-3.png), [tree](settings-detection-position-3-accessibility-tree.txt) |
 | Localization, attempt 4 | [Screenshot](settings-detection-position-4.png), [tree](settings-detection-position-4-accessibility-tree.txt) |
-| Original logs and activities | [Baseline log](baseline-run.log), [baseline activities](baseline-activities.json), [localization log](positions-run.log) |
+| Original logs and activities | [Baseline log](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/settings-detection/baseline-run.log), [baseline activities](baseline-activities.json), [localization log](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/settings-detection/positions-run.log) |
 
 Full local result bundles: `/tmp/bb-settings-detection-baseline.xcresult` and
 `/tmp/bb-settings-detection-positions.xcresult`. Build logs:

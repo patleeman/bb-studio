@@ -3,3 +3,6 @@ node_modules/
 pnpm-debug.log*
 packages/*/dist/
 .DS_Store
+# Verification output: link evidence from a pinned commit instead of tracking it.
+docs/review-evidence/
+*.log

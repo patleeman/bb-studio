@@ -26,8 +26,8 @@ retention before the cancelled task resumes. The later assertion is the release
 check. A positive attached control receives another real content change and
 starts exactly one read, proving live reloads still work while attached.
 
-Evidence: [before log](before.log), [before summary](before-summary.json),
-[after log](after.log), and [after summary](after-summary.json). The fixed native
+Evidence: [before log](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/native-performance/detach/before.log), [before summary](before-summary.json),
+[after log](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/native-performance/detach/after.log), and [after summary](after-summary.json). The fixed native
 build and regression passed on 3 October 2026, Debug / iPhone 18 Pro / iOS 27.0.
 Local bundles: `/tmp/bb-native-performance/detach/repro.xcresult` and
 `/tmp/bb-native-performance/detach/after.xcresult`.

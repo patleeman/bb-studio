@@ -13,7 +13,7 @@ Do not launch the installed app in `/Applications` as that fixture. On
 3 October 2026, a launch with a fresh `BB_DATA_DIR`, separate Chromium profile
 and isolated ports still activated the shared updater. It replaced the
 installed BB 0.44.0 bundle with 0.45.0 before the test opened any menu.
-The [incident report](review-evidence/2026-10-02/native-reactions/REPORT.md)
+The [incident report](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/native-reactions/REPORT.md)
 records the installation, signature check and owned-process cleanup. Native
 Reactions remains unverified.
 

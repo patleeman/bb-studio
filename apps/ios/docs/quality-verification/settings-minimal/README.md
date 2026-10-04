@@ -79,8 +79,8 @@ simulator. The ten named tests select their local variant with `-controlCase`.
 The five failing cases are expected diagnostic failures, not passing tests.
 Builds succeeded. No BB installation or server is needed for the harness.
 
-Logs are retained in [matrix](matrix/run.log), [isolation](isolation/run.log),
-[standard](standard/run.log), and [product](product/run.log). Full local bundles:
+Logs are retained in [matrix](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/settings-minimal/matrix/run.log), [isolation](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/settings-minimal/isolation/run.log),
+[standard](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/settings-minimal/standard/run.log), and [product](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/settings-minimal/product/run.log). Full local bundles:
 `/tmp/bb-settings-minimal-matrix.xcresult`,
 `/tmp/bb-settings-minimal-isolation.xcresult`,
 `/tmp/bb-settings-minimal-standard.xcresult`, and
@@ -95,8 +95,8 @@ navigation assertions and unresolved findings are unchanged.
 The scrolled accessibility XXXL value row passed element detection and its
 combined label was reachable. [Screenshot](product-row/settings-configured-limit-accessibility-xxxl.png),
 [tree](product-row/settings-configured-limit-accessibility-xxxl-accessibility-tree.txt),
-[passing log](product-row/passed-run.log), and
-[initial query failure](product-row/run.log). The first attempt failed
+[passing log](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/settings-minimal/product-row/passed-run.log), and
+[initial query failure](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/apps/ios/docs/quality-verification/settings-minimal/product-row/run.log). The first attempt failed
 `XCTAssertTrue(configured.exists)` before any audit because it searched for an
 exact `Configured limit` child. The corrected query matches the observed
 combined label `Configured limit, Automatic`; no production change was needed.

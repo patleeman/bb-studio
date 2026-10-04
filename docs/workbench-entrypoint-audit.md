@@ -36,8 +36,8 @@ another desktop chat panel.
 | Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio-feed/README.md) |
 | Explore | Shared explainer/page destinations; old owner-scoped panel and main fallback when companions are absent | [Explainer/page reuse and retained state](../packages/bb-studio-explore/README.md) |
 | Sidebar | Thread Float action uses `openFloat`; ordinary navigation/split stays host-owned | [Real sidebar first moves](../packages/bb-studio-float/README.md) |
-| Navigation | Host panel activation/split plus Studio's shared Quick Open placement | [Keyboard/focus checks](review-evidence/2026-10-02/search-accessibility/README.md) |
-| Reactions | Composer bridge selects the displayed message's thread; drafts quotes/reactions into it | [Settings, selection and message actions](review-evidence/2026-10-02/reactions-explore/README.md); native right-click remains open |
+| Navigation | Host panel activation/split plus Studio's shared Quick Open placement | [Keyboard/focus checks](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/search-accessibility/README.md) |
+| Reactions | Composer bridge selects the displayed message's thread; drafts quotes/reactions into it | [Settings, selection and message actions](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/reactions-explore/README.md); native right-click remains open |
 | Decisions | Shared server queue/model routing; no independent chat view or placement state | [Settings surface and routing tests](../packages/bb-studio-decisions/README.md) |
 | Mobile | Existing thread/item identifiers and generated native endpoint contracts | [Native links and delivery surface](../packages/bb-studio-mobile/README.md); device QA remains in the review ledger |
 

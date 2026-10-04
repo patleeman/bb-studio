@@ -32,5 +32,5 @@ ports, profile and owned-process cleanup; the regular launcher does not select
 the staging bundle. Follow the [staging requirements](../../native-desktop-staging.md)
 and inspect any rebuilt artifact again before launch.
 
-The earlier [installed-app updater incident](../../review-evidence/2026-10-02/native-reactions/REPORT.md)
+The earlier [installed-app updater incident](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/native-reactions/REPORT.md)
 remains separate. Preparing this build did not restore or alter the installed app.
