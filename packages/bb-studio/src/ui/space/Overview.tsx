@@ -1,4 +1,4 @@
-// A Space at a glance, the first workbench tab beside its lead: what needs
+// A Space at a glance, on its dashboard: what needs
 // you, what's running, and every thread in it with sub-threads under their
 // parent, then its newest items. The plan itself lives on the Space's page.
 import {

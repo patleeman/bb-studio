@@ -1,5 +1,5 @@
-// A Space as a project: the lead's chat in the middle, with the Space's
-// Overview, Page and Thread as fixed tabs in the workbench beside it. Before
+// A Space opens on its dashboard, with named thread tabs in the main view
+// and its Page in the workbench beside it. Before
 // the Space has a lead, BB's own composer starts one. The panel's root lists
 // every Space.
 import * as Menu from "@radix-ui/react-dropdown-menu";
@@ -194,6 +194,7 @@ function SpaceView({ spaceId }: { spaceId: string }) {
             {activeThread === null ? <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-8">
                 <h2 className="text-lg font-semibold">{name}</h2>
+                {space?.description ? <p className="mt-2 text-sm text-muted-foreground">{space.description}</p> : null}
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <span className="inline-flex items-center gap-2 text-sm"><ThreadGlyph thread={leadLive} />{leadLive?.hasPendingInteraction ? "Lead needs you" : leadLive && RUNNING.has(leadLive.runtimeStatus) ? "Lead is working" : "Lead is idle"}</span>
                   <button type="button" onClick={() => openThread(leadThreadId)} className={GHOST_BUTTON}><Icon name="MessageSquare" className="size-4" />Talk to lead</button>

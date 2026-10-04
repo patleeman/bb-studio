@@ -1,5 +1,5 @@
-// Registers Spaces as projects: the Spaces panel (a Space's lead in the
-// middle; its Overview, Page and Thread as fixed workbench tabs), the Spaces
+// Registers Spaces: the dashboard and individual thread tabs in the main
+// panel, its Page as a fixed workbench tab, the Spaces
 // sidebar section, the Space page beside every Space thread, and Hand off.
 import { retainPanel } from "@bb-studio/kit/app";
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
