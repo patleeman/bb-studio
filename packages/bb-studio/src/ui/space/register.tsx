@@ -21,7 +21,8 @@ export function registerSpaces(app: PluginAppBuilder): void {
   app.slots.threadPanelAction({
     id: SPACE_ITEM_ACTION,
     title: "New in Space",
-    icon: "Plus",
+    // Also the icon of every item tab it opens.
+    icon: "FileText",
     layout: "flush",
     component: SpaceItemTab,
     run: (context) => { context.openPanel({ title: "New in Space", params: { draft: newDraftId() } }); },

@@ -37,6 +37,9 @@ function Time({ at }: { at: number }) {
   return <time dateTime={new Date(at).toISOString()} className="shrink-0 text-xs text-muted-foreground tabular-nums">{relative(at)}</time>;
 }
 
+/** Idle threads shown before "Show all": the most recently active ones. */
+const IDLE_SHOWN = 4;
+
 type Row = { thread: OverviewThread; title: string; state: ReturnType<typeof stateOf>; byLead: boolean; at: number };
 
 function Section({ title, count, action, children }: { title: string; count?: number; action?: ReactNode; children: ReactNode }) {
@@ -107,7 +110,7 @@ export function SpaceStatus({ spaceId }: { spaceId: string }) {
   const navigate = useBbNavigate();
   const { threads: sidebar } = useSidebarThreads();
   const [starting, setStarting] = useState(false);
-  const [showIdle, setShowIdle] = useState(false);
+  const [showAllIdle, setShowAllIdle] = useState(false);
   const live = useMemo(() => new Map(sidebar.map((thread) => [thread.id, thread])), [sidebar]);
   const leadId = lead.data?.leadThreadId ?? null;
   const rows = useMemo<Row[]>(() => {
@@ -148,7 +151,6 @@ export function SpaceStatus({ spaceId }: { spaceId: string }) {
           </div>
           <button type="button" onClick={() => setStarting(true)} className={GHOST_BUTTON} title="Start a thread in this Space"><Icon name="MessageSquarePlus" className="size-4" />Thread</button>
           <NewInSpaceMenu spaceId={spaceId} onCreated={(item) => openItemTab(navigate, item)} />
-          <button type="button" onClick={overview.refresh} aria-label="Refresh status" title="Refresh" className={GHOST_BUTTON}><Icon name="RefreshCw" className="size-4" /></button>
         </header>
 
         {overview.error ? <p role="alert" className="mt-3 text-sm text-destructive">Couldn't update the status. {overview.data ? "Showing the last loaded status." : ""} <button type="button" onClick={overview.refresh} className="underline">Retry</button></p> : null}
@@ -197,8 +199,8 @@ export function SpaceStatus({ spaceId }: { spaceId: string }) {
           ) : null}
 
           {idle.length ? (
-            <Section title="Idle" count={idle.length} action={<button type="button" onClick={() => setShowIdle((value) => !value)} className={GHOST_BUTTON} aria-expanded={showIdle}>{showIdle ? "Hide" : "Show"}</button>}>
-              {showIdle ? <div className="-mx-2">{idle.map((row) => <ThreadRow key={row.thread.id} row={row} live={live.get(row.thread.id)} onOpen={() => open(row)} />)}</div> : null}
+            <Section title="Idle" count={idle.length} action={idle.length > IDLE_SHOWN ? <button type="button" onClick={() => setShowAllIdle((value) => !value)} className={GHOST_BUTTON} aria-expanded={showAllIdle}>{showAllIdle ? "Show fewer" : "Show all"}</button> : null}>
+              <div className="-mx-2">{(showAllIdle ? idle : idle.slice(0, IDLE_SHOWN)).map((row) => <ThreadRow key={row.thread.id} row={row} live={live.get(row.thread.id)} onOpen={() => open(row)} />)}</div>
             </Section>
           ) : null}
         </> : null}

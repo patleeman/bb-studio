@@ -80,7 +80,7 @@ export function NewInSpaceMenu({ spaceId, onCreated, label = "New" }: { spaceId:
               <Icon name={kind.icon} />{kind.label}
             </Menu.Item>
           ))}
-          {error ? <Menu.Item className={MENU_ITEM} onSelect={(event) => { event.preventDefault(); load(); }} title={error}><Icon name="RefreshCw" />Retry loading</Menu.Item>
+          {error ? <Menu.Item className={MENU_ITEM} onSelect={(event) => { event.preventDefault(); load(); }} title={error}>Retry loading</Menu.Item>
             : kinds === null ? <Menu.Item className={MENU_ITEM} disabled>Loading…</Menu.Item>
               : !kinds.length ? <Menu.Item className={MENU_ITEM} disabled>Nothing to create</Menu.Item> : null}
         </Menu.Content>
