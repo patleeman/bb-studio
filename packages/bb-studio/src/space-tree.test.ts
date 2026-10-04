@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Space } from "./spaces";
 import { spaceTreeItems, type TreeSource } from "./space-tree";
 
-const space: Space = { id: "s1", name: "Launch", color: "#000", icon: null, description: "", defaultProjectId: null, projectIds: ["proj_app"], threadIds: [], itemKeys: ["pages:a", "pages:b", "pages:c", "pages:home", "talk:t1"], pageId: "home", createdAt: 0, updatedAt: 0 };
-const item = (pluginId: string, id: string, updatedAt: number, extra: Partial<TreeSource> = {}): TreeSource => ({ pluginId, id, kind: "page", title: id, icon: null, href: `/${id}`, updatedAt, projectId: null, parentId: null, archived: false, ...extra });
+const space: Space = { id: "s1", isDefault: false, name: "Launch", color: "#000", icon: null, description: "", defaultProjectId: null, projectIds: ["proj_app"], threadIds: [], itemKeys: [], pageId: "home", createdAt: 0, updatedAt: 0 };
+const item = (pluginId: string, id: string, updatedAt: number, extra: Partial<TreeSource> = {}): TreeSource => ({ pluginId, id, kind: "page", title: id, icon: null, href: `/${id}`, updatedAt, projectId: "proj_app", parentId: null, archived: false, ...extra });
 const options = { background: new Set(["talk:note"]), kindIcon: () => "File", pagesPluginId: "pages" };
 
 describe("spaceTreeItems", () => {
@@ -14,7 +14,7 @@ describe("spaceTreeItems", () => {
       item("pages", "c", 2, { parentId: "b" }),
       item("pages", "home", 9),
       item("excalidraw", "d", 5, { projectId: "proj_app" }),
-      item("pages", "other", 7),
+      item("pages", "other", 7, { projectId: null }),
       item("talk", "t1", 8, { kind: "note" }),
       item("pages", "gone", 6, { archived: true }),
     ], options);
@@ -29,10 +29,9 @@ describe("spaceTreeItems", () => {
   });
 
   it("survives a parent cycle and clamps depth", () => {
-    const deep = { ...space, itemKeys: ["pages:1", "pages:2", "pages:3", "pages:4", "pages:5", "pages:x", "pages:y"] };
     const chain = [item("pages", "1", 9), ...[2, 3, 4, 5].map((n) => item("pages", String(n), 9 - n, { parentId: String(n - 1) }))];
     const cycle = [item("pages", "x", 1, { parentId: "y" }), item("pages", "y", 0, { parentId: "x" })];
-    const { items } = spaceTreeItems(deep, [...chain, ...cycle], options);
+    const { items } = spaceTreeItems(space, [...chain, ...cycle], options);
     expect(items.map((each) => each.depth)).toEqual([0, 1, 2, 3, 3, 0, 1]);
     expect(items.at(-2)!.title).toBe("x");
   });

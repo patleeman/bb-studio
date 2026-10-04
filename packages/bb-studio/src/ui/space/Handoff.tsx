@@ -12,7 +12,6 @@ import { GHOST_BUTTON, Icon } from "@bb-studio/kit/app";
 import { useState } from "react";
 import { useCall } from "./data";
 import { OpenSpacePage } from "./ThreadSpacePage";
-import { PORTAL_SCOPE } from "./styles";
 
 export function HandoffDialog({ threadId, projectId, open, onOpenChange, onDone }: {
   threadId: string;

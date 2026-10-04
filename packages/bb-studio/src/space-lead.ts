@@ -12,11 +12,9 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { NewThreadRequestInput, SpaceLeadView, SpaceOverviewView, SpaceRun } from "./contract";
 import type { HubItem } from "./hub";
-import type { ProjectSpaceStore } from "./office/legacy-spaces";
-import { PERSONAL_PROJECT_ID } from "./office/migration";
 import { backgroundKinds } from "./query";
 import { pageHref, PAGES_PLUGIN_ID } from "./space-page";
-import { inSpace, spacePath, THREAD_REF, type Space } from "./spaces";
+import { inSpace, PERSONAL_PROJECT_ID, spacePath, THREAD_REF, type Space, type SpaceStore } from "./spaces";
 
 type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
@@ -30,7 +28,7 @@ const SNAPSHOT_MS = 60_000;
 export interface SpaceLeadDeps {
   db: Database.Database;
   sdk: Sdk;
-  spaces: ProjectSpaceStore;
+  spaces: SpaceStore;
   /** The space's home page id, made from the space template if it has none; null without Pages. */
   ensurePage(spaceId: string): Promise<string | null>;
   hub: { overview(): Promise<{ items: HubItem[]; providers: { pluginId: string; kinds: { id: string; background?: boolean }[] }[] }> };
@@ -220,7 +218,7 @@ export class SpaceLeads {
     const threads = (async () => {
       const result: Record<string, string> = {};
       const owners = this.deps.spaces.threads.all();
-      const spaces = this.deps.spaces.office.list();
+      const spaces = this.deps.spaces.list();
       const byProject = new Map(spaces.flatMap((space) => space.projectIds.map((projectId) => [projectId, space.id] as const)));
       const fallback = spaces.find((space) => space.isDefault)?.id ?? null;
       for (const thread of await this.list({ archived: false })) {

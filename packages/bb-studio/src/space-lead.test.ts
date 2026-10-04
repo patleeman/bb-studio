@@ -1,11 +1,9 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { StudioHub, type HubItem } from "./hub";
-import { initializeOffice } from "./office/server";
+import type { HubItem } from "./hub";
 import { SpaceLeads } from "./space-lead";
-import { migrateThreadOwners } from "./space-threads";
-import { THREAD_REF } from "./spaces";
+import { SpaceStore, THREAD_REF } from "./spaces";
 
 const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
@@ -52,7 +50,7 @@ async function setup() {
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
-  const { spaces } = await initializeOffice(bb, db, new StudioHub(bb.sdk), { folderRoot: "/nonexistent-test-root" });
+  const spaces = new SpaceStore(db);
   const garden = spaces.create({ name: "Garden", defaultProjectId: "p" });
   const kitchen = spaces.create({ name: "Kitchen", defaultProjectId: "q" });
   let pageCount = 0;
@@ -112,31 +110,7 @@ it("starts threads in the space and keeps each thread in one space", async () =>
   // Taking it out falls back to its project's space.
   x.spaces.removeMembers(x.kitchen.id, [{ pluginId: THREAD_REF, id: threadId }]);
   expect(x.spaces.ownerOfThread({ id: threadId, projectId: "p" })).toBe(x.garden.id);
-  expect(() => x.spaces.add(x.kitchen.id, [{ pluginId: "pages", id: "pg" }])).toThrow("folder");
-});
-
-it("migrates threads in several spaces to the one they joined last, once", async () => {
-  const x = await setup();
-  x.db.prepare("DELETE FROM office_migrations WHERE id = 'space-thread-owner-v1'").run();
-  const tag = x.db.prepare("INSERT INTO tags (id, name, color, created_at, kind) VALUES (?, ?, '#000', 1, 'tag')");
-  tag.run(x.garden.id, "Garden"); tag.run(x.kitchen.id, "Kitchen");
-  const member = x.db.prepare("INSERT INTO item_tags (plugin_id, item_id, tag_id, created_at) VALUES (?, ?, ?, ?)");
-  member.run("bb-thread", "old", x.garden.id, 10);
-  member.run("bb-thread", "old", x.kitchen.id, 20);
-  member.run("bb-thread", "solo", x.garden.id, 5);
-  member.run("pages", "pg", x.kitchen.id, 5);
-  const log = vi.fn();
-  migrateThreadOwners(x.db, log);
-  expect(x.spaces.threads.explicit("old")).toBe(x.kitchen.id);
-  expect(x.spaces.threads.explicit("solo")).toBe(x.garden.id);
-  expect(log).toHaveBeenCalledTimes(1);
-  expect(log.mock.calls[0]![0]).toContain(`keeping ${x.kitchen.id}, dropping ${x.garden.id}`);
-  expect(x.db.prepare("SELECT plugin_id FROM item_tags").all()).toEqual([{ plugin_id: "pages" }]);
-  expect(x.db.prepare("SELECT id FROM tags").all()).toEqual([{ id: x.kitchen.id }]);
-  member.run("bb-thread", "late", x.garden.id, 30);
-  migrateThreadOwners(x.db, log);
-  expect(x.spaces.threads.explicit("late")).toBeNull();
-  expect(log).toHaveBeenCalledTimes(1);
+  expect(() => x.spaces.add(x.kitchen.id, [{ pluginId: "pages", id: "pg" }])).toThrow("follow their project");
 });
 
 it("overviews implicit and explicit threads and the space's items", async () => {

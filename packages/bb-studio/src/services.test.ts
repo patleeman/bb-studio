@@ -15,11 +15,8 @@ function setup() {
 
 describe("Studio services", () => {
   it("keeps existing item threads when adding multiple item refs", () => {
-    const db = new Database(":memory:");
-    for (const migration of MIGRATIONS.slice(0, -1)) db.exec(migration);
-    db.prepare("INSERT INTO item_threads VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run("thr_old", page.pluginId, page.id, "chat", "idle", 1, 1, "{}");
-    db.exec(MIGRATIONS.at(-1)!);
-    const services = new StudioServices(db);
+    const { services } = setup();
+    services.linkThread({ threadId: "thr_old", ref: page, role: "chat", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });
     services.linkThread({ threadId: "thr_old", ref: task, role: "new-thread", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });
     expect(services.threadsForThread("thr_old").map((thread) => thread.ref)).toEqual(expect.arrayContaining([page, task]));
   });

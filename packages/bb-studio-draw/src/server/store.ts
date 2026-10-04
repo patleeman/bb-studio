@@ -16,16 +16,16 @@ export const MIGRATIONS = [
        name TEXT NOT NULL,
        data TEXT NOT NULL DEFAULT '{}',
        created_at INTEGER NOT NULL,
-       updated_at INTEGER NOT NULL
-     )`,
-  `ALTER TABLE drawings ADD COLUMN project_id TEXT;
-   ALTER TABLE drawings ADD COLUMN updated_by TEXT;
-   ALTER TABLE drawings ADD COLUMN archived_at INTEGER;`,
-  `ALTER TABLE drawings ADD COLUMN template INTEGER NOT NULL DEFAULT 0`,
-  `CREATE TABLE drawing_recovery_copies (
-     recovery_key TEXT PRIMARY KEY,
-     drawing_id TEXT NOT NULL
-   )`,
+       updated_at INTEGER NOT NULL,
+       project_id TEXT,
+       updated_by TEXT,
+       archived_at INTEGER,
+       template INTEGER NOT NULL DEFAULT 0
+     );
+   CREATE TABLE IF NOT EXISTS drawing_recovery_copies (
+       recovery_key TEXT PRIMARY KEY,
+       drawing_id TEXT NOT NULL
+     );`,
 ];
 
 export type DrawingRow = {
@@ -35,7 +35,7 @@ export type DrawingRow = {
   created_at: number;
   updated_at: number;
   project_id: string | null;
-  /** "user" or "agent"; null for drawings saved before Studio. */
+  /** "user" or "agent". */
   updated_by: string | null;
   archived_at: number | null;
   template: number;

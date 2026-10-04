@@ -1,4 +1,3 @@
-import { initializeOffice } from "./src/office/server";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
@@ -15,6 +14,9 @@ import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 //   query language (src/query.ts) drives the agent tool and CLI too.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
@@ -26,7 +28,8 @@ import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, type Space } from "./src/spaces";
-import { spaceItem, spaceKind } from "./src/space-items";
+import { SpaceFolders } from "./src/space-folders";
+import { spaceItem } from "./src/space-items";
 import { spaceTreeItems, TREE_THREADS } from "./src/space-tree";
 import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince, type SpaceWidget } from "./src/space-page";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
@@ -61,9 +64,20 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
-  // Set up below; office deletes call it only after the plugin has loaded.
-  let leads: SpaceLeads | undefined;
-  const { spaces, folders: officeFolders } = await initializeOffice(bb, db, hub, { onSpaceDeleted: (id) => void leads?.removeSpace(id).catch(() => {}) });
+  const spaces = new SpaceStore(db);
+  spaces.reconcileProjects((await bb.sdk.projects.list({ includePersonal: true })).map((project) => project.id));
+  // A new space gets its own catch-all project under ~/Spaces (src/space-folders.ts).
+  const folders = new SpaceFolders(db, spaces, {
+    root: join(homedir(), "Spaces"),
+    mkdir: async (path) => { await mkdir(path, { recursive: true }); },
+    projects: async () => (await bb.sdk.projects.list({ includePersonal: true })).map((project) => ({ id: project.id, name: project.name, path: (project.sources.find((source) => source.isDefault) ?? project.sources[0])?.path ?? null })),
+    createProject: async (name, path) => {
+      const hostId = (await bb.sdk.system.config()).primaryHostId;
+      if (!hostId) throw new Error("Connect the primary host before making a space.");
+      const project = await bb.sdk.projects.create({ name, source: { type: "local_path", hostId, path } });
+      return { id: project.id, name: project.name, path };
+    },
+  });
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
   const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
@@ -99,10 +113,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.idle", ({ thread }) => updateThread(thread.id, "idle"));
   bb.events.on("thread.failed", ({ thread }) => updateThread(thread.id, "failed"));
   bb.events.on("thread.archived", ({ thread }) => updateThread(thread.id, "archived"));
-  bb.events.on("thread.deleted", ({ thread }) => {
-    tags.forget(THREAD_REF, [thread.id]);
-    updateThread(thread.id, "deleted");
-  });
+  bb.events.on("thread.deleted", ({ thread }) => updateThread(thread.id, "deleted"));
   bb.events.on("thread.unarchived", ({ thread }) => updateThread(thread.id, "idle"));
   // The composer does not expose a thread id to add-ons. Its first accepted
   // input still contains the item's link or mention, so link it when saved.
@@ -186,7 +197,6 @@ export default async function plugin(bb: BbPluginApi) {
       closed = tabs.prune(provider.pluginId, live) || closed;
     }
     if (closed) tabsChanged();
-    inheritParentSpaces(result.items);
     const assigned = tags.assignments();
     const allSpaces = spaces.list();
     const inSpaces = spaceAssignments(allSpaces, result.items);
@@ -273,14 +283,6 @@ export default async function plugin(bb: BbPluginApi) {
     // Item ownership follows its project; linking a thread does not refile it.
     if (joining.length) tagsChanged();
   };
-  // A sub-item joins its parent's spaces once, when it's new; taking it out
-  // later sticks. Add-ons say an item is new only by its createdAt.
-  const inheritParentSpaces = (items: readonly HubItem[]) => {
-    const joined = spaces.inheritParents(items, PAGES_PLUGIN_ID);
-    if (joined) tagsChanged();
-    return joined;
-  };
-
   const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean(), title: z.string().optional(), icon: z.string().optional() }).nullable() });
   const callPages = <T extends z.ZodType>(method: string, input: unknown, outputSchema: T) =>
     bb.sdk.plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) }) as Promise<z.infer<T>>;
@@ -379,7 +381,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   const deleteSpace = (id: string) => {
     const pageId = spaces.get(id)?.pageId;
-    void leads?.removeSpace(id).catch(() => {});
+    void spaceLeads.removeSpace(id).catch(() => {});
     spaces.remove(id);
     // The page may hold the user's writing: archive it rather than delete it.
     if (pageId) void callPages("update", { id: pageId, archived: true }, pageResult).catch(() => {});
@@ -390,8 +392,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (space.pageId) void callPages("update", { id: space.pageId, title: space.name, icon: space.icon ?? "" }, pageResult).catch(() => {});
   };
   // Each space's lead thread works beside its page (src/space-lead.ts).
-  leads = new SpaceLeads({ db, sdk: bb.sdk, spaces, ensurePage: spacePage, hub, changed: tagsChanged });
-  const spaceLeads = leads;
+  const spaceLeads = new SpaceLeads({ db, sdk: bb.sdk, spaces, ensurePage: spacePage, hub, changed: tagsChanged });
   /** A thread's space can change without a membership write; sidebars refetch space_of_threads. */
   const threadsMoved = () => { spaceLeads.threadsChanged(); tagsChanged(); };
   bb.events.on("thread.created", () => threadsMoved());
@@ -532,7 +533,7 @@ export default async function plugin(bb: BbPluginApi) {
     createSpace: async (input) => {
       const made = spaces.create(input);
       tagsChanged();
-      await officeFolders.ensureCatchAll(made.id);
+      await folders.ensureCatchAll(made.id);
       return { space: spaces.get(made.id) ?? made };
     },
     updateSpace: ({ id, ...input }) => {
@@ -679,7 +680,6 @@ export default async function plugin(bb: BbPluginApi) {
           fresh = await hub.get(pluginId, ids);
         } catch { fresh = null; changes.append(null); }
       }
-      if (fresh?.length) inheritParentSpaces(fresh);
       const byId = new Map(fresh?.map((item) => [item.id, item]));
       for (const id of fresh === null ? [] : (ids ?? [])) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
       for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });

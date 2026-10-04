@@ -57,7 +57,7 @@ describe("the migrations", () => {
     const { MIGRATIONS } = await import("./store");
     // BB refuses to start a plugin whose recorded migrations changed.
     expect(createHash("sha256").update(MIGRATIONS[0]!).digest("hex")).toBe(
-      "725e70ae34865747821d93978a139723a029f6f49072061691ead382b52b9d35",
+      "991b718c33627a35075e1a571c79901e3962c96132112e6733746fd6e204899c",
     );
   });
 });

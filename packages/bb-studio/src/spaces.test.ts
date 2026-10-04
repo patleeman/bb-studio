@@ -1,56 +1,43 @@
+import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { inSpace, linkedSpaceIds, parentSpaceIds, PROJECT_REF, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace } from "./spaces";
+import { inSpace, linkedSpaceIds, PERSONAL_PROJECT_ID, PROJECT_REF, spaceAssignments, SpaceStore, spacePath, THREAD_REF } from "./spaces";
 import { pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince } from "./space-page";
 import { TagStore } from "./tags";
 import { firstThreadSpaceIds } from "./thread-item-refs";
 
 function stores() {
   const db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
   for (const statement of MIGRATIONS) db.exec(statement);
-  return { tags: new TagStore(db), spaces: new SpaceStore(db) };
+  return { db, tags: new TagStore(db), spaces: new SpaceStore(db) };
 }
 
-const page = { pluginId: "pages", id: "pg_1", projectId: null };
-const drawing = { pluginId: "excalidraw", id: "d1", projectId: "proj_app" };
-
 describe("spaces", () => {
-  it("keeps an inherited child removed after the store restarts while the child is still new", () => {
-    const db = new Database(":memory:");
-    for (const statement of MIGRATIONS) db.exec(statement);
-    const spaces = new SpaceStore(db);
-    const launch = spaces.create({ name: "Launch" });
-    spaces.add(launch.id, [{ pluginId: "pages", id: "parent" }]);
-    const child = { pluginId: "pages", id: "child", parentId: "parent", projectId: null, createdAt: 1_000, archived: false };
-    expect(spaces.inheritParents([child], "pages", 2_000)).toBe(true);
-    spaces.removeMembers(launch.id, [child]);
-    const restarted = new SpaceStore(db);
-    expect(restarted.inheritParents([child], "pages", 3_000)).toBe(false);
-    expect(restarted.get(launch.id)!.itemKeys).toEqual(["pages:parent"]);
-    // Expiring the marker cannot make an old child inherit again.
-    expect(restarted.inheritParents([child], "pages", 122_000)).toBe(false);
-    expect(db.prepare("SELECT * FROM item_space_inheritance").all()).toEqual([]);
-    // Explicit filing still works after automatic inheritance was suppressed.
-    restarted.add(launch.id, [child]);
-    expect(restarted.get(launch.id)!.itemKeys).toContain("pages:child");
-    db.close();
+  it("set up on an empty data directory, and again on restart", async () => {
+    const { bb, harness } = createFakePluginHost({ pluginId: "studio" });
+    try {
+      const db = bb.storage.database();
+      bb.storage.migrate(db, MIGRATIONS);
+      expect(new SpaceStore(db).list().map((space) => space.name)).toEqual(["Personal"]);
+      bb.storage.migrate(db, MIGRATIONS);
+      expect(new SpaceStore(db).list()).toHaveLength(1);
+    } finally { await harness.lifecycle.dispose(); }
   });
 
-  it("commits inheritance membership and its durable marker together", () => {
-    const db = new Database(":memory:");
-    for (const statement of MIGRATIONS) db.exec(statement);
-    const spaces = new SpaceStore(db);
-    const launch = spaces.create({ name: "Launch" });
-    spaces.add(launch.id, [{ pluginId: "pages", id: "parent" }]);
-    db.exec("CREATE TRIGGER fail_inheritance BEFORE INSERT ON item_tags WHEN NEW.item_id = 'child' BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;");
-    const child = { pluginId: "pages", id: "child", parentId: "parent", projectId: null, createdAt: 1_000, archived: false };
-    expect(() => spaces.inheritParents([child], "pages", 2_000)).toThrow("simulated write failure");
-    expect(db.prepare("SELECT * FROM item_space_inheritance").all()).toEqual([]);
-    db.exec("DROP TRIGGER fail_inheritance");
-    expect(spaces.inheritParents([child], "pages", 2_000)).toBe(true);
-    expect(spaces.get(launch.id)!.itemKeys).toContain("pages:child");
-    db.close();
+
+  it("start with the default space, which owns Personal and unknown projects", () => {
+    const { db, spaces } = stores();
+    const personal = spaces.defaultSpace();
+    expect(personal).toMatchObject({ name: "Personal", isDefault: true, defaultProjectId: PERSONAL_PROJECT_ID, projectIds: [PERSONAL_PROJECT_ID] });
+    // Opening the store again keeps the one default space.
+    expect(new SpaceStore(db).list()).toHaveLength(1);
+    expect(spaces.forProject(null).id).toBe(personal.id);
+    expect(spaces.forProject("outside").id).toBe(personal.id);
+    spaces.reconcileProjects(["outside"]);
+    expect(spaces.defaultSpace().projectIds).toContain("outside");
+    expect(() => spaces.remove(personal.id)).toThrow("can't be deleted");
   });
 
   it("keep their page, and start it with every widget", () => {
@@ -78,67 +65,56 @@ describe("spaces", () => {
     expect(widgetsSince(0)).toEqual([...SPACE_WIDGETS]);
   });
 
-  it("are kept apart from tags", () => {
-    const { tags, spaces } = stores();
-    const launch = spaces.create({ name: "Launch", description: "Q4 launch" });
-    tags.ensure("Research");
-    expect(tags.list().map((tag) => tag.name)).toEqual(["Research"]);
-    expect(spaces.list().map((space) => space.name)).toEqual(["Launch"]);
-    // Tag operations can't reach a space.
-    expect(() => tags.ensure("launch")).toThrow(/is a space/);
-    tags.apply([page], [launch.id], []);
-    expect(spaces.get(launch.id)!.itemKeys).toEqual([]);
-    tags.remove(launch.id);
-    expect(spaces.get(launch.id)).not.toBeNull();
-    expect(() => tags.rename(launch.id, "Other")).toThrow();
-  });
-
-  it("share names with tags without clashing", () => {
+  it("are kept apart from tags, and have unique names", () => {
     const { tags, spaces } = stores();
     tags.ensure("Launch");
-    expect(() => spaces.create({ name: "launch" })).toThrow(/tag called/);
-    const space = spaces.create({ name: "Orbit" });
-    expect(() => tags.rename(tags.byName("Launch")!.id, "orbit")).toThrow(/space called/);
-    expect(() => spaces.update(space.id, { name: "Launch" })).toThrow(/tag called/);
+    const launch = spaces.create({ name: "Launch" });
+    expect(tags.list().map((tag) => tag.name)).toEqual(["Launch"]);
+    expect(() => spaces.create({ name: "launch" })).toThrow(/space called/);
+    const orbit = spaces.create({ name: "Orbit" });
+    expect(() => spaces.update(orbit.id, { name: "LAUNCH" })).toThrow(/space called/);
+    expect(spaces.update(launch.id, { name: "Launch 2", icon: "🚀" })).toMatchObject({ name: "Launch 2", icon: "🚀" });
   });
 
-  it("hold items, projects and threads", () => {
+  it("own whole projects, and threads added one by one", () => {
     const { spaces } = stores();
     const space = spaces.create({ name: "Launch", defaultProjectId: "proj_app" });
     expect(space.projectIds).toEqual(["proj_app"]);
-    spaces.add(space.id, [page, { pluginId: THREAD_REF, id: "thr_1" }, { pluginId: PROJECT_REF, id: "proj_docs" }]);
+    spaces.add(space.id, [{ pluginId: THREAD_REF, id: "thr_1" }, { pluginId: PROJECT_REF, id: "proj_docs" }]);
     const held = spaces.get(space.id)!;
-    expect(held.itemKeys).toEqual(["pages:pg_1"]);
     expect(held.threadIds).toEqual(["thr_1"]);
     expect(held.projectIds.sort()).toEqual(["proj_app", "proj_docs"]);
-    // A project's items and threads belong without being added.
+    expect(() => spaces.add(space.id, [{ pluginId: "pages", id: "pg_1" }])).toThrow(/follow their project/);
+    const drawing = { pluginId: "excalidraw", id: "d1", projectId: "proj_app" };
+    const global = { pluginId: "pages", id: "pg_2", projectId: null };
     expect(inSpace(held, drawing)).toBe(true);
-    expect(inSpace(held, { pluginId: "pages", id: "pg_2", projectId: null })).toBe(false);
-    expect(threadInSpace(held, { id: "thr_2", projectId: "proj_docs" })).toBe(true);
-    expect(threadInSpace(held, { id: "thr_1", projectId: "proj_other" })).toBe(true);
-    expect(threadInSpace(held, { id: "thr_3", projectId: "proj_other" })).toBe(false);
-    expect(spaceAssignments([held], [page, drawing, { pluginId: "pages", id: "pg_2", projectId: null }])).toEqual(
-      new Map([["pages:pg_1", [space.id]], ["excalidraw:d1", [space.id]]]),
-    );
+    expect(inSpace(held, global)).toBe(false);
+    expect(spaceAssignments([held, spaces.defaultSpace()], [drawing, global])).toEqual(new Map([["excalidraw:d1", [space.id]], ["pages:pg_2", [spaces.defaultSpace().id]]]));
+    // A thread is in one space: the one it was added to, else its project's.
+    expect(spaces.ownerOfThread({ id: "thr_1", projectId: null })).toBe(space.id);
+    expect(spaces.ownerOfThread({ id: "thr_2", projectId: "proj_docs" })).toBe(space.id);
+    spaces.removeMembers(space.id, [{ pluginId: THREAD_REF, id: "thr_1" }, { pluginId: PROJECT_REF, id: "proj_docs" }]);
+    expect(spaces.ownerOfThread({ id: "thr_1", projectId: null })).toBe(spaces.defaultSpace().id);
+    expect(spaces.forProject("proj_docs").isDefault).toBe(true);
   });
 
-  it("clear the default project when it leaves", () => {
+  it("protect a catch-all project and Personal", () => {
     const { spaces } = stores();
     const space = spaces.create({ name: "Launch", defaultProjectId: "proj_app" });
-    spaces.removeMembers(space.id, [{ pluginId: PROJECT_REF, id: "proj_app" }]);
-    expect(spaces.get(space.id)).toMatchObject({ projectIds: [], defaultProjectId: null });
+    expect(() => spaces.moveProject("proj_app", spaces.defaultSpace().id)).toThrow(/catch-all/);
+    expect(() => spaces.moveProject(PERSONAL_PROJECT_ID, space.id)).toThrow(/Personal/);
   });
 
-  it("forget deleted items and leave members alone when deleted", () => {
-    const { tags, spaces } = stores();
-    const space = spaces.create({ name: "Launch" });
-    spaces.add(space.id, [page, { pluginId: THREAD_REF, id: "thr_1" }]);
-    // Pruning a provider's items leaves thread and project members be.
-    tags.prune("pages", new Set());
-    expect(spaces.get(space.id)).toMatchObject({ itemKeys: [], threadIds: ["thr_1"] });
+  it("hand their projects and threads back to the default space when deleted", () => {
+    const { db, spaces } = stores();
+    const space = spaces.create({ name: "Launch", defaultProjectId: "proj_app" });
+    spaces.add(space.id, [{ pluginId: THREAD_REF, id: "thr_1" }]);
     spaces.remove(space.id);
-    expect(spaces.list()).toEqual([]);
-    expect(() => spaces.add(space.id, [page])).toThrow(/no longer exists/);
+    expect(spaces.list().map((each) => each.name)).toEqual(["Personal"]);
+    expect(spaces.forProject("proj_app").isDefault).toBe(true);
+    expect(spaces.threads.explicit("thr_1")).toBeNull();
+    expect(() => spaces.add(space.id, [{ pluginId: THREAD_REF, id: "thr_2" }])).toThrow(/no longer exists/);
+    expect(db.pragma("foreign_key_check")).toEqual([]);
   });
 
   it("finds a space by id or name", () => {
@@ -154,22 +130,5 @@ describe("spaces", () => {
     expect(linkedSpaceIds(`Work on ${link} and ${link}`)).toEqual(["spc_0123456789abcdef"]);
     expect(firstThreadSpaceIds([{ type: "client/thread/start", data: { input: [{ type: "text", text: `In ${link}` }] } }])).toEqual(["spc_0123456789abcdef"]);
     expect(firstThreadSpaceIds([])).toBeNull();
-  });
-
-  it("take in sub-items made under their items or their page", () => {
-    const { spaces } = stores();
-    const launch = spaces.create({ name: "Launch" });
-    spaces.setPage(launch.id, "pg_home");
-    spaces.add(launch.id, [{ pluginId: "pages", id: "pg_1" }]);
-    const app = spaces.create({ name: "App" });
-    spaces.add(app.id, [{ pluginId: PROJECT_REF, id: "proj_app" }, { pluginId: "pages", id: "pg_1" }]);
-    const all = spaces.list();
-    const child = (parentId: string | null, projectId: string | null = null) => ({ pluginId: "pages", id: "pg_2", parentId, projectId });
-    expect(parentSpaceIds(all, child("pg_1"), "pages")).toEqual([app.id, launch.id]);
-    // Already in App through its project.
-    expect(parentSpaceIds(all, child("pg_1", "proj_app"), "pages")).toEqual([launch.id]);
-    expect(parentSpaceIds(all, child("pg_home"), "pages")).toEqual([launch.id]);
-    expect(parentSpaceIds(all, { ...child("pg_home"), pluginId: "excalidraw" }, "pages")).toEqual([]);
-    expect(parentSpaceIds(all, child(null), "pages")).toEqual([]);
   });
 });

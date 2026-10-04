@@ -1,7 +1,6 @@
 // Tags group Studio items across add-ons. Studio keeps them, keyed by
 // `<plugin>:<id>`, so every add-on's items can be tagged without the add-on
-// knowing about tags. Spaces live in the same table with kind 'space'
-// (src/spaces.ts); everything here sees plain tags only.
+// knowing about tags. Spaces are separate (src/spaces.ts).
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 
@@ -28,24 +27,19 @@ export function tagName(raw: string): string {
   return name;
 }
 
-/** Whether a space already has this name; tags and spaces share names. */
-export function takenBySpace(db: Database.Database, name: string): boolean {
-  return db.prepare("SELECT 1 FROM tags WHERE name = ? COLLATE NOCASE AND kind = 'space'").get(name) !== undefined;
-}
-
 export class TagStore {
   constructor(private readonly db: Database.Database) {}
 
   list(): Tag[] {
-    return this.db.prepare("SELECT id, name, color FROM tags WHERE kind = 'tag' ORDER BY name COLLATE NOCASE").all() as Tag[];
+    return this.db.prepare("SELECT id, name, color FROM tags ORDER BY name COLLATE NOCASE").all() as Tag[];
   }
 
   get(id: string): Tag | null {
-    return (this.db.prepare("SELECT id, name, color FROM tags WHERE id = ? AND kind = 'tag'").get(id) as Tag | undefined) ?? null;
+    return (this.db.prepare("SELECT id, name, color FROM tags WHERE id = ?").get(id) as Tag | undefined) ?? null;
   }
 
   byName(name: string): Tag | null {
-    return (this.db.prepare("SELECT id, name, color FROM tags WHERE name = ? COLLATE NOCASE AND kind = 'tag'").get(tagName(name)) as Tag | undefined) ?? null;
+    return (this.db.prepare("SELECT id, name, color FROM tags WHERE name = ? COLLATE NOCASE").get(tagName(name)) as Tag | undefined) ?? null;
   }
 
   /** The tag with this name, made if it doesn't exist yet. */
@@ -53,7 +47,6 @@ export class TagStore {
     const name = tagName(raw);
     const existing = this.byName(name);
     if (existing) return existing;
-    if (takenBySpace(this.db, name)) throw new Error(`"${name}" is a space, not a tag.`);
     const count = (this.db.prepare("SELECT COUNT(*) AS n FROM tags").get() as { n: number }).n;
     const tag = { id: newId("tag"), name, color: TAG_COLORS[count % TAG_COLORS.length]! };
     this.db.prepare("INSERT INTO tags (id, name, color, created_at) VALUES (?, ?, ?, ?)").run(tag.id, tag.name, tag.color, Date.now());
@@ -64,8 +57,7 @@ export class TagStore {
     const name = tagName(raw);
     const clash = this.byName(name);
     if (clash && clash.id !== id) throw new Error(`There's already a tag called "${clash.name}".`);
-    if (takenBySpace(this.db, name)) throw new Error(`There's already a space called "${name}".`);
-    if (this.db.prepare("UPDATE tags SET name = ? WHERE id = ? AND kind = 'tag'").run(name, id).changes === 0) throw new Error("That tag no longer exists.");
+    if (this.db.prepare("UPDATE tags SET name = ? WHERE id = ?").run(name, id).changes === 0) throw new Error("That tag no longer exists.");
     return this.get(id)!;
   }
 
@@ -80,7 +72,7 @@ export class TagStore {
   /** Tag ids per `<plugin>:<id>`. */
   assignments(): Map<string, string[]> {
     const rows = this.db
-      .prepare("SELECT plugin_id, item_id, tag_id FROM item_tags JOIN tags ON tags.id = item_tags.tag_id WHERE tags.kind = 'tag' ORDER BY tags.name COLLATE NOCASE")
+      .prepare("SELECT plugin_id, item_id, tag_id FROM item_tags JOIN tags ON tags.id = item_tags.tag_id ORDER BY tags.name COLLATE NOCASE")
       .all() as { plugin_id: string; item_id: string; tag_id: string }[];
     const map = new Map<string, string[]>();
     for (const row of rows) {
