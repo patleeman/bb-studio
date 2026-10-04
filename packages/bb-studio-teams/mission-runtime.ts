@@ -7,7 +7,7 @@ import { ChannelData } from "./channel-data";
 import { defaultLimits } from "./workspace-contract";
 import { publishChange } from "./realtime-server";
 import { isExecuting } from "./job-state";
-import { activitySnippetFromTimeline, isPassReply } from "./activity";
+import { activitySnippetFromTimeline } from "./activity";
 import { advanceTurnClock } from "./turn-clock";
 import { jobHasProgress, retryStalled, stalledAfterRetry } from "./mission-stall";
 export const errorText = (cause: unknown) => cause instanceof Error ? cause.message : String(cause);
@@ -17,7 +17,6 @@ export const jobPrompt = (job: Job) => ["Read MISSION.md and MEMORY.md before ac
 export const jobInput = (job: Job) => [{ type: "text" as const, text: jobPrompt(job), mentions: [] }];
 type TimelineRowLike = {kind?: unknown; role?: unknown; text?: unknown; children?: unknown};
 export function timelineRows(rows: unknown): TimelineRowLike[] { return Array.isArray(rows) ? rows.flatMap(row => row && typeof row === "object" ? [row, ...timelineRows(row.children)] : []) : []; }
-/** Only legacy mission scheduling is managed here. Views use BB's ordinary threads. */
 export class Runtime {
 readonly locks = new Map<string, Promise<unknown>>();
 readonly busy = new Map<string, {threadId:string;at:number}>();
@@ -26,7 +25,7 @@ readonly onChanged = new Set<() => void>();
 readonly data: ChannelData;
 constructor(readonly bb: BbPluginApi, readonly store: Store) { this.data = new ChannelData(store); }
 changed(scope: "all"|"bots"|"channel"="all", id?:string) { publishChange(this.bb,scope,id); for(const fn of this.onChanged) fn(); }
-permissionMode(bot: Bot, _roomId?: string | null): Promise<PermissionMode> { return Promise.resolve(permissionModeFor(bot.providerId, bot.permissionMode)); }
+permissionMode(bot: Bot): Promise<PermissionMode> { return Promise.resolve(permissionModeFor(bot.providerId, bot.permissionMode)); }
 async locked<T>(id: string, work: () => Promise<T>): Promise<T> {
     const next = (this.locks.get(id) ?? Promise.resolve())
       .catch(() => {})
@@ -84,7 +83,7 @@ async conversation(
       ],
       sendAt: Date.now() + (emptyDirectMessage ? 60_000 : 1500),
       ...(kind === "admin" ? {} : {
-        title: kind === "group" ? `${bot.name} work · #${title}` : `${bot.name} · ${title}`,
+        title: `${bot.name} · ${title}`,
       }),
       // A thread with a profile is an ordinary thread; bot work stays hidden.
       visibility: "visible",
@@ -356,7 +355,7 @@ complete( threadId: string, text: string | null, error?: string, providerFailure
       job.status = "error";
       job.error = error;
     } else {
-      job.reply = isPassReply(text) ? null : text?.trim() || null;
+      job.reply = text?.trim() || null;
       job.error = null;
       job.status = "done";
     }
@@ -688,7 +687,7 @@ async driveJob( bot: Bot, job: Job, forkJob: boolean) {
             reasoningLevel: bot.fallbackReasoningLevel,
           }
         : bot;
-      const permissionMode = await this.permissionMode(executionBot, job.roomId);
+      const permissionMode = await this.permissionMode(executionBot);
       if (!c) c = await this.conversation(executionBot, job.conversationKey, "mission", "Mission", jobPrompt(job), [], permissionMode);
       else {
         // The dispatch hook runs during send and must already see this job.

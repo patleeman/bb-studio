@@ -822,7 +822,6 @@ public enum BotTeams {
 
   public enum ListOutputDirectConversationsValueItemKind: Sendable, Hashable, Codable {
     case admin
-    case group
     case mission
     case unknown(String)
 
@@ -830,7 +829,6 @@ public enum BotTeams {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
       case "admin": self = .admin
-      case "group": self = .group
       case "mission": self = .mission
       default: self = .unknown(value)
       }
@@ -840,7 +838,6 @@ public enum BotTeams {
       var container = encoder.singleValueContainer()
       switch self {
       case .admin: try container.encode("admin")
-      case .group: try container.encode("group")
       case .mission: try container.encode("mission")
       case .unknown(let value): try container.encode(value)
       }
@@ -3097,7 +3094,6 @@ public enum BotTeams {
 
   public enum GetOutputConversationsItemKind: Sendable, Hashable, Codable {
     case admin
-    case group
     case mission
     case unknown(String)
 
@@ -3105,7 +3101,6 @@ public enum BotTeams {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
       case "admin": self = .admin
-      case "group": self = .group
       case "mission": self = .mission
       default: self = .unknown(value)
       }
@@ -3115,7 +3110,6 @@ public enum BotTeams {
       var container = encoder.singleValueContainer()
       switch self {
       case .admin: try container.encode("admin")
-      case .group: try container.encode("group")
       case .mission: try container.encode("mission")
       case .unknown(let value): try container.encode(value)
       }
@@ -3543,7 +3537,6 @@ public enum BotTeams {
 
   public enum ConversationOutputKind: Sendable, Hashable, Codable {
     case admin
-    case group
     case mission
     case unknown(String)
 
@@ -3551,7 +3544,6 @@ public enum BotTeams {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
       case "admin": self = .admin
-      case "group": self = .group
       case "mission": self = .mission
       default: self = .unknown(value)
       }
@@ -3561,7 +3553,6 @@ public enum BotTeams {
       var container = encoder.singleValueContainer()
       switch self {
       case .admin: try container.encode("admin")
-      case .group: try container.encode("group")
       case .mission: try container.encode("mission")
       case .unknown(let value): try container.encode(value)
       }
@@ -3606,7 +3597,6 @@ public enum BotTeams {
 
   public enum NewConversationOutputKind: Sendable, Hashable, Codable {
     case admin
-    case group
     case mission
     case unknown(String)
 
@@ -3614,7 +3604,6 @@ public enum BotTeams {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
       case "admin": self = .admin
-      case "group": self = .group
       case "mission": self = .mission
       default: self = .unknown(value)
       }
@@ -3624,7 +3613,6 @@ public enum BotTeams {
       var container = encoder.singleValueContainer()
       switch self {
       case .admin: try container.encode("admin")
-      case .group: try container.encode("group")
       case .mission: try container.encode("mission")
       case .unknown(let value): try container.encode(value)
       }

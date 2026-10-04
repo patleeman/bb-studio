@@ -10,7 +10,7 @@ Open **Channels**, choose **New**, and select bots or existing threads from any 
 
 Choose a **Channel view** above the conversation. The choice is saved for each channel on this device:
 
-- **Merged** keeps the existing chronological conversation of owner input and final replies. It hides tools, inter-agent input, unfinished output, empty replies and `[PASS]` replies from older bot prompts.
+- **Merged** keeps the existing chronological conversation of owner input and final replies. It hides tools, inter-agent input, unfinished output, and empty replies.
 - **Grid** shows each member’s native BB transcript, including streaming output, tool activity and message directives. Spawned children appear as links beneath their parent; explicitly selected child threads have their own tiles.
 - **Active** gives working threads and requests for input the main area. All members stay visible in a compact rail. When nobody is working, select a member or send a channel message.
 - **Focus** shows one selected thread large, with the other members in the rail. Select a member or use a tile’s **Focus thread** button to switch.
@@ -34,11 +34,11 @@ A bot can run on an outside agent from the External Agents plugin: Hermes, OpenC
 
 Mission and memory editors reject stale saves. A profile can configure a fallback model for managed mission work; a provider failure retries the mission once in a fresh thread. Ordinary threads keep BB's model and retry controls. Archiving a bot stops managed work and turns off its mission interval; its ordinary threads and history remain available.
 
-Use BB Automations to schedule work in a normal thread. Scheduled findings go to Studio Feed with stable story keys. Legacy channel automations retain their triggers and enabled state while moving to normal profile threads. Channels live at `/plugins/bot-teams/channels/<id>`. Links from before the rename (`/views/<id>`) and links to old channels open the same channel, including single-bot ones. Old channel messages remain in storage and are not replayed or displayed.
+Use BB Automations to schedule work in a normal thread. Scheduled findings go to Studio Feed with stable story keys. Channels live at `/plugins/bot-teams/channels/<id>`. Old channel messages remain in storage and are not replayed or displayed.
 
 ## CLI and tools
 
-`bb bots --help` lists profile, mission, memory and channel commands: `bb bots channel-read`, `channel-create` and `channel-send`, with the older `view-*` names kept as aliases. Use `--json` for structured output. Agent tools provide `bots_views`, `bots_view_read`, `bots_view_create` and `bots_create`. Coordination uses `bb thread log` and `bb thread tell` with the owner's addressed roster.
+`bb bots --help` lists profile, mission, memory and channel commands: `bb bots channel-read`, `channel-create` and `channel-send`. Use `--json` for structured output. Agent tools provide `bots_views`, `bots_view_read`, `bots_view_create` and `bots_create`. Coordination uses `bb thread log` and `bb thread tell` with the owner's addressed roster.
 
 The public RPC contract is [client-contract.ts](client-contract.ts); channel schemas are [view-contract.ts](view-contract.ts). Bot and historical storage schemas remain in [contract.ts](contract.ts). The channel provider, channel orchestration, chat modes and channel tools have been removed.
 

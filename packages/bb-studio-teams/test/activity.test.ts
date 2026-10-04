@@ -1,7 +1,6 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { activitySnippetFromTimeline } from "../activity";
-import { channelWorkActivity } from "../channel-work";
 
 test("activity snippets use the latest useful transcript row", () => {
   assert.equal(
@@ -90,49 +89,14 @@ test("nested work rows are reduced to their latest visible detail", () => {
   );
 });
 
-test("empty and legacy [PASS] replies never become visible channel activity", () => {
-  for (const text of ["", " \n ", "[PASS]", " **[pass]** "])
+test("empty replies never become visible channel activity", () => {
+  for (const text of ["", " \n "])
     assert.equal(
       activitySnippetFromTimeline({
         rows: [{ kind: "conversation", role: "assistant", text }],
       }),
       null,
     );
-  assert.equal(
-    channelWorkActivity({ status: "running", activitySnippet: "" }),
-    "Working…",
-  );
-  assert.equal(
-    channelWorkActivity({
-      status: "running",
-      activitySnippet: "All checks PASS",
-    }),
-    "All checks PASS",
-  );
-});
-
-test("stopping and queued states replace stale activity in the compact row", () => {
-  assert.equal(
-    channelWorkActivity({
-      status: "running",
-      cancellationPending: true,
-      activitySnippet: "Reading files",
-    }),
-    "Stopping…",
-  );
-  assert.equal(
-    channelWorkActivity({
-      status: "queued",
-      queueReason: "Waiting for Atlas",
-      queuePosition: 2,
-      activitySnippet: "Old work",
-    }),
-    "Waiting for Atlas · Position 2",
-  );
-  assert.equal(
-    channelWorkActivity({ status: "dispatching", activitySnippet: "Old work" }),
-    "Preparing response…",
-  );
 });
 
 test("activity snippets skip rows from earlier turns in a reused thread", () => {

@@ -47,8 +47,8 @@ test("a profile can't change mid-response or on threads the plugin runs", async 
       x.harness.behavior.callRpc("setThreadProfile", { threadId: "thr_busy", botId: x.a.id }),
       /current response/,
     );
-    const group = await x.runtime.conversation(x.a, `group:${x.room.id}`, "group", x.room.name, "Review");
-    assert.equal(await x.harness.behavior.callRpc("threadProfile", { threadId: group.threadId }), null);
+    const mission = await x.runtime.conversation(x.a, "mission", "mission", "Mission", "Review");
+    assert.equal(await x.harness.behavior.callRpc("threadProfile", { threadId: mission.threadId }), null);
   } finally {
     await x.close();
   }

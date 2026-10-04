@@ -1263,7 +1263,6 @@
                     "type": "string",
                     "enum": [
                       "admin",
-                      "group",
                       "mission"
                     ]
                   },
@@ -3802,7 +3801,6 @@
                   "type": "string",
                   "enum": [
                     "admin",
-                    "group",
                     "mission"
                   ]
                 },
@@ -4323,7 +4321,6 @@
             "type": "string",
             "enum": [
               "admin",
-              "group",
               "mission"
             ]
           },
@@ -4393,7 +4390,6 @@
             "type": "string",
             "enum": [
               "admin",
-              "group",
               "mission"
             ]
           },

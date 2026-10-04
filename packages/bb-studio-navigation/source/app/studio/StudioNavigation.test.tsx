@@ -121,14 +121,11 @@ describe("Studio Navigation", () => {
 
   it("reaches channels through Studio, with a standalone fallback", () => {
     const channels = item("bot-teams/channels", "Channels");
-    const formerViews = item("bot-teams/former-views", "Channels");
-    renderNavigation([...ITEMS, channels, formerViews]);
+    renderNavigation([...ITEMS, channels]);
     expect(rowOrder()).not.toContain(channels.id);
-    expect(rowOrder()).not.toContain(formerViews.id);
     cleanup();
-    renderNavigation([...ITEMS.filter(entry => entry !== STUDIO), channels, formerViews]);
+    renderNavigation([...ITEMS.filter(entry => entry !== STUDIO), channels]);
     expect(rowOrder()).toContain(channels.id);
-    expect(rowOrder()).not.toContain(formerViews.id);
   });
 
   it("keeps add-on panels while the Studio hub can't open them", () => {

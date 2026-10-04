@@ -51,9 +51,7 @@ export default context => {
   id:"bots",packageDir:"bb-studio-teams",fileName:"staged-preview.png",
   setup:async client=>{
    await launchRoomThread(); const id=getLaunchRoomId();
-   // Channels used to live at /views/<id>; old links must land on the channel.
-   await client.navigate(`/plugins/bot-teams/views/${id}`);
-   await client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+15000;const tick=()=>location.pathname==="/plugins/bot-teams/channels/${id}"?resolve():Date.now()>end?reject(new Error("Old view link stayed at "+location.pathname)):setTimeout(tick,200);tick();})`,true);
+   await client.navigate(`/plugins/bot-teams/channels/${id}`);
    await client.waitForSelector('[data-thread-view]');
    for(const text of launchRoomReplies)await client.waitForText(text);
    await client.evaluate(`(()=>{

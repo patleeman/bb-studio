@@ -1,7 +1,6 @@
 import { createTestStore } from "./test-store";
 
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 
 
 
@@ -12,7 +11,7 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 
 
 import { Runtime } from "../mission-runtime";
-import { profileInput, type Bot, type Room } from "../contract";
+import { profileInput, type Bot } from "../contract";
 
 
 
@@ -112,21 +111,12 @@ export const setup = () => {
     b = bot("/tmp/b", "bot_1123456789abcdef", "Scribe");
   store.put(a);
   store.put(b);
-  const runtime = new Runtime(host.bb, store),
-    room: Room = {
-      id: randomUUID(),
-      name: "Research",
-      memberIds: [a.id, b.id],
-      paused: false,
-      createdAt: 1,
-      updatedAt: 1,
-    };
-  store.putRoom(room);
+  const runtime = new Runtime(host.bb, store);
   const close = async () => {
     await runtime.dispose();
     await host.harness.lifecycle.dispose();
   };
-  return { ...host, store, a, b, runtime, room, close };
+  return { ...host, store, a, b, runtime, close };
 };
 
 

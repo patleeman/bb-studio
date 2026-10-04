@@ -114,16 +114,4 @@ export class ThreadProfiles {
     }
     return this.newThread(bot);
   }
-
-  /** Old direct messages were hidden threads; show them as ordinary ones. */
-  async showMigrated() {
-    for (const threadId of this.store.profileThreadsToShow()) {
-      try {
-        await this.bb.sdk.threads.update({ threadId, visibility: "visible" });
-      } catch (cause) {
-        if (!missingThread(cause)) throw cause;
-      }
-      this.store.shownProfileThread(threadId);
-    }
-  }
 }

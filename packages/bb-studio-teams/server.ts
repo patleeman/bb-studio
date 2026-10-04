@@ -6,7 +6,7 @@ import { z } from "zod";
 import { rpcContract } from "./client-contract";
 import { fitProfileToProvider } from "./external-agents";
 import { profileInput, botSchema, type Bot, type BotCreateRequest, type Conversation } from "./contract";
-import { Store, newId, document, migrateAgentsFile } from "./store";
+import { Store, newId, document } from "./store";
 import { MIGRATIONS } from "./migrations";
 import { Runtime, missingThread } from "./mission-runtime";
 import { isExecuting } from "./job-state";
@@ -20,7 +20,6 @@ import { studioSchemas } from "@bb-studio/kit/contract";
 import { registerStudio } from "./studio-provider";
 import { registerViewMentions } from "./view-mentions";
 import { registerTeamsCli } from "./teams-cli";
-import { migrateViews } from "./view-migration";
 export { rpcContract } from "./client-contract";
 
 export default async function plugin(bb: BbPluginApi) {
@@ -253,11 +252,11 @@ export default async function plugin(bb: BbPluginApi) {
     ...views.handlers(),
     createBotSetupThread: async request => ({ threadId: (await bb.sdk.threads.spawn({ ...request, origin: "app", title: "Create a bot" })).id }),
     create: input => create(input),
-    usage: ({ id }) => runtime.data.usage(undefined, id),
+    usage: ({ id }) => runtime.data.usage(id),
     saveLimits: ({ id, limits }) => runtime.locked(id, async () => {
       const bot = store.get(id);
       store.put({ ...bot, limits, updatedAt: Math.max(Date.now(), bot.updatedAt + 1) });
-      runtime.changed(); return runtime.data.usage(undefined, id);
+      runtime.changed(); return runtime.data.usage(id);
     }),
     resolveBotCreateRequest: async ({ id, approved }) => {
       const request = store.botCreateRequest(id);
@@ -411,17 +410,7 @@ export default async function plugin(bb: BbPluginApi) {
     runtime.changed();
   });
   bb.background.service("bots", { async start(signal) {
-    await profiles.showMigrated();
-    for (const bot of store.all()) {
-      try { if (await migrateAgentsFile(bot.home)) bb.log.info(`Replaced the [PASS] instruction in ${bot.handle}'s AGENTS.md.`); }
-      catch (cause) { bb.log.warn(`Could not update ${bot.handle}'s AGENTS.md: ${String(cause)}`); }
-    }
-    let migrationRetryAt = 0;
     while (!signal.aborted) {
-      if (Date.now() >= migrationRetryAt) {
-        try { await migrateViews(bb, store, runtime, profiles, views); migrationRetryAt = Date.now() + 60_000; }
-        catch (cause) { migrationRetryAt = Date.now() + 60_000; bb.log.warn(`View migration will retry: ${String(cause)}`); }
-      }
       try { await recoverApprovedBotCreates(signal); await runtime.tickMissions(); }
       catch (cause) { bb.log.warn(`Bot maintenance failed: ${String(cause)}`); }
       try { await delay(1500, undefined, { signal }); } catch { break; }

@@ -2,13 +2,12 @@ import { z } from "zod";
 import { rpcContract as botContract } from "./contract";
 import { viewContract, threadViewSchema } from "./view-contract";
 
-/** Public Teams API. Channel execution and transcript APIs are retired. */
 export const rpcContract = {
   ...viewContract,
-  list: { input: z.null(), output: botContract.list.output.omit({ rooms: true, activeRoomIds: true, roomThreads: true, roomWork: true, attentionCounts: true, approvalCounts: true }).extend({ views: z.array(threadViewSchema) }) },
-  spaceConversations: { input: z.null(), output: botContract.spaceConversations.output.omit({ channels: true }) },
+  list: { input: z.null(), output: botContract.list.output.extend({ views: z.array(threadViewSchema) }) },
+  spaceConversations: botContract.spaceConversations,
   createBotSetupThread: botContract.createBotSetupThread,
-  create: { ...botContract.create, input: botContract.create.input.omit({ roomId: true }) },
+  create: botContract.create,
   resolveBotCreateRequest: botContract.resolveBotCreateRequest,
   update: botContract.update,
   swapModel: botContract.swapModel,

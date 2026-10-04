@@ -7,7 +7,6 @@ import { permissionModeFor } from "./external-agents";
 import type { ThreadProfiles } from "./thread-profiles";
 import { missingThread } from "./mission-runtime";
 import { isBroadcastHandle } from "./mentions";
-import { isPassReply } from "./activity";
 
 type Timeline = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["timeline"]>>;
 type Row = Timeline["rows"][number];
@@ -55,7 +54,7 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
     }
   };
   walk(rows);
-  for (const row of replies.values()) if (row.text.trim() && !isPassReply(row.text)) entries.push({
+  for (const row of replies.values()) if (row.text.trim()) entries.push({
     id: `${row.threadId}:${row.id}`, threadId: row.threadId, role: "assistant", text: row.text,
     createdAt: row.createdAt, groupId: null,
   });
@@ -68,11 +67,9 @@ export class ThreadViews {
   constructor(readonly bb: BbPluginApi, readonly store: Store, readonly profiles: ThreadProfiles) {}
   readonly onChanged = new Set<() => void>();
   changed() { this.bb.realtime.publish("views-changed", {}); for (const listener of this.onChanged) listener(); }
-  all(includeRedirects = false): ThreadView[] {
+  all(): ThreadView[] {
     return (this.store.db.prepare("SELECT json FROM thread_views").all() as { json: string }[])
       .map(row => threadViewSchema.parse(JSON.parse(row.json)))
-      // Single-bot legacy records only resolve old links to their fresh thread.
-      .filter(view => includeRedirects || view.members.length !== 1 || !this.store.db.prepare("SELECT 1 FROM view_migrations WHERE room_id=?").get(view.id))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
   get(id: string) {
@@ -96,15 +93,12 @@ export class ThreadViews {
     if (new Set(members.map(m => `${m.kind}:${m.id}`)).size !== members.length) throw new Error("Choose distinct members.");
     for (const m of members) {
       if (m.kind === "bot") { if (this.store.get(m.id).retired) throw new Error("Restore this bot before adding it."); }
-      else {
-        const thread = await this.bb.sdk.threads.get({ threadId: m.id });
-        if (thread.providerId === "bot-teams-channel") throw new Error("Choose an ordinary thread.");
-      }
+      else await this.bb.sdk.threads.get({ threadId: m.id });
     }
   }
   async create(name: string, members: ViewMember[], id: string = randomUUID()) {
     return this.locked(id, async () => {
-      const existing = this.all(true).find(v => v.id === id);
+      const existing = this.all().find(v => v.id === id);
       if (existing) {
         if (existing.name !== name || JSON.stringify(existing.members) !== JSON.stringify(members)) throw new Error("This request ID was already used for another channel.");
         return existing;

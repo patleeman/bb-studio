@@ -21,7 +21,7 @@ import { setup, deferred } from "./bots-fixture";
 test("successful empty missions finish quietly instead of failing or synthesizing a reply", async () => {
   const x = setup();
   try {
-    for (const [index, text] of [null, "", " \n\t", "[PASS]", "**[pass]**"].entries()) {
+    for (const [index, text] of [null, "", " \n\t"].entries()) {
       const id = `quiet-${index}`;
       x.runtime.enqueue(x.a, { id, text: "Check for changes", conversationKey: id });
       await x.runtime.drive(x.a);
@@ -93,11 +93,11 @@ test("roster identifies current direct threads independently of bot jobs", async
       threadId: "thr_current", title: "Current", kind: "admin", createdAt: 3,
     });
     x.store.putConversation({
-      id: "group-primary", botId: x.a.id, key: `group:${x.room.id}`,
+      id: "group-primary", botId: x.a.id, key: "mission",
       threadId: "thr_group", title: "Group", kind: "mission", createdAt: 3,
     });
     x.store.putConversation({
-      id: "group-fork", botId: x.b.id, key: `group:${x.room.id}:fork:message`,
+      id: "group-fork", botId: x.b.id, key: "mission:fork:message",
       threadId: "thr_fork", title: "Group fork", kind: "mission", createdAt: 3,
     });
     const currentThread = makeThreadResponse({ id: "thr_current", status: "active" });
@@ -133,7 +133,6 @@ test("roster identifies current direct threads independently of bot jobs", async
     ]);
     const listed = await x.harness.behavior.callRpc("list", null) as {
       directThreads: Record<string, { threadId: string; indicator: string; status: string }>;
-      roomThreads: Record<string, { threadId: string; indicator: string; status: string }[]>;
       bots: { id: string; working: boolean }[];
     };
     assert.deepEqual(listed.directThreads, {

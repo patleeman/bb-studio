@@ -2,8 +2,6 @@ import { revisionSchema, usageLimits, usageSummary } from "./workspace-contract"
 import type { defineRpcContract } from "@get-bb/plugin-sdk";
 import { botSetupThreadRequest } from "./bot-creation-contract";
 import { z } from "zod";
-import { sendModes } from "./send-mode";
-export const sendModeSchema = z.enum(sendModes);
 export const idSchema = z.string().regex(/^bot_[a-f0-9]{16}$/);
 export const permissionModeSchema = z.enum(["accept-edits", "auto", "full"]);
 export type PermissionMode = z.infer<typeof permissionModeSchema>;
@@ -71,15 +69,9 @@ export const threadStatusViewSchema = z.object({
 });
 export type ThreadStatusView = z.infer<typeof threadStatusViewSchema>;
 export type DirectThreadView = ThreadStatusView;
-export const roomWorkSchema = z.object({
-  queued: z.number().int().nonnegative(),
-  running: z.number().int().nonnegative(),
-});
-export type RoomWork = z.infer<typeof roomWorkSchema>;
 export type ProfileInput = z.infer<typeof profileInput>;
 export const botCreateInput = profileInput.extend({
   mission: z.string().min(1).max(64000),
-  roomId: z.string().uuid().optional(),
 });
 export const botCreateRequestSchema = z.object({
   id: z.string().uuid(),
@@ -145,7 +137,7 @@ export const conversationSchema = z.object({
   key: z.string(),
   threadId: z.string(),
   title: z.string(),
-  kind: z.enum(["admin", "group", "mission"]),
+  kind: z.enum(["admin", "mission"]),
   createdAt: z.number(),
   archivedAt: z.number().optional(),
   originalKey: z.string().optional(),
@@ -235,147 +227,6 @@ export const jobSchema = z.object({
   outputAttachments: z.array(attachmentSchema).default([]),
 });
 export type Job = z.infer<typeof jobSchema>;
-export const responseBehavior = z.enum(["smart", "directed", "everyone"]);
-export const roomSchema = z.object({
-  limits: usageLimits.optional(),
-  /** Overrides every member bot's own mode while set. Null means each bot's own. */
-  permissionMode: permissionModeSchema.nullable().optional(),
-  id: z.string().uuid(),
-  name: z.string().trim().min(1).max(80),
-  memberIds: z.array(idSchema).max(16),
-  pinned: z.boolean().optional(),
-  archived: z.boolean().optional(),
-  lastReadAt: z.number().optional(),
-  responseBehavior: responseBehavior.optional(),
-  paused: z.boolean(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  /** The channel's BB thread, when one exists. Filled in when listing; never stored. */
-  threadId: z.string().optional(),
-});
-export type Room = z.infer<typeof roomSchema>;
-export const attentionReason = z.enum(["decision", "blocker", "update"]);
-export const messageSchema = z.object({
-  // Derived from the attention inbox when reading a transcript.
-  attentionStatus: z.enum(["open", "snoozed", "acknowledged"]).optional(),
-  ownerMention: z.boolean().optional(),
-  attentionReason: attentionReason.optional(),
-  saved: z.boolean().optional(),
-  editedAt: z.number().optional(),
-  sentText: z.string().optional(),
-  sendMode: sendModeSchema.optional(),
-  classifierActions: z.array(z.object({
-    botId: idSchema,
-    action: z.enum(["steer", "followup", "fork"]),
-    suggestedAction: z.enum(["steer", "followup", "fork"]).optional(),
-  })).max(16).optional(),
-  classifierPlan: z.object({
-    coordinatorId: idSchema.nullable(),
-    collaboratorIds: z.array(idSchema).max(16),
-    executionMode: z.enum(["serialized", "parallel"]),
-    finalizerId: idSchema.nullable(),
-    source: z.enum(["jev", "providers", "fallback"]).optional(),
-  }).optional(),
-  internalResult: z.boolean().optional(),
-  conversationKey: z.string().optional(),
-  automationId: z.string().optional(),
-  id: z.string(),
-  roomId: z.string(),
-  runId: z.string(),
-  botId: idSchema.nullable(),
-  speaker: z.string(),
-  system: z.enum(["bot_joined", "bot_timeout", "bot_dm"]).optional(),
-  sourceThreadId: z.string().optional(),
-  sourceJobId: z.string().optional(),
-  replyTo: z.string().nullable().default(null),
-  attachments: z.array(attachmentSchema).default([]),
-  text: z.string(),
-  createdAt: z.number(),
-});
-export type RoomMessage = z.infer<typeof messageSchema>;
-export const attentionSchema = z.object({
-  id: z.string(),
-  roomId: z.string(),
-  reason: attentionReason,
-  status: z.enum(["open", "snoozed", "acknowledged"]),
-  snoozedUntil: z.number().nullable(),
-  revision: z.number().int(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-});
-export const attentionView = attentionSchema.extend({
-  channelName: z.string(),
-  message: messageSchema,
-  pendingReply: z.object({ id: z.string(), text: z.string(), error: z.string().nullable() }).nullable().default(null),
-});
-export type Attention = z.infer<typeof attentionSchema>;
-export type AttentionView = z.infer<typeof attentionView>;
-export const approvalDecision = z.enum([
-  "allow_once",
-  "allow_for_session",
-  "deny",
-]);
-export const approvalQuestion = z.object({
-  id: z.string(),
-  prompt: z.string(),
-  multiSelect: z.boolean(),
-  allowFreeText: z.boolean(),
-  options: z
-    .array(
-      z.object({
-        value: z.string(),
-        label: z.string(),
-        description: z.string().nullable().default(null),
-      }),
-    )
-    .default([]),
-});
-/** A bot's pending request, forwarded from its work thread into the channel. */
-export const approvalSchema = z.object({
-  id: z.string(),
-  threadId: z.string(),
-  botId: idSchema,
-  roomId: z.string(),
-  jobId: z.string().nullable(),
-  kind: z.enum(["approval", "question", "other"]),
-  title: z.string(),
-  detail: z.string().nullable(),
-  decisions: z.array(approvalDecision).default([]),
-  questions: z.array(approvalQuestion).default([]),
-  createdAt: z.number(),
-});
-export type ChannelApproval = z.infer<typeof approvalSchema>;
-/** Scheduled prompts are execution records, not chat messages. */
-export const isAutomationTrigger = (
-  message: Pick<RoomMessage, "automationId" | "botId">,
-) => !!message.automationId && message.botId === null;
-export const runSchema = z.object({
-  id: z.string(),
-  roomId: z.string(),
-  status: z.enum(["queued", "running", "done", "stopped"]),
-  mode: z.literal("concurrent").optional(),
-  pendingJobIds: z.array(z.string()).default([]),
-  settledJobIds: z.array(z.string()).default([]),
-  round: z.number(),
-  remaining: z.array(idSchema),
-  next: z.array(idSchema),
-  jobId: z.string().nullable(),
-  createdAt: z.number(),
-  error: z.string().nullable(),
-  routing: z.enum(["pending", "done", "error"]).optional(),
-  routingError: z.string().optional(),
-  routingDepth: z.number().optional(),
-  routingBotIds: z.array(idSchema).optional(),
-  routingPlan: z.object({
-    coordinatorId: idSchema.nullable(),
-    collaboratorIds: z.array(idSchema).max(16),
-    executionMode: z.enum(["serialized", "parallel"]),
-    finalizerId: idSchema.nullable(),
-    source: z.enum(["jev", "providers", "fallback"]).optional(),
-  }).optional(),
-  finalMessageId: z.string().optional(),
-});
-export type RoomRun = z.infer<typeof runSchema>;
 export const rpcContract = {
   createBotSetupThread: {
     input: botSetupThreadRequest,
@@ -405,23 +256,16 @@ export const rpcContract = {
     input: z.null(),
     output: z.object({
       bots: z.array(botListItemSchema),
-      rooms: z.array(roomSchema),
-      activeRoomIds: z.array(z.string()),
       directThreads: z.record(idSchema, threadStatusViewSchema),
       directConversations: z.record(idSchema, z.array(conversationSchema)),
       directThreadInfo: z.record(z.string(), directThreadInfoSchema),
-      roomThreads: z.record(z.string(), z.array(threadStatusViewSchema)),
-      roomWork: z.record(z.string(), roomWorkSchema),
-      attentionCounts: z.record(z.string(), z.number().int().nonnegative()),
-      approvalCounts: z.record(z.string(), z.number().int().nonnegative()),
       botCreateRequests: z.array(botCreateRequestViewSchema),
     }),
   },
-  /** Channels and direct messages by BB thread, for Studio spaces. */
+  /** Direct messages by BB thread, for Studio spaces. */
   spaceConversations: {
     input: z.null(),
     output: z.object({
-      channels: z.array(z.object({ threadId: z.string(), name: z.string(), archived: z.boolean() })),
       direct: z.array(z.object({ threadId: z.string(), botName: z.string() })),
     }),
   },

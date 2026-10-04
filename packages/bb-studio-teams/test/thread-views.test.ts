@@ -160,7 +160,6 @@ test("timeline excludes tools, inter-agent messages, interim replies, and empty 
     { ...base, id: "turn", kind: "turn", status: "completed", children: [message("interim", "Working", 2), message("final", "Done", 3)] },
     { ...base, id: "turn2", kind: "turn", status: "pending", children: [{ ...message("streaming", "Still working", 4), turnId: "turn2" }] },
     { ...message("quiet", " \n", 5), turnId: "turn3" },
-    { ...message("pass", "[PASS]", 6), turnId: "turn4" },
   ];
   expect(finalEntries(rows as never).map(e => e.text)).toEqual(["Help", "Done"]);
   const withFile = { ...rows[0], id: "owner2", attachments: { imageUrls: [], localFilePaths: ["/tmp/a/brief.pdf"], localFiles: 1, localImagePaths: [], localImages: 0, webImages: 1 } };

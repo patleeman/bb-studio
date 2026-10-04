@@ -31,14 +31,9 @@ export class ChannelData {
       createdAt: number;
     }[];
   }
-  usage(roomId?: string, botId?: string) {
+  usage(botId: string) {
     const since = Date.now() - 24 * 60 * 60 * 1000;
-    const limits =
-      (botId
-        ? this.store.get(botId).limits
-        : roomId
-          ? this.store.room(roomId).limits
-          : undefined) ?? defaultLimits;
+    const limits = this.store.get(botId).limits ?? defaultLimits;
     const rows = this.store.db
       .prepare(
         `SELECT
@@ -47,24 +42,14 @@ export class ChannelData {
       COALESCE(SUM(status IN ('running','dispatching','queued')),0) AS active,
       COALESCE(SUM(status='error'),0) AS errors
       FROM jobs WHERE COALESCE(json_extract(json,'$.startedAt'),json_extract(json,'$.dispatchStartedAt'),created_at)>=?
-      ${roomId ? "AND json_extract(json,'$.roomId')=?" : ""} ${botId ? "AND bot_id=?" : ""}`,
+      AND bot_id=?`,
       )
-      .get(since, ...(roomId ? [roomId] : []), ...(botId ? [botId] : [])) as {
+      .get(since, botId) as {
       turns: number;
       forks: number;
       active: number;
       errors: number;
     };
-    const routing = roomId
-      ? (this.store.db
-          .prepare(
-            "SELECT COUNT(*) AS routingCalls,COALESCE(SUM(duration_ms),0) AS routingMilliseconds FROM routing_usage WHERE room_id=? AND created_at>=?",
-          )
-          .get(roomId, since) as {
-          routingCalls: number;
-          routingMilliseconds: number;
-        })
-      : { routingCalls: 0, routingMilliseconds: 0 };
-    return { ...rows, ...routing, since, limits };
+    return { ...rows, routingCalls: 0, routingMilliseconds: 0, since, limits };
   }
 }

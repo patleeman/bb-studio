@@ -26,8 +26,6 @@ export const RETIRED_PANELS = [
   "float/companions",
   // Studio Chat's panel; chats start from Studio items and the overlay.
   "studio-chat/chats",
-  // Old /views links redirect to channels; the row would only repeat Channels.
-  "bot-teams/former-views",
 ];
 
 export function studioNavigationItems(

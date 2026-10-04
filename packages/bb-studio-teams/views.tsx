@@ -281,14 +281,3 @@ function ViewCollection() {
   useRealtime("views-changed", () => setVersion(value => value + 1));
   return <AddOnCollection pluginId={PLUGIN_ID} title="Channels" kind={VIEW_KIND.id} call={call} refreshKey={version} />;
 }
-/** Channels lived at /views/<id>; old links and floated tabs land on the same channel. */
-export function LegacyChannelRedirect({ subPath }: PluginNavPanelProps) {
-  const companionNavigate = useCompanionNavigate();
-  const currentNavigate = useRef(companionNavigate);
-  currentNavigate.current = companionNavigate;
-  useEffect(() => {
-    const path = `/plugins/${PLUGIN_ID}/channels${subPath ? `/${subPath}` : ""}`;
-    if (!currentNavigate.current({ kind: "path", path })) openAppPath(path, { replace: true });
-  }, [subPath]);
-  return <PageColumn><p role="status">Opening channel…</p></PageColumn>;
-}
