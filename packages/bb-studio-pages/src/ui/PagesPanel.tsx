@@ -88,6 +88,8 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
       renameBoard: (id, title) => rpc.call("boardRename", { id, title }),
       createBoardTask: (input) => rpc.call("boardTaskCreate", input),
       recording: (id) => rpc.call("recordingView", { id }).then((result) => result.recording),
+      whiteboard: (id) => rpc.call("whiteboardGet", { id }).then((result) => result.whiteboard),
+      saveWhiteboard: (input) => rpc.call("whiteboardSave", input).then((result) => result.whiteboard),
       // A new item must show in the next embed's lookup.
       createItem: (pageId, pluginId, kind) =>
         rpc.call("studioCreate", { pageId, pluginId, kind }).then((result) => {

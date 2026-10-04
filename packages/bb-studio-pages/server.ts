@@ -219,6 +219,8 @@ async function registerPages(bb: BbPluginApi) {
     linkPreview: ({ url }) => fetchPreview(url),
     studioItems: async () => ({ items: await embeds.items() }),
     artifactView: async ({ id }) => ({ view: await embeds.artifactView(id) }),
+    whiteboardGet: async ({ id }) => ({ whiteboard: await embeds.whiteboard(id) }),
+    whiteboardSave: async ({ id, add, erase }) => ({ whiteboard: await embeds.saveWhiteboard(id, add, erase) }),
     studioCreate: async ({ pageId, pluginId, kind }) => ({ item: await embeds.create(pluginId, kind, requireMeta(pageId).project_id) }),
     tableGet: ({ id }) => embeds.table("get", { id }),
     tableUpdate: (input) => embeds.table("update", input),

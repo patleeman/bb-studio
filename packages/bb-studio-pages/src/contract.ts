@@ -2,6 +2,7 @@ import { conversationRequestSchema } from "@bb-studio/kit/contract";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { columnSchema, rowPatchSchema, tableSchema, tableUpdateSchema, valuesSchema } from "@bb-studio/kit/tables";
+import { whiteboardStrokeSchema, whiteboardViewSchema } from "./whiteboard";
 
 export * from "./constants";
 
@@ -228,6 +229,13 @@ export const rpcContract = defineRpcContract({
         })
         .nullable(),
     }),
+  },
+  /** A drawing embed's scene as SVG, for the inline whiteboard; null when it's gone. */
+  whiteboardGet: { input: z.object({ id: itemId }), output: z.object({ whiteboard: whiteboardViewSchema.nullable() }) },
+  /** Pen strokes and erasures from the inline whiteboard, merged into the drawing by Studio Draw. */
+  whiteboardSave: {
+    input: z.object({ id: itemId, add: z.array(whiteboardStrokeSchema).max(200), erase: z.array(z.string().min(1).max(200)).max(2000) }),
+    output: z.object({ whiteboard: whiteboardViewSchema }),
   },
   /** A new item of another add-on, such as a task, table or drawing, in the page's project. */
   studioCreate: {

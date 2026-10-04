@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type { Column, Table, Values } from "@bb-studio/kit/tables";
 import type { TableApi } from "@bb-studio/kit/table-grid";
+import type { WhiteboardStroke, WhiteboardView } from "../whiteboard";
 import type { BoardCard, BotView, PageMetaView, RecordingCard, SpaceWidgetView, StudioEmbedItem, TaskCard, TaskColumn } from "../contract";
 
 export interface ArtifactView {
@@ -35,6 +36,9 @@ export interface PagesUi {
   renameBoard(id: string, title: string): Promise<unknown>;
   createBoardTask(input: { boardId: string; title: string; status?: string }): Promise<{ taskId: string }>;
   recording(id: string): Promise<RecordingCard | null>;
+  /** A drawing embed's scene, for the inline whiteboard. */
+  whiteboard(id: string): Promise<WhiteboardView | null>;
+  saveWhiteboard(input: { id: string; add: WhiteboardStroke[]; erase: string[] }): Promise<WhiteboardView>;
   /** Makes an item in another add-on, in the page's project. */
   createItem(pageId: string, pluginId: string, kind: string): Promise<StudioEmbedItem>;
   createTable(input: { pageId: string; title: string; columns: Column[]; rows: Values[] }): Promise<Table>;
@@ -67,6 +71,8 @@ export const PagesUiContext = createContext<PagesUi>({
   renameBoard: unavailable,
   createBoardTask: unavailable,
   recording: unavailable,
+  whiteboard: unavailable,
+  saveWhiteboard: unavailable,
   createItem: unavailable,
   createTable: unavailable,
   space: () => Promise.resolve(null),

@@ -8,6 +8,7 @@ import { indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/ser
 import { TABLES_PLUGIN_ID, tablesContract } from "@bb-studio/kit/tables";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { changesData, DRAW_PLUGIN_ID, parseScene, renderWhiteboard, whiteboardChanges, type WhiteboardStroke, type WhiteboardView } from "./whiteboard";
 import { PLUGIN_ID, spaceWidgetSchema, type BoardCard, type RecordingCard, type TaskCard, type TaskColumn } from "./contract";
 
 const MAX_TEXT = 20_000;
@@ -38,6 +39,7 @@ const boardSchema = z.object({
   tasks: z.array(taskFields),
 });
 const okSchema = z.object({ ok: z.boolean() });
+const drawingSchema = z.object({ drawing: z.object({ id: z.string(), name: z.string(), updatedAt: z.number(), data: z.string() }).nullable() });
 
 const recordingSchema = z.object({
   recording: z.object({
@@ -182,6 +184,25 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
           return [{ id: segment.id, offsetMs: segment.offsetMs, durationMs: segment.durationMs, text, url: `/api/v1/plugins/talk/http/audio?${query}` }];
         }),
       };
+    },
+    /** A drawing as the inline whiteboard shows it. */
+    async whiteboard(id: string): Promise<WhiteboardView | null> {
+      const { drawing } = await call(DRAW_PLUGIN_ID, "getDrawing", { id }, drawingSchema);
+      if (!drawing) return null;
+      return { id: drawing.id, name: drawing.name, updatedAt: drawing.updatedAt, ...renderWhiteboard(parseScene(drawing.data)) };
+    },
+    /** Adds pen strokes and erases elements; Draw merges them into what's there. */
+    async saveWhiteboard(id: string, add: WhiteboardStroke[], erase: string[]): Promise<WhiteboardView> {
+      const { drawing } = await call(DRAW_PLUGIN_ID, "getDrawing", { id }, drawingSchema);
+      if (!drawing) throw new Error("This drawing is gone.");
+      const changes = whiteboardChanges(parseScene(drawing.data), add, erase);
+      if (changes.length) {
+        await call(DRAW_PLUGIN_ID, "saveDrawing", { id, data: changesData(changes) }, z.object({ ok: z.boolean(), updatedAt: z.number() }));
+        index.invalidate();
+      }
+      const view = await this.whiteboard(id);
+      if (!view) throw new Error("This drawing is gone.");
+      return view;
     },
     async artifactView(id: string) {
       const { artifact } = await sdk.plugins.callRpc({ pluginId: "artifacts", method: "get", input: { id } as never, outputSchema: artifactSchema });

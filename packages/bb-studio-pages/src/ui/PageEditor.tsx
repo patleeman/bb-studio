@@ -32,6 +32,7 @@ import type { PageConnection } from "./connection";
 import { authorInfo, usePagesUi } from "./context";
 import { useDarkMode } from "./shared";
 import { CommentDictation } from "./CommentDictation";
+import { editWhiteboardWhenShown } from "./whiteboard";
 import {
   dictationParagraphs,
   pageFieldKey,
@@ -59,7 +60,7 @@ const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
   { kind: "task", aliases: ["todo", "to do", "issue"] },
   { kind: "board", aliases: ["kanban", "tasks", "sprint", "backlog"] },
   { kind: "table", aliases: ["database", "spreadsheet", "sheet", "grid"] },
-  { kind: "drawing", aliases: ["excalidraw", "sketch", "whiteboard", "diagram"] },
+  { kind: "drawing", aliases: ["whiteboard", "excalidraw", "sketch", "diagram", "draw"] },
 ];
 
 export type SidePanel = "comments" | null;
@@ -309,8 +310,9 @@ export function PageEditor({
         onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind } }),
       })),
       ...STUDIO_NEW.map(({ kind, aliases }) => ({
-        title: `New ${STUDIO_EMBEDS[kind].label.toLowerCase()}`,
-        subtext: `Make a ${STUDIO_EMBEDS[kind].label.toLowerCase()} and embed it here`,
+        // A new drawing is a whiteboard to sketch on in place.
+        title: kind === "drawing" ? "Whiteboard" : `New ${STUDIO_EMBEDS[kind].label.toLowerCase()}`,
+        subtext: kind === "drawing" ? "Sketch here; saved as a Studio Draw drawing" : `Make a ${STUDIO_EMBEDS[kind].label.toLowerCase()} and embed it here`,
         aliases: [...aliases, "new", "create", "studio"],
         group: "Studio",
         icon: <Icon name={STUDIO_EMBED_ICONS[kind]} className="size-4" />,
@@ -320,6 +322,7 @@ export function PageEditor({
           void ui.createItem(page.id, STUDIO_EMBEDS[kind].pluginId, kind).then(
             (item) => {
               if (kind === "task") focusNewTask(item.id);
+              if (kind === "drawing") editWhiteboardWhenShown(item.id);
               placeEmbed(editor, blockId, { kind, target: item.id });
             },
             (error) => toast.error(errorMessage(error)),

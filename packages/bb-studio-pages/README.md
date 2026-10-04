@@ -121,8 +121,13 @@ afterwards.
     or its tasks as a checklist; the view shown is kept with the page;
   - a recording plays in the page, with its summary, decisions and
     transcript; click a line to play from there;
-  - a drawing shows its picture and an artifact its content (images, HTML,
-    PDFs, code, text).
+  - a drawing is an inline whiteboard: it shows the drawing, and **Sketch**
+    (or a double-click) adds a pen, an eraser and five colors. Strokes save
+    to the Studio Draw drawing as ordinary Excalidraw elements, merged with
+    other edits, so **Open in Draw** shows them in the full editor. `/whiteboard`
+    makes a new drawing in the page's project and opens it ready to draw.
+    Pages draws the scene as plain SVG and doesn't load Excalidraw;
+  - an artifact shows its content (images, HTML, PDFs, code, text).
 
   Pasting a link to a Studio item embeds it too, and a link to a table view
   embeds that view. A basic table's block menu (⋮⋮) has **Turn into

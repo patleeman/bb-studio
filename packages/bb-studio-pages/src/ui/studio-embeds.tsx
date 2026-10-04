@@ -10,6 +10,7 @@ import type { StudioEmbedItem } from "../contract";
 import { STUDIO_EMBEDS, isEmbedKindItem, studioRef, studioSubtitle, type StudioEmbedKind } from "../schema-config";
 import { usePagesUi, type ArtifactView } from "./context";
 import { BoardEmbed, RecordingBody, TableEmbed, TaskBody } from "./live-embeds";
+import { Whiteboard } from "./whiteboard";
 
 export function useStudioItems(enabled = true): StudioEmbedItem[] | null {
   const ui = usePagesUi();
@@ -124,6 +125,8 @@ function ItemBody({ item }: { item: StudioEmbedItem }) {
   if (item.pluginId === "artifacts") return <ArtifactBody id={item.id} />;
   // Every Talk item, dictation or meeting, is a recording.
   if (item.pluginId === STUDIO_EMBEDS.recording.pluginId) return <RecordingBody id={item.id} />;
+  // A drawing is an inline whiteboard: its picture, and a pen to add to it.
+  if (item.pluginId === STUDIO_EMBEDS.drawing.pluginId) return <Whiteboard id={item.id} onOpen={() => ui.openPath(item.href)} />;
   if (item.thumbnailUrl && !failed) {
     return (
       <button type="button" className="block w-full cursor-pointer border-t border-border bg-background" onClick={() => ui.openPath(item.href)}>
