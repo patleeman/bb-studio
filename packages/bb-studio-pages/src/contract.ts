@@ -230,6 +230,21 @@ export const rpcContract = defineRpcContract({
         .nullable(),
     }),
   },
+  /** Hands a checklist item to an agent: a new thread with the item as its prompt, mentioned on the item. */
+  checklistHandOff: {
+    input: z.object({ id: pageId, blockId: z.string().min(4).max(100), note: z.string().max(20_000).nullable().optional() }),
+    output: z.object({ threadId: z.string() }),
+  },
+  /** The page's checklist items handed to agents, newest first. */
+  checklistHandoffs: {
+    input: z.object({ id: pageId }),
+    output: z.object({ handoffs: z.array(z.object({ threadId: z.string(), blockId: z.string(), title: z.string(), state: z.string(), note: z.string().nullable(), updatedAt: z.number() })) }),
+  },
+  /** Makes a page of checklists for each Studio Tasks board without one; boards are left as they are. */
+  migrateBoards: {
+    input: z.object({ dryRun: z.boolean().optional(), includeArchived: z.boolean().optional() }),
+    output: z.object({ boards: z.array(z.object({ boardId: z.string(), title: z.string(), pageId: z.string().nullable(), tasks: z.number(), status: z.enum(["created", "exists", "would-create"]) })) }),
+  },
   /** A drawing embed's scene as SVG, for the inline whiteboard; null when it's gone. */
   whiteboardGet: { input: z.object({ id: itemId }), output: z.object({ whiteboard: whiteboardViewSchema.nullable() }) },
   /** Pen strokes and erasures from the inline whiteboard, merged into the drawing by Studio Draw. */

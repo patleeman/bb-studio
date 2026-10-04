@@ -47,6 +47,18 @@ block ids (the full id or its first 8 characters):
 Pages saves a restore point before an agent's or bot's first edit in a
 while, so the user can roll back from **Version history**.
 
+## Checklists handed to agents
+
+A checklist item can carry a thread mention such as
+`@[Agent · working](thread:thr_…)`: the user handed that item to an agent,
+and Pages keeps the label on the thread's state. Leave the mention in place
+when editing the item. If you are that agent, end with a one-line summary
+and don't check the item off; the user does that after reviewing.
+
+`bb pages migrate-boards [--dry-run]` makes a page of checklists from each
+Studio Tasks board, once per board, without changing the boards. Run it only
+when the user asks.
+
 ## Markdown
 
 Pages reads and writes GitHub-flavoured Markdown plus:

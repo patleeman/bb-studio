@@ -23,7 +23,7 @@ import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../cons
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, SPACE_SECTIONS, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
 import { linkEmbed, referenceMention } from "./links";
-import { PageSideMenu, placeEmbed } from "./block-menu";
+import { handOffChecklist, PageSideMenu, placeEmbed } from "./block-menu";
 import { focusNewTask } from "./live-embeds";
 import { pageSpaceId, SPACE_SECTION_LABELS } from "./space-embeds";
 import { pageSchema } from "./blocks";
@@ -234,6 +234,18 @@ export function PageEditor({
           const block = editor.getTextCursorPosition().block;
           if (block.type !== "checkListItem") { toast.error("Select a checkbox first."); return; }
           void rpc.call("taskFromCheckbox", { id: page.id, blockId: block.id }).then(() => toast.success("Task created"), (error) => toast.error(String(error)));
+        },
+      },
+      {
+        title: "Hand to agent",
+        subtext: "Start an agent on this checklist item and link its thread here",
+        aliases: ["agent", "delegate", "assign", "handoff", "checkbox", "to do"],
+        group: "Studio",
+        icon: <Icon name="Sent" className="size-4" />,
+        onItemClick: () => {
+          const block = editor.getTextCursorPosition().block;
+          if (block.type !== "checkListItem") { toast.error("Select a checklist item first."); return; }
+          void handOffChecklist(ui, page.id, block.id);
         },
       },
       {

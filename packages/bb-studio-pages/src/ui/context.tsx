@@ -36,6 +36,8 @@ export interface PagesUi {
   renameBoard(id: string, title: string): Promise<unknown>;
   createBoardTask(input: { boardId: string; title: string; status?: string }): Promise<{ taskId: string }>;
   recording(id: string): Promise<RecordingCard | null>;
+  /** Hands a checklist item to an agent; resolves to its thread. */
+  handOffChecklist(pageId: string, blockId: string): Promise<{ threadId: string }>;
   /** A drawing embed's scene, for the inline whiteboard. */
   whiteboard(id: string): Promise<WhiteboardView | null>;
   saveWhiteboard(input: { id: string; add: WhiteboardStroke[]; erase: string[] }): Promise<WhiteboardView>;
@@ -71,6 +73,7 @@ export const PagesUiContext = createContext<PagesUi>({
   renameBoard: unavailable,
   createBoardTask: unavailable,
   recording: unavailable,
+  handOffChecklist: unavailable,
   whiteboard: unavailable,
   saveWhiteboard: unavailable,
   createItem: unavailable,

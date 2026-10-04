@@ -111,6 +111,25 @@ export const MIGRATIONS = [
      created_at INTEGER NOT NULL
    )`,
   `ALTER TABLE pages ADD COLUMN template INTEGER NOT NULL DEFAULT 0`,
+  // Checklist items handed to agents (src/checklists.ts).
+  `CREATE TABLE IF NOT EXISTS checklist_handoffs (
+     thread_id TEXT PRIMARY KEY,
+     page_id TEXT NOT NULL,
+     block_id TEXT NOT NULL,
+     title TEXT NOT NULL,
+     state TEXT NOT NULL,
+     note TEXT,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS checklist_handoffs_page ON checklist_handoffs (page_id, created_at)`,
+  // Studio Tasks boards already made into pages, so the migration runs once per board.
+  `CREATE TABLE IF NOT EXISTS board_migrations (
+     board_id TEXT PRIMARY KEY,
+     page_id TEXT NOT NULL,
+     tasks INTEGER NOT NULL,
+     migrated_at INTEGER NOT NULL
+   )`,
 ];
 
 export { newId };

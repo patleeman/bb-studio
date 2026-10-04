@@ -23,6 +23,7 @@ import { registerStudio } from "./src/studio";
 import { outgoingStudioLinks } from "./src/studio-links";
 import { agentConfiguration, registerTools } from "./src/tools";
 import { registerPagesWithExplore } from "./src/explore/integration";
+import { Checklists } from "./src/checklists";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
@@ -43,6 +44,7 @@ async function registerPages(bb: BbPluginApi) {
   const store = new PageStore(db, () => config.snapshotsPerPage);
   const bots = new BotDirectory(bb);
   const service = new PagesService(bb, store, bots);
+  const checklists = new Checklists(bb, db, service, store);
 
   // Live sync -----------------------------------------------------------------
 
@@ -219,6 +221,9 @@ async function registerPages(bb: BbPluginApi) {
     linkPreview: ({ url }) => fetchPreview(url),
     studioItems: async () => ({ items: await embeds.items() }),
     artifactView: async ({ id }) => ({ view: await embeds.artifactView(id) }),
+    checklistHandOff: ({ id, blockId, note }) => checklists.handOff({ pageId: id, blockId, note: note ?? null }),
+    checklistHandoffs: ({ id }) => ({ handoffs: checklists.handoffs(id).map((row) => ({ threadId: row.thread_id, blockId: row.block_id, title: row.title, state: row.state, note: row.note, updatedAt: row.updated_at })) }),
+    migrateBoards: async (input) => ({ boards: await checklists.migrateBoards(input) }),
     whiteboardGet: async ({ id }) => ({ whiteboard: await embeds.whiteboard(id) }),
     whiteboardSave: async ({ id, add, erase }) => ({ whiteboard: await embeds.saveWhiteboard(id, add, erase) }),
     studioCreate: async ({ pageId, pluginId, kind }) => ({ item: await embeds.create(pluginId, kind, requireMeta(pageId).project_id) }),
@@ -484,6 +489,7 @@ async function registerPages(bb: BbPluginApi) {
       { name: "show", summary: "Print a page (id or title) as Markdown", usage: "bb pages show <page-id> [--ids]" },
       { name: "create", summary: "Create a page from a title and optional Markdown", usage: "bb pages create <title> [--global] [--markdown <text>]" },
       { name: "append", summary: "Append Markdown to a page", usage: "bb pages append <page-id> <markdown…>" },
+      { name: "migrate-boards", summary: "Make a page of checklists from each Studio Tasks board (once per board; boards are kept)", usage: "bb pages migrate-boards [--dry-run] [--include-archived]" },
     ],
     async run(argv, ctx) {
       const { command, rest } = subcommand(argv);
@@ -528,8 +534,16 @@ async function registerPages(bb: BbPluginApi) {
             applyEdits(service.hub.open(meta.id).doc, [{ op: "append", markdown }], origin);
             return { exitCode: 0, stdout: `Appended to ${meta.id}.\n` };
           }
+          case "migrate-boards": {
+            const dryRun = flag("--dry-run") === true;
+            const boards = await checklists.migrateBoards({ dryRun, includeArchived: flag("--include-archived") === true });
+            if (!boards.length) return { exitCode: 0, stdout: "No Studio Tasks boards.\n" };
+            const verb = { created: "created", exists: "already a page", "would-create": "would create" } as const;
+            const lines = boards.map((board) => `${board.boardId}\t${board.title}\t${verb[board.status]}${board.pageId ? `\t${board.pageId}` : ""}${board.status === "exists" ? "" : `\t${board.tasks} task(s)`}`);
+            return { exitCode: 0, stdout: `${lines.join("\n")}\n${dryRun ? "Dry run: nothing was changed.\n" : ""}` };
+          }
           default:
-            return usage("bb pages <list|show|create|append> …");
+            return usage("bb pages <list|show|create|append|migrate-boards> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
@@ -544,6 +558,14 @@ async function registerPages(bb: BbPluginApi) {
     service.onThreadSettled(thread.id, { failed: false, text: lastAssistantText }),
   );
   bb.events.on("thread.failed", ({ thread, error }) => service.onThreadSettled(thread.id, { failed: true, text: error }));
+  // Checklist items handed to agents follow their thread.
+  bb.events.on("thread.active", ({ thread }) => checklists.signal(thread.id, "active"));
+  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => checklists.signal(thread.id, "idle", lastAssistantText));
+  bb.events.on("thread.failed", ({ thread, error }) => checklists.signal(thread.id, "failed", error));
+  bb.events.on("interaction.pending", ({ thread }) => checklists.signal(thread.id, "needs-input"));
+  bb.events.on("thread.archived", ({ thread }) => checklists.signal(thread.id, "archived"));
+  bb.events.on("thread.unarchived", ({ thread }) => checklists.signal(thread.id, "unarchived"));
+  bb.events.on("thread.deleted", ({ thread }) => checklists.signal(thread.id, "deleted"));
 
   bb.background.schedule("pages-refresh", "* * * * *", () => service.runDueRefreshes());
 

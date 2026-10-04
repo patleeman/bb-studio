@@ -487,6 +487,14 @@ export function formatMentionDate(iso: string): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
 }
 
+const AGENT_STATE_CLASSES: Record<string, string> = {
+  starting: "bg-sky-500/12 text-sky-700 dark:text-sky-300",
+  working: "bg-sky-500/12 text-sky-700 dark:text-sky-300",
+  "needs input": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  replied: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+  failed: "bg-red-500/12 text-red-700 dark:text-red-300",
+};
+
 function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS; target: string; label: string }) {
   const ui = usePagesUi();
   const bot = kind === "bot" ? ui.bots.find((candidate) => candidate.id === target) : undefined;
@@ -499,6 +507,8 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
       className={cn(
         "pages-mention inline-flex cursor-pointer items-center gap-1 rounded px-1 align-baseline font-medium",
         kind === "bot" ? "bg-violet-500/12 text-violet-600 dark:text-violet-300" : "bg-foreground/6 text-foreground",
+        // A checklist item's agent (src/checklists.ts) shows its thread's state.
+        kind === "thread" && label.startsWith("Agent · ") && AGENT_STATE_CLASSES[label.slice(8)],
       )}
       data-kind={kind}
       {...(kind === "thread"

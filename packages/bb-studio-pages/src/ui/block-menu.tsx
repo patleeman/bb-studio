@@ -70,6 +70,29 @@ function TurnIntoDatabaseItem({ pageId, pageTitle }: { pageId: string; pageTitle
   );
 }
 
+/** On a checklist item: start an agent on it, linked back on the item. */
+function HandToAgentItem({ pageId }: { pageId: string }) {
+  const Components = useComponentsContext()!;
+  const editor = useBlockNoteEditor<PageSchema["blockSchema"], PageSchema["inlineContentSchema"], PageSchema["styleSchema"]>();
+  const ui = usePagesUi();
+  const block = useExtensionState(SideMenuExtension, { editor, selector: (state) => state?.block });
+  if (block?.type !== "checkListItem") return null;
+  return (
+    <Components.Generic.Menu.Item className="bn-menu-item whitespace-nowrap" icon={<Icon name="Sent" className="size-4" />} onClick={() => void handOffChecklist(ui, pageId, block.id)}>
+      Hand to agent
+    </Components.Generic.Menu.Item>
+  );
+}
+
+export async function handOffChecklist(ui: ReturnType<typeof usePagesUi>, pageId: string, blockId: string) {
+  try {
+    await ui.handOffChecklist(pageId, blockId);
+    toast.success("An agent is on it. Its thread is linked on the item.");
+  } catch (error) {
+    toast.error(errorMessage(error));
+  }
+}
+
 /** BlockNote's side menu, with the page's block handle menu. */
 export function PageSideMenu({ pageId, pageTitle }: { pageId: string; pageTitle: string }) {
   const menu = useMemo(() => () => <PageBlockMenu pageId={pageId} pageTitle={pageTitle} />, [pageId, pageTitle]);
@@ -85,6 +108,7 @@ function PageBlockMenu({ pageId, pageTitle }: { pageId: string; pageTitle: strin
       <TableRowHeaderItem>{dict.drag_handle.header_row_menuitem}</TableRowHeaderItem>
       <TableColumnHeaderItem>{dict.drag_handle.header_column_menuitem}</TableColumnHeaderItem>
       <TurnIntoDatabaseItem pageId={pageId} pageTitle={pageTitle} />
+      <HandToAgentItem pageId={pageId} />
     </DragHandleMenu>
   );
 }

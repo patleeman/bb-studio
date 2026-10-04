@@ -289,6 +289,32 @@ export function restoreFromState(doc: Y.Doc, state: Uint8Array, origin: unknown)
   });
 }
 
+/**
+ * Puts a thread mention at the end of a checklist item, or relabels the one
+ * already there, without touching the item's text, children or comments.
+ */
+export function tagChecklistThread(doc: Y.Doc, ref: string, threadId: string, label: string, origin: unknown): boolean {
+  return transformDoc(doc, origin, (tr) => {
+    const target = findBlock(tr.doc, ref);
+    const content = target.node.firstChild!;
+    if (content.type.name !== "checkListItem") throw new PageEditError(`Block ${shortId(target.id)} is a ${content.type.name}, not a checklist item.`);
+    const start = target.pos + 2;
+    let existing: number | null = null;
+    content.forEach((child, offset) => {
+      if (child.type.name === "mention" && child.attrs.kind === "thread" && child.attrs.target === threadId) existing = start + offset;
+    });
+    const schema = tr.doc.type.schema;
+    if (existing !== null) {
+      const node = tr.doc.nodeAt(existing)!;
+      if (node.attrs.label !== label) tr.setNodeMarkup(existing, undefined, { ...node.attrs, label });
+      return;
+    }
+    const end = start + content.content.size;
+    const mention = schema.nodes.mention!.create({ kind: "thread", target: threadId, label });
+    tr.insert(end, content.content.size && !content.textContent.endsWith(" ") ? [schema.text(" "), mention] : [mention]);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Comment marks
 

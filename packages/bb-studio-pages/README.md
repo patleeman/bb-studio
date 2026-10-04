@@ -267,6 +267,28 @@ run `pnpm tailwind:blocknote` to regenerate it.
 
 Studio can duplicate a page with its subpages, mark a page as a template, and instantiate it with `{{name}}` variables. The provider exports Markdown with uploaded assets, printable HTML with those assets, or a text PDF. Use Studio's New menu to start from a saved template.
 
+## Checklists and agents
+
+A checklist item is a unit of work. **Hand to agent** (in the item's ⋮⋮
+menu, or `/hand to agent` on the item) starts a thread in the page's project
+with the item as its prompt and a mention of the page. Pages puts a mention
+of that thread at the end of the item, labelled with the thread's state:
+**Agent · working**, **needs input**, **replied** or **failed**. Click it to
+open the thread. Check the item off yourself after reviewing; the agent is
+told not to.
+
+### Boards to pages
+
+`bb pages migrate-boards` makes one page of checklists for each Studio Tasks
+board: a heading per column, an item per task (subtasks nested, done tasks
+checked), and the task's agent thread mentioned on its item. Each item links
+its task, so checking it moves the task to Done, and moving the task to Done
+checks it. It runs once per board: a board whose page exists is skipped. The
+boards and tasks are left as they are; the only change in Studio Tasks is a
+link from each task to its item. Add `--dry-run` to list what it would make,
+or `--include-archived` to include archived boards. Template boards are
+skipped.
+
 ## Explore
 
 [Explore](../bb-studio-explore/README.md) is built into Pages. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page. The directive, the `explore_explain` tool, the Explore panel and the thread tab work as they do in the standalone plugin. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate`.
