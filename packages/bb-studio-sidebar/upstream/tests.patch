@@ -85,7 +85,7 @@ index 4d15df5..085c8cd 100644
 +    expect(within(alpha).getByRole("button", { name: "Close Launch plan" })).not.toBeNull();
 +    const beta = screen.getByTitle("Beta").closest("[data-sidebar-sticky-group]") as HTMLElement;
 +    expect(within(beta).getByRole("button", { name: "New page, drawing or table" })).not.toBeNull();
-+    fireEvent.click(within(alpha).getByRole("button", { name: "Launch plan" }));
++    fireEvent.click(within(alpha).getByRole("link", { name: "Launch plan" }));
 +    expect(JSON.parse(sessionStorage.getItem("bb-studio:open-in-space") ?? "null")).toEqual({ threadId: "thr_lead", request: { kind: "item", path: "/plugins/pages/pages/pg_1", title: "Launch plan" } });
 +    // A Space without a lead still opens on Studio's Space page.
 +    fireEvent.click(screen.getByRole("button", { name: "Open Beta" }));

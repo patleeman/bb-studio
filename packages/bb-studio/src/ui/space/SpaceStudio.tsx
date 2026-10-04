@@ -72,17 +72,17 @@ export function SpaceItemsTab({ threadId }: PluginThreadPanelProps) {
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-8">
       <header className="flex flex-wrap items-center gap-3">
-        <h1 className={cn(PAGE_TITLE, "min-w-0 flex-1")}>Items{closed.length ? <span className="ml-2 text-base font-normal text-muted-foreground tabular-nums">{closed.length}</span> : null}</h1>
+        <h1 className={cn(PAGE_TITLE, "min-w-0 flex-1")}>Items</h1>
         <NewInSpaceMenu spaceId={spaceId} onCreated={(item) => openItemTab(navigate, item)} />
       </header>
       {closed.length ? (
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {kinds.length > 1 ? (
             <div role="group" aria-label="Kind" className="flex flex-wrap items-center gap-1">
-              <button type="button" aria-pressed={kind === ALL} className={PILL} onClick={() => setKind(ALL)}>All <span className="ml-1 tabular-nums opacity-70">{closed.length}</span></button>
+              <button type="button" aria-pressed={kind === ALL} className={PILL} onClick={() => setKind(ALL)}>All</button>
               {kinds.map((each) => (
                 <button key={each.id} type="button" aria-pressed={kind === each.id} className={PILL} onClick={() => setKind(each.id)}>
-                  {each.label} <span className="ml-1 tabular-nums opacity-70">{each.count}</span>
+                  {each.label}
                 </button>
               ))}
             </div>

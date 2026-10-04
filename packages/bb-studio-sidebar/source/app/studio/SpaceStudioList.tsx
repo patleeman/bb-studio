@@ -1,9 +1,12 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import { openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
+import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import { COARSE_POINTER_ROW_HEIGHT_CLASS } from "@/components/ui/coarse-pointer-sizing";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,8 +24,8 @@ import type { OpenInSpaceRequest } from "./openInSpace.js";
 import type { SpaceItems } from "./studioSpaces.js";
 
 /** "Studio" or "Threads" inside a Space, with its own + on hover; a title with `onOpen` opens its view. */
-export function SpaceSubheading({ title, count, action, onOpen, openLabel }: { title: string; count?: number; action?: ReactNode; onOpen?(): void; openLabel?: string }) {
-  const label = <>{title}{count ? <span className="ml-1.5 tabular-nums opacity-70">{count}</span> : null}</>;
+export function SpaceSubheading({ title, action, onOpen, openLabel }: { title: string; action?: ReactNode; onOpen?(): void; openLabel?: string }) {
+  const label = title;
   return (
     <div className={cn("group/sub flex h-7 items-center gap-1 pr-0.5 pl-2 text-xs", SIDEBAR_GROUP_TEXT_CLASS)}>
       {onOpen
@@ -100,6 +103,80 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
   );
 }
 
+type OpenItem = SpaceItems["open"][number];
+
+const resultsSchema = z.object({ done: z.array(z.string()) }).passthrough();
+
+function copyText(text: string, done: string) {
+  navigator.clipboard.writeText(text).then(() => toast.success(done), () => toast.error("Couldn't copy."));
+}
+
+/** An open Studio item: click opens it beside the lead; right-click has the rest, as a thread's menu does. */
+function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): void; onClose(): void }) {
+  const sdk = useSdk();
+  const row = useRef<HTMLAnchorElement>(null);
+  const canFloat = useCanFloat({ kind: "path", path: item.href, title: item.title });
+  const call = (method: "archive" | "remove", input: Record<string, unknown>) =>
+    sdk.plugins.callRpc({ pluginId: "studio", method, input: input as never, outputSchema: resultsSchema, signal: AbortSignal.timeout(15_000) });
+  const archive = () => void call("archive", { pluginId: item.pluginId, ids: [item.id], archived: true }).then(
+    () => toast.success(`Archived ${item.title}`),
+    (cause: unknown) => toast.error(`Couldn't archive: ${cause instanceof Error ? cause.message : String(cause)}`),
+  );
+  const remove = () => {
+    if (!window.confirm(`Delete “${item.title}”? This can't be undone.`)) return;
+    void call("remove", { pluginId: item.pluginId, ids: [item.id] }).then(
+      () => toast.success(`Deleted ${item.title}`),
+      (cause: unknown) => toast.error(`Couldn't delete: ${cause instanceof Error ? cause.message : String(cause)}`),
+    );
+  };
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="group/item relative" data-space-studio-item={`${item.pluginId}:${item.id}`}>
+          <a
+            ref={row}
+            href={item.href}
+            title={item.title}
+            onClick={(event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              onOpen();
+            }}
+            onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); onClose(); } }}
+            className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pr-8 pl-2 text-left")}
+          >
+            <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}>
+              {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{item.title}</span>
+          </a>
+          <button
+            type="button"
+            aria-label={`Close ${item.title}`}
+            title="Close"
+            onClick={onClose}
+            className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "absolute top-1/2 right-0.5 inline-flex -translate-y-1/2 items-center justify-center opacity-0 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100 max-md:pointer-coarse:opacity-100")}
+          >
+            <Icon name="X" className="size-3.5" />
+          </button>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-52" aria-label={`${item.title} actions`}>
+        <ContextMenuItem onSelect={onOpen}><Icon name="ArrowUpRight" className="size-4" />Open</ContextMenuItem>
+        <ContextMenuItem onSelect={() => { if (!row.current || !openPathInSplit(row.current, item.href)) onOpen(); }}><Icon name="Columns2" className="size-4" />Open in split</ContextMenuItem>
+        {canFloat ? <ContextMenuItem onSelect={() => openFloat({ kind: "path", path: item.href, title: item.title })}><Icon name="AppWindow" className="size-4" />Float</ContextMenuItem> : null}
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => copyText(`[${item.title}](${item.href})`, "Link copied")}><Icon name="Copy" className="size-4" />Copy link</ContextMenuItem>
+        <ContextMenuItem onSelect={() => copyText(item.id, "ID copied")}><Icon name="Copy" className="size-4" />Copy ID</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={onClose}><Icon name="X" className="size-4" />Close</ContextMenuItem>
+        <ContextMenuItem onSelect={archive}><Icon name="Archive" className="size-4" />Archive</ContextMenuItem>
+        <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={remove}><Icon name="Trash2" className="size-4" />Delete</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
 /**
  * A Space's open Studio items, like tabs: each opens beside the lead, and ×
  * closes it here without touching the item. Opening any of the Space's items
@@ -128,7 +205,6 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, o
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
         title="Studio"
-        count={open.length || undefined}
         onOpen={() => onOpen({ kind: "items" })}
         openLabel={`All Studio items in ${spaceName}`}
         action={(
@@ -149,28 +225,7 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, o
         )}
       />
       {open.map((item) => (
-        <div key={key(item)} className="group/item relative" data-space-studio-item={key(item)}>
-          <button
-            type="button"
-            title={item.title}
-            onClick={() => onOpen({ kind: "item", path: item.href, title: item.title })}
-            className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pr-8 pl-2 text-left")}
-          >
-            <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}>
-              {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
-            </span>
-            <span className="min-w-0 flex-1 truncate">{item.title}</span>
-          </button>
-          <button
-            type="button"
-            aria-label={`Close ${item.title}`}
-            title="Close"
-            onClick={() => close(item)}
-            className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "absolute top-1/2 right-0.5 inline-flex -translate-y-1/2 items-center justify-center opacity-0 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100 max-md:pointer-coarse:opacity-100")}
-          >
-            <Icon name="X" className="size-3.5" />
-          </button>
-        </div>
+        <StudioItemRow key={key(item)} item={item} onOpen={() => onOpen({ kind: "item", path: item.href, title: item.title })} onClose={() => close(item)} />
       ))}
       {!open.length && !total ? (
         <button type="button" onClick={() => onOpen({ kind: "new-item" })} className={quietRow}>

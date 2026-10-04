@@ -331,7 +331,6 @@ export function SpaceModeSections({
                 />
                 <SpaceSubheading
                   title="Threads"
-                  count={group.threads.length || undefined}
                   action={(
                     <button
                       type="button"
