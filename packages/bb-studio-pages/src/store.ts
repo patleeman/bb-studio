@@ -3,8 +3,8 @@ import type Database from "better-sqlite3";
 
 // SQLite persistence. A page's content is its Yjs state (`state`); `markdown`
 // is a derived cache for search, mentions and previews, refreshed on save.
-// MIGRATIONS is append-only: BB records each statement's hash by index.
-
+// The schema as of the 2026-10-04 reset. Append new statements; never edit or
+// reorder these, since each database records the hash of every one it ran.
 export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS pages (
      id TEXT PRIMARY KEY,
@@ -23,8 +23,7 @@ export const MIGRATIONS = [
      refresh_cron TEXT,
      refresh_instructions TEXT NOT NULL DEFAULT '',
      refresh_last_at INTEGER
-   )`,
-  `CREATE INDEX IF NOT EXISTS pages_parent ON pages (project_id, parent_id, position)`,
+   , template INTEGER NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS snapshots (
      id TEXT PRIMARY KEY,
      page_id TEXT NOT NULL,
@@ -33,7 +32,6 @@ export const MIGRATIONS = [
      actor TEXT NOT NULL,
      created_at INTEGER NOT NULL
    )`,
-  `CREATE INDEX IF NOT EXISTS snapshots_page ON snapshots (page_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS files (
      id TEXT PRIMARY KEY,
      page_id TEXT NOT NULL,
@@ -60,58 +58,11 @@ export const MIGRATIONS = [
      created_at INTEGER NOT NULL,
      updated_at INTEGER NOT NULL
    )`,
-  `CREATE INDEX IF NOT EXISTS requests_page ON requests (page_id, created_at)`,
-  `CREATE INDEX IF NOT EXISTS requests_thread ON requests (thread_id, status)`,
-  // Agent threads started from a page's composer.
   `CREATE TABLE IF NOT EXISTS chats (
      thread_id TEXT PRIMARY KEY,
      page_id TEXT NOT NULL,
      created_at INTEGER NOT NULL
    )`,
-  `CREATE INDEX IF NOT EXISTS chats_page ON chats (page_id, created_at)`,
-  // Explore's old tables. Explore is its own plugin now (bb-studio-explore); kept so the list stays append-only.
-  `CREATE TABLE IF NOT EXISTS explore_explainers (
-     id TEXT PRIMARY KEY,
-     key TEXT NOT NULL UNIQUE,
-     parent_id TEXT,
-     thread_id TEXT NOT NULL,
-     message_id TEXT NOT NULL,
-     turn_id TEXT,
-     emoji TEXT NOT NULL,
-     label TEXT NOT NULL,
-     page_id TEXT,
-     project_id TEXT,
-     status TEXT NOT NULL,
-     follow_ups TEXT NOT NULL DEFAULT '[]',
-     generated_at INTEGER,
-     regenerated_at INTEGER,
-     error TEXT,
-     created_at INTEGER NOT NULL,
-     updated_at INTEGER NOT NULL
-   )`,
-  `CREATE INDEX IF NOT EXISTS explore_explainers_message ON explore_explainers (thread_id, message_id)`,
-  `CREATE INDEX IF NOT EXISTS explore_explainers_page ON explore_explainers (page_id)`,
-  `CREATE TABLE IF NOT EXISTS explore_jobs (
-     id TEXT PRIMARY KEY,
-     explainer_id TEXT NOT NULL,
-     kind TEXT NOT NULL,
-     status TEXT NOT NULL,
-     label TEXT NOT NULL,
-     detail TEXT NOT NULL,
-     progress INTEGER NOT NULL,
-     worker_thread_id TEXT,
-     error TEXT,
-     created_at INTEGER NOT NULL,
-     updated_at INTEGER NOT NULL
-   )`,
-  `CREATE INDEX IF NOT EXISTS explore_jobs_explainer ON explore_jobs (explainer_id, created_at)`,
-  `CREATE TABLE IF NOT EXISTS explore_parents (
-     project_key TEXT PRIMARY KEY,
-     page_id TEXT NOT NULL,
-     created_at INTEGER NOT NULL
-   )`,
-  `ALTER TABLE pages ADD COLUMN template INTEGER NOT NULL DEFAULT 0`,
-  // Checklist items handed to agents (src/checklists.ts).
   `CREATE TABLE IF NOT EXISTS checklist_handoffs (
      thread_id TEXT PRIMARY KEY,
      page_id TEXT NOT NULL,
@@ -122,14 +73,12 @@ export const MIGRATIONS = [
      created_at INTEGER NOT NULL,
      updated_at INTEGER NOT NULL
    )`,
+  `CREATE INDEX IF NOT EXISTS pages_parent ON pages (project_id, parent_id, position)`,
+  `CREATE INDEX IF NOT EXISTS snapshots_page ON snapshots (page_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS requests_page ON requests (page_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS requests_thread ON requests (thread_id, status)`,
+  `CREATE INDEX IF NOT EXISTS chats_page ON chats (page_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS checklist_handoffs_page ON checklist_handoffs (page_id, created_at)`,
-  // Studio Tasks boards already made into pages, so the migration runs once per board.
-  `CREATE TABLE IF NOT EXISTS board_migrations (
-     board_id TEXT PRIMARY KEY,
-     page_id TEXT NOT NULL,
-     tasks INTEGER NOT NULL,
-     migrated_at INTEGER NOT NULL
-   )`,
 ];
 
 export { newId };

@@ -1,6 +1,5 @@
 // The feed's posts. A story is the posts that share a story key; the feed
 // lists each story once, by its newest post.
-import { AUTOMATIC_MIGRATION, AUTOMATIC_FILTER_MIGRATION } from "./automatic-store";
 import { createHash } from "node:crypto";
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
@@ -35,6 +34,8 @@ export type PostRow = {
 /** A listed post, with how many posts its story has. */
 export type ListedRow = PostRow & { story_posts: number };
 
+// The schema as of the 2026-10-04 reset. Append new statements; never edit or
+// reorder these, since each database records the hash of every one it ran.
 export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS feed_posts (
      id TEXT PRIMARY KEY,
@@ -55,25 +56,20 @@ export const MIGRATIONS = [
      updated_at INTEGER NOT NULL,
      edited_by TEXT,
      resolved_at INTEGER
-   );
-   CREATE INDEX IF NOT EXISTS feed_posts_created ON feed_posts (created_at DESC, id DESC);
-   CREATE INDEX IF NOT EXISTS feed_posts_story ON feed_posts (story, created_at);
-   CREATE INDEX IF NOT EXISTS feed_posts_content ON feed_posts (content_key, created_at);
-   CREATE INDEX IF NOT EXISTS feed_posts_directive ON feed_posts (directive_key, created_at);`,
-  `CREATE TABLE IF NOT EXISTS feed_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
-  // A linked page's preview picture; image is "" when it has none.
-  `CREATE TABLE IF NOT EXISTS feed_link_images (url TEXT PRIMARY KEY, image TEXT NOT NULL, fetched_at INTEGER NOT NULL);`,
-  // Read state per post. Everything before the old read mark is read.
-  `ALTER TABLE feed_posts ADD COLUMN read_at INTEGER;
-   UPDATE feed_posts SET read_at = created_at
-     WHERE created_at <= CAST(COALESCE((SELECT value FROM feed_meta WHERE key = 'last_seen_at'), '0') AS INTEGER);
-   CREATE INDEX IF NOT EXISTS feed_posts_unread ON feed_posts (read_at, created_at);`,
-  // Link previews keep the page's title and description too; look them up again.
-  `DELETE FROM feed_link_images;
-   ALTER TABLE feed_link_images ADD COLUMN title TEXT NOT NULL DEFAULT '';
-   ALTER TABLE feed_link_images ADD COLUMN description TEXT NOT NULL DEFAULT '';`,
-  AUTOMATIC_MIGRATION,
-  AUTOMATIC_FILTER_MIGRATION,
+   , read_at INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS feed_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS feed_link_images (url TEXT PRIMARY KEY, image TEXT NOT NULL, fetched_at INTEGER NOT NULL, title TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '')`,
+  `CREATE TABLE IF NOT EXISTS inbox_jobs (thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL, body TEXT NOT NULL, retry_at INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS inbox_checkpoints (thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS inbox_updates (
+  thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL, headline TEXT NOT NULL,
+  body TEXT NOT NULL, urgent INTEGER NOT NULL, read_at INTEGER
+, filtered INTEGER NOT NULL DEFAULT 1)`,
+  `CREATE INDEX IF NOT EXISTS feed_posts_created ON feed_posts (created_at DESC, id DESC)`,
+  `CREATE INDEX IF NOT EXISTS feed_posts_story ON feed_posts (story, created_at)`,
+  `CREATE INDEX IF NOT EXISTS feed_posts_content ON feed_posts (content_key, created_at)`,
+  `CREATE INDEX IF NOT EXISTS feed_posts_directive ON feed_posts (directive_key, created_at)`,
+  `CREATE INDEX IF NOT EXISTS feed_posts_unread ON feed_posts (read_at, created_at)`,
 ];
 
 /** A linked page's preview; empty strings when it has none. */

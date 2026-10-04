@@ -89,6 +89,8 @@ export function parseFollowUps(value: string): ExploreItem[] {
   }
 }
 
+// The schema as of the 2026-10-04 reset. Append new statements; never edit or
+// reorder these, since each database records the hash of every one it ran.
 export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS explore_explainers (
      id TEXT PRIMARY KEY,
@@ -109,8 +111,6 @@ export const MIGRATIONS = [
      created_at INTEGER NOT NULL,
      updated_at INTEGER NOT NULL
    )`,
-  `CREATE INDEX IF NOT EXISTS explore_explainers_message ON explore_explainers (thread_id, message_id)`,
-  `CREATE INDEX IF NOT EXISTS explore_explainers_page ON explore_explainers (page_id)`,
   `CREATE TABLE IF NOT EXISTS explore_jobs (
      id TEXT PRIMARY KEY,
      explainer_id TEXT NOT NULL,
@@ -124,7 +124,6 @@ export const MIGRATIONS = [
      created_at INTEGER NOT NULL,
      updated_at INTEGER NOT NULL
    )`,
-  `CREATE INDEX IF NOT EXISTS explore_jobs_explainer ON explore_jobs (explainer_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS explore_parents (
      project_key TEXT PRIMARY KEY,
      page_id TEXT NOT NULL,
@@ -144,10 +143,13 @@ export const MIGRATIONS = [
      post_id TEXT,
      linked_page_id TEXT,
      digested_at INTEGER
-   );
-   CREATE INDEX IF NOT EXISTS explore_findings_digest ON explore_findings (digested_at, created_at);
-   CREATE INDEX IF NOT EXISTS explore_findings_post ON explore_findings (post_id);
-   CREATE TABLE IF NOT EXISTS explore_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+   )`,
+  `CREATE TABLE IF NOT EXISTS explore_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS explore_explainers_message ON explore_explainers (thread_id, message_id)`,
+  `CREATE INDEX IF NOT EXISTS explore_explainers_page ON explore_explainers (page_id)`,
+  `CREATE INDEX IF NOT EXISTS explore_jobs_explainer ON explore_jobs (explainer_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS explore_findings_digest ON explore_findings (digested_at, created_at)`,
+  `CREATE INDEX IF NOT EXISTS explore_findings_post ON explore_findings (post_id)`,
 ];
 
 export class ExploreStore {

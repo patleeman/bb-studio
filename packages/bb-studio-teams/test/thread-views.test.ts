@@ -11,7 +11,7 @@ function fixture() {
   x.harness.inspection.sdk.stub("threads.get", async ({ threadId }) => makeThreadResponse({ id: threadId, status: "idle" }));
   x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [], timelinePage: { olderCursor: null, hasOlderRows: false } }));
   x.harness.inspection.sdk.stub("threads.events.list", async () => []);
-  const profiles = new ThreadProfiles(x.bb, x.store, x.runtime, () => true);
+  const profiles = new ThreadProfiles(x.bb, x.store, x.runtime);
   return { ...x, views: new ThreadViews(x.bb, x.store, profiles) };
 }
 

@@ -2,13 +2,14 @@ import Database from "better-sqlite3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import plugin from "../server";
-import { AutomaticStore, AUTOMATIC_MIGRATION, AUTOMATIC_FILTER_MIGRATION } from "./automatic-store";
+import { AutomaticStore } from "./automatic-store";
+import { MIGRATIONS } from "./store";
 import { recurringThread } from "./automatic-contract";
 import { quietReply } from "./automatic";
 
 describe("automatic Inbox persistence", () => {
   it("coalesces jobs, ignores old model results, and never replays a processed turn", () => {
-    const db = new Database(":memory:"); db.exec(AUTOMATIC_MIGRATION); db.exec(AUTOMATIC_FILTER_MIGRATION);
+    const db = new Database(":memory:"); for (const migration of MIGRATIONS) db.exec(migration);
     const store = new AutomaticStore(db);
     const old = { thread_id: "t", at: 10, body: "Old" };
     const next = { ...old, at: 20, body: "New" };

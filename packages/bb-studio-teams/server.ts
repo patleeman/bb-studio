@@ -26,7 +26,7 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new Store(db), runtime = new Runtime(bb, store);
-  const profiles = new ThreadProfiles(bb, store, runtime, id => !store.routingSession(id));
+  const profiles = new ThreadProfiles(bb, store, runtime);
   const views = new ThreadViews(bb, store, profiles);
   const project = () => personalProjectId(bb);
   const activeConversations = (id: string) => store.conversations(id).filter(c => c.kind === "mission" && !c.archivedAt);

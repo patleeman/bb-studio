@@ -12,9 +12,10 @@ import type {
 } from "../shared/contract";
 import { countWords, defaultTitle, joinTranscript, tail } from "../shared/format";
 
-/** Append-only: statement index is the migration id. */
+// The schema as of the 2026-10-04 reset. Append new statements; never edit or
+// reorder these, since each database records the hash of every one it ran.
 export const MIGRATIONS = [
-  `CREATE TABLE recordings (
+  `CREATE TABLE IF NOT EXISTS recordings (
      id TEXT PRIMARY KEY,
      title TEXT NOT NULL,
      title_source TEXT NOT NULL,
@@ -27,8 +28,8 @@ export const MIGRATIONS = [
      updated_at INTEGER NOT NULL,
      ended_at INTEGER,
      heartbeat_at INTEGER NOT NULL
-   );
-   CREATE TABLE segments (
+   , archived_at INTEGER, meeting_notes TEXT, audio_removed_at INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS segments (
      recording_id TEXT NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
      id TEXT NOT NULL,
      session_id TEXT NOT NULL,
@@ -43,17 +44,12 @@ export const MIGRATIONS = [
      error TEXT,
      attempts INTEGER NOT NULL DEFAULT 0,
      next_attempt_at INTEGER NOT NULL DEFAULT 0,
-     created_at INTEGER NOT NULL,
+     created_at INTEGER NOT NULL, cleaned_text TEXT,
      PRIMARY KEY (recording_id, id)
-   );
-   CREATE INDEX segments_order ON segments(recording_id, started_at, idx);
-   CREATE INDEX segments_pending ON segments(status, next_attempt_at);
-   CREATE INDEX recordings_updated ON recordings(updated_at);`,
-  // BB Studio: archiving, as for every Studio item.
-  `ALTER TABLE recordings ADD COLUMN archived_at INTEGER;`,
-  `ALTER TABLE recordings ADD COLUMN meeting_notes TEXT;`,
-  `ALTER TABLE recordings ADD COLUMN audio_removed_at INTEGER;`,
-  `ALTER TABLE segments ADD COLUMN cleaned_text TEXT;`,
+   )`,
+  `CREATE INDEX IF NOT EXISTS segments_order ON segments(recording_id, started_at, idx)`,
+  `CREATE INDEX IF NOT EXISTS segments_pending ON segments(status, next_attempt_at)`,
+  `CREATE INDEX IF NOT EXISTS recordings_updated ON recordings(updated_at)`,
 ];
 
 interface RecordingRow {

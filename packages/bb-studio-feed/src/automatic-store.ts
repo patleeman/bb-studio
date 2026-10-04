@@ -1,16 +1,5 @@
 import type Database from "better-sqlite3";
 
-export const AUTOMATIC_MIGRATION = `
-CREATE TABLE IF NOT EXISTS inbox_preferences (thread_id TEXT PRIMARY KEY, followed INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS inbox_jobs (thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL, body TEXT NOT NULL, retry_at INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS inbox_checkpoints (thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS inbox_updates (
-  thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL, headline TEXT NOT NULL,
-  body TEXT NOT NULL, urgent INTEGER NOT NULL, read_at INTEGER
-);`;
-
-export const AUTOMATIC_FILTER_MIGRATION = "ALTER TABLE inbox_updates ADD COLUMN filtered INTEGER NOT NULL DEFAULT 1;";
-
 export type Job = { thread_id: string; at: number; body: string };
 export type Update = Job & { headline: string; urgent: number; read_at: number | null; filtered: number };
 
@@ -42,7 +31,6 @@ export class AutomaticStore {
   }
   read(id: string, at: number) { this.db.prepare("UPDATE inbox_updates SET read_at = ? WHERE thread_id = ? AND at <= ?").run(at, id, at); }
   remove(id: string) {
-    // inbox_preferences is no longer read; clear any old rows with the rest.
-    for (const table of ["inbox_jobs", "inbox_updates", "inbox_checkpoints", "inbox_preferences"]) this.db.prepare(`DELETE FROM ${table} WHERE thread_id = ?`).run(id);
+    for (const table of ["inbox_jobs", "inbox_updates", "inbox_checkpoints"]) this.db.prepare(`DELETE FROM ${table} WHERE thread_id = ?`).run(id);
   }
 }

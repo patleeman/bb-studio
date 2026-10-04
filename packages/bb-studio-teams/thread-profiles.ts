@@ -21,13 +21,10 @@ export class ThreadProfiles {
     private readonly bb: BbPluginApi,
     private readonly store: Store,
     private readonly runtime: Pick<Runtime, "conversation" | "changed">,
-    /** False for threads this plugin runs itself, such as channels and routing. */
-    private readonly eligible: (threadId: string) => boolean,
   ) {}
 
   /** The attached bot, or null when this thread cannot take a profile. */
   profile(threadId: string): { botId: string | null } | null {
-    if (!this.eligible(threadId)) return null;
     const conversation = this.store.byThread(threadId);
     if (!conversation) return { botId: null };
     return conversation.kind === "admin" ? { botId: conversation.botId } : null;
@@ -89,7 +86,7 @@ export class ThreadProfiles {
     this.pending.delete(projectId);
     if (!pending || Date.now() - pending.at > pendingForMs) return null;
     const bot = this.store.findBot(pending.botId);
-    if (!bot || bot.retired || !this.eligible(threadId)) return null;
+    if (!bot || bot.retired) return null;
     return this.attach(bot, threadId);
   }
 

@@ -46,13 +46,6 @@ export class Store {
       ]),
     );
   }
-  routingSession(threadId: string): string | undefined {
-    return (
-      this.db
-        .prepare("SELECT request_id FROM routing_sessions WHERE thread_id=?")
-        .get(threadId) as { request_id: string } | undefined
-    )?.request_id;
-  }
   get(id: string): Bot {
     const row = this.db.prepare("SELECT json FROM bots WHERE id=?").get(id) as
       | { json: string }
