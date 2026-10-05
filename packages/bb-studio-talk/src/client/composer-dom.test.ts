@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COMPOSER_REFERENCE_EVENT, insertDictationIntoComposer } from "./composer-dom";
+import { COMPOSER_REFERENCE_EVENT, findComposer, insertDictationIntoComposer } from "./composer-dom";
 
 afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -51,5 +51,22 @@ describe("dictation source delivery", () => {
     target.remove();
     expect(await insertDictationIntoComposer(target, "Text", [recording])).toBe(false);
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe("findComposer", () => {
+  it("prefers the focused composer over a later one on screen", () => {
+    const boxes = [0, 1].map(() => {
+      const box = document.createElement("form");
+      box.setAttribute("data-promptbox", "");
+      box.innerHTML = '<div contenteditable="true" tabindex="0"></div>';
+      Object.defineProperty(box, "offsetParent", { value: document.body });
+      document.body.append(box);
+      return box;
+    });
+    (boxes[0]!.firstElementChild as HTMLElement).focus();
+    expect(findComposer()).toBe(boxes[0]);
+    (document.activeElement as HTMLElement).blur();
+    expect(findComposer()).toBe(boxes[1]);
   });
 });

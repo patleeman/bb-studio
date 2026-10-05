@@ -11,6 +11,7 @@
 // falls back to built-in dictation and Talk stays reachable from its
 // commands and the recordings page.
 import { recordingLink, type RecordingReference } from "./recording-reference";
+import { visibleComposers } from "./composer-source";
 
 export const COMPOSER_REFERENCE_EVENT = "bb-talk:composer-reference";
 
@@ -153,10 +154,9 @@ function textBeforeCaret(editor: HTMLElement): string {
   return range.toString();
 }
 
-/** The last visible composer on screen. */
-export function findComposer(): HTMLElement | null {
-  const all = [...document.querySelectorAll<HTMLElement>("[data-promptbox]")].filter(
-    (element) => element.offsetParent !== null,
-  );
-  return all.at(-1) ?? null;
+/** The visible composer holding focus, else the last visible composer on screen. */
+export function findComposer(focused: Element | null = document.activeElement): HTMLElement | null {
+  const all = visibleComposers();
+  const owner = focused?.closest<HTMLElement>("[data-promptbox]");
+  return (owner && all.includes(owner) ? owner : all.at(-1)) ?? null;
 }
