@@ -220,6 +220,15 @@ describe("text that looks like block syntax", () => {
   });
 });
 
+describe("ordered lists", () => {
+  it("keep their start number", () => {
+    const markdown = "3. Third\n4. Fourth\n\n- [ ] Task\n\n1. One\n";
+    const blocks = throughYjs(markdownToBlocks(markdown));
+    expect(blocks[0]).toMatchObject({ type: "numberedListItem", props: { start: 3 } });
+    expect(blocksToMarkdown(blocks)).toBe("3. Third\n4. Fourth\n- [ ] Task\n1. One\n");
+  });
+});
+
 describe("toggles", () => {
   const MARKDOWN = `<details>
 <summary>**More** details</summary>

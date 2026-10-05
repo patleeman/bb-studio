@@ -196,7 +196,7 @@ function convertBlock(node: RootContent): PageBlock[] {
 }
 
 function convertList(list: List): PageBlock[] {
-  return list.children.map((item: ListItem) => {
+  return list.children.map((item: ListItem, index) => {
     const [first, ...rest] = item.children;
     const type = list.ordered
       ? "numberedListItem"
@@ -208,6 +208,8 @@ function convertList(list: List): PageBlock[] {
       content: first?.type === "paragraph" ? inline(first.children) : [],
     };
     if (type === "checkListItem") block.props = { checked: item.checked === true };
+    // BlockNote keeps a list's start number on its first item.
+    if (type === "numberedListItem" && index === 0 && typeof list.start === "number" && list.start !== 1) block.props = { start: list.start };
     const childNodes = first?.type === "paragraph" ? rest : item.children;
     const children = convertBlocks(childNodes as RootContent[]);
     if (children.length) block.children = children;
@@ -396,7 +398,8 @@ function renderBlocks(blocks: PageBlock[], indent: string, options: MarkdownOpti
   };
   for (const block of blocks) {
     const isList = LIST_TYPES.includes(block.type);
-    number = block.type === "numberedListItem" ? number + 1 : 0;
+    const start = block.props?.start;
+    number = block.type !== "numberedListItem" ? 0 : !number && typeof start === "number" ? start : number + 1;
     const text = renderBlock(block, indent, number, options);
     if (isList) {
       listRun ??= [];
