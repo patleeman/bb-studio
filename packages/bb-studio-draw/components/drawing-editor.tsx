@@ -49,7 +49,7 @@ import {
 } from "../lib/scene";
 import { useDrawingSync } from "../lib/sync";
 import { DrawingSaveQueue } from "../lib/save-queue";
-import { DrawingDraftSession, drawingDraftStore, type DrawingDraft } from "../lib/drafts";
+import { DraftOwnership, DrawingDraftSession, drawingDraftStore, type DrawingDraft } from "../lib/drafts";
 import { DRAWING_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, drawingHref } from "../src/shared";
 
 const SPIN = "animate-spin motion-reduce:animate-none";
@@ -97,6 +97,9 @@ export function DrawingEditor({
   const draftSessionRef = useRef<DrawingDraftSession | null>(null);
   if (!draftSessionRef.current) draftSessionRef.current = new DrawingDraftSession(draftStore, drawingId, crypto.randomUUID(), error => setLocalError(error ? errorMessage(error) : null));
   const draftSession = draftSessionRef.current;
+  // Other windows skip this editor's draft while it's open (see DraftOwnership).
+  const [ownership] = useState(() => new DraftOwnership());
+  useEffect(() => ownership.hold(draftSession.id), [ownership, draftSession]);
 
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -129,7 +132,7 @@ export function DrawingEditor({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const drafts = draftStore.list(drawingId).then((saved) => {
+    const drafts = draftStore.list(drawingId).then((saved) => ownership.recoverable(saved)).then((saved) => {
       if (!cancelled) setRecoveryDrafts(saved);
       return saved;
     }).catch((error) => { if (!cancelled) setDraftLoadError(errorMessage(error)); return []; });
@@ -311,7 +314,7 @@ export function DrawingEditor({
   );
 
   async function checkDrafts() {
-    try { setRecoveryDrafts((await draftStore.list(drawingId)).filter(draft => draft.id !== draftSession.id)); setDraftLoadError(null); }
+    try { setRecoveryDrafts(await ownership.recoverable((await draftStore.list(drawingId)).filter(draft => draft.id !== draftSession.id))); setDraftLoadError(null); }
     catch (error) { setDraftLoadError(errorMessage(error)); }
   }
 
@@ -321,34 +324,37 @@ export function DrawingEditor({
     setRecoveryBusy(true);
     setRecoveryError(null);
     try {
-      if (action !== "discard") {
-        if (!parseScene(draft.data)) throw new Error("This draft could not be read. Download it before discarding it.");
-        if (action === "copy") {
-          const { drawing } = await rpc.call("recoverDrawingCopy", {
-            sourceDrawingId: drawingId, draftId: draft.id, draftToken: draft.token,
-            data: draft.data, name: `${name || "Drawing"} (recovered)`.slice(0, 200), projectId: projectId.current,
-          });
-          await draftStore.remove(draft.id, draft.token);
-          await checkDrafts();
-          openCompanion({ kind: "path", path: drawingHref(drawing.id), title: drawing.name });
-          return;
+      // An open window still owns its draft: it can't be recovered or discarded here.
+      await ownership.whileOrphaned(draft.id, async () => {
+        if (action !== "discard") {
+          if (!parseScene(draft.data)) throw new Error("This draft could not be read. Download it before discarding it.");
+          if (action === "copy") {
+            const { drawing } = await rpc.call("recoverDrawingCopy", {
+              sourceDrawingId: drawingId, draftId: draft.id, draftToken: draft.token,
+              data: draft.data, name: `${name || "Drawing"} (recovered)`.slice(0, 200), projectId: projectId.current,
+            });
+            await draftStore.remove(draft.id, draft.token);
+            await checkDrafts();
+            openCompanion({ kind: "path", path: drawingHref(drawing.id), title: drawing.name });
+            return;
+          }
+          await rpc.call("saveDrawing", { id: drawingId, data: draft.data, expectedUpdatedAt: draft.baseRevision });
+          const { drawing } = await rpc.call("getDrawing", { id: drawingId });
+          if (!drawing) throw new Error("The drawing was removed. Your local draft is still available.");
+          const scene = parseScene(drawing.data);
+          baseRevision.current = drawing.updatedAt;
+          loadedRef.current = true;
+          projectId.current = drawing.projectId;
+          setName(drawing.name);
+          serverRevSetterRef.current(drawing.updatedAt);
+          savedSceneRef.current = null;
+          apiRef.current = null;
+          setInitialData(scene ? { ...scene, appState: sanitizeAppStateForStorage(scene.appState), scrollToContent: true } as unknown as ExcalidrawInitialDataState : null);
+          setCanvasGeneration(value => value + 1);
         }
-        await rpc.call("saveDrawing", { id: drawingId, data: draft.data, expectedUpdatedAt: draft.baseRevision });
-        const { drawing } = await rpc.call("getDrawing", { id: drawingId });
-        if (!drawing) throw new Error("The drawing was removed. Your local draft is still available.");
-        const scene = parseScene(drawing.data);
-        baseRevision.current = drawing.updatedAt;
-        loadedRef.current = true;
-        projectId.current = drawing.projectId;
-        setName(drawing.name);
-        serverRevSetterRef.current(drawing.updatedAt);
-        savedSceneRef.current = null;
-        apiRef.current = null;
-        setInitialData(scene ? { ...scene, appState: sanitizeAppStateForStorage(scene.appState), scrollToContent: true } as unknown as ExcalidrawInitialDataState : null);
-        setCanvasGeneration(value => value + 1);
-      }
-      await draftStore.remove(draft.id, draft.token);
-      await checkDrafts();
+        await draftStore.remove(draft.id, draft.token);
+        await checkDrafts();
+      });
     } catch (error) { setRecoveryError(errorMessage(error)); }
     finally { setRecoveryBusy(false); }
   }

@@ -106,3 +106,47 @@ export class DrawingDraftSession {
     this.persisted = null;
   }
 }
+
+/** The part of the Web Locks API (navigator.locks) that draft ownership uses. */
+export interface DraftLockManager {
+  request<T>(name: string, options: { ifAvailable: true }, callback: (lock: unknown) => Promise<T> | T): Promise<T>;
+  request<T>(name: string, callback: (lock: unknown) => Promise<T> | T): Promise<T>;
+  query(): Promise<{ held?: { name?: string }[] }>;
+}
+
+const draftLockName = (draftId: string) => `bb-studio-draw-draft:${draftId}`;
+
+/**
+ * An open editor holds its draft's lock until it closes, so other windows can
+ * tell its pending work from a draft whose window is gone. The browser drops
+ * the lock when the window closes or crashes. Without Web Locks (an insecure
+ * origin), every draft counts as recoverable, as before.
+ */
+export class DraftOwnership {
+  constructor(private readonly locks: DraftLockManager | undefined = typeof navigator === "undefined" ? undefined : (navigator as { locks?: DraftLockManager }).locks) {}
+
+  /** Holds the lock for `draftId` until the returned release is called. */
+  hold(draftId: string): () => void {
+    if (!this.locks) return () => {};
+    let release!: () => void;
+    const released = new Promise<void>(resolve => { release = resolve; });
+    void this.locks.request(draftLockName(draftId), () => released).catch(() => { /* Liveness is best effort. */ });
+    return release;
+  }
+
+  /** Drafts whose editor is not open in any window. */
+  async recoverable(drafts: DrawingDraft[]): Promise<DrawingDraft[]> {
+    if (!this.locks) return drafts;
+    const held = new Set(((await this.locks.query()).held ?? []).map(lock => lock.name));
+    return drafts.filter(draft => !held.has(draftLockName(draft.id)));
+  }
+
+  /** Runs `action` only while no open editor owns the draft; otherwise throws. */
+  async whileOrphaned<T>(draftId: string, action: () => Promise<T>): Promise<T> {
+    if (!this.locks) return action();
+    return this.locks.request<T>(draftLockName(draftId), { ifAvailable: true }, lock => {
+      if (!lock) throw new Error("This draft belongs to a drawing that is open in another window.");
+      return action();
+    });
+  }
+}

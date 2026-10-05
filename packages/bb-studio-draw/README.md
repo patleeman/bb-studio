@@ -101,7 +101,10 @@ versa) via tombstones; edits to the *same* element resolve by Excalidraw's
   you close the browser with unsaved changes.
 - Unsaved scenes, including image files and deletion tombstones, are also
   written to IndexedDB in this browser. Each editor has its own draft key,
-  so another tab cannot replace its recovery data. A server acknowledgement
+  so another tab cannot replace its recovery data. While an editor is open it
+  holds a Web Lock on its draft, so other tabs neither offer that draft for
+  recovery nor discard it (on origins without Web Locks, every draft is
+  offered). A server acknowledgement
   removes only the matching saved draft; newer edits stay recoverable.
   On reopening a drawing, **Recover draft** checks the server revision
   atomically before merging. If another writer changed the drawing, recovery

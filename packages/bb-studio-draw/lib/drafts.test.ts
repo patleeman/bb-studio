@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DrawingDraftSession, drawingDraftStore, type DraftStore, type DrawingDraft } from "./drafts";
+import { DraftOwnership, DrawingDraftSession, drawingDraftStore, type DraftLockManager, type DraftStore, type DrawingDraft } from "./drafts";
 
 function memoryStore() {
   const rows = new Map<string, DrawingDraft>();
@@ -119,5 +119,40 @@ describe("durable drawing drafts", () => {
     const store = drawingDraftStore();
     await expect(store.list("drawing")).rejects.toThrow();
     await expect(store.list("drawing")).rejects.toThrow();
+  });
+});
+
+/** In-memory Web Locks: exclusive, released when the callback settles. */
+function fakeLocks() {
+  const held = new Set<string>();
+  const request = async (name: string, ...rest: unknown[]) => {
+    const callback = rest[rest.length - 1] as (lock: unknown) => unknown;
+    const ifAvailable = rest.length > 1;
+    if (held.has(name)) { if (ifAvailable) return callback(null); throw new Error("fake locks only support ifAvailable contention"); }
+    held.add(name);
+    try { return await callback({ name }); } finally { held.delete(name); }
+  };
+  return { request, query: async () => ({ held: [...held].map(name => ({ name })) }) } as unknown as DraftLockManager;
+}
+
+describe("draft ownership across windows", () => {
+  it("hides another open window's pending draft and refuses to discard it, until that window closes", async () => {
+    const { store } = memoryStore();
+    const locks = fakeLocks();
+    const live = session(store, "live"), closed = session(store, "closed");
+    live.stage("live scene", 1); closed.stage("closed scene", 1);
+    await Promise.all([live.retry(), closed.retry()]);
+    const release = new DraftOwnership(locks).hold("live");
+    await Promise.resolve();
+    const other = new DraftOwnership(locks);
+    expect((await other.recoverable(await store.list("drawing"))).map(draft => draft.id)).toEqual(["closed"]);
+    const [liveDraft] = (await store.list("drawing")).filter(draft => draft.id === "live");
+    await expect(other.whileOrphaned("live", () => store.remove("live", liveDraft!.token))).rejects.toThrow("open in another window");
+    expect((await store.list("drawing")).map(draft => draft.id).sort()).toEqual(["closed", "live"]);
+    release();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect((await other.recoverable(await store.list("drawing"))).map(draft => draft.id).sort()).toEqual(["closed", "live"]);
+    await other.whileOrphaned("live", () => store.remove("live", liveDraft!.token));
+    expect((await store.list("drawing")).map(draft => draft.id)).toEqual(["closed"]);
   });
 });
