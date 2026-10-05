@@ -1,6 +1,8 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { defineItemMention } from "@bb-studio/kit/server";
-import { legacyChatContract, rpcContract, MENTION_PROVIDER_ID } from "@bb-studio/kit/chat-contract";
+import { legacyChatContract, rpcContract, schemas, MENTION_PROVIDER_ID } from "@bb-studio/kit/chat-contract";
+import { STUDIO_ITEM_AT_METHOD, STUDIO_PLUGIN_ID, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
+import { untitled } from "@bb-studio/kit/format";
 import { ref } from "@bb-studio/kit/chat-schemas";
 import { z } from "zod";
 
@@ -10,6 +12,22 @@ const importedLink = linkSchema.extend({ item: ref });
 const MIGRATED = "migrated:";
 const FIRST_RETRY_MS = 5_000;
 const MAX_RETRY_MS = 10 * 60_000;
+
+const GENERIC_HINT = "Find it with studio_list_items; its link is above.";
+
+/** What the agent is told about a mentioned item: a pointer, not the content. Mirrors Studio's chat/context.ts. */
+function pointerNote(item: StudioItem & { pluginId: string }, kind: StudioKind | null): string {
+  const label = (kind?.label ?? item.kind).toLowerCase();
+  return [
+    `The user has this Studio ${label} open while they talk to you: "${untitled(item.title)}" (${label} id ${item.id}, from the ${item.pluginId} plugin, link ${item.href}).`,
+    `When they say "this" or "here", they mean it. ${kind?.agentHint ?? GENERIC_HINT}`,
+    "Read it fresh before you answer about it; don't guess its content.",
+  ].join("\n");
+}
+
+function missingNote(key: string): string {
+  return `The user had a Studio item open (${key}), but it can't be found now. It may have been deleted. ${GENERIC_HINT}`;
+}
 
 /** Upgrade-only bridge. Studio owns the UI, new links, and all chat behavior. */
 export default async function plugin(bb: BbPluginApi) {
@@ -52,12 +70,16 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.ui.registerMentionProvider(defineItemMention({
     id: MENTION_PROVIDER_ID, label: "On screen", search: () => [],
+    // Archived items still get a pointer, and any failure falls back to the
+    // missing note, as the mention did before Studio took chat over.
     async resolve(key) {
       const colon = key.indexOf(":");
-      const { item } = await call("chat.subject", { pluginId: key.slice(0, colon), id: key.slice(colon + 1) });
-      return { context: item
-        ? `The user means this Studio ${item.kindLabel.toLowerCase()}: "${item.title}" (${item.pluginId}:${item.id}, ${item.href}). Read it with its plugin's tools before answering.`
-        : `The Studio item ${key} is gone. Look for it with studio_list_items.` };
+      if (colon <= 0 || colon === key.length - 1) return { context: missingNote(key) };
+      const { item, kind } = await bb.sdk.plugins.callRpc({
+        pluginId: STUDIO_PLUGIN_ID, method: STUDIO_ITEM_AT_METHOD, input: { pluginId: key.slice(0, colon), id: key.slice(colon + 1) },
+        outputSchema: schemas.itemAt.output, signal: AbortSignal.timeout(10_000),
+      }).catch(() => ({ item: null, kind: null }));
+      return { context: item ? pointerNote(item, kind) : missingNote(key) };
     },
   }));
 

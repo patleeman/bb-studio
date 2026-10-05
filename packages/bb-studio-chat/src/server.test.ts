@@ -2,13 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import plugin from "../server";
 import { rpcContract } from "@bb-studio/kit/chat-contract";
 
-async function setup(values: Map<string, unknown>, fail: boolean | { failures: number } = false) {
-  const callRpc = vi.fn(async ({ method, input }: { method: keyof typeof rpcContract; input: any }) => {
+async function setup(values: Map<string, unknown>, fail: boolean | { failures: number } = false, itemAt: (input: any) => unknown = () => ({ item: null, kind: null })) {
+  const callRpc = vi.fn(async ({ method, input }: { method: keyof typeof rpcContract | "itemAt"; input: any }) => {
+    if (method === "itemAt") return itemAt(input);
     rpcContract[method].input.parse(input);
     if (fail === true || (typeof fail === "object" && fail.failures-- > 0)) throw new Error("Studio is unavailable");
     return method === "chat.importLinks" ? { imported: input.links.length } : { thread: { threadId: "thread", title: "Linked", origin: "chosen" } };
   });
-  let handlers: any, cli: any;
+  let handlers: any, cli: any, mention: any;
   const warn = vi.fn();
   const disposers: (() => void)[] = [];
   await plugin({
@@ -18,13 +19,13 @@ async function setup(values: Map<string, unknown>, fail: boolean | { failures: n
       set: async (key: string, value: unknown) => { values.set(key, value); },
     } },
     sdk: { plugins: { callRpc } },
-    ui: { registerMentionProvider: vi.fn() },
+    ui: { registerMentionProvider: (value: unknown) => { mention = value; } },
     rpc: { register: (_contract: unknown, value: unknown) => { handlers = value; } },
     cli: { register: (value: unknown) => { cli = value; } },
     log: { warn },
     onDispose: (dispose: () => void) => { disposers.push(dispose); },
   } as any);
-  return { callRpc, handlers, cli, warn, dispose: () => disposers.forEach(each => each()) };
+  return { callRpc, handlers, cli, mention, warn, dispose: () => disposers.forEach(each => each()) };
 }
 
 describe("Chat upgrade bridge", () => {
@@ -94,5 +95,16 @@ describe("Chat upgrade bridge", () => {
     expect(callRpc.mock.calls.filter(([call]) => call.method === "chat.importLinks")).toHaveLength(1);
     values.set("link:pages:page", { threadId: "newer", at: 2 });
     expect((await cli.run(["migrate"])).stdout).toContain("imported 1");
+  });
+  it("resolves mentions of archived items to a pointer and lookup failures to the missing note", async () => {
+    const item = { pluginId: "excalidraw", id: "drw_1", kind: "drawing", title: "Launch flow", href: "/plugins/excalidraw/d/drw_1", archived: true };
+    const { mention } = await setup(new Map(), false, input => {
+      if (input.id === "boom") throw new Error("Studio is unavailable");
+      return input.id === "drw_1" ? { item, kind: null } : { item: null, kind: null };
+    });
+    expect((await mention.resolve("excalidraw:drw_1")).context).toMatch(/Studio drawing open.*"Launch flow"/);
+    expect((await mention.resolve("excalidraw:boom")).context).toContain("can't be found now");
+    expect((await mention.resolve("excalidraw:gone")).context).toContain("can't be found now");
+    expect((await mention.resolve("nocolon")).context).toContain("can't be found now");
   });
 });
