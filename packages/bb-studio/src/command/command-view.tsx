@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate, useSdk, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, PageColumn, StudioBar, Tooltip, openCompanion } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { errorMessage as message } from "@bb-studio/kit/format";
@@ -173,6 +173,9 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const nameOf = (threadId: string) => thread(threadId)?.title || "Thread";
     const defaultTo = reply && thread(reply) ? reply : space?.leadThreadId ?? null;
   const panes = useCommandPanes(spaceId, threads, space?.leadThreadId ?? null);
+  const sdk = useSdk();
+  // Reading a pane marks its thread read in BB too, then refreshes the dots.
+  const markSeen = useCallback((threadId: string) => { void sdk.threads.markRead({ threadId }).then(load, () => {}); }, [sdk, load]);
   const pickReply = useCallback((threadId: string, focusComposer?: boolean) => { setReply(threadId); if (focusComposer) setFocus(value => value + 1); }, []);
   return <div className="relative flex h-full min-h-0 flex-col" data-command-view>
     <StudioBar>
@@ -186,7 +189,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
         <NewThreadButton space={space?.space ?? null} onNew={panes.newThread} />
       </div>
     </StudioBar>
-    {!space ? <div className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-[760px] px-4 pt-6">{!error && <Placeholder rows={2} />}</div></div> : <CommandThreads panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} draftPane={<NewThreadPane space={space.space} panes={panes} onStarted={load} />} onReply={pickReply} onOpen={openThread} />}
+    {!space ? <div className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-[760px] px-4 pt-6">{!error && <Placeholder rows={2} />}</div></div> : <CommandThreads panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} draftPane={<NewThreadPane space={space.space} panes={panes} onStarted={load} />} onReply={pickReply} onSeen={markSeen} onOpen={openThread} />}
     <div className="command-dock">
     <div className="min-w-0">
       {/* Keep the existing draft key so moving Command preserves unsent messages. */}

@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CommandSwitcher, CommandThreads, useCommandPanes } from "./command-threads";
 import type { CommandThread } from "./command-contract";
-const state = vi.hoisted(() => ({ reply: vi.fn(), select: vi.fn(), open: vi.fn() }));
+const state = vi.hoisted(() => ({ reply: vi.fn(), select: vi.fn(), open: vi.fn(), seen: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ ThreadChat: ({ threadId, variant, messageActions }: any) => React.createElement("button", { "data-native-thread": threadId, "data-variant": variant, onClick: () => messageActions[0].run({ threadId }) }, "Native transcript") }));
 const tooltips = vi.hoisted(() => [] as unknown[]);
 vi.mock("@bb-studio/kit/app", () => ({ ItemTile: () => null, Icon: () => null, Tooltip: ({ label, children }: { label: unknown; children: unknown }) => { tooltips.push(label); return children; } }));
@@ -13,7 +13,7 @@ const row = (id: string, status: string, extra: Partial<CommandThread> = {}): Co
 function View({ threads, leadThreadId }: { threads: CommandThread[]; leadThreadId: string | null }) {
   const panes = useCommandPanes("space", threads, leadThreadId);
   return React.createElement(React.Fragment, null,
-    React.createElement(CommandThreads, { panes, threads, leadThreadId, draftPane: React.createElement("div", { "data-draft": panes.draft?.threadId ?? "composing" }), onReply: state.reply, onOpen: state.open }),
+    React.createElement(CommandThreads, { panes, threads, leadThreadId, draftPane: React.createElement("div", { "data-draft": panes.draft?.threadId ?? "composing" }), onReply: state.reply, onSeen: state.seen, onOpen: state.open }),
     React.createElement("button", { "aria-label": "New thread", onClick: panes.newThread }),
     React.createElement("button", { "aria-label": "Started", onClick: () => panes.started("fresh") }),
     React.createElement("button", { "aria-label": "Discard", onClick: panes.discard }),
@@ -116,7 +116,18 @@ test("panes open on the newest message and follow new ones until the owner scrol
     height = 1800;
     act(() => { scroller.append(document.createElement("p")); });
     return Promise.resolve();
-  }).then(() => expect(top).toBe(300));
+  }).then(() => {
+    expect(top).toBe(300);
+    // Back at the bottom, it follows again; growth with no upward scroll keeps it there.
+    top = height - 200;
+    scroller.dispatchEvent(new Event("scroll"));
+    height = 2400;
+    act(() => { scroller.append(document.createElement("p")); });
+    scroller.dispatchEvent(new Event("scroll"));
+    height = 2600;
+    act(() => { scroller.append(document.createElement("p")); });
+    return Promise.resolve();
+  }).then(() => expect(top).toBe(2400));
 });
 test("the thread list checks the open threads", () => {
   render([row("lead", "idle"), row("run", "active")], "lead");
@@ -156,4 +167,21 @@ test("a new thread drafts in a pane beside the others and becomes its own pane o
   render([row("lead", "idle"), row("run", "active"), row("fresh", "starting")], "lead");
   expect(draft()).toBeNull();
   expect(shown()).toEqual(["run", "fresh"]);
+});
+test("an unread thread's pane and row stand out until the owner clicks into the pane", () => {
+  render([row("lead", "idle"), row("done", "idle", { unread: true })], "lead");
+  switcher("done");
+  const pane = container.querySelector('[data-channel-thread="done"]') as HTMLElement;
+  expect(pane.hasAttribute("data-unread")).toBe(true);
+  expect(pane.querySelector("[data-command-unread]")?.textContent).toBe("New");
+  expect(container.querySelector('.channel-switcher-row[data-unread] .channel-switcher-pick')?.textContent).toContain("done");
+  expect(container.querySelector('[data-channel-thread="lead"]')?.hasAttribute("data-unread")).toBe(false);
+  act(() => { pane.querySelector("header")!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); });
+  expect(state.seen).toHaveBeenCalledWith("done");
+  render([row("lead", "idle"), row("done", "idle", { unread: false })], "lead");
+  expect(container.querySelector("[data-unread]")).toBeNull();
+  // Read panes don't report again.
+  state.seen.mockClear();
+  act(() => { (container.querySelector('[data-channel-thread="done"] header') as HTMLElement).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); });
+  expect(state.seen).not.toHaveBeenCalled();
 });

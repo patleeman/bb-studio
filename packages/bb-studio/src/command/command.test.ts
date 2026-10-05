@@ -8,7 +8,7 @@ const SPACES = { spaces: [{ id: "sp_default", name: "Personal", isDefault: true,
 function fixture(spaceOf: Record<string, string> = {}, lead: string | null = null) {
   const host = createFakePluginHost({ pluginId: "studio", sdk: { threads: { send: async () => ({ delivery: "sent" } as never) } } });
   const x = { bb: host.bb, harness: host.harness, close: () => host.harness.lifecycle.dispose() };
-  x.harness.inspection.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => makeThreadResponse({ id: threadId, title: threadId, status: "idle", updatedAt: threadId.length, archivedAt: threadId.startsWith("old") ? 5 : null }));
+  x.harness.inspection.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => makeThreadResponse({ id: threadId, title: threadId, status: "idle", updatedAt: threadId.length, archivedAt: threadId.startsWith("old") ? 5 : null, latestAttentionAt: 10, lastReadAt: threadId.startsWith("new") ? 5 : threadId === "never" ? null : 10 }));
   x.harness.inspection.sdk.stub("threads.interactions.list", async ({ threadId }) => threadId === "ask" ? [{}] as never : []);
   x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [], timelinePage: { olderCursor: null, hasOlderRows: false } }));
   x.harness.inspection.sdk.stub("threads.events.list", async () => []);
@@ -137,5 +137,13 @@ test("a thread started in Command is created from the composer's request and joi
     expect(x.joined).toEqual([["sp_launch", "thr_new"]]);
     await expect(x.command.spawn("sp_gone", request)).rejects.toThrow("no longer exists");
     expect(spawned).toHaveLength(1);
+  } finally { await x.close(); }
+});
+
+test("threads with something since they were last read are unread", async () => {
+  const x = fixture({ newsy: "sp_launch", seen: "sp_launch", never: "sp_launch" });
+  try {
+    const { threads } = await x.command.space("sp_launch");
+    expect(Object.fromEntries(threads.map(t => [t.id, t.unread]))).toEqual({ newsy: true, seen: false, never: true });
   } finally { await x.close(); }
 });

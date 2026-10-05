@@ -7,6 +7,8 @@ export const commandThreadSchema = z.object({
   parentThreadId: z.string().nullable(), status: z.string(), updatedAt: z.number(),
   error: z.string().nullable().default(null),
   hasPendingInteraction: z.boolean().optional(),
+  /** Something happened since the owner last read it (BB's unread dot). */
+  unread: z.boolean().optional(),
 });
 /** An owner message or a final reply, for the merged layout. */
 export const commandEntrySchema = z.object({

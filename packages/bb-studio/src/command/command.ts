@@ -5,7 +5,7 @@ const missingThread = (cause: unknown) => /(?:^|\b)(?:thread not found|thread do
 
 type Timeline = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["timeline"]>>;
 type Row = Timeline["rows"][number];
-type Listed = Pick<Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["get"]>>, "id" | "title" | "titleFallback" | "parentThreadId" | "status" | "updatedAt" | "archivedAt">;
+type Listed = Pick<Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["get"]>>, "id" | "title" | "titleFallback" | "parentThreadId" | "status" | "updatedAt" | "archivedAt" | "lastReadAt" | "latestAttentionAt">;
 
 /** The most threads a Command view shows; the default Space can hold every thread. */
 export const COMMAND_LIMIT = 32;
@@ -97,7 +97,7 @@ export class Command {
     return this.shown.get(focused.spaceId) ?? await this.space(focused.spaceId);
   }
   private row(thread: Listed, pending: boolean): CommandThread {
-    return { id: thread.id, title: thread.title || thread.titleFallback || "New thread", parentThreadId: thread.parentThreadId ?? null, status: thread.status, updatedAt: thread.updatedAt, error: null, hasPendingInteraction: pending };
+    return { id: thread.id, title: thread.title || thread.titleFallback || "New thread", parentThreadId: thread.parentThreadId ?? null, status: thread.status, updatedAt: thread.updatedAt, error: null, hasPendingInteraction: pending, unread: thread.latestAttentionAt > (thread.lastReadAt ?? 0) };
   }
   async space(spaceId: string) {
     const spaces = this.spaces.list();

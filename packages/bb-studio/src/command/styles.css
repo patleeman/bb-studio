@@ -10,7 +10,7 @@
 }
 
 /* Status: a dot and a word. Only states that matter get color. */
-.channel-thread-layout { --channel-working: #4f8ff7; }
+[data-command-view] { --channel-working: #4f8ff7; --channel-input: var(--warning, #e0a63a); --channel-unread: #f4512c; }
 .channel-status {
   display: inline-flex;
   flex: 0 0 auto;
@@ -75,9 +75,63 @@
   border-radius: 8px;
   background: var(--background);
 }
-.channel-thread-pane[data-activity="Working"] { border-color: color-mix(in srgb, var(--channel-working) 60%, var(--border)); }
-.channel-thread-pane[data-activity="Needs input"] { border-color: color-mix(in srgb, var(--warning, #bf973f) 65%, var(--border)); }
 .channel-thread-pane[data-activity="Failed"] { border-color: color-mix(in srgb, var(--destructive) 55%, var(--border)); }
+
+/* Working panes pop: a solid ring, a glow, a tinted header, and a bar that
+   moves along the top. Idle panes step back until you point at them. */
+.channel-thread-pane[data-activity="Working"] {
+  border-color: var(--channel-working);
+  box-shadow: 0 0 0 1px var(--channel-working), 0 0 20px color-mix(in srgb, var(--channel-working) 30%, transparent);
+}
+.channel-thread-pane[data-activity="Working"] > header {
+  position: relative;
+  background: color-mix(in srgb, var(--channel-working) 10%, var(--background));
+}
+.channel-thread-pane[data-activity="Working"] > header::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--channel-working), transparent);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: channel-working-bar 1.6s linear infinite;
+}
+@keyframes channel-working-bar {
+  from { background-position: -50% 0; }
+  to { background-position: 150% 0; }
+}
+.channel-thread-pane[data-activity="Needs input"] {
+  border-color: var(--channel-input);
+  box-shadow: 0 0 0 1px var(--channel-input), 0 0 20px color-mix(in srgb, var(--channel-input) 30%, transparent);
+}
+.channel-thread-pane[data-activity="Needs input"] > header { background: color-mix(in srgb, var(--channel-input) 12%, var(--background)); }
+.channel-thread-pane[data-activity="Idle"]:not([data-unread]) > header,
+.channel-thread-pane[data-activity="Idle"]:not([data-unread]) > .channel-pane-body { opacity: 0.6; transition: opacity 150ms; }
+.channel-thread-pane[data-activity="Idle"]:not([data-unread]):is(:hover, :focus-within) > :is(header, .channel-pane-body) { opacity: 1; }
+
+/* Unread: something happened since you last read it. Urgent until you click in. */
+.channel-thread-pane[data-unread] {
+  border-color: var(--channel-unread);
+  box-shadow: 0 0 0 2px var(--channel-unread), 0 0 24px color-mix(in srgb, var(--channel-unread) 40%, transparent);
+  animation: channel-unread-pulse 1.8s ease-in-out infinite;
+}
+@keyframes channel-unread-pulse {
+  50% { box-shadow: 0 0 0 2px var(--channel-unread), 0 0 8px color-mix(in srgb, var(--channel-unread) 20%, transparent); }
+}
+.channel-unread-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: var(--channel-unread);
+  color: white;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .channel-thread-pane[data-activity="Working"] > header::after,
+  .channel-thread-pane[data-unread] { animation: none; }
+}
 .channel-thread-pane > header {
   display: flex;
   min-height: 40px;
@@ -248,6 +302,8 @@
 .channel-switcher-row:hover,
 .channel-switcher-row[data-current] { background: var(--state-hover); }
 .channel-switcher-row[data-current] > .channel-switcher-pick { font-weight: 500; }
+.channel-switcher-row[data-unread] > .channel-switcher-pick { color: var(--channel-unread); font-weight: 600; }
+.channel-switcher-row[data-unread] > .channel-switcher-pick > .channel-status-dot { display: block; background: var(--channel-unread); opacity: 1; }
 .channel-switcher-row:not([data-current]) > .channel-switcher-pick { color: var(--muted-foreground); }
 .channel-switcher-row[data-fork] > .channel-switcher-pick { padding-left: 20px; font-size: var(--text-xs); }
 .channel-switcher-check {

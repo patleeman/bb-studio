@@ -1,4 +1,11 @@
 // Exercise a Space's Command view and its native transcripts through the full staged stable BB application.
+import { serverUrl } from "../bb.mjs";
+
+/** BB's read state, as the thread list's unread dot shows it. */
+const readState = async (threadId, read) => {
+ const response = await fetch(`${serverUrl}/api/v1/threads/${threadId}/${read ? "read" : "unread"}`, { method: "POST" });
+ if (!response.ok) throw new Error(`Could not mark ${threadId} ${read ? "read" : "unread"}: ${response.status}`);
+};
 export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sleep }) => {
  let fixture;
  const settleThreads = async space => {
@@ -12,6 +19,8 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
   const spaceId = getLaunchSpaceId();
   const space = await pluginRpc("studio", "command", { spaceId });
   await settleThreads(space);
+  // Nobody has read the demo threads yet; start them read so unread means something.
+  await Promise.all(space.threads.map(thread => readState(thread.id, true)));
   const existing = space.threads.find(thread => thread.title === "Release checklist");
   if (existing) return (fixture = { id: spaceId, threadId: existing.id });
   const { entries } = await pluginRpc("studio", "commandFeed", { spaceId });
@@ -19,6 +28,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
   // An ordinary thread joins the Space beside the two other threads.
   const thread = JSON.parse(await bbCli(["thread", "spawn", "--project", projectId, "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low", "--title", "Release checklist", "--prompt", 'This is a deterministic UI fixture. Do not use tools or change files. Reply exactly with these two lines:\nThe launch checklist is ready.\n::reactions{items="✅ Approve|🔍 Review"}', "--json"]));
   await bbCli(["thread", "wait", thread.id, "--timeout", "1m"]);
+  await readState(thread.id, true);
   await pluginRpc("studio", "spaceMembers", { id: spaceId, add: [{ pluginId: "bb-thread", id: thread.id }] });
   fixture = { id: spaceId, threadId: thread.id };
   return fixture;
@@ -95,7 +105,18 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    await clearDraft(client);
    await client.clickAriaButtonWithPointer("Send to the lead instead");
    await wait(client, "document.querySelector('[data-command-target]')?.textContent.includes('To Atlas · lead')");
+   // Something new in Scribe: its pane and row turn urgent until it's read.
+   const scribe = (await pluginRpc("studio", "command", { spaceId: data.id })).threads.find(thread => thread.title === "Scribe");
+   await readState(scribe.id, false);
+   await wait(client, `!!document.querySelector('[data-channel-thread="${scribe.id}"][data-unread] [data-command-unread]')&&!!document.querySelector('.channel-switcher-row[data-unread]')&&document.querySelectorAll('[data-command-panes] [data-unread]').length===1`);
    await client.evaluate("document.activeElement?.blur()");
+   return async () => {
+    // Clicking into the pane reads it, here and in BB.
+    await client.evaluate(`document.querySelector('[data-channel-thread="${scribe.id}"] header').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))`);
+    await wait(client, "!document.querySelector('[data-unread]')");
+    const after = (await pluginRpc("studio", "command", { spaceId: data.id })).threads.find(thread => thread.id === scribe.id);
+    if (after.unread) throw new Error("Clicking into the pane did not mark the thread read");
+   };
   }) },
   { id: "studio-command-grid-arrange", packageDir: "bb-studio", fileName: "command-grid-arrange.png", setup: guard(async client => {
    const data = await all(client);

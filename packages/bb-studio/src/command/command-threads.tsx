@@ -25,10 +25,18 @@ function useFollowLatest() {
   const [body, setBody] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!body) return;
-    let scroller: HTMLElement | null = null, follow = true, frame = 0;
-    const toLatest = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { if (follow && scroller) scroller.scrollTop = scroller.scrollHeight; }); };
+    let scroller: HTMLElement | null = null, follow = true, frame = 0, lastTop = 0;
+    const toLatest = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { if (follow && scroller) { scroller.scrollTop = scroller.scrollHeight; lastTop = scroller.scrollTop; } }); };
     // Scrolling up stops following; scrolling back to the bottom resumes it.
-    const scrolled = () => { if (scroller) follow = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 48; };
+    // Content that grows between our scroll and its event moves nothing up,
+    // so streaming can't switch following off.
+    const scrolled = () => {
+      if (!scroller) return;
+      const top = scroller.scrollTop;
+      if (scroller.scrollHeight - top - scroller.clientHeight < 48) follow = true;
+      else if (top < lastTop - 1) follow = false;
+      lastTop = top;
+    };
     const resized = new ResizeObserver(toLatest);
     // BB swaps its loading state for the scroller once the thread loads.
     const attach = () => {
@@ -38,6 +46,7 @@ function useFollowLatest() {
       resized.disconnect();
       scroller = next;
       follow = true;
+      lastTop = 0;
       if (!scroller) return;
       scroller.addEventListener("scroll", scrolled, { passive: true });
       resized.observe(scroller);
@@ -129,11 +138,13 @@ export function useCommandPanes(spaceId: string, threads: CommandThread[], leadT
 }
 
 /** A Space's open panes: one following the work, or the ones the owner opened, side by side. */
-export function CommandThreads({ panes, threads, leadThreadId, draftPane, onReply, onOpen }: {
+export function CommandThreads({ panes, threads, leadThreadId, draftPane, onReply, onSeen, onOpen }: {
   panes: CommandPanes; threads: CommandThread[]; leadThreadId: string | null;
   /** The new-thread pane, shown at the end while panes.draft is set. */
   draftPane?: ReactNode;
   onReply(id: string, focusComposer?: boolean): void; onOpen(id: string): void;
+  /** The owner clicked or focused into a thread's pane: it counts as read. */
+  onSeen(id: string): void;
 }) {
   const label = (thread: CommandThread) => thread.title;
   const choose = useMemo(() => (id: string) => onReply(id, true), [onReply]);
@@ -167,7 +178,8 @@ export function CommandThreads({ panes, threads, leadThreadId, draftPane, onRepl
 
   const pane = (thread: CommandThread) => {
     const forks = childrenOf(thread.id);
-    return <section key={thread.id} className="channel-thread-pane" data-channel-thread={thread.id} data-activity={threadActivity(thread)} aria-label={`${label(thread)} transcript`}
+    return <section key={thread.id} className="channel-thread-pane" data-channel-thread={thread.id} data-activity={threadActivity(thread)} data-unread={thread.unread || undefined}
+      onPointerDownCapture={thread.unread ? () => onSeen(thread.id) : undefined} onFocusCapture={thread.unread ? () => onSeen(thread.id) : undefined} aria-label={`${label(thread)} transcript`}
       data-dragging={dragging === thread.id || undefined} data-drop={drop?.id === thread.id && dragging !== thread.id ? drop.place : undefined} data-drop-axis={drop?.id === thread.id ? drop.axis : undefined}
       onDragOver={arrangeable ? event => dragOver(event, thread.id) : undefined}
       onDrop={arrangeable ? event => { event.preventDefault(); if (draggingRef.current && drop) panes.move(draggingRef.current, drop.id, drop.place); endDrag(); } : undefined}>
@@ -180,6 +192,7 @@ export function CommandThreads({ panes, threads, leadThreadId, draftPane, onRepl
           <Tooltip label={`Open ${thread.title}`}><button className="block max-w-full truncate text-left text-sm font-medium hover:underline" type="button" onClick={() => onOpen(thread.id)}>{label(thread)}</button></Tooltip>
         </span>
         {thread.id === leadThreadId && <span className="shrink-0 text-xs text-subtle-foreground" data-command-lead>Lead</span>}
+        {thread.unread && <Tooltip label="Something new since you last read it. Click into the pane to mark it read."><span className="channel-unread-badge" data-command-unread>New</span></Tooltip>}
         {following && <Tooltip label="This pane switches to whichever thread is working. Open another thread to keep this one."><span className="shrink-0 text-xs text-subtle-foreground" data-command-following>Following</span></Tooltip>}
         <Status thread={thread} withTime />
         <span className="channel-pane-actions">
@@ -221,7 +234,7 @@ export function CommandSwitcher({ panes, threads, leadThreadId, target, onReply 
     <div className="channel-switcher-list">
       {rows.map(thread => {
         const open = shown.has(thread.id), activity = threadActivity(thread);
-        return <div key={thread.id} className="channel-switcher-row" data-current={open || undefined} data-fork={thread.parentThreadId ? "" : undefined} data-activity={activity}>
+        return <div key={thread.id} className="channel-switcher-row" data-unread={thread.unread || undefined} data-current={open || undefined} data-fork={thread.parentThreadId ? "" : undefined} data-activity={activity}>
           <Tooltip label={open ? `${thread.title} · ${activity}` : `Open ${thread.title} · ${activity}`}><button type="button" className="channel-switcher-pick" aria-pressed={open} onClick={() => panes.open(thread.id)} aria-label={`${thread.title}, ${activity}${open ? ", open" : ""}`}>
             <span className="channel-switcher-check" aria-hidden>{open && <Icon name="Check" className="size-3.5" />}</span>
             <span className="channel-rail-name">{thread.title}</span>
