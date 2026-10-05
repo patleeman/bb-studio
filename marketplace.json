@@ -58,7 +58,7 @@
     {
       "id": "float",
       "displayName": "Float",
-      "description": "Part of BB Studio. Float any thread, channel, Studio item or view as a tab in one panel, docked at the bottom or dragged anywhere, and keep several open while you work.",
+      "description": "Part of BB Studio. Float any thread, Studio item or view as a tab in one panel, docked at the bottom or dragged anywhere, and keep several open while you work.",
       "icon": {
         "url": "./packages/bb-studio-float/assets/icon.svg"
       },
@@ -207,12 +207,11 @@
     {
       "id": "bot-teams",
       "displayName": "Studio Teams",
-      "description": "Part of BB Studio. Persistent bot profiles and channels of ordinary threads, with shared memory and missions.",
+      "description": "Part of BB Studio. Persistent bot profiles that ordinary threads work as, with shared memory and missions, and a Command view to talk to a Space's threads at once.",
       "icon": "Bot",
       "tags": [
         "agents",
         "collaboration",
-        "channels",
         "automation",
         "notifications",
         "bb-studio"
@@ -324,7 +323,7 @@
     {
       "id": "smart-decisions",
       "displayName": "Studio Decisions",
-      "description": "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and it chooses recipients in Studio Teams views.",
+      "description": "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and other plugins can ask it for quick decisions.",
       "icon": {
         "url": "./packages/bb-studio-decisions/assets/icon.svg"
       },

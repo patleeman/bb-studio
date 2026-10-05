@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A Bot Teams bot, opened from Studio: who it is, the threads that work as
-/// it, and the channels it's in.
+/// it.
 struct BotView: View {
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
@@ -61,14 +61,6 @@ struct BotView: View {
                     Text("Threads")
                 } footer: {
                     Text("Threads working as \(bot.name). Choose Work as bot in any thread's menu.")
-                }
-                let rooms = teams?.views.filter { !$0.archived && $0.members.contains { $0.kind == "bot" && $0.id == id } } ?? []
-                if !rooms.isEmpty {
-                    Section("Channels") {
-                        ForEach(rooms) { room in
-                            NavigationLink(value: Route.savedView(id: room.id)) { Label(room.name, systemImage: "rectangle.stack") }
-                        }
-                    }
                 }
             } else if teams != nil {
                 ContentUnavailableView("Bot Not Found", systemImage: "person.crop.circle.badge.questionmark")

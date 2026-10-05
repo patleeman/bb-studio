@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts and Tables keep their own data, item views and agent tools. Studio Teams keeps its bots and channels on its own pages. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
+BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts and Tables keep their own data, item views and agent tools. Studio Teams keeps its bots on its own page. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
 
 ## Provider contract
 

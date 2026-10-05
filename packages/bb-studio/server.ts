@@ -29,6 +29,7 @@ import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
 import { SpaceFolders } from "./src/space-folders";
+import { createThreadLines } from "./src/thread-lines";
 import { spaceOpenItems, spaceTreeItems } from "./src/space-tree";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
@@ -241,6 +242,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
   // Each space's optional lead thread and its heartbeat (src/space-lead.ts).
   const spaceLeads = new SpaceLeads({ db, sdk: bb.sdk, spaces, changed: tagsChanged });
+  const threadLines = createThreadLines(bb.sdk);
   /** A thread's space can change without a membership write; sidebars refetch space_of_threads. */
   const threadsMoved = () => { spaceLeads.threadsChanged(); tagsChanged(); };
   bb.events.on("thread.created", () => threadsMoved());
@@ -418,6 +420,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     space_lead: ({ spaceId }) => spaceLeads.get(spaceId),
     space_set_lead: ({ spaceId, threadId }) => spaceLeads.setLead(spaceId, threadId),
+    thread_lines: async ({ threadIds }) => ({ lines: await threadLines.read(threadIds) }),
     space_of_threads: async () => ({ threads: await spaceLeads.spaceOfThreads() }),
     space_set_run: ({ spaceId, ...run }) => spaceLeads.setRun(spaceId, run),
     thread_handoff: ({ threadId, request }) => spaceLeads.handoff(threadId, request),

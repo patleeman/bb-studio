@@ -85,8 +85,8 @@ and later. A thread is in a space when it was added to it or its project is.
 
 Spaces show in the sidebar with their threads and Studio items; the user
 makes, edits and deletes them there, and picks a space's lead and Heartbeat
-from its ⋯ menu. Studio Teams channels and direct
-messages are threads, so they join a space as threads do. Each thread's
+from its ⋯ menu. Studio Teams bot conversations
+are threads, so they join a space as threads do. Each thread's
 header shows the spaces it's in, linking back to them, and adds it to
 another. The Studio panel
 is the collection. Search, space, kind, project and tag filters, list or

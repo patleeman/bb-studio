@@ -1,8 +1,7 @@
 import SwiftUI
 
 /// The bot a thread works as, like Work as bot beside the web composer. A
-/// thread works as one bot; inviting another opens a new channel with both,
-/// its draft linked back to this thread.
+/// thread works as one bot.
 struct ThreadProfileSheet: View {
     let thread: ThreadEntry
     /// The attached bot's id, or nil for an ordinary thread.
@@ -32,19 +31,6 @@ struct ThreadProfileSheet: View {
                         Text("Working as")
                     } footer: {
                         Text(busy ? "Change the bot after this response." : "Changing the model keeps the thread working as the bot.")
-                    }
-                    let others = bots.filter { $0.id != botId }
-                    if !others.isEmpty {
-                        Section {
-                            ForEach(others) { other in
-                                Button { Task { await handoff(with: other, current: bot) } } label: { BotRow(bot: other) }
-                                    .foregroundStyle(.primary)
-                            }
-                        } header: {
-                            Text("Create a channel")
-                        } footer: {
-                            Text("Keep this thread and another bot together in a channel.")
-                        }
                     }
                 } else if bots.isEmpty {
                     ContentUnavailableView("No Bots", systemImage: "person.crop.circle",
@@ -97,18 +83,6 @@ struct ThreadProfileSheet: View {
             try await client.setThreadProfile(thread.id, botId: id)
             operation.complete(on: app) { onChange(id) }
             operation.complete(on: app) { dismiss() }
-        } catch {
-            self.error = BBClient.describe(error, server: client.baseURL)
-        }
-    }
-
-    private func handoff(with other: Bot, current: Bot?) async {
-        saving = true
-        defer { saving = false }
-        do {
-            let view = try await client.createSavedView(name: thread.displayTitle, members: [SavedViewMember(kind: "thread", id: thread.id), SavedViewMember(kind: "bot", id: other.id)])
-            operation.complete(on: app) { dismiss() }
-            operation.complete(on: app) { app.push(.savedView(id: view.id)) }
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }

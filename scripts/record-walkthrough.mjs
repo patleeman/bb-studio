@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CdpClient, ensureChrome } from "./capture/driver.mjs";
-import { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep } from "./capture/bb.mjs";
+import { projectId, threadId, pluginRpc, bbCli, launchSpace, getLaunchSpaceId, sleep } from "./capture/bb.mjs";
 import { seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc } from "./capture/seed.mjs";
 import { loadCaptures } from "./capture/entries.mjs";
 
@@ -52,10 +52,10 @@ const SCENES = [
   ["excalidraw", "*Sketch* it together.", "Excalidraw, shared with your agents.", 3],
   ["studio-tables", "Real *tables*.", "Typed columns, views, CSV and agent tools.", 3],
   ["artifacts", "Keep what they *make*.", "Reports, images and files, all saved.", 3],
-  ["feed", "One *feed* of reports.", "From every thread, channel and automation.", 4],
-  ["bots", "Bots that work as a *team*.", "Channels, delegation and memory.", 4, 900],
+  ["feed", "One *feed* of reports.", "From every thread and automation.", 4],
+  ["bots", "Bots that work as a *team*.", "A Command view, delegation and memory.", 4, 900],
   ["reactions-smart", "Answer in *one tap*.", "Replies come with suggested answers.", 3.5],
-  ["float", "Keep it all *open*.", "Threads, channels and items as floating tabs.", 3.5, 960],
+  ["float", "Keep it all *open*.", "Threads and items as floating tabs.", 3.5, 960],
   ["studio-chat", "Chat about *what you see*.", "The agent knows what's on screen.", 3.5],
 ];
 const INTRO = ["Your agents make *a lot*.", "BB Studio keeps it all in one place.", 2.5];
@@ -91,7 +91,7 @@ const ownScenes = {
   },
 };
 
-const context = { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
+const context = { projectId, threadId, pluginRpc, bbCli, launchSpace, getLaunchSpaceId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
 const captures = loadCaptures(context);
 
 /** Scrolls the page's tallest scroller down a little and back, so long surfaces move. */

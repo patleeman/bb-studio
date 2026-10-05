@@ -39,7 +39,7 @@ function PublishThreadBadges() {
 
   useEffect(() => publishThreadBadges(pluginId, badges), [pluginId, badges]);
 
-  // Channel work also announces changes; refetch at most once a second.
+  // Bot work announces many changes; refetch at most once a second.
   useRealtime("scoped-changed", (event) => {
     if (!affects(event, "bots") || timer.current) return;
     timer.current = setTimeout(() => {

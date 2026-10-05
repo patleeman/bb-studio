@@ -17,8 +17,6 @@ export type PostRow = {
   bot_id: string | null;
   thread_id: string | null;
   project_id: string | null;
-  channel_id: string | null;
-  channel_name: string | null;
   /** The directive line and body, hashed: the same reply seen twice is one post. */
   content_key: string;
   /** The directive line, hashed: how a reply's card finds its post. */
@@ -70,6 +68,9 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS feed_posts_content ON feed_posts (content_key, created_at)`,
   `CREATE INDEX IF NOT EXISTS feed_posts_directive ON feed_posts (directive_key, created_at)`,
   `CREATE INDEX IF NOT EXISTS feed_posts_unread ON feed_posts (read_at, created_at)`,
+  // Studio Teams channels are gone.
+  `ALTER TABLE feed_posts DROP COLUMN channel_id`,
+  `ALTER TABLE feed_posts DROP COLUMN channel_name`,
 ];
 
 /** A linked page's preview; empty strings when it has none. */
@@ -123,8 +124,6 @@ export class FeedStore {
       bot_id: post.botId ?? null,
       thread_id: post.threadId ?? null,
       project_id: post.projectId ?? null,
-      channel_id: null,
-      channel_name: null,
       content_key: contentKey(post.source, post.body),
       directive_key: directiveKey(post.source),
       created_at: at,
@@ -135,9 +134,9 @@ export class FeedStore {
     };
     this.db
       .prepare(
-        `INSERT INTO feed_posts (id, title, body, topic, story, priority, author, bot_id, thread_id, project_id, channel_id, channel_name,
+        `INSERT INTO feed_posts (id, title, body, topic, story, priority, author, bot_id, thread_id, project_id,
            content_key, directive_key, created_at, updated_at, edited_by, resolved_at, read_at)
-         VALUES (@id, @title, @body, @topic, @story, @priority, @author, @bot_id, @thread_id, @project_id, @channel_id, @channel_name,
+         VALUES (@id, @title, @body, @topic, @story, @priority, @author, @bot_id, @thread_id, @project_id,
            @content_key, @directive_key, @created_at, @updated_at, @edited_by, @resolved_at, @read_at)`,
       )
       .run(row);

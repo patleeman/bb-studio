@@ -3,8 +3,7 @@
 // More than one composer can be mounted at once (the main view plus a
 // floating chat, a side chat, a split). A reaction belongs in the composer
 // that writes to the thread whose message it came from. Failing that, a
-// new-thread composer takes it: a Studio Teams channel's composer is one, and
-// routes the reply to the thread. A composer bound to another thread never
+// new-thread composer takes it. A composer bound to another thread never
 // does, since that would send the reaction to the wrong conversation.
 
 import type { PluginComposerScope } from "@get-bb/plugin-sdk/app";

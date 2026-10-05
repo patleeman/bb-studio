@@ -9,7 +9,7 @@ import type { Bot, Job, ProfileInput, rpcContract } from "./contract";
 import { Button, Input } from "@bb-studio/kit/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@bb-studio/kit/ui";
 import { readConfigDraft, writeConfigDraft, profileDraft, documentDraft } from "./config-draft";
-import { Modal } from "./channel-controls";
+import { Modal } from "./controls";
 import { COARSE_POINTER_HEADER_ICON_BUTTON_CLASS } from "@bb-studio/kit/ui";
 import { externalAgent, externalPermissionHint, externalToolsNote, permissionModeFor, reasoningLevelFor } from "./external-agents";
 import { ExternalAgentBadge, useExternalHealth } from "./external-health";

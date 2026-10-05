@@ -136,7 +136,7 @@ function FallbackModel() {
     <div className="divide-y divide-border rounded-lg border border-border bg-card px-4">
       <Row
         label="Use"
-        description="Decides when no Jev provider answers, in a hidden thread that is deleted afterwards. Off sends every undecided Smart Queue message as a follow-up, and Studio Teams offers Retry routing."
+        description="Decides when no Jev provider answers, in a hidden thread that is deleted afterwards. Off sends every undecided Smart Queue message as a follow-up."
       >
         <Select value={value.mode} onValueChange={(mode) => void chooseMode(mode as Fallback["mode"])}>
           <SelectTrigger className="w-56" aria-label="Fallback model source">
@@ -152,7 +152,7 @@ function FallbackModel() {
         </Select>
       </Row>
       {value.mode === "thread" && (
-        <Row label="Model" description="The caller's provider with its default model and lowest reasoning level: the busy thread's for Smart Queue, the bot's for Studio Teams.">
+        <Row label="Model" description="The caller's provider with its default model and lowest reasoning level: the busy thread's for Smart Queue.">
           <span className="text-sm text-muted-foreground">Matches each thread</span>
         </Row>
       )}
@@ -187,7 +187,7 @@ export default definePluginApp((app) => {
   app.slots.settingsSection({
     id: "jev-connection",
     title: "Jev connection",
-    description: "Which Jev providers Studio Decisions will call, in order, for Smart Queue and Studio Teams.",
+    description: "Which Jev providers Studio Decisions will call, in order, for Smart Queue and other plugins.",
     component: JevConnection,
   });
   app.slots.settingsSection({

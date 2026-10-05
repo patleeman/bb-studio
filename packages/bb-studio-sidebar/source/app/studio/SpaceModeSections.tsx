@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAtom, useAtomValue } from "jotai";
+import { openAppPath } from "@bb-studio/kit/app";
+import { useSdk } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_CONTROL_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
@@ -318,7 +320,33 @@ export function SpaceModeSections({
   );
 }
 
-/** The current Space's plain heading: its mark and name, and ⋯ with New thread, Edit and Delete. */
+const TEAMS_PLUGIN_ID = "bot-teams";
+let teamsInstalled: Promise<boolean> | null = null;
+
+/** Whether Studio Teams is installed and running; checked once per window. */
+function useTeamsInstalled(): boolean {
+  const sdk = useSdk();
+  const [installed, setInstalled] = useState(false);
+  useEffect(() => {
+    let live = true;
+    teamsInstalled ??= sdk.plugins.list().then(
+      ({ plugins }) => plugins.some((plugin) => plugin.id === TEAMS_PLUGIN_ID && plugin.enabled && plugin.status !== "error" && plugin.status !== "incompatible"),
+      () => false,
+    );
+    void teamsInstalled.then((value) => live && setInstalled(value));
+    return () => {
+      live = false;
+    };
+  }, [sdk]);
+  return installed;
+}
+
+/** Forget the cached Studio Teams check. */
+export function resetTeamsInstalledForTest(): void {
+  teamsInstalled = null;
+}
+
+/** The current Space's plain heading: its mark and name, and ⋯ with New thread, Command view, Edit and Delete. */
 function SpaceSidebarSection({
   space,
   sectionId,
@@ -337,6 +365,7 @@ function SpaceSidebarSection({
   children: ReactNode;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
+  const teams = useTeamsInstalled();
   return (
     <SortableSidebarSection
       id={sectionId}
@@ -361,6 +390,12 @@ function SpaceSidebarSection({
             <Icon name="MessageSquarePlus" />
             New thread here
           </DropdownMenuItem>
+          {teams ? (
+            <DropdownMenuItem onSelect={() => openAppPath(`/plugins/${TEAMS_PLUGIN_ID}/command/${encodeURIComponent(space.id)}`, { main: true })}>
+              <Icon name="GridView" />
+              Command view
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => openSpaceDialog(space.id, "heartbeat")}>
             <Icon name="Star" />

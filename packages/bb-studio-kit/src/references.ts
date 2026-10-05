@@ -20,7 +20,7 @@ export interface ReferenceOptions {
 
 const LEGACY_NAMESPACES: Record<string, readonly string[]> = {
   pages: ["page"], excalidraw: ["drawing"], artifacts: ["artifact"], talk: ["recordings"],
-  "studio-tables": ["table"], "bot-teams": ["bot", "views"],
+  "studio-tables": ["table"], "bot-teams": ["bot"],
 };
 const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { pluginId: "pages", path: "/plugins/pages/pages/" },
@@ -29,7 +29,6 @@ const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { pluginId: "talk", path: "/plugins/talk/recordings/" },
   { pluginId: "studio-tables", path: "/plugins/studio-tables/tables/", subpaths: ["view/:id", "row/:id", "view/:id/row/:id"] },
   { pluginId: "bot-teams", path: "/plugins/bot-teams/bots/", subpaths: ["profile"] },
-  { pluginId: "bot-teams", path: "/plugins/bot-teams/channels/" },
 ];
 const validPlugin = (id: string) => /^[a-z0-9-]+$/.test(id);
 

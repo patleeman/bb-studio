@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -9,36 +8,26 @@ import type { Bot } from "./contract";
 import type { Store } from "./store";
 
 export function registerTeamsCli(bb: BbPluginApi, store: Store, handlers: PluginRpcHandlers<typeof rpcContract>, approveCreate: (input: z.infer<typeof rpcContract.create.input>, threadId: string, signal?: AbortSignal) => Promise<{ approved: boolean; bot: Bot | null }>) {
-  const tools: string[] = [];
-  for (const [name, method, description] of [
-    ["bots_views", "views", "List channels: saved groups of bots and ordinary BB threads."],
-    ["bots_view_read", "view", "Read a channel's final replies and member thread IDs. Coordinate using BB's thread primitives."],
-    ["bots_view_create", "viewCreate", "Create a channel referencing bots and threads. No group provider or orchestration is involved."],
-  ] as const) {
-    tools.push(name);
-    bb.agents.registerTool({ name, description, parameters: rpcContract[method].input, execute: async (input) => JSON.stringify(await (handlers[method] as (input: never) => Promise<unknown>)(input as never)) });
-  }
-  tools.push("bots_create");
+  const tools = ["bots_create"];
   bb.agents.registerTool({ name: "bots_create", description: "Create a persistent bot with its profile and mission. A bot proposing another bot waits for owner approval.", parameters: rpcContract.create.input, execute: async (input, context) => {
     const result = await approveCreate(input, context.threadId, context.signal);
     if (!result.approved) return "Bot creation was not approved.";
     return JSON.stringify(result.bot ?? await handlers.create(input));
   } });
   bb.cli.register({
-    name: "bots", summary: "Manage persistent bot profiles and channels",
+    name: "bots", summary: "Manage persistent bot profiles",
     commands: [
-      { name: "list", summary: "List bots and channels", usage: "[options]" }, { name: "show", summary: "Read a bot profile", usage: "<id>" },
-      { name: "create", summary: "Create a bot", usage: "[options]" }, { name: "channel-read", summary: "Read a channel", usage: "<id>" },
-      { name: "channel-create", summary: "Create a channel", usage: "[options]" }, { name: "channel-send", summary: "Message threads in a channel", usage: "[options]" },
+      { name: "list", summary: "List bots", usage: "[options]" }, { name: "show", summary: "Read a bot profile", usage: "<id>" },
+      { name: "create", summary: "Create a bot", usage: "[options]" },
       { name: "mission", summary: "Read or save the bot's mission", usage: "[options]" }, { name: "memory", summary: "Read or save durable bot memory", usage: "[options]" },
       { name: "wake", summary: "Run the bot's mission now", usage: "[options]" }, { name: "message", summary: "Open the bot's normal thread", usage: "[options]" },
       { name: "update", summary: "Update a bot's profile", usage: "[options]" },
     ],
     async run(argv, context) {
-      const options = { json: { type: "boolean" }, input: { type: "string" }, "input-file": { type: "string" }, name: { type: "string" }, description: { type: "string" }, avatar: { type: "string" }, provider: { type: "string" }, model: { type: "string" }, reasoning: { type: "string" }, permissions: { type: "string" }, interval: { type: "string" }, mission: { type: "string" }, "mission-file": { type: "string" }, "fallback-provider": { type: "string" }, "fallback-model": { type: "string" }, "fallback-reasoning": { type: "string" }, machine: { type: "string" }, file: { type: "string" }, text: { type: "string" }, "text-file": { type: "string" }, "request-id": { type: "string" }, members: { type: "string" }, targets: { type: "string" }, version: { type: "string" }, help: { type: "boolean" } } as const;
+      const options = { json: { type: "boolean" }, input: { type: "string" }, "input-file": { type: "string" }, name: { type: "string" }, description: { type: "string" }, avatar: { type: "string" }, provider: { type: "string" }, model: { type: "string" }, reasoning: { type: "string" }, permissions: { type: "string" }, interval: { type: "string" }, mission: { type: "string" }, "mission-file": { type: "string" }, "fallback-provider": { type: "string" }, "fallback-model": { type: "string" }, "fallback-reasoning": { type: "string" }, machine: { type: "string" }, file: { type: "string" }, text: { type: "string" }, "text-file": { type: "string" }, version: { type: "string" }, help: { type: "boolean" } } as const;
       try {
         const { values: v, positionals: args } = parseArgs({ args: argv, options, allowPositionals: true });
-        if (!args.length || v.help) return { exitCode: 0, stdout: "bb bots list | show <bot> | create --name NAME --mission TEXT | update <bot> --input JSON | mission|memory <bot> [--text TEXT --version HASH] | wake <bot> | message <bot> | channel-read <channel> | channel-create --name NAME --members JSON | channel-send <channel> --text TEXT [--targets JSON]\nBot profiles run in ordinary BB threads. Use bb automation for schedules and bb feed for reports." };
+        if (!args.length || v.help) return { exitCode: 0, stdout: "bb bots list | show <bot> | create --name NAME --mission TEXT | update <bot> --input JSON | mission|memory <bot> [--text TEXT --version HASH] | wake <bot> | message <bot>\nBot profiles run in ordinary BB threads. Use bb automation for schedules and bb feed for reports." };
         const [command, id] = args;
         const parsed = v["input-file"] ? JSON.parse(await readFile(v["input-file"], "utf8")) : v.input ? JSON.parse(v.input) : {};
         let method: keyof typeof rpcContract, input: unknown;
@@ -76,9 +65,6 @@ export function registerTeamsCli(bb: BbPluginApi, store: Store, handlers: Plugin
             input = { ...documentInput, ...(text === undefined ? {} : { text, version }) };
             break;
           }
-          case "channel-read": method = "view"; input = { id, ...parsed }; break;
-          case "channel-create": method = "viewCreate"; input = { ...parsed, name: v.name ?? parsed.name, members: v.members ? JSON.parse(v.members) : parsed.members ?? [], requestId: v["request-id"] ?? randomUUID() }; break;
-          case "channel-send": method = "viewSend"; input = { ...parsed, id, text: text ?? parsed.text, targets: v.targets ? JSON.parse(v.targets) : parsed.targets ?? [], requestId: v["request-id"] ?? randomUUID() }; if (context.threadId) throw new Error("Coordinate using bb thread tell with the owner's roster. Channel sends are owner addressing actions."); break;
           default: throw new Error(`Unknown bots command: ${command}`);
         }
         let data = await (handlers[method] as (input: never) => Promise<unknown>)(rpcContract[method].input.parse(input) as never);

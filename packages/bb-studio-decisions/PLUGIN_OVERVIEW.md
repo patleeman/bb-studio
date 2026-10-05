@@ -1,8 +1,7 @@
 Set up BB Studio's fast decision models once. Studio Decisions holds the Jev
-keys and the fallback model. Smart Queue and Studio Teams both use them.
+keys and the fallback model. Smart Queue and other plugins use them.
 
-Send a message to a busy thread without choosing between steer and queue, and
-let Studio Teams pick which bots answer a channel message.
+Send a message to a busy thread without choosing between steer and queue.
 
 ## What you get
 
@@ -11,8 +10,6 @@ let Studio Teams pick which bots answer a channel message.
 - Related follow-ups go to the agent together as one turn, in whatever order
   you queued them.
 - When several messages steer, they reach the agent in the order you sent them.
-- Studio Teams routes channel messages with the same Jev setup, so its keys
-  live here too.
 - If the standalone Smart Queue plugin is on, this one's queue pauses, so each
   message is decided once.
 - `bb smart-decisions recent` lists each decision and the provider that made it,
@@ -33,8 +30,7 @@ hidden, temporary thread. If nothing answers, the message waits as a follow-up.
 
 Each Smart Queue decision sends the thread title, your last three requests, the end of the
 latest assistant output, and the new message to the Jev provider you configured,
-or to the fallback model's provider. Studio Teams sends the channel message,
-recent channel messages, and the bot roster. That provider bills the usage.
+or to the fallback model's provider. That provider bills the usage.
 
 Smart Queue acts only on messages you type. It leaves agent messages, plugin
 messages, retries, scheduled sends, and hidden threads alone.

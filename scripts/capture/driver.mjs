@@ -64,17 +64,6 @@ export class CdpClient {
     return result.result?.value;
   }
 
-  async openChannelTab(name) {
-    await this.evaluate(`document.querySelector('button[aria-label^="Show right panel"]')?.click()`);
-    await this.waitForAriaButton(name);
-    await this.evaluate(`(() => {
-      const tab = [...document.querySelectorAll('[aria-label="Right panel views"] button')]
-        .find(button => button.getAttribute('aria-label') === ${JSON.stringify(name)});
-      if (!tab) throw new Error('Missing native channel tab');
-      tab.click();
-    })()`);
-  }
-
   async navigate(path) {
     await this.command("Page.navigate", { url: `${serverUrl}${path}` });
     await sleep(900);

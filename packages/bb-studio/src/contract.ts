@@ -253,6 +253,11 @@ export const rpcContract = defineRpcContract({
   /** A space's lead and heartbeat. Clears a lead thread that was deleted, and turns its heartbeat off. */
   space_lead: { input: z.object({ spaceId }), output: spaceLead },
   /** Makes an existing thread the space's lead, adding it to the space; null clears the lead and turns the heartbeat off. */
+  /** Each thread's latest line for the sidebar: its last prose, or what failed or blocks it. */
+  thread_lines: {
+    input: z.object({ threadIds: z.array(z.string().min(1).max(200)).max(60) }),
+    output: z.object({ lines: z.record(z.string(), z.object({ text: z.string(), kind: z.enum(["progress", "failure", "blocked"]), at: z.number().nullable() })) }),
+  },
   space_set_lead: { input: z.object({ spaceId, threadId: z.string().min(1).max(200).nullable() }), output: spaceLead },
   /** The one space each thread is in. Refetch on Studio's realtime channel. */
   space_of_threads: { input: z.object({}), output: z.object({ threads: z.record(z.string(), z.string()) }) },

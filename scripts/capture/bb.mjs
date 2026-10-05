@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 // Captures run against a staged BB (scripts/staged-bb.mjs), never the BB you
-// work in, whose projects, threads, and channels are private.
+// work in, whose projects, threads, and Spaces are private.
 if (!process.env.BB_SERVER_URL || !process.env.BB_DATA_DIR)
   throw new Error('Source a staged BB\'s capture.env first: node scripts/staged-bb.mjs start, then . "$TMPDIR/bb-studio-staged/capture.env".');
 export const serverUrl = process.env.BB_SERVER_URL.replace(/\/$/, "");
@@ -21,21 +21,22 @@ export async function pluginRpc(pluginId, method, input) {
   return payload.result;
 }
 
-// Saved view fixture seeded by staged-bb.mjs.
-export const launchRoomReplies = [
+// The Launch work Space seeded by staged-bb.mjs: threads working as Atlas (its lead) and Scribe.
+export const launchReplies = [
  "Ready. I'll keep the decision log for ORBIT-42 and post next steps after each check.",
  "Release check passed: the brief, owner, and Friday window all line up.",
  "Logged: release check passed. Next step: confirm the Friday release window.",
 ];
-let launchRoomId = null;
-export async function launchRoomThread() {
- const views = await pluginRpc("bot-teams","views",{});
- const view=views.find(v=>v.name==="Launch work"&&!v.archived);
- if(!view)throw new Error("Seed Launch work before capturing.");
- const page=await pluginRpc("bot-teams","view",{id:view.id});
- for(const reply of launchRoomReplies)if(!page.entries.some(e=>e.role==="assistant"&&e.text.startsWith(reply.slice(0,40))))throw new Error(`Missing seeded reply: ${reply}`);
- launchRoomId=view.id;
- return page.threads[0]?.id;
+let launchSpaceId = null;
+/** Checks the seeded Launch work Space and returns its lead thread. */
+export async function launchSpace() {
+ const { spaces } = await pluginRpc("studio","spaces",null);
+ const space = spaces.find(s=>s.name==="Launch work");
+ if(!space)throw new Error("Seed Launch work before capturing.");
+ const { entries } = await pluginRpc("bot-teams","commandFeed",{spaceId:space.id});
+ for(const reply of launchReplies)if(!entries.some(e=>e.role==="assistant"&&e.text.startsWith(reply.slice(0,40))))throw new Error(`Missing seeded reply: ${reply}`);
+ launchSpaceId=space.id;
+ return (await pluginRpc("bot-teams","command",{spaceId:space.id})).leadThreadId;
 }
 
 /** Run the bb CLI as the owner, not as the thread this script may run inside. */
@@ -52,4 +53,4 @@ export async function bbCli(args) {
   return stdout;
 }
 
-export const getLaunchRoomId = () => launchRoomId;
+export const getLaunchSpaceId = () => launchSpaceId;

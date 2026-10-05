@@ -1,10 +1,9 @@
-// Bots and channels as Studio items.
+// Bots as Studio items.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { snippets } from "@bb-studio/kit/format";
 import type { Bot } from "./contract";
 import { externalAgent } from "./external-agents";
-import type { ThreadView } from "./view-contract";
 
 export const PLUGIN_ID = "bot-teams";
 export const NEW_BOT_EVENT = "bb-studio:bot-teams:new-bot";
@@ -25,25 +24,6 @@ export const BOT_KIND: StudioKind = {
   blurb: "Persistent teammates with their own workspace and memory.",
   agentHint: "It's a bot: @mention it by name to hand it work; `bb bots show <id>` and `bb bots memory <id>` describe it.",
 };
-
-export const VIEW_KIND: StudioKind = {
-  id: "view", label: "Channel", plural: "Channels", icon: "MessageSquare",
-  columns: [], actions: [], create: { mode: "rpc" }, canArchive: true,
-  capabilities: { create: true, move: false, archive: true, delete: true, rename: false, duplicate: false, export: false, comments: false, versions: false, links: false },
-  mentionProviderId: "views",
-  hasOwnChat: true,
-  blurb: "Message several bots and threads together.",
-  agentHint: "Read this channel with `bb bots channel-read <id>`. Work and approvals belong to its ordinary threads.",
-};
-export const viewHref = (id: string) => `/plugins/${PLUGIN_ID}/channels/${id}`;
-export function viewStudioItem(view: ThreadView): StudioItem {
-  return {
-    id: view.id, kind: VIEW_KIND.id, title: view.name, icon: null,
-    projectId: null, parentId: null, createdAt: view.createdAt, updatedAt: view.updatedAt,
-    updatedBy: null, preview: null, facts: [], badge: null, thumbnailUrl: null,
-    href: viewHref(view.id), archived: view.archived,
-  };
-}
 
 export const botHref = (id: string) => `/plugins/${PLUGIN_ID}/bots/${id}`;
 
@@ -82,33 +62,27 @@ export function registerStudio(
   schemas: StudioSchemas,
   deps: {
     bots(): Bot[];
-    views(): ThreadView[];
-    createView(): Promise<ThreadView>;
-    archiveView(id: string, archived: boolean): Promise<unknown>;
-    deleteView(id: string): Promise<unknown>;
-    readView(id: string): Promise<string>;
     activity(): Map<string, BotActivity>;
     retire(id: string, retired: boolean): Promise<unknown>;
   },
 ): void {
   const items = () => {
     const activity = deps.activity();
-    return [...deps.bots().map((bot) => toStudioItem(bot, activity.get(bot.id))), ...deps.views().map(viewStudioItem)];
+    return deps.bots().map((bot) => toStudioItem(bot, activity.get(bot.id)));
   };
-  // Bots and channels have their own pages and aren't Studio items. Those pages are
+  // Bots have their own page and aren't Studio items. That page is
   // built on the Studio collection, so the provider methods stay, but undiscoverable:
   // Studio and Pages collect items only from discoverable providers.
-  const unsupported = () => { throw new Error("Bots and channels don't support this."); };
+  const unsupported = () => { throw new Error("Bots don't support this."); };
   bb.rpc.register(schemas.provider, {
     studio_rename: unsupported,
     studio_duplicate: unsupported,
     studio_template: unsupported,
     studio_instantiate: unsupported,
     studio_export: unsupported,
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2 as const, panel: "bots", kinds: [BOT_KIND, VIEW_KIND] }),
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2 as const, panel: "bots", kinds: [BOT_KIND] }),
     studio_get: ({ ids }) => ({ items: items().filter((item) => ids.includes(item.id)) }),
     studio_read: async ({ id }) => {
-      if (deps.views().some(view => view.id === id)) return { content: await deps.readView(id) };
       const bot = deps.bots().find((each) => each.id === id);
       return { content: bot ? [`# ${bot.name}`, bot.description, `@${bot.handle}`].filter(Boolean).join("\n\n") : null };
     },
@@ -123,14 +97,12 @@ export function registerStudio(
         .filter((bot) => bot.description.toLowerCase().includes(needle) || bot.handle.toLowerCase().includes(needle));
       return { ids: found.map((bot) => bot.id), snippets: snippets(found, needle, (bot) => bot.description) };
     },
-    studio_create: async ({ kind }) => {
-      if (kind === VIEW_KIND.id) return { item: viewStudioItem(await deps.createView()) };
+    studio_create: () => {
       throw new Error("Bots are created in a setup chat.");
     },
-    studio_move: ({ ids }) => ({ done: [], failed: ids.map((id) => ({ id, error: deps.views().some(view => view.id === id) ? "A channel spans projects. Add it to a Studio space instead." : "A bot keeps its own project." })) }),
-    studio_archive: ({ ids, archived }) => eachId(ids, (id) => deps.views().some(view => view.id === id) ? deps.archiveView(id, archived) : deps.retire(id, archived)),
-    studio_delete: ({ ids }) => eachId(ids, (id) => {
-      if (deps.views().some(view => view.id === id)) return deps.deleteView(id);
+    studio_move: ({ ids }) => ({ done: [], failed: ids.map((id) => ({ id, error: "A bot keeps its own project." })) }),
+    studio_archive: ({ ids, archived }) => eachId(ids, (id) => deps.retire(id, archived)),
+    studio_delete: ({ ids }) => eachId(ids, () => {
       throw new Error("Bots can't be deleted. Archive them instead.");
     }),
     studio_action: ({ action }) => {

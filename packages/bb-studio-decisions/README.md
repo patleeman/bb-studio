@@ -8,8 +8,8 @@ provider you already use. Enter the keys once here. Two things use them:
 
 - **Smart Queue**, built in, decides what happens when you send a message to a
   thread that is still working.
-- **Studio Teams** asks it to choose recipients for untagged messages in saved
-  views. Busy owner sends use the same Smart Queue as other threads.
+- **Other plugins** ask it for quick decisions through its
+  [plugin RPC](#for-other-plugins).
 
 ## Smart Queue
 
@@ -20,7 +20,7 @@ longer need to pick steer or queue yourself.
 
 If the standalone **Smart Queue** plugin is also enabled, Studio Decisions'
 Smart Queue pauses, so each message is decided once. Its Jev and fallback
-model setup still serves Studio Teams.
+model setup still serves other plugins.
 
 ### How it decides
 
@@ -78,8 +78,7 @@ less.
 
 Smart Queue acts only on messages you send yourself to a busy thread. It
 ignores messages from agents and other threads, plugin submissions, retries,
-scheduled messages, and hidden threads. Visible Studio Teams bot threads use
-the same queue as any other thread.
+scheduled messages, and hidden threads.
 
 Smart Queue holds the message. The queued card shows *Smart Queue is deciding
 whether to steer or follow up*. Then either the message joins the turn, or the
@@ -113,7 +112,7 @@ Open **Settings → Plugins → Studio Decisions**, or use `bb plugin config sma
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `enabled` | `true` | Turn Smart Queue on or off. Studio Teams is unaffected. |
+| `enabled` | `true` | Turn Smart Queue on or off. Other plugins' calls are unaffected. |
 | `jevProvider` | `auto` | `auto`, `typesafe`, `vercel`, `openrouter`, `opencode-zen`, or `custom`. |
 | `typesafeApiKey`, `vercelApiKey`, `openRouterApiKey`, `zenApiKey` | — | Provider keys (secret). See [Jev providers](#jev-providers). |
 | `typesafeModel` | `jev-latest` | Dropdown: `jev-latest`, `jev-preview`, or `jev-1.13.0` to pin that version. |
@@ -128,7 +127,7 @@ Below the form, two sections complete the page:
   any configuration problems. **Test** sends a fixed sample message to Jev and
   reports which provider answered; it never reads a thread.
 - **Fallback model** chooses what decides when no Jev provider answers: the
-  caller's provider (the busy thread's, or the bot's for Studio Teams), a
+  caller's provider (the busy thread's for Smart Queue), a
   specific model picked with BB's own provider, model, and reasoning picker,
   or off. The same choice is available as `bb smart-decisions fallback`.
 
@@ -163,13 +162,11 @@ logs.
   optional `serviceTier`) runs the caller's chosen model instead of the fallback,
   including when the fallback is off. It uses the same temporary-thread cleanup.
 
-Studio Teams uses these methods to choose view recipients. Studio Talk
-can choose models for transcript cleanup, recording titles, and summaries. Callers share the typed
+Studio Talk can choose models for transcript cleanup, recording titles, and summaries. Callers share the typed
 `@bb-studio/kit/decisions` client, including its `askTitle` helper.
 
 Both return `{ ok: true, … , via, ms }`, or `{ ok: false, unavailable, error }`.
-`unavailable` means nothing is configured to answer. Studio Teams preserves the composer draft and asks the owner to select
-recipients.
+`unavailable` means nothing is configured to answer.
 
 ## Staged preview
 

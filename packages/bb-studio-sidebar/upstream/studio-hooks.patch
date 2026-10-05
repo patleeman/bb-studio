@@ -17,34 +17,13 @@ index bdc330d..c1bf1e7 100644
 -      "Pinned threads, custom sections, projects, machines, and nested threads.",
 +      "Studio apps' sections above your threads: pinned threads, custom sections, projects, machines, and nested threads.",
 diff --git a/source/app/dnd/useSectionThreadDnd.ts b/source/app/dnd/useSectionThreadDnd.ts
-index 39258e5..3492076 100644
+index 39258e5..cee5dac 100644
 --- a/source/app/dnd/useSectionThreadDnd.ts
 +++ b/source/app/dnd/useSectionThreadDnd.ts
-@@ -7,0 +8 @@ import {
-+  type ReactNode,
-@@ -22,0 +24 @@ import type { SidebarThread } from "../model/sidebar-thread.js";
-+import { channelDropThreads, useThreadChannelDrop } from "../studio/useThreadChannelDrop.js";
-@@ -88,0 +91 @@ export interface SectionThreadDndState {
-+  dropDialog?: ReactNode;
-@@ -209 +212,2 @@ function parseGroupSectionId(key: string): SidebarSectionId {
+@@ -209 +209,2 @@ function parseGroupSectionId(key: string): SidebarSectionId {
 -    key.startsWith("machine:")
 +    key.startsWith("machine:") ||
 +    key.startsWith("space:")
-@@ -1059,0 +1064 @@ export function useSectionThreadDnd({
-+  const channelDrop = useThreadChannelDrop();
-@@ -1323,0 +1329,8 @@ export function useSectionThreadDnd({
-+      const targetId = rowDrop?.threadId ?? (overId ? parseSidebarThreadRowDroppableId(overId) : null);
-+      const sources = (lookup.rootThreadIdsByItemId.get(activeId) ?? [activeId]).flatMap(id => { const thread = lookup.threadByItemId.get(id); return thread ? [thread] : []; });
-+      const channelThreads = channelDropThreads(sources, targetId ? lookup.threadByItemId.get(targetId) : undefined);
-+      if (channelThreads.length) {
-+        channelDrop.offer(channelThreads, decision?.kind === "nest" ? () => commitDropChanges(decision, "Failed to nest threads.") : undefined);
-+        clearProjectedDrag();
-+        return;
-+      }
-@@ -1370,0 +1384 @@ export function useSectionThreadDnd({
-+      channelDrop.offer,
-@@ -1408,0 +1423 @@ export function useSectionThreadDnd({
-+    dropDialog: channelDrop.dialog,
 diff --git a/source/app/list/ProjectList.tsx b/source/app/list/ProjectList.tsx
 index afa82d9..b92cf86 100644
 --- a/source/app/list/ProjectList.tsx
@@ -266,18 +245,6 @@ index afa82d9..b92cf86 100644
 +      {projectCreation.dialog}
 @@ -1861,0 +2011 @@ function ProjectListComponent({
 +    </HiddenThreadsProvider>
-diff --git a/source/app/list/ProjectRow.tsx b/source/app/list/ProjectRow.tsx
-index 11c1c06..636f525 100644
---- a/source/app/list/ProjectRow.tsx
-+++ b/source/app/list/ProjectRow.tsx
-@@ -2293,0 +2294 @@ export const ChronologicalSectionThreadSections = memo(
-+              {sectionDnd.dropDialog}
-diff --git a/source/app/list/ReorderableSidebarSectionOrderList.tsx b/source/app/list/ReorderableSidebarSectionOrderList.tsx
-index 5fed8b5..041d9e4 100644
---- a/source/app/list/ReorderableSidebarSectionOrderList.tsx
-+++ b/source/app/list/ReorderableSidebarSectionOrderList.tsx
-@@ -32,0 +33 @@ export function ReorderableSidebarSectionOrderList({
-+      {threadDnd.dropDialog}
 diff --git a/source/app/list/SidebarHeaderControls.tsx b/source/app/list/SidebarHeaderControls.tsx
 index ec076ad..fe95274 100644
 --- a/source/app/list/SidebarHeaderControls.tsx

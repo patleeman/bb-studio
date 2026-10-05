@@ -2,44 +2,32 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { ChannelThreads } from "../channel-threads";
-import type { ThreadView, ViewThread } from "../view-contract";
-const state = vi.hoisted(() => ({ rpc: { call: vi.fn() }, reply: vi.fn(), select: vi.fn(), open: vi.fn() }));
-vi.mock("@get-bb/plugin-sdk/app", () => ({ useRpc: () => state.rpc, ThreadChat: ({ threadId, variant, messageActions }: any) => React.createElement("button", { "data-native-thread": threadId, "data-variant": variant, onClick: () => messageActions[0].run({ threadId }) }, "Native transcript") }));
+import { CommandThreads } from "../command-threads";
+import type { CommandThread } from "../command-contract";
+const state = vi.hoisted(() => ({ reply: vi.fn(), select: vi.fn(), open: vi.fn() }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ ThreadChat: ({ threadId, variant, messageActions }: any) => React.createElement("button", { "data-native-thread": threadId, "data-variant": variant, onClick: () => messageActions[0].run({ threadId }) }, "Native transcript") }));
 vi.mock("@bb-studio/kit/app", () => ({ ItemTile: () => null, Icon: () => null }));
 let root: Root, container: HTMLDivElement;
-const row = (id: string, status: string, extra: Partial<ViewThread> = {}): ViewThread => ({ id, title: id, status, botId: null, parentThreadId: null, updatedAt: 1, error: null, ...extra });
-const view: ThreadView = { id: "channel", name: "Review", members: [{ kind: "thread", id: "idle" }, { kind: "thread", id: "active" }], archived: false, createdAt: 1, updatedAt: 1 };
-const render = (layout: "active" | "grid" | "focus", threads = [row("idle", "idle"), row("active", "active")], selected: string | null = null) => act(() => root.render(React.createElement(ChannelThreads, { view, initialThreads: threads, bots: [], layout, selected, onSelect: state.select, onReply: state.reply, onOpen: state.open })));
-beforeEach(() => { vi.clearAllMocks(); state.rpc.call.mockImplementation(() => new Promise(() => {})); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
+const row = (id: string, status: string, extra: Partial<CommandThread> = {}): CommandThread => ({ id, title: id, status, botId: null, parentThreadId: null, updatedAt: 1, error: null, ...extra });
+const render = (layout: "active" | "grid" | "focus", threads = [row("idle", "idle"), row("active", "active")], selected: string | null = null, leadThreadId: string | null = null) => act(() => root.render(React.createElement(CommandThreads, { spaceId: "space", threads, leadThreadId, bots: [], layout, selected, onSelect: state.select, onReply: state.reply, onOpen: state.open })));
+beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
-test("active shows every working thread side by side, keeps them after they stop, and adds a pick", async () => {
-  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "active"), row("busy", "starting")]);
+test("active shows every working thread side by side, keeps them after they stop, and adds a pick", () => {
   render("active", [row("idle", "idle"), row("active", "active"), row("busy", "starting")]);
-  await act(async () => {});
   const shown = () => [...container.querySelectorAll("[data-native-thread]")].map(node => node.getAttribute("data-native-thread")).sort();
   expect(shown()).toEqual(["active", "busy"]);
   expect([...container.querySelectorAll(".channel-switcher-row[data-current]")].map(row => row.textContent)).toHaveLength(2);
-  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "idle"), row("busy", "idle")]);
-  await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+  render("active", [row("idle", "idle"), row("active", "idle"), row("busy", "idle")]);
   expect(shown()).toEqual(["active", "busy"]);
-  const idle = [...container.querySelectorAll('[aria-label="Channel threads"] button')].find(button => button.textContent?.includes("idle"))!;
+  const idle = [...container.querySelectorAll('[aria-label="Space threads"] button')].find(button => button.textContent?.includes("idle"))!;
   act(() => (idle as HTMLButtonElement).click());
   expect(state.select).not.toHaveBeenCalled();
   expect(shown()).toEqual(["active", "busy", "idle"]);
   expect(container.querySelector("[data-channel-thread]")?.getAttribute("data-channel-thread")).toBe("idle");
   act(() => (container.querySelector('[aria-label="Stop showing idle"]') as HTMLButtonElement).click());
   expect(shown()).toEqual(["active", "busy"]);
-  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "active"), row("busy", "idle")]);
-  await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+  render("active", [row("idle", "idle"), row("active", "active"), row("busy", "idle")]);
   expect(shown()).toEqual(["active"]);
-});
-test("focus and active list unstarted bots with the dashed treatment, and grid does too", () => {
-  const withBot: ThreadView = { ...view, members: [...view.members, { kind: "bot", id: "quiet" }] };
-  for (const layout of ["focus", "active", "grid"] as const) {
-    act(() => root.render(React.createElement(ChannelThreads, { view: withBot, initialThreads: [row("idle", "idle")], bots: [{ id: "quiet", name: "Quiet bot", avatar: null } as any], layout, selected: null, onSelect: state.select, onReply: state.reply, onOpen: state.open })));
-    expect(container.querySelector(".channel-member-unstarted")?.textContent).toContain("Quiet bot");
-  }
 });
 test("native message reply actions address their source thread, and grid folds children behind links", () => {
   render("grid", [row("idle", "idle"), row("active", "active"), row("child", "active", { parentThreadId: "active" })]);
@@ -55,12 +43,11 @@ test("focus mounts only the selected native transcript", () => {
   expect(container.querySelectorAll("[data-native-thread]")).toHaveLength(1);
   expect(container.querySelector("[data-native-thread]")?.getAttribute("data-native-thread")).toBe("idle");
 });
-test("grid puts threads that need input first and folds unstarted bots into one row", () => {
-  const withBot: ThreadView = { ...view, members: [...view.members, { kind: "bot", id: "quiet" }] };
-  act(() => root.render(React.createElement(ChannelThreads, { view: withBot, initialThreads: [row("idle", "idle", { updatedAt: 9 }), row("ask", "idle", { hasPendingInteraction: true })], bots: [{ id: "quiet", name: "Quiet bot", avatar: null } as any], layout: "grid", selected: null, onSelect: state.select, onReply: state.reply, onOpen: state.open })));
-  expect([...container.querySelectorAll("[data-channel-thread]")].map(pane => pane.getAttribute("data-channel-thread"))).toEqual(["ask", "idle"]);
-  expect(container.querySelectorAll(".channel-thread-pane")).toHaveLength(2);
-  expect(container.querySelector(".channel-unstarted .channel-member-unstarted")?.textContent).toContain("Quiet bot");
+test("grid puts the lead first, then threads that need input", () => {
+  render("grid", [row("idle", "idle", { updatedAt: 9 }), row("ask", "idle", { hasPendingInteraction: true }), row("lead", "idle")], null, "lead");
+  expect([...container.querySelectorAll("[data-channel-thread]")].map(pane => pane.getAttribute("data-channel-thread"))).toEqual(["lead", "ask", "idle"]);
+  expect(container.querySelector('[data-channel-thread="lead"] [data-command-lead]')?.textContent).toBe("Lead");
+  expect(container.querySelector(".channel-unstarted")).toBeNull();
 });
 test("grid panes rearrange by drag or arrow keys, persist per channel, and reset to attention order", () => {
   localStorage.clear();
@@ -78,11 +65,11 @@ test("grid panes rearrange by drag or arrow keys, persist per channel, and reset
   expect(pane("one").getAttribute("data-drop")).toBe("before");
   fire(pane("one"), "drop");
   expect(order()).toEqual(["three", "one", "two"]);
-  expect(JSON.parse(localStorage.getItem("bot-teams:grid-order:channel")!)).toEqual(["three", "one", "two"]);
+  expect(JSON.parse(localStorage.getItem("bot-teams:command-order:space")!)).toEqual(["three", "one", "two"]);
   act(() => (container.querySelector('[aria-label="Move three"]') as HTMLElement).dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
   expect(order()).toEqual(["one", "three", "two"]);
   expect(container.textContent).toContain("Moved three to position 2 of 3.");
   act(() => (([...container.querySelectorAll("button")].find(button => button.textContent === "Reset order")) as HTMLButtonElement).click());
   expect(order()).toEqual(["one", "two", "three"]);
-  expect(localStorage.getItem("bot-teams:grid-order:channel")).toBeNull();
+  expect(localStorage.getItem("bot-teams:command-order:space")).toBeNull();
 });

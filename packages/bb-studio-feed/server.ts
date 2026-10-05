@@ -1,5 +1,5 @@
 // Studio Feed: one feed of what agents report. A reply that ends with a
-// `::post{…}` line is published, from any thread, channel or automation.
+// `::post{…}` line is published, from any thread or automation.
 // The work is in src/register.ts; this wires it into BB.
 import { usage } from "@bb-studio/kit/cli";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";

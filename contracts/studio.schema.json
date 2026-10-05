@@ -3970,6 +3970,70 @@
         "additionalProperties": false
       }
     },
+    "thread_lines": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadIds": {
+            "maxItems": 60,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "threadIds"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "progress",
+                    "failure",
+                    "blocked"
+                  ]
+                },
+                "at": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "text",
+                "kind",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ],
+        "additionalProperties": false
+      }
+    },
     "space_set_lead": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

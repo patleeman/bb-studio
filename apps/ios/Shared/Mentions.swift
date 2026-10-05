@@ -43,7 +43,7 @@ public struct Mention: Codable, Hashable, Sendable {
     }
 }
 
-/// `GET /api/v1/plugins/mentions/search`: bots, channels, DMs and other plugin items.
+/// `GET /api/v1/plugins/mentions/search`: bots and other plugin items.
 public struct MentionResults: Decodable, Sendable {
     public struct Group: Decodable, Sendable {
         public var pluginId: String

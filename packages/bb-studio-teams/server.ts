@@ -12,13 +12,13 @@ import { Runtime, missingThread } from "./mission-runtime";
 import { isExecuting } from "./job-state";
 import { broadcastHandles } from "./mentions";
 import { ThreadProfiles } from "./thread-profiles";
-import { ThreadViews } from "./thread-views";
+import { Command } from "./command";
 import { botHandlers } from "./rpc-bots";
 import { directThreadIndicator } from "./direct-status";
 import { personalProjectId } from "@bb-studio/kit/server";
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { registerStudio } from "./studio-provider";
-import { registerViewMentions } from "./view-mentions";
+import { registerMentionProviders } from "./mention-providers";
 import { registerTeamsCli } from "./teams-cli";
 export { rpcContract } from "./client-contract";
 
@@ -27,7 +27,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const store = new Store(db), runtime = new Runtime(bb, store);
   const profiles = new ThreadProfiles(bb, store, runtime);
-  const views = new ThreadViews(bb, store, profiles);
+  const command = new Command(bb, store, profiles);
   const project = () => personalProjectId(bb);
   const activeConversations = (id: string) => store.conversations(id).filter(c => c.kind === "mission" && !c.archivedAt);
   const assertConversationIdle = async (c: Conversation) => {
@@ -146,7 +146,6 @@ export default async function plugin(bb: BbPluginApi) {
       requesterBotId: author.botId,
       requesterThreadId: threadId,
       requesterName: author.speaker,
-      channelName: null,
       input,
       status: "pending",
       createdAt: now,
@@ -249,7 +248,7 @@ export default async function plugin(bb: BbPluginApi) {
     return bot;
   };
   const handlers: PluginRpcHandlers<typeof rpcContract> = {
-    ...views.handlers(),
+    ...command.handlers(),
     createBotSetupThread: async request => ({ threadId: (await bb.sdk.threads.spawn({ ...request, origin: "app", title: "Create a bot" })).id }),
     create: input => create(input),
     usage: ({ id }) => runtime.data.usage(id),
@@ -346,30 +345,19 @@ export default async function plugin(bb: BbPluginApi) {
           if (store.currentDirectConversation(c.botId)?.threadId === c.threadId) directThreads[c.botId] = { threadId: c.threadId, status: thread.status, indicator: listed.has(c.threadId) ? directThreadIndicator(listed.get(c.threadId)!) : ["active", "starting"].includes(thread.status) ? "runtime" : thread.status === "error" ? "unread-error" : "none" };
         } catch (cause) { if (!missingThread(cause)) bb.log.warn(String(cause)); }
       }
-      return { bots: bots.map(bot => ({ ...bot, working: activity.get(bot.id)?.working ?? false, lastActivityAt: activity.get(bot.id)?.lastActivityAt ?? null })), views: views.all(), directConversations, directThreads, directThreadInfo,
-        botCreateRequests: store.botCreateRequests().map(r => ({ ...r.input, id: r.id, requesterBotId: r.requesterBotId, requesterName: r.requesterName, channelName: null, mission: r.input.mission.slice(0,4000), missionTruncated: r.input.mission.length > 4000, createdAt: r.createdAt, expiresAt: r.expiresAt })) };
+      return { bots: bots.map(bot => ({ ...bot, working: activity.get(bot.id)?.working ?? false, lastActivityAt: activity.get(bot.id)?.lastActivityAt ?? null })), directConversations, directThreads, directThreadInfo,
+        botCreateRequests: store.botCreateRequests().map(r => ({ ...r.input, id: r.id, requesterBotId: r.requesterBotId, requesterName: r.requesterName, mission: r.input.mission.slice(0,4000), missionTruncated: r.input.mission.length > 4000, createdAt: r.createdAt, expiresAt: r.expiresAt })) };
     },
   };
   bb.rpc.register(rpcContract, handlers);
-  // The Bots and Channels pages' collections (not Studio items; see studio-provider.ts).
+  // The Bots page's collection (not Studio items; see studio-provider.ts).
   registerStudio(bb, studioSchemas(z), {
     bots: () => store.all(),
     activity: () => store.botActivitySummary(),
-    views: () => views.all(),
-    createView: () => views.create("New channel", []),
-    archiveView: async (id, archived) => {
-      const view = views.get(id);
-      return views.handlers().viewUpdate({ ...view, archived, expectedUpdatedAt: view.updatedAt });
-    },
-    deleteView: async (id) => views.handlers().viewDelete({ id }),
-    readView: async (id) => {
-      const page = await views.page(id);
-      return [`# ${page.view.name}`, ...page.entries.map(entry => `${entry.role === "user" ? "You" : "Reply"}: ${entry.text}`)].join("\n\n");
-    },
     retire: (id, retired) => runtime.retire(id, retired),
   });
   const tools = registerTeamsCli(bb, store, handlers, approveBotCreate);
-  registerViewMentions(bb, store, views);
+  registerMentionProviders(bb, store);
   bb.agents.configure(context => {
     const conversation = store.byThread(context.thread.id);
     const bot = conversation ? store.get(conversation.botId) : null;
@@ -377,7 +365,7 @@ export default async function plugin(bb: BbPluginApi) {
       `This thread works as the persistent bot ${JSON.stringify(bot.name)} (@${bot.handle}). Work as this bot. Your persistent bot home is ${JSON.stringify(bot.home)}. Read AGENTS.md in this bot home as well as MISSION.md and MEMORY.md, using that absolute path. Do the work itself in this thread's initial working directory: it is the thread's project, not your bot home.`,
       "Read MISSION.md and MEMORY.md at the beginning of every turn, including follow-ups. Keep durable memory up to date.",
       "MISSION.md belongs to the owner. Change it only on an explicit owner request. Keep private conversation details out of shared memory.",
-      "Collaboration uses normal BB threads. A Studio view message includes the owner's request and a roster of addressed thread IDs; that authorizes coordination with those threads for that request. Scheduled reports go to Studio Feed with stable story keys. When there is nothing new to report, finish without a final assistant message.",
+      "Collaboration uses normal BB threads. A Studio Command message includes the owner's request and a roster of addressed thread IDs; that authorizes coordination with those threads for that request. Scheduled reports go to Studio Feed with stable story keys. When there is nothing new to report, finish without a final assistant message.",
       `Profile: ${JSON.stringify(bot.description)}`,
     ].join("\n") } : {}) };
   });
@@ -387,8 +375,8 @@ export default async function plugin(bb: BbPluginApi) {
     return { action: "proceed" };
   });
   for (const event of ["thread.created", "thread.active", "thread.idle", "thread.failed", "thread.archived", "thread.unarchived"] as const)
-    bb.events.on(event, () => views.changed());
-  bb.events.on("thread.deleted", ({ thread }) => { store.deleteConversation(thread.id); views.forgetThread(thread.id); runtime.changed(); views.changed(); });
+    bb.events.on(event, () => command.changed());
+  bb.events.on("thread.deleted", ({ thread }) => { store.deleteConversation(thread.id); runtime.changed(); command.changed(); });
   bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
     const c = store.byThread(thread.id);
     if (!c) return;

@@ -476,7 +476,7 @@ extension BBClient {
     }
 
     /// The bot this thread works as: `.some(nil)` for none, `nil` when the
-    /// thread can't take a profile (channels and bot work threads).
+    /// thread can't take a profile (bot work threads).
     public func threadProfile(_ threadId: String) async throws -> String?? {
         struct Profile: Decodable { var botId: String? }
         let profile: Profile? = try await rpcIfPresent("bot-teams", "threadProfile", ["threadId": .string(threadId)])

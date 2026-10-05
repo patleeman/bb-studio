@@ -19,7 +19,7 @@ describe("pickComposer", () => {
     expect(pickComposer([side, other], "thr_c")).toBe(side);
   });
 
-  it("falls back to a new-thread composer, such as a channel's, but never another thread's", () => {
+  it("falls back to a new-thread composer, but never another thread's", () => {
     expect(pickComposer([other, main], "thr_z")).toBe(main);
     expect(pickComposer([main, other], "thr_z")).toBe(main);
   });

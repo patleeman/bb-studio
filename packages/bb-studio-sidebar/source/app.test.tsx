@@ -16,6 +16,7 @@ import {
 } from "./app/preferences/preferences-sync.js";
 import { getDefaultStore } from "jotai";
 import { studioSpacesAtom } from "./app/studio/studioSpaces.js";
+import { resetTeamsInstalledForTest } from "./app/studio/SpaceModeSections.js";
 import {
   defaultPreferences,
   type PreferenceValues,
@@ -148,6 +149,7 @@ function threadIds(): string[] {
 afterEach(() => {
   cleanup();
   getDefaultStore().set(studioSpacesAtom, { status: "loading" });
+  resetTeamsInstalledForTest();
   resetPreferencesSyncForTest();
   setPreferencesMirrorStorageForTest(undefined);
 });
@@ -205,11 +207,14 @@ describe("thread-list plugin", () => {
     };
     const { inspection, rpcCalls } = renderList({ organizationMode: "space" }, {
       sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads },
-      sdk: { plugins: { callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
-        if (pluginId !== "studio" || !studio[method]) return {} as never;
-        studioCalls.push({ method, input });
-        return studio[method]!(input) as never;
-      } } },
+      sdk: { plugins: {
+        list: async () => ({ plugins: [{ id: "bot-teams", enabled: true, status: "running" }] }) as never,
+        callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
+          if (pluginId !== "studio" || !studio[method]) return {} as never;
+          studioCalls.push({ method, input });
+          return studio[method]!(input) as never;
+        },
+      } },
     });
     // The default Space shows first; threads in no Space are its.
     await screen.findByTitle("Alpha");
@@ -231,6 +236,10 @@ describe("thread-list plugin", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Edit Space" }));
     window.removeEventListener("studio:space-dialog", onDialog);
     expect(dialogs).toEqual([{ spaceId: "sp_alpha", dialog: "edit" }]);
+    // With Studio Teams installed, ⋯ opens the Space's Command view.
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Alpha actions" }), { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Command view" }));
+    expect(window.location.pathname).toBe("/plugins/bot-teams/command/sp_alpha");
     fireEvent.click(screen.getByRole("button", { name: "New thread in Alpha" }));
     expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_web", focusPrompt: true } });
     // An item opens in the main area (in place here, where BB can't split).

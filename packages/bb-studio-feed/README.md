@@ -125,7 +125,7 @@ and the tool returns a card line for it:
 ```
 
 The agent ends its reply with that line, and the reply shows the post as a
-card where it was written, in the thread or the channel. The card shows the
+card in the thread where it was written. The card shows the
 title, an **Urgent** badge, the topic, which update of a story it is, and
 whether you've read it, with **Open in Inbox** and **Mark read**.
 
@@ -186,7 +186,7 @@ the tools it started with.
   picture, the whole post, a card for the page it links to, and the story's
   earlier updates. Press <kbd>j</kbd> and <kbd>k</kbd> to move between posts,
   and <kbd>m</kbd> to mark the open one read or unread.
-- **The thread button** is named after the thread or channel the post came
+- **The thread button** is named after the thread the post came
   from and opens its companion tab. **New thread** opens a retained discussion
   draft with BB's project, model and attachment controls. Opening it again
   focuses the same draft. On send, the agent receives the post's current title

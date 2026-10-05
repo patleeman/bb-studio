@@ -488,30 +488,6 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
-      "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "view",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "viewCreate",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "viewUpdate",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "viewSend",
-      "coverage": "literal method checked against contract"
-    },
-    {
       "file": "apps/ios/Shared/ServerTools.swift",
       "plugin": "account-pool",
       "method": "account.list",

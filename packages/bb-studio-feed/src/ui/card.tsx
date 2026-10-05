@@ -1,5 +1,5 @@
 // `::post{id="…"}` at the end of a reply: the post it made, as a card
-// in the thread or channel. The card finds its post by the directive line. It
+// in the thread. The card finds its post by the directive line. It
 // says what kind of post it is (urgent, its topic, which update of a story),
 // and opens it in the Inbox or marks it read without leaving the conversation.
 import { Badge, GHOST_BUTTON, ItemDirectiveCard, cn } from "@bb-studio/kit/app";

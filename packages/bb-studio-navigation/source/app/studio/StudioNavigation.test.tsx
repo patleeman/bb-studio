@@ -100,6 +100,7 @@ describe("Studio Navigation", () => {
       item("pages/explainers", "Explore"),
       item("float/companions", "Companions"),
       item("studio-chat/chats", "Chat", { isVisible: false }),
+      item("bot-teams/command", "Command"),
     ];
     renderNavigation([...ITEMS, ...retired]);
     for (const entry of retired) {
@@ -117,12 +118,6 @@ describe("Studio Navigation", () => {
     for (const entry of retired) {
       expect(rowOrder()).not.toContain(entry.id);
     }
-  });
-
-  it("keeps the Channels row, which the Studio hub doesn't list", () => {
-    const channels = item("bot-teams/channels", "Channels");
-    renderNavigation([...ITEMS, channels]);
-    expect(rowOrder()).toContain(channels.id);
   });
 
   it("keeps add-on panels while the Studio hub can't open them", () => {

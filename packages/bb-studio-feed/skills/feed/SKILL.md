@@ -31,7 +31,7 @@ Call `feed_post`:
 
 It returns a card line, `::post{id="post_…"}`. End your reply with it, on its
 own line, outside code blocks and before any `::explore` or `::reactions`
-line, so the post shows as a card in your thread or channel.
+line, so the post shows as a card in your thread.
 
 If `feed_post` isn't available, `bb feed post` does the same and prints the
 card line.

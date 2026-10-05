@@ -63,12 +63,11 @@ test("unrelated threads cannot claim a bot identity using metadata", async () =>
         pluginMetadata: { botId: "bot_0123456789abcdef" },
       }),
     );
-    assert.ok(result.tools.some((t) => t.name === "bots_view_read"));
+    assert.ok(result.tools.some((t) => t.name === "bots_create"));
     assert.ok(!result.tools.some((t) => t.name === "bots_react"));
     assert.equal(result.instructions, null);
     assert.deepEqual(await host.harness.behavior.callRpc("list", null), {
       bots: [],
-      views: [],
       directThreads: {},
       directConversations: {},
       directThreadInfo: {},

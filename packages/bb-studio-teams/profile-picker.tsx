@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { experimental_Icon as Icon, useComposer, useComposerView, useRpc, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { ComposerMore, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, useComposerMoreSide } from "@bb-studio/kit/app";
+import { experimental_Icon as Icon, useComposer, useComposerView, useRpc } from "@get-bb/plugin-sdk/app";
+import { ComposerMore, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, useComposerMoreSide } from "@bb-studio/kit/app";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
 import { PLUGIN_ID } from "./studio-provider";
@@ -15,8 +15,7 @@ const savePick = (projectId: string, botId: string | null) =>
 /**
  * Beside the composer: the bot this thread works as. Working as a bot, the
  * thread's agent is the bot, in the thread's project with its mission and
- * memory. A thread works as one bot; inviting another hands the thread off
- * to a new channel with both. In the new-thread composer the pick also applies
+ * memory. A thread works as one bot. In the new-thread composer the pick also applies
  * the bot's model and permissions, which can still be changed before sending,
  * and attaches when the first message is sent.
  *
@@ -27,7 +26,6 @@ export function ProfilePicker() {
   const [triggerRef, side] = useComposerMoreSide();
   const view = useComposerView();
   const composer = useComposer();
-  const navigate = useBbNavigate();
   const rpc = useRpc<typeof rpcContract>();
   const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
   const projectId = view.scope.kind === "new-thread" ? view.scope.projectId : null;
@@ -117,17 +115,7 @@ export function ProfilePicker() {
     }
   };
 
-  const handoff = async (other: Bot) => {
-    setPending(true); setError(null);
-    try {
-      const members = threadId ? [{ kind: "thread" as const, id: threadId }, { kind: "bot" as const, id: other.id }] : [...(bot ? [{ kind: "bot" as const, id: bot.id }] : []), { kind: "bot" as const, id: other.id }];
-      const saved = await rpc.call("viewCreate", { name: "Shared work", members, requestId: crypto.randomUUID() });
-      navigate.toPluginPanel("channels", { subPath: saved.id });
-    } catch(cause) { setError(message(cause)); } finally { setPending(false); }
-  };
-
   const label = bot ? bot.name : current ? "Archived bot" : "Work as bot";
-  const others = bots.filter((b) => b.id !== current);
   const picker = (
     <DropdownMenu onOpenChange={(open) => open && loadBots()}>
       <DropdownMenuTrigger asChild>
@@ -151,16 +139,6 @@ export function ProfilePicker() {
               <span className="channel-settings-check"><Icon name="X" /></span>
               <span>{busy ? "Stop working as it after this response" : `Stop working as ${bot?.name ?? "this bot"}`}</span>
             </DropdownMenuItem>
-            {others.length ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Create a shared view</DropdownMenuLabel>
-                {others.map((b) => (
-                  <BotItem key={b.id} bot={b} onSelect={() => handoff(b)}
-                    description={bot ? `Shared view with ${bot.name} and ${b.name}` : `Shared view with ${b.name}`} />
-                ))}
-              </>
-            ) : null}
           </>
         ) : (
           <>

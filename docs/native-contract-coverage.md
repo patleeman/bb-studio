@@ -29,7 +29,7 @@ then call the real Swift wrappers, decode their serialized transport requests,
 compare them with those same fixtures, and check response decoding:
 
 - Talk recording creation, audio segment upload and transcript reads.
-- Bots document revision tokens and channel delivery failures.
+- Bots document revision tokens.
 - Tables text, number, boolean, list, relation and null cell values.
 - Feed read state, priority and pagination; Studio Chat's start envelope.
 

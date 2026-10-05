@@ -2,7 +2,6 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import { z } from "zod";
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { threadViewSchema } from "../view-contract";
 import type { Bot } from "../contract";
 import { registerStudio, type BotActivity } from "../studio-provider";
 
@@ -25,18 +24,12 @@ const bot = (patch: Partial<Bot> = {}): Bot =>
     ...patch,
   }) as Bot;
 
-const view = threadViewSchema.parse({ id: "33333333-3333-4333-8333-333333333333", name: "Launch room", members: [], createdAt: 1, updatedAt: 2 });
-function setup(bots: Bot[], activity = new Map<string, BotActivity>(), views = [] as typeof view[]) {
+function setup(bots: Bot[], activity = new Map<string, BotActivity>()) {
   let handlers: Record<string, (input: unknown) => unknown> = {};
   const bb = { rpc: { register: (_contract: unknown, registered: typeof handlers) => (handlers = registered) } };
   const retired: string[] = [];
   registerStudio(bb as never, studioSchemas(z), {
     bots: () => bots,
-    views: () => views,
-    createView: async () => { const created = { ...view, name: "New view" }; views.push(created); return created; },
-    archiveView: async (id, archived) => { views.find(view => view.id === id)!.archived = archived; },
-    deleteView: async (id) => { views.splice(views.findIndex(view => view.id === id), 1); },
-    readView: async () => "# Launch room\n\nYou: Ready?\n\nReply: Ready.",
     activity: () => activity,
     retire: async (id, value) => void retired.push(`${id}:${value}`),
   });
@@ -79,38 +72,9 @@ test("archives by retiring, and refuses move and delete", async () => {
   assert.deepEqual((await call("studio_search", { query: "@" })).ids, []);
 });
 
-test("bots and channels stay out of Studio: the provider isn't discoverable", () => {
+test("bots stay out of Studio: the provider isn't discoverable", () => {
   let options: unknown = "unset";
   const bb = { rpc: { register: (_contract: unknown, _handlers: unknown, registered?: unknown) => { options = registered; } } };
-  registerStudio(bb as never, studioSchemas(z), { bots: () => [], views: () => [], createView: async () => view, archiveView: async () => {}, deleteView: async () => {}, readView: async () => "", activity: () => new Map(), retire: async () => {} });
+  registerStudio(bb as never, studioSchemas(z), { bots: () => [], activity: () => new Map(), retire: async () => {} });
   assert.equal((options as { experimental_discoverable?: boolean } | undefined)?.experimental_discoverable ?? false, false);
-});
-
-test("saved views are Studio items with ordinary view links and lifecycle actions", async () => {
-  const { call } = setup([bot()], new Map(), [{ ...view }]);
-  const info = await call("studio_describe", null);
-  const kind = info.kinds.find((kind: any) => kind.id === "view");
-  assert.deepEqual(kind.create, { mode: "rpc" });
-  assert.equal(kind.mentionProviderId, "views");
-  const { items } = await call("studio_list", null);
-  assert.ok(studioSchemas(z).provider.studio_list.output.parse({ items }));
-  assert.equal(items[1].href, `/plugins/bot-teams/channels/${view.id}`);
-  assert.equal(items[1].projectId, null);
-  assert.deepEqual((await call("studio_get", { ids: [view.id] })).items, [items[1]]);
-  // Studio indexes the title itself; the content fallback must not duplicate it.
-  assert.deepEqual((await call("studio_search", { query: "Launch" })).ids, []);
-  assert.match((await call("studio_read", { id: view.id })).content, /Reply: Ready/);
-  assert.deepEqual(await call("studio_archive", { ids: [view.id], archived: true }), { done: [view.id], failed: [] });
-  assert.equal((await call("studio_get", { ids: [view.id] })).items[0].archived, true);
-  assert.deepEqual(await call("studio_delete", { ids: [view.id, bot().id] }), { done: [view.id], failed: [{ id: bot().id, error: "Bots can't be deleted. Archive them instead." }] });
-  assert.equal((await call("studio_get", { ids: [view.id] })).items.length, 0);
-});
-
-test("Studio creates an empty view ready for editing", async () => {
-  const { call } = setup([]);
-  const { item } = await call("studio_create", { kind: "view", projectId: "proj_a" });
-  assert.equal(item.kind, "view");
-  assert.equal(item.title, "New view");
-  assert.equal(item.projectId, null);
-  assert.equal((await call("studio_list", null)).items[0].id, item.id);
 });

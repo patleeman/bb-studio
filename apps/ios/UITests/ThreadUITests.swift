@@ -310,16 +310,9 @@ final class ThreadUITests: XCTestCase {
         }
     }
 
-    /// Read-only: browses a channel and custom instructions.
+    /// Read-only: browses custom instructions.
     func testPluginScreens() {
         app.open(URL(string: "bbstudio://home")!)
-        let channel = app.buttons.containing(.image, identifier: "number").firstMatch
-        if channel.waitForExistence(timeout: 10) {
-            channel.tap()
-            sleep(3)
-            shot("plugins-channel")
-            app.navigationBars.buttons.element(boundBy: 0).tap()
-        }
         app.tabBars.buttons["Settings"].tap()
         let instructions = app.buttons["Custom Instructions"]
         if instructions.waitForExistence(timeout: 5) {
@@ -1006,7 +999,7 @@ final class ThreadUITests: XCTestCase {
         // A link from before the rename still opens.
         app.open(URL(string: "bbgo://bot/bot_32fb8c40db41abea")!)
         XCTAssertTrue(app.staticTexts["Chief of Staff"].firstMatch.waitForExistence(timeout: 10), "bot screen")
-        XCTAssertTrue(app.staticTexts["Channels"].waitForExistence(timeout: 5) || app.staticTexts["CHANNELS"].exists, "channels")
+        XCTAssertTrue(app.staticTexts["Threads"].waitForExistence(timeout: 5) || app.staticTexts["THREADS"].exists, "threads")
         shot("bot-view")
     }
 

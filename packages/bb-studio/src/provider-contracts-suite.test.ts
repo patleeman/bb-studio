@@ -13,7 +13,6 @@ import { registerStudio as registerBots } from "../../bb-studio-teams/studio-pro
 import { createTestStore } from "../../bb-studio-teams/test/test-store";
 import { botSchema } from "../../bb-studio-teams/contract";
 import { Runtime } from "../../bb-studio-teams/mission-runtime";
-import { ThreadViews } from "../../bb-studio-teams/thread-views";
 import tablesPlugin from "../../bb-studio-tables/server";
 import { schemas } from "./contract";
 import { StudioHub, type HubSdk } from "./hub";
@@ -89,37 +88,27 @@ providerConformance("Artifacts", () => {
   };
 });
 
-function botsFixture(kind: "bot" | "view"): ProviderHarness {
+providerConformance("Bots", () => {
   const db = new Database(":memory:");
   const store = createTestStore(db);
   const { handlers, bb, events } = registration();
   const runtime = new Runtime(bb as never, store);
-  const views = new ThreadViews(bb as never, store, {} as never);
   registerBots(bb as never, schemas, {
-    bots: () => store.all(), activity: () => store.botActivitySummary(), views: () => views.all(),
-    createView: () => views.create("Conformance channel", []),
-    archiveView: async (id, archived) => { const view = views.get(id); return views.handlers().viewUpdate({ ...view, archived, expectedUpdatedAt: view.updatedAt }); },
-    deleteView: (id) => Promise.resolve(views.handlers().viewDelete({ id })),
-    readView: async (id) => { const page = await views.page(id); return [`# ${page.view.name}`, ...page.entries.map((entry) => entry.text)].join("\n\n"); },
+    bots: () => store.all(), activity: () => store.botActivitySummary(),
     retire: (id, retired) => runtime.retire(id, retired),
   });
   return {
-    pluginId: "bot-teams", kind, handlers, expectedContent: kind === "bot" ? "Conformance bot content" : "Conformance channel", projectId: null, canDelete: kind !== "bot",
-    ...(kind === "bot" ? { seed: () => {
+    pluginId: "bot-teams", kind: "bot", handlers, expectedContent: "Conformance bot content", projectId: null, canDelete: false,
+    seed: () => {
       const id = `bot_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
       store.put(botSchema.parse({ id, name: "Conformance bot", description: "Conformance bot content", handle: id, home: "/unused/conformance", projectId: "proj_private", hostId: "local", createdAt: 1, updatedAt: 1, lastWakeAt: 0, error: null }));
       return id;
-    } } : {}),
-    notificationCount: () => events.length,
-    editTitle: async (id, title) => {
-      if (kind === "bot") store.put({ ...store.get(id), name: title, updatedAt: 2 });
-      else { const view = views.get(id); await views.handlers().viewUpdate({ ...view, name: title, expectedUpdatedAt: view.updatedAt }); }
     },
+    notificationCount: () => events.length,
+    editTitle: (id, title) => { store.put({ ...store.get(id), name: title, updatedAt: 2 }); },
     close: () => { db.close(); },
   };
-}
-providerConformance("Bots", () => botsFixture("bot"));
-providerConformance("Channels", () => botsFixture("view"));
+});
 
 function tablesFixture() {
   const db = new Database(":memory:");

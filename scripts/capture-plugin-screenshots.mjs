@@ -4,7 +4,7 @@ import { readFile, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CdpClient, ensureChrome } from "./capture/driver.mjs";
-import { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep } from "./capture/bb.mjs";
+import { projectId, threadId, pluginRpc, bbCli, launchSpace, getLaunchSpaceId, sleep } from "./capture/bb.mjs";
 import { seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc } from "./capture/seed.mjs";
 import { loadCaptures } from "./capture/entries.mjs";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -19,7 +19,7 @@ const captureOnly = process.env.BB_CAPTURE_ONLY
   ? new Set(process.env.BB_CAPTURE_ONLY.split(",").map((value) => value.trim()).filter(Boolean))
   : null;
 if (!projectId || !threadId) throw new Error("Set BB_CAPTURE_PROJECT_ID and BB_CAPTURE_THREAD_ID to a seeded BB thread before capturing.");
-const context = { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
+const context = { projectId, threadId, pluginRpc, bbCli, launchSpace, getLaunchSpaceId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
 const captures = loadCaptures(context);
 
 const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();

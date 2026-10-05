@@ -37,7 +37,7 @@ do not have to maintain competing defaults.
 | Draw | Excalidraw's canvas controls and item-level title, project, export, and deletion | Existing controls cover drawing preferences. There is no background model job to configure. |
 | Artifacts | Explicit save/upload, project placement, item versions, preview/download/export, archive/delete | Existing item controls cover storage actions; no automatic expiry is imposed. |
 | Tasks | Archive-thread-on-done switch; board columns/views; per-task assignee, priority, due/reminder/recurrence; handoff provider/model/environment | Existing controls cover task behavior and agent execution. |
-| Teams | Bot profile model, fallback, reasoning, permissions, mission interval and limits; channel layout and membership | Existing profile and channel controls cover these choices. |
+| Teams | Bot profile model, fallback, reasoning, permissions, mission interval and limits; Command view layout and approval mode | Existing profile and Command view controls cover these choices. |
 | Sidebar | Organization, sorting/direction, grouping, hidden/collapsed groups, row actions, provider icons, and background-thread visibility | Existing sidebar preferences cover layout. |
 | Navigation | BB Appearance chooses the navigation provider; native Customize sidebar controls visibility/order | Uses BB's existing preferences. |
 | Mobile | APNs credentials/environment/bundle and Expo endpoint in plugin settings; mute per thread; notification permission and presentation in BB/iOS | Relay configuration already exists. Feed and BB's Push notifications plugin own event selection. |

@@ -9,7 +9,7 @@
   },
   "bb": {
     "name": "Studio Decisions",
-    "description": "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and it chooses recipients in Studio Teams views.",
+    "description": "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and other plugins can ask it for quick decisions.",
     "branding": {
       "icon": "./assets/icon.svg"
     },

@@ -31,7 +31,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "new-space", component: NewSpace });
   app.slots.experimental_appOverlay({ id: "manage-space", component: ManageSpace });
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
-  // Links a thread, channel or direct message back to its spaces, and picks
+  // Links a thread back to its spaces, and picks
   // the spaces a new thread joins.
   // Collapses the row under the composer into a ⋯ menu.
   app.composer.customize({ id: "thread-spaces", scopes: ["thread", "new-thread"], actions: [{ id: "spaces", component: ComposerSpaces }] });

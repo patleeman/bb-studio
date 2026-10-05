@@ -1,30 +1,21 @@
 # Studio Teams
 
-Studio Teams adds persistent bot profiles and channels to BB Studio. Bots keep a mission and durable memory; their work happens in ordinary BB threads.
+Studio Teams adds persistent bot profiles to BB Studio, and a Command view to talk to a Space's threads at once. A bot is a profile a thread wears: it keeps a mission and durable memory, and its work happens in ordinary BB threads.
 
 ## Use
 
-Create a bot from **Teams → New bot**. Describe its purpose in the prefilled conversation; the agent chooses sensible profile settings and creates it. The bot's page lets you edit its profile, mission and memory, and open every thread working as it. **Work as bot** beside a thread's composer attaches a profile to an idle thread. The thread keeps its own project and model selection. The profile’s **Chat** action resumes its direct conversation; **Chat → New conversation** starts another. Conversations open in the shared companion tabs, preferring the right workbench when supported and Float otherwise. Without Float, they open in the main channel.
+Create a bot from **Teams → New bot**. Describe its purpose in the prefilled conversation; the agent chooses sensible profile settings and creates it. The bot's page lets you edit its profile, mission and memory, and open every thread working as it. **Work as bot** beside a thread's composer attaches a profile to an idle thread. The thread keeps its own project and model selection and shows the bot's avatar and name. The profile's **Chat** action resumes its direct conversation; **Chat → New conversation** starts another. Conversations open in the shared companion tabs, preferring the right workbench when supported and Float otherwise. Outside agents are bots too, running in plain threads.
 
-Open **Channels**, choose **New**, and select bots or existing threads from any project. With Studio Sidebar, drag one thread onto another and choose **Create channel**; **Nest threads** keeps the existing parent/child gesture available. A channel references its threads: it does not move them, change their projects, or require bot profiles. Channels and bots live on their own pages, not in the Studio collection. A thread can belong to several channels; deleting a channel leaves its threads intact. Bot profiles and channels also open as companion tabs. A channel keeps its own composer and title controls, and opening a member thread leaves the channel’s draft in place.
+## Command view
 
-Choose a **Channel view** above the conversation. The choice is saved for each channel on this device:
+With Studio Sidebar's By space organization, choose **Command view** in a Space heading's ⋯ menu. It opens `/plugins/bot-teams/command/<spaceId>`: one screen for every thread in the Space, lead first. There is no membership to manage. The Space's threads are its members (threads in no Space belong to the default Space), up to 32 at a time. The title bar reads **Space / Command**, with the layout toggles on the right. The choice is saved for each Space on this device:
 
-- **Merged** keeps the existing chronological conversation of owner input and final replies. It hides tools, inter-agent input, unfinished output, and empty replies.
-- **Grid** shows each member’s native BB transcript, including streaming output, tool activity and message directives. Spawned children appear as links beneath their parent; explicitly selected child threads have their own tiles.
-- **Active** gives working threads and requests for input the main area. All members stay visible in a compact rail. When nobody is working, select a member or send a channel message.
-- **Focus** shows one selected thread large, with the other members in the rail. Select a member or use a tile’s **Focus thread** button to switch.
+- **Merged** shows owner messages and final replies from every thread in one conversation. It hides tools, inter-agent input, unfinished output, and empty replies. A message sent to several threads shows once.
+- **Grid** shows each thread's native BB transcript, including streaming output, tool activity and message directives. Forks appear as links beneath their parent. The lead comes first; drag a pane by its header, or focus its grip and use the arrow keys, to [rearrange the grid](assets/command-grid-arrange.png). **Reset order** returns to attention order.
+- **Active** gives working threads and requests for input the main area, beside a box that lists every thread. Finished threads stay until new work starts.
+- **Focus** shows one selected thread large, with the others in the box.
 
-The shared composer stays in place when views change. **Reply in channel**, or interacting inside a transcript, addresses that thread; `@all` still broadcasts to everyone.
-
-Channel sends display the owner's text and attachments in native transcripts.
-The channel roster, recent replies, and coordination instructions travel as
-agent-only context. Older sends that stored the envelope as visible text keep
-that historical text; the current SDK has no transcript message override.
-
-The composer is BB's own prompt box, so it has the same editor, file attachments, voice dictation, and saved drafts as a thread. @-mention the bots or threads that should get a message, use `@all` or `@channel` to ping every member, or choose **Reply** on a message. The mention menu offers both broadcast tags; typing either directly also works. Attachments go to every recipient. The approval menu under the box sets the approval mode for everyone or per member; **Each thread’s own** leaves every thread's mode as it is. A bot continues its latest thread in this channel. Add `+new` after its mention (`@atlas +new`) to start a fresh one. All recipients receive the same addressed thread roster and recent context, with real thread IDs allocated before delivery. A message with no mention goes to the channel's only member, or asks Studio Decisions to choose recipients; if it is uncertain, the draft stays in the composer for you to address. Retry preserves successful deliveries when another recipient failed.
-
-Busy messages use your global Smart Queue settings. Prefix a message with `/steer`, `/followup` or `/fork` to choose explicitly. Open a member thread for tools, approvals, queues, stopping work and model controls. The iOS app uses the same channels and composer behavior.
+The composer is BB's own prompt box, with the same editor, file attachments, voice dictation, and saved drafts as a thread. A message goes to the Space's lead. In Focus it goes to the thread on screen, and **Send to this thread** on a pane or message picks another; the line under the box says who receives it. @-mention threads or bots (the thread in the Space working as that bot) to message them together, or `@all` for every thread. Attachments go to every recipient. Each recipient gets the roster of addressed thread IDs as agent-only context, so they can coordinate with `bb thread log` and `bb thread tell`. The approval menu under the box sets the approval mode for every recipient; **Each thread's own** leaves each thread's mode as it is. Busy threads follow your global Smart Queue settings; prefix a message with `/steer`, `/followup` or `/fork` to choose explicitly. Nothing is stored by the Command view: it reads Studio's Spaces and BB's threads each time.
 
 ## Outside agents
 
@@ -34,13 +25,13 @@ A bot can run on an outside agent from the External Agents plugin: Hermes, OpenC
 
 Mission and memory editors reject stale saves. A profile can configure a fallback model for managed mission work; a provider failure retries the mission once in a fresh thread. Ordinary threads keep BB's model and retry controls. Archiving a bot stops managed work and turns off its mission interval; its ordinary threads and history remain available.
 
-Use BB Automations to schedule work in a normal thread. Scheduled findings go to Studio Feed with stable story keys. Channels live at `/plugins/bot-teams/channels/<id>`. Old channel messages remain in storage and are not replayed or displayed.
+Use BB Automations to schedule work in a normal thread. Scheduled findings go to Studio Feed with stable story keys.
 
 ## CLI and tools
 
-`bb bots --help` lists profile, mission, memory and channel commands: `bb bots channel-read`, `channel-create` and `channel-send`. Use `--json` for structured output. Agent tools provide `bots_views`, `bots_view_read`, `bots_view_create` and `bots_create`. Coordination uses `bb thread log` and `bb thread tell` with the owner's addressed roster.
+`bb bots --help` lists profile, mission and memory commands. Use `--json` for structured output. The `bots_create` agent tool creates a bot; a bot proposing another waits for owner approval. Coordination uses `bb thread log` and `bb thread tell` with the owner's addressed roster.
 
-The public RPC contract is [client-contract.ts](client-contract.ts); channel schemas are [view-contract.ts](view-contract.ts). Bot and historical storage schemas remain in [contract.ts](contract.ts). The channel provider, channel orchestration, chat modes and channel tools have been removed.
+The public RPC contract is [client-contract.ts](client-contract.ts): bot schemas are in [contract.ts](contract.ts), and the Command view's in [command-contract.ts](command-contract.ts).
 
 ## Staged preview
 
@@ -63,65 +54,14 @@ in the ⋯ menu under the composer. These captures run on stable BB 0.45.0 with
 the suite installed from pushed commit ddb7fb0, and check each placement
 before capture.
 
-![A channel over Atlas and Scribe's ordinary threads](assets/staged-preview.png)
+![The Launch work Space's Command view, merged](assets/staged-preview.png)
 
-Captured from an isolated stable BB installed from the pushed Git revision. The Launch work channel shows deterministic ORBIT-42 replies from Atlas and Scribe, laid out like a regular BB thread: your messages on the right, each bot's reply under its name (which links to its ordinary thread), and BB's prompt box with the approval menu beneath it.
+Captured from an isolated stable BB installed from the pushed Git revision. The Launch work Space holds a thread working as Atlas, its lead, and one working as Scribe. Its Command view, in the Merged layout, shows deterministic ORBIT-42 replies from both: your messages on the right, each bot's reply under its name (which links to its thread), and BB's prompt box addressed to Atlas with the approval menu beneath it. The live check confirms the breadcrumb, the layout toggles, the default recipient, and that @-mentions offer both bots.
 
-The [compact preview](assets/staged-preview-mobile.png) shows the same live channel at 390 pixels wide, with its latest reply and composer visible. The [bot profile](assets/bot-profile.png) shows profile settings.
+The [compact preview](assets/staged-preview-mobile.png) shows the same Command view at 390 pixels wide, with its latest reply and composer visible. The [bot profile](assets/bot-profile.png) shows profile settings. The [@all suggestion](assets/command-broadcasts.png) check sends `@all` and verifies that every thread in the Space received it.
 
-![The @channel broadcast suggestion in BB's mention menu](assets/channel-broadcasts.png)
+![Grid with three native BB transcripts, the lead first, under the layout toggles](assets/command-grid.png)
 
-Captured on stable BB 0.45.0 in an isolated staged app. The Release review channel offers `@all` and `@channel` in BB's mention menu. The live check selects and sends both tags, then verifies that Atlas and Scribe each received the messages in their ordinary threads.
+Grid shows every thread's native transcript: Atlas, Scribe, and an ordinary Release checklist thread added to the Space. The [Focus layout](assets/command-focus.png) looks like a thread page, with the Space's threads in a box in the left margin; when the margin is too narrow, the box [shows avatars only](assets/command-focus-compact.png). The [Active layout](assets/command-active.png) puts working threads side by side. On a phone, [Grid](assets/command-grid-mobile.png) stacks the transcripts and [Focus](assets/command-focus-mobile.png) turns the box into a row above the transcript.
 
-![A channel, bot profile, and conversation in shared companion tabs](assets/companion-preview.png)
-
-Captured on stable BB 0.45.0 with the full suite installed from pushed commit adc6638. The live check retains the channel’s exact composer DOM, an unsent draft, and `release-review.txt` through switching and folding. Atlas’s Chat action reuses its existing direct conversation, and the channel keeps its own title and member controls without an extra Studio Chat action.
-
-![Grid view with three native BB transcripts, attention-ordered, under the segmented view switcher](assets/channel-grid.png)
-
-A segmented switcher above the channel picks Merged, Grid, Active, or Focus.
-Grid shows every member's native transcript. Threads that need input or are
-failing come first, then working threads, then the rest by most recent update.
-Bots that have no thread yet share one row with a dashed outline, the same
-outline they get in Focus and Active. To
-[rearrange the grid](assets/channel-grid-arrange.png), drag a pane by its
-header and drop it where the blue line shows. You can also focus the pane's
-grip and use the arrow keys. Each channel remembers its order. New threads
-follow in attention order, and Reset order returns to it.
-
-The [Focus view](assets/channel-focus.png) looks like a thread page. The
-transcript scrolls edge to edge at the composer's width, and a floating box in
-the left margin lists the members. Click a name to swap threads. The current
-row has Reply in channel and Open thread. When the margin is too narrow for
-names, the box [shows avatars only](assets/channel-focus-compact.png).
-The [Active view](assets/channel-active.png) sits between Focus and Grid: the
-same member box, beside a closer grid with a pane for every working thread.
-Finished threads stay on screen until new work starts. Picking a member in the
-box adds its pane first, and Stop showing removes it again. On a phone, [Grid](assets/channel-grid-mobile.png)
-stacks the transcripts and [Focus](assets/channel-focus-mobile.png) turns the
-box into a row above the transcript.
-
-These captures run in the full stable BB 0.45.0 application with Studio Teams
-installed from pushed commit bd81493. Live assertions check concise owner input
-without transport envelopes in Grid and phone Focus, native reaction rendering and reply routing,
-retention of the exact composer and its draft across all four views, and promotion
-that Active shows two working threads side by side, keeps them after they
-stop, and adds and removes a pick, that the member box stays clear of the
-transcripts at full and compact widths, and that the unstarted Quinn has a
-dashed outline in Grid, Focus, and Active.
-The arrange check drags a pane over another in the live grid, then confirms
-the drop, the order after a reload, and Reset order.
-
-![Dragging ordinary threads opens the Combine threads dialog](assets/channel-thread-drop.png)
-
-The live sidebar check drags two ordinary threads together, creates a channel
-with both references, and verifies that their projects and parent links stay the
-same. The dialog also offers the existing **Nest threads** action.
-
-![The channel member editor with one scrolling list](assets/channel-editor.png)
-
-The [phone editor](assets/channel-editor-mobile.png) keeps the title, name,
-search field, and Save/Cancel actions visible. These captures use stable
-BB 0.45.0 with Teams installed from pushed commit 6e84e8f and a deterministic
-large roster. Live checks scroll the list, shrink the viewport to 480 pixels
-high, filter to one member and no matches, and save the selected member.
+These captures run in the full stable BB application. Live assertions check concise owner input without the agent-only roster, native reaction rendering and the recipient they pick, retention of the exact composer and its draft across all four layouts, that Active shows two working threads side by side, keeps them after they stop, and adds and removes a pick, and that the thread box stays clear of the transcripts at full and compact widths. The arrange check drags a pane over another in the live grid, then confirms the drop, the order after a reload, and Reset order.

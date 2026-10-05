@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type MouseEventHandler,
-  type ReactNode,
 } from "react";
 import { useSetAtom } from "jotai";
 import { toast } from "sonner";
@@ -21,7 +20,6 @@ import {
   type UniqueIdentifier,
 } from "@dnd-kit/core";
 import type { SidebarThread } from "../model/sidebar-thread.js";
-import { channelDropThreads, useThreadChannelDrop } from "../studio/useThreadChannelDrop.js";
 import {
   experimental_useSidebarThreadActions,
   useSdk,
@@ -88,7 +86,6 @@ export interface SectionThreadReorderTarget {
 }
 
 export interface SectionThreadDndState {
-  dropDialog?: ReactNode;
   activeItemId: string | null;
   activeThread: SidebarThread | null;
   consumeClickSuppression: ConsumeDragClickSuppression;
@@ -1061,7 +1058,6 @@ export function useSectionThreadDnd({
     ],
   );
   const sdk = useSdk();
-  const channelDrop = useThreadChannelDrop();
   const sidebarActions = experimental_useSidebarThreadActions();
   const { handleDragEnd: handlePinnedDragEnd } = useNeighborReorderSortable({
     disabled: pinnedReorderPending || pinnedThreads.length < 2,
@@ -1326,14 +1322,6 @@ export function useSectionThreadDnd({
         projectedNestParentId,
         decisionOptions,
       );
-      const targetId = rowDrop?.threadId ?? (overId ? parseSidebarThreadRowDroppableId(overId) : null);
-      const sources = (lookup.rootThreadIdsByItemId.get(activeId) ?? [activeId]).flatMap(id => { const thread = lookup.threadByItemId.get(id); return thread ? [thread] : []; });
-      const channelThreads = channelDropThreads(sources, targetId ? lookup.threadByItemId.get(targetId) : undefined);
-      if (channelThreads.length) {
-        channelDrop.offer(channelThreads, decision?.kind === "nest" ? () => commitDropChanges(decision, "Failed to nest threads.") : undefined);
-        clearProjectedDrag();
-        return;
-      }
       if (!decision) {
         clearProjectedDrag();
         return;
@@ -1381,7 +1369,6 @@ export function useSectionThreadDnd({
       clearNestCandidate,
       clearProjectedDrag,
       commitDropChanges,
-      channelDrop.offer,
       decisionOptions,
       dragOverParentKey,
       enabled,
@@ -1420,7 +1407,6 @@ export function useSectionThreadDnd({
     pendingDropDecision !== null &&
     hasDropDecisionLanded(lookup, pendingDropDecision);
   return {
-    dropDialog: channelDrop.dialog,
     activeItemId: dropDecisionLanded ? null : activeIdRef.current,
     activeThread: dropDecisionLanded ? null : activeThread,
     consumeClickSuppression,

@@ -3,7 +3,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Attachment, Bot, Conversation, Job, PermissionMode } from "./contract";
 import { Store } from "./store";
 import { permissionModeFor } from "./external-agents";
-import { ChannelData } from "./channel-data";
+import { BotData } from "./bot-data";
 import { defaultLimits } from "./workspace-contract";
 import { publishChange } from "./realtime-server";
 import { isExecuting } from "./job-state";
@@ -22,9 +22,9 @@ readonly locks = new Map<string, Promise<unknown>>();
 readonly busy = new Map<string, {threadId:string;at:number}>();
 readonly progressChecks = new Map<string, {at:number;progress:boolean}>();
 readonly onChanged = new Set<() => void>();
-readonly data: ChannelData;
-constructor(readonly bb: BbPluginApi, readonly store: Store) { this.data = new ChannelData(store); }
-changed(scope: "all"|"bots"|"channel"="all", id?:string) { publishChange(this.bb,scope,id); for(const fn of this.onChanged) fn(); }
+readonly data: BotData;
+constructor(readonly bb: BbPluginApi, readonly store: Store) { this.data = new BotData(store); }
+changed(scope: "all"|"bots"="all", id?:string) { publishChange(this.bb,scope,id); for(const fn of this.onChanged) fn(); }
 permissionMode(bot: Bot): Promise<PermissionMode> { return Promise.resolve(permissionModeFor(bot.providerId, bot.permissionMode)); }
 async locked<T>(id: string, work: () => Promise<T>): Promise<T> {
     const next = (this.locks.get(id) ?? Promise.resolve())
@@ -384,7 +384,7 @@ async refreshJobActivity( job: Job): Promise<Job> {
     } catch (cause) {
       if (!missingThread(cause))
         this.bb.log.debug(
-          `Channel activity refresh failed: ${errorText(cause)}`,
+          `Bot activity refresh failed: ${errorText(cause)}`,
         );
       return this.store.job(job.id) ?? job;
     }

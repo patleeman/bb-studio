@@ -1,6 +1,6 @@
 import standaloneChat from "./pages-standalone-chat.mjs";
 
-export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep }) => [
+export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, launchSpace, getLaunchSpaceId, sleep }) => [
   ...(process.env.BB_CAPTURE_STANDALONE_CHAT === "1" ? [
     standaloneChat({ projectId, seedPages, pluginRpc, bbCli, sleep }),
     standaloneChat({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile: true }),

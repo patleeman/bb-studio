@@ -23,4 +23,11 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS revisions_by_scope ON document_revisions(scope,id)`,
   `CREATE INDEX IF NOT EXISTS views_by_thread ON view_threads(thread_id)`,
   `CREATE INDEX IF NOT EXISTS view_entries_by_thread ON view_entries(thread_id,created_at)`,
+  // Channels were removed; the Command view reads Studio's Spaces instead.
+  `DROP INDEX IF EXISTS views_by_thread`,
+  `DROP INDEX IF EXISTS view_entries_by_thread`,
+  `DROP TABLE IF EXISTS view_sends`,
+  `DROP TABLE IF EXISTS view_entries`,
+  `DROP TABLE IF EXISTS view_threads`,
+  `DROP TABLE IF EXISTS thread_views`,
 ];

@@ -371,24 +371,12 @@ struct StudioView: View {
             if let error = store.error {
                 Section { PagesErrorRow(message: error) { await store.load(client) } }
             }
-            if !query.isEmpty {
-                ForEach(["thread", "channel"], id: \.self) { kind in
-                    let matches = externalMatches.filter { $0.kind == kind }
-                    if !matches.isEmpty {
-                        Section(kind == "thread" ? "Threads" : "Bot threads") {
-                            ForEach(Array(matches.enumerated()), id: \.offset) { _, match in
-                                if let id = match.ref?.id, kind == "thread" {
-                                    NavigationLink(value: Route.thread(id: id)) {
-                                        Label(match.title ?? "Thread", systemImage: "bubble.left")
-                                    }
-                                } else if let href = match.href, let url = URL(string: href, relativeTo: client.baseURL) {
-                                    Link(destination: url) {
-                                        VStack(alignment: .leading) {
-                                            Text(match.title ?? "Channel")
-                                            Text(match.snippet?.text ?? "").font(.caption).foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
+            if !query.isEmpty, !externalMatches.isEmpty {
+                Section("Threads") {
+                    ForEach(Array(externalMatches.enumerated()), id: \.offset) { _, match in
+                        if let id = match.ref?.id {
+                            NavigationLink(value: Route.thread(id: id)) {
+                                Label(match.title ?? "Thread", systemImage: "bubble.left")
                             }
                         }
                     }
@@ -890,7 +878,7 @@ struct StudioView: View {
         guard !Task.isCancelled else { return }
         if let results = try? await client.studioSearchAll(trimmed) {
             if !Task.isCancelled {
-                externalMatches = results.filter { $0.kind == "thread" || $0.kind == "channel" }
+                externalMatches = results.filter { $0.kind == "thread" }
                 contentMatches = Dictionary(results.compactMap { result in
                     guard let ref = result.ref, let pluginId = ref.pluginId, let id = ref.id else { return nil }
                     return ("\(pluginId):\(id)", result.snippet?.text ?? "")

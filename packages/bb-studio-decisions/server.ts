@@ -52,7 +52,7 @@ export default async function plugin(bb: BbPluginApi) {
       options: [...jevProviderChoices],
       default: "auto",
       description:
-        "Where Studio Decisions calls Jev, for Smart Queue and for plugins such as Studio Teams. Auto tries TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen, then Custom, using each one that has a key, and moves on when one fails.",
+        "Where Studio Decisions calls Jev, for Smart Queue and for other plugins. Auto tries TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen, then Custom, using each one that has a key, and moves on when one fails.",
     },
     typesafeApiKey: {
       type: "string",

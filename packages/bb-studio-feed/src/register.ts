@@ -1,5 +1,5 @@
 // Studio Feed's server: agents publish with the feed_post tool (or `bb feed
-// post`), from any thread, Teams channel or automation, and end their reply
+// post`), from any thread or automation, and end their reply
 // with the post's card line.
 //
 //   - FeedService (service.ts) publishes and notifies; this file
@@ -25,7 +25,7 @@ export const FEED_TOOLS = ["feed_post", "feed_list", "feed_read", "feed_edit", "
 
 const TEAMS_PLUGIN_ID = "bot-teams";
 const MOBILE_PLUGIN_ID = "mobile";
-/** How long Teams' bots and channels are trusted before asking again. */
+/** How long Teams' bots are trusted before asking again. */
 const TEAMS_CACHE_MS = 30_000;
 const RPC_TIMEOUT_MS = 10_000;
 

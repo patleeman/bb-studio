@@ -4,17 +4,11 @@ import type { rpcContract } from "./client-contract";
 import { defaultLimits } from "./workspace-contract";
 import { Button } from "@bb-studio/kit/ui";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
-import { IconActionTooltip } from "./channel-controls";
+import { IconActionTooltip } from "./controls";
 import { Input } from "@bb-studio/kit/ui";
 import { ActionBar, EmptyNote, ErrorMessage, FormRow, message, Section } from "./bot-ui";
 
-export function UsagePanel({
-  id,
-  kind,
-}: {
-  id: string;
-  kind: "bot";
-}) {
+export function UsagePanel({ id }: { id: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const controlId = useId();
   const [usage, setUsage] = useState<Awaited<
@@ -27,7 +21,7 @@ export function UsagePanel({
     [notice, setNotice] = useState("");
   const dirty = JSON.stringify(limits) !== JSON.stringify(baselineLimits);
   useEffect(() => {
-    void rpc.call("usage", { id, kind }).then(
+    void rpc.call("usage", { id }).then(
       (data) => {
         setUsage(data);
         setLimits(data.limits);
@@ -35,7 +29,7 @@ export function UsagePanel({
       },
       (cause) => setError(message(cause)),
     );
-  }, [id, kind, rpc]);
+  }, [id, rpc]);
   const limitsValid = Object.entries({
     turnsPerHour: [1, 1000],
     turnsPerDay: [1, 10000],
@@ -51,7 +45,7 @@ export function UsagePanel({
     setError(null);
     setNotice("");
     try {
-      const data = await rpc.call("saveLimits", { id, kind, limits });
+      const data = await rpc.call("saveLimits", { id, limits });
       setUsage(data);
       setLimits(data.limits);
       setBaselineLimits(data.limits);
@@ -129,8 +123,6 @@ export function UsagePanel({
               />
               turns per day
             </label>
-            {kind === "bot" && (
-              <>
                 <label htmlFor={`${controlId}-minutes`}>
                   <Input
                     id={`${controlId}-minutes`}
@@ -157,8 +149,6 @@ export function UsagePanel({
                   />
                   concurrent forks
                 </label>
-              </>
-            )}
           </div>
         </FormRow>
       </Section>

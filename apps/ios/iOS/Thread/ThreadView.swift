@@ -44,7 +44,7 @@ struct ThreadView: View {
     @State private var newTitle = ""
     @State private var reviewingPlan: PlanReview?
     /// The bot this thread works as: `.some(nil)` for none, nil where it
-    /// can't work as a bot (channels, bot work threads, no Bot Teams).
+    /// can't work as a bot (bot work threads, no Bot Teams).
     @State private var profile: String??
     @State private var profileBot: Bot?
     @State private var choosingProfile = false

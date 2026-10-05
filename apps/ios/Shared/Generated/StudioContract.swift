@@ -38,6 +38,7 @@ public enum Studio {
     public static let createInSpace = "createInSpace"
     public static let recentThreads = "recentThreads"
     public static let space_lead = "space_lead"
+    public static let thread_lines = "thread_lines"
     public static let space_set_lead = "space_set_lead"
     public static let space_of_threads = "space_of_threads"
     public static let space_set_run = "space_set_run"
@@ -152,6 +153,8 @@ public enum Studio {
   public typealias RecentThreads = RecentThreadsOutput
 
   public typealias SpaceLead = SpaceLeadOutput
+
+  public typealias ThreadLines = ThreadLinesOutput
 
   public typealias SpaceSetLead = SpaceSetLeadOutput
 
@@ -2695,6 +2698,61 @@ public enum Studio {
       self.leadThreadId = leadThreadId
       self.defaultProjectId = defaultProjectId
       self.run = run
+    }
+  }
+
+  public struct ThreadLinesInput: Sendable, Hashable, Codable {
+    public var threadIds: [String]?
+
+    public init(threadIds: [String]? = nil) {
+      self.threadIds = threadIds
+    }
+  }
+
+  public enum ThreadLinesOutputLinesValueKind: Sendable, Hashable, Codable {
+    case progress
+    case failure
+    case blocked
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "progress": self = .progress
+      case "failure": self = .failure
+      case "blocked": self = .blocked
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .progress: try container.encode("progress")
+      case .failure: try container.encode("failure")
+      case .blocked: try container.encode("blocked")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ThreadLinesOutputLinesValue: Sendable, Hashable, Codable {
+    public var text: String?
+    public var kind: ThreadLinesOutputLinesValueKind?
+    public var at: Double?
+
+    public init(text: String? = nil, kind: ThreadLinesOutputLinesValueKind? = nil, at: Double? = nil) {
+      self.text = text
+      self.kind = kind
+      self.at = at
+    }
+  }
+
+  public struct ThreadLinesOutput: Sendable, Hashable, Codable {
+    public var lines: [String: ThreadLinesOutputLinesValue]?
+
+    public init(lines: [String: ThreadLinesOutputLinesValue]? = nil) {
+      self.lines = lines
     }
   }
 

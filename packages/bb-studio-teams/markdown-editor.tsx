@@ -8,7 +8,7 @@ import { search, searchKeymap, openSearchPanel } from "@codemirror/search";
 import { tags } from "@lezer/highlight";
 import { Markdown, experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import { Button } from "@bb-studio/kit/ui";
-import { IconActionTooltip } from "./channel-controls";
+import { IconActionTooltip } from "./controls";
 import { wrapMarkdown, prefixMarkdown, insertMarkdownLink } from "./markdown-commands";
 
 const externalValue = Annotation.define<boolean>();

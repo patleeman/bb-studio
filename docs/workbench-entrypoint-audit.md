@@ -13,7 +13,7 @@ activation and persistent pins. Reopening a target focuses its existing tab.
 
 Eleven content plugins register `retainPanel` and matching `FloatPanels`:
 Studio, Studio Chat, Pages, Talk, Draw, Artifacts, Tasks, Tables, Feed, Explore
-and Teams. Teams covers `bots`, `channels` and the legacy `views` redirect.
+and Teams. Teams covers `bots`.
 Their app overlays own the original views before the first companion move.
 Sidebar and Navigation supply entry points. Reactions and Decisions act on the
 existing conversation; Mobile supplies native links and delivery rather than
@@ -31,7 +31,7 @@ another desktop chat panel.
 | Draw | Retained canvas, shared item Chat and companion-aware related references | [Original first-move canvas and compact header](../packages/bb-studio-draw/README.md) |
 | Artifacts | Retained viewer, text/image/HTML quotes through shared Chat | [Viewer/quote formats and compact controls](../packages/bb-studio-artifacts/README.md) |
 | Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio-tables/README.md) |
-| Teams | Bot Chat, channels and member-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Channel composer/file retention and conversation reuse](../packages/bb-studio-teams/README.md) |
+| Teams | Bot Chat and profile-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Conversation reuse](../packages/bb-studio-teams/README.md) |
 | Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio-feed/README.md) |
 | Sidebar | Thread Float action uses `openFloat`; ordinary navigation/split stays host-owned | [Real sidebar first moves](../packages/bb-studio-float/README.md) |
 | Navigation | Host panel activation/split plus Studio's shared Quick Open placement | [Keyboard/focus checks](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/search-accessibility/README.md) |

@@ -59,9 +59,6 @@ export function BotCreateRequests({
                   </h3>
                   <span className="text-xs text-muted-foreground">
                     requested by {request.requesterName}
-                    {request.channelName
-                      ? ` in ${request.channelName}`
-                      : ""}
                   </span>
                 </div>
                 {request.description ? (

@@ -1,6 +1,6 @@
-import { ViewsPage } from "./views";
+import { CommandPage } from "./command-view";
 import { affects } from "./realtime";
-import { UsagePanel } from "./channel-workbench";
+import { UsagePanel } from "./usage-panel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { definePluginApp, useRpc, useRealtime, useBbNavigate, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import type { Bot, BotListItem, Conversation, Job } from "./contract";
@@ -10,7 +10,7 @@ import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { Button } from "@bb-studio/kit/ui";
 import { TabBar, ProfileForm, DocumentEditor, WorkList, ErrorMessage, message } from "./bot-ui";
 
-import { Modal } from "./channel-controls";
+import { Modal } from "./controls";
 import { ProfilePicker } from "./profile-picker";
 import { ThreadBadges } from "./thread-badges";
 import { ProfileThreads } from "./profile-threads";
@@ -231,7 +231,7 @@ function BotDetail({ id, tab, href }: { id: string; tab: string; href: string })
             />
           )}
           {tab === "threads" && <ProfileThreads id={id} />}
-          {tab === "usage" && <UsagePanel id={id} kind="bot" />}
+          {tab === "usage" && <UsagePanel id={id} />}
           {tab === "activity" && (
             <>
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -361,11 +361,11 @@ export default definePluginApp((app) => {
     component: retainPanel("bots", BotsPage),
     headerContent: StudioBarSlot,
   });
-  app.slots.navPanel({ id: "channels", title: "Channels", icon: "MessageSquare", path: "channels", component: retainPanel("channels", ViewsPage), headerContent: StudioBarSlot });
+  // A Space's Command view, opened from the Space's ⋯ menu in the sidebar (Navigation hides its row).
+  app.slots.navPanel({ id: "command", title: "Command", icon: "GridView", path: "command", component: retainPanel("command", CommandPage), headerContent: StudioBarSlot });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
   app.slots.experimental_appOverlay({ id: "companions", component: () => <>
     <FloatPanels path="bots" render={subPath => <BotsPage subPath={subPath} />} />
-    <FloatPanels path="channels" render={(subPath) => <ViewsPage subPath={subPath} />} />
   </> });
 });

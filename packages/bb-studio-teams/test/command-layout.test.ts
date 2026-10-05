@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
-import { activeThreads, arrangeGrid, byAttention, followedThreads, movePane, channelLayout, focusedThread, threadActivity } from "../channel-layout";
-import type { ViewThread } from "../view-contract";
-const thread = (id: string, status: string, extra: Partial<ViewThread> = {}): ViewThread => ({ id, title: id, status, botId: null, parentThreadId: null, updatedAt: 1, error: null, ...extra });
-test("unknown preferences preserve the existing merged view", () => {
-  expect(channelLayout(null)).toBe("merged");
-  expect(channelLayout("removed-mode")).toBe("merged");
-  expect(channelLayout("active")).toBe("active");
+import { activeThreads, arrangeGrid, byAttention, followedThreads, movePane, commandLayout, focusedThread, threadActivity } from "../command-layout";
+import type { CommandThread } from "../command-contract";
+const thread = (id: string, status: string, extra: Partial<CommandThread> = {}): CommandThread => ({ id, title: id, status, botId: null, parentThreadId: null, updatedAt: 1, error: null, ...extra });
+test("unknown preferences fall back to the grid", () => {
+  expect(commandLayout(null)).toBe("grid");
+  expect(commandLayout("removed-mode")).toBe("grid");
+  expect(commandLayout("active")).toBe("active");
 });
 test("active view includes working ordinary threads and input requests, excluding unavailable and idle threads", () => {
   const rows = [thread("idle", "idle"), thread("start", "starting"), thread("run", "active"), thread("input", "idle", { hasPendingInteraction: true }), thread("gone", "active", { error: "Deleted" })];
@@ -33,7 +33,7 @@ test("arranged grid panes keep their places while new ones follow in attention o
 });
 test("active shows every working thread with a pick first, then keeps the last set, then the latest", () => {
   const rows = [thread("old", "idle", { updatedAt: 1 }), thread("new", "idle", { updatedAt: 5 }), thread("run", "active"), thread("ask", "idle", { hasPendingInteraction: true })];
-  const ids = (list: ViewThread[]) => list.map(row => row.id);
+  const ids = (list: CommandThread[]) => list.map(row => row.id);
   expect(ids(followedThreads(rows, null, []))).toEqual(["ask", "run"]);
   expect(ids(followedThreads(rows, "old", []))).toEqual(["old", "ask", "run"]);
   expect(ids(followedThreads(rows, "run", []))).toEqual(["run", "ask"]);

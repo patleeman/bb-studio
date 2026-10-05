@@ -44,14 +44,10 @@ final class NativePayloadContractTests: XCTestCase {
         XCTAssertEqual(detail.segments.first?.mimeType, "audio/mp4")
     }
 
-    func testBotDocumentRevisionAndChannelDeliveryFailuresSurviveDecoding() async throws {
+    func testBotDocumentRevisionSurvivesDecoding() async throws {
         let documentClient = try client("bot-document")
         let document = try await documentClient.saveBotDocument("bot_aaaaaaaaaaaaaaaa", file: "MEMORY.md", text: "Updated memory", version: "sha-v1")
         XCTAssertEqual(document.version, "sha-v2")
-        let sendClient = try client("bot-send")
-        let result = try await sendClient.sendToView("11111111-1111-4111-8111-111111111111", text: "Review this", targets: [.init(kind: "bot", id: "bot_aaaaaaaaaaaaaaaa")], replyThreadId: nil, fresh: true, mode: "followup", requestId: "22222222-2222-4222-8222-222222222222")
-        XCTAssertEqual(result.deliveries.map(\.status), ["queued", "error"])
-        XCTAssertEqual(result.deliveries.last?.error, "Provider unavailable")
     }
 
     func testGeneratedTableDecoderPreservesEveryCellValueShape() async throws {

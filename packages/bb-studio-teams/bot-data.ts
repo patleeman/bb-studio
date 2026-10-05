@@ -1,8 +1,8 @@
 import { Store } from "./store";
 import { defaultLimits } from "./workspace-contract";
 
-/** Snapshots of the bot's plain-text documents and channel usage data. */
-export class ChannelData {
+/** Snapshots of the bot's plain-text documents, and its usage. */
+export class BotData {
   constructor(readonly store: Store) {
 
   }

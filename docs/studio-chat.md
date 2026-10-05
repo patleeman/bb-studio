@@ -18,7 +18,7 @@ elsewhere. Actions inside Float therefore target their own item.
 The `viewing` RPC separately resolves the main pane's route for the
 **Viewing** chip. That label describes what is visible; it does not change
 the item attached to an open composer or add context to a message. Teams
-bot profiles and saved views own their conversation UI. Their kinds set
+bot profiles own their conversation UI. Their kind sets
 `hasOwnChat: true`, so they do not trigger item-chat discovery or background
 chat tabs. There is no idle corner bar covering their Send
 button.

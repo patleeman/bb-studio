@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// What `@` offers while typing: threads by title, then bots, channels and
-/// other plugin items from BB's mention search.
+/// What `@` offers while typing: threads by title, then bots and other
+/// plugin items from BB's mention search.
 struct MentionSuggestions: View {
     let query: String
     let threadId: String
@@ -87,8 +87,6 @@ struct MentionSuggestions: View {
     private static func icon(_ provider: String) -> String {
         switch provider {
         case "bots": "person.crop.circle"
-        case "channels": "number"
-        case "dms": "bubble.left"
         case "recordings": "waveform"
         case "pages": "doc.richtext"
         case "drawings", "drawing": "scribble.variable"

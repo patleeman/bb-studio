@@ -1,19 +1,18 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Store } from "./store";
-import type { ThreadViews } from "./thread-views";
 import { isBroadcastHandle, matchingBroadcastMentions } from "./mentions";
 
-export function registerViewMentions(bb: BbPluginApi, store: Store, views: ThreadViews) {
+export function registerMentionProviders(bb: BbPluginApi, store: Store) {
   bb.ui.registerMentionProvider({
-    id: "broadcasts", label: "Channel mentions",
+    id: "broadcasts", label: "Everyone",
     search({ query }) {
       return matchingBroadcastMentions(query).map(({ handle }) => ({
-        id: handle, title: `@${handle}`, subtitle: "Everyone in this channel", icon: "Users",
+        id: handle, title: `@${handle}`, subtitle: "Every thread in this Command view", icon: "Users",
       }));
     },
     resolve(handle) {
-      if (!isBroadcastHandle(handle)) throw new Error("Unknown channel mention.");
-      return { context: `@${handle} addresses every member when sent from a Studio Teams channel.` };
+      if (!isBroadcastHandle(handle)) throw new Error("Unknown mention.");
+      return { context: `@${handle} addresses every thread when sent from a Space's Command view.` };
     },
   });
   bb.ui.registerMentionProvider({
@@ -25,14 +24,6 @@ export function registerViewMentions(bb: BbPluginApi, store: Store, views: Threa
     async resolve(itemId) {
       const bot = store.get(itemId);
       return { label: bot.name, context: `Persistent bot ${JSON.stringify(bot.name)} (@${bot.handle}): ${JSON.stringify(bot.description)}. Read its profile with bb bots show ${bot.id}. Start an ordinary thread with its profile when the owner asks you to collaborate.` };
-    },
-  });
-  bb.ui.registerMentionProvider({
-    id: "views", label: "Channels",
-    async search({ query }) { return views.all().filter(v => !v.archived && v.name.toLowerCase().includes(query.toLowerCase())).slice(0, 30).map(v => ({ id: v.id, title: v.name, icon: "MessageSquare" })); },
-    async resolve(itemId) {
-      const view = views.get(itemId);
-      return { label: view.name, context: `Channel ${JSON.stringify(view.name)}: /plugins/bot-teams/channels/${view.id}. Read it with bb bots channel-read ${view.id}. This is a view of ordinary threads, not a shared agent session.` };
     },
   });
 }

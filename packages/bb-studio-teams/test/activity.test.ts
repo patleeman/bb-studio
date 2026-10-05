@@ -89,7 +89,7 @@ test("nested work rows are reduced to their latest visible detail", () => {
   );
 });
 
-test("empty replies never become visible channel activity", () => {
+test("empty replies never become visible activity", () => {
   for (const text of ["", " \n "])
     assert.equal(
       activitySnippetFromTimeline({

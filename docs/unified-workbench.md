@@ -38,7 +38,7 @@ can open in the main view. Placement does not create another conversation.
 | Draw | Drawing editor, live changes, opening references beside it |
 | Artifacts | Text, image, file, and HTML viewers; selections and quotes |
 | Tables | Tables, views, cells that link Studio items, editing continuity |
-| Teams | Bot profiles, conversations, saved views, thread entry points |
+| Teams | Bot profiles, conversations, thread entry points |
 | Feed | Item and thread links from posts |
 | Explore | Explainer panels and links to pages |
 | Sidebar | Thread and Studio navigation, row menus, split actions |
@@ -80,8 +80,8 @@ and Unlink. Studio Chat resolves actions by explicit item identity, including
 companion items. Its composer and picker keep that subject during main-pane
 navigation. Tests cover linking, quotes, project selection, missing or archived
 items, overlapping requests and submissions, failed drafts, and fallback
-thread navigation. Teams saved views remain free of item-chat overlays and
-automatic background chat discovery. The old corner bar is removed.
+thread navigation. Teams' Command view is not an item, so it stays free of
+item-chat overlays and automatic background chat discovery. The old corner bar is removed.
 Targeted staging installs the full suite while seeding only the selected
 capture's required fixtures. Stable BB 0.44.0 captures pass with the full suite
 installed from pushed commit e7ed8a3: Chat opens an unlinked composer, chooses
@@ -151,10 +151,9 @@ The [desktop](../packages/bb-studio-pages/assets/standalone-chat.png) and
 [phone](../packages/bb-studio-pages/assets/standalone-chat-mobile.png) screenshots
 are visually checked. All scheduled threads and seeded pages are deleted.
 
-Teams now registers companion renderers for bot profiles, saved views, and
-legacy channel routes. Bot Chat resumes its direct conversation; New
-conversation is separate. Saved-view and profile thread entry points use
-the shared companion policy. Kinds with `hasOwnChat: true` opt out of
+Teams registers companion renderers for bot profiles. Bot Chat resumes its
+direct conversation; New conversation is separate. Profile thread entry
+points use the shared companion policy. Kinds with `hasOwnChat: true` opt out of
 automatic Studio Chat discovery while keeping explicit mention context.
 Headers can supply their own `chatAction`. Companion navigation now has an
 explicit context for asynchronous saves and legacy redirects, so it does
@@ -163,12 +162,7 @@ not depend on a transient click event.
 The full suite check passes after pushed commit adc6638: typechecks, all
 plugin tests, stable BB 0.45.0 compatibility, contracts, marketplace,
 screenshots, and the shared kit archive. Teams has 92 tests, the kit 73,
-and Studio Chat 23. Its repeatable `bots-companions` capture on stable BB
-0.45.0 verifies the saved view's exact composer DOM, draft, and file
-attachment through tab switching and folding, conversation reuse without
-duplication, and retained title/member controls. The screenshot is visually
-checked. This extends stable Float coverage; native host release is still
-required.
+and Studio Chat 23. Native host release is still required.
 
 The shared header now keeps Chat visible at narrow widths and groups secondary
 controls under Item actions. Its controls stay mounted through closing,

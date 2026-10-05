@@ -78,7 +78,6 @@ export const botCreateRequestSchema = z.object({
   requesterBotId: idSchema,
   requesterThreadId: z.string().min(1),
   requesterName: z.string().min(1),
-  channelName: z.string().nullable(),
   input: botCreateInput,
   status: z.enum([
     "pending",
@@ -99,7 +98,6 @@ export const botCreateRequestViewSchema = z.object({
   id: z.string().uuid(),
   requesterBotId: idSchema,
   requesterName: z.string().min(1),
-  channelName: z.string().nullable(),
   name: z.string(),
   description: z.string(),
   avatar: z.string(),
@@ -241,15 +239,11 @@ export const rpcContract = {
     output: z.array(revisionSchema),
   },
   usage: {
-    input: z.object({ id: z.string(), kind: z.enum(["bot", "channel"]) }),
+    input: z.object({ id: idSchema }),
     output: usageSummary,
   },
   saveLimits: {
-    input: z.object({
-      id: z.string(),
-      kind: z.enum(["bot", "channel"]),
-      limits: usageLimits,
-    }),
+    input: z.object({ id: idSchema, limits: usageLimits }),
     output: usageSummary,
   },
   list: {
@@ -335,7 +329,7 @@ export const rpcContract = {
   },
   threadProfile: {
     input: z.object({ threadId: z.string().min(1) }),
-    // Null when the thread can't take a profile, such as a channel thread.
+    // Null when the thread can't take a profile, such as a bot's mission thread.
     output: z.object({ botId: idSchema.nullable() }).nullable(),
   },
   setThreadProfile: {

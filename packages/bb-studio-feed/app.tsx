@@ -5,7 +5,7 @@
 //     first, and a post's page at feed/<id>. Waiting threads plus unread
 //     stories show next to it.
 //   - messageDirective `::post{id="…"}`: the post a reply made, as a
-//     card in its thread or channel.
+//     card in its thread.
 import { FloatPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { DIRECTIVE, INBOX_ICON, INBOX_TITLE, PANEL_PATH } from "./src/shared";

@@ -150,7 +150,7 @@ struct SpaceSettingsSheet: View {
 
 // MARK: A thread's spaces
 
-/// The spaces a thread or channel is in, for its menu.
+/// The spaces a thread is in, for its menu.
 @MainActor
 final class ThreadSpacesModel: ObservableObject {
     @Published private(set) var held: ThreadSpaces?

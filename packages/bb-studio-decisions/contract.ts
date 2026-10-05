@@ -6,7 +6,7 @@ export { publicContract } from "@bb-studio/kit/decisions-contract";
 const chosenModelSchema = modelSelectionSchema.extend({ mode: z.literal("model") });
 /**
  * Which model decides when no Jev provider answers. `thread` uses the
- * caller's provider (the busy thread's, or the bot's) and its default model,
+ * caller's provider (the busy thread's, or the calling plugin's) and its default model,
  * so it works with whatever the user has installed.
  */
 export const fallbackSchema = z.discriminatedUnion("mode", [

@@ -1,6 +1,6 @@
 # Float
 
-Float puts threads, channels, Studio items and views in one panel of tabs,
+Float puts threads, Studio items and views in one panel of tabs,
 docked at the bottom right or dragged anywhere on screen. Plugin id `float`, display name "Float",
 in `packages/bb-studio-float`. It started as Studio Chat's single floating
 card, which was split out so anything you can open from the sidebar can
@@ -16,8 +16,7 @@ float, several things at once.
 | The right-click menu on Studio items | `packages/bb-studio-float/src/ItemMenu.tsx`; items are marked with `studioItemProps` from `packages/bb-studio-kit/src/app/studio-item.ts` |
 
 A tab's target is a thread (`{ kind: "thread", threadId }`) or an in-app
-path (`{ kind: "path", path }`, e.g. an item's href). A channel is a BB
-thread, so it floats as one.
+path (`{ kind: "path", path }`, e.g. an item's href).
 
 ## Showing another plugin's view
 

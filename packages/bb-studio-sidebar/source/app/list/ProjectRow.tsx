@@ -2291,7 +2291,6 @@ export const ChronologicalSectionThreadSections = memo(
         {sectionDnd ? (
           <DndContext {...sectionDnd.dndContextProps}>
             <SectionThreadDndProvider value={renderedSectionDnd}>
-              {sectionDnd.dropDialog}
               {orderedSections}
               <SectionThreadDragOverlayPortal
                 activeThread={sectionDnd.activeThread}

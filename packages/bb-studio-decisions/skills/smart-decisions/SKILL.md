@@ -1,6 +1,6 @@
 ---
 name: smart-decisions
-description: Set up or troubleshoot Studio Decisions, the one place BB Studio configures its fast Jev (System One) model and fallback model. Use it to check the Jev providers Smart Queue and Studio Teams use, explain why a message sent to a busy BB thread steered the running turn or waited as a follow-up, or dry-run that decision with the bb smart-decisions CLI.
+description: Set up or troubleshoot Studio Decisions, the one place BB Studio configures its fast Jev (System One) model and fallback model. Use it to check the Jev providers Smart Queue and other plugins use, explain why a message sent to a busy BB thread steered the running turn or waited as a follow-up, or dry-run that decision with the bb smart-decisions CLI.
 ---
 
 # Studio Decisions
@@ -13,9 +13,8 @@ BB Studio. Two things use them:
   messages sent by agents or other threads, so `bb thread tell` from inside a
   thread is not classified. It pauses while the standalone `smart-queue`
   plugin is enabled, so only one of them decides.
-- **Studio Teams** routes channel messages through Studio Decisions' plugin
-  RPC. Its `routingEngine` picks Jev or the fallback model; the keys and models
-  are set here, not in Studio Teams.
+- **Other plugins** call Studio Decisions' plugin RPC (`systemOne.ask`,
+  `model.ask`) with the same keys and fallback model.
 
 ## Commands
 
@@ -60,7 +59,7 @@ Change settings with `bb plugin config smart-decisions set <key> <value>`.
   `customJevApiKey`. `customJevHeaders` adds `name: value` headers separated by
   semicolons.
 - `jevTimeoutMs` applies to every caller. `steerConfidence`, `batchConfidence` and
-  `enabled` apply to Smart Queue only; Studio Teams keeps its own confidence threshold.
+  `enabled` apply to Smart Queue only; other plugins apply their own thresholds.
 - The fallback model is not a `bb plugin config` setting. Use
   `bb smart-decisions fallback`, or the picker on the settings page.
 
@@ -82,7 +81,6 @@ and any configuration problems.
 - `request failed (HTTP 400)` from a Jev provider ends with the provider's own
   reason, such as an unsupported model name. Run `bb smart-decisions check` to
   retry with a fixed sample.
-- Studio Teams says *Studio Decisions did not answer*: Studio Decisions is not
-  installed or is disabled. *No Jev provider is configured*: add a key here.
+- *No Jev provider is configured*: add a key here.
 - To stop Smart Queue, run
   `bb plugin config smart-decisions set enabled false`.

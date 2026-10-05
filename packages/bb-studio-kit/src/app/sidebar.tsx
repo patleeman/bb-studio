@@ -109,7 +109,7 @@ export function SidebarSection({
   children,
 }: {
   title: string;
-  /** The heading when it differs from the section's name, e.g. "Archived channels". */
+  /** The heading when it differs from the section's name, e.g. "Archived threads". */
   label?: string;
   actions?: readonly SidebarSectionAction[];
   /** Controls after the action buttons, e.g. a menu button of the section's own. */
@@ -269,7 +269,7 @@ export function SidebarDisplayMenuItems<Organize extends string, Sort extends st
   organize,
   sort,
 }: {
-  /** Plural, lower case: "channels". */
+  /** Plural, lower case: "threads". */
   noun: string;
   display: SidebarDisplay<Organize, Sort>;
   onChange(next: SidebarDisplay<Organize, Sort>): void;

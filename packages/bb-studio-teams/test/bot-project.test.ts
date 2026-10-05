@@ -6,7 +6,7 @@ import { personalProjectId } from "@bb-studio/kit/server";
 const withProjects = (list: () => Promise<unknown[]>) =>
   ({ sdk: { projects: { list } } }) as unknown as BbPluginApi;
 
-test("bots and channel threads use BB's Personal project, never a new one", async () => {
+test("bots use BB's Personal project, never a new one", async () => {
   assert.equal(
     await personalProjectId(withProjects(async () => [
       { id: "proj_other", kind: "standard" },

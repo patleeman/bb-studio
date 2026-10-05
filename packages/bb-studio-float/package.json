@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Part of BB Studio. Float any thread, channel, Studio item or view as a tab in one panel, docked at the bottom or dragged anywhere, and keep several open while you work.",
+  "description": "Part of BB Studio. Float any thread, Studio item or view as a tab in one panel, docked at the bottom or dragged anywhere, and keep several open while you work.",
   "engines": {
     "bb": ">=0.44",
     "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
     "name": "Float",
-    "description": "Part of BB Studio. Float any thread, channel, Studio item or view as a tab in one panel, docked at the bottom or dragged anywhere, and keep several open while you work.",
+    "description": "Part of BB Studio. Float any thread, Studio item or view as a tab in one panel, docked at the bottom or dragged anywhere, and keep several open while you work.",
     "branding": {
       "icon": "./assets/icon.svg"
     },

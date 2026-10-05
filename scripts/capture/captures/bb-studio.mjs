@@ -87,7 +87,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         for (const label of ["Page", "Drawing", "Table"]) {
           if (!unfiltered.includes(label)) throw new Error(`New menu did not offer ${label}`);
         }
-        // Bots and channels live in Teams, not Studio.
+        // Bots live in Teams, not Studio.
         if (unfiltered.includes("Bot")) throw new Error("The New menu still offers a bot");
         for (const kind of ["drawing", "page"]) {
           await client.navigate("/plugins/studio/studio/collection");
