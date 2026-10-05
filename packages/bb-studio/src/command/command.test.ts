@@ -147,3 +147,39 @@ test("threads with something since they were last read are unread", async () => 
     expect(Object.fromEntries(threads.map(t => [t.id, t.unread]))).toEqual({ newsy: true, seen: false, never: true });
   } finally { await x.close(); }
 });
+
+test("each thread in a Space gets a one-letter alias that it keeps", async () => {
+  const x = fixture({ lead: "sp_launch", fix: "sp_launch" }, "lead");
+  try {
+    const first = await x.command.space("sp_launch");
+    expect(Object.fromEntries(first.threads.map(t => [t.id, t.alias]))).toEqual({ lead: "a", fix: "b" });
+    const again = await x.command.space("sp_launch");
+    expect(again.threads.map(t => t.alias)).toEqual(["a", "b"]);
+  } finally { await x.close(); }
+});
+
+test("attachments uploaded in the composer's project are copied to each recipient's project", async () => {
+  const x = fixture({ a: "sp_launch", b: "sp_launch" });
+  try {
+    x.harness.inspection.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => makeThreadResponse({ id: threadId, title: threadId, status: "idle", projectId: threadId === "a" ? "proj_studio" : "proj_personal" }));
+    const copies: unknown[] = [];
+    x.harness.inspection.sdk.stub("projects.attachments.copy", async (args: unknown) => { copies.push(args); });
+    await x.command.send(commandSendInput.parse({ spaceId: "sp_launch", threadIds: ["a", "b"], text: "Look", projectId: "proj_personal", attachments: [{ type: "localImage", path: "shot.png" }, { type: "localFile", path: "/abs/notes.md" }, { type: "image", url: "https://x/y.png" }] }));
+    // Only relative uploads, only to projects other than the composer's.
+    expect(copies).toEqual([{ projectId: "proj_studio", sourceProjectId: "proj_personal", paths: ["shot.png"] }]);
+    const sends = x.harness.inspection.sdk.callsTo("threads.send").map(call => call[0]) as { input: { type: string; path?: string }[] }[];
+    expect(sends[0]!.input.some(part => part.path === "shot.png")).toBe(true);
+  } finally { await x.close(); }
+});
+
+test("a message that went to the lead by default lets it forward to the right thread", async () => {
+  const x = fixture({ lead: "sp_launch", fix: "sp_launch" }, "lead");
+  try {
+    await x.command.send(commandSendInput.parse({ spaceId: "sp_launch", threadIds: ["lead"], text: "Fix the bug", toLeadByDefault: true }));
+    await x.command.send(commandSendInput.parse({ spaceId: "sp_launch", threadIds: ["lead"], text: "Plan it" }));
+    const [byDefault, picked] = x.harness.inspection.sdk.callsTo("threads.send").map(call => (call[0] as { input: { text?: string }[] }).input[1]!.text!);
+    expect(byDefault).toContain("forward it with bb thread tell");
+    expect(byDefault).toContain('{"alias":"b","title":"fix","threadId":"fix"}');
+    expect(picked).not.toContain("forward");
+  } finally { await x.close(); }
+});

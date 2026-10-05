@@ -1,6 +1,7 @@
 import type { BbPluginApi, NewThreadRequest, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { commandContract, type CommandDelivery, type CommandEntry, type CommandSend, type CommandThread } from "./command-contract";
 import { errorMessage } from "@bb-studio/kit/format";
+import { assignAliases } from "./mentions";
 const missingThread = (cause: unknown) => /(?:^|\b)(?:thread not found|thread does not exist|HTTP 404)(?:\b|$)/i.test(errorMessage(cause));
 
 type Timeline = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["timeline"]>>;
@@ -99,6 +100,14 @@ export class Command {
   private row(thread: Listed, pending: boolean): CommandThread {
     return { id: thread.id, title: thread.title || thread.titleFallback || "New thread", parentThreadId: thread.parentThreadId ?? null, status: thread.status, updatedAt: thread.updatedAt, error: null, hasPendingInteraction: pending, unread: thread.latestAttentionAt > (thread.lastReadAt ?? 0) };
   }
+  /** Each shown thread's one-letter name, kept per Space. */
+  private async aliases(spaceId: string, threadIds: string[]) {
+    const key = `command-aliases:${spaceId}`;
+    const previous = (await this.bb.storage.kv.get<Record<string, string>>(key)) ?? {};
+    const next = assignAliases(previous, threadIds);
+    if (JSON.stringify(next) !== JSON.stringify(previous)) await this.bb.storage.kv.set(key, next);
+    return next;
+  }
   async space(spaceId: string) {
     const spaces = this.spaces.list();
     const [spaceOf, leadThreadId] = await Promise.all([this.spaces.spaceOfThreads(), this.spaces.lead(spaceId)]);
@@ -135,6 +144,8 @@ export class Command {
     // A fork shows under its parent only while the parent is shown too.
     const shown = new Set(threads.map(thread => thread.id));
     for (const thread of threads) if (thread.parentThreadId && !shown.has(thread.parentThreadId)) thread.parentThreadId = null;
+    const aliases = await this.aliases(spaceId, threads.map(thread => thread.id));
+    for (const thread of threads) thread.alias = aliases[thread.id];
     const result = { space: { id: space.id, name: space.name, defaultProjectId: space.defaultProjectId }, leadThreadId: leadThreadId && shown.has(leadThreadId) ? leadThreadId : null, threads };
     this.shown.set(spaceId, result);
     return result;
@@ -180,7 +191,7 @@ export class Command {
     return { entries: mergeEntries(all.flat()) };
   }
   async send(input: CommandSend) {
-    const { space, threads } = await this.space(input.spaceId);
+    const { space, threads, leadThreadId } = await this.space(input.spaceId);
     for (const id of input.threadIds) if (!threads.some(thread => thread.id === id)) throw new Error("A recipient must be one of this Space's threads.");
     const targets = [...new Set(input.threadIds)];
     const roster = targets.map(threadId => ({ threadId }));
@@ -188,7 +199,12 @@ export class Command {
       `[Studio Command message to ${targets.length === 1 ? "one thread" : `${targets.length} threads`} in Space ${JSON.stringify(space.name)}]`,
       `Recipients: ${JSON.stringify(roster)}`,
       targets.length > 1 ? "The owner addressed these threads together. You may read and message the listed threads to coordinate this request using bb thread log/tell. Work in this normal thread. If another recipient has covered your result, finish without a final assistant message." : "Work in this normal thread.",
+      ...(input.toLeadByDefault && targets.length === 1 && targets[0] === leadThreadId ? [
+        "The owner didn't address a thread, so this came to you as the Space's lead. If it is clearly meant for one of these threads, forward it with bb thread tell <threadId>, passing on the owner's words and any attachment paths, and reply in one line saying where it went. Otherwise handle it yourself.",
+        `Threads: ${JSON.stringify(threads.filter(thread => thread.id !== leadThreadId && !thread.parentThreadId).map(thread => ({ alias: thread.alias, title: thread.title, threadId: thread.id })))}`,
+      ] : []),
     ].join("\n");
+    await this.shareAttachments(input, targets);
     const deliveries: CommandDelivery[] = [];
     for (const target of targets) {
       let threadId = target;
@@ -217,6 +233,17 @@ export class Command {
     this.spaces.join(spaceId, thread.id);
     this.changed();
     return { threadId: thread.id };
+  }
+  /**
+   * The composer uploads files to its own project, and BB reads a relative
+   * attachment path from the receiving thread's project: copy them there.
+   */
+  private async shareAttachments(input: CommandSend, threadIds: string[]) {
+    const paths = input.attachments.flatMap(part => part.type !== "image" && !/^[\\/]|^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(part.path) ? [part.path] : []);
+    if (!paths.length || !input.projectId) return;
+    const projects = new Set((await Promise.all(threadIds.map(threadId => this.bb.sdk.threads.get({ threadId })))).map(thread => thread.projectId));
+    projects.delete(input.projectId);
+    for (const projectId of projects) await this.bb.sdk.projects.attachments.copy({ projectId, sourceProjectId: input.projectId, paths });
   }
   handlers(): PluginRpcHandlers<typeof commandContract> {
     return {

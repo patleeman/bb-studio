@@ -36,3 +36,25 @@ test("picked Space threads carry their thread ID", () => {
   assert.equal(spaceThreadMentionId("space-threads:"), null);
   assert.equal(spaceThreadMentionId("bots:thr_1"), null);
 });
+
+test("aliases are single letters that stick to their threads, and new threads take the first free one", async () => {
+  const { assignAliases, typedAliases } = await import("./mentions");
+  const first = assignAliases({}, ["lead", "fix", "inbox"]);
+  assert.deepEqual(first, { lead: "a", fix: "b", inbox: "c" });
+  // fix leaves; inbox keeps c, a new thread takes b.
+  assert.deepEqual(assignAliases(first, ["lead", "inbox", "new"]), { lead: "a", inbox: "c", new: "b" });
+  const many = assignAliases({}, Array.from({ length: 28 }, (_, i) => `t${i}`));
+  assert.equal(many.t25, "z");
+  assert.equal(many.t26, "a2");
+  assert.deepEqual(typedAliases("@b fix this, and @C too. Not me@d or @all or @bb"), ["b", "c"]);
+});
+
+test("a typed alias finds its thread first in the mention menu", () => {
+  const threads = [
+    { id: "lead", title: "Plan the launch", parentThreadId: null, status: "idle", alias: "a" },
+    { id: "fix", title: "Fix a bug", parentThreadId: null, status: "active", alias: "b" },
+  ];
+  assert.deepEqual(matchingSpaceThreads(threads, "lead", "b").map(t => [t.id, t.subtitle]), [["fix", "@b · Working"]]);
+  // "a" is lead's alias and also in "Plan the launch" and "Fix a bug": the alias wins.
+  assert.deepEqual(matchingSpaceThreads(threads, "lead", "a").map(t => t.id), ["lead", "fix"]);
+});

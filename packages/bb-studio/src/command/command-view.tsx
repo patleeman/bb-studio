@@ -7,7 +7,8 @@ import "./styles.css";
 const PLUGIN_ID = "studio";
 import type { rpcContract } from "../contract";
 import type { CommandAttachment, CommandPermissionMode, CommandSpace } from "./command-contract";
-import { broadcastMentionText, spaceThreadMentionId } from "./mentions";
+import { broadcastMentionText, spaceThreadMentionId, typedAliases } from "./mentions";
+import { draftRecipients, useCommandDraft } from "./draft-recipients";
 import { CommandSwitcher, CommandThreads, useCommandPanes, type CommandPanes } from "./command-threads";
 import { recipients } from "./command-layout";
 
@@ -106,6 +107,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const [permission, setPermission] = useStored<CommandPermissionMode | null>(`studio:command-permission:${spaceId}`, value => MODE_CHOICES.find(choice => choice.id === value)?.id ?? null);
   // The thread picked to reply to.
   const [reply, setReply] = useState<string | null>(null);
+  const draft = useCommandDraft();
   const [focus, setFocus] = useState(0);
   const generation = useRef(0);
   const load = useCallback(() => {
@@ -153,13 +155,18 @@ function CommandView({ spaceId }: { spaceId: string }) {
       }
       return [out];
     }).join("\n").trim();
-    // Typed @all works like the picked mention.
+    // Typed @all works like the picked mention, and a typed @a like picking thread a.
     if (/(^|[^a-zA-Z0-9_.-])@(all|everyone)(?![a-zA-Z0-9_.-])/i.test(text)) everyone = true;
+    for (const alias of typedAliases(text)) {
+      const named = space.threads.find(t => t.alias === alias);
+      if (named) mentioned.push(named.id);
+    }
     const command = /^\/(steer|followup|fork)\s+/.exec(text);
     let failure: string | null = null;
     try {
       const threadIds = recipients(mentioned, everyone, reply, space);
-      const result = await rpc.call("commandSend", { spaceId, threadIds, text: command ? text.slice(command[0].length) : text, attachments, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork", permissionMode: permission });
+      const toLeadByDefault = !everyone && !mentioned.length && !reply;
+      const result = await rpc.call("commandSend", { spaceId, threadIds, text: command ? text.slice(command[0].length) : text, attachments, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork", permissionMode: permission, projectId: request.projectId, toLeadByDefault });
       const failures = result.deliveries.filter(d => d.status === "error");
       if (failures.length) failure = failures.map(d => d.error).join("\n");
       else setReply(null);
@@ -172,6 +179,9 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const thread = (id: string | null) => threads.find(t => t.id === id);
   const nameOf = (threadId: string) => thread(threadId)?.title || "Thread";
     const defaultTo = reply && thread(reply) ? reply : space?.leadThreadId ?? null;
+  // Mentions in the draft decide who it goes to, ahead of the picked thread.
+  const addressed = draftRecipients(draft, threads);
+  const aliasOf = (threadId: string) => thread(threadId)?.alias;
   const panes = useCommandPanes(spaceId, threads, space?.leadThreadId ?? null);
   const sdk = useSdk();
   // Reading a pane marks its thread read in BB too, then refreshes the dots.
@@ -196,7 +206,9 @@ function CommandView({ spaceId }: { spaceId: string }) {
       <div data-command-composer onFocusCapture={markFocus} onKeyDownCapture={event => { if (event.key === "@") markFocus(); }}><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
       <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          {defaultTo && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">{nameOf(defaultTo)}</span>{defaultTo === space?.leadThreadId && !reply ? " · lead" : ""}</span>{reply && <Tooltip label="Send to the lead instead"><button type="button" aria-label="Send to the lead instead" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></Tooltip>}</span>}
+          {addressed === "everyone" ? <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">everyone</span></span></span>
+          : addressed.length ? <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To {addressed.map((id, i) => <span key={id}>{i ? ", " : ""}{aliasOf(id) && <span className="channel-alias" aria-hidden>{aliasOf(id)}</span>}<span className="text-foreground">{nameOf(id)}</span></span>)}</span></span>
+          : defaultTo && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">{nameOf(defaultTo)}</span>{defaultTo === space?.leadThreadId && !reply ? " · lead" : ""}</span>{reply && <Tooltip label="Send to the lead instead"><button type="button" aria-label="Send to the lead instead" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></Tooltip>}</span>}
         </div>
         <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Approval mode" className={`inline-flex h-6 min-w-0 items-center gap-1 rounded-md px-1 text-xs font-medium leading-tight transition-colors hover:bg-state-hover data-[state=open]:bg-state-active ${permission === "full" ? "text-warning-text" : "text-muted-foreground hover:text-foreground"}`}><span className="truncate">{MODE_CHOICES.find(choice => choice.id === permission)!.label}</span><Icon name="ChevronDown" className="size-3 shrink-0" /></button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-72">
@@ -206,7 +218,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
       </div>
       {error && <div className="mt-2">{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</div>}
     </div>
-    {space && <CommandSwitcher panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} target={defaultTo} onReply={pickReply} />}
+    {space && <CommandSwitcher panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} targets={addressed === "everyone" ? space.threads.filter(t => !t.parentThreadId).map(t => t.id) : addressed.length ? addressed : defaultTo ? [defaultTo] : []} onReply={pickReply} />}
     </div>
   </div>;
 }

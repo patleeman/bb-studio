@@ -17,13 +17,13 @@ function View({ threads, leadThreadId }: { threads: CommandThread[]; leadThreadI
     React.createElement("button", { "aria-label": "New thread", onClick: panes.newThread }),
     React.createElement("button", { "aria-label": "Started", onClick: () => panes.started("fresh") }),
     React.createElement("button", { "aria-label": "Discard", onClick: panes.discard }),
-    React.createElement(CommandSwitcher, { panes, threads, leadThreadId, target: leadThreadId, onReply: state.reply }),
+    React.createElement(CommandSwitcher, { panes, threads, leadThreadId, targets: leadThreadId ? [leadThreadId] : [], onReply: state.reply }),
     React.createElement("button", { "aria-label": "Follow work", onClick: panes.follow }));
 }
 const render = (threads = [row("idle", "idle"), row("active", "active")], leadThreadId: string | null = null) => act(() => root.render(React.createElement(View, { threads, leadThreadId })));
 const shown = () => [...container.querySelectorAll("[data-channel-thread]")].map(pane => pane.getAttribute("data-channel-thread"));
 const click = (label: string) => act(() => (container.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement).click());
-const switcher = (name: string) => act(() => ([...container.querySelectorAll('[aria-label="Space threads"] .channel-switcher-pick')].find(button => button.textContent?.startsWith(name)) as HTMLButtonElement).click());
+const switcher = (name: string) => act(() => ([...container.querySelectorAll('[aria-label="Space threads"] .channel-switcher-pick')].find(button => button.getAttribute("aria-label")?.startsWith(`${name}, `)) as HTMLButtonElement).click());
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} }); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 test("one pane follows the work until the owner opens another thread, which makes a grid", () => {
@@ -184,4 +184,10 @@ test("an unread thread's pane and row stand out until the owner clicks into the 
   state.seen.mockClear();
   act(() => { (container.querySelector('[data-channel-thread="done"] header') as HTMLElement).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); });
   expect(state.seen).not.toHaveBeenCalled();
+});
+test("panes and rows show each thread's alias, and the lit arrows follow every addressed thread", () => {
+  render([row("lead", "idle", { alias: "a" }), row("run", "active", { alias: "b" })], "lead");
+  switcher("lead");
+  expect([...container.querySelectorAll("[data-command-panes] [data-command-alias]")].map(e => e.textContent)).toEqual(["b", "a"]);
+  expect([...container.querySelectorAll('[aria-label="Space threads"] .channel-alias')].map(e => e.textContent)).toEqual(["a", "b"]);
 });

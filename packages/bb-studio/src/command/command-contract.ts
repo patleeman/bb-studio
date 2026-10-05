@@ -9,6 +9,8 @@ export const commandThreadSchema = z.object({
   hasPendingInteraction: z.boolean().optional(),
   /** Something happened since the owner last read it (BB's unread dot). */
   unread: z.boolean().optional(),
+  /** A one-letter name, typed as @a. */
+  alias: z.string().optional(),
 });
 /** An owner message or a final reply, for the merged layout. */
 export const commandEntrySchema = z.object({
@@ -31,6 +33,10 @@ export const commandSendInput = z.object({
   mode: z.enum(["auto", "steer", "followup", "fork"]).default("auto"),
   /** Approval mode for every recipient's turn; null keeps each thread's own. */
   permissionMode: commandPermissionModeSchema.nullable().default(null),
+  /** The composer's project, where its attachments were uploaded. */
+  projectId: z.string().min(1).max(200).optional(),
+  /** Nothing was addressed, so it went to the lead, who may forward it. */
+  toLeadByDefault: z.boolean().default(false),
 }).refine(input => input.text || input.attachments.length, { message: "Write a message or attach a file.", path: ["text"] });
 export const commandDeliverySchema = z.object({
   threadId: z.string(), status: z.enum(["sent", "queued", "error"]), error: z.string().nullable(),

@@ -119,6 +119,28 @@
 @keyframes channel-unread-pulse {
   50% { box-shadow: 0 0 0 2px var(--channel-unread), 0 0 8px color-mix(in srgb, var(--channel-unread) 20%, transparent); }
 }
+/* A thread's one-letter alias, typed as @a. */
+.channel-alias {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+  color: var(--foreground);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.channel-thread-pane[data-activity="Working"] .channel-alias { background: var(--channel-working); color: white; }
+.channel-thread-pane[data-unread] .channel-alias { background: var(--channel-unread); color: white; }
+[data-command-target] .channel-alias { min-width: 16px; height: 16px; margin-right: 4px; font-size: 10px; }
+.channel-switcher-row .channel-alias { min-width: 18px; height: 18px; font-size: 11px; }
 .channel-unread-badge {
   flex: 0 0 auto;
   border-radius: 999px;

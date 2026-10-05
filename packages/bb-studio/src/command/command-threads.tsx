@@ -187,7 +187,7 @@ export function CommandThreads({ panes, threads, leadThreadId, draftPane, onRepl
         onDragStart={arrangeable ? event => { event.dataTransfer.setData(PANE_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setDragImage(event.currentTarget.parentElement!, 24, 20); setDragging(thread.id); } : undefined}
         onDragEnd={arrangeable ? endDrag : undefined}>
         {arrangeable && <Tooltip label="Drag to rearrange. Arrow keys move it too."><button type="button" className="channel-pane-grip" aria-label={`Move ${label(thread)}`} onKeyDown={event => nudge(event, thread.id)}><Icon name="DragDropVertical" className="size-3.5" /></button></Tooltip>}
-        <ItemTile icon={null} kindIcon="MessageSquare" size="sm" />
+        {thread.alias ? <Tooltip label={`Type @${thread.alias} to address ${thread.title}`}><span className="channel-alias" data-command-alias>{thread.alias}</span></Tooltip> : <ItemTile icon={null} kindIcon="MessageSquare" size="sm" />}
         <span className="min-w-0 flex-1">
           <Tooltip label={`Open ${thread.title}`}><button className="block max-w-full truncate text-left text-sm font-medium hover:underline" type="button" onClick={() => onOpen(thread.id)}>{label(thread)}</button></Tooltip>
         </span>
@@ -220,10 +220,10 @@ export function CommandThreads({ panes, threads, leadThreadId, draftPane, onRepl
  * ones and an arrow the one messages go to. Click a name to open it as a
  * pane; click the arrow to send to it.
  */
-export function CommandSwitcher({ panes, threads, leadThreadId, target, onReply }: {
+export function CommandSwitcher({ panes, threads, leadThreadId, targets, onReply }: {
   panes: CommandPanes; threads: CommandThread[]; leadThreadId: string | null;
-  /** The thread the composer sends to. */
-  target: string | null; onReply(id: string, focusComposer?: boolean): void;
+  /** The threads the composer sends to. */
+  targets: readonly string[]; onReply(id: string, focusComposer?: boolean): void;
 }) {
   const roots = byAttention(threads.filter(thread => !thread.parentThreadId));
   const lead = roots.filter(thread => thread.id === leadThreadId);
@@ -237,11 +237,12 @@ export function CommandSwitcher({ panes, threads, leadThreadId, target, onReply 
         return <div key={thread.id} className="channel-switcher-row" data-unread={thread.unread || undefined} data-current={open || undefined} data-fork={thread.parentThreadId ? "" : undefined} data-activity={activity}>
           <Tooltip label={open ? `${thread.title} · ${activity}` : `Open ${thread.title} · ${activity}`}><button type="button" className="channel-switcher-pick" aria-pressed={open} onClick={() => panes.open(thread.id)} aria-label={`${thread.title}, ${activity}${open ? ", open" : ""}`}>
             <span className="channel-switcher-check" aria-hidden>{open && <Icon name="Check" className="size-3.5" />}</span>
+            {thread.alias && <span className="channel-alias" aria-hidden>{thread.alias}</span>}
             <span className="channel-rail-name">{thread.title}</span>
             {thread.id === leadThreadId && <span className="shrink-0 text-xs text-subtle-foreground">Lead</span>}
             <span className="channel-status-dot" aria-hidden />
           </button></Tooltip>
-          <Tooltip label={thread.id === target ? `Messages go to ${thread.title}` : `Send to ${thread.title}`}><button type="button" className="channel-pane-action channel-switcher-send" aria-pressed={thread.id === target} aria-label={`Send to ${thread.title}`} onClick={() => onReply(thread.id, true)}><Icon name="ArrowTurnBackward" className="size-3.5" /></button></Tooltip>
+          <Tooltip label={targets.includes(thread.id) ? `Messages go to ${thread.title}` : `Send to ${thread.title}`}><button type="button" className="channel-pane-action channel-switcher-send" aria-pressed={targets.includes(thread.id)} aria-label={`Send to ${thread.title}`} onClick={() => onReply(thread.id, true)}><Icon name="ArrowTurnBackward" className="size-3.5" /></button></Tooltip>
           {open && !panes.following && <Tooltip label="Close this pane"><button type="button" className="channel-pane-action channel-switcher-close" aria-label={`Close ${thread.title}`} onClick={() => panes.close(thread.id)}><Icon name="X" className="size-3" /></button></Tooltip>}
         </div>;
       })}

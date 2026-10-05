@@ -149,6 +149,38 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    await wait(client, `${rows}===3&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Release checklist')`);
    await docked(client);
   }) },
+  { id: "studio-command-attach", packageDir: "bb-studio", fileName: "command-attach.png", setup: guard(async client => {
+   const data = await open(client);
+   const page = await pluginRpc("studio", "command", { spaceId: data.id });
+   const target = page.threads.find(thread => thread.id === data.threadId);
+   if (!target?.alias) throw new Error("Release checklist has no alias");
+   // A real image from the composer's own project, sent to a thread in another project by its alias.
+   const { writeFileSync } = await import("node:fs");
+   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CAFWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC", "base64");
+   writeFileSync("/tmp/bb-command-attach.png", png);
+   const { root } = await client.command("DOM.getDocument", { depth: 1 });
+   const { nodeId } = await client.command("DOM.querySelector", { nodeId: root.nodeId, selector: "[data-command-composer] input[type=file]" });
+   await client.command("DOM.setFileInputFiles", { nodeId, files: ["/tmp/bb-command-attach.png"] });
+   await wait(client, "!!document.querySelector('[data-command-composer] img')");
+   await client.evaluate("document.querySelector('[data-command-composer] .ProseMirror').focus()");
+   await client.command("Input.insertText", { text: `@${target.alias} This is a deterministic UI fixture. Do not use tools. Reply exactly: Got the image.` });
+   await client.evaluate("(()=>{const editor=document.querySelector('[data-command-composer] .ProseMirror');editor.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));})()");
+   await wait(client, `document.querySelector('[data-command-target]')?.textContent.includes('Release checklist')&&document.querySelector('.channel-switcher [aria-label="Send to Release checklist"]')?.getAttribute('aria-pressed')==='true'`);
+   return async () => {
+    await client.evaluate("document.querySelector('[data-command-composer] .ProseMirror').focus()");
+    for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    // Sent: the draft clears with no error, and the thread got the image.
+    await wait(client, "!document.querySelector('[data-command-composer] img')&&!document.querySelector('[data-command-view] [role=alert]')");
+    // The upload was copied into the recipient's project, where BB reads it.
+    const { readdirSync } = await import("node:fs");
+    const thread = JSON.parse(await bbCli(["thread", "show", data.threadId, "--json"]));
+    const dir = `${process.env.BB_DATA_DIR}/attachments/${thread.projectId}`;
+    let copied = false;
+    for (let tries = 0; tries < 20 && !copied; tries++) { try { copied = readdirSync(dir).some(name => name.startsWith("bb-command-attach")); } catch {} if (!copied) await sleep(500); }
+    if (!copied) throw new Error(`The image was not copied into ${dir}`);
+    await bbCli(["thread", "stop", data.threadId]).catch(() => {});
+   };
+  }) },
   { id: "studio-command-new-thread", packageDir: "bb-studio", fileName: "command-new-thread.png", setup: guard(async client => {
    const data = await open(client);
    // The bar's +, not the sidebar's same-named button.
