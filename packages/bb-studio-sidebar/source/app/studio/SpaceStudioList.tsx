@@ -6,6 +6,7 @@ import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
+import { EmptyState } from "@/components/ui/empty-state";
 import { COARSE_POINTER_ROW_HEIGHT_CLASS } from "@/components/ui/coarse-pointer-sizing";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
@@ -81,13 +82,12 @@ const createdSchema = z.object({ href: z.string(), title: z.string().optional() 
 
 type Kind = z.infer<typeof kindSchema> & { pluginId: string; providerName: string };
 
-/** Every kind of Studio item, made in the Space's folder, from `children` (+ by default). */
-function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated, children }: {
+/** Every kind of Studio item, made in the Space's folder, from +. */
+function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
   onCreated(href: string): void;
-  children?: ReactNode;
 }) {
   const sdk = useSdk();
   const [kinds, setKinds] = useState<Kind[] | null>(null);
@@ -117,11 +117,9 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated, children
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
       <DropdownMenuTrigger asChild>
-        {children ?? (
-          <button type="button" aria-label={`New Studio item in ${spaceName}`} title="New Studio item" className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")} onClick={(event) => event.stopPropagation()}>
-            <Icon name="Plus" className="size-3.5" />
-          </button>
-        )}
+        <button type="button" aria-label={`New Studio item in ${spaceName}`} title="New Studio item" className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")} onClick={(event) => event.stopPropagation()}>
+          <Icon name="Plus" className="size-3.5" />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48" aria-label={`New in ${spaceName}`}>
         {(kinds ?? []).map((kind) => (
@@ -328,7 +326,6 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
     openStudioItem(null, href);
     void sdk.plugins.callRpc({ pluginId: "studio", method: "visitTab", input: { path: href } as never, outputSchema: z.unknown(), signal: AbortSignal.timeout(15_000) }).catch(() => {});
   };
-  const quietRow = cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pl-2 text-left text-muted-foreground");
   return (
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
@@ -343,14 +340,15 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
       {open.map((item) => (
         <StudioItemRow key={key(item)} item={item} onClose={() => close(item)} />
       ))}
-      {!open.length && !total ? (
-        <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openCreated}>
-          <button type="button" className={quietRow}>
-            <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}><Icon name="Plus" className="size-3.5" /></span>
-            <span className="truncate">New page, drawing or table</span>
-          </button>
-        </NewItemMenu>
-      ) : null}
+      {open.length ? null : (
+        <EmptyState
+          message={total ? "Nothing open" : "No items"}
+          icon="File"
+          className="px-2 py-0.5"
+          iconClassName="size-3.5 text-subtle-foreground/50"
+          messageClassName="text-xs leading-4 text-subtle-foreground/60"
+        />
+      )}
     </div>
   );
 }

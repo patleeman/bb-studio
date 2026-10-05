@@ -306,7 +306,7 @@ describe("thread-list plugin", () => {
     expect(threadIds().filter((id) => id !== "thr_pinned")).toEqual(["thr_ask", "thr_later"]);
     expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.parentElement?.querySelector("[data-sidebar-needs-you]")).not.toBeNull();
     expect(document.querySelectorAll("[data-sidebar-needs-you]")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "New page, drawing or table" })).not.toBeNull();
+    expect(screen.getByText("No items")).not.toBeNull();
     const created: Event[] = [];
     const onNew = (event: Event) => created.push(event);
     window.addEventListener("studio:new-space", onNew);
