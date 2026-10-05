@@ -50,7 +50,7 @@ import {
 import { useDrawingSync } from "../lib/sync";
 import { DrawingSaveQueue } from "../lib/save-queue";
 import { DrawingDraftSession, drawingDraftStore, type DrawingDraft } from "../lib/drafts";
-import { DRAWING_UPDATE_TYPE, REALTIME_CHANNEL, drawingHref } from "../src/shared";
+import { DRAWING_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, drawingHref } from "../src/shared";
 
 const SPIN = "animate-spin motion-reduce:animate-none";
 
@@ -502,7 +502,7 @@ export function DrawingEditor({
       <button type="button" aria-label="Copy image" title="Copy image" className={ICON_BUTTON} onClick={() => void copyImage()}>
         <Icon name="Copy" className="size-4" />
       </button>
-      <ItemMenu reference={thread} onDelete={() => setConfirmDelete(true)} className="w-52">
+      <ItemMenu reference={thread} item={{ pluginId: PLUGIN_ID, id: drawingId }} projectId={projectId.current} onMoved={() => void rpc.call("getDrawing", { id: drawingId }).then(({ drawing }) => { if (drawing) projectId.current = drawing.projectId; })} onDelete={() => setConfirmDelete(true)} className="w-52">
 
           {threadId || studioChat !== false ? null : (
             <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>

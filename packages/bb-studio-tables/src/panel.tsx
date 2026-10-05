@@ -140,7 +140,7 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
             <button type="button" className={ICON_BUTTON} title="Export this view as CSV" aria-label="Export CSV" onClick={() => void exportCsv()}>
               <Icon name="Download" className="size-4" />
             </button>
-            <ItemMenu reference={{ title: table.title, href: tableHref({ tableId }) }} />
+            <ItemMenu reference={{ title: table.title, href: tableHref({ tableId }) }} item={{ pluginId: TABLES_PLUGIN_ID, id: tableId }} projectId={table.projectId} onMoved={() => setVersion((n) => n + 1)} />
           </>
         }
       />

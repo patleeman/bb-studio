@@ -82,6 +82,7 @@ export {
   type StudioItemLink,
 } from "./studio-item";
 export { useOpenTarget, type OpenPlace } from "./move";
+export { MoveToItems, MoveToSubmenu, moveToSpace, spaceOfProject, useMoveSpaces, type MoveSpace } from "./move-to";
 export { CompanionView, CompanionOutlet, companionWorkbenchAvailable, openCompanion, useOpenCompanion, type CompanionPlacement, type CompanionViewProps } from "./companion";
 export { useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";

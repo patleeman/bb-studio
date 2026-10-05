@@ -50,6 +50,8 @@ export type TagView = z.infer<typeof tag>;
 
 const space = z.object({
   id: z.string(),
+  /** The default space, Personal: it holds Global items and every project no other space owns. */
+  isDefault: z.boolean(),
   name: z.string(),
   color: z.string(),
   icon: z.string().nullable(),

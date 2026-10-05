@@ -60,6 +60,7 @@ import { openFloat, useFloatAvailable } from "./float";
 import { CopyReferenceMenuItem } from "./item-menu";
 import { floatPanelFor } from "./float-registry";
 import { useOpenTarget } from "./move";
+import { MoveToItems, MoveToSubmenu } from "./move-to";
 import { STUDIO_ITEM_CLICKS_OFF, studioItemProps } from "./studio-item";
 
 export type { CollectionTag } from "./tags";
@@ -476,15 +477,7 @@ export function CollectionPage({
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          {(kind?.capabilities?.move ?? true) ? <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Icon name="Folder" className="size-4" /> Move to project
-              <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-80 w-52 overflow-auto">
-              {projectItems(item.projectId, (projectId) => move([item], projectId))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub> : null}
+          {(kind?.capabilities?.move ?? true) ? <MoveToSubmenu items={[item]} projects={projects} projectId={item.projectId ?? null} onProject={(projectId) => move([item], projectId)} /> : null}
           {tagging ? (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
@@ -832,9 +825,9 @@ export function CollectionPage({
                       <Icon name="Folder" /> Move <Icon name="ChevronDown" className="-mr-1 opacity-70" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
+                  <DropdownMenuContent align="start" className="max-h-96 w-60 overflow-auto">
                     <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Move {plural(chosen.length, "item")} to</DropdownMenuLabel>
-                    {projectItems(undefined, (projectId) => move(chosen, projectId))}
+                    <MoveToItems items={chosen} projects={projects} onProject={(projectId) => move(chosen, projectId)} onMoved={clear} />
                   </DropdownMenuContent>
                 </DropdownMenu> : null}
                 {tagging ? (

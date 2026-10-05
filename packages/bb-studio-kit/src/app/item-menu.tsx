@@ -1,20 +1,14 @@
+import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
+import type { StudioSchemas } from "../contract";
+import { errorMessage } from "../format";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { copyItemReference } from "./item-reference";
-import { DANGER_BUTTON, FLOATING, GHOST_BUTTON, ICON_BUTTON, projectName, type Project } from "./pieces";
+import { MoveToSubmenu, type ItemRef } from "./move-to";
+import { DANGER_BUTTON, FLOATING, GHOST_BUTTON, ICON_BUTTON, type Project } from "./pieces";
 import type { StudioItemLink } from "./studio-item";
 
 export function projectChoices(projects: readonly Project[]) {
@@ -41,9 +35,11 @@ export function CopyReferenceMenuItem({ item }: { item: StudioItemLink }) {
 export function ItemMenu({
   children,
   reference,
+  item,
   projects,
   projectId,
   onMove,
+  onMoved,
   onDelete,
   deleteDisabled,
   busy = false,
@@ -52,14 +48,34 @@ export function ItemMenu({
   children?: ReactNode;
   /** Adds Copy reference for this item. */
   reference?: StudioItemLink;
+  /**
+   * This item, in this plugin. With `projectId`, Move to offers Studio's
+   * Spaces and every project, and moves through the plugin's `studio_move`
+   * unless `onMove` is given.
+   */
+  item?: ItemRef;
   projects?: Project[];
   projectId?: string | null;
   onMove?(projectId: string | null): void;
+  /** After a move. */
+  onMoved?(): void;
   onDelete?(): void;
   deleteDisabled?: boolean;
   busy?: boolean;
   className?: string;
 }) {
+  const rpc = useRpc<StudioSchemas["provider"]>();
+  const moveHere = async (target: string | null) => {
+    try {
+      const { failed } = await rpc.call("studio_move", { ids: [item!.id], projectId: target });
+      if (failed.length) throw new Error(failed[0]!.error);
+      toast.success("Moved");
+      onMoved?.();
+    } catch (cause) {
+      toast.error(`Couldn't move: ${errorMessage(cause)}`);
+    }
+  };
+  const movable = onMove ? Boolean(projects || item) : Boolean(item && projectId !== undefined);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -70,21 +86,7 @@ export function ItemMenu({
       <DropdownMenuContent align="end" className={cn("w-56", className)}>
         {reference ? <CopyReferenceMenuItem item={reference} /> : null}
         {children}
-        {onMove && projects ? (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Icon name="MoveTo" className="size-4" /> Move to project
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-80 w-56 overflow-y-auto">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Now in {projectName(projects, projectId ?? null)}</DropdownMenuLabel>
-              {projectChoices(projects).map((project) => (
-                <DropdownMenuItem key={project.id ?? "global"} disabled={project.id === (projectId ?? null)} onSelect={() => onMove(project.id)}>
-                  <Icon name={project.id ? "Folder" : "Globe"} className="size-4" /> {project.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        ) : null}
+        {movable ? <MoveToSubmenu items={item ? [item] : []} projects={projects} projectId={projectId ?? null} onProject={onMove ?? ((target) => void moveHere(target))} onMoved={onMoved} /> : null}
         {onDelete ? (
           <>
             <DropdownMenuSeparator />
