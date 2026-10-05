@@ -367,53 +367,9 @@ struct StudioView: View {
     private var selected: [StudioItem] { store.items.filter { selection.contains($0.id) } }
 
     var body: some View {
-        List(selection: $selection) {
-            if let error = store.error {
-                Section { PagesErrorRow(message: error) { await store.load(client) } }
-            }
-            if !query.isEmpty, !externalMatches.isEmpty {
-                Section("Threads") {
-                    ForEach(Array(externalMatches.enumerated()), id: \.offset) { _, match in
-                        if let id = match.ref?.id {
-                            NavigationLink(value: Route.thread(id: id)) {
-                                Label(match.title ?? "Thread", systemImage: Symbols.thread)
-                            }
-                        }
-                    }
-                }
-            }
-            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["talk", "pages"]) {
-                Section { quickActions }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-            }
-            if store.kinds.count > 1 || hasArchived || !usedTags.isEmpty || !store.spaces.isEmpty {
-                Section { kindFilter }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-            }
-            ForEach(sections, id: \.title) { section in
-                Section {
-                    ForEach(section.items) { item in
-                        row(item)
-                    }
-                } header: {
-                    Text(section.title).foregroundStyle(Color.primary.opacity(0.75))
-                }
-            }
-        }
-        .listSectionSpacing(.compact)
+        studioPages
         .overlay {
-            if !store.loaded {
-                ProgressView()
-            } else if !query.isEmpty, visible.isEmpty, externalMatches.isEmpty {
-                ContentUnavailableView.search(text: query)
-            } else if visible.isEmpty, showArchived {
-                ContentUnavailableView("Nothing archived", systemImage: "archivebox")
-            } else if visible.isEmpty, store.error == nil {
-                ContentUnavailableView("Nothing here yet", systemImage: "square.stack",
-                    description: Text(emptyText))
-            }
+            if !store.loaded { ProgressView() }
         }
         .overlay(alignment: .bottom) {
             if let notice {
@@ -553,6 +509,95 @@ struct StudioView: View {
         }
     }
 
+    // MARK: Pages
+
+    /// Each kind is a page, All first, in the chips' order: a horizontal swipe
+    /// moves between them, as By space does on Home. Search is one list.
+    @ViewBuilder
+    private var studioPages: some View {
+        if query.isEmpty {
+            TabView(selection: Binding(get: { app.studioKind ?? "" }, set: { app.studioKind = $0.isEmpty ? nil : $0 })) {
+                ForEach(kindPages, id: \.self) { kind in
+                    studioList(kind: kind.isEmpty ? nil : kind, chips: false)
+                        .background(YieldsRowSwipesToPager())
+                        .tag(kind)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .safeAreaBar(edge: .top) {
+                if showsFilter {
+                    kindFilter
+                        .contentMargins(.horizontal, 20, for: .scrollContent)
+                        .padding(.vertical, 6)
+                }
+            }
+            .sensoryFeedback(.selection, trigger: app.studioKind)
+        } else {
+            studioList(kind: app.studioKind, chips: true)
+        }
+    }
+
+    /// "" is All; a kind chosen elsewhere keeps its page even with nothing in it.
+    private var kindPages: [String] {
+        let kinds = store.kinds.map(\.id)
+        return [""] + kinds + (app.studioKind.map { kinds.contains($0) ? [] : [$0] } ?? [])
+    }
+
+    private var showsFilter: Bool {
+        store.kinds.count > 1 || hasArchived || !usedTags.isEmpty || !store.spaces.isEmpty
+    }
+
+    private func studioList(kind: String?, chips: Bool) -> some View {
+        let visible = visible(kind: kind)
+        return List(selection: $selection) {
+            if let error = store.error {
+                Section { PagesErrorRow(message: error) { await store.load(client) } }
+            }
+            if !query.isEmpty, !externalMatches.isEmpty {
+                Section("Threads") {
+                    ForEach(Array(externalMatches.enumerated()), id: \.offset) { _, match in
+                        if let id = match.ref?.id {
+                            NavigationLink(value: Route.thread(id: id)) {
+                                Label(match.title ?? "Thread", systemImage: Symbols.thread)
+                            }
+                        }
+                    }
+                }
+            }
+            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["talk", "pages"]) {
+                Section { quickActions }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
+            if chips, showsFilter {
+                Section { kindFilter }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
+            ForEach(sections(visible), id: \.title) { section in
+                Section {
+                    ForEach(section.items) { item in
+                        row(item)
+                    }
+                } header: {
+                    Text(section.title).foregroundStyle(Color.primary.opacity(0.75))
+                }
+            }
+        }
+        .listSectionSpacing(.compact)
+        .overlay {
+            if !store.loaded {
+            } else if !query.isEmpty, visible.isEmpty, externalMatches.isEmpty {
+                ContentUnavailableView.search(text: query)
+            } else if visible.isEmpty, showArchived {
+                ContentUnavailableView("Nothing archived", systemImage: "archivebox")
+            } else if visible.isEmpty, store.error == nil {
+                ContentUnavailableView("Nothing here yet", systemImage: "square.stack",
+                    description: Text(emptyText(kind)))
+            }
+        }
+    }
+
     // MARK: Header
 
     /// Capture first, file later: each tile opens straight into typing or recording.
@@ -601,42 +646,48 @@ struct StudioView: View {
     }
 
     private var kindFilter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip("All", nil, selected: app.studioKind == nil) { app.studioKind = nil }
-                ForEach(store.kinds) { kind in
-                    chip(kind.plural, kind.symbol, selected: app.studioKind == kind.id) {
-                        app.studioKind = app.studioKind == kind.id ? nil : kind.id
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    chip("All", nil, selected: app.studioKind == nil) { withAnimation { app.studioKind = nil } }
+                        .id("")
+                    ForEach(store.kinds) { kind in
+                        chip(kind.plural, kind.symbol, selected: app.studioKind == kind.id) {
+                            withAnimation { app.studioKind = app.studioKind == kind.id ? nil : kind.id }
+                        }
+                        .id(kind.id)
+                    }
+                    ForEach(store.spaces) { space in
+                        chip(space.emoji.map { "\($0) \(space.name)" } ?? space.name, space.emoji == nil ? "square.stack.3d.up" : nil,
+                            selected: app.studioSpace == space.id, tint: Color(hex: space.color)) {
+                            app.studioSpace = app.studioSpace == space.id ? nil : space.id
+                        }
+                        .contextMenu {
+                            Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
+                        }
+                    }
+                    ForEach(usedTags) { tag in
+                        chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {
+                            tagFilter = tagFilter == tag.id ? nil : tag.id
+                        }
+                        .contextMenu {
+                            Button {
+                                newTag = tag.name
+                                renamingTag = tag
+                            } label: { Label("Rename Tag…", systemImage: "pencil") }
+                            Button(role: .destructive) { deletingTag = tag } label: { Label("Delete Tag…", systemImage: "trash") }
+                        }
+                    }
+                    if hasArchived {
+                        chip("Archived", "archivebox", selected: showArchived) { showArchived.toggle() }
                     }
                 }
-                ForEach(store.spaces) { space in
-                    chip(space.emoji.map { "\($0) \(space.name)" } ?? space.name, space.emoji == nil ? "square.stack.3d.up" : nil,
-                        selected: app.studioSpace == space.id, tint: Color(hex: space.color)) {
-                        app.studioSpace = app.studioSpace == space.id ? nil : space.id
-                    }
-                    .contextMenu {
-                        Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
-                    }
-                }
-                ForEach(usedTags) { tag in
-                    chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {
-                        tagFilter = tagFilter == tag.id ? nil : tag.id
-                    }
-                    .contextMenu {
-                        Button {
-                            newTag = tag.name
-                            renamingTag = tag
-                        } label: { Label("Rename Tag…", systemImage: "pencil") }
-                        Button(role: .destructive) { deletingTag = tag } label: { Label("Delete Tag…", systemImage: "trash") }
-                    }
-                }
-                if hasArchived {
-                    chip("Archived", "archivebox", selected: showArchived) { showArchived.toggle() }
-                }
+                .padding(.vertical, 2)
             }
-            .padding(.vertical, 2)
+            .scrollClipDisabled()
+            // A swipe to another kind brings its chip into view.
+            .onChange(of: app.studioKind) { withAnimation { proxy.scrollTo(app.studioKind ?? "", anchor: .center) } }
         }
-        .scrollClipDisabled()
     }
 
     private func chip(_ title: String, _ symbol: String?, selected: Bool, tint: Color? = nil, action: @escaping () -> Void) -> some View {
@@ -814,11 +865,14 @@ struct StudioView: View {
         item.projectId.map { store.projectNames[$0] ?? "Project" }
     }
 
-    private var visible: [StudioItem] {
+    /// The items on the page shown.
+    private var visible: [StudioItem] { visible(kind: app.studioKind) }
+
+    private func visible(kind: String?) -> [StudioItem] {
         store.items.filter { item in
             if item.archived != showArchived { return false }
-            if let kind = app.studioKind, item.kind != kind { return false }
-            if app.studioKind == nil, query.isEmpty, store.info(item)?.background == true { return false }
+            if let kind, item.kind != kind { return false }
+            if kind == nil, query.isEmpty, store.info(item)?.background == true { return false }
             if let tagFilter, item.tags?.contains(tagFilter) != true { return false }
             if let space = app.studioSpace, item.spaces?.contains(space) != true { return false }
             switch project {
@@ -839,7 +893,7 @@ struct StudioView: View {
     }
 
     /// Today, Yesterday, Previous 7 Days, then by month.
-    private var sections: [DaySection] {
+    private func sections(_ visible: [StudioItem]) -> [DaySection] {
         let calendar = Calendar.current
         let now = Date.now
         func title(_ item: StudioItem) -> String {
@@ -861,11 +915,11 @@ struct StudioView: View {
         return result
     }
 
-    private var emptyText: String {
+    private func emptyText(_ kind: String?) -> String {
         if let space = app.studioSpace.flatMap(store.space) {
             return "Nothing in \(space.name) yet. Make one with New, or move items here from their menus."
         }
-        return switch app.studioKind {
+        return switch kind {
         case "page": "Pages you and your agents write show up here."
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
