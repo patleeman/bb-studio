@@ -218,7 +218,7 @@ The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `
 
 ## Space Command view
 
-Open **Command view** from a Space’s sidebar heading. It shows the Space’s ordinary threads as native transcripts. With nothing opened, one pane follows whichever thread is working. Open another thread from the list beside the composer, where a check marks each open thread, and it joins as a pane, so the view becomes a grid you can rearrange. Closing a pane only hides it: open it again from the list, or choose **Follow work** (⚡ in the bar) to go back to one following pane. Panes open on the newest message and keep up as the thread works. Press **⌘N** or **+** to start a new thread in the Space. Send to the lead, pick a thread, @mention threads by title, or use @all. Files, drafts, permissions and send modes use BB’s composer.
+Open **Command view** from a Space’s sidebar heading. It shows the Space’s ordinary threads as native transcripts. With nothing opened, one pane follows whichever thread is working. Open another thread from the list beside the composer, where a check marks each open thread, and it joins as a pane, so the view becomes a grid you can rearrange. Closing a pane only hides it: open it again from the list, or choose **Follow work** (⚡ in the bar) to go back to one following pane. Panes open on the newest message and keep up as the thread works. Press **⌘N** or **+** to start a new thread in the Space. Messages go to the lead unless you pick another thread with its ↩ in the thread list, @mention threads by title, or use @all. Files, drafts, permissions and send modes use BB’s composer.
 
 ![One pane following the Space's working thread, with the thread list beside the composer](assets/command-follow.png)
 
