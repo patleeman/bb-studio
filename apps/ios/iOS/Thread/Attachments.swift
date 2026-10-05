@@ -49,6 +49,7 @@ struct PendingAttachment: Identifiable, Equatable {
 /// The paperclip menu: photo library, camera, and files.
 struct AttachmentMenu: View {
     @Binding var items: [PendingAttachment]
+    var symbol = "paperclip"
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var choosingPhotos = false
     @State private var usingCamera = false
@@ -62,8 +63,9 @@ struct AttachmentMenu: View {
             }
             Button { choosingFiles = true } label: { Label("Choose File", systemImage: "folder") }
         } label: {
-            Image(systemName: "paperclip").font(.title3).frame(width: 36, height: 36)
+            Image(systemName: symbol).font(.title3).frame(width: 36, height: 36)
         }
+        .accessibilityLabel("Attach")
         .photosPicker(isPresented: $choosingPhotos, selection: $photoItems, maxSelectionCount: 6, matching: .images)
         .onChange(of: photoItems) {
             let picked = photoItems

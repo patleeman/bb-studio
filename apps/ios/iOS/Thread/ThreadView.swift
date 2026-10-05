@@ -11,6 +11,8 @@ struct ThreadView: View {
     @ObservedObject private var outbox = Outbox.shared
     @ObservedObject private var muted = MutedThreads.shared
     @State private var choosingModel = false
+    /// The composer's model button: the thread's model and reasoning level.
+    @State private var executionLabel: String?
     @State private var attachments: [PendingAttachment] = []
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var dictating = false
@@ -132,6 +134,13 @@ struct ThreadView: View {
         }
         .sheet(isPresented: $choosingModel) {
             ExecutionSheet(threadId: model.threadId, providerId: model.thread?.providerId)
+        }
+        // Again after the sheet closes, in case it changed them.
+        .task(id: "\(model.threadId) \(model.thread?.providerId ?? "") \(choosingModel)") {
+            guard !choosingModel, let execution = try? await app.client.execution(model.threadId) else { return }
+            let options = try? await app.client.executionOptions(providerId: model.thread?.providerId)
+            let name = execution.model.map { id in options?.models.first { $0.id == id || $0.model == id }?.displayName ?? id }
+            executionLabel = [name, execution.reasoningLevel].compactMap { $0 }.joined(separator: " · ")
         }
         .sheet(isPresented: $editingFull) {
             FullComposer(text: $draft, canSend: canSend, send: {
@@ -714,35 +723,20 @@ struct ThreadView: View {
                 CommandSuggestions(query: query, projectId: projectId, providerId: providerId,
                     environmentId: model.thread?.environmentId, pick: insertCommand)
             }
-            AttachmentStrip(items: $attachments)
-            HStack(alignment: .bottom, spacing: 4) {
-                AttachmentMenu(items: $attachments)
-                Button { dictating = true } label: {
-                    Image(systemName: "mic.fill").font(.title3).frame(width: 36, height: 36)
-                }
-                .accessibilityLabel("Dictate")
-                ComposerField(text: $draft, focused: $composerFocused, trailingInset: draftIsLong ? 32 : 12) { images in
-                    attachments += images.compactMap { PendingAttachment.image($0, name: "pasted.jpg") }
-                }
-                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
-                .overlay(alignment: .topTrailing) {
-                    if draftIsLong {
-                        Button { editingFull = true } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.caption.weight(.semibold))
-                                .frame(width: 28, height: 28)
-                        }
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Expand")
-                    }
-                }
+            ComposerBar(
+                text: $draft, focused: $composerFocused, attachments: $attachments,
+                dictate: { dictating = true }, expand: draftIsLong ? { editingFull = true } : nil
+            ) {
+                Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
+                    .accessibilityLabel("Model & permissions")
+            } send: {
                 Button(action: send) {
                     Group {
                         if model.sending {
                             ProgressView()
                         } else {
                             Image(systemName: model.thread?.isRunning == true ? "text.append" : "arrow.up.circle.fill")
-                                .font(model.thread?.isRunning == true ? .title3 : .title)
+                                .font(model.thread?.isRunning == true ? .body.weight(.semibold) : .title)
                         }
                     }
                     .frame(width: 36, height: 36)

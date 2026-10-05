@@ -98,7 +98,6 @@ struct NewThreadView: View {
                 HStack(spacing: 6) {
                     placeChip
                     workspaceChip
-                    agentChip
                 }
             }
             .scrollClipDisabled()
@@ -111,17 +110,12 @@ struct NewThreadView: View {
                     .frame(height: 32)
                     .background(.fill.tertiary, in: .capsule)
             }
-            AttachmentStrip(items: $attachments)
-            HStack(alignment: .bottom, spacing: 4) {
-                AttachmentMenu(items: $attachments)
-                Button { dictating = true } label: {
-                    Image(systemName: "mic.fill").font(.title3).frame(width: 36, height: 36)
-                }
-                .accessibilityLabel("Dictate")
-                ComposerField(text: $text, focused: $focused, placeholder: "What should the agent do?", maxLines: 10) { images in
-                    attachments += images.compactMap { PendingAttachment.image($0, name: "pasted.jpg") }
-                }
-                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
+            ComposerBar(
+                text: $text, focused: $focused, attachments: $attachments, placeholder: "What should the agent do?", maxLines: 10,
+                dictate: { dictating = true }
+            ) {
+                agentMenu
+            } send: {
                 Button { Task { await create() } } label: {
                     Group {
                         if creating { ProgressView() } else { Image(systemName: "arrow.up.circle.fill").font(.title) }
@@ -198,7 +192,7 @@ struct NewThreadView: View {
     }
 
     /// Provider, model, reasoning and permissions, each defaulting to the project's.
-    private var agentChip: some View {
+    private var agentMenu: some View {
         Menu {
             Picker(selection: $providerId) {
                 Text(defaultLabel(defaults?.providerId.flatMap(providerName))).tag("")
@@ -225,7 +219,8 @@ struct NewThreadView: View {
             } label: { Label("Permissions", systemImage: "lock.shield") }
             .pickerStyle(.menu)
         } label: {
-            chip(selectedModel?.displayName ?? defaultModelName ?? "Agent", systemImage: "sparkles")
+            ComposerSettingsLabel(title: [selectedModel?.displayName ?? defaultModelName, reasoning.isEmpty ? defaults?.reasoningLevel : reasoning]
+                .compactMap { $0 }.joined(separator: " · "))
         }
         .accessibilityIdentifier("newThreadAgent")
     }

@@ -76,6 +76,76 @@ struct ComposerField: UIViewRepresentable {
     }
 }
 
+/// The message box, as in ChatGPT: one card with any attachments, the field
+/// at full width, and a row under it with + (attach), the agent's settings,
+/// dictation and `send`.
+struct ComposerBar<Settings: View, Send: View>: View {
+    @Binding var text: String
+    @Binding var focused: Bool
+    @Binding var attachments: [PendingAttachment]
+    var placeholder = "Message"
+    var maxLines = 6
+    let dictate: () -> Void
+    /// Opens the draft on a whole screen; shown only when set.
+    var expand: (() -> Void)?
+    @ViewBuilder let settings: () -> Settings
+    @ViewBuilder let send: () -> Send
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AttachmentStrip(items: $attachments)
+                .padding([.horizontal, .top], 10)
+            ComposerField(text: $text, focused: $focused, placeholder: placeholder, maxLines: maxLines, trailingInset: expand == nil ? 12 : 36) { images in
+                attachments += images.compactMap { PendingAttachment.image($0, name: "pasted.jpg") }
+            }
+            .padding(.top, 4)
+            .overlay(alignment: .topTrailing) {
+                if let expand {
+                    Button(action: expand) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 36, height: 32)
+                    }
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Expand")
+                }
+            }
+            HStack(spacing: 2) {
+                AttachmentMenu(items: $attachments, symbol: "plus")
+                settings()
+                Spacer(minLength: 4)
+                Button(action: dictate) {
+                    Image(systemName: "mic").font(.title3).frame(width: 36, height: 36)
+                }
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Dictate")
+                send()
+            }
+            .padding(.horizontal, 6)
+            .padding(.bottom, 6)
+        }
+        .background(.fill.tertiary, in: .rect(cornerRadius: 22))
+    }
+}
+
+/// The composer's agent button: a gauge and the model (with its reasoning level), as ChatGPT shows its own.
+struct ComposerSettingsLabel: View {
+    let title: String?
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "gauge.with.dots.needle.67percent")
+            if let title, !title.isEmpty { Text(title).lineLimit(1) }
+        }
+        .font(.subheadline)
+        // Grey, not the button's tint.
+        .foregroundStyle(Color(uiColor: .secondaryLabel))
+        .padding(.horizontal, 8)
+        .frame(height: 36)
+        .contentShape(.rect)
+    }
+}
+
 final class PastingTextView: UITextView {
     var onPasteImages: (([UIImage]) -> Void)?
     let placeholder = UILabel()
