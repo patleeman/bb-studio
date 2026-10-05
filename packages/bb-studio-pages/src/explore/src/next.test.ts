@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { MAX_NOTE_LENGTH, NEXT_LIMITS, parseNextItems, preferredReplies } from "./next";
 import { INSTRUCTIONS_LIMIT, nextInstructions } from "./prompt";
-import { ExploreStore, MIGRATIONS } from "./store";
+import { ExploreStore, MIGRATIONS, NEXT_LOG_DAYS } from "./store";
 import { appendDraft, pickComposer } from "./ui/composer";
 
 describe("the ::next directive", () => {
@@ -116,6 +116,35 @@ describe("the click log", () => {
     const since = tick(1_000);
     log.nextShown({ threadId: "thr_1", messageId: "msg_2", items: [{ kind: "reply", emoji: "👍", label: "New" }] });
     expect(log.nextStats(since).kinds[0]).toEqual({ kind: "reply", shown: 1, clicked: 0 });
+  });
+});
+
+describe("the click log's size", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const item = (label: string) => [{ kind: "reply" as const, emoji: "👍", label }];
+
+  it("forgets suggestions older than its window", () => {
+    let at = 1_000;
+    const db = new Database(":memory:");
+    for (const statement of MIGRATIONS) db.exec(statement);
+    const log = new ExploreStore(db, () => at);
+    log.nextShown({ threadId: "thr_1", messageId: "msg_1", items: item("Old") });
+    at += (NEXT_LOG_DAYS + 1) * DAY;
+    log.nextShown({ threadId: "thr_1", messageId: "msg_2", items: item("New") });
+    expect(db.prepare("SELECT label FROM next_suggestions").all()).toEqual([{ label: "New" }]);
+    expect(log.nextStats(0).kinds[0]).toEqual({ kind: "reply", shown: 1, clicked: 0 });
+  });
+
+  it("keeps at most its row cap, newest first", () => {
+    let at = 1_000;
+    const db = new Database(":memory:");
+    for (const statement of MIGRATIONS) db.exec(statement);
+    const log = new ExploreStore(db, () => at, { days: NEXT_LOG_DAYS, maxRows: 2 });
+    for (const label of ["a", "b", "c"]) {
+      log.nextShown({ threadId: "thr_1", messageId: `msg_${label}`, items: item(label) });
+      at += 2 * 60 * 60 * 1000;
+    }
+    expect(db.prepare("SELECT label FROM next_suggestions ORDER BY shown_at").all()).toEqual([{ label: "b" }, { label: "c" }]);
   });
 });
 

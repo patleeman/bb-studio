@@ -15,7 +15,7 @@ import { exploreInstructions } from "./prompt";
 import { ExploreService } from "./service";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "./constants";
 import { MAX_LABEL_LENGTH, STAGES } from "./shared";
-import { ExploreStore, MIGRATIONS, type ExplainerRow } from "./store";
+import { ExploreStore, MIGRATIONS, NEXT_LOG_DAYS, type ExplainerRow } from "./store";
 import { walk } from "./timeline";
 import { exploreWorkers } from "./worker";
 import type { NextKind } from "./next";
@@ -187,7 +187,7 @@ export function registerExplore(bb: BbPluginApi, options: {
       }
       case "stats": {
         const days = flags.values.days === undefined ? 30 : Number(flags.values.days);
-        if (!Number.isInteger(days) || days < 1) return fail(`usage: ${USAGE.stats}`);
+        if (!Number.isInteger(days) || days < 1 || days > NEXT_LOG_DAYS) return fail(`usage: ${USAGE.stats} (1 to ${NEXT_LOG_DAYS} days; older suggestions are not kept)`);
         const stats = store.nextStats(Date.now() - days * DAY_MS);
         const kinds = stats.kinds.map((row) => [row.kind, row.shown, row.clicked, percent(row.clicked, row.shown)].join("\t"));
         const top = stats.top.map((row) => [row.kind, `${row.emoji} ${row.label}`, `${row.clicked}/${row.shown}`].join("\t"));

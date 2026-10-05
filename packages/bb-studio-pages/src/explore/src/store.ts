@@ -152,14 +152,23 @@ export const MIGRATIONS = [
   `ALTER TABLE explore_explainers ADD COLUMN note TEXT`,
 ];
 
+/** The click log keeps this many days, enough for `bb pages explore stats --days 180`. */
+export const NEXT_LOG_DAYS = 180;
+/** And at most this many suggestions, newest kept. */
+export const NEXT_LOG_MAX_ROWS = 50_000;
+const NEXT_PRUNE_EVERY_MS = 60 * 60 * 1000;
+
 export type NextKindStats = { kind: NextKind; shown: number; clicked: number };
 export type NextLabelStats = { kind: NextKind; emoji: string; label: string; shown: number; clicked: number };
 export type NextStats = { since: number; kinds: NextKindStats[]; top: NextLabelStats[] };
 
 export class ExploreStore {
+  private nextPrunedAt: number | null = null;
+
   constructor(
     private readonly db: Database.Database,
     private readonly now: () => number = Date.now,
+    private readonly nextLog: { days: number; maxRows: number } = { days: NEXT_LOG_DAYS, maxRows: NEXT_LOG_MAX_ROWS },
   ) {}
 
   // ----- explainers -----
@@ -337,6 +346,16 @@ export class ExploreStore {
     this.db.transaction(() => {
       for (const item of input.items) insert.run(suggestionKey({ ...input, ...item }), input.threadId, input.messageId, item.kind, item.emoji, item.label, at);
     })();
+    if (this.nextPrunedAt === null || at - this.nextPrunedAt >= NEXT_PRUNE_EVERY_MS) this.pruneNext(at);
+  }
+
+  /** Drops suggestions shown before the log's window, then the oldest past its row cap. */
+  pruneNext(at: number = this.now()): void {
+    this.nextPrunedAt = at;
+    this.db.prepare("DELETE FROM next_suggestions WHERE shown_at < ?").run(at - this.nextLog.days * 24 * 60 * 60 * 1000);
+    this.db
+      .prepare("DELETE FROM next_suggestions WHERE key IN (SELECT key FROM next_suggestions ORDER BY shown_at DESC, rowid DESC LIMIT -1 OFFSET ?)")
+      .run(this.nextLog.maxRows);
   }
 
   /** Records a click, and the suggestion as shown if that was missed. */
