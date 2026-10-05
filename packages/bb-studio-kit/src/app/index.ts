@@ -1,5 +1,7 @@
 // The Studio frontend kit: the shared collection, item header, sidebar
 // sections, and the pieces they are built from.
+// Every Studio surface shows `title` attributes as fast tooltips.
+import "../ui/fast-title";
 export {
   CollectionPage,
   type CollectionFilter,

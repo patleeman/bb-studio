@@ -5,6 +5,7 @@ export * from "./coarse-pointer-sizing";
 export * from "./context-menu";
 export * from "./dialog";
 export * from "./dropdown-menu";
+export * from "./fast-title";
 export * from "./icon";
 export * from "./input";
 export * from "./menu-item-hover";
