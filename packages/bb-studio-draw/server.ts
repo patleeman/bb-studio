@@ -193,6 +193,14 @@ export default async function plugin(bb: BbPluginApi) {
     return `${elements.length} element(s): ${parts.join(", ")}`;
   }
 
+  /** Image files without their data: what an agent needs to reference them. */
+  function fileSummaries(files: Record<string, unknown> | undefined) {
+    return Object.fromEntries(Object.entries(files ?? {}).map(([id, file]) => {
+      const f = (file && typeof file === "object" ? file : {}) as { mimeType?: unknown; dataURL?: unknown };
+      return [id, { id, mimeType: typeof f.mimeType === "string" ? f.mimeType : null, dataURLChars: typeof f.dataURL === "string" ? f.dataURL.length : 0 }];
+    }));
+  }
+
   bb.log.info("loaded");
 
   bb.rpc.register(rpcContract, {
@@ -340,7 +348,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "excalidraw_get_drawing",
     description:
-      "Read the current scene of an Excalidraw drawing: element JSON, appState, files, plus a text summary. Always call this immediately before editing so you see the user's latest changes. To edit, use excalidraw_update_drawing.",
+      "Read the current scene of an Excalidraw drawing: element JSON, appState, a text summary, and each image file's id, mimeType and size (image data is left out; `bb excalidraw show <id>` prints it). Always call this immediately before editing so you see the user's latest changes. To edit, use excalidraw_update_drawing.",
     parameters: z.object({ drawingId: z.string().min(1) }),
     execute({ drawingId }) {
       const row = store.get(drawingId);
@@ -365,7 +373,9 @@ export default async function plugin(bb: BbPluginApi) {
           version: 2,
           elements: clean,
           appState: scene?.appState ?? {},
-          files: scene?.files ?? {},
+          // Image data URLs would push most drawings with an image past the
+          // inline limit, hiding the elements; list the files instead.
+          files: fileSummaries(scene?.files),
         },
       };
       const json = JSON.stringify(payload, null, 2);

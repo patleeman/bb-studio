@@ -42,3 +42,24 @@ it("tells the agent when an upsert of a deleted element was not applied", async 
     await host.harness.lifecycle.dispose();
   }
 });
+
+it("shows an agent the elements of a drawing with a large image, without the image data", async () => {
+  const host = createFakePluginHost({ pluginId: "excalidraw", sdk: {
+    plugins: { callRpc: async () => { throw new Error("Studio is optional"); } },
+  } });
+  await plugin(host.bb);
+  try {
+    const { drawing } = await host.harness.behavior.callRpc("createDrawing", { name: "Photo" }) as { drawing: { id: string } };
+    const dataURL = `data:image/png;base64,${"A".repeat(500_000)}`;
+    await host.harness.behavior.callAgentTool("excalidraw_update_drawing", {
+      drawingId: drawing.id,
+      elements: [{ id: "img", type: "image", fileId: "f1" }],
+      files: { f1: { mimeType: "image/png", dataURL } },
+    });
+    const result = JSON.parse(String(await host.harness.behavior.callAgentTool("excalidraw_get_drawing", { drawingId: drawing.id })));
+    expect(result.scene.elements.map((el: { id: string }) => el.id)).toEqual(["img"]);
+    expect(result.scene.files).toEqual({ f1: { id: "f1", mimeType: "image/png", dataURLChars: dataURL.length } });
+  } finally {
+    await host.harness.lifecycle.dispose();
+  }
+});
