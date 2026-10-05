@@ -18,6 +18,11 @@ import { useExplainers, type ExplainerTarget } from "./rows";
 
 const SETTINGS_HREF = `/settings/plugins/${PLUGIN_ID}`;
 
+const CHIP = "inline-flex h-6 items-center gap-1.5 border border-border bg-transparent px-2 text-xs text-foreground hover:bg-state-hover";
+/** Replies are round; things the agent does (Ask for, Tell me more, Fix this) are dashed squares. */
+const REPLY_CHIP = `${CHIP} rounded-full`;
+const ACTION_CHIP = `${CHIP} rounded-md border-dashed`;
+
 /** Keeps each mounted composer's API where message directives can reach it. Renders nothing. */
 export function ComposerBridge() {
   const composer = useComposer();
@@ -75,10 +80,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
       type="button"
       onClick={() => draft(kind, item, `${item.emoji} ${item.label}`)}
       title={kind === "do" ? "Draft this request in your message box" : "Draft this reply in your message box"}
-      className={cn(
-        "inline-flex h-6 items-center gap-1.5 border border-border bg-transparent px-2 text-xs text-foreground hover:bg-state-hover",
-        kind === "do" ? "rounded-md border-dashed" : "rounded-full",
-      )}
+      className={kind === "do" ? ACTION_CHIP : REPLY_CHIP}
     >
       <span aria-hidden="true">{item.emoji}</span>
       <span>{item.label}</span>
@@ -156,32 +158,32 @@ function BtwNotes({ notes, onFix, ...target }: ExplainerTarget & { notes: readon
             <span aria-hidden className="w-4 shrink-0 text-center leading-5">
               {note.emoji}
             </span>
-            <p className="min-w-0 flex-1 leading-5 text-foreground">
-              {note.text}{" "}
-              <span className="whitespace-nowrap text-xs">
+            <div className="min-w-0 flex-1">
+              <p className="leading-5 text-foreground">{note.text}</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() => void act(note, explainer, false, note.text)}
                   disabled={Boolean(busy[key])}
                   title={error ?? explainer?.job?.detail ?? "Write a page explaining this"}
                   className={cn(
-                    "font-medium hover:underline disabled:cursor-progress",
-                    state === "error" ? "text-destructive" : "text-muted-foreground hover:text-foreground",
+                    ACTION_CHIP,
+                    "disabled:cursor-progress",
+                    state === "error" && "border-destructive/60 text-destructive",
                     state === "running" && "animate-pulse motion-reduce:animate-none",
                   )}
                 >
-                  {more}
+                  <span aria-hidden="true">{state === "ready" ? "↗" : state === "running" ? "⏳" : state === "error" ? "↻" : "📖"}</span>
+                  <span>{more}</span>
                 </button>
                 {isBug(note) ? (
-                  <>
-                    <span aria-hidden className="text-muted-foreground/50"> · </span>
-                    <button type="button" onClick={() => onFix(note)} title="Draft a request to fix this" className="font-medium text-muted-foreground hover:text-foreground hover:underline">
-                      Fix this
-                    </button>
-                  </>
+                  <button type="button" onClick={() => onFix(note)} title="Draft a request to fix this in your message box" className={ACTION_CHIP}>
+                    <span aria-hidden="true">🔧</span>
+                    <span>Fix this</span>
+                  </button>
                 ) : null}
-              </span>
-            </p>
+              </div>
+            </div>
           </li>
         );
       })}
