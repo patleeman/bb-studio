@@ -267,3 +267,18 @@ export function isUnreadDoneThread(thread: ThreadStatusShape): boolean {
   }
   return (DONE_THREAD_STATUSES[thread.status] ?? false) && thread.isUnread;
 }
+
+export type ThreadAttentionState = "needs-you" | "working" | "error" | "unread" | "idle";
+
+const ATTENTION_BUSY = new Set(["starting", "active", "stopping", "provisioning"]);
+
+/** What a thread asks of the user, most urgent first. */
+export function threadAttentionState(
+  thread: Pick<PluginSidebarThread, "status" | "runtimeStatus" | "indicator" | "hasPendingInteraction" | "isUnread">,
+): ThreadAttentionState {
+  if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input") return "needs-you";
+  if (ATTENTION_BUSY.has(thread.status) || ATTENTION_BUSY.has(thread.runtimeStatus) || thread.indicator === "runtime") return "working";
+  if (thread.indicator === "unread-error") return "error";
+  if (thread.indicator === "unread-success" || thread.isUnread) return "unread";
+  return "idle";
+}

@@ -18,6 +18,7 @@ export const chronologicalSortSchema = z.enum([
   "updated",
   "created",
   "alpha",
+  "attention",
   "none",
 ]);
 export type ChronologicalSort = z.infer<typeof chronologicalSortSchema>;

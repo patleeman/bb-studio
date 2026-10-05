@@ -1,6 +1,7 @@
 import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { SidebarThread } from "../model/sidebar-thread.js";
+import { threadAttentionState, type ThreadAttentionState } from "../model/thread-activity.js";
 
 /** A thread's latest line from Studio's `thread_lines`. */
 export interface ThreadLine {
@@ -12,18 +13,10 @@ export interface ThreadLine {
 /** By space only: the latest line of each thread whose line has loaded. */
 export const SpaceRowsContext = createContext<{ lines: Readonly<Record<string, ThreadLine>> } | null>(null);
 
-export type SpaceThreadState = "needs-you" | "working" | "error" | "unread" | "idle";
-
-const BUSY = new Set(["starting", "active", "stopping", "provisioning"]);
+export type SpaceThreadState = ThreadAttentionState;
 
 /** The one state a By space row's dot shows, most urgent first. */
-export function spaceThreadState(thread: SidebarThread): SpaceThreadState {
-  if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input") return "needs-you";
-  if (BUSY.has(thread.status) || BUSY.has(thread.runtimeStatus) || thread.indicator === "runtime") return "working";
-  if (thread.indicator === "unread-error") return "error";
-  if (thread.indicator === "unread-success" || thread.isUnread) return "unread";
-  return "idle";
-}
+export const spaceThreadState = threadAttentionState;
 
 export const SPACE_THREAD_DOT: Record<SpaceThreadState, { className: string; label: string | null }> = {
   "needs-you": { className: "size-2 bg-warning ring-[3px] ring-warning/30", label: "Needs you" },

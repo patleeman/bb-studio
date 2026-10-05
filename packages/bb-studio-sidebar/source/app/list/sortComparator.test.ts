@@ -199,6 +199,31 @@ describe("getSidebarThreadComparator", () => {
     ).toEqual(["thr_c", "thr_b", "thr_a"]);
   });
 
+  it("needs me lists waiting threads first, then working, then the rest", () => {
+    const readOld = thread({ id: "thr_read", lastReadAt: 9, latestAttentionAt: 9 });
+    const working = thread({ id: "thr_working", status: "active", lastReadAt: 8, latestAttentionAt: 8 });
+    const unreadOld = thread({ id: "thr_unread_old", lastReadAt: 0, latestAttentionAt: 3 });
+    const unreadNew = thread({ id: "thr_unread_new", lastReadAt: 0, latestAttentionAt: 5 });
+    const asking = thread({ id: "thr_asking", hasPendingInteraction: true, lastReadAt: 4, latestAttentionAt: 4 });
+    const entries = [readOld, working, unreadOld, asking, unreadNew];
+    expect(order(getSidebarThreadComparator("attention"), entries)).toEqual([
+      "thr_unread_new",
+      "thr_asking",
+      "thr_unread_old",
+      "thr_working",
+      "thr_read",
+    ]);
+    expect(
+      order(getSidebarThreadComparator("attention", "ascending"), entries),
+    ).toEqual([
+      "thr_unread_old",
+      "thr_asking",
+      "thr_unread_new",
+      "thr_working",
+      "thr_read",
+    ]);
+  });
+
   it("alphabetical lists A→Z", () => {
     expect(
       order(getSidebarThreadComparator("alpha"), [cherry, apple, banana]),

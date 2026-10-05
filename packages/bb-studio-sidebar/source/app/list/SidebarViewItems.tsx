@@ -35,6 +35,7 @@ const SIDEBAR_ORGANIZE_OPTIONS = [
 ] as const;
 
 const SIDEBAR_SORT_OPTIONS = [
+  { label: "Needs me", sort: "attention", direction: "descending" },
   { label: "Updated at", sort: "updated", direction: "descending" },
   { label: "Created at", sort: "created", direction: "descending" },
   { label: "Alphabetical", sort: "alpha", direction: "ascending" },

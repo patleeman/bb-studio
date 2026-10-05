@@ -3,7 +3,9 @@ import { buildSectionKey } from "./section-keys.js";
 import type { SidebarThread } from "./sidebar-thread.js";
 import {
   getCollapsedChildActivity,
+  threadAttentionState,
   type CollapsedChildActivity,
+  type ThreadAttentionState,
 } from "./thread-activity.js";
 
 interface ProjectThreadNodeStats {
@@ -123,6 +125,33 @@ export function compareStandardThreads(
   }
 
   return compareByLatestAttentionAtDescending(left, right);
+}
+
+const NEEDS_ME_RANK: Record<ThreadAttentionState, number> = {
+  "needs-you": 0,
+  error: 0,
+  unread: 0,
+  working: 1,
+  idle: 2,
+};
+
+/**
+ * "Needs me": threads waiting on the user (a question, an unread error or
+ * result) first, then working ones, then the rest; each tier by when the
+ * thread last needed the user, latest first.
+ */
+export function compareByNeedsMe(
+  left: SidebarThread,
+  right: SidebarThread,
+  direction: 1 | -1 = 1,
+): number {
+  const rank =
+    NEEDS_ME_RANK[threadAttentionState(left)] -
+    NEEDS_ME_RANK[threadAttentionState(right)];
+  if (rank !== 0) {
+    return rank;
+  }
+  return direction * compareByLatestAttentionAtDescending(left, right);
 }
 
 function representativeThread(item: ProjectThreadItem): SidebarThread {

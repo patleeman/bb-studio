@@ -75,6 +75,7 @@ import { buildPinnedSidebarState } from "../model/pinned-sidebar-threads.js";
 import {
   CHRONOLOGICAL_CONTAINER_ID,
   compareByCreatedAtDescending,
+  compareByNeedsMe,
   compareStandardThreads,
   createSidebarProjectIdResolver,
   isSidebarProjectThread,
@@ -323,6 +324,10 @@ export function getSidebarThreadComparator(
       multiplier *
       compareProjectThreadItemsByTitleAscending(left, right, rename);
     return comparator;
+  }
+  if (normalizedSort === "attention") {
+    // Tiers always lead; direction only flips the order inside a tier.
+    return (left, right) => compareByNeedsMe(left, right, multiplier);
   }
   const base =
     normalizedSort === "created"
