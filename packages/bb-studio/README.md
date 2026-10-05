@@ -134,13 +134,15 @@ and [native legacy collection](assets/studio-collection-companion-transfers-nati
   spawned with, is never changed. Older threads keep their titles until you
   run `bb studio retitle`. Turn it off with **Short thread titles** in
   Studio's settings. Titles come from the fallback model in Studio Decisions.
-- **For agents**: the `studio_list_items`, `studio_tag_items` and
-  `studio_delete_items` tools, the
-  `bb studio` CLI, and a `studio` skill.
+- **For agents**: the `studio_list_items`, `studio_list_spaces`,
+  `studio_tag_items`, `studio_delete_items`, `studio_space_items` and
+  `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill.
 
 ```sh
-bb studio list [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
+bb studio list [query…] [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--space <name>] [--json]
 bb studio tags
+bb studio spaces
+bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)
 bb studio providers
 bb studio reindex
 bb studio retitle (<thread-id>… | --self | --recent <count>)
