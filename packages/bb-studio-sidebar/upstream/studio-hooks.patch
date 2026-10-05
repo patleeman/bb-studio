@@ -1,34 +1,143 @@
 diff --git a/source/app.tsx b/source/app.tsx
-index bdc330d..c1bf1e7 100644
+index bdc330d..298d754 100644
 --- a/source/app.tsx
 +++ b/source/app.tsx
-@@ -1,0 +2 @@ import { definePluginApp, type PluginThreadListProps } from "@get-bb/plugin-sdk/
+@@ -1,0 +2,2 @@ import { definePluginApp, type PluginThreadListProps } from "@get-bb/plugin-sdk/
++import { Navigation } from "./app/navigation/Navigation.js";
 +import { SidebarAnchors } from "@bb-studio/kit/app";
-@@ -6 +6,0 @@ import { ProjectList } from "./app/list/ProjectList.js";
+@@ -6 +7,0 @@ import { ProjectList } from "./app/list/ProjectList.js";
 -import { useSidebarThreadReveal } from "./app/list/useSidebarThreadReveal.js";
-@@ -13 +12,0 @@ function ThreadList({
+@@ -13 +13,0 @@ function ThreadList({
 -  useSidebarThreadReveal();
-@@ -17,0 +17 @@ function ThreadList({
+@@ -17,0 +18 @@ function ThreadList({
 +        <SidebarAnchors onNavigate={onNavigate} />
-@@ -30 +30 @@ export default definePluginApp((app) => {
+@@ -27,0 +29,5 @@ export default definePluginApp((app) => {
++  app.slots.experimental_sidebarNavigation({
++    id: "navigation", title: "Studio Navigation",
++    description: "BB navigation without the add-on rows Studio already opens.",
++    component: Navigation,
++  });
+@@ -30 +36 @@ export default definePluginApp((app) => {
 -    title: "Thread list",
 +    title: "Studio Sidebar",
-@@ -32 +32 @@ export default definePluginApp((app) => {
+@@ -32 +38 @@ export default definePluginApp((app) => {
 -      "Pinned threads, custom sections, projects, machines, and nested threads.",
 +      "Studio apps' sections above your threads: pinned threads, custom sections, projects, machines, and nested threads.",
 diff --git a/source/app/dnd/useSectionThreadDnd.ts b/source/app/dnd/useSectionThreadDnd.ts
-index 39258e5..cee5dac 100644
+index 39258e5..b1a5413 100644
 --- a/source/app/dnd/useSectionThreadDnd.ts
 +++ b/source/app/dnd/useSectionThreadDnd.ts
-@@ -209 +209,2 @@ function parseGroupSectionId(key: string): SidebarSectionId {
+@@ -12,0 +13 @@ import {
++  pointerWithin,
+@@ -103,0 +105,13 @@ export interface SectionThreadDndState {
++/**
++ * Studio: a drop that moves threads into a group held outside the threads'
++ * own fields, such as a Space. `target` maps a drop target (a section key or
++ * another droppable id) to the parent key to move into, or null when it isn't
++ * one or the threads are there already.
++ */
++export interface SectionThreadGroupMove {
++  target(overKey: string, threadIds: readonly string[]): string | null;
++  /** Droppables outside the sections, such as Space dots, that win over what they cover. */
++  ownsDroppable?(id: string): boolean;
++  move(parentKey: string, threadIds: readonly string[]): Promise<unknown>;
++}
++
+@@ -111,0 +126 @@ interface UseSectionThreadDndArgs {
++  groupMove?: SectionThreadGroupMove;
+@@ -152 +167,6 @@ export type SectionThreadDropDecision =
+-  | ({ kind: "move"; toParentKey: string } & SectionThreadDropChanges)
++  | ({
++      kind: "move";
++      toParentKey: string;
++      /** Studio: the move is the group move's, into `toParentKey`. */
++      groupMove?: true;
++    } & SectionThreadDropChanges)
+@@ -209 +229,2 @@ function parseGroupSectionId(key: string): SidebarSectionId {
 -    key.startsWith("machine:")
 +    key.startsWith("machine:") ||
 +    key.startsWith("space:")
+@@ -508,0 +530 @@ interface ResolveSectionThreadDropDecisionOptions {
++  groupMove?: Pick<SectionThreadGroupMove, "target">;
+@@ -632,0 +655,20 @@ export function resolveSectionThreadDropDecision(
++  const threadIds = threads.map((thread) => thread.id);
++  const groupKey = toParentKey ?? (isSelfCollision ? null : overId);
++  const groupParentKey =
++    groupKey && options.groupMove
++      ? options.groupMove.target(groupKey, threadIds)
++      : null;
++  if (groupParentKey !== null) {
++    return {
++      kind: "move",
++      activeId,
++      toParentKey: groupParentKey,
++      groupMove: true,
++      threadIds,
++      unpinThreadIds: [],
++      updates: threadIds
++        .filter((threadId) => lookup.nestParentIdByItemId.has(threadId))
++        .map((threadId) => ({ threadId, parentThreadId: null })),
++      pinThreadIds: [],
++    };
++  }
+@@ -635 +676,0 @@ export function resolveSectionThreadDropDecision(
+-  const threadIds = threads.map((thread) => thread.id);
+@@ -846,0 +888,2 @@ function hasDropDecisionLanded(
++  // Studio: the group move shows itself once it lands.
++  if (decision.kind === "move" && decision.groupMove) return true;
+@@ -879,0 +923 @@ export function useSectionThreadDnd({
++  groupMove,
+@@ -904 +948,4 @@ export function useSectionThreadDnd({
+-  const decisionOptions = useMemo(() => ({ groups }), [groups]);
++  const decisionOptions = useMemo(
++    () => ({ groups, groupMove }),
++    [groupMove, groups],
++  );
+@@ -1010,0 +1058,10 @@ export function useSectionThreadDnd({
++      const ownsDroppable = groupMove?.ownsDroppable;
++      const owned = ownsDroppable
++        ? pointerWithin(args).find(
++            ({ id }) => typeof id === "string" && ownsDroppable(id),
++          )
++        : undefined;
++      if (owned) {
++        latestRowCollisionRef.current = null;
++        return [owned];
++      }
+@@ -1051,0 +1109 @@ export function useSectionThreadDnd({
++      groupMove,
+@@ -1332,0 +1391,18 @@ export function useSectionThreadDnd({
++          if (decision.groupMove && groupMove) {
++            settle(
++              commitDropChanges(
++                decision,
++                `Failed to move ${describeThreadCount(decision.threadIds)}.`,
++              ).then(() =>
++                groupMove.move(decision.toParentKey, decision.threadIds),
++              ),
++            );
++            break;
++          }
++          settle(
++            commitDropChanges(
++              decision,
++              `Failed to move ${describeThreadCount(decision.threadIds)}.`,
++            ),
++          );
++          break;
+@@ -1373,0 +1450 @@ export function useSectionThreadDnd({
++      groupMove,
 diff --git a/source/app/list/ProjectList.tsx b/source/app/list/ProjectList.tsx
-index afa82d9..7586ad1 100644
+index afa82d9..9aa7da0 100644
 --- a/source/app/list/ProjectList.tsx
 +++ b/source/app/list/ProjectList.tsx
-@@ -45,0 +46,8 @@ import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
+@@ -38 +38,4 @@ import { getCollapsedChildActivity } from "../model/thread-activity.js";
+-import { useSectionThreadDnd } from "../dnd/useSectionThreadDnd.js";
++import {
++  useSectionThreadDnd,
++  type SectionThreadGroupMove,
++} from "../dnd/useSectionThreadDnd.js";
+@@ -45,0 +49,8 @@ import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
 +import { useProjectCreation } from "../studio/useProjectCreation.js";
 +import { visibleProjects } from "../studio/visibleProjects.js";
 +import { HiddenThreadsProvider, useHiddenThreads } from "../studio/useHiddenThreads.js";
@@ -37,47 +146,53 @@ index afa82d9..7586ad1 100644
 +import { defaultSpaceId, projectSpaces } from "../studio/space-groups.js";
 +import { publishSidebarOrganization, useStudioSpaces, useStudioSpacesSync } from "../studio/studioSpaces.js";
 +import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
-@@ -99,0 +108 @@ import {
+@@ -99,0 +111 @@ import {
 +  sidebarHideEmptyProjectsAtom,
-@@ -143 +152 @@ export { PROJECT_LIST_ACTION_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
+@@ -143 +155 @@ export { PROJECT_LIST_ACTION_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
 -type ThreadListStatus = "loading" | "ready" | "unavailable";
 +export type ThreadListStatus = "loading" | "ready" | "unavailable";
-@@ -155 +164 @@ interface ToggleCollapsedIdListArgs {
+@@ -155 +167 @@ interface ToggleCollapsedIdListArgs {
 -type ToggleCollapsedId = (id: string) => void;
 +export type ToggleCollapsedId = (id: string) => void;
-@@ -174 +183 @@ const EMPTY_SECTION_DEFINITIONS: readonly SidebarSectionDefinition[] = [];
+@@ -174 +186 @@ const EMPTY_SECTION_DEFINITIONS: readonly SidebarSectionDefinition[] = [];
 -function getProjectThreadListState({
 +export function getProjectThreadListState({
-@@ -191 +200 @@ function getProjectThreadListState({
+@@ -191 +203 @@ function getProjectThreadListState({
 -function toggleCollapsedIdList({
 +export function toggleCollapsedIdList({
-@@ -395 +404 @@ function ProjectListSectionMoveScope({
+@@ -395 +407 @@ function ProjectListSectionMoveScope({
 -interface BuiltInSectionRenderState {
 +export interface BuiltInSectionRenderState {
-@@ -405,0 +415 @@ interface ActiveSidebarModeSectionsProps {
+@@ -405,0 +418 @@ interface ActiveSidebarModeSectionsProps {
 +  renderSpace?: () => ReactNode;
-@@ -412,0 +423 @@ export function ActiveSidebarModeSections({
+@@ -412,0 +426 @@ export function ActiveSidebarModeSections({
 +  renderSpace,
-@@ -413,0 +425 @@ export function ActiveSidebarModeSections({
+@@ -413,0 +428 @@ export function ActiveSidebarModeSections({
 +  if (mode === "space" && renderSpace) return renderSpace();
-@@ -419 +431 @@ export function ActiveSidebarModeSections({
+@@ -419 +434 @@ export function ActiveSidebarModeSections({
 -interface GroupedModePinnedProps {
 +export interface GroupedModePinnedProps {
-@@ -429 +441 @@ interface GroupedModePinnedProps {
+@@ -429 +444 @@ interface GroupedModePinnedProps {
 -function buildGroupSectionItem(
 +export function buildGroupSectionItem(
-@@ -457 +469 @@ function buildGroupSectionItem(
+@@ -457 +472 @@ function buildGroupSectionItem(
 -function useGroupedModeThreadDnd({
 +export function useGroupedModeThreadDnd({
-@@ -522,0 +535 @@ interface ProjectModeSectionsProps
+@@ -466,0 +482 @@ function useGroupedModeThreadDnd({
++  groupMove,
+@@ -476,0 +493 @@ function useGroupedModeThreadDnd({
++  groupMove?: SectionThreadGroupMove;
+@@ -493,0 +511 @@ function useGroupedModeThreadDnd({
++    groupMove,
+@@ -522,0 +541 @@ interface ProjectModeSectionsProps
 +  createdProjectId: string | null;
-@@ -548,0 +562 @@ function ProjectModeSections({
+@@ -548,0 +568 @@ function ProjectModeSections({
 +  createdProjectId,
-@@ -558,0 +573,3 @@ function ProjectModeSections({
+@@ -558,0 +579,3 @@ function ProjectModeSections({
 +  const hideEmptyProjects = useAtomValue(sidebarHideEmptyProjectsAtom);
 +  const rename = useSidebarRenameState();
 +  const [dragging, setDragging] = useState(false);
-@@ -593,2 +610,10 @@ function ProjectModeSections({
+@@ -593,2 +616,10 @@ function ProjectModeSections({
 -      projects
 -        .filter((project) => !project.isPersonal)
 +      visibleProjects({
@@ -90,7 +205,7 @@ index afa82d9..7586ad1 100644
 +        dragging,
 +        ready: status === "ready",
 +      })
-@@ -603 +628,10 @@ function ProjectModeSections({
+@@ -603 +634,10 @@ function ProjectModeSections({
 -    [projects, status, threadsByProject],
 +    [
 +      projects,
@@ -102,7 +217,7 @@ index afa82d9..7586ad1 100644
 +      createdProjectId,
 +      dragging,
 +    ],
-@@ -696,0 +731,30 @@ function ProjectModeSections({
+@@ -696,0 +737,30 @@ function ProjectModeSections({
 +  const projectThreadDnd = threadDnd && {
 +    ...threadDnd,
 +    dndContextProps: {
@@ -133,18 +248,18 @@ index afa82d9..7586ad1 100644
 +      },
 +    },
 +  };
-@@ -794 +858,4 @@ function ProjectModeSections({
+@@ -794 +864,4 @@ function ProjectModeSections({
 -      <ReorderableSidebarSectionOrderList order={order} threadDnd={threadDnd}>
 +      <ReorderableSidebarSectionOrderList
 +        order={order}
 +        threadDnd={projectThreadDnd}
 +      >
-@@ -1347,0 +1415 @@ function ProjectListComponent({
+@@ -1347,0 +1421 @@ function ProjectListComponent({
 +  const projectCreation = useProjectCreation(onProjectSelect);
-@@ -1349 +1417 @@ function ProjectListComponent({
+@@ -1349 +1423 @@ function ProjectListComponent({
 -  const { status, sections, projects, personalProject, archived } =
 +  const { status, sections, projects: allProjects, personalProject, archived } =
-@@ -1351,0 +1420,28 @@ function ProjectListComponent({
+@@ -1351,0 +1426,28 @@ function ProjectListComponent({
 +  const selectedThreadId = activeThreadId ?? undefined;
 +  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
 +  const threadCount = useMemo(() => allProjects.reduce((count, project) => count + project.threads.length, 0), [allProjects]);
@@ -173,7 +288,7 @@ index afa82d9..7586ad1 100644
 +  );
 +  const hiddenThreads = useHiddenThreads({ projects: allProjects, sectionKeyOf, keepIds });
 +  const projects = hiddenThreads.projects;
-@@ -1359 +1455,9 @@ function ProjectListComponent({
+@@ -1359 +1461,9 @@ function ProjectListComponent({
 -  const selectedThreadId = activeThreadId ?? undefined;
 +  const allThreads = useMemo(() => allProjects.flatMap((project) => project.threads), [allProjects]);
 +  useSidebarThreadRevealCore({
@@ -184,7 +299,7 @@ index afa82d9..7586ad1 100644
 +    personalProjectId,
 +    hiddenThreadIds: hiddenThreads.hiddenIds,
 +  });
-@@ -1411,0 +1516,8 @@ function ProjectListComponent({
+@@ -1411,0 +1522,8 @@ function ProjectListComponent({
 +  // A Space's new thread starts in its default project; Studio decides
 +  // whether the thread joins the Space (by the project), not this list.
 +  const handleCreateThreadInProject = useCallback(
@@ -193,17 +308,17 @@ index afa82d9..7586ad1 100644
 +    },
 +    [openRootComposeForProject, personalProjectId],
 +  );
-@@ -1566 +1677,0 @@ function ProjectListComponent({
+@@ -1566 +1683,0 @@ function ProjectListComponent({
 -  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
-@@ -1723 +1834 @@ function ProjectListComponent({
+@@ -1723 +1840 @@ function ProjectListComponent({
 -  if (threadListStatus === "loading" || !preferencesReady) {
 +  if (threadListStatus === "loading" || !preferencesReady || (spaceMode && !spaceData)) {
-@@ -1731,0 +1843 @@ function ProjectListComponent({
+@@ -1731,0 +1849 @@ function ProjectListComponent({
 +    <HiddenThreadsProvider value={hiddenThreads.state}>
-@@ -1733,0 +1846,2 @@ function ProjectListComponent({
+@@ -1733,0 +1852,2 @@ function ProjectListComponent({
 +        onNewProject: projectCreation.openDialog,
 +        isCreatingProject: projectCreation.isCreating,
-@@ -1740 +1854,35 @@ function ProjectListComponent({
+@@ -1740 +1860,35 @@ function ProjectListComponent({
 -          mode={organizationMode}
 +          mode={effectiveMode}
 +          renderSpace={() => spaceData && (
@@ -240,19 +355,30 @@ index afa82d9..7586ad1 100644
 +              onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
 +            />
 +          )}
-@@ -1804,0 +1953 @@ function ProjectListComponent({
+@@ -1804,0 +1959 @@ function ProjectListComponent({
 +              createdProjectId={projectCreation.createdProjectId}
-@@ -1860,0 +2010 @@ function ProjectListComponent({
+@@ -1860,0 +2016 @@ function ProjectListComponent({
 +      {projectCreation.dialog}
-@@ -1861,0 +2012 @@ function ProjectListComponent({
+@@ -1861,0 +2018 @@ function ProjectListComponent({
 +    </HiddenThreadsProvider>
 diff --git a/source/app/list/SidebarHeaderControls.tsx b/source/app/list/SidebarHeaderControls.tsx
-index ec076ad..fe95274 100644
+index ec076ad..f48ba59 100644
 --- a/source/app/list/SidebarHeaderControls.tsx
 +++ b/source/app/list/SidebarHeaderControls.tsx
 @@ -22,0 +23,2 @@ export interface HeaderCreationActions {
 +  onNewProject?: () => void;
 +  isCreatingProject?: boolean;
+@@ -34,0 +37 @@ export function SidebarHeaderControls({
++  leadingAction,
+@@ -43,0 +47,2 @@ export function SidebarHeaderControls({
++  /** A button before ⋯ in place of New thread. */
++  leadingAction?: ReactNode;
+@@ -59 +64 @@ export function SidebarHeaderControls({
+-        showNewThread ? (
++        leadingAction ?? (showNewThread ? (
+@@ -66 +71 @@ export function SidebarHeaderControls({
+-        ) : null
++        ) : null)
 diff --git a/source/app/list/SidebarViewItems.tsx b/source/app/list/SidebarViewItems.tsx
 index 063bfec..5a6e174 100644
 --- a/source/app/list/SidebarViewItems.tsx
@@ -381,17 +507,19 @@ index aa949ec..1fd7730 100644
 +export const sidebarHideEmptyProjectsAtom =
 +  createSyncedPreferenceAtom("hideEmptyProjects");
 diff --git a/source/app/rows/ThreadActionsMenu.tsx b/source/app/rows/ThreadActionsMenu.tsx
-index c9f9497..0f5b250 100644
+index c9f9497..e9611fa 100644
 --- a/source/app/rows/ThreadActionsMenu.tsx
 +++ b/source/app/rows/ThreadActionsMenu.tsx
-@@ -51,0 +52,3 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
+@@ -51,0 +52,4 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
 +import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
 +import { HideThreadItem } from "../studio/HiddenThreads.js";
 +import { SpaceLeadItem } from "../studio/SpaceLead.js";
-@@ -257,0 +261 @@ function ThreadActionsMenuItems({
++import { MoveToSpaceItem } from "../studio/MoveToSpace.js";
+@@ -257,0 +262 @@ function ThreadActionsMenuItems({
 +  const floatAvailable = useFloatAvailable();
-@@ -327 +331,6 @@ function ThreadActionsMenuItems({
+@@ -327 +332,7 @@ function ThreadActionsMenuItems({
 -          {id === "split" && onOpenInSplit ? separator : null}
++          {id === "move" ? <MoveToSpaceItem thread={thread} surface={surface} /> : null}
 +          {id === "archive" ? <HideThreadItem threadId={thread.id} surface={surface} /> : null}
 +          {id === "archive" ? <SpaceLeadItem thread={thread} surface={surface} /> : null}
 +          {id === "split" && floatAvailable ? (

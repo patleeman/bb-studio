@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAtom, useAtomValue } from "jotai";
+import { DndContext, useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { openAppPath } from "@bb-studio/kit/app";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
@@ -33,7 +35,9 @@ import {
   type BuiltInSidebarSectionOptions,
   type BuiltInSidebarSectionOptionsById,
 } from "../list/BuiltInSidebarSection.js";
-import { ReorderableSidebarSectionOrderList } from "../list/ReorderableSidebarSectionOrderList.js";
+import { SectionThreadDragOverlayPortal } from "../list/ProjectRow.js";
+import { SectionThreadDndProvider } from "../dnd/SectionThreadDndContext.js";
+import type { SectionThreadDndState, SectionThreadGroupMove } from "../dnd/useSectionThreadDnd.js";
 import { ThreadListVisibility, ThreadListVisibilityGroupScope } from "../list/ThreadListVisibility.js";
 import { SidebarHeaderControls } from "../list/SidebarHeaderControls.js";
 import {
@@ -42,7 +46,18 @@ import {
   sidebarGroupThreadsByEnvironmentAtom,
 } from "../preferences/atoms.js";
 import { toggleCollapsedIdList } from "../list/ProjectList.js";
-import { buildSpaceThreadGroups, createSpaceResolver, defaultSpaceId, spaceSectionKey, type StudioSpace, projectSpaces } from "./space-groups.js";
+import {
+  buildSpaceThreadGroups,
+  createSpaceResolver,
+  defaultSpaceId,
+  isSpaceDotDropId,
+  projectSpaces,
+  spaceHeadingDropId,
+  spaceIdOfDropKey,
+  spaceSectionKey,
+  type StudioSpace,
+} from "./space-groups.js";
+import { useMoveThreadsToSpace } from "./MoveToSpace.js";
 import { SpaceStudioList, SpaceSubheading } from "./SpaceStudioList.js";
 import { SpaceArchivedMenu } from "./SpaceArchivedMenu.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
@@ -259,6 +274,31 @@ export function SpaceModeSections({
     () => [...looseItems, ...shown.map((candidate) => candidate.item)],
     [looseItems, shown],
   );
+  // A thread dropped on a Space's heading, list or dot moves into that Space.
+  const moveThreads = useMoveThreadsToSpace();
+  const groupMove = useMemo<SectionThreadGroupMove>(() => {
+    const byId = new Map(threads.map((thread) => [thread.id, thread]));
+    const spaceOfKey = (key: string) => {
+      const spaceId = spaceIdOfDropKey(key);
+      return spaceId === null ? null : spaces.find((space) => space.id === spaceId) ?? null;
+    };
+    return {
+      target: (key, threadIds) => {
+        const space = spaceOfKey(key);
+        if (!space) return null;
+        const moves = threadIds.some((id) => {
+          const thread = byId.get(id);
+          return !thread || resolveSpace(thread) !== space.id;
+        });
+        return moves ? spaceSectionKey(space.id) : null;
+      },
+      ownsDroppable: isSpaceDotDropId,
+      move: (key, threadIds) => {
+        const space = spaceOfKey(key);
+        return space ? moveThreads(threadIds, space) : Promise.resolve();
+      },
+    };
+  }, [moveThreads, resolveSpace, spaces, threads]);
   // Threads still nest by dropping one onto another; sections don't reorder.
   const threadDnd = useGroupedModeThreadDnd({
     collapsedThreadIds,
@@ -270,6 +310,7 @@ export function SpaceModeSections({
     pinned: { pinnedReorderPending, pinnedRootItems, pinnedRootNodes, pinnedThreads, onReorderPinnedThread },
     rootItems,
     threads: nonPinnedThreads,
+    groupMove,
   });
 
   const tree = (props: { rootItems: ProjectThreadItem[]; threads: SidebarThread[]; dndParentKey?: string }) => (
@@ -300,10 +341,13 @@ export function SpaceModeSections({
   return (
     <SpaceLeadContext.Provider value={leadState}>
       <SpaceRowsContext.Provider value={rows}>
+      <SpaceDndScope threadDnd={threadDnd}>
       <div ref={area} data-sidebar-space-area="" className="flex min-w-0 flex-col">
         <ThreadListVisibility groups={[]} order={[]} onOrderChange={noop} label="Spaces" selectedThreadId={selectedThreadId}>
-          <ReorderableSidebarSectionOrderList order={order} threadDnd={threadDnd}>
-            {(sectionId, consumeClickSuppression) => {
+          <SortableContext items={order} strategy={verticalListSortingStrategy}>
+            <div className="space-y-4">
+            {order.map((sectionId) => {
+              const consumeClickSuppression = threadDnd?.consumeClickSuppression ?? (() => false);
               const builtInSection = renderBuiltInSidebarSection({
                 sectionId,
                 sections: builtInSections,
@@ -330,6 +374,7 @@ export function SpaceModeSections({
               const heartbeat = heartbeats[group.space.id] ?? null;
               return (
                 <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>
+                  <SpaceDropArea spaceId={group.space.id}>
                   <SpaceSidebarSection
                     space={group.space}
                     sectionId={group.sectionId}
@@ -371,18 +416,43 @@ export function SpaceModeSections({
                     />
                     {tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId })}
                   </SpaceSidebarSection>
+                  </SpaceDropArea>
                 </ThreadListVisibilityGroupScope>
               );
-            }}
-          </ReorderableSidebarSectionOrderList>
+            })}
+            </div>
+          </SortableContext>
         </ThreadListVisibility>
         {spaces.length ? (
           <SpaceSwitcher spaces={spaces} currentId={currentId} attention={attention} onSelect={switchTo} />
         ) : null}
       </div>
+      </SpaceDndScope>
       </SpaceRowsContext.Provider>
     </SpaceLeadContext.Provider>
   );
+}
+
+/**
+ * The threads' drag and drop around the whole By space area, so the Space
+ * dots below the list take drops too.
+ */
+function SpaceDndScope({ threadDnd, children }: { threadDnd: SectionThreadDndState | null; children: ReactNode }) {
+  if (!threadDnd) return <>{children}</>;
+  return (
+    <SectionThreadDndProvider value={threadDnd}>
+      <DndContext {...threadDnd.dndContextProps}>
+        {children}
+        <SectionThreadDragOverlayPortal activeThread={threadDnd.activeThread} />
+      </DndContext>
+    </SectionThreadDndProvider>
+  );
+}
+
+/** A Space section, its heading a drop target for threads moving in. */
+function SpaceDropArea({ spaceId, children }: { spaceId: string; children: ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: spaceHeadingDropId(spaceId) });
+  return <div ref={setNodeRef} data-space-drop={spaceId}>{children}</div>;
 }
 
 const COMMAND_PLUGIN_ID = "studio";
@@ -414,7 +484,7 @@ export function resetCommandInstalledForTest(): void {
 /**
  * A Space's plain heading: its mark (amber-dotted in All when a thread there
  * needs the user) and name, a Command view button, and ⋯ with New thread,
- * Command view, Edit and Delete. In All it collapses.
+ * Command view, Threads…, Projects…, Edit and Delete. In All it collapses.
  */
 function SpaceSidebarSection({
   space,
@@ -477,6 +547,15 @@ function SpaceSidebarSection({
               Command view
             </DropdownMenuItem>
           ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => openSpaceDialog(space.id, "threads")}>
+            <Icon name="MessageSquare" />
+            Threads…
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => openSpaceDialog(space.id, "projects")}>
+            <Icon name="Folder" />
+            Projects…
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => openSpaceDialog(space.id, "heartbeat")}>
             <Icon name="Star" />

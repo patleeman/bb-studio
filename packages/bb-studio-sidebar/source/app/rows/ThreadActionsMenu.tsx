@@ -52,6 +52,7 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
 import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
 import { HideThreadItem } from "../studio/HiddenThreads.js";
 import { SpaceLeadItem } from "../studio/SpaceLead.js";
+import { MoveToSpaceItem } from "../studio/MoveToSpace.js";
 import { useCustomizeThreadRowActions } from "../list/customizeRowActionsContext.js";
 
 interface ThreadActionsMenuBaseProps {
@@ -328,6 +329,7 @@ function ThreadActionsMenuItems({
             onRename={onRename}
             variant={menuVariant}
           />
+          {id === "move" ? <MoveToSpaceItem thread={thread} surface={surface} /> : null}
           {id === "archive" ? <HideThreadItem threadId={thread.id} surface={surface} /> : null}
           {id === "archive" ? <SpaceLeadItem thread={thread} surface={surface} /> : null}
           {id === "split" && floatAvailable ? (

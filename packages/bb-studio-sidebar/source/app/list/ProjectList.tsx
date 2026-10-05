@@ -35,7 +35,10 @@ import {
   type ProjectThreadNode,
 } from "../model/project-thread-groups.js";
 import { getCollapsedChildActivity } from "../model/thread-activity.js";
-import { useSectionThreadDnd } from "../dnd/useSectionThreadDnd.js";
+import {
+  useSectionThreadDnd,
+  type SectionThreadGroupMove,
+} from "../dnd/useSectionThreadDnd.js";
 import { useNestDropPreview } from "../dnd/useNestDropPreview.js";
 import {
   getErrorCode,
@@ -476,6 +479,7 @@ export function useGroupedModeThreadDnd({
   pinned,
   rootItems,
   threads,
+  groupMove,
 }: {
   collapsedThreadIds: Set<string>;
   compareThreads: ThreadComparator;
@@ -486,6 +490,7 @@ export function useGroupedModeThreadDnd({
   pinned: GroupedModePinnedProps;
   rootItems: readonly ProjectThreadItem[];
   threads: readonly SidebarThread[];
+  groupMove?: SectionThreadGroupMove;
 }) {
   const expandThread = useCallback(
     (threadId: string) => {
@@ -503,6 +508,7 @@ export function useGroupedModeThreadDnd({
     onTopLevelSectionOrderChange: onOrderChange,
     onExpandThread: expandThread,
     groups: true,
+    groupMove,
     pinnedReorderPending: pinned.pinnedReorderPending,
     pinnedThreads: pinned.pinnedThreads,
     pinnedRootItems: pinned.pinnedRootItems,

@@ -1,16 +1,20 @@
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SIDEBAR_CONTENT_SELECTOR } from "../ui/sidebar.js";
-import type { StudioSpace } from "./space-groups.js";
+import { spaceDotDropId, type StudioSpace } from "./space-groups.js";
 
 /** Studio's New space dialog; no detail. */
 export const NEW_SPACE_EVENT = "studio:new-space";
 /** One of a Space's dialogs; detail `{ spaceId, dialog }`. */
 export const SPACE_DIALOG_EVENT = "studio:space-dialog";
 
-export function openSpaceDialog(spaceId: string, dialog: "edit" | "delete" | "heartbeat"): void {
+/** Studio's Space dialogs: Threads and Projects move threads and projects into the Space. */
+export type SpaceDialog = "edit" | "delete" | "heartbeat" | "threads" | "projects";
+
+export function openSpaceDialog(spaceId: string, dialog: SpaceDialog): void {
   window.dispatchEvent(new CustomEvent(SPACE_DIALOG_EVENT, { detail: { spaceId, dialog }, cancelable: true }));
 }
 
@@ -138,31 +142,15 @@ export function SpaceSwitcher({ spaces, currentId, attention, onSelect }: {
         </TooltipTrigger>
         <TooltipContent side="top">All Spaces</TooltipContent>
       </Tooltip>
-      {spaces.map((space) => {
-        const current = space.id === currentId;
-        const needsYou = attention.has(space.id);
-        return (
-          <Tooltip key={space.id}>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label={needsYou ? `${space.name}, needs you` : space.name}
-                aria-current={current ? "true" : undefined}
-                data-space-id={space.id}
-                onClick={() => onSelect(space.id)}
-                className={cn(
-                  "relative inline-flex size-7 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-                  current ? "bg-sidebar-accent" : "opacity-60 hover:bg-sidebar-accent/60 hover:opacity-100",
-                )}
-              >
-                <SpaceMark space={space} size="md" />
-                {needsYou ? <span data-space-needs-you="" aria-hidden="true" className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" /> : null}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">{space.name}</TooltipContent>
-          </Tooltip>
-        );
-      })}
+      {spaces.map((space) => (
+        <SpaceDot
+          key={space.id}
+          space={space}
+          current={space.id === currentId}
+          needsYou={attention.has(space.id)}
+          onSelect={onSelect}
+        />
+      ))}
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -177,5 +165,40 @@ export function SpaceSwitcher({ spaces, currentId, attention, onSelect }: {
         <TooltipContent side="top">New Space</TooltipContent>
       </Tooltip>
     </nav>
+  );
+}
+
+/** One Space's dot; a thread dragged onto it moves into the Space. */
+function SpaceDot({ space, current, needsYou, onSelect }: {
+  space: StudioSpace;
+  current: boolean;
+  needsYou: boolean;
+  onSelect(spaceId: string): void;
+}) {
+  const { isOver, setNodeRef } = useDroppable({ id: spaceDotDropId(space.id) });
+  return (
+    <span ref={setNodeRef} className="inline-flex">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={needsYou ? `${space.name}, needs you` : space.name}
+            aria-current={current ? "true" : undefined}
+            data-space-id={space.id}
+            data-drop-target={isOver ? "" : undefined}
+            onClick={() => onSelect(space.id)}
+            className={cn(
+              "relative inline-flex size-7 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+              isOver ? "bg-sidebar-accent opacity-100 ring-2 ring-sidebar-ring"
+                : current ? "bg-sidebar-accent" : "opacity-60 hover:bg-sidebar-accent/60 hover:opacity-100",
+            )}
+          >
+            <SpaceMark space={space} size="md" />
+            {needsYou ? <span data-space-needs-you="" aria-hidden="true" className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" /> : null}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">{isOver ? `Move to ${space.name}` : space.name}</TooltipContent>
+      </Tooltip>
+    </span>
   );
 }

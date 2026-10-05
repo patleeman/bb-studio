@@ -10,6 +10,7 @@ import { useSetAtom } from "jotai";
 import { toast } from "sonner";
 import {
   MeasuringStrategy,
+  pointerWithin,
   type ClientRect,
   type Collision,
   type CollisionDetection,
@@ -101,6 +102,19 @@ export interface SectionThreadDndState {
   pinnedReorderPending: boolean;
 }
 
+/**
+ * Studio: a drop that moves threads into a group held outside the threads'
+ * own fields, such as a Space. `target` maps a drop target (a section key or
+ * another droppable id) to the parent key to move into, or null when it isn't
+ * one or the threads are there already.
+ */
+export interface SectionThreadGroupMove {
+  target(overKey: string, threadIds: readonly string[]): string | null;
+  /** Droppables outside the sections, such as Space dots, that win over what they cover. */
+  ownsDroppable?(id: string): boolean;
+  move(parentKey: string, threadIds: readonly string[]): Promise<unknown>;
+}
+
 interface UseSectionThreadDndArgs {
   containerId: string;
   enabled: boolean;
@@ -109,6 +123,7 @@ interface UseSectionThreadDndArgs {
   onTopLevelSectionOrderChange: (order: SidebarSectionId[]) => void;
   onExpandThread?: (threadId: string) => void;
   groups?: boolean;
+  groupMove?: SectionThreadGroupMove;
   pinnedReorderPending: boolean;
   pinnedThreads: readonly SidebarThread[];
   pinnedRootItems?: readonly ProjectThreadItem[];
@@ -149,7 +164,12 @@ interface SectionThreadDropChanges {
 }
 
 export type SectionThreadDropDecision =
-  | ({ kind: "move"; toParentKey: string } & SectionThreadDropChanges)
+  | ({
+      kind: "move";
+      toParentKey: string;
+      /** Studio: the move is the group move's, into `toParentKey`. */
+      groupMove?: true;
+    } & SectionThreadDropChanges)
   | ({ kind: "nest"; parentThreadId: string } & SectionThreadDropChanges)
   | ({ kind: "pin" } & SectionThreadDropChanges)
   | { kind: "reorder-pinned"; activeId: string; overId: string }
@@ -507,6 +527,7 @@ function resolveSectionThreadDropParentKey(
 
 interface ResolveSectionThreadDropDecisionOptions {
   groups?: boolean;
+  groupMove?: Pick<SectionThreadGroupMove, "target">;
 }
 
 function getPinnedThreadIds(threads: readonly SidebarThread[]): string[] {
@@ -631,9 +652,28 @@ export function resolveSectionThreadDropDecision(
     : resolveSectionThreadDropParentKey(lookup, overId);
   const toParentKey =
     directParentKey ?? (isSelfCollision ? projectedParentKey : null);
+  const threadIds = threads.map((thread) => thread.id);
+  const groupKey = toParentKey ?? (isSelfCollision ? null : overId);
+  const groupParentKey =
+    groupKey && options.groupMove
+      ? options.groupMove.target(groupKey, threadIds)
+      : null;
+  if (groupParentKey !== null) {
+    return {
+      kind: "move",
+      activeId,
+      toParentKey: groupParentKey,
+      groupMove: true,
+      threadIds,
+      unpinThreadIds: [],
+      updates: threadIds
+        .filter((threadId) => lookup.nestParentIdByItemId.has(threadId))
+        .map((threadId) => ({ threadId, parentThreadId: null })),
+      pinThreadIds: [],
+    };
+  }
   if (!toParentKey) return null;
 
-  const threadIds = threads.map((thread) => thread.id);
   if (toParentKey === PINNED_THREAD_PARENT_KEY) {
     const detachThreadIds = threadIds.filter((threadId) =>
       lookup.nestParentIdByItemId.has(threadId),
@@ -845,6 +885,8 @@ function hasDropDecisionLanded(
   lookup: SectionThreadDndLookup,
   decision: SectionThreadDropDecision,
 ): boolean {
+  // Studio: the group move shows itself once it lands.
+  if (decision.kind === "move" && decision.groupMove) return true;
   switch (decision.kind) {
     case "move":
     case "pin": {
@@ -878,6 +920,7 @@ export function useSectionThreadDnd({
   onTopLevelSectionOrderChange,
   onExpandThread,
   groups = false,
+  groupMove,
   pinnedReorderPending,
   pinnedThreads,
   pinnedRootItems,
@@ -902,7 +945,10 @@ export function useSectionThreadDnd({
       rootItems,
     ],
   );
-  const decisionOptions = useMemo(() => ({ groups }), [groups]);
+  const decisionOptions = useMemo(
+    () => ({ groups, groupMove }),
+    [groupMove, groups],
+  );
   const topLevelSectionIds = useMemo(
     () => new Set<string>(topLevelSectionOrder),
     [topLevelSectionOrder],
@@ -1009,6 +1055,16 @@ export function useSectionThreadDnd({
         });
       }
       pinnedInsertRef.current = null;
+      const ownsDroppable = groupMove?.ownsDroppable;
+      const owned = ownsDroppable
+        ? pointerWithin(args).find(
+            ({ id }) => typeof id === "string" && ownsDroppable(id),
+          )
+        : undefined;
+      if (owned) {
+        latestRowCollisionRef.current = null;
+        return [owned];
+      }
       const groupThreads =
         typeof args.active.id === "string"
           ? lookup.groupThreadsByItemId.get(args.active.id)
@@ -1050,6 +1106,7 @@ export function useSectionThreadDnd({
     },
     [
       getNestBandFraction,
+      groupMove,
       handleResolvedRow,
       handleRowPointer,
       holdNestCandidate,
@@ -1331,6 +1388,24 @@ export function useSectionThreadDnd({
       };
       switch (decision.kind) {
         case "move":
+          if (decision.groupMove && groupMove) {
+            settle(
+              commitDropChanges(
+                decision,
+                `Failed to move ${describeThreadCount(decision.threadIds)}.`,
+              ).then(() =>
+                groupMove.move(decision.toParentKey, decision.threadIds),
+              ),
+            );
+            break;
+          }
+          settle(
+            commitDropChanges(
+              decision,
+              `Failed to move ${describeThreadCount(decision.threadIds)}.`,
+            ),
+          );
+          break;
         case "nest":
           settle(
             commitDropChanges(
@@ -1372,6 +1447,7 @@ export function useSectionThreadDnd({
       decisionOptions,
       dragOverParentKey,
       enabled,
+      groupMove,
       handlePinnedDragEnd,
       lookup,
       onReorderPinnedThread,

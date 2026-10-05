@@ -107,3 +107,23 @@ export function buildSpaceThreadGroups(
     loose,
   };
 }
+
+/** A Space heading's drop target; the section key itself belongs to its thread list. */
+export function spaceHeadingDropId(spaceId: string): string {
+  return `space-head:${spaceId}`;
+}
+
+/** A Space dot's drop target in the switcher. */
+export function spaceDotDropId(spaceId: string): string {
+  return `space-dot:${spaceId}`;
+}
+
+export function isSpaceDotDropId(id: string): boolean {
+  return id.startsWith("space-dot:");
+}
+
+/** The Space a drop target stands for: its section, heading or dot. */
+export function spaceIdOfDropKey(key: string): string | null {
+  const match = /^space(?:-head|-dot)?:(.+)$/u.exec(key);
+  return match ? match[1]! : null;
+}
