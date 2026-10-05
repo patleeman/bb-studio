@@ -10,7 +10,7 @@ vi.mock("@bb-studio/kit/app", () => ({ ItemTile: () => null, Icon: () => null })
 let root: Root, container: HTMLDivElement;
 const row = (id: string, status: string, extra: Partial<CommandThread> = {}): CommandThread => ({ id, title: id, status, parentThreadId: null, updatedAt: 1, error: null, ...extra });
 const render = (layout: "active" | "grid" | "focus", threads = [row("idle", "idle"), row("active", "active")], selected: string | null = null, leadThreadId: string | null = null) => act(() => root.render(React.createElement(CommandThreads, { spaceId: "space", threads, leadThreadId, layout, selected, onSelect: state.select, onReply: state.reply, onOpen: state.open })));
-beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
+beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} }); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 test("active shows every working thread side by side, keeps them after they stop, and adds a pick", () => {
   render("active", [row("idle", "idle"), row("active", "active"), row("busy", "starting")]);
@@ -72,4 +72,27 @@ test("grid panes rearrange by drag or arrow keys, persist per channel, and reset
   act(() => (([...container.querySelectorAll("button")].find(button => button.textContent === "Reset order")) as HTMLButtonElement).click());
   expect(order()).toEqual(["one", "two", "three"]);
   expect(localStorage.getItem("studio:command-order:space")).toBeNull();
+});
+test("panes open on the newest message and follow new ones until the owner scrolls up", () => {
+  vi.stubGlobal("requestAnimationFrame", (run: () => void) => { run(); return 0; });
+  render("grid", [row("one", "active")]);
+  const body = container.querySelector(".channel-pane-body")!, scroller = document.createElement("div");
+  scroller.className = "overflow-y-auto";
+  let top = 0, height = 1000;
+  Object.defineProperties(scroller, { scrollHeight: { get: () => height }, clientHeight: { get: () => 200 }, scrollTop: { get: () => top, set: value => { top = Math.min(value, height - 200); } } });
+  // BB mounts its scroller once the thread loads.
+  act(() => { body.firstElementChild!.append(scroller); });
+  return Promise.resolve().then(() => {
+    expect(top).toBe(800);
+    height = 1400;
+    act(() => { scroller.append(document.createElement("p")); });
+    return Promise.resolve();
+  }).then(() => {
+    expect(top).toBe(1200);
+    top = 300;
+    scroller.dispatchEvent(new Event("scroll"));
+    height = 1800;
+    act(() => { scroller.append(document.createElement("p")); });
+    return Promise.resolve();
+  }).then(() => expect(top).toBe(300));
 });

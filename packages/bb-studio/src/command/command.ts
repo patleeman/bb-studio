@@ -15,7 +15,7 @@ export const COMMAND_FOCUS_MS = 10 * 60_000;
 
 /** Studio's own Space data, read in-process. */
 export type CommandSpaces = {
-  list(): readonly { id: string; name: string; isDefault: boolean }[];
+  list(): readonly { id: string; name: string; isDefault: boolean; defaultProjectId: string | null }[];
   spaceOfThreads(): Promise<Record<string, string>>;
   lead(spaceId: string): Promise<string | null>;
 };
@@ -133,7 +133,7 @@ export class Command {
     // A fork shows under its parent only while the parent is shown too.
     const shown = new Set(threads.map(thread => thread.id));
     for (const thread of threads) if (thread.parentThreadId && !shown.has(thread.parentThreadId)) thread.parentThreadId = null;
-    const result = { space: { id: space.id, name: space.name }, leadThreadId: leadThreadId && shown.has(leadThreadId) ? leadThreadId : null, threads };
+    const result = { space: { id: space.id, name: space.name, defaultProjectId: space.defaultProjectId }, leadThreadId: leadThreadId && shown.has(leadThreadId) ? leadThreadId : null, threads };
     this.shown.set(spaceId, result);
     return result;
   }

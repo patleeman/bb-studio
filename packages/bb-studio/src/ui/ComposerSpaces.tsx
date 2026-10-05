@@ -34,6 +34,12 @@ const savePick = (projectId: string, ids: string[]) => {
 // Space here; the picker takes it once, for its project (or any, if null).
 const HANDOFF_KEY = "studio:new-thread-space";
 const HANDOFF_TTL_MS = 30_000;
+/** Names the Space the next New thread starts in, as Studio Sidebar does. */
+export const handOffNewThreadSpace = (spaceId: string, projectId: string | null) => {
+  const detail = { spaceId, projectId, at: Date.now() };
+  try { sessionStorage.setItem(HANDOFF_KEY, JSON.stringify(detail)); } catch { /* storage unavailable */ }
+  window.dispatchEvent(new CustomEvent(HANDOFF_KEY, { detail }));
+};
 const takeHandoff = (projectId: string): string | null => {
   try {
     const raw = sessionStorage.getItem(HANDOFF_KEY);

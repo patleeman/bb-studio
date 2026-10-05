@@ -37,7 +37,7 @@ export const commandContract = {
   command: {
     input: z.object({ spaceId }),
     output: z.object({
-      space: z.object({ id: z.string(), name: z.string() }),
+      space: z.object({ id: z.string(), name: z.string(), defaultProjectId: z.string().nullable().default(null) }),
       leadThreadId: z.string().nullable(),
       threads: z.array(commandThreadSchema),
     }),

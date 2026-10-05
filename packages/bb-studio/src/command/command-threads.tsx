@@ -26,6 +26,49 @@ function Status({ thread, withTime = false }: { thread: CommandThread; withTime?
 }
 
 /**
+ * Keeps a transcript on its newest message while the owner stays at the
+ * bottom, the way a thread page does. BB's timeline ThreadChat scrolls but
+ * doesn't follow, so without this every pane opened at its first message.
+ */
+function useFollowLatest() {
+  const [body, setBody] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!body) return;
+    let scroller: HTMLElement | null = null, follow = true, frame = 0;
+    const toLatest = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { if (follow && scroller) scroller.scrollTop = scroller.scrollHeight; }); };
+    // Scrolling up stops following; scrolling back to the bottom resumes it.
+    const scrolled = () => { if (scroller) follow = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 48; };
+    const resized = new ResizeObserver(toLatest);
+    // BB swaps its loading state for the scroller once the thread loads.
+    const attach = () => {
+      const next = body.querySelector<HTMLElement>('[class~="overflow-y-auto"]');
+      if (next === scroller) return;
+      scroller?.removeEventListener("scroll", scrolled);
+      resized.disconnect();
+      scroller = next;
+      follow = true;
+      if (!scroller) return;
+      scroller.addEventListener("scroll", scrolled, { passive: true });
+      resized.observe(scroller);
+      for (const child of scroller.children) resized.observe(child);
+    };
+    const changed = new MutationObserver(() => { attach(); toLatest(); });
+    changed.observe(body, { childList: true, subtree: true, characterData: true });
+    attach();
+    toLatest();
+    return () => { cancelAnimationFrame(frame); changed.disconnect(); resized.disconnect(); scroller?.removeEventListener("scroll", scrolled); };
+  }, [body]);
+  return setBody;
+}
+
+function Transcript({ threadId, onReply, choose }: { threadId: string; onReply(id: string): void; choose(id: string): void }) {
+  const follow = useFollowLatest();
+  return <div ref={follow} className="channel-pane-body" onPointerDownCapture={() => onReply(threadId)} onFocusCapture={() => onReply(threadId)}>
+    <ThreadChat threadId={threadId} variant="timeline" layout="contained" className="h-full" messageActions={[{ id: "command-reply", title: "Send to this thread", icon: "ArrowTurnBackward", run: () => choose(threadId) }]} />
+  </div>;
+}
+
+/**
  * A Space's threads in the grid, active and focus layouts. The lead comes
  * first until the owner arranges the grid.
  */
@@ -125,7 +168,7 @@ export function CommandThreads({ spaceId, threads, leadThreadId, layout, selecte
           {layout === "active" && pinned === thread.id && <button type="button" aria-label={`Stop showing ${label(thread)}`} title="Stop showing" onClick={unpin} className="channel-pane-action"><Icon name="X" className="size-3.5" /></button>}
         </span>
       </header>
-      {thread.error ? <p className="p-4 text-sm text-destructive">{thread.error}</p> : <div className="channel-pane-body" onPointerDownCapture={() => onReply(thread.id)} onFocusCapture={() => onReply(thread.id)}><ThreadChat threadId={thread.id} variant="timeline" layout="contained" className="h-full" messageActions={[{ id: "command-reply", title: "Send to this thread", icon: "ArrowTurnBackward", run: () => choose(thread.id) }]} /></div>}
+      {thread.error ? <p className="p-4 text-sm text-destructive">{thread.error}</p> : <Transcript threadId={thread.id} onReply={onReply} choose={choose} />}
       {forks.length > 0 && <footer aria-label="Forks">{forks.map(child => <button type="button" key={child.id} onClick={() => onSelect(child.id)} title={child.title}><Icon name="GitBranch" className="size-3 shrink-0" aria-hidden /><span className="truncate">{child.title}</span><Status thread={child} /></button>)}</footer>}
     </section>;
   };
@@ -152,7 +195,7 @@ export function CommandThreads({ spaceId, threads, leadThreadId, layout, selecte
     })}
   </nav>;
   const transcript = (thread: CommandThread) => <section key={thread.id} className="channel-single" data-channel-thread={thread.id} data-activity={threadActivity(thread)} aria-label={`${label(thread)} transcript`}>
-    {thread.error ? <p className="channel-stage-empty text-destructive">{thread.error}</p> : <div className="channel-pane-body" onPointerDownCapture={() => onReply(thread.id)} onFocusCapture={() => onReply(thread.id)}><ThreadChat threadId={thread.id} variant="timeline" layout="contained" className="h-full" messageActions={[{ id: "command-reply", title: "Send to this thread", icon: "ArrowTurnBackward", run: () => choose(thread.id) }]} /></div>}
+    {thread.error ? <p className="channel-stage-empty text-destructive">{thread.error}</p> : <Transcript threadId={thread.id} onReply={onReply} choose={choose} />}
   </section>;
 
   return <div className="channel-thread-layout" data-channel-layout={layout}>

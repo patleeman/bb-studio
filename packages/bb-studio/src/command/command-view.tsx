@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { experimental_NewThreadComposer as NewThreadComposer, Markdown, useBbNavigate, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { BarCrumb, BarSeparator, Icon, ItemTile, PageColumn, StudioBar, openCompanion } from "@bb-studio/kit/app";
+import { experimental_NewThreadComposer as NewThreadComposer, experimental_useSidebarThreadActions, Markdown, useBbNavigate, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, ItemTile, PageColumn, StudioBar, openCompanion } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { errorMessage as message } from "@bb-studio/kit/format";
 import "./styles.css";
@@ -10,6 +10,7 @@ import type { CommandAttachment, CommandEntry, CommandPermissionMode, CommandSpa
 import { broadcastMentionText, spaceThreadMentionId } from "./mentions";
 import { CommandLayoutPicker, CommandThreads } from "./command-threads";
 import { commandLayout, recipients, type CommandLayout } from "./command-layout";
+import { handOffNewThreadSpace } from "../ui/ComposerSpaces";
 
 type Contract = typeof rpcContract;
 type Space = CommandSpace;
@@ -23,6 +24,9 @@ const MODE_CHOICES: { id: CommandPermissionMode | null; label: string; detail: s
   { id: "auto", label: "Approve for me", detail: "Same workspace sandbox, with requests reviewed automatically." },
   { id: "full", label: "Full Access", detail: "No sandbox and no approvals. The agent can run anything on your machine." },
 ];
+
+/** BB's own New thread keys (⌘N, ⌘⇧O), which file the thread in this Space while Command is open. */
+const isNewThreadKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) && !event.altKey && (event.key.toLowerCase() === "n" ? !event.shiftKey : event.key.toLowerCase() === "o" && event.shiftKey);
 
 /** The last data each Space showed, so reopening the view draws at once while it refreshes. */
 const lastSpace = new Map<string, Space>(), lastFeed = new Map<string, CommandEntry[]>();
@@ -76,6 +80,25 @@ function CommandView({ spaceId }: { spaceId: string }) {
   useLayoutEffect(() => {
     if (followLatest.current && timeline.current) timeline.current.scrollTop = timeline.current.scrollHeight;
   }, [entries?.at(-1)?.id]);
+
+  // New thread opens BB's new-thread screen with this Space already picked.
+  const threadActions = experimental_useSidebarThreadActions();
+  const newThread = useCallback(() => {
+    if (!space) return;
+    handOffNewThreadSpace(space.space.id, space.space.defaultProjectId);
+    threadActions.openNewThread({ projectId: space.space.defaultProjectId ?? undefined, focusPrompt: true });
+  }, [space, threadActions]);
+  useEffect(() => {
+    // Capture runs before BB's own handler, so the key files the thread here instead.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || !space || !isNewThreadKey(event) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      newThread();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [newThread, space]);
 
   // Tells the "This Space" mention provider which Space's threads to offer.
   const markFocus = () => { void rpc.call("commandFocus", { spaceId }).catch(() => {}); };
@@ -147,7 +170,11 @@ function CommandView({ spaceId }: { spaceId: string }) {
         <BarSeparator />
         <BarCrumb current>Command</BarCrumb>
       </nav>
-      <div className="flex shrink-0 items-center gap-0.5"><CommandLayoutPicker value={layout} onChange={setLayout} /></div>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <button type="button" aria-label={`New thread in ${space?.space.name ?? "this Space"}`} aria-keyshortcuts="Meta+N" title="New thread in this Space (⌘N)" className={ICON_BUTTON} disabled={!space} onClick={newThread}><Icon name="Plus" className="size-4" aria-hidden /></button>
+        <span aria-hidden className="mx-1 h-4 w-px bg-border" />
+        <CommandLayoutPicker value={layout} onChange={setLayout} />
+      </div>
     </StudioBar>
     {layout === "merged" ? <div data-command-timeline ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col px-4 pt-6 pb-8">
       {(!space || !entries) && !error && <Placeholder rows={3} />}

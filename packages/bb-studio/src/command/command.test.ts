@@ -4,7 +4,7 @@ import { Command, finalEntries, mergeEntries } from "./command";
 import { commandSendInput, type CommandSpace } from "./command-contract";
 import { recipients } from "./command-layout";
 
-const SPACES = { spaces: [{ id: "sp_default", name: "Personal", isDefault: true }, { id: "sp_launch", name: "Launch", isDefault: false }] };
+const SPACES = { spaces: [{ id: "sp_default", name: "Personal", isDefault: true, defaultProjectId: null }, { id: "sp_launch", name: "Launch", isDefault: false, defaultProjectId: "proj_launch" }] };
 function fixture(spaceOf: Record<string, string> = {}, lead: string | null = null) {
   const host = createFakePluginHost({ pluginId: "studio", sdk: { threads: { send: async () => ({ delivery: "sent" } as never) } } });
   const x = { bb: host.bb, harness: host.harness, close: () => host.harness.lifecycle.dispose() };
@@ -20,7 +20,7 @@ test("a Space's threads come from Studio, lead first, without archived ones", as
   const x = fixture({ lead: "sp_launch", ask: "sp_launch", oldie: "sp_launch", elsewhere: "sp_default" }, "lead");
   try {
     const space = await x.command.space("sp_launch");
-    expect(space.space).toEqual({ id: "sp_launch", name: "Launch" });
+    expect(space.space).toEqual({ id: "sp_launch", name: "Launch", defaultProjectId: "proj_launch" });
     expect(space.leadThreadId).toBe("lead");
     expect(space.threads.map(t => [t.id, t.hasPendingInteraction])).toEqual([["lead", false], ["ask", true]]);
     await expect(x.command.space("sp_gone")).rejects.toThrow("no longer exists");
@@ -53,7 +53,7 @@ test("sends reach only the Space's threads, with the roster as agent-only contex
 });
 
 test("messages go to mentions, then the picked thread, then the lead", () => {
-  const space: CommandSpace = { space: { id: "s", name: "S" }, leadThreadId: "lead", threads: [["lead", null], ["other", null], ["fork", "other"]].map(([id, parentThreadId]) => ({ id: id!, title: id!, parentThreadId, status: "idle", updatedAt: 1, error: null })) };
+  const space: CommandSpace = { space: { id: "s", name: "S", defaultProjectId: null }, leadThreadId: "lead", threads: [["lead", null], ["other", null], ["fork", "other"]].map(([id, parentThreadId]) => ({ id: id!, title: id!, parentThreadId, status: "idle", updatedAt: 1, error: null })) };
   expect(recipients(["other", "other"], false, "lead", space)).toEqual(["other"]);
   expect(recipients([], true, null, space)).toEqual(["lead", "other"]);
   expect(recipients([], false, "fork", space)).toEqual(["fork"]);
