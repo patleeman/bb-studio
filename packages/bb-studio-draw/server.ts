@@ -627,7 +627,9 @@ export default async function plugin(bb: BbPluginApi) {
               typeof el === "object" &&
               typeof (el as SceneElement).id === "string",
           );
-          const merged = applyElementUpserts(row.data, upserts);
+          // A full scene's image elements need its files, or they merge as broken images.
+          const files = Array.isArray(parsed) ? undefined : (parsed as { files?: Record<string, unknown> })?.files;
+          const merged = applyElementUpserts(row.data, upserts, { files: files && typeof files === "object" ? files : undefined });
           const updatedAt = write(row, merged, "cli");
           return {
             exitCode: 0,
