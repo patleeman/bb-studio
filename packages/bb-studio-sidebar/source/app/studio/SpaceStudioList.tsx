@@ -22,6 +22,11 @@ import {
 import type { SpaceBrowseItem, SpaceItems } from "./studioSpaces.js";
 import { compactAge } from "./SpaceThreadRow.js";
 import { CHROME_SECTION_LABEL_CLASS } from "@/components/ui/chrome-style-tokens";
+import {
+  SIDEBAR_HOVER_ACTIONS_CLASS,
+  SIDEBAR_HOVER_ACTIONS_MOBILE_ALWAYS_VALUE,
+  SIDEBAR_HOVER_ACTIONS_ROW_CLASS,
+} from "../ui/sidebar-hover-actions.js";
 
 let splitting = false;
 
@@ -45,11 +50,18 @@ export function openStudioItem(anchor: HTMLAnchorElement | null, href: string, s
 }
 
 /** "Studio" or "Threads" inside a Space, with its own controls on hover. */
-export function SpaceSubheading({ title, action, showAction = false }: { title: string; action?: ReactNode; showAction?: boolean }) {
+export function SpaceSubheading({ title, action }: { title: string; action?: ReactNode }) {
   return (
-    <div className={cn("group/sub flex h-7 items-center gap-1 pr-0.5 pl-2", CHROME_SECTION_LABEL_CLASS)}>
+    <div className={cn(SIDEBAR_HOVER_ACTIONS_ROW_CLASS, "flex h-7 items-center gap-1 pr-0.5 pl-2", CHROME_SECTION_LABEL_CLASS)}>
       <span className="min-w-0 flex-1 truncate">{title}</span>
-      {action ? <span className={cn(showAction ? "opacity-100" : "opacity-0", "transition-opacity group-hover/sub:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100")}>{action}</span> : null}
+      {action ? (
+        <span
+          className={cn(SIDEBAR_HOVER_ACTIONS_CLASS, "inline-flex shrink-0 items-center has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100")}
+          data-sidebar-hover-actions-mobile={SIDEBAR_HOVER_ACTIONS_MOBILE_ALWAYS_VALUE}
+        >
+          {action}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -320,7 +332,6 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
         title="Studio"
-        showAction={!open.length}
         action={(
           <span className="inline-flex items-center gap-0.5">
             {browsable.length ? <BrowseMenu spaceName={spaceName} items={browsable} onPick={openPicked} /> : null}
