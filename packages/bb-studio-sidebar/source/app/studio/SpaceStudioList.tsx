@@ -26,12 +26,12 @@ import { CHROME_SECTION_LABEL_CLASS } from "@/components/ui/chrome-style-tokens"
 let splitting = false;
 
 /**
- * Opens a Studio item in the main area: in a split beside the current pane,
- * or in its place with `inPlace` (⌘/Ctrl-click) or when BB won't split.
+ * Opens a Studio item in the main area, in place of the current pane, or in
+ * a split beside it with `split` (⌘/Ctrl-click) when BB will split.
  * `anchor` is a link this plugin renders; BB splits a Mod-click on one.
  */
-export function openStudioItem(anchor: HTMLAnchorElement | null, href: string, inPlace = false): void {
-  if (!inPlace) {
+export function openStudioItem(anchor: HTMLAnchorElement | null, href: string, split = false): void {
+  if (split) {
     splitting = true;
     try {
       if (openPathInSplit(anchor, href)) return;
@@ -139,8 +139,8 @@ function openMenu(button: HTMLElement) {
 }
 
 /**
- * An open Studio item: click opens it in a split beside the current pane,
- * ⌘/Ctrl-click in its place; right-click or ⋯ has the rest, as a thread's menu does.
+ * An open Studio item: click opens it in the main pane, ⌘/Ctrl-click in a
+ * split beside it, as a thread row does; right-click or ⋯ has the rest, as a thread's menu does.
  */
 function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
   const sdk = useSdk();
@@ -281,7 +281,7 @@ function BrowseMenu({ spaceName, items, onPick }: { spaceName: string; items: re
 /**
  * A Space's open Studio items, like tabs: each opens in the main area, and ×
  * closes it here without touching the item. Opening any of the Space's items
- * adds it; + makes a new one in the Space and opens it in a split.
+ * adds it; + makes a new one in the Space and opens it.
  */
 export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }: {
   spaceId: string;
@@ -290,8 +290,7 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
   items: SpaceItems | undefined;
 }) {
   const sdk = useSdk();
-  const splitLink = useRef<HTMLAnchorElement>(null);
-  const openCreated = (href: string) => openStudioItem(splitLink.current, href);
+  const openCreated = (href: string) => openStudioItem(null, href);
   // Closed here until Studio's next list catches up.
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const key = (item: { pluginId: string; id: string }) => `${item.pluginId}:${item.id}`;
@@ -304,9 +303,9 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
   };
   const openKeys = new Set(open.map(key));
   const browsable = (items?.all ?? []).filter((item) => !openKeys.has(key(item)));
-  // Picked from the menu: open it beside, and list it as open in the Space.
+  // Picked from the menu: open it, and list it as open in the Space.
   const openPicked = (href: string) => {
-    openStudioItem(splitLink.current, href);
+    openStudioItem(null, href);
     void sdk.plugins.callRpc({ pluginId: "studio", method: "visitTab", input: { path: href } as never, outputSchema: z.unknown(), signal: AbortSignal.timeout(15_000) }).catch(() => {});
   };
   const quietRow = cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pl-2 text-left text-muted-foreground");
@@ -322,8 +321,6 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
           </span>
         )}
       />
-      {/* BB splits a Mod-click on a link this plugin renders; new items open through this one. */}
-      <a ref={splitLink} href="/" hidden aria-hidden="true" tabIndex={-1} onClick={(event) => { if (!splitting) event.preventDefault(); }} />
       {open.map((item) => (
         <StudioItemRow key={key(item)} item={item} onClose={() => close(item)} />
       ))}
