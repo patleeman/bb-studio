@@ -56,6 +56,19 @@ final class SpacesTests: XCTestCase {
         XCTAssertEqual(assignment.spaceId(of: child, among: ["listed": root, "child": child]), "launch")
     }
 
+    @MainActor
+    func testSpaceLinksOpenHomeInBySpaceAndStudioOtherwise() throws {
+        let spaces = [try space("personal", isDefault: true), try space("launch")]
+        XCTAssertEqual(AppModel.spaceLinkTarget("launch", organizationMode: "space", spaces: spaces), .home("launch"))
+        XCTAssertEqual(AppModel.spaceLinkTarget("all", organizationMode: "space", spaces: spaces), .home("all"))
+        XCTAssertEqual(AppModel.spaceLinkTarget("launch", organizationMode: "project", spaces: spaces), .studio("launch"))
+        XCTAssertEqual(AppModel.spaceLinkTarget("launch", organizationMode: nil, spaces: spaces), .studio("launch"))
+        // Unknown ids, or no answer from Studio, aren't remembered anywhere.
+        XCTAssertEqual(AppModel.spaceLinkTarget("gone", organizationMode: "space", spaces: spaces), .unknown)
+        XCTAssertEqual(AppModel.spaceLinkTarget("gone", organizationMode: "project", spaces: spaces), .unknown)
+        XCTAssertEqual(AppModel.spaceLinkTarget("launch", organizationMode: "space", spaces: nil), .unknown)
+    }
+
     func testDefaultSpaceFallsBackToTheFirst() throws {
         let assignment = SpaceAssignment(spaces: [try space("a"), try space("b")], spaceOf: [:])
         XCTAssertEqual(assignment.defaultSpaceId, "a")

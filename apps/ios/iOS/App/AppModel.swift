@@ -201,11 +201,43 @@ final class AppModel: ObservableObject {
         newThreadDraft = text
     }
 
-    /// Home, showing the Space: its lead, open items and threads.
+    /// The Space in By space Home (its lead, open items and threads); otherwise Studio
+    /// filtered to it, since Home shows Spaces only in By space. An id Studio doesn't
+    /// know opens Home without remembering it.
     func openSpace(_ id: String) {
-        tab = .inbox
-        path = []
-        homeSpace = id
+        let client = client
+        spaceLink?.cancel()
+        spaceLink = Task {
+            async let preferences = try? client.sidebarPreferences()
+            async let spaces = try? client.studioSpaces()
+            let target = Self.spaceLinkTarget(id, organizationMode: await preferences?.organizationMode, spaces: await spaces)
+            guard !Task.isCancelled, client.baseURL == serverURL else { return }
+            switch target {
+            case .home(let id):
+                tab = .inbox
+                path = []
+                homeSpace = id
+            case .studio(let id):
+                openStudio(space: id)
+            case .unknown:
+                tab = .inbox
+                path = []
+            }
+        }
+    }
+
+    private var spaceLink: Task<Void, Never>?
+
+    enum SpaceLinkTarget: Equatable {
+        case home(String), studio(String), unknown
+    }
+
+    /// Home in By space (as the web sidebar decides), Studio otherwise; nil `spaces` means Studio didn't answer.
+    static func spaceLinkTarget(_ id: String, organizationMode: String?, spaces: [StudioSpace]?) -> SpaceLinkTarget {
+        guard let spaces, !spaces.isEmpty else { return .unknown }
+        let known = spaces.contains { $0.id == id }
+        if organizationMode == "space" { return known || id == "all" ? .home(id) : .unknown }
+        return known ? .studio(id) : .unknown
     }
 
     func openThread(_ id: String) {
