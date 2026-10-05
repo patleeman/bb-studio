@@ -483,6 +483,22 @@ export class TalkStore {
     return this.db.prepare(`DELETE FROM recordings WHERE id = ?`).run(id).changes > 0;
   }
 
+  /**
+   * Settles every finishing recording with nothing left to transcribe. A
+   * crash between a segment's last update and its settle would otherwise
+   * leave the recording finishing forever. Returns the ids it finished.
+   */
+  settleFinishing(): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id FROM recordings r WHERE status = 'finishing'
+           AND NOT EXISTS (SELECT 1 FROM segments s WHERE s.recording_id = r.id AND s.status = 'pending')`,
+      )
+      .all() as { id: string }[];
+    for (const { id } of rows) this.settle(id);
+    return rows.map((row) => row.id);
+  }
+
   /** A finishing recording is done once nothing is left to transcribe. */
   private settle(id: string): void {
     this.db

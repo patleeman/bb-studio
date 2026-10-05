@@ -174,6 +174,15 @@ export default async function plugin(bb: BbPluginApi) {
     });
   }
 
+  // A crash between a segment's update and its settle leaves a recording
+  // finishing with nothing left to transcribe; finish it now.
+  for (const id of store.settleFinishing()) {
+    changed(id);
+    maybeTitle(id);
+    maybeSummarize(id);
+    discardEmptyLater(id);
+  }
+
   // ── Transcription ───────────────────────────────────────────────────────
   const transcriber = new Transcriber({
     store,

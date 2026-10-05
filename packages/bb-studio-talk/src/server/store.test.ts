@@ -241,4 +241,19 @@ describe("saved recording cleanup", () => {
     expect(store.segments(REC)[0]!.cleanedText).toBeNull();
     expect(store.cleanedTranscript(REC)).toBeNull();
   });
+
+  it("settles a recording left finishing by a crash after its last segment", () => {
+    const { store, db } = memoryStore();
+    store.create({ id: REC, kind: "recording", projectId: null, threadId: null });
+    addSegment(store, REC, "sessiona", 0, 100);
+    addSegment(store, REC, "sessionb", 0, 200);
+    store.setStatus(REC, "finishing");
+    store.markTranscribed(REC, "sessiona-0", "hello");
+    // The process died after this update and before its settle.
+    db.prepare(`UPDATE segments SET status = 'done', text = 'there' WHERE id = 'sessionb-0'`).run();
+    expect(store.recording(REC)!.status).toBe("finishing");
+    expect(store.settleFinishing()).toEqual([REC]);
+    expect(store.recording(REC)!.status).toBe("done");
+    expect(store.settleFinishing()).toEqual([]);
+  });
 });
