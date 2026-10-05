@@ -61,6 +61,7 @@ import { useMoveThreadsToSpace } from "./MoveToSpace.js";
 import { SpaceStudioList, SpaceSubheading } from "./SpaceStudioList.js";
 import { SpaceArchivedMenu } from "./SpaceArchivedMenu.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
+import { setSpaceNewThreadTarget } from "./new-thread-space.js";
 import { SpaceRowsContext } from "./SpaceThreadRow.js";
 import { handOffNewThreadSpace } from "./new-thread-space.js";
 import { threadLineIds, threadLineStatusKey, useThreadLines } from "./useThreadLines.js";
@@ -74,10 +75,6 @@ import {
   useSpaceSwitchGestures,
 } from "./SpaceSwitcher.js";
 import type { SpaceItems } from "./studioSpaces.js";
-
-/** Read by Studio Navigation's New thread row. */
-const SPACE_NEW_THREAD_PROJECT_KEY = "bb-studio:space-new-thread-project";
-const SPACE_NEW_THREAD_SPACE_KEY = "bb-studio:space-new-thread-space";
 
 export interface SpaceModeSectionsProps
   extends BuiltInSectionRenderState, GroupedModePinnedProps {
@@ -190,22 +187,11 @@ export function SpaceModeSections({
   const newThreadProjectId = currentSpace?.defaultProjectId ?? null;
   const newThreadSpaceId = newThreadProjectId ? currentSpace?.id ?? null : null;
   useEffect(() => {
-    try {
-      if (newThreadProjectId && newThreadSpaceId) {
-        localStorage.setItem(SPACE_NEW_THREAD_PROJECT_KEY, newThreadProjectId);
-        localStorage.setItem(SPACE_NEW_THREAD_SPACE_KEY, newThreadSpaceId);
-      } else {
-        localStorage.removeItem(SPACE_NEW_THREAD_PROJECT_KEY);
-        localStorage.removeItem(SPACE_NEW_THREAD_SPACE_KEY);
-      }
-    } catch { /* storage unavailable */ }
+    setSpaceNewThreadTarget(
+      newThreadProjectId && newThreadSpaceId ? { spaceId: newThreadSpaceId, projectId: newThreadProjectId } : null,
+    );
   }, [newThreadProjectId, newThreadSpaceId]);
-  useEffect(() => () => {
-    try {
-      localStorage.removeItem(SPACE_NEW_THREAD_PROJECT_KEY);
-      localStorage.removeItem(SPACE_NEW_THREAD_SPACE_KEY);
-    } catch { /* storage unavailable */ }
-  }, []);
+  useEffect(() => () => setSpaceNewThreadTarget(null), []);
   useEffect(() => {
     if (!selectedThreadId || revealedFor.current === selectedThreadId) return;
     const thread = threads.find((candidate) => candidate.id === selectedThreadId);

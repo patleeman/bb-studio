@@ -2,6 +2,7 @@
 // when another surface already reaches it or Studio retired it; bb's own rows
 // and every other plugin's panels stay.
 import { experimental_useSidebarThreadActions, type ExperimentalSidebarNavigationItem } from "@get-bb/plugin-sdk/app";
+import { handOffNewThreadSpace, spaceNewThreadTarget } from "../../studio/new-thread-space.js";
 
 export const STUDIO_HUB = "studio/studio";
 
@@ -46,13 +47,6 @@ export function useStudioNavigationItems(
   return studioNavigationItems(items);
 }
 
-/** Studio Sidebar keeps the selected Space's default project here (By space, one Space shown). */
-export const SPACE_NEW_THREAD_PROJECT_KEY = "bb-studio:space-new-thread-project";
-/** And that Space's id, for the composer's Space picker. */
-export const SPACE_NEW_THREAD_SPACE_KEY = "bb-studio:space-new-thread-space";
-/** Read once by Studio's composer Space picker; see Studio Sidebar's new-thread-space.ts. */
-const NEW_THREAD_SPACE_HANDOFF = "studio:new-thread-space";
-
 /**
  * New thread starts in the Space the sidebar shows, as the Space's own + does.
  * Returns whether it handled the click; ⌘-click (split) and no Space fall back to bb.
@@ -61,19 +55,10 @@ export function useSpaceNewThread(): (item: ExperimentalSidebarNavigationItem, o
   const threads = experimental_useSidebarThreadActions();
   return (item, openInSplit) => {
     if (item.action.kind !== "new-thread" || openInSplit) return false;
-    let projectId: string | null = null;
-    let spaceId: string | null = null;
-    try {
-      projectId = localStorage.getItem(SPACE_NEW_THREAD_PROJECT_KEY);
-      spaceId = localStorage.getItem(SPACE_NEW_THREAD_SPACE_KEY);
-    } catch { /* storage unavailable */ }
-    if (!projectId) return false;
-    if (spaceId) {
-      const detail = { spaceId, projectId, at: Date.now() };
-      try { sessionStorage.setItem(NEW_THREAD_SPACE_HANDOFF, JSON.stringify(detail)); } catch { /* storage unavailable */ }
-      window.dispatchEvent(new CustomEvent(NEW_THREAD_SPACE_HANDOFF, { detail }));
-    }
-    threads.openNewThread({ projectId, focusPrompt: true });
+    const target = spaceNewThreadTarget();
+    if (!target) return false;
+    handOffNewThreadSpace(target.spaceId, target.projectId);
+    threads.openNewThread({ projectId: target.projectId, focusPrompt: true });
     return true;
   };
 }
