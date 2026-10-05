@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { experimental_Icon as Icon, useComposer, useComposerView, useRpc } from "@get-bb/plugin-sdk/app";
-import { ComposerMore, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, useComposerMoreSide } from "@bb-studio/kit/app";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/app";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
 import { PLUGIN_ID } from "./studio-provider";
@@ -20,10 +20,9 @@ const savePick = (projectId: string, botId: string | null) =>
  * and attaches when the first message is sent.
  *
  * A new thread's pick, and the bot a thread works as, show after the model
- * picker; otherwise the control waits in the ⋯ menu under the composer.
+ * picker; otherwise it stays where BB puts composer actions.
  */
 export function ProfilePicker() {
-  const [triggerRef, side] = useComposerMoreSide();
   const view = useComposerView();
   const composer = useComposer();
   const rpc = useRpc<typeof rpcContract>();
@@ -119,7 +118,7 @@ export function ProfilePicker() {
   const picker = (
     <DropdownMenu onOpenChange={(open) => open && loadBots()}>
       <DropdownMenuTrigger asChild>
-        <button ref={triggerRef} type="button" className="channel-settings-trigger" disabled={pending}
+        <button type="button" className="channel-settings-trigger" disabled={pending}
           data-profile={current ? "" : undefined}
           aria-label={current ? `Working as ${label}` : "Work as a bot"}
           title={error ?? (current ? `Working as ${label}` : "Work as a bot")}>
@@ -128,7 +127,7 @@ export function ProfilePicker() {
           <Icon name="ChevronDown" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align="start" className="w-72">
+      <DropdownMenuContent side="bottom" align="start" className="w-72">
         {current ? (
           <>
             <DropdownMenuLabel>Working as</DropdownMenuLabel>
@@ -155,7 +154,7 @@ export function ProfilePicker() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-  return projectId || current ? <ComposerLeading pluginId={PLUGIN_ID}>{picker}</ComposerLeading> : <ComposerMore pluginId={PLUGIN_ID} order={20}>{picker}</ComposerMore>;
+  return projectId || current ? <ComposerLeading pluginId={PLUGIN_ID}>{picker}</ComposerLeading> : picker;
 }
 
 function BotItem({ bot, description, disabled, onSelect }: {

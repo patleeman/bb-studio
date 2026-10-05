@@ -1,7 +1,7 @@
 // bb-studio frontend: the Studio collection, one nav panel whose
 // sub-path filters it to a kind, the sidebar's Studio tabs and Spaces, the
-// Space dialogs other plugins open by window event, each thread's spaces
-// under its composer, and Studio search.
+// Space dialogs other plugins open by window event, each thread's space
+// in its header, and Studio search.
 import { FloatPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ManageSpace } from "./src/ui/ManageSpace";
@@ -10,7 +10,7 @@ import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { StudioPanel } from "./src/ui/StudioPanel";
 import { ComposerSpaces } from "./src/ui/ComposerSpaces";
-import { ComposerTrim } from "./src/ui/ComposerTrim";
+import { ThreadSpaceLink } from "./src/ui/ThreadSpaceLink";
 import { ActivityPanel } from "./src/ui/HomePanel";
 import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
 
@@ -31,11 +31,10 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "new-space", component: NewSpace });
   app.slots.experimental_appOverlay({ id: "manage-space", component: ManageSpace });
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
-  // Links a thread back to its spaces, and picks
-  // the spaces a new thread joins.
-  // Collapses the row under the composer into a ⋯ menu.
-  app.composer.customize({ id: "thread-spaces", scopes: ["thread", "new-thread"], actions: [{ id: "spaces", component: ComposerSpaces }] });
-  app.composer.customize({ id: "composer-trim", scopes: ["thread"], actions: [{ id: "trim", component: ComposerTrim }] });
+  // Links a thread back to its space from its header, and picks the space a
+  // new thread joins under its composer.
+  app.slots.experimental_threadHeaderAction({ id: "space-link", title: "Space", component: ThreadSpaceLink });
+  app.composer.customize({ id: "thread-spaces", scopes: ["new-thread"], actions: [{ id: "spaces", component: ComposerSpaces }] });
   app.commands.register({
     id: "search",
     title: "Studio: Search everything",

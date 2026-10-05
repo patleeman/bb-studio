@@ -83,7 +83,6 @@ export {
 } from "./studio-item";
 export { useOpenTarget, type OpenPlace } from "./move";
 export { CompanionView, CompanionOutlet, companionWorkbenchAvailable, openCompanion, useOpenCompanion, type CompanionPlacement, type CompanionViewProps } from "./companion";
-export { COMPOSER_MORE_ITEM, ComposerMore, useComposerMoreSide } from "./composer-more";
 export { useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";
 export { NewConversationComposer, type NewConversationProps, type ConversationSubmit } from "./new-conversation";

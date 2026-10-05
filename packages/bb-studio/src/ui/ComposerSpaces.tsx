@@ -1,7 +1,6 @@
-// A thread's space under its composer, beside its project, machine and
-// branch, so a thread links back to the space it's in and can move to another
-// there. A new thread joins the space picked before it starts. It sits in the
-// row's ⋯ menu with the other Studio controls there.
+// The space a new thread joins, picked in its composer before it starts. A
+// thread that has started shows its space in its header instead
+// (ThreadSpaceLink).
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,11 +8,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  ComposerMore,
   Icon,
-  useComposerMoreSide,
 } from "@bb-studio/kit/app";
-import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useComposer, useComposerView, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -21,7 +18,6 @@ import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
 import { openSpaceItems } from "./StudioPanel";
 
-const THREAD_REF = "bb-thread";
 const REFETCH_DEBOUNCE_MS = 300;
 const pendingKey = (projectId: string) => `studio:new-thread-spaces:${projectId}`;
 const savedPick = (projectId: string): string[] => {
@@ -37,24 +33,14 @@ const savePick = (projectId: string, ids: string[]) => {
 const TRIGGER = "inline-flex h-6 min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0";
 
 /** A space's emoji, or the spaces icon: a colour dot here reads as a status. */
-function SpaceMark({ space }: { space: SpaceView | undefined }) {
+export function SpaceMark({ space }: { space: SpaceView | undefined }) {
   return space?.icon ? <span className="text-xs leading-none">{space.icon}</span> : <Icon name="Layers" />;
 }
 
-export function ComposerSpaces() {
-  return <ComposerMore pluginId={STUDIO_PLUGIN_ID} order={10}><SpacesPicker /></ComposerMore>;
-}
-
-function SpacesPicker() {
-  const [triggerRef, side] = useComposerMoreSide();
-  const view = useComposerView();
-  const composer = useComposer();
+/** Every space, and the ones `threadId` is in, kept fresh as spaces change. */
+export function useSpaces(threadId: string | null) {
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
-  const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
-  const projectId = view.scope.kind === "new-thread" ? view.scope.projectId : null;
   const [held, setHeld] = useState<{ spaces: SpaceView[]; inherited: string[] } | null>(null);
-  const [picked, setPicked] = useState<string[]>(() => (projectId ? savedPick(projectId) : []));
   const [all, setAll] = useState<SpaceView[]>([]);
   const refetch = useCallback(() => {
     if (threadId) rpc.call("spacesForThread", { threadId }).then(setHeld, () => setHeld(null));
@@ -67,6 +53,55 @@ function SpacesPicker() {
     clearTimeout(timer.current);
     timer.current = setTimeout(refetch, REFETCH_DEBOUNCE_MS);
   });
+  return { held, all, refetch };
+}
+
+/** The spaces menu: open one it's in, move it to another, or take it out. */
+export function SpacesMenuContent({ heading, othersHeading = "Add to space", holding, inherited, all, align = "start", onChange }: {
+  heading: string;
+  othersHeading?: string;
+  holding: SpaceView[];
+  inherited: string[];
+  all: SpaceView[];
+  align?: "start" | "end";
+  onChange: (space: SpaceView, add: boolean) => void;
+}) {
+  const navigate = useBbNavigate();
+  const others = all.filter((space) => !holding.some((each) => each.id === space.id));
+  const removable = holding.filter((space) => !inherited.includes(space.id));
+  return (
+    <DropdownMenuContent side="bottom" align={align} className="max-h-96 w-64 overflow-y-auto">
+      {holding.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{heading}</DropdownMenuLabel> : null}
+      {holding.map((space) => (
+        <DropdownMenuItem key={space.id} onSelect={() => openSpaceItems(navigate, space)}>
+          <SpaceMark space={space} /> {space.name}
+          {inherited.includes(space.id) ? <span className="ml-auto text-xs text-muted-foreground">Project</span> : null}
+        </DropdownMenuItem>
+      ))}
+      {holding.length && others.length ? <DropdownMenuSeparator /> : null}
+      {others.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{othersHeading}</DropdownMenuLabel> : null}
+      {others.map((space) => (
+        <DropdownMenuItem key={space.id} onSelect={() => onChange(space, true)}>
+          <SpaceMark space={space} /> {space.name}
+        </DropdownMenuItem>
+      ))}
+      {removable.length ? <DropdownMenuSeparator /> : null}
+      {removable.map((space) => (
+        <DropdownMenuItem key={space.id} onSelect={() => onChange(space, false)}>
+          <Icon name="X" className="size-4" /> Remove from {space.name}
+        </DropdownMenuItem>
+      ))}
+    </DropdownMenuContent>
+  );
+}
+
+export function ComposerSpaces() {
+  const view = useComposerView();
+  const composer = useComposer();
+  const rpc = useRpc<typeof rpcContract>();
+  const projectId = view.scope.kind === "new-thread" ? view.scope.projectId : null;
+  const { all } = useSpaces(null);
+  const [picked, setPicked] = useState<string[]>(() => (projectId ? savedPick(projectId) : []));
 
   // A new thread's pick belongs to the composer's project and survives the
   // composer remounting. The server holds it until the first message; only
@@ -90,35 +125,21 @@ function SpacesPicker() {
     });
   }, [composer, projectId]);
 
-  const holding = threadId ? held?.spaces ?? [] : all.filter((space) => picked.includes(space.id));
-  const inherited = threadId ? held?.inherited ?? [] : [];
-  if ((threadId && !held) || (!holding.length && !all.length)) return null;
+  const holding = all.filter((space) => picked.includes(space.id));
+  if (!projectId || !all.length) return null;
 
   const change = async (space: SpaceView, add: boolean) => {
-    if (projectId) {
-      // A thread is in one space, so a new pick replaces the last.
-      const next = add ? [space.id] : picked.filter((id) => id !== space.id);
-      setPicked(next);
-      savePick(projectId, next);
-      await rpc.call("pendingThreadSpaces", { projectId, ids: next }).catch((cause) => toast.error(`Couldn't pick the space: ${errorMessage(cause)}`));
-      return;
-    }
-    if (!threadId) return;
-    const ref = [{ pluginId: THREAD_REF, id: threadId }];
-    try {
-      await rpc.call("spaceMembers", { id: space.id, add: add ? ref : [], remove: add ? [] : ref });
-      refetch();
-    } catch (cause) {
-      toast.error(`Couldn't change the space: ${errorMessage(cause)}`);
-    }
+    // A thread is in one space, so a new pick replaces the last.
+    const next = add ? [space.id] : picked.filter((id) => id !== space.id);
+    setPicked(next);
+    savePick(projectId, next);
+    await rpc.call("pendingThreadSpaces", { projectId, ids: next }).catch((cause) => toast.error(`Couldn't pick the space: ${errorMessage(cause)}`));
   };
   const [first] = holding;
-  const others = all.filter((space) => !holding.some((each) => each.id === space.id));
-  const removable = holding.filter((space) => !inherited.includes(space.id));
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button ref={triggerRef} type="button" className={TRIGGER}
+        <button type="button" className={TRIGGER}
           aria-label={first ? `Spaces: ${holding.map((space) => space.name).join(", ")}` : "Add to a space"}
           title={first ? holding.map((space) => space.name).join(", ") : "Add to a space"}>
           <SpaceMark space={first} />
@@ -127,28 +148,7 @@ function SpacesPicker() {
           <Icon name="ChevronDown" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align="start" className="max-h-96 w-64 overflow-y-auto">
-        {holding.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{threadId ? "In spaces" : "Joins"}</DropdownMenuLabel> : null}
-        {holding.map((space) => (
-          <DropdownMenuItem key={space.id} onSelect={() => openSpaceItems(navigate, space)}>
-            <SpaceMark space={space} /> {space.name}
-            {inherited.includes(space.id) ? <span className="ml-auto text-xs text-muted-foreground">Project</span> : null}
-          </DropdownMenuItem>
-        ))}
-        {holding.length && others.length ? <DropdownMenuSeparator /> : null}
-        {others.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Add to space</DropdownMenuLabel> : null}
-        {others.map((space) => (
-          <DropdownMenuItem key={space.id} onSelect={() => void change(space, true)}>
-            <SpaceMark space={space} /> {space.name}
-          </DropdownMenuItem>
-        ))}
-        {removable.length ? <DropdownMenuSeparator /> : null}
-        {removable.map((space) => (
-          <DropdownMenuItem key={space.id} onSelect={() => void change(space, false)}>
-            <Icon name="X" className="size-4" /> Remove from {space.name}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
+      <SpacesMenuContent heading="Joins" holding={holding} inherited={[]} all={all} onChange={(space, add) => void change(space, add)} />
     </DropdownMenu>
   );
 }
