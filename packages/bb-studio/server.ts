@@ -1,7 +1,8 @@
 import { registerChat } from "./src/chat/server";
 import { Command } from "./src/command/command";
 import { registerMentionProviders } from "./src/command/mention-providers";
-import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
+import { subcommand, usage } from "@bb-studio/kit/cli";
+import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
 // - Studio finds add-ons through RPC discovery (src/hub.ts) and fans the
@@ -960,9 +961,23 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "retitle", summary: "Give threads a short title now and keep it current as they grow", usage: "bb studio retitle (<thread-id>… | --self | --recent <count>)" },
     ],
     async run(argv, ctx) {
-      const { command, rest } = subcommand(argv);
-      const flag = (name: string) => takeFlag(rest, name);
-      const option = (name: string) => takeOption(rest, name);
+      const { command, rest: raw } = subcommand(argv);
+      const USAGE: Record<string, string> = {
+        list: "bb studio list [query…] [--all] [--json] [--space <name>] [--kind <kind>] [--tag <tag>] [--query <text>]",
+        move: "bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)",
+        retitle: "bb studio retitle (<thread-id>… | --self | --recent <count>)",
+      };
+      const SPECS: Record<string, CliSpec> = {
+        list: { flags: ["--json", "--all"], options: ["--space", "--kind", "--tag", "--query"] },
+        move: { options: ["--space", "--project"] },
+        retitle: { flags: ["--self"], options: ["--recent"] },
+      };
+      const parsed = parseCliArgs(raw, SPECS[command ?? ""] ?? {});
+      const known = ["list", "tags", "spaces", "move", "providers", "reindex", "retitle"].includes(command ?? "");
+      if (!parsed.ok && known) return usage(`${USAGE[command!] ?? `bb studio ${command}`}\n${parsed.error}`);
+      const rest = parsed.ok ? parsed.positional : [];
+      const flag = (name: string) => parsed.ok && parsed.flags.has(name);
+      const option = (name: string) => (parsed.ok ? parsed.options.get(name) : undefined);
       try {
         switch (command) {
           case "list": {
@@ -984,7 +999,7 @@ export default async function plugin(bb: BbPluginApi) {
           case "move": {
             const spaceName = option("--space");
             const project = option("--project");
-            if (!rest.length || Boolean(spaceName) === Boolean(project)) return usage("bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)");
+            if (!rest.length || Boolean(spaceName) === Boolean(project)) return usage(USAGE.move!);
             const threadIds = rest.filter((ref) => /^thr_[a-z0-9]+$/i.test(ref));
             const itemRefs = rest.filter((ref) => !threadIds.includes(ref));
             const lines: string[] = [];
@@ -1023,14 +1038,15 @@ export default async function plugin(bb: BbPluginApi) {
           }
           case "retitle": {
             const recent = option("--recent");
-            const ids = flag("--self") && ctx.threadId ? [ctx.threadId, ...rest] : rest;
+            if (flag("--self") && !ctx.threadId) return usage(`${USAGE.retitle}\n--self only works inside a thread.`);
+            const ids = flag("--self") && ctx.threadId ? [ctx.threadId, ...rest] : [...rest];
             if (recent) {
               const count = Number(recent);
               if (!Number.isInteger(count) || count < 1 || count > 100) return usage("bb studio retitle --recent <1-100>");
               const threads = await bb.sdk.threads.list({ limit: count, ...(ctx.projectId ? { projectId: ctx.projectId } : {}) });
               ids.push(...threads.filter((thread) => thread.visibility !== "hidden" && thread.id !== ctx.threadId).map((thread) => thread.id));
             }
-            if (!ids.length) return usage("bb studio retitle (<thread-id>… | --self | --recent <count>)");
+            if (!ids.length) return usage(USAGE.retitle!);
             const retitle = async (threadId: string) => {
               const before = (await bb.sdk.threads.get({ threadId }).catch(() => null))?.title ?? "Untitled";
               try {
