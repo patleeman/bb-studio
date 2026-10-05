@@ -26,6 +26,14 @@ extension BBClient {
         error is CancellationError || (error as? URLError)?.code == .cancelled
     }
 
+    /// The plugin isn't installed or running, or has no such RPC method: BB answers
+    /// 404 (`unknown plugin`, `unknown_method`) or 503 (not running). Handler
+    /// failures are 400 or 500, and network errors aren't `BBError`s.
+    public static func isMissingRPC(_ error: Error) -> Bool {
+        guard let error = error as? BBError else { return false }
+        return error.status == 404 || error.status == 503
+    }
+
     /// The request never left the phone or never reached BB, so sending again can't duplicate it.
     /// Timeouts and dropped connections don't count: BB may have acted before the reply was lost.
     public static func neverArrived(_ error: Error) -> Bool {
@@ -182,12 +190,17 @@ extension BBClient {
     }
 
     /// Studio Sidebar's (`thread-list-plus`) when it runs, which is what the web
-    /// sidebar shows then; otherwise BB's own Thread List's.
+    /// sidebar shows then; otherwise BB's own Thread List's. Only a missing Studio
+    /// Sidebar falls back: a timeout or failure throws, so callers keep what they had.
     public func sidebarPreferences() async throws -> SidebarPreferences {
         struct Envelope: Decodable { var preferences: SidebarPreferences }
-        if let envelope: Envelope = try? await rpc(Self.studioSidebarPlugin, "listPreferences") { return envelope.preferences }
-        let envelope: Envelope = try await rpc("thread-list", "listPreferences")
-        return envelope.preferences
+        do {
+            let envelope: Envelope = try await rpc(Self.studioSidebarPlugin, "listPreferences")
+            return envelope.preferences
+        } catch where Self.isMissingRPC(error) {
+            let envelope: Envelope = try await rpc("thread-list", "listPreferences")
+            return envelope.preferences
+        }
     }
 
     /// Studio Sidebar's plugin id, kept from when it was Thread List Plus.
