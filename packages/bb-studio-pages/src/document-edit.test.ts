@@ -44,4 +44,14 @@ describe("editDocument", () => {
     editDocument(doc, "- Parent\n  - Child with note\n\nAfter edited\n", locked, "client");
     expect(commentAnchors(doc).get("thread-1")).toEqual({ blockId: child, text: "note" });
   });
+
+  it("removes nested blocks the client's Markdown left out", async () => {
+    const Y = await import("yjs");
+    const { readMarkdown, seedMarkdown } = await import("./doc");
+    const { editDocument } = await import("./document-edit");
+    const doc = new Y.Doc();
+    seedMarkdown(doc, "- Parent\n  - Child\n");
+    editDocument(doc, "- Parent\n", new Set(), "client");
+    expect(readMarkdown(doc)).toBe("- Parent\n");
+  });
 });

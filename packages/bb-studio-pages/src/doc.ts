@@ -96,7 +96,9 @@ export function findBlock(doc: PMNode, ref: string): FoundBlock {
 // Edits
 
 export type EditOp =
-  | { op: "insert_after" | "insert_before" | "replace"; block: string; markdown: string }
+  | { op: "insert_after" | "insert_before"; block: string; markdown: string }
+  /** `keepNested: false` drops the block's nested blocks when the Markdown has none. */
+  | { op: "replace"; block: string; markdown: string; keepNested?: boolean }
   | { op: "append" | "prepend"; markdown: string }
   | { op: "delete"; block: string }
   | { op: "set_checked"; block: string; checked: boolean }
@@ -143,8 +145,12 @@ function applyOp(tr: Transform, op: EditOp, touched: string[]): void {
     case "replace": {
       const target = findBlock(doc, op.block);
       const nodes = containersFor(op.markdown);
-      // Keep the replaced block's id so references to it stay valid.
-      nodes[0] = nodes[0]!.type.create({ ...nodes[0]!.attrs, id: target.id }, nodes[0]!.content, nodes[0]!.marks);
+      // Keep the replaced block's id so references to it stay valid, and its
+      // nested blocks (which pages_read lists under their own ids) unless the
+      // replacement brings its own.
+      const first = nodes[0]!;
+      const content = op.keepNested !== false && first.childCount === 1 && target.node.childCount === 2 ? first.content.addToEnd(target.node.child(1)) : first.content;
+      nodes[0] = first.type.create({ ...first.attrs, id: target.id }, content, first.marks);
       tr.replaceWith(target.pos, target.pos + target.node.nodeSize, nodes);
       touched.push(...nodes.map((node) => String(node.attrs.id)));
       return;

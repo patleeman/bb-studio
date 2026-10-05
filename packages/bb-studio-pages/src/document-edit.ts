@@ -81,5 +81,7 @@ export function editDocument(doc: Y.Doc, markdown: string, locked: ReadonlySet<s
       throw new PageEditError("A paragraph you changed has comments. Edit it in BB web to keep them.");
     }
   }
-  return ops.length ? applyEdits(doc, ops, origin) : { touched: [], changed: false };
+  // The client's Markdown is the whole block, nested blocks included.
+  const whole = ops.map((op): EditOp => (op.op === "replace" ? { ...op, keepNested: false } : op));
+  return whole.length ? applyEdits(doc, whole, origin) : { touched: [], changed: false };
 }

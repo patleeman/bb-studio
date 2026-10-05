@@ -44,6 +44,16 @@ describe("applyEdits", () => {
     expect(readMarkdown(doc).startsWith("Intro paragraph")).toBe(true);
   });
 
+  it("keeps a replaced block's nested blocks unless the replacement has its own", () => {
+    const doc = page("- [ ] Parent\n  - [ ] Sub\n");
+    const [parent] = ids(doc);
+    applyEdits(doc, [{ op: "replace", block: parent!, markdown: "- [x] Parent renamed" }], "test");
+    expect(readMarkdown(doc)).toBe("- [x] Parent renamed\n  - [ ] Sub\n");
+    expect(ids(doc)[0]).toBe(parent);
+    applyEdits(doc, [{ op: "replace", block: parent!, markdown: "- [x] Parent\n  - [ ] New sub" }], "test");
+    expect(readMarkdown(doc)).toBe("- [x] Parent\n  - [ ] New sub\n");
+  });
+
   it("replaces text in place and keeps formatting", () => {
     const doc = page("Ship **on Friday** please\n");
     applyEdits(doc, [{ op: "replace_text", find: "Friday", replace: "Monday" }], "test");

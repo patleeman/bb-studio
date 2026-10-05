@@ -35,7 +35,7 @@ const block = z.string().min(4).describe("Block id or its first 8 characters, fr
 const opSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("insert_after"), block, markdown: z.string() }),
   z.object({ op: z.literal("insert_before"), block, markdown: z.string() }),
-  z.object({ op: z.literal("replace"), block, markdown: z.string().describe("Replacement Markdown; may be several blocks") }),
+  z.object({ op: z.literal("replace"), block, markdown: z.string().describe("Replacement Markdown; may be several blocks. The block's nested blocks stay unless this Markdown nests its own") }),
   z.object({ op: z.literal("append"), markdown: z.string() }),
   z.object({ op: z.literal("prepend"), markdown: z.string() }),
   z.object({ op: z.literal("delete"), block }),
