@@ -300,7 +300,7 @@ describe("thread-list plugin", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Make Space lead" }));
     expect(studioCalls).toContainEqual({ method: "space_set_lead", input: { spaceId: "sp_alpha", threadId: "thr_parent" } });
     await waitFor(() => expect(document.querySelector("[data-space-lead=thr_parent]")).not.toBeNull());
-    // The dots switch Spaces; Beta's needs you, and that thread comes first.
+    // The dots switch Spaces; Beta's needs you, and that thread comes first, above Later's unread result.
     const switcher = screen.getByRole("navigation", { name: "Spaces" });
     fireEvent.click(within(switcher).getByRole("button", { name: "Beta, needs you" }));
     await screen.findByTitle("Beta");

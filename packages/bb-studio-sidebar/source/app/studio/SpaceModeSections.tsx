@@ -13,11 +13,12 @@ import type { SidebarThread } from "../model/sidebar-thread.js";
 import {
   buildProjectThreadGroups,
   CHRONOLOGICAL_CONTAINER_ID,
+  getProjectThreadItemDescendants,
   isSidebarProjectThread,
   type ProjectThreadItem,
   type ThreadComparator,
 } from "../model/project-thread-groups.js";
-import { getCollapsedChildActivity } from "../model/thread-activity.js";
+import { getCollapsedChildActivity, threadAttentionState, type ThreadAttentionState } from "../model/thread-activity.js";
 import type { SidebarSectionId } from "../model/sidebar-section-id.js";
 import { ProjectThreadTree } from "../list/ProjectRow.js";
 import {
@@ -104,13 +105,19 @@ export interface SpaceModeSectionsProps
 
 const noop = () => {};
 
-/** Items with a thread that needs the user come first, otherwise in order. */
-function needsYouFirst(items: readonly ProjectThreadItem[]): ProjectThreadItem[] {
-  const needsYou = (item: ProjectThreadItem) =>
-    item.kind === "thread" ? item.node.thread.hasPendingInteraction || item.node.stats.childActivity.pending
-      : item.kind === "environment" ? item.group.stats.childActivity.pending
-        : item.group.activity.pending;
-  return [...items.filter(needsYou), ...items.filter((item) => !needsYou(item))];
+// A question blocks its thread, so it outranks a failure, which outranks a result.
+const WAIT_RANK: Record<ThreadAttentionState, number> = { "needs-you": 0, error: 1, unread: 2, working: 3, idle: 3 };
+
+/**
+ * Items with a thread that waits on the user, its own or a sub-thread's, come
+ * first: questions, then unread errors, then unread results. Items in the same
+ * tier keep their order.
+ */
+export function needsYouFirst(items: readonly ProjectThreadItem[]): ProjectThreadItem[] {
+  const rank = (item: ProjectThreadItem) =>
+    Math.min(WAIT_RANK.idle, ...getProjectThreadItemDescendants([item]).map((thread) => WAIT_RANK[threadAttentionState(thread)]));
+  const ranks = new Map(items.map((item) => [item, rank(item)]));
+  return [...items].sort((left, right) => ranks.get(left)! - ranks.get(right)!);
 }
 
 /** "every5minutes" reads "every 5 minutes". */
