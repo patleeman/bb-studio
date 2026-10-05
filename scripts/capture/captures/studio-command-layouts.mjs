@@ -28,7 +28,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
  // Opens a thread from the list beside the composer; one already open stays put.
  const show = (client, title) => client.evaluate(`(()=>{const row=Array.from(document.querySelectorAll('[aria-label="Space threads"] button[aria-pressed]')).find(b=>b.getAttribute('aria-label').startsWith(${JSON.stringify(title + ", ")}));if(!row)throw new Error('Missing thread row: '+${JSON.stringify(title)});if(row.getAttribute('aria-pressed')!=='true')row.click();})()`);
  const follow = async client => {
-  await client.evaluate("(()=>{const back=Array.from(document.querySelectorAll('.channel-switcher-head button')).find(b=>b.textContent==='Follow work');if(back)back.click();})()");
+  await client.evaluate("(()=>{const back=document.querySelector('[aria-label=\"Follow work\"]');if(back&&back.getAttribute('aria-pressed')!=='true')back.click();})()");
   await wait(client, `${panes}.length===1&&!!document.querySelector('[data-command-following]')`);
  };
  const open = async (client, titles = []) => {
@@ -51,7 +51,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
   }
  };
  // The thread list sits beside the composer, never over the panes.
- const docked = client => client.evaluate("(()=>{const list=document.querySelector('.channel-switcher')?.getBoundingClientRect();const composer=document.querySelector('[data-command-composer]')?.getBoundingClientRect();const stage=document.querySelector('.channel-thread-stage')?.getBoundingClientRect();if(!list||!composer||!stage)throw new Error('Missing thread list, composer or panes');if(list.top<stage.bottom-1)throw new Error('Thread list overlaps the panes');if(innerWidth>820&&list.left<composer.right)throw new Error('Thread list is not beside the composer');})()");
+ const docked = client => client.evaluate("(()=>{const list=document.querySelector('.channel-switcher')?.getBoundingClientRect();const composer=document.querySelector('[data-command-composer]')?.getBoundingClientRect();const stage=document.querySelector('.channel-thread-stage')?.getBoundingClientRect();if(!list||!composer||!stage)throw new Error('Missing thread list, composer or panes');if(list.top<stage.bottom-1)throw new Error('Thread list overlaps the panes');if(innerWidth>820&&list.left<composer.right)throw new Error('Thread list is not beside the composer');const box=document.querySelector('[data-command-composer] form')?.getBoundingClientRect(),rows=document.querySelector('.channel-switcher-list')?.getBoundingClientRect();if(innerWidth>820&&(!box||!rows||Math.abs(box.top-rows.top)>1||Math.abs(box.bottom-rows.bottom)>1))throw new Error('Thread list is not as tall as the composer box');})()");
  const rows = "document.querySelectorAll('[aria-label=\"Space threads\"] button[aria-pressed]').length";
  const clearDraft = async client => {
   await client.evaluate("document.querySelector('[data-command-composer] .ProseMirror').focus()");

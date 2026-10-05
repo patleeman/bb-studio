@@ -186,7 +186,7 @@ export function CommandThreads({ panes, threads, leadThreadId, onReply, onOpen }
   </div>;
 }
 
-/** Every thread in the Space, beside the composer: open one as a pane, or close it again. */
+/** Every thread in the Space, beside the composer: a check marks the open ones. Click one to open it, or close it again. */
 export function CommandSwitcher({ panes, threads, leadThreadId }: { panes: CommandPanes; threads: CommandThread[]; leadThreadId: string | null }) {
   const roots = byAttention(threads.filter(thread => !thread.parentThreadId));
   const lead = roots.filter(thread => thread.id === leadThreadId);
@@ -195,17 +195,11 @@ export function CommandSwitcher({ panes, threads, leadThreadId }: { panes: Comma
   const shown = new Set(panes.shown.map(thread => thread.id));
   return <nav className="channel-switcher" aria-label="Space threads">
     <div className="channel-switcher-list">
-      <div className="channel-switcher-head">
-        <span>Threads</span>
-        {panes.following
-          ? <span className="text-subtle-foreground" title="One pane follows whichever thread is working. Open another thread to add a pane.">Following work</span>
-          : <button type="button" onClick={panes.follow} title="Close every pane and follow whichever thread is working">Follow work</button>}
-      </div>
       {rows.map(thread => {
         const open = shown.has(thread.id), activity = threadActivity(thread);
         return <div key={thread.id} className="channel-switcher-row" data-current={open || undefined} data-fork={thread.parentThreadId ? "" : undefined} data-activity={activity}>
           <button type="button" aria-pressed={open} onClick={() => panes.open(thread.id)} aria-label={`${thread.title}, ${activity}${open ? ", open" : ""}`} title={open ? `${thread.title} · ${activity}` : `Open ${thread.title} · ${activity}`}>
-            {thread.parentThreadId ? <Icon name="GitBranch" className="size-3.5 shrink-0 text-subtle-foreground" aria-hidden /> : <ItemTile icon={null} kindIcon="MessageSquare" size="sm" />}
+            <span className="channel-switcher-check" aria-hidden>{open && <Icon name="Check" className="size-3.5" />}</span>
             <span className="channel-rail-name">{thread.title}</span>
             {thread.id === leadThreadId && <span className="shrink-0 text-xs text-subtle-foreground">Lead</span>}
             <span className="channel-status-dot" aria-hidden />

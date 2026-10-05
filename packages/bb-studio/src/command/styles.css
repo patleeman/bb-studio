@@ -53,7 +53,7 @@
 }
 .channel-thread-stage {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   grid-auto-rows: minmax(360px, 1fr);
   gap: 12px;
   min-width: 0;
@@ -205,7 +205,8 @@
 }
 .channel-switcher-list {
   position: absolute;
-  inset: 0 0 28px;
+  /* BB's composer box starts 8px into its wrapper. */
+  inset: 8px 0 28px;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -215,22 +216,6 @@
   padding: 4px;
   scrollbar-width: thin;
 }
-.channel-switcher-head {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 4px 2px 6px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-.channel-switcher-head > button {
-  border-radius: 6px;
-  padding: 2px 6px;
-  color: var(--muted-foreground);
-}
-.channel-switcher-head > button:hover { color: var(--foreground); background: var(--state-hover); }
 .channel-switcher-row {
   display: flex;
   min-width: 0;
@@ -254,7 +239,13 @@
 .channel-switcher-row[data-current] { background: var(--state-hover); }
 .channel-switcher-row[data-current] > button[aria-pressed] { font-weight: 500; }
 .channel-switcher-row:not([data-current]) > button[aria-pressed] { color: var(--muted-foreground); }
-.channel-switcher-row[data-fork] > button[aria-pressed] { padding-left: 28px; font-size: var(--text-xs); }
+.channel-switcher-row[data-fork] > button[aria-pressed] { padding-left: 20px; font-size: var(--text-xs); }
+.channel-switcher-check {
+  display: inline-flex;
+  width: 14px;
+  flex: 0 0 auto;
+  justify-content: center;
+}
 .channel-switcher-row[data-activity="Idle"] .channel-status-dot { display: none; }
 .channel-switcher-row > button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .channel-switcher-close { width: 22px; height: 22px; margin-right: 2px; }
@@ -277,7 +268,6 @@
     padding: 0;
     scrollbar-width: none;
   }
-  .channel-switcher-head > span:first-child { display: none; }
   .channel-switcher-row > button[aria-pressed] { height: 30px; padding: 0 10px 0 4px; }
   .channel-switcher-row > button[aria-pressed] > .channel-rail-name { max-width: 140px; }
   .channel-switcher-row[data-fork] > button[aria-pressed] { padding: 0 10px 0 6px; }

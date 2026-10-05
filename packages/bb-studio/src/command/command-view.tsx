@@ -157,6 +157,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
         <BarCrumb current>Command</BarCrumb>
       </nav>
       <div className="flex shrink-0 items-center gap-0.5">
+        <button type="button" aria-label="Follow work" aria-pressed={panes.following} title={panes.following ? "Following work: one pane shows whichever thread is working" : "Follow work: close the panes and show whichever thread is working"} className={ICON_BUTTON} disabled={!space} onClick={panes.follow}><Icon name="Zap" className="size-4" aria-hidden /></button>
         <NewThreadButton space={space?.space ?? null} />
       </div>
     </StudioBar>

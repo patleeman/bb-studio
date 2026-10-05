@@ -13,7 +13,8 @@ function View({ threads, leadThreadId }: { threads: CommandThread[]; leadThreadI
   const panes = useCommandPanes("space", threads, leadThreadId);
   return React.createElement(React.Fragment, null,
     React.createElement(CommandThreads, { panes, threads, leadThreadId, onReply: state.reply, onOpen: state.open }),
-    React.createElement(CommandSwitcher, { panes, threads, leadThreadId }));
+    React.createElement(CommandSwitcher, { panes, threads, leadThreadId }),
+    React.createElement("button", { "aria-label": "Follow work", onClick: panes.follow }));
 }
 const render = (threads = [row("idle", "idle"), row("active", "active")], leadThreadId: string | null = null) => act(() => root.render(React.createElement(View, { threads, leadThreadId })));
 const shown = () => [...container.querySelectorAll("[data-channel-thread]")].map(pane => pane.getAttribute("data-channel-thread"));
@@ -52,7 +53,7 @@ test("closing a pane hides it until the thread list opens it again, and closing 
   expect(shown()).toEqual(["run"]);
   expect(localStorage.getItem("studio:command-open:space")).toBeNull();
   switcher("lead");
-  act(() => ([...container.querySelectorAll("button")].find(button => button.textContent === "Follow work") as HTMLButtonElement).click());
+  click("Follow work");
   expect(shown()).toEqual(["run"]);
 });
 test("the thread list puts the lead first and forks under their parent; fork links open a pane", () => {
@@ -112,4 +113,9 @@ test("panes open on the newest message and follow new ones until the owner scrol
     act(() => { scroller.append(document.createElement("p")); });
     return Promise.resolve();
   }).then(() => expect(top).toBe(300));
+});
+test("the thread list checks the open threads", () => {
+  render([row("lead", "idle"), row("run", "active")], "lead");
+  const checked = () => [...container.querySelectorAll('[aria-label="Space threads"] button[aria-pressed="true"]')].map(button => button.textContent);
+  expect(checked()).toEqual(["run"]);
 });
