@@ -11,10 +11,6 @@ import { MoveToSubmenu, type ItemRef } from "./move-to";
 import { DANGER_BUTTON, FLOATING, GHOST_BUTTON, ICON_BUTTON, type Project } from "./pieces";
 import type { StudioItemLink } from "./studio-item";
 
-export function projectChoices(projects: readonly Project[]) {
-  return [{ id: null, name: "Global" }, ...projects];
-}
-
 /** Copies a reference to `item`; pasted into a Studio item, it shows as a pill. */
 function copyReferenceWithToast(item: StudioItemLink) {
   void copyItemReference(item).then((copied) => {

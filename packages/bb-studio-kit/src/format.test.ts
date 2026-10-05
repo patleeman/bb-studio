@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { errorMessage, formatBytes, quoteMessage, relativeTime, untitled } from "./format";
-import { projectChoices } from "./app/item-menu";
 
 describe("shared item formatting", () => {
   it("keeps binary size boundaries readable", () => {
@@ -16,13 +15,6 @@ describe("shared item formatting", () => {
     expect(errorMessage("offline")).toBe("offline");
     expect(untitled("  ")).toBe("Untitled");
     expect(relativeTime(9000, 10000)).toBe("just now");
-  });
-
-  it("offers Global before projects", () => {
-    expect(projectChoices([{ id: "a", name: "Alpha" }])).toEqual([
-      { id: null, name: "Global" },
-      { id: "a", name: "Alpha" },
-    ]);
   });
 });
 
