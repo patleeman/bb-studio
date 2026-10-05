@@ -110,7 +110,7 @@ export function RowDialog({
           <div className="ml-auto flex items-center gap-1">
             {host.copyLink ? (
               <button type="button" className="flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground" onClick={() => host.copyLink!({ rowId: row.id })}>
-                <Icon name="Paperclip" className="size-3.5" /> Copy link
+                <Icon name="studio/link" fallback="Copy" className="size-3.5" /> Copy link
               </button>
             ) : null}
             <button

@@ -489,7 +489,7 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
                 </ContextMenuItem>
                 {host.copyLink ? (
                   <ContextMenuItem onSelect={() => host.copyLink!({ ...(view ? { viewId: view.id } : {}), rowId: rows[box.top]!.id })}>
-                    <Icon name="Paperclip" /> Copy link to row
+                    <Icon name="studio/link" fallback="Copy" /> Copy link to row
                   </ContextMenuItem>
                 ) : null}
                 <ContextMenuSeparator />

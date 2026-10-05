@@ -80,6 +80,8 @@ const LINK_ICONS: Record<string, string> = {
   "talk/recordings": "talk/talk",
   "studio-tables/tables": "Rows2",
   "studio/spaces": "Layers",
+  "studio/chats": "MessageSquare",
+  "pages/explainers": "pages/explore",
 };
 
 /** The icon for the item a link opens, read from the link itself: /plugins/<plugin>/<panel>/<id>. */

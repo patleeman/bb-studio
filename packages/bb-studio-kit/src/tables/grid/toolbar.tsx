@@ -363,7 +363,7 @@ function ViewTab({
         </DropdownMenuItem>
         {onCopyLink ? (
           <DropdownMenuItem onSelect={onCopyLink}>
-            <Icon name="Paperclip" /> Copy link to view
+            <Icon name="studio/link" fallback="Copy" /> Copy link to view
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />

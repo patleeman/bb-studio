@@ -481,7 +481,7 @@ export function CollectionPage({
           {tagging ? (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <Icon name="studio/tag" className="size-4" /> Tags
+                <Icon name="studio/tag" fallback="Pin" className="size-4" /> Tags
                 <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-80 w-56 overflow-auto">{tagMenu([item])}</DropdownMenuSubContent>
@@ -489,7 +489,7 @@ export function CollectionPage({
           ) : null}
           {(kind?.capabilities?.archive ?? kind?.canArchive) ? (
             <DropdownMenuItem onSelect={() => archive([item], !item.archived)}>
-              <Icon name="Archive" className="size-4" /> {item.archived ? "Restore from archive" : "Archive"}
+              <Icon name={item.archived ? "ArchiveRestore" : "Archive"} className="size-4" /> {item.archived ? "Restore from archive" : "Archive"}
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />
@@ -822,7 +822,7 @@ export function CollectionPage({
                 {chosen.every((item) => kindOf(item)?.capabilities?.move ?? true) ? <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button type="button" className={OUTLINE_BUTTON} disabled={working}>
-                      <Icon name="Folder" /> Move <Icon name="ChevronDown" className="-mr-1 opacity-70" />
+                      <Icon name="MoveTo" /> Move <Icon name="ChevronDown" className="-mr-1 opacity-70" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="max-h-96 w-60 overflow-auto">
@@ -834,7 +834,7 @@ export function CollectionPage({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button type="button" className={OUTLINE_BUTTON} disabled={working}>
-                        <Icon name="studio/tag" className="size-4" /> Tag <Icon name="ChevronDown" className="-mr-1 opacity-70" />
+                        <Icon name="studio/tag" fallback="Pin" className="size-4" /> Tag <Icon name="ChevronDown" className="-mr-1 opacity-70" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
@@ -845,7 +845,7 @@ export function CollectionPage({
                 ) : null}
                 {allArchivable ? (
                   <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => archive(chosen, !archived)}>
-                    <Icon name="Archive" /> {archived ? "Restore" : "Archive"}
+                    <Icon name={archived ? "ArchiveRestore" : "Archive"} /> {archived ? "Restore" : "Archive"}
                   </button>
                 ) : null}
                 {chosen.every((item) => kindOf(item)?.capabilities?.delete ?? true) ? <button
@@ -915,7 +915,7 @@ export function CollectionPage({
                         aria-label="Filter by tag"
                         className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"
                       >
-                        {activeTag ? <TagDot color={activeTag.color} /> : <Icon name="studio/tag" className="size-3.5" />}
+                        {activeTag ? <TagDot color={activeTag.color} /> : <Icon name="studio/tag" fallback="Pin" className="size-3.5" />}
                         <span className="max-w-40 truncate">{activeTag ? activeTag.name : tagFilter === UNTAGGED ? "Untagged" : "All tags"}</span>
                         <Icon name="ChevronDown" className="size-3.5" />
                       </button>

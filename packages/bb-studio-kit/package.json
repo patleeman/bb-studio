@@ -18,7 +18,6 @@
     "./table-grid": "./src/tables/grid/index.ts",
     "./app": "./src/app/index.ts",
     "./ui": "./src/ui/index.ts",
-    "./ui/huge-icon": "./src/ui/huge-icon.tsx",
     "./chat-contract": "./src/chat-contract.ts",
     "./chat-schemas": "./src/chat-schemas.ts"
   },
