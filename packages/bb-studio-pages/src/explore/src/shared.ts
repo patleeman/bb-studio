@@ -26,6 +26,8 @@ export interface ExploreItem {
   emoji: string;
   /** The finding without its emoji, e.g. "How the job queue works". */
   label: string;
+  /** Why it matters to the user, from the Next row. Not part of its identity. */
+  why?: string;
 }
 
 const EMOJI = /^(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|[#*0-9]️?⃣)/u;

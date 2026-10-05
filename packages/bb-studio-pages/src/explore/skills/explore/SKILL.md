@@ -19,7 +19,8 @@ It goes just before a `::reactions` line if there is one, otherwise last.
 When the Next row is on (*End replies with a Next row*, the default), those
 findings go in the `explore` attribute of one `::next` line instead, next to
 `reply` (quick answers) and `do` (actions you offer to take):
-`::next{reply="👍 Ship it" explore="🐛 Retry backoff disagrees" do="📄 Write up the plan as a page"}`.
+`::next{reply="👍 Ship it" explore="🐛 Retry backoff disagrees — your retry fix depends on it" do="📄 Write up the plan as a page"}`.
+Each `explore` item ends with ` — ` and why the user would care.
 Clicking a `reply` or `do` item drafts its text in the composer; when the user
 sends a `do` item, carry it out.
 

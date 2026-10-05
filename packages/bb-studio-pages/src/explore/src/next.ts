@@ -6,7 +6,7 @@
 // `reply` items draft a quick answer, `explore` items write an explainer, and
 // `do` items draft an instruction for the agent to carry out. Attributes come
 // from the model, so parsing caps and dedupes them like `::explore` does.
-import { labelKey, MAX_ITEMS, parseExploreItems, type ExploreItem } from "./shared";
+import { labelKey, MAX_ITEMS, parseExploreItem, parseExploreItems, type ExploreItem } from "./shared";
 
 export const NEXT_DIRECTIVE = "next";
 
@@ -18,8 +18,42 @@ export const NEXT_LIMITS: Record<NextKind, number> = { reply: 5, explore: MAX_IT
 
 export type NextItems = Record<NextKind, ExploreItem[]>;
 
+/** Separates an explore item's label from why it matters: `🐛 Label — why`. */
+const WHY_SEPARATOR = /\s+(?:—|--)\s+/;
+/** Longer reasons are cut: one line under the label, not a paragraph. */
+export const MAX_WHY_LENGTH = 160;
+
+function cutWhy(text: string): string {
+  const clean = text.replace(/[\u0000-\u001f"{}]/g, " ").replace(/\s+/g, " ").trim();
+  if (clean.length <= MAX_WHY_LENGTH) return clean;
+  const room = clean.slice(0, MAX_WHY_LENGTH - 1);
+  const space = room.lastIndexOf(" ");
+  return `${(space > MAX_WHY_LENGTH / 2 ? room.slice(0, space) : room).trimEnd()}…`;
+}
+
+/** Explore items with an optional reason after an em dash. */
+export function parseExploreWithWhy(raw: string | undefined, max: number): ExploreItem[] {
+  if (typeof raw !== "string") return [];
+  const seen = new Set<string>();
+  const items: ExploreItem[] = [];
+  for (const part of raw.slice(0, 4_000).split("|")) {
+    const [head, ...rest] = part.split(WHY_SEPARATOR);
+    const item = parseExploreItem(head);
+    if (!item) continue;
+    const key = labelKey(item.label);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const why = cutWhy(rest.join(" — "));
+    items.push(why ? { ...item, why } : item);
+    if (items.length >= max) break;
+  }
+  return items;
+}
+
 export function parseNextItems(attributes: Readonly<Record<string, string | undefined>>): NextItems {
-  return Object.fromEntries(NEXT_KINDS.map((kind) => [kind, parseExploreItems(attributes[kind], NEXT_LIMITS[kind])])) as NextItems;
+  return Object.fromEntries(
+    NEXT_KINDS.map((kind) => [kind, kind === "explore" ? parseExploreWithWhy(attributes[kind], NEXT_LIMITS[kind]) : parseExploreItems(attributes[kind], NEXT_LIMITS[kind])]),
+  ) as NextItems;
 }
 
 export function nextItemCount(items: NextItems): number {

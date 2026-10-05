@@ -18,6 +18,18 @@ describe("the ::next directive", () => {
     expect(items.do).toHaveLength(NEXT_LIMITS.do);
   });
 
+  it("reads why an explore item matters, after an em dash", () => {
+    const items = parseNextItems({ explore: "🐛 Backoff disagrees — your retry fix depends on it|🏗️ Job queue -- the worker you touched|🔗 No reason|🐛 backoff  disagrees — again" });
+    expect(items.explore).toEqual([
+      { emoji: "🐛", label: "Backoff disagrees", why: "your retry fix depends on it" },
+      { emoji: "🏗️", label: "Job queue", why: "the worker you touched" },
+      { emoji: "🔗", label: "No reason" },
+    ]);
+    // A dash inside a word or label isn't a separator.
+    expect(parseNextItems({ explore: "🕐 Re-entrant lock-free queue" }).explore[0]).toEqual({ emoji: "🕐", label: "Re-entrant lock-free queue" });
+    expect(parseNextItems({ explore: `🐛 Long — ${"word ".repeat(60)}` }).explore[0].why?.length).toBeLessThanOrEqual(160);
+  });
+
   it("has nothing for missing attributes", () => {
     expect(parseNextItems({})).toEqual({ reply: [], explore: [], do: [] });
   });
@@ -32,6 +44,7 @@ describe("the Next instructions", () => {
     const items = parseNextItems(attributes);
     expect(items.reply).toHaveLength(2);
     expect(items.explore).toHaveLength(1);
+    expect(items.explore[0].why).toBeTruthy();
     expect(items.do).toHaveLength(1);
     expect(text).toContain("Prefer these when they fit: 👍 Agree | ❓ Clarify");
     expect(text).toContain("Don't also write ::reactions or ::explore lines");

@@ -182,7 +182,14 @@ function ExploreRow({
         <span aria-hidden className="w-5 shrink-0 text-center text-base leading-none">
           {item.emoji}
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.label}</span>
+        {item.why ? (
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-sm text-foreground">{item.label}</span>
+            <span className="line-clamp-2 text-xs text-muted-foreground">{item.why}</span>
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.label}</span>
+        )}
         <span
           className={cn(
             "flex shrink-0 items-center gap-1.5 text-xs tabular-nums",

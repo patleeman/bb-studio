@@ -99,7 +99,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
           threadId={threadId}
           messageId={messageId}
           turnId={message.turnId}
-          title="Things to explore"
+          title="You might be interested in"
           onExplore={(item) => logClick("explore", item)}
           className="my-0 rounded-none border-x-0 border-b-0"
         />
