@@ -66,13 +66,18 @@ export function editDocument(doc: Y.Doc, markdown: string, locked: ReadonlySet<s
     if (locked.size) throw new PageEditError("This page has comments. Clear it in BB web to keep them.");
     return replaceContent(doc, "", origin);
   }
-  const current = readBlocks(doc).flatMap((block) => {
+  const blocks = readBlocks(doc);
+  const current = blocks.flatMap((block) => {
     const markdown = key(block);
     return block.id && markdown ? [{ id: block.id, markdown }] : [];
   });
+  // Rewriting a top-level block rewrites its nested blocks too, so a comment
+  // on any of them locks it.
+  const holdsComment = (block: PageBlock): boolean => (block.id !== undefined && locked.has(block.id)) || (block.children ?? []).some(holdsComment);
+  const lockedTop = new Set(blocks.filter(holdsComment).map((block) => block.id!));
   const ops = planDocumentEdit(current, next);
   for (const op of ops) {
-    if ((op.op === "replace" || op.op === "delete") && locked.has(op.block)) {
+    if ((op.op === "replace" || op.op === "delete") && lockedTop.has(op.block)) {
       throw new PageEditError("A paragraph you changed has comments. Edit it in BB web to keep them.");
     }
   }

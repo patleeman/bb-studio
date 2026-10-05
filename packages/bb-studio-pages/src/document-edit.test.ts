@@ -28,3 +28,20 @@ describe("planDocumentEdit", () => {
     ]);
   });
 });
+
+describe("editDocument", () => {
+  it("won't rewrite a block whose nested block holds a comment", async () => {
+    const Y = await import("yjs");
+    const { addCommentMark, commentAnchors, readBlocks, seedMarkdown } = await import("./doc");
+    const { editDocument } = await import("./document-edit");
+    const doc = new Y.Doc();
+    seedMarkdown(doc, "- Parent\n  - Child with note\n\nAfter\n");
+    const child = readBlocks(doc)[0]!.children![0]!.id!;
+    addCommentMark(doc, child, "thread-1", "note", "test");
+    const locked = new Set([...commentAnchors(doc).values()].map((anchor) => anchor.blockId));
+    expect(() => editDocument(doc, "- Parent edited\n  - Child with note\n\nAfter\n", locked, "client")).toThrow(/has comments/);
+    expect(commentAnchors(doc).get("thread-1")).toEqual({ blockId: child, text: "note" });
+    editDocument(doc, "- Parent\n  - Child with note\n\nAfter edited\n", locked, "client");
+    expect(commentAnchors(doc).get("thread-1")).toEqual({ blockId: child, text: "note" });
+  });
+});
