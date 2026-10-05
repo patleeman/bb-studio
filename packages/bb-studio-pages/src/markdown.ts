@@ -384,6 +384,8 @@ export function blocksToMarkdown(blocks: PageBlock[], options: MarkdownOptions =
   return renderBlocks(blocks, "", options).join("\n\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }
 
+const LIST_TYPES = ["bulletListItem", "numberedListItem", "checkListItem"];
+
 function renderBlocks(blocks: PageBlock[], indent: string, options: MarkdownOptions): string[] {
   const out: string[] = [];
   let number = 0;
@@ -393,7 +395,7 @@ function renderBlocks(blocks: PageBlock[], indent: string, options: MarkdownOpti
     listRun = null;
   };
   for (const block of blocks) {
-    const isList = ["bulletListItem", "numberedListItem", "checkListItem"].includes(block.type);
+    const isList = LIST_TYPES.includes(block.type);
     number = block.type === "numberedListItem" ? number + 1 : 0;
     const text = renderBlock(block, indent, number, options);
     if (isList) {
@@ -413,9 +415,13 @@ function renderBlock(block: PageBlock, indent: string, number: number, options: 
   const props = block.props ?? {};
   const content = Array.isArray(block.content) ? block.content : [];
   const text = renderInline(content);
-  const childIndent = indent + "  ";
+  // A list item's children line up with its text, past the `1. ` marker.
+  const childIndent = indent + " ".repeat(block.type === "numberedListItem" ? String(number).length + 2 : 2);
   const children = block.children?.length ? renderBlocks(block.children, childIndent, options) : [];
-  const listChildren = children.length ? "\n" + children.join("\n") : "";
+  // Only nested lists can sit tight under an item: a paragraph or a rule
+  // right below the item's text would join it or turn it into a heading.
+  const tight = block.children?.every((child) => LIST_TYPES.includes(child.type));
+  const listChildren = children.length ? (tight ? "\n" + children.join("\n") : "\n\n" + children.join("\n\n")) : "";
   const nestedChildren = children.length ? "\n\n" + children.join("\n\n") : "";
   const quoted = (value: string) =>
     value

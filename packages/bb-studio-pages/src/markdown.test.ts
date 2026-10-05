@@ -168,7 +168,7 @@ describe("html blocks", () => {
     const blocks = markdownToBlocks("- Item\n\n  ```html\n  <b>nested</b>\n  ```\n\n> quote\n\n```HTML\n<i>upper</i>\n```\n");
     expect(blocks[0]).toMatchObject({ type: "bulletListItem", children: [{ type: "html", content: "<b>nested</b>" }] });
     expect(blocks[2]).toMatchObject({ type: "html", content: "<i>upper</i>" });
-    expect(blocksToMarkdown(throughYjs(blocks))).toBe("- Item\n  ```html\n  <b>nested</b>\n  ```\n\n> quote\n\n```html\n<i>upper</i>\n```\n");
+    expect(blocksToMarkdown(throughYjs(blocks))).toBe("- Item\n\n  ```html\n  <b>nested</b>\n  ```\n\n> quote\n\n```html\n<i>upper</i>\n```\n");
   });
 
   it("keeps an existing HTML code block as code through a read and write", () => {
@@ -185,6 +185,25 @@ describe("html blocks", () => {
     expect(block).toMatchObject({ type: "codeBlock", props: { language: "html" }, content: big });
     const [atCap] = markdownToBlocks(`\`\`\`html\n${"y".repeat(MAX_HTML_CHARS)}\n\`\`\`\n`);
     expect(atCap!.type).toBe("html");
+  });
+});
+
+describe("nested list items", () => {
+  it("keep their children through a read and write", () => {
+    const blocks: PageBlock[] = [
+      { type: "numberedListItem", content: [{ type: "text", text: "One", styles: {} }], children: [{ type: "bulletListItem", content: [{ type: "text", text: "Under one", styles: {} }] }] },
+      { type: "bulletListItem", content: [{ type: "text", text: "Item", styles: {} }], children: [
+        { type: "paragraph", content: [{ type: "text", text: "Item note", styles: {} }] },
+        { type: "divider" },
+        { type: "paragraph", content: [{ type: "text", text: "Last", styles: {} }] },
+      ] },
+    ];
+    const markdown = blocksToMarkdown(throughYjs(blocks));
+    expect(markdownToBlocks(markdown)).toMatchObject([
+      { type: "numberedListItem", content: [{ text: "One" }], children: [{ type: "bulletListItem", content: [{ text: "Under one" }] }] },
+      { type: "bulletListItem", content: [{ text: "Item" }], children: [{ type: "paragraph", content: [{ text: "Item note" }] }, { type: "divider" }, { type: "paragraph", content: [{ text: "Last" }] }] },
+    ]);
+    expect(blocksToMarkdown(throughYjs(markdownToBlocks(markdown)))).toBe(markdown);
   });
 });
 
