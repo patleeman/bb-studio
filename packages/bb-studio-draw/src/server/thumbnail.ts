@@ -9,6 +9,11 @@ import { getNonDeletedElements, type SceneElement, type StoredScene } from "../.
 
 const MAX_ELEMENTS = 2000;
 const MAX_IMAGE_CHARS = 1_500_000;
+/** All embedded image data together; past this, images draw as placeholders. */
+const MAX_TOTAL_IMAGE_CHARS = 4_000_000;
+
+/** Each image file is embedded once, as a symbol its elements reuse. */
+type ImageDefs = { ids: Map<string, string>; markup: string[]; chars: number };
 const PADDING = 16;
 const DEFAULT_STROKE = "#1e1e1e";
 
@@ -106,7 +111,7 @@ function text(element: SceneElement): string {
   return `<text font-family="${escape(fontFamily(element.fontFamily))}" font-size="${size}" text-anchor="${align}" fill="${color(element.strokeColor, DEFAULT_STROKE)}">${spans}</text>`;
 }
 
-function shape(element: SceneElement, scene: StoredScene): string {
+function shape(element: SceneElement, scene: StoredScene, images: ImageDefs): string {
   const x = num(element.x);
   const y = num(element.y);
   const width = num(element.width);
@@ -145,10 +150,20 @@ function shape(element: SceneElement, scene: StoredScene): string {
       const fileId = typeof element.fileId === "string" ? element.fileId : "";
       const file = scene.files?.[fileId] as { dataURL?: unknown } | undefined;
       const url = typeof file?.dataURL === "string" ? file.dataURL : "";
-      if (!/^data:image\/(png|jpeg|gif|webp);base64,[a-z0-9+/=]+$/i.test(url) || url.length > MAX_IMAGE_CHARS) {
-        return `<rect x="${x}" y="${y}" width="${Math.abs(width)}" height="${Math.abs(height)}" fill="#eee"/>`;
+      let symbol = images.ids.get(fileId);
+      if (
+        !symbol &&
+        /^data:image\/(png|jpeg|gif|webp);base64,[a-z0-9+/=]+$/i.test(url) &&
+        url.length <= MAX_IMAGE_CHARS &&
+        images.chars + url.length <= MAX_TOTAL_IMAGE_CHARS
+      ) {
+        symbol = `img${images.ids.size}`;
+        images.ids.set(fileId, symbol);
+        images.chars += url.length;
+        images.markup.push(`<symbol id="${symbol}" viewBox="0 0 1 1" preserveAspectRatio="none"><image width="1" height="1" preserveAspectRatio="none" href="${url}"/></symbol>`);
       }
-      return `<image x="${x}" y="${y}" width="${Math.abs(width)}" height="${Math.abs(height)}" preserveAspectRatio="none" href="${url}"/>`;
+      if (!symbol) return `<rect x="${x}" y="${y}" width="${Math.abs(width)}" height="${Math.abs(height)}" fill="#eee"/>`;
+      return `<use href="#${symbol}" x="${x}" y="${y}" width="${Math.abs(width)}" height="${Math.abs(height)}"/>`;
     }
     default:
       return "";
@@ -162,8 +177,9 @@ export function sceneThumbnail(scene: StoredScene | null): string | null {
   if (!elements.length) return null;
   const box: Box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const parts: string[] = [];
+  const images: ImageDefs = { ids: new Map(), markup: [], chars: 0 };
   for (const element of elements) {
-    const markup = shape(element, scene);
+    const markup = shape(element, scene, images);
     if (!markup) continue;
     const b = bounds(element);
     box.minX = Math.min(box.minX, b.minX);
@@ -184,6 +200,7 @@ export function sceneThumbnail(scene: StoredScene | null): string | null {
   const height = Math.max(1, box.maxY - box.minY + PADDING * 2);
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}" width="${Math.round(width)}" height="${Math.round(height)}">`,
+    ...(images.markup.length ? [`<defs>${images.markup.join("")}</defs>`] : []),
     ...parts,
     `</svg>`,
   ].join("");

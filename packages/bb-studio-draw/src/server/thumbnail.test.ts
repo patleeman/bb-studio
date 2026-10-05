@@ -38,4 +38,14 @@ describe("drawing thumbnails", () => {
     const remote = thumb([element("image", { fileId: "f3" })], { f3: { mimeType: "image/png", dataURL: "https://example.com/x.png" } })!;
     expect(remote).not.toContain("example.com");
   });
+
+  it("embeds each image file once and caps the total image data", () => {
+    const png = (n: number) => `data:image/png;base64,${String(n).repeat(1_000_000)}`;
+    const shared = thumb([element("image", { fileId: "f1" }), element("image", { fileId: "f1", x: 200 })], { f1: { dataURL: png(1) } })!;
+    expect(shared.split(png(1)).length - 1).toBe(1);
+    const files = Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`f${i}`, { dataURL: png(i + 1) }]));
+    const many = thumb(Object.keys(files).map((fileId) => element("image", { fileId })), files)!;
+    expect(many.length).toBeLessThan(5_000_000);
+    expect(many).toContain('fill="#eee"');
+  });
 });
