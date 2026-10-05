@@ -119,6 +119,8 @@ const HIDDEN_KEY = "health-hidden";
 export class HealthMonitor {
   private latest: HealthSummary | null = null;
   private inFlight: Promise<HealthSummary> | null = null;
+  /** Changes to the hidden list, one at a time, so a check can't undo a Hide made while it ran. */
+  private hiding: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly deps: {
     sdk: HealthSdk;
@@ -145,15 +147,25 @@ export class HealthMonitor {
     return this.inFlight;
   }
 
+  private editHidden<T>(edit: () => Promise<T>): Promise<T> {
+    const run = this.hiding.then(edit, edit);
+    this.hiding = run.catch(() => {});
+    return run;
+  }
+
   private async run(): Promise<HealthSummary> {
-    const hidden = await this.hidden();
-    const next = await checkHealth(this.deps.sdk, this.deps.schemas, hidden, (this.deps.now ?? Date.now)());
-    // A problem that went away and comes back shows again. A plugin whose
-    // check didn't answer keeps its hidden problems until it does.
-    const silent = new Set(next.unanswered.map((entry) => entry.pluginId));
-    const present = new Set(next.problems.map((problem) => problem.key));
-    const kept = [...hidden].filter((key) => present.has(key) || silent.has(pluginOf(key)));
-    if (kept.length !== hidden.size) await this.deps.kv.set(HIDDEN_KEY, kept);
+    const checked = await checkHealth(this.deps.sdk, this.deps.schemas, new Set(), (this.deps.now ?? Date.now)());
+    // Read the hidden list after the check: the user may have hidden one meanwhile.
+    const next = await this.editHidden(async () => {
+      const hidden = await this.hidden();
+      // A problem that went away and comes back shows again. A plugin whose
+      // check didn't answer keeps its hidden problems until it does.
+      const silent = new Set(checked.unanswered.map((entry) => entry.pluginId));
+      const present = new Set(checked.problems.map((problem) => problem.key));
+      const kept = [...hidden].filter((key) => present.has(key) || silent.has(pluginOf(key)));
+      if (kept.length !== hidden.size) await this.deps.kv.set(HIDDEN_KEY, kept);
+      return { ...checked, problems: checked.problems.map((problem) => ({ ...problem, hidden: hidden.has(problem.key) })) };
+    });
     const previous = this.latest;
     this.latest = next;
     if (!previous || fingerprint(previous) !== fingerprint(next)) this.deps.changed(next);
@@ -161,10 +173,13 @@ export class HealthMonitor {
   }
 
   async hide(key: string, hide: boolean): Promise<HealthSummary> {
-    const hidden = await this.hidden();
-    if (hide) hidden.add(key);
-    else hidden.delete(key);
-    await this.deps.kv.set(HIDDEN_KEY, [...hidden]);
+    const hidden = await this.editHidden(async () => {
+      const hidden = await this.hidden();
+      if (hide) hidden.add(key);
+      else hidden.delete(key);
+      await this.deps.kv.set(HIDDEN_KEY, [...hidden]);
+      return hidden;
+    });
     if (this.latest) {
       this.latest = { ...this.latest, problems: this.latest.problems.map((problem) => ({ ...problem, hidden: hidden.has(problem.key) })) };
       this.deps.changed(this.latest);

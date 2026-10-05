@@ -93,6 +93,20 @@ describe("HealthMonitor", () => {
     expect((await instance.check()).problems[0]!.hidden).toBe(true);
   });
 
+  it("keeps a Hide made while a check is running", async () => {
+    const { instance, store, sdk } = monitor({ a: [broken] });
+    const [problem] = (await instance.check()).problems;
+    const answer = sdk.plugins.callRpc;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    sdk.plugins.callRpc = (async (args: Parameters<typeof answer>[0]) => { await gate; return answer(args); }) as typeof answer;
+    const running = instance.check();
+    await instance.hide(problem!.key, true);
+    release();
+    expect((await running).problems[0]!.hidden).toBe(true);
+    expect(store.get("health-hidden")).toEqual([problem!.key]);
+  });
+
   it("announces only real changes, and reuses a fresh result", async () => {
     const { instance, changed } = monitor({ a: [broken] });
     await instance.check();
