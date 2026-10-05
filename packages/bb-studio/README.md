@@ -218,17 +218,17 @@ The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `
 
 ## Space Command view
 
-Open **Command view** from a Space’s sidebar heading. It shows the Space’s ordinary threads: Merged combines final replies, Grid shows native transcripts side by side, Active follows working threads, and Focus shows one thread. Send to the lead, pick a thread, @mention threads by title, or use @all. Files, drafts, permissions and send modes use BB’s composer.
+Open **Command view** from a Space’s sidebar heading. It shows the Space’s ordinary threads as native transcripts. With nothing opened, one pane follows whichever thread is working. Open another thread from the list beside the composer and it joins as a pane, so the view becomes a grid you can rearrange. Closing a pane only hides it: open it again from the list, or choose **Follow work** to go back to one following pane. Panes open on the newest message and keep up as the thread works. Press **⌘N** or **+** to start a new thread in the Space. Send to the lead, pick a thread, @mention threads by title, or use @all. Files, drafts, permissions and send modes use BB’s composer.
 
-![A Space’s Command view with ordinary threads](assets/command-merged.png)
+![One pane following the Space's working thread, with the thread list beside the composer](assets/command-follow.png)
 
-Captured in staged stable BB 0.45.0 with the Launch work Space, ordinary Atlas and Scribe threads, and deterministic ORBIT-42 replies. Live assertions check thread membership, recipient selection, the breadcrumb, typed mention searches, draft retention, reactions, pane arrangement, and desktop/mobile layouts. The fixture puts its standing instructions in agent-only context, so native transcripts show the conversation.
+Captured in staged stable BB with the Launch work Space, ordinary Atlas and Scribe threads, and deterministic ORBIT-42 replies. Live assertions check thread membership, recipient selection, the breadcrumb, typed mention searches, draft retention, reactions, following a working thread, opening, closing and rearranging panes, the thread list beside the composer, and desktop and phone layouts. The fixture puts its standing instructions in agent-only context, so native transcripts show the conversation.
 
-![Ordinary threads side by side in Grid](assets/command-grid.png)
+![Three threads open side by side](assets/command-grid.png)
 
-![Focus on one thread on a phone](assets/command-focus-mobile.png)
+![One thread on a phone, with the thread chips above the composer](assets/command-follow-mobile.png)
 
-The same run checks [Grid arrangement](assets/command-grid-arrange.png), [Focus](assets/command-focus.png), [compact Focus](assets/command-focus-compact.png), [Active](assets/command-active.png), and [phone Grid](assets/command-grid-mobile.png).
+The same run checks [the overview](assets/command.png), [rearranging panes](assets/command-grid-arrange.png), [closing and reopening a pane](assets/command-close.png), and [the grid on a phone](assets/command-grid-mobile.png).
 
 ## Item chat
 

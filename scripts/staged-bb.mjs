@@ -153,11 +153,12 @@ async function seedCommand(machine, project) {
     });
     const thread = await response.json();
     if (!response.ok || !thread.id) throw new Error(`Could not seed ${name}: ${JSON.stringify(thread)}`);
+    await bb("thread", "wait", thread.id, "--timeout", "180s");
+    // After the first reply, so BB's automatic title can't replace it.
     const renamed = await fetch(`${serverUrl}/api/v1/threads/${thread.id}`, {
       method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: name }),
     });
     if (!renamed.ok) throw new Error(`Could not name the ${name} fixture`);
-    await bb("thread", "wait", thread.id, "--timeout", "180s");
     return thread.id;
   };
   const atlas = await makeThread("Atlas", "atlas-mission.md");

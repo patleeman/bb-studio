@@ -160,12 +160,9 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
   }) },
   { id: "studio-command-follow-mobile", packageDir: "bb-studio", fileName: "command-follow-mobile.png", privateSidebar: false, setup: guard(async client => {
    await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-   await open(client, ["Atlas"]);
-   await client.clickAriaButtonWithPointer("Close Atlas");
-   await wait(client, `${panes}.length===1&&!!document.querySelector('[data-command-following]')`);
-   await show(client, "Atlas");
-   await client.evaluate("document.querySelector('[aria-label=\"Show only Atlas\"]')?.click()");
-   await wait(client, `${panes}.length===1`);
+   // With nothing working, the one pane follows the lead.
+   await open(client);
+   await wait(client, `${panes}.length===1&&!!document.querySelector('[data-command-panes] [aria-label="Atlas transcript"]')&&!!document.querySelector('[data-command-following]')`);
    await client.waitForText("Ready. I checked the brief:");
    await concise(client);
    await client.evaluate(`(()=>{if(${rows}!==3)throw new Error('Phone lost a thread chip');if(document.documentElement.scrollWidth>innerWidth||document.querySelector('[data-command-composer]').getBoundingClientRect().bottom>innerHeight)throw new Error('Phone view exceeds the viewport');})()`);
