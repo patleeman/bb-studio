@@ -48,11 +48,10 @@ and the Related popover before capture.
 
 ![A thread working as Atlas](assets/composer-thread-bot.png)
 
-**Work as bot** sits in the composer's action row in a new thread, here with
-Atlas picked, and in a thread working as a bot. A thread without a bot shows it
-with the other plugin actions in the composer. These captures run on stable BB 0.45.0 with
-the suite installed from pushed commit ddb7fb0, and check each placement
-before capture.
+**Work as bot** sits with the other plugin actions in the composer, in a new
+thread (here with Atlas picked) and in a thread working as a bot. These
+captures run on stable BB 0.45.0 with the suite installed from pushed commit
+ddb7fb0, and check each placement before capture.
 
 ![The Launch work Space's Command view, merged](assets/staged-preview.png)
 

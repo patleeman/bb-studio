@@ -3,8 +3,6 @@ import { experimental_Icon as Icon, useComposer, useComposerView, useRpc } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/app";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
-import { PLUGIN_ID } from "./studio-provider";
-import { ComposerLeading } from "./composer-leading";
 import { message } from "./bot-ui";
 
 const pendingKey = (projectId: string) => `bb:bots:new-thread-profile:${projectId}`;
@@ -18,9 +16,6 @@ const savePick = (projectId: string, botId: string | null) =>
  * memory. A thread works as one bot. In the new-thread composer the pick also applies
  * the bot's model and permissions, which can still be changed before sending,
  * and attaches when the first message is sent.
- *
- * A new thread's pick, and the bot a thread works as, show after the model
- * picker; otherwise it stays where BB puts composer actions.
  */
 export function ProfilePicker() {
   const view = useComposerView();
@@ -154,7 +149,7 @@ export function ProfilePicker() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-  return projectId || current ? <ComposerLeading pluginId={PLUGIN_ID}>{picker}</ComposerLeading> : picker;
+  return picker;
 }
 
 function BotItem({ bot, description, disabled, onSelect }: {
