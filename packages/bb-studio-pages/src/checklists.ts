@@ -5,7 +5,7 @@
 // the item off after reviewing.
 import type Database from "better-sqlite3";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { untitled } from "@bb-studio/kit/format";
+import { errorMessage, untitled } from "@bb-studio/kit/format";
 import { pageCheckboxes } from "@bb-studio/kit/page-checkbox";
 import { primaryHostId, studioServices } from "@bb-studio/kit/server";
 import { PLUGIN_ID } from "./constants";
@@ -138,7 +138,7 @@ export class Checklists {
       if (tagChecklistThread(page.doc, row.block_id, row.thread_id, checklistLabel(row.state), "checklist")) this.service.hub.flush(page);
     } catch (error) {
       // The item may have been deleted or turned into something else.
-      this.bb.log.info(`checklist ${row.page_id}/${row.block_id}: ${error instanceof Error ? error.message : String(error)}`);
+      this.bb.log.info(`checklist ${row.page_id}/${row.block_id}: ${errorMessage(error)}`);
     }
   }
 }

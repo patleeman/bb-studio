@@ -1,6 +1,7 @@
 // Embeds that stay live: a table edited in place, a recording played with its
 // transcript. Each reads and writes its add-on
 // through Pages and refreshes while it's shown.
+import { errorMessage } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, cn } from "@bb-studio/kit/ui";
 import { parseTableSubPath, tableHref, tableSubPath, type Table } from "@bb-studio/kit/tables";
@@ -11,10 +12,6 @@ import { usePagesUi } from "./context";
 import { useStudioItems } from "./studio-embeds";
 
 const POLL_MS = 5_000;
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 /** Loads a value and reloads it every few seconds while the page is visible. */
 function useLive<T>(load: () => Promise<T>, key: string): { value: T | undefined; failed: boolean; reload(): void } {
@@ -70,9 +67,9 @@ export function TableEmbed({ target, onTargetChange }: { target: string; onTarge
       copyLink: ({ viewId, rowId }) =>
         void navigator.clipboard.writeText(new URL(tableHref({ tableId, viewId, rowId }), window.location.origin).href).then(
           () => toast.success(rowId ? "Copied a link to the row." : viewId ? "Copied a link to the view." : "Copied a link to the table."),
-          (error) => toast.error(message(error)),
+          (error) => toast.error(errorMessage(error)),
         ),
-      onError: (error) => toast.error(message(error)),
+      onError: (error) => toast.error(errorMessage(error)),
     }),
     [ui, items, tableId],
   );
@@ -148,7 +145,7 @@ export function RecordingBody({ id }: { id: string }) {
     }
     if (playing !== index) element.src = segment.url;
     setPlaying(index);
-    void element.play().catch((error) => toast.error(message(error)));
+    void element.play().catch((error) => toast.error(errorMessage(error)));
   };
   const toggle = () => {
     const element = audio.current;

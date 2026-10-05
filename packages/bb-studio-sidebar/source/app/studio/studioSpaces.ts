@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { useEffect, useRef } from "react";
 import { atom, useAtomValue, useSetAtom } from "jotai";
 import { useSdk } from "@get-bb/plugin-sdk/app";
@@ -225,7 +226,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
         const list = spaces.map(({ id, name, color, icon, defaultProjectId, isDefault, projectIds }) => ({ id, name, color, icon, defaultProjectId, isDefault, projectIds }));
         if (active) setState({ status: "ready", spaces: list, spaceOf, leads, heartbeats, items, threadsLoaded: spaceMode });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         // Keep the last good load through a passing failure.
         if (active) setState((current) => current.status === "ready" && current.threadsLoaded === spaceMode ? current : { status: "unavailable", error: message });
       } finally {

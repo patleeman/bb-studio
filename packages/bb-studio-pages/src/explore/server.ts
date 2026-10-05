@@ -1,6 +1,7 @@
 // Explore (experimental): agents end answers that read code with a few things
 // they noticed along the way; a click writes a Studio Page explaining one.
 // The work is in src/register.ts; this wires it into BB.
+import { errorMessage } from "@bb-studio/kit/format";
 import { usage } from "@bb-studio/kit/cli";
 import type { BbPluginApi, PluginSettingDescriptor } from "@get-bb/plugin-sdk";
 import { z } from "zod";
@@ -60,7 +61,7 @@ export default async function plugin(bb: BbPluginApi) {
       try {
         return await explore.cli(argv, ctx);
       } catch (error) {
-        return { exitCode: 1, stderr: `${error instanceof Error ? error.message : String(error)}\n` };
+        return { exitCode: 1, stderr: `${errorMessage(error)}\n` };
       }
     },
   });

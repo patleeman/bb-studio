@@ -1,3 +1,5 @@
+import { errorMessage } from "@bb-studio/kit/format";
+
 type Draft = { id: string; title: string; base: string; at: number; supersedes?: string };
 type Page = { title: string; updatedAt: number };
 export type TitleTransport = {
@@ -12,7 +14,6 @@ export type TitleSnapshot = {
   currentTitle: string;
   alternatives: Draft[];
 };
-const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
 type TitleRecoveryMemory = {
   drafts: Map<string, Draft>;
   unpersisted: Set<string>;
@@ -146,7 +147,7 @@ export class TitleRecovery {
         if (key?.startsWith(this.prefix)) records[key] = storage.getItem(key);
       }
       return { records };
-    } catch (error) { return { records, error: errorText(error) }; }
+    } catch (error) { return { records, error: errorMessage(error) }; }
   }
 }
 
@@ -165,7 +166,7 @@ export class PageTitle {
     this.server = page;
     let drafts: Draft[] = recovery.memory();
     let localError: string | null = null;
-    try { drafts = recovery.load(); } catch (error) { localError = this.readError = errorText(error); }
+    try { drafts = recovery.load(); } catch (error) { localError = this.readError = errorMessage(error); }
     if (recovery.hasUnpersisted()) localError ??= "The title draft is only kept in this open browser. Retry local recovery before closing.";
     this.draft = drafts[0] ?? null;
     this.snapshot = {
@@ -187,7 +188,7 @@ export class PageTitle {
       // The newest immutable record is already in memory; retain the previous
       // on-disk record, but do not accumulate stale memory-only keystrokes.
       if (previous && previous.id !== next.id) this.recovery.forgetMemory(previous);
-      this.emit({ localError: errorText(error) });
+      this.emit({ localError: errorMessage(error) });
     }
   }
   private replace(title: string, base: string) {
@@ -227,7 +228,7 @@ export class PageTitle {
         ...(this.draft && this.snapshot.status === "saved" ? { title: this.draft.title, status: "recovered" } : {}),
       });
       if (this.draft) this.persist(this.draft, null);
-    } catch (error) { this.readError = errorText(error); this.emit({ localError: this.readError }); }
+    } catch (error) { this.readError = errorMessage(error); this.emit({ localError: this.readError }); }
   };
   useMine = () => {
     if (!this.draft || this.saving) return;
@@ -248,7 +249,7 @@ export class PageTitle {
   discard = () => {
     if (this.saving || !this.draft) return;
     try { this.recovery.remove(this.draft); }
-    catch (error) { this.emit({ localError: errorText(error) }); return; }
+    catch (error) { this.emit({ localError: errorMessage(error) }); return; }
     this.epoch++;
     this.draft = null;
     if (this.timer) clearTimeout(this.timer);
@@ -268,7 +269,7 @@ export class PageTitle {
       try { this.recovery.remove(submitted); this.emit({ localError: this.readError }); }
       catch (error) {
         this.recovery.forgetMemory(submitted); // The server has this version.
-        this.emit({ localError: errorText(error) });
+        this.emit({ localError: errorMessage(error) });
       }
       this.draft = null;
       this.emit({ title: page.title, status: "saved", error: null, currentTitle: page.title });
@@ -301,7 +302,7 @@ export class PageTitle {
         this.emit({
           status: current && current.title !== submitted.base ? "conflict" : "failed",
           currentTitle: current?.title ?? this.server.title,
-          error: current === null ? "This page no longer exists. Download your title draft to keep it." : errorText(error),
+          error: current === null ? "This page no longer exists. Download your title draft to keep it." : errorMessage(error),
         });
       }
     } finally { this.saving = false; }

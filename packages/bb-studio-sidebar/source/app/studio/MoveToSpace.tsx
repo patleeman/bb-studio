@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { useCallback, useContext, useState } from "react";
 import { useSetAtom } from "jotai";
 import { useSdk } from "@get-bb/plugin-sdk/app";
@@ -62,7 +63,7 @@ export function useMoveThreadsToSpace(): (threadIds: readonly string[], space: S
       });
       toast.success(`Moved ${threadIds.length === 1 ? "" : `${threadIds.length} threads `}to ${space.name}`);
     } catch (cause) {
-      toast.error(`Couldn't move to ${space.name}: ${cause instanceof Error ? cause.message : String(cause)}`);
+      toast.error(`Couldn't move to ${space.name}: ${errorMessage(cause)}`);
       throw cause;
     } finally {
       settle();

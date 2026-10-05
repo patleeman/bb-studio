@@ -6,6 +6,7 @@
 //
 // Chunks are stored as ArrayBuffers, not Blobs: WebKit web views (the BB
 // mobile app) have a history of losing Blobs stored in IndexedDB.
+import { errorMessage } from "@bb-studio/kit/format";
 
 export interface OutboxSegment {
   recordingId: string;
@@ -67,7 +68,7 @@ export function isPermanentRejection(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   if (code === "invalid_input" || code === "invalid_json") return true;
   // A dictation whose audio expired takes no more audio.
-  return /audio was deleted/.test(error instanceof Error ? error.message : String(error));
+  return /audio was deleted/.test(errorMessage(error));
 }
 
 /** A set-aside segment as the recovery view lists it, without its audio. */

@@ -12,6 +12,7 @@
 // one Studio wrote, the thread is left alone. `bb studio retitle` turns it
 // back on for a thread, including threads from before Studio did this.
 // The "Short thread titles" setting turns the automatic part off.
+import { errorMessage } from "@bb-studio/kit/format";
 import type Database from "better-sqlite3";
 
 export const MAX_TITLE_CHARS = 36;
@@ -192,7 +193,7 @@ export class ThreadTitler {
     let failure: unknown;
     const done = this.title(threadId, force, controller.signal).catch((error: unknown) => {
       if (controller.signal.aborted) return;
-      this.deps.log?.(`Studio could not title ${threadId}: ${error instanceof Error ? error.message : String(error)}`);
+      this.deps.log?.(`Studio could not title ${threadId}: ${errorMessage(error)}`);
       failure = error;
     }).finally(() => {
       if (this.running.get(threadId)?.controller === controller) this.running.delete(threadId);

@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { createContext, useContext } from "react";
 import { useSetAtom } from "jotai";
 import { useSdk } from "@get-bb/plugin-sdk/app";
@@ -38,7 +39,7 @@ export function SpaceLeadItem({ thread, surface }: {
       () => window.dispatchEvent(new Event(STUDIO_CHANGED_EVENT)),
       (cause: unknown) => {
         window.dispatchEvent(new Event(STUDIO_CHANGED_EVENT));
-        toast.error(`Couldn't change the lead: ${cause instanceof Error ? cause.message : String(cause)}`);
+        toast.error(`Couldn't change the lead: ${errorMessage(cause)}`);
       },
     );
   };

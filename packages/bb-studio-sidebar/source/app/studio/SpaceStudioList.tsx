@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { openAppPath, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
 import { toast } from "sonner";
@@ -98,7 +99,7 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated, children
     call("overview", null, overviewSchema).then(
       ({ providers }) => setKinds(providers.filter((provider) => provider.state === "ready").flatMap((provider) =>
         provider.kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true)).map((kind) => ({ ...kind, pluginId: provider.pluginId, providerName: provider.name })))),
-      (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+      (cause: unknown) => setError(errorMessage(cause)),
     );
   };
   const create = async (kind: Kind) => {
@@ -110,7 +111,7 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated, children
       const { href } = await call("createInSpace", { id: spaceId, pluginId: kind.pluginId, kind: kind.id }, createdSchema);
       onCreated(href);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorMessage(cause));
     }
   };
   return (
@@ -166,21 +167,21 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
     const next = title.trim();
     if (!next || next === item.title) return;
     void call("rename", { pluginId: item.pluginId, id: item.id, title: next }).catch(
-      (cause: unknown) => toast.error(`Couldn't rename: ${cause instanceof Error ? cause.message : String(cause)}`),
+      (cause: unknown) => toast.error(`Couldn't rename: ${errorMessage(cause)}`),
     );
   };
   const pin = () => void sdk.plugins.callRpc({ pluginId: "studio", method: "pinTab", input: { pluginId: item.pluginId, id: item.id, pinned: !item.pinned } as never, outputSchema: z.object({ ok: z.boolean() }), signal: AbortSignal.timeout(15_000) }).catch(
-    (cause: unknown) => toast.error(`Couldn't ${item.pinned ? "unpin" : "pin"}: ${cause instanceof Error ? cause.message : String(cause)}`),
+    (cause: unknown) => toast.error(`Couldn't ${item.pinned ? "unpin" : "pin"}: ${errorMessage(cause)}`),
   );
   const archive = () => void call("archive", { pluginId: item.pluginId, ids: [item.id], archived: true }).then(
     () => toast.success(`Archived ${item.title}`),
-    (cause: unknown) => toast.error(`Couldn't archive: ${cause instanceof Error ? cause.message : String(cause)}`),
+    (cause: unknown) => toast.error(`Couldn't archive: ${errorMessage(cause)}`),
   );
   const remove = () => {
     if (!window.confirm(`Delete “${item.title}”? This can't be undone.`)) return;
     void call("remove", { pluginId: item.pluginId, ids: [item.id] }).then(
       () => toast.success(`Deleted ${item.title}`),
-      (cause: unknown) => toast.error(`Couldn't delete: ${cause instanceof Error ? cause.message : String(cause)}`),
+      (cause: unknown) => toast.error(`Couldn't delete: ${errorMessage(cause)}`),
     );
   };
   return (

@@ -1,5 +1,6 @@
 // Data for Spaces: their threads (one Space per thread) and optional lead.
 // Loads are shared per method and input, and refetch on Studio's change signal.
+import { errorMessage } from "@bb-studio/kit/format";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
@@ -56,7 +57,7 @@ function loadLive(entry: LiveEntry, method: string, input: unknown) {
   entry.inflight = true;
   entry.call(method, input)
     .then((data) => { entry.loadedAt = Date.now(); setLive(entry, { data, error: null, loading: false }); })
-    .catch((cause: unknown) => setLive(entry, { ...entry.state, error: cause instanceof Error ? cause.message : String(cause), loading: false }))
+    .catch((cause: unknown) => setLive(entry, { ...entry.state, error: errorMessage(cause), loading: false }))
     .finally(() => {
       entry.inflight = false;
       if (entry.again) { entry.again = false; loadLive(entry, method, input); }

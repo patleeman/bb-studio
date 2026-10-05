@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 import { createChangeBus, createStoreProvider, defineItemMention, studioIndex, studioServices } from "@bb-studio/kit/server";
@@ -471,7 +472,7 @@ export default function plugin(bb: BbPluginApi) {
       } catch (error) {
         return {
           exitCode: 1,
-          stderr: `${error instanceof Error ? error.message : String(error)}\n`,
+          stderr: `${errorMessage(error)}\n`,
         };
       }
     },
