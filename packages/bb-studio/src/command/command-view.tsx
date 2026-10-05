@@ -37,6 +37,37 @@ function Placeholder({ rows }: { rows: number }) {
   </div>;
 }
 
+/** A poll that changed nothing keeps the old object, so the panes and composer don't re-render. */
+const same = (a: Space | null, b: Space) => !!a && JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * New thread in this Space. BB's thread actions hook re-renders on every
+ * thread change, so it lives here rather than in the whole view.
+ */
+function NewThreadButton({ space }: { space: Space["space"] | null }) {
+  const threadActions = experimental_useSidebarThreadActions();
+  const latest = useRef({ space, threadActions });
+  latest.current = { space, threadActions };
+  const open = useCallback(() => {
+    const { space, threadActions } = latest.current;
+    if (!space) return;
+    handOffNewThreadSpace(space.id, space.defaultProjectId);
+    threadActions.openNewThread({ projectId: space.defaultProjectId ?? undefined, focusPrompt: true });
+  }, []);
+  useEffect(() => {
+    // Capture runs before BB's own handler, so the key files the thread here instead.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || !latest.current.space || !isNewThreadKey(event) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      open();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open]);
+  return <button type="button" aria-label={`New thread in ${space?.name ?? "this Space"}`} aria-keyshortcuts="Meta+N" title="New thread in this Space (⌘N)" className={ICON_BUTTON} disabled={!space} onClick={open}><Icon name="Plus" className="size-4" aria-hidden /></button>;
+}
+
 function useStored<T extends string | null>(key: string, read: (value: string | null) => T) {
   const [value, setValue] = useState<T>(() => { try { return read(localStorage.getItem(key) ?? localStorage.getItem(key.replace("studio:", "bot-teams:"))); } catch { return read(null); } });
   useEffect(() => { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); localStorage.removeItem(key.replace("studio:", "bot-teams:")); } catch {} }, [key, value]);
@@ -57,7 +88,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const generation = useRef(0), feedGeneration = useRef(0);
   const load = useCallback(() => {
     const seq = ++generation.current;
-    void rpc.call("command", { spaceId }).then(next => { if (seq === generation.current) { lastSpace.set(spaceId, next); setSpace(next); setError(null); } }, e => { if (seq === generation.current) setError(message(e)); });
+    void rpc.call("command", { spaceId }).then(next => { if (seq === generation.current) { lastSpace.set(spaceId, next); setSpace(current => same(current, next) ? current : next); setError(null); } }, e => { if (seq === generation.current) setError(message(e)); });
   }, [rpc, spaceId]);
   const loadFeed = useCallback(() => {
     const seq = ++feedGeneration.current;
@@ -80,25 +111,6 @@ function CommandView({ spaceId }: { spaceId: string }) {
   useLayoutEffect(() => {
     if (followLatest.current && timeline.current) timeline.current.scrollTop = timeline.current.scrollHeight;
   }, [entries?.at(-1)?.id]);
-
-  // New thread opens BB's new-thread screen with this Space already picked.
-  const threadActions = experimental_useSidebarThreadActions();
-  const newThread = useCallback(() => {
-    if (!space) return;
-    handOffNewThreadSpace(space.space.id, space.space.defaultProjectId);
-    threadActions.openNewThread({ projectId: space.space.defaultProjectId ?? undefined, focusPrompt: true });
-  }, [space, threadActions]);
-  useEffect(() => {
-    // Capture runs before BB's own handler, so the key files the thread here instead.
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat || !space || !isNewThreadKey(event) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
-      event.preventDefault();
-      event.stopPropagation();
-      newThread();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [newThread, space]);
 
   // Tells the "This Space" mention provider which Space's threads to offer.
   const markFocus = () => { void rpc.call("commandFocus", { spaceId }).catch(() => {}); };
@@ -171,7 +183,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
         <BarCrumb current>Command</BarCrumb>
       </nav>
       <div className="flex shrink-0 items-center gap-0.5">
-        <button type="button" aria-label={`New thread in ${space?.space.name ?? "this Space"}`} aria-keyshortcuts="Meta+N" title="New thread in this Space (⌘N)" className={ICON_BUTTON} disabled={!space} onClick={newThread}><Icon name="Plus" className="size-4" aria-hidden /></button>
+        <NewThreadButton space={space?.space ?? null} />
         <span aria-hidden className="mx-1 h-4 w-px bg-border" />
         <CommandLayoutPicker value={layout} onChange={setLayout} />
       </div>

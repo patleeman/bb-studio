@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { ThreadChat } from "@get-bb/plugin-sdk/app";
 import { ICON_BUTTON, Icon, ItemTile } from "@bb-studio/kit/app";
 import type { CommandThread } from "./command-contract";
@@ -53,7 +53,7 @@ function useFollowLatest() {
       for (const child of scroller.children) resized.observe(child);
     };
     const changed = new MutationObserver(() => { attach(); toLatest(); });
-    changed.observe(body, { childList: true, subtree: true, characterData: true });
+    changed.observe(body, { childList: true, subtree: true });
     attach();
     toLatest();
     return () => { cancelAnimationFrame(frame); changed.disconnect(); resized.disconnect(); scroller?.removeEventListener("scroll", scrolled); };
@@ -61,12 +61,20 @@ function useFollowLatest() {
   return setBody;
 }
 
-function Transcript({ threadId, onReply, choose }: { threadId: string; onReply(id: string): void; choose(id: string): void }) {
+/**
+ * One thread's transcript. Re-rendering BB's timeline is costly, so it renders
+ * only when the thread changes; the callbacks only set view state, so older
+ * copies of them still work.
+ */
+const Transcript = memo(function Transcript({ threadId, onReply, choose }: { threadId: string; onReply(id: string): void; choose(id: string): void }) {
   const follow = useFollowLatest();
-  return <div ref={follow} className="channel-pane-body" onPointerDownCapture={() => onReply(threadId)} onFocusCapture={() => onReply(threadId)}>
-    <ThreadChat threadId={threadId} variant="timeline" layout="contained" className="h-full" messageActions={[{ id: "command-reply", title: "Send to this thread", icon: "ArrowTurnBackward", run: () => choose(threadId) }]} />
+  const latest = useRef({ onReply, choose });
+  latest.current = { onReply, choose };
+  const actions = useMemo(() => [{ id: "command-reply", title: "Send to this thread", icon: "ArrowTurnBackward", run: () => latest.current.choose(threadId) }], [threadId]);
+  return <div ref={follow} className="channel-pane-body" onPointerDownCapture={() => latest.current.onReply(threadId)} onFocusCapture={() => latest.current.onReply(threadId)}>
+    <ThreadChat threadId={threadId} variant="timeline" layout="contained" className="h-full" messageActions={actions} />
   </div>;
-}
+}, (a, b) => a.threadId === b.threadId);
 
 /**
  * A Space's threads in the grid, active and focus layouts. The lead comes
