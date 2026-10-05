@@ -129,7 +129,7 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated, children
             <Icon name={kind.icon} className="size-4" />{kind.label}
           </DropdownMenuItem>
         ))}
-        {error ? <DropdownMenuItem onSelect={(event) => { event.preventDefault(); load(); }} title={error}><Icon name="ArrowReloadHorizontal" className="size-4" />Retry</DropdownMenuItem>
+        {error ? <DropdownMenuItem onSelect={(event) => { event.preventDefault(); load(); }} title={error}><Icon name="RotateCcw" className="size-4" />Retry</DropdownMenuItem>
           : kinds === null ? <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
             : !kinds.length ? <DropdownMenuItem disabled>Nothing to create</DropdownMenuItem> : null}
       </DropdownMenuContent>
@@ -255,7 +255,7 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52" aria-label={`${item.title} actions`}>
         {canFloat ? <><ContextMenuItem onSelect={() => openFloat({ kind: "path", path: item.href, title: item.title })}><Icon name="AppWindow" className="size-4" />Float</ContextMenuItem><ContextMenuSeparator /></> : null}
-        <ContextMenuItem onSelect={() => copyText(`[${item.title}](${item.href})`, "Link copied")}><Icon name="Copy" className="size-4" />Copy link</ContextMenuItem>
+        <ContextMenuItem onSelect={() => copyText(`[${item.title}](${item.href})`, "Link copied")}><Icon name="studio/link" fallback="Copy" className="size-4" />Copy link</ContextMenuItem>
         <ContextMenuItem onSelect={() => copyText(item.id, "ID copied")}><Icon name="Copy" className="size-4" />Copy ID</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={pin}><Icon name={item.pinned ? "PinOff" : "Pin"} className="size-4" />{item.pinned ? "Unpin" : "Pin"}</ContextMenuItem>
