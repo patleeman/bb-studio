@@ -77,7 +77,7 @@ export interface SpaceThreadRow {
   dot: ReactNode;
   /** The relative time where BB shows the status glyph. */
   time: ReactNode;
-  /** The latest line under the title, or null for a one-line row. */
+  /** The latest line under the title, or a blank one until it loads. */
   line: ReactNode;
 }
 
@@ -85,7 +85,8 @@ export interface SpaceThreadRow {
  * By space's two-line row: a status dot, the title and its age on line one,
  * the thread's latest line, muted, on line two. The line wraps onto its own
  * row of the flex container and ignores the pointer, so a click on it opens
- * the thread like the rest of the row.
+ * the thread like the rest of the row. A thread with no line yet, such as one
+ * just starting, keeps a blank line so every row is the same height.
  */
 export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null {
   const rows = useContext(SpaceRowsContext);
@@ -93,8 +94,8 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
   const line = rows.lines[thread.id];
   const at = Math.max(thread.updatedAt, thread.latestAttentionAt, line?.at ?? 0);
   return {
-    className: cn(line && "h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto"),
-    style: line ? { rowGap: 0 } : undefined,
+    className: "h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto",
+    style: { rowGap: 0 },
     dot: <SpaceThreadDot state={spaceThreadState(thread)} />,
     time: (
       <time
@@ -117,6 +118,13 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
       >
         {line.text}
       </span>
-    ) : null,
+    ) : (
+      <span
+        aria-hidden
+        className="pointer-events-none basis-full leading-4 text-xs group-data-[sidebar-touch-armed=true]/thread-row:hidden"
+      >
+        {"\u00a0"}
+      </span>
+    ),
   };
 }
