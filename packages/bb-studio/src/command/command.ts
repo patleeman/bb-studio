@@ -211,16 +211,23 @@ export class Command {
     for (const id of input.threadIds) if (!threads.some(thread => thread.id === id)) throw new Error("A recipient must be one of this Space's threads.");
     const targets = [...new Set(input.threadIds)];
     const roster = targets.map(threadId => ({ threadId }));
+    const forwarding = input.toLeadByDefault && targets.length === 1 && targets[0] === leadThreadId;
+    const forwardable = threads.filter(thread => thread.id !== leadThreadId && !thread.parentThreadId);
+    const files = input.attachments.flatMap(part => part.type === "image" ? [] : [part.path]);
+    const webImages = input.attachments.filter(part => part.type === "image").length;
     const prompt = [
       `[Studio Command message to ${targets.length === 1 ? "one thread" : `${targets.length} threads`} in Space ${JSON.stringify(space.name)}]`,
       `Recipients: ${JSON.stringify(roster)}`,
       targets.length > 1 ? "The owner addressed these threads together. You may read and message the listed threads to coordinate this request using bb thread log/tell. Work in this normal thread. If another recipient has covered your result, finish without a final assistant message." : "Work in this normal thread.",
-      ...(input.toLeadByDefault && targets.length === 1 && targets[0] === leadThreadId ? [
-        "The owner didn't address a thread, so this came to you as the Space's lead. If it is clearly meant for one of these threads, forward it with bb thread tell <threadId>, passing on the owner's words and any attachment paths, and reply in one line saying where it went. Otherwise handle it yourself.",
-        `Threads: ${JSON.stringify(threads.filter(thread => thread.id !== leadThreadId && !thread.parentThreadId).map(thread => ({ alias: thread.alias, title: thread.title, threadId: thread.id })))}`,
+      ...(forwarding ? [
+        "The owner didn't address a thread, so this came to you as the Space's lead. If it is clearly meant for one of these threads, forward it with bb thread tell <threadId>, passing on the owner's words, and reply in one line saying where it went. Otherwise handle it yourself.",
+        `Threads: ${JSON.stringify(forwardable.map(thread => ({ alias: thread.alias, title: thread.title, threadId: thread.id })))}`,
+        ...(files.length ? [`Attached files, copied into every listed thread's project so the same paths work there; include them in what you forward: ${JSON.stringify(files)}`] : []),
+        ...(webImages ? [`${webImages === 1 ? "A pasted image" : `${webImages} pasted images`} can't be forwarded with bb thread tell. If you forward this, say so and ask the owner to send ${webImages === 1 ? "the image" : "the images"} to that thread.`] : []),
       ] : []),
     ].join("\n");
-    await this.shareAttachments(input, targets);
+    // A forward reuses the same relative paths, so the files go wherever the lead may send them.
+    await this.shareAttachments(input, forwarding ? [...targets, ...forwardable.map(thread => thread.id)] : targets);
     const deliveries: CommandDelivery[] = [];
     for (const target of targets) {
       let threadId = target;

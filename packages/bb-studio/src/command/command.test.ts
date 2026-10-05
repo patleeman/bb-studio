@@ -200,6 +200,20 @@ test("attachments uploaded in the composer's project are copied to each recipien
   } finally { await x.close(); }
 });
 
+test("a message to the lead by default copies its files to every thread it may forward to, and says images can't follow", async () => {
+  const x = fixture({ lead: "sp_launch", fix: "sp_launch", docs: "sp_launch" }, "lead");
+  try {
+    x.harness.inspection.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => makeThreadResponse({ id: threadId, title: threadId, status: "idle", projectId: `proj_${threadId}` }));
+    const copies: { projectId: string }[] = [];
+    x.harness.inspection.sdk.stub("projects.attachments.copy", async (args: { projectId: string }) => { copies.push(args); });
+    await x.command.send(commandSendInput.parse({ spaceId: "sp_launch", threadIds: ["lead"], text: "Fix this", projectId: "proj_lead", toLeadByDefault: true, attachments: [{ type: "localImage", path: "shot.png" }, { type: "image", url: "data:image/png;base64,AAAA" }] }));
+    expect(copies.map(copy => copy.projectId).sort()).toEqual(["proj_docs", "proj_fix"]);
+    const prompt = (x.harness.inspection.sdk.callsTo("threads.send")[0]![0] as { input: { text?: string }[] }).input[1]!.text!;
+    expect(prompt).toContain('["shot.png"]');
+    expect(prompt).toContain("can't be forwarded");
+  } finally { await x.close(); }
+});
+
 test("a message that went to the lead by default lets it forward to the right thread", async () => {
   const x = fixture({ lead: "sp_launch", fix: "sp_launch" }, "lead");
   try {
