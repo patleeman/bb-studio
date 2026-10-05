@@ -357,7 +357,7 @@ export default async function plugin(bb: BbPluginApi) {
     retire: (id, retired) => runtime.retire(id, retired),
   });
   const tools = registerTeamsCli(bb, store, handlers, approveBotCreate);
-  registerMentionProviders(bb, store);
+  registerMentionProviders(bb, store, command);
   bb.agents.configure(context => {
     const conversation = store.byThread(context.thread.id);
     const bot = conversation ? store.get(conversation.botId) : null;

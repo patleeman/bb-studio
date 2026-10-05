@@ -7,7 +7,7 @@ import { PLUGIN_ID } from "./studio-provider";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
 import type { CommandAttachment, CommandEntry, CommandPermissionMode, CommandSpace } from "./command-contract";
-import { broadcastMentionText } from "./mentions";
+import { broadcastMentionText, spaceThreadMentionId } from "./mentions";
 import { CommandLayoutPicker, CommandThreads } from "./command-threads";
 import { commandLayout, recipients, type CommandLayout } from "./command-layout";
 
@@ -69,6 +69,8 @@ function CommandView({ spaceId }: { spaceId: string }) {
     if (followLatest.current && timeline.current) timeline.current.scrollTop = timeline.current.scrollHeight;
   }, [entries?.at(-1)?.id]);
 
+  // Tells the "This Space" mention provider which Space's threads to offer.
+  const markFocus = () => { void rpc.call("commandFocus", { spaceId }).catch(() => {}); };
   /** BB's composer submits rich input: mentions pick recipients and files ride along. Throwing keeps the draft. */
   const send = async (request: NewThreadRequest) => {
     if (!space) return;
@@ -84,14 +86,19 @@ function CommandView({ spaceId }: { spaceId: string }) {
         const ours = r.kind === "plugin" && r.pluginId === PLUGIN_ID;
         const broadcast = ours ? broadcastMentionText(r.itemId) : null;
         const bot = ours ? bots.find(b => b.id === r.itemId.replace(/^bots:/, "")) : undefined;
+        const picked = ours ? spaceThreadMentionId(r.itemId) : null;
         if (broadcast) everyone = true;
+        if (picked) {
+          if (!space.threads.some(t => t.id === picked)) throw new Error(`${label} is no longer in this Space.`);
+          mentioned.push(picked);
+        }
         if (bot) {
           const wearing = space.threads.filter(t => t.botId === bot.id && !t.parentThreadId).sort((a, b) => b.updatedAt - a.updatedAt)[0];
           if (!wearing) throw new Error(`No thread in this Space works as ${bot.name}.`);
           mentioned.push(wearing.id);
         }
         if (r.kind === "thread" && space.threads.some(t => t.id === r.threadId)) mentioned.push(r.threadId);
-        out = out.slice(0, m.start) + (broadcast ?? (bot ? `@${bot.handle}` : r.kind === "thread" ? `${label} (thread ${r.threadId})` : label)) + out.slice(m.end);
+        out = out.slice(0, m.start) + (broadcast ?? (bot ? `@${bot.handle}` : picked ? `${label} (thread ${picked})` : r.kind === "thread" ? `${label} (thread ${r.threadId})` : label)) + out.slice(m.end);
       }
       return [out];
     }).join("\n").trim();
@@ -149,7 +156,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
       {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
     </div></div> : <CommandThreads spaceId={spaceId} threads={space.threads} leadThreadId={space.leadThreadId} bots={bots} layout={layout} selected={selected} onSelect={threadId => { setSelected(threadId); setReply(null); setLayout("focus"); }} onReply={(threadId, focusComposer) => { setReply(threadId); if (focusComposer) setFocus(value => value + 1); }} onOpen={openThread} />}
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
-      <div data-command-composer><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
+      <div data-command-composer onFocusCapture={markFocus} onKeyDownCapture={event => { if (event.key === "@") markFocus(); }}><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
       <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           {defaultTo && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">{nameOf(defaultTo)}</span>{defaultTo === space.leadThreadId && !reply ? " · lead" : ""}</span>{reply && <button type="button" aria-label="Send to the lead instead" title="Send to the lead instead" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button>}</span>}

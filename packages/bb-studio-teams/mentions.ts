@@ -17,3 +17,24 @@ export const matchingBroadcastMentions = (query: string) =>
     .filter((handle) => handle !== "everyone" || !!query)
     .filter((handle) => handle.startsWith(query.toLowerCase()))
     .map((handle) => ({ handle }));
+
+/** Picked from the "This Space" provider: `space-threads:<threadId>`. */
+export const spaceThreadMentionId = (itemId: string) =>
+  itemId.startsWith("space-threads:") ? itemId.slice("space-threads:".length) || null : null;
+
+type MentionableThread = { id: string; title: string; botId: string | null; parentThreadId: string | null; status: string };
+
+/** A Space's top-level threads, lead first, for a bare or typed @. */
+export function matchingSpaceThreads(threads: readonly MentionableThread[], leadThreadId: string | null, botName: (botId: string) => string | null, query: string) {
+  const q = query.toLowerCase();
+  return threads
+    .filter(t => !t.parentThreadId)
+    .map(t => ({ thread: t, bot: t.botId ? botName(t.botId) : null }))
+    .filter(({ thread, bot }) => `${thread.title} ${bot ?? ""}`.toLowerCase().includes(q))
+    .map(({ thread, bot }) => ({
+      id: thread.id,
+      title: thread.title,
+      subtitle: [thread.id === leadThreadId ? "Lead" : null, bot, thread.status === "active" || thread.status === "starting" ? "Working" : null].filter(Boolean).join(" · ") || "Thread",
+      icon: bot ? "Bot" : "MessageSquare",
+    }));
+}

@@ -45,6 +45,8 @@ export const commandContract = {
   /** Owner messages and final replies across the Space's threads, oldest first. */
   commandFeed: { input: z.object({ spaceId }), output: z.object({ entries: z.array(commandEntrySchema) }) },
   commandSend: { input: commandSendInput, output: z.object({ deliveries: z.array(commandDeliverySchema) }) },
+  /** The Command composer was focused: its Space's threads answer @ in the "This Space" mention provider. */
+  commandFocus: { input: z.object({ spaceId }), output: z.object({ ok: z.literal(true) }) },
 };
 export type CommandThread = z.infer<typeof commandThreadSchema>;
 export type CommandSpace = z.infer<typeof commandContract.command.output>;

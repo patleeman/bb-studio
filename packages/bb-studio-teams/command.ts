@@ -13,6 +13,8 @@ type Listed = Pick<Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["get"]>>, "i
 /** The most threads a Command view shows; the default Space can hold every thread. */
 export const COMMAND_LIMIT = 32;
 export const COMMAND_TOPIC = "command-changed";
+/** How long after the Command composer was focused its Space answers a bare @. */
+export const COMMAND_FOCUS_MS = 10 * 60_000;
 
 const spacesSchema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), isDefault: z.boolean().catch(false) }).passthrough()) });
 const spaceOfSchema = z.object({ threads: z.record(z.string(), z.string()) });
@@ -81,7 +83,17 @@ export function mergeEntries(entries: CommandEntry[], limit = 100): CommandEntry
  */
 export class Command {
   constructor(readonly bb: BbPluginApi, readonly store: Store, readonly profiles: ThreadProfiles) {}
+  /** Mention providers aren't told which view asked, so the Command composer says which Space it is in. */
+  private focused: { spaceId: string; at: number } | null = null;
+  private shown = new Map<string, Awaited<ReturnType<Command["space"]>>>();
   changed() { this.bb.realtime.publish(COMMAND_TOPIC, {}); }
+  focus(spaceId: string, now = Date.now()) { this.focused = { spaceId, at: now }; }
+  /** The focused Space's threads for the "This Space" mention provider; none once the focus is stale. */
+  async mentionable(now = Date.now()) {
+    const focused = this.focused;
+    if (!focused || now - focused.at > COMMAND_FOCUS_MS) return null;
+    return this.shown.get(focused.spaceId) ?? await this.space(focused.spaceId);
+  }
   private studio<T>(method: string, input: unknown, outputSchema: z.ZodType<T>) {
     return this.bb.sdk.plugins.callRpc({ pluginId: "studio", method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) });
   }
@@ -127,7 +139,9 @@ export class Command {
     // A fork shows under its parent only while the parent is shown too.
     const shown = new Set(threads.map(thread => thread.id));
     for (const thread of threads) if (thread.parentThreadId && !shown.has(thread.parentThreadId)) thread.parentThreadId = null;
-    return { space: { id: space.id, name: space.name }, leadThreadId: leadThreadId && shown.has(leadThreadId) ? leadThreadId : null, threads };
+    const result = { space: { id: space.id, name: space.name }, leadThreadId: leadThreadId && shown.has(leadThreadId) ? leadThreadId : null, threads };
+    this.shown.set(spaceId, result);
+    return result;
   }
   /** The latest owner messages and final replies of one thread, without storing them. */
   async entries(threadId: string) {
@@ -213,6 +227,7 @@ export class Command {
       command: ({ spaceId }) => this.space(spaceId),
       commandFeed: ({ spaceId }) => this.feed(spaceId),
       commandSend: input => this.send(input),
+      commandFocus: ({ spaceId }) => { this.focus(spaceId); return { ok: true as const }; },
     };
   }
 }

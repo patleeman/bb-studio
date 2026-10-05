@@ -1,8 +1,24 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Store } from "./store";
-import { isBroadcastHandle, matchingBroadcastMentions } from "./mentions";
+import type { Command } from "./command";
+import { isBroadcastHandle, matchingBroadcastMentions, matchingSpaceThreads } from "./mentions";
 
-export function registerMentionProviders(bb: BbPluginApi, store: Store) {
+export function registerMentionProviders(bb: BbPluginApi, store: Store, command: Command) {
+  // Threads without a bot have no handle; their title is their name.
+  bb.ui.registerMentionProvider({
+    id: "space-threads", label: "This Space",
+    async search({ query, threadId }) {
+      // The Command composer starts no thread; a thread's own composer has one.
+      if (threadId) return [];
+      const space = await command.mentionable();
+      if (!space) return [];
+      return matchingSpaceThreads(space.threads, space.leadThreadId, botId => { try { return store.get(botId).name; } catch { return null; } }, query).slice(0, 30);
+    },
+    async resolve(threadId) {
+      const thread = await bb.sdk.threads.get({ threadId });
+      return { context: `BB thread ${JSON.stringify(thread.title || thread.titleFallback || "New thread")} (${thread.id}). Read it with bb thread log ${thread.id}.` };
+    },
+  });
   bb.ui.registerMentionProvider({
     id: "broadcasts", label: "Everyone",
     search({ query }) {

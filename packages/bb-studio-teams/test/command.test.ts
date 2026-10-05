@@ -118,3 +118,13 @@ test("text-only replies use BB completion events, and empty final output hides p
     expect((await x.command.feed("sp_launch")).entries.map(entry => entry.text)).toEqual(["Done"]);
   } finally { await x.close(); }
 });
+
+test("the focused Command Space answers @ for a while, then stops", async () => {
+  const x = fixture({ lead: "sp_launch", ask: "sp_launch" }, "lead");
+  try {
+    expect(await x.command.mentionable()).toBeNull();
+    x.command.focus("sp_launch", 1_000);
+    expect((await x.command.mentionable(2_000))?.threads.map(t => t.id)).toEqual(["lead", "ask"]);
+    expect(await x.command.mentionable(1_000 + 11 * 60_000)).toBeNull();
+  } finally { await x.close(); }
+});
