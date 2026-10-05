@@ -13,7 +13,8 @@ import {
   type DefaultReactSuggestionItem,
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
-import "@blocknote/shadcn/style.css";
+// BlockNote's stylesheet without the :has() rules that slow typing everywhere in BB.
+import "./blocknote.css";
 import { itemReferenceFrom } from "@bb-studio/kit/app";
 import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
