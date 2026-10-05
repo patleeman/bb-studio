@@ -40,6 +40,7 @@ const spacesSchema = z.object({
     icon: z.string().nullable().catch(null),
     defaultProjectId: z.string().nullable().catch(null),
     isDefault: z.boolean().catch(false),
+    projectIds: z.array(z.string()).catch([]),
   }).passthrough()),
 });
 const spaceOfSchema = z.object({ threads: z.record(z.string(), z.string()) });
@@ -175,7 +176,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
             count: space.itemCount,
           }]));
         }
-        const list = spaces.map(({ id, name, color, icon, defaultProjectId, isDefault }) => ({ id, name, color, icon, defaultProjectId, isDefault }));
+        const list = spaces.map(({ id, name, color, icon, defaultProjectId, isDefault, projectIds }) => ({ id, name, color, icon, defaultProjectId, isDefault, projectIds }));
         if (active) setState({ status: "ready", spaces: list, spaceOf, leads, heartbeats, items, threadsLoaded: spaceMode });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

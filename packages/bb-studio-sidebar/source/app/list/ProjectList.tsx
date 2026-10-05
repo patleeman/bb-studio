@@ -48,7 +48,7 @@ import { visibleProjects } from "../studio/visibleProjects.js";
 import { HiddenThreadsProvider, useHiddenThreads } from "../studio/useHiddenThreads.js";
 import { createSectionKeyResolver } from "../studio/hidden-threads.js";
 import { SpaceModeSections } from "../studio/SpaceModeSections.js";
-import { defaultSpaceId } from "../studio/space-groups.js";
+import { defaultSpaceId, projectSpaces } from "../studio/space-groups.js";
 import { publishSidebarOrganization, useStudioSpaces, useStudioSpacesSync } from "../studio/studioSpaces.js";
 import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
 import {
@@ -1439,6 +1439,7 @@ function ProjectListComponent({
       spaceOf: spaceData?.spaceOf ?? {},
       spaceIds: new Set(spaceData?.spaces.map((space) => space.id) ?? []),
       defaultSpaceId: spaceData ? defaultSpaceId(spaceData.spaces) : null,
+      projectSpace: spaceData ? projectSpaces(spaceData.spaces) : undefined,
     }),
     [effectiveMode, personalProjectId, spaceData],
   );

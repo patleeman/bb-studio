@@ -43,6 +43,8 @@ export interface SectionKeyContext {
   spaceIds: ReadonlySet<string>;
   /** By space: where threads in no Space show. */
   defaultSpaceId?: string | null;
+  /** By space: each project's Space, for threads Studio hasn't listed yet. */
+  projectSpace?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -52,7 +54,7 @@ export interface SectionKeyContext {
  */
 export function createSectionKeyResolver(
   threads: readonly SidebarThread[],
-  { mode, personalProjectId, spaceOf, spaceIds, defaultSpaceId = null }: SectionKeyContext,
+  { mode, personalProjectId, spaceOf, spaceIds, defaultSpaceId = null, projectSpace }: SectionKeyContext,
 ): (thread: SidebarThread) => string {
   const byId = new Map(threads.map((thread) => [thread.id, thread]));
   const rootOf = (thread: SidebarThread) => {
@@ -67,7 +69,7 @@ export function createSectionKeyResolver(
     return root;
   };
   if (mode === "space") {
-    const spaceFor = createSpaceResolver(threads, spaceOf, spaceIds, defaultSpaceId);
+    const spaceFor = createSpaceResolver(threads, spaceOf, spaceIds, defaultSpaceId, projectSpace);
     return (thread) => {
       const spaceId = spaceFor(thread);
       return spaceId === null ? "threads" : spaceSectionKey(spaceId);

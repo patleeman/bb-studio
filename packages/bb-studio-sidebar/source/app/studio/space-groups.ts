@@ -9,6 +9,13 @@ export interface StudioSpace {
   defaultProjectId: string | null;
   /** Studio's default Space (Personal): threads in no Space belong to it. */
   isDefault: boolean;
+  /** Projects the Space owns: their threads are in it unless added elsewhere. */
+  projectIds: readonly string[];
+}
+
+/** Which Space owns each project. */
+export function projectSpaces(spaces: readonly StudioSpace[]): ReadonlyMap<string, string> {
+  return new Map(spaces.flatMap((space) => space.projectIds.map((projectId) => [projectId, space.id] as const)));
 }
 
 /** The default Space: Studio's flagged one, else the first. */
@@ -40,6 +47,8 @@ export function createSpaceResolver(
   spaceOf: Readonly<Record<string, string>>,
   spaceIds: ReadonlySet<string>,
   fallback: string | null = null,
+  /** A thread Studio hasn't listed yet, such as a new one, follows its project's Space. */
+  projectSpace: ReadonlyMap<string, string> = new Map(),
 ): (thread: SidebarThread) => string | null {
   const byId = new Map(threads.map((thread) => [thread.id, thread]));
   const known = (id: string) => {
@@ -55,7 +64,8 @@ export function createSpaceResolver(
       seen.add(parent.id);
       root = parent;
     }
-    return known(root.id) ?? known(thread.id) ?? fallback;
+    const viaProject = projectSpace.get(root.projectId);
+    return known(root.id) ?? known(thread.id) ?? (viaProject && spaceIds.has(viaProject) ? viaProject : null) ?? fallback;
   };
 }
 
@@ -70,7 +80,7 @@ export function buildSpaceThreadGroups(
   spaceOf: Readonly<Record<string, string>>,
   leads: Readonly<Record<string, string | null>>,
 ): { groups: SpaceThreadGroup[]; loose: SidebarThread[] } {
-  const resolve = createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), defaultSpaceId(spaces));
+  const resolve = createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), defaultSpaceId(spaces), projectSpaces(spaces));
   const bySpace = new Map<string, SidebarThread[]>();
   const loose: SidebarThread[] = [];
   for (const thread of threads) {

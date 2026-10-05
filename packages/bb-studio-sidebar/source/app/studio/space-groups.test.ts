@@ -5,8 +5,8 @@ import { buildSpaceThreadGroups, defaultSpaceId, type StudioSpace } from "./spac
 import { neighbourSpaceId } from "./SpaceSwitcher.js";
 
 const spaces: StudioSpace[] = [
-  { id: "sp_b", name: "Beta", color: "#00f", icon: null, defaultProjectId: null, isDefault: false },
-  { id: "sp_a", name: "Alpha", color: "#f00", icon: "🚀", defaultProjectId: "proj_a", isDefault: true },
+  { id: "sp_b", name: "Beta", color: "#00f", icon: null, defaultProjectId: null, isDefault: false, projectIds: ["proj_b"] },
+  { id: "sp_a", name: "Alpha", color: "#f00", icon: "🚀", defaultProjectId: "proj_a", isDefault: true, projectIds: ["proj_a"] },
 ];
 
 describe("By space grouping", () => {
@@ -27,6 +27,12 @@ describe("By space grouping", () => {
       ["sp_a", "lead", "lead", ["newest", "child", "none", "gone"]],
     ]);
     expect(loose).toEqual([]);
+  });
+
+  it("puts a thread Studio hasn't listed yet in its project's Space", () => {
+    const fresh = makeSidebarThread({ id: "fresh", projectId: "proj_b", updatedAt: 10, latestAttentionAt: 10 });
+    const { groups } = buildSpaceThreadGroups([...rows, fresh], spaces, spaceOf, {});
+    expect(groups.find((group) => group.space.id === "sp_b")?.threads.map((thread) => thread.id)).toContain("fresh");
   });
 
   it("keeps threads loose only without Spaces", () => {

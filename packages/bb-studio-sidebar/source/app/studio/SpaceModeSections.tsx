@@ -41,13 +41,7 @@ import {
   sidebarGroupThreadsByEnvironmentAtom,
 } from "../preferences/atoms.js";
 import { toggleCollapsedIdList } from "../list/ProjectList.js";
-import {
-  buildSpaceThreadGroups,
-  createSpaceResolver,
-  defaultSpaceId,
-  spaceSectionKey,
-  type StudioSpace,
-} from "./space-groups.js";
+import { buildSpaceThreadGroups, createSpaceResolver, defaultSpaceId, spaceSectionKey, type StudioSpace, projectSpaces } from "./space-groups.js";
 import { SpaceStudioList, SpaceSubheading } from "./SpaceStudioList.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
 import { SpaceRowsContext } from "./SpaceThreadRow.js";
@@ -158,7 +152,7 @@ export function SpaceModeSections({
   );
 
   const resolveSpace = useMemo(
-    () => createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), fallbackSpaceId),
+    () => createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), fallbackSpaceId, projectSpaces(spaces)),
     [fallbackSpaceId, spaceOf, spaces, threads],
   );
   const leadState = useMemo<SpaceLeadState>(() => ({ spaceIdOf: resolveSpace, leads }), [leads, resolveSpace]);

@@ -25,7 +25,7 @@ index 39258e5..cee5dac 100644
 +    key.startsWith("machine:") ||
 +    key.startsWith("space:")
 diff --git a/source/app/list/ProjectList.tsx b/source/app/list/ProjectList.tsx
-index afa82d9..b92cf86 100644
+index afa82d9..7586ad1 100644
 --- a/source/app/list/ProjectList.tsx
 +++ b/source/app/list/ProjectList.tsx
 @@ -45,0 +46,8 @@ import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
@@ -34,7 +34,7 @@ index afa82d9..b92cf86 100644
 +import { HiddenThreadsProvider, useHiddenThreads } from "../studio/useHiddenThreads.js";
 +import { createSectionKeyResolver } from "../studio/hidden-threads.js";
 +import { SpaceModeSections } from "../studio/SpaceModeSections.js";
-+import { defaultSpaceId } from "../studio/space-groups.js";
++import { defaultSpaceId, projectSpaces } from "../studio/space-groups.js";
 +import { publishSidebarOrganization, useStudioSpaces, useStudioSpacesSync } from "../studio/studioSpaces.js";
 +import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
 @@ -99,0 +108 @@ import {
@@ -144,7 +144,7 @@ index afa82d9..b92cf86 100644
 @@ -1349 +1417 @@ function ProjectListComponent({
 -  const { status, sections, projects, personalProject, archived } =
 +  const { status, sections, projects: allProjects, personalProject, archived } =
-@@ -1351,0 +1420,27 @@ function ProjectListComponent({
+@@ -1351,0 +1420,28 @@ function ProjectListComponent({
 +  const selectedThreadId = activeThreadId ?? undefined;
 +  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
 +  const threadCount = useMemo(() => allProjects.reduce((count, project) => count + project.threads.length, 0), [allProjects]);
@@ -167,12 +167,13 @@ index afa82d9..b92cf86 100644
 +      spaceOf: spaceData?.spaceOf ?? {},
 +      spaceIds: new Set(spaceData?.spaces.map((space) => space.id) ?? []),
 +      defaultSpaceId: spaceData ? defaultSpaceId(spaceData.spaces) : null,
++      projectSpace: spaceData ? projectSpaces(spaceData.spaces) : undefined,
 +    }),
 +    [effectiveMode, personalProjectId, spaceData],
 +  );
 +  const hiddenThreads = useHiddenThreads({ projects: allProjects, sectionKeyOf, keepIds });
 +  const projects = hiddenThreads.projects;
-@@ -1359 +1454,9 @@ function ProjectListComponent({
+@@ -1359 +1455,9 @@ function ProjectListComponent({
 -  const selectedThreadId = activeThreadId ?? undefined;
 +  const allThreads = useMemo(() => allProjects.flatMap((project) => project.threads), [allProjects]);
 +  useSidebarThreadRevealCore({
@@ -183,7 +184,7 @@ index afa82d9..b92cf86 100644
 +    personalProjectId,
 +    hiddenThreadIds: hiddenThreads.hiddenIds,
 +  });
-@@ -1411,0 +1515,8 @@ function ProjectListComponent({
+@@ -1411,0 +1516,8 @@ function ProjectListComponent({
 +  // A Space's new thread starts in its default project; Studio decides
 +  // whether the thread joins the Space (by the project), not this list.
 +  const handleCreateThreadInProject = useCallback(
@@ -192,17 +193,17 @@ index afa82d9..b92cf86 100644
 +    },
 +    [openRootComposeForProject, personalProjectId],
 +  );
-@@ -1566 +1676,0 @@ function ProjectListComponent({
+@@ -1566 +1677,0 @@ function ProjectListComponent({
 -  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
-@@ -1723 +1833 @@ function ProjectListComponent({
+@@ -1723 +1834 @@ function ProjectListComponent({
 -  if (threadListStatus === "loading" || !preferencesReady) {
 +  if (threadListStatus === "loading" || !preferencesReady || (spaceMode && !spaceData)) {
-@@ -1731,0 +1842 @@ function ProjectListComponent({
+@@ -1731,0 +1843 @@ function ProjectListComponent({
 +    <HiddenThreadsProvider value={hiddenThreads.state}>
-@@ -1733,0 +1845,2 @@ function ProjectListComponent({
+@@ -1733,0 +1846,2 @@ function ProjectListComponent({
 +        onNewProject: projectCreation.openDialog,
 +        isCreatingProject: projectCreation.isCreating,
-@@ -1740 +1853,35 @@ function ProjectListComponent({
+@@ -1740 +1854,35 @@ function ProjectListComponent({
 -          mode={organizationMode}
 +          mode={effectiveMode}
 +          renderSpace={() => spaceData && (
@@ -239,11 +240,11 @@ index afa82d9..b92cf86 100644
 +              onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
 +            />
 +          )}
-@@ -1804,0 +1952 @@ function ProjectListComponent({
+@@ -1804,0 +1953 @@ function ProjectListComponent({
 +              createdProjectId={projectCreation.createdProjectId}
-@@ -1860,0 +2009 @@ function ProjectListComponent({
+@@ -1860,0 +2010 @@ function ProjectListComponent({
 +      {projectCreation.dialog}
-@@ -1861,0 +2011 @@ function ProjectListComponent({
+@@ -1861,0 +2012 @@ function ProjectListComponent({
 +    </HiddenThreadsProvider>
 diff --git a/source/app/list/SidebarHeaderControls.tsx b/source/app/list/SidebarHeaderControls.tsx
 index ec076ad..fe95274 100644
