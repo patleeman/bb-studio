@@ -212,9 +212,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForAriaButton("Remove Project Orbit");
         await client.waitForAriaButton("Remove Kind Pages");
         await client.waitForText("Offline mode launch");
-        const layout = await client.evaluate(`(() => { const field = document.querySelector('input[aria-label="Search and filter studio"]'); return { inside: !field.parentElement.querySelector('[aria-label^="Remove "]'), overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
-        if (!layout.inside || layout.overflow) throw new Error(`Invalid filter layout: ${JSON.stringify(layout)}`);
-        // Let the saved-view toast clear so it cannot cover mobile search.
+        const layout = await client.evaluate(`(() => { const field = document.querySelector('input[aria-label="Search and filter studio"]'); return { inside: !field.parentElement.querySelector('[aria-label^="Remove "]'), overflow: document.documentElement.scrollWidth > innerWidth, toolbarOverflow: [...document.querySelectorAll('[role="toolbar"][aria-label="Filters"]')].some((toolbar) => toolbar.scrollWidth > toolbar.clientWidth + 1) }; })()`);
+        if (!layout.inside || layout.overflow || layout.toolbarOverflow) throw new Error(`Invalid filter layout: ${JSON.stringify(layout)}`);
+        // Leave the controls, then let the toast and tooltips clear.
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 20, y: 800 });
         await sleep(5000);
       } catch (error) { await cleanup(); throw error; }
       return cleanup;

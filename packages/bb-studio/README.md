@@ -12,9 +12,22 @@ threads into one place, each with an optional lead thread.
 ![Live BB screenshot of the Studio collection](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): the Studio
-collection as cards, with the query bar above it and the filter rail beside it.
-The rail counts the seeded items by kind, project and tag. The cards show a
-paused Talk recording, a drawing, three Orbit pages and the staged bots.
+collection as a list, with search and compact Space and Kind menus above it.
+Project, Tags and Status are available under **More filters**. The rows show
+a paused Talk recording, a drawing and three Orbit pages.
+
+![Live BB screenshot of Studio with active filters](assets/filters.png)
+
+Selected filters appear below search, each with a remove button and an explicit
+Include/Exclude menu. Clearing search keeps the filters; **Clear filters** keeps
+the search text. **Save view** remembers the query, and **Views** appears once a
+view exists. Query syntax such as `kind:page` still completes in search.
+
+![Live BB screenshot of Studio filters on mobile](assets/filters-mobile.png)
+
+The same controls work at phone width. Both captures check menu selection,
+a stored plural filter, text search, exclusion, project filtering, and saving
+and reopening a view.
 
 ![Live BB screenshot of the New menu with a Pages filter](assets/new-menu.png)
 
@@ -73,7 +86,7 @@ and [native legacy collection](assets/studio-collection-companion-transfers-nati
   choices are remembered. The column you group by drops out, and a Spaces
   column appears once items belong to spaces. Drawings show thumbnails;
   recordings show their length and word count. Background kinds, such as Talk's dictations, stay
-  out of All and Home; their own pill and search still show them.
+  out of All and Home; the Kind menu and search still show them.
 - **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search everything**
   in the command palette, Cmd/Ctrl+Shift+P) opens a quick-open box over any
   page. Studio indexes titles and text from current add-ons, then searches BB threads live. The palette also has recent items and commands for creating items, opening Studio, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —
