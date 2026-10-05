@@ -134,7 +134,7 @@ function renderList(
 
 function sectionHeaders(): string[] {
   return Array.from(
-    document.querySelectorAll('[data-sidebar-sticky-tier="label"] [title]'),
+    document.querySelectorAll('[data-sidebar-sticky-tier="label"] [title]:not(button)'),
     (element) => element.getAttribute("title") ?? "",
   );
 }
@@ -250,13 +250,16 @@ describe("thread-list plugin", () => {
     });
     // The default Space shows first; threads in no Space are its.
     await screen.findByTitle("Alpha");
-    expect(sectionHeaders()).toEqual(["Pinned", "Alpha"]);
+    // A pinned thread sits in its Space, under the lead, not in a Pinned section.
+    expect(sectionHeaders()).toEqual(["Alpha"]);
     expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("space");
     const alpha = () => screen.getByTitle("Alpha").closest("[data-sidebar-sticky-group]") as HTMLElement;
     expect(alpha().querySelector("[data-sidebar-space-mark]")?.textContent).toBe("🚀");
     const lead = alpha().querySelector("[data-space-lead=thr_lead]") as HTMLElement;
-    expect(lead.textContent).toContain("heartbeat hourly");
-    expect(Array.from(alpha().querySelectorAll("[data-sidebar-thread-id]"), (el) => el.getAttribute("data-sidebar-thread-id"))[0]).toBe("thr_lead");
+    // No Lead heading: a star in place of the dot marks the lead, its heartbeat in the label.
+    expect(lead.querySelector("[data-space-thread-mark=lead]")?.getAttribute("aria-label")).toBe("Space lead · heartbeat hourly");
+    expect(Array.from(alpha().querySelectorAll("[data-space-thread-mark]"), (el) => el.getAttribute("data-space-thread-mark"))).toEqual(["lead", "pinned"]);
+    expect(Array.from(alpha().querySelectorAll("[data-sidebar-thread-id]"), (el) => el.getAttribute("data-sidebar-thread-id")).slice(0, 2)).toEqual(["thr_lead", "thr_pinned"]);
     expect(within(alpha()).getByText("Personal thread")).not.toBeNull();
     expect(threadIds()).not.toContain("thr_later");
     // Two-line rows: a status dot, the title and its age, then the latest line, leads first.
@@ -290,7 +293,9 @@ describe("thread-list plugin", () => {
     window.history.pushState(null, "", "/");
     fireEvent.click(screen.getByRole("button", { name: "Command view for Alpha" }));
     expect(window.location.pathname).toBe("/plugins/studio/studio/command/sp_alpha");
-    fireEvent.click(screen.getByRole("button", { name: "New thread in Alpha" }));
+    // The Space heading's + offers a thread first, then Studio items.
+    fireEvent.pointerDown(screen.getByRole("button", { name: "New in Alpha" }), { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Thread" }));
     expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_web", focusPrompt: true } });
     // An item opens in the main area (in place here, where BB can't split).
     fireEvent.click(within(alpha()).getByRole("link", { name: "Launch plan" }));
@@ -304,16 +309,15 @@ describe("thread-list plugin", () => {
     const switcher = screen.getByRole("navigation", { name: "Spaces" });
     fireEvent.click(within(switcher).getByRole("button", { name: "Beta, needs you" }));
     await screen.findByTitle("Beta");
-    expect(sectionHeaders()).toEqual(["Pinned", "Beta"]);
+    expect(sectionHeaders()).toEqual(["Beta"]);
     await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "currentSpace", value: "sp_beta" } }));
     expect(threadIds().filter((id) => id !== "thr_pinned")).toEqual(["thr_ask", "thr_later"]);
     expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.parentElement?.querySelector("[data-sidebar-needs-you]")).not.toBeNull();
     expect(document.querySelectorAll("[data-sidebar-needs-you]")).toHaveLength(1);
     expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.closest("[data-sidebar-rename-row]")?.querySelector("[data-space-thread-pill=needs-you]")?.textContent).toBe("Needs you");
-    // Beta has no Studio items, so its Studio starts collapsed.
-    expect(screen.queryByText("No items")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Expand Studio" }));
-    expect(screen.getByText("No items")).not.toBeNull();
+    // Beta has no open Studio items, so it shows no Studio rows, and no headings at all.
+    expect(screen.queryByRole("group", { name: "Beta Studio items" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^(Expand|Collapse) (Lead|Studio|Threads)$/ })).toBeNull();
     const created: Event[] = [];
     const onNew = (event: Event) => created.push(event);
     window.addEventListener("studio:new-space", onNew);
@@ -323,7 +327,7 @@ describe("thread-list plugin", () => {
     await waitFor(() => expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')!.closest("[data-sidebar-rename-row]")!.querySelector("[data-space-thread-line]")?.className).toContain("text-warning"));
     // ⌃⌥← / ⌃⌥→ step through All and the Spaces; All stacks every Space.
     fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
-    await waitFor(() => expect(sectionHeaders()).toEqual(["Pinned", "Alpha", "Beta"]));
+    await waitFor(() => expect(sectionHeaders()).toEqual(["Alpha", "Beta"]));
     await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "currentSpace", value: "all" } }));
     expect(within(switcher).getByRole("button", { name: "All Spaces" }).getAttribute("aria-current")).toBe("true");
     const beta = () => screen.getByTitle("Beta").closest("[data-sidebar-sticky-group]") as HTMLElement;
@@ -334,18 +338,8 @@ describe("thread-list plugin", () => {
     await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "collapsedSpaces", value: ["sp_beta"] } }));
     fireEvent.click(screen.getByRole("button", { name: "Expand Beta section" }));
     await within(beta()).findByText("Asks you");
-    // Each Space's Studio and Threads fold away on their own.
-    fireEvent.click(within(beta()).getByRole("button", { name: "Collapse Threads" }));
-    await waitFor(() => expect(within(beta()).queryByText("Asks you")).toBeNull());
-    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "collapsedSpaceSections", value: ["sp_beta:threads"] } }));
-    fireEvent.click(within(beta()).getByRole("button", { name: "Collapse Studio" }));
-    await waitFor(() => expect(within(beta()).queryByText("No items")).toBeNull());
-    fireEvent.click(within(beta()).getByRole("button", { name: "Expand Threads" }));
-    fireEvent.click(within(beta()).getByRole("button", { name: "Expand Studio" }));
-    await within(beta()).findByText("Asks you");
-    expect(within(beta()).getByText("No items")).not.toBeNull();
     fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
-    await waitFor(() => expect(sectionHeaders()).toEqual(["Pinned", "Alpha"]));
+    await waitFor(() => expect(sectionHeaders()).toEqual(["Alpha"]));
   });
 
   it("keeps BB's one-line rows outside By space", async () => {

@@ -18,7 +18,7 @@ const mockup = { pluginId: "artifacts", id: "art_1", title: "Mockup", icon: null
 const withOpen = (open: SpaceItems["open"]): SpaceItems => ({ open, all: [], count: 1 });
 const list = (items: SpaceItems) => (
   <TooltipProvider>
-    <SpaceStudioList spaceId="spc_1" spaceName="Work" defaultProjectId={null} items={items} />
+    <SpaceStudioList spaceName="Work" items={items} />
   </TooltipProvider>
 );
 

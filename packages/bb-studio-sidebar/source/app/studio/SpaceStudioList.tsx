@@ -1,18 +1,18 @@
 import { errorMessage } from "@bb-studio/kit/format";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createStudioItem, openAppPath, openPathInSplit } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
-import { EmptyState } from "@/components/ui/empty-state";
 import { COARSE_POINTER_ROW_HEIGHT_CLASS } from "@/components/ui/coarse-pointer-sizing";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -23,12 +23,6 @@ import {
 } from "../rows/sidebarRowClasses.js";
 import type { SpaceBrowseItem, SpaceItems } from "./studioSpaces.js";
 import { compactAge } from "./SpaceThreadRow.js";
-import { CHROME_SECTION_LABEL_CLASS } from "@/components/ui/chrome-style-tokens";
-import {
-  SIDEBAR_HOVER_ACTIONS_CLASS,
-  SIDEBAR_HOVER_ACTIONS_MOBILE_ALWAYS_VALUE,
-  SIDEBAR_HOVER_ACTIONS_ROW_CLASS,
-} from "../ui/sidebar-hover-actions.js";
 
 let splitting = false;
 
@@ -51,45 +45,6 @@ export function openStudioItem(anchor: HTMLAnchorElement | null, href: string, s
   openAppPath(href);
 }
 
-export type SpaceSubheadingCollapse = { isCollapsed: boolean; onToggleCollapsed(): void };
-
-/**
- * "Lead", "Studio" or "Threads" inside a Space, with its own controls on
- * hover. With `collapse`, the title folds the section away.
- */
-export function SpaceSubheading({ title, action, collapse }: { title: string; action?: ReactNode; collapse?: SpaceSubheadingCollapse }) {
-  return (
-    <div className={cn(SIDEBAR_HOVER_ACTIONS_ROW_CLASS, "flex h-7 items-center gap-1 pr-0.5 pl-2", CHROME_SECTION_LABEL_CLASS)}>
-      {collapse ? (
-        <button
-          type="button"
-          aria-expanded={!collapse.isCollapsed}
-          aria-label={collapse.isCollapsed ? `Expand ${title}` : `Collapse ${title}`}
-          onClick={collapse.onToggleCollapsed}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-left outline-none focus-visible:underline"
-        >
-          <span className="min-w-0 truncate">{title}</span>
-          <Icon
-            name="ChevronRight"
-            aria-hidden="true"
-            className={cn("size-3 shrink-0 transition-transform duration-150", !collapse.isCollapsed && cn(SIDEBAR_HOVER_ACTIONS_CLASS, "rotate-90"))}
-          />
-        </button>
-      ) : (
-        <span className="min-w-0 flex-1 truncate">{title}</span>
-      )}
-      {action ? (
-        <span
-          className={cn(SIDEBAR_HOVER_ACTIONS_CLASS, "inline-flex shrink-0 items-center has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100")}
-          data-sidebar-hover-actions-mobile={SIDEBAR_HOVER_ACTIONS_MOBILE_ALWAYS_VALUE}
-        >
-          {action}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 const kindSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -105,12 +60,13 @@ const projectSchema = z.object({ projectId: z.string() });
 
 type Kind = z.infer<typeof kindSchema> & { pluginId: string; providerName: string };
 
-/** Every kind of Studio item, made in the Space's folder, from +. */
-function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
+/** A new thread, then every kind of Studio item, made in the Space's folder, from +. */
+function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated, onNewThread }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
   onCreated(href: string): void;
+  onNewThread(): void;
 }) {
   const sdk = useSdk();
   const [kinds, setKinds] = useState<Kind[] | null>(null);
@@ -146,11 +102,15 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={`New Studio item in ${spaceName}`} title="New Studio item" className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")} onClick={(event) => event.stopPropagation()}>
+        <button type="button" aria-label={`New in ${spaceName}`} title="New thread or item" className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")} onClick={(event) => event.stopPropagation()}>
           <Icon name="Plus" className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48" aria-label={`New in ${spaceName}`}>
+        <DropdownMenuItem onSelect={onNewThread}>
+          <Icon name="MessageSquarePlus" className="size-4" />Thread
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {(kinds ?? []).map((kind) => (
           <DropdownMenuItem key={`${kind.pluginId}:${kind.id}`} onSelect={() => void create(kind)}>
             <Icon name={kind.icon} className="size-4" />{kind.label}
@@ -318,17 +278,45 @@ function BrowseMenu({ spaceName, items, onPick }: { spaceName: string; items: re
   );
 }
 
+/** Opens an item picked or made from a Space's menus, and lists it as open in the Space. */
+function useOpenInSpace(): (href: string) => void {
+  const sdk = useSdk();
+  return (href) => {
+    openStudioItem(null, href);
+    void sdk.plugins.callRpc({ pluginId: "studio", method: "visitTab", input: { path: href } as never, outputSchema: z.unknown(), signal: AbortSignal.timeout(15_000) }).catch(() => {});
+  };
+}
+
 /**
- * A Space's open Studio items, like tabs: each opens in the main area, and ×
- * closes it here without touching the item. Opening any of the Space's items
- * adds it; + makes a new one in the Space and opens it.
+ * The Space heading's buttons for its Studio items and threads: open one of
+ * its items, and + for a new thread or item, made in the Space.
  */
-export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, collapse }: {
+export function SpaceNewMenus({ spaceId, spaceName, defaultProjectId, items, onNewThread }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
   items: SpaceItems | undefined;
-  collapse?: SpaceSubheadingCollapse;
+  onNewThread(): void;
+}) {
+  const openPicked = useOpenInSpace();
+  const openKeys = new Set((items?.open ?? []).map((item) => `${item.pluginId}:${item.id}`));
+  const browsable = (items?.all ?? []).filter((item) => !openKeys.has(`${item.pluginId}:${item.id}`));
+  return (
+    <>
+      {browsable.length ? <BrowseMenu spaceName={spaceName} items={browsable} onPick={openPicked} /> : null}
+      <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openPicked} onNewThread={onNewThread} />
+    </>
+  );
+}
+
+/**
+ * A Space's open Studio items, like tabs: each opens in the main area, and ×
+ * closes it here without touching the item. Opening any of the Space's items
+ * adds it. Their kind icons set them apart from threads, so they need no heading.
+ */
+export function SpaceStudioList({ spaceName, items }: {
+  spaceName: string;
+  items: SpaceItems | undefined;
 }) {
   const sdk = useSdk();
   // Closed here until Studio's next list catches up.
@@ -342,43 +330,17 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, c
     });
   }, [items]);
   const open = (items?.open ?? []).filter((item) => !closed.has(key(item)));
-  const total = items?.count ?? 0;
   const close = (item: SpaceItems["open"][number]) => {
     setClosed((current) => new Set(current).add(key(item)));
     void sdk.plugins.callRpc({ pluginId: "studio", method: "closeTabs", input: { items: [{ pluginId: item.pluginId, id: item.id }] } as never, outputSchema: z.object({ ok: z.boolean() }), signal: AbortSignal.timeout(15_000) })
       .catch(() => setClosed((current) => { const next = new Set(current); next.delete(key(item)); return next; }));
   };
-  const openKeys = new Set(open.map(key));
-  const browsable = (items?.all ?? []).filter((item) => !openKeys.has(key(item)));
-  // Picked or made from a menu: open it, and list it as open in the Space.
-  const openPicked = (href: string) => {
-    openStudioItem(null, href);
-    void sdk.plugins.callRpc({ pluginId: "studio", method: "visitTab", input: { path: href } as never, outputSchema: z.unknown(), signal: AbortSignal.timeout(15_000) }).catch(() => {});
-  };
+  if (!open.length) return null;
   return (
     <div role="group" aria-label={`${spaceName} Studio items`}>
-      <SpaceSubheading
-        title="Studio"
-        collapse={collapse}
-        action={(
-          <span className="inline-flex items-center gap-0.5">
-            {browsable.length ? <BrowseMenu spaceName={spaceName} items={browsable} onPick={openPicked} /> : null}
-            <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openPicked} />
-          </span>
-        )}
-      />
-      {collapse?.isCollapsed ? null : open.map((item) => (
+      {open.map((item) => (
         <StudioItemRow key={key(item)} item={item} onClose={() => close(item)} />
       ))}
-      {collapse?.isCollapsed || open.length ? null : (
-        <EmptyState
-          message={total ? "Nothing open" : "No items"}
-          icon="File"
-          className="px-2 py-0.5"
-          iconClassName="size-3.5 text-subtle-foreground/50"
-          messageClassName="text-xs leading-4 text-subtle-foreground/60"
-        />
-      )}
     </div>
   );
 }

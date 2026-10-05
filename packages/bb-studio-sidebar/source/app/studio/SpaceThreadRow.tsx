@@ -1,5 +1,6 @@
 import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { Icon } from "@/components/ui/icon";
 import type { SidebarThread } from "../model/sidebar-thread.js";
 import { threadAttentionState, type ThreadAttentionState } from "../model/thread-activity.js";
 
@@ -10,8 +11,14 @@ export interface ThreadLine {
   at: number | null;
 }
 
-/** By space only: the latest line of each thread whose line has loaded. */
-export const SpaceRowsContext = createContext<{ lines: Readonly<Record<string, ThreadLine>> } | null>(null);
+/** How a Space's lead or a pinned thread is told apart without a heading. */
+export type SpaceThreadMark = { kind: "lead"; label: string } | { kind: "pinned" };
+
+/** By space only: the latest line of each thread whose line has loaded, and the lead's and pins' marks. */
+export const SpaceRowsContext = createContext<{
+  lines: Readonly<Record<string, ThreadLine>>;
+  marks?: Readonly<Record<string, SpaceThreadMark>>;
+} | null>(null);
 
 export type SpaceThreadState = ThreadAttentionState;
 
@@ -81,6 +88,39 @@ function SpaceThreadDot({ state }: { state: SpaceThreadState }) {
   );
 }
 
+/** The mark takes the state's colour, so the lead and pins still show what they need. */
+const MARK_TONE: Record<SpaceThreadState, string> = {
+  "needs-you": "text-warning",
+  working: "text-success",
+  error: "text-destructive",
+  unread: "text-blue-500",
+  idle: "text-subtle-foreground",
+};
+
+/** A star for the lead or a pin, where other rows have their status dot. */
+function SpaceThreadMarkIcon({ mark, state }: { mark: SpaceThreadMark; state: SpaceThreadState }) {
+  const status = SPACE_THREAD_DOT[state].label;
+  const label = [mark.kind === "lead" ? mark.label : "Pinned", status].filter(Boolean).join(" · ");
+  return (
+    // As wide as a dot, so the title lines up with the rows around it.
+    <span
+      data-space-thread-mark={mark.kind}
+      data-space-thread-dot={state}
+      data-sidebar-needs-you={state === "needs-you" ? "" : undefined}
+      role="img"
+      aria-label={label}
+      title={label}
+      className="relative mr-2 size-[7px] shrink-0"
+    >
+      <Icon
+        name={mark.kind === "lead" ? "Star" : "Pin"}
+        aria-hidden
+        className={cn("absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2", MARK_TONE[state], mark.kind === "lead" && "fill-current")}
+      />
+    </span>
+  );
+}
+
 const LINE_TONE: Record<ThreadLine["kind"], string> = {
   progress: "text-subtle-foreground",
   failure: "text-destructive/80",
@@ -91,7 +131,7 @@ const LINE_TONE: Record<ThreadLine["kind"], string> = {
 export interface SpaceThreadRow {
   className: string | undefined;
   style: CSSProperties | undefined;
-  /** The status dot before the title; it replaces BB's status glyph. */
+  /** The status dot before the title, or the lead's or a pin's mark; it replaces BB's status glyph. */
   dot: ReactNode;
   /** The relative time where BB shows the status glyph; null when a pill shows instead. */
   time: ReactNode;
@@ -120,7 +160,7 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
   return {
     className: cn("h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto", SPACE_THREAD_TITLE[state]),
     style: { rowGap: 0 },
-    dot: <SpaceThreadDot state={state} />,
+    dot: rows.marks?.[thread.id] ? <SpaceThreadMarkIcon mark={rows.marks[thread.id]!} state={state} /> : <SpaceThreadDot state={state} />,
     pill: SPACE_THREAD_PILL[state] ? (
       <span
         data-space-thread-pill={state}

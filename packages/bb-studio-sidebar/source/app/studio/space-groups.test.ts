@@ -81,4 +81,22 @@ describe("By space grouping", () => {
     const items = buildProjectThreadGroups(group.threads, compareStandardThreads, new Set(), false);
     expect(items.map((item) => item.kind === "thread" ? item.node.thread.id : item.kind)).toEqual(["newest", "gone", "none"]);
   });
+
+  it("lists a Space's pinned threads in pin order with their sub-threads, apart from its lead and other threads", () => {
+    const pinRows = [
+      ...rows,
+      makeSidebarThread({ id: "pin_b", updatedAt: 7, latestAttentionAt: 7 }),
+      makeSidebarThread({ id: "pin_a", updatedAt: 8, latestAttentionAt: 8 }),
+      makeSidebarThread({ id: "pin_child", parentThreadId: "pin_a", updatedAt: 2, latestAttentionAt: 2 }),
+    ];
+    const pinSpaces = { ...spaceOf, pin_a: "sp_a", pin_b: "sp_a" };
+    // The lead stays the lead when pinned; a pin under another pin stays in its tree.
+    const { groups } = buildSpaceThreadGroups(pinRows, spaces, pinSpaces, { sp_a: "lead" }, ["pin_a", "lead", "pin_child", "pin_b", "beta"]);
+    const alpha = groups.find((group) => group.space.id === "sp_a")!;
+    expect(alpha.lead?.id).toBe("lead");
+    expect(alpha.pinned.map((thread) => thread.id)).toEqual(["pin_a", "pin_b"]);
+    expect(alpha.pinnedChildren.map((thread) => thread.id)).toEqual(["pin_child"]);
+    expect(alpha.threads.map((thread) => thread.id).sort()).toEqual(["gone", "newest", "none"]);
+    expect(groups.find((group) => group.space.id === "sp_b")!.pinned.map((thread) => thread.id)).toEqual(["beta"]);
+  });
 });

@@ -30,6 +30,10 @@ export interface SpaceThreadGroup {
   lead: SidebarThread | null;
   /** The lead's sub-threads, at any depth; they nest under the lead. */
   leadChildren: SidebarThread[];
+  /** Pinned threads, in pin order, below the lead and above the rest; the lead stays the lead. */
+  pinned: SidebarThread[];
+  /** The pinned threads' sub-threads, at any depth. */
+  pinnedChildren: SidebarThread[];
   /** Every other thread in the Space. */
   threads: SidebarThread[];
 }
@@ -73,14 +77,16 @@ export function createSpaceResolver(
 
 /**
  * One group per Space in Studio's order, each with its threads apart from the
- * lead. Threads in no (known) Space join the default Space; `loose` holds
- * them only when there are no Spaces at all.
+ * lead and the pinned threads. Threads in no (known) Space join the default
+ * Space; `loose` holds them only when there are no Spaces at all.
  */
 export function buildSpaceThreadGroups(
   threads: readonly SidebarThread[],
   spaces: readonly StudioSpace[],
   spaceOf: Readonly<Record<string, string>>,
   leads: Readonly<Record<string, string | null>>,
+  /** Pinned thread ids, in pin order. */
+  pinnedIds: readonly string[] = [],
 ): { groups: SpaceThreadGroup[]; loose: SidebarThread[] } {
   const resolve = createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), defaultSpaceId(spaces), projectSpaces(spaces));
   const bySpace = new Map<string, SidebarThread[]>();
@@ -101,12 +107,27 @@ export function buildSpaceThreadGroups(
       const held = bySpace.get(space.id) ?? [];
       const lead = held.find((thread) => thread.id === leadThreadId) ?? null;
       const underLead = lead ? descendantIds(lead.id, held) : new Set<string>();
+      const byId = new Map(held.map((thread) => [thread.id, thread]));
+      // A pin inside another pinned tree, or under the lead, stays where its root is.
+      const pinnedSet = new Set(pinnedIds);
+      const pinned = pinnedIds.flatMap((id) => {
+        const thread = byId.get(id);
+        if (!thread || id === leadThreadId || underLead.has(id)) return [];
+        for (let parent = thread.parentThreadId ? byId.get(thread.parentThreadId) : undefined; parent; parent = parent.parentThreadId ? byId.get(parent.parentThreadId) : undefined) {
+          if (pinnedSet.has(parent.id) || parent.id === leadThreadId) return [];
+        }
+        return [thread];
+      });
+      const underPinned = new Set(pinned.flatMap((thread) => [...descendantIds(thread.id, held)]));
+      const pinnedRoots = new Set(pinned.map((thread) => thread.id));
       return {
         space,
         leadThreadId,
         lead,
         leadChildren: held.filter((thread) => underLead.has(thread.id)),
-        threads: held.filter((thread) => thread.id !== leadThreadId && !underLead.has(thread.id)),
+        pinned,
+        pinnedChildren: held.filter((thread) => underPinned.has(thread.id)),
+        threads: held.filter((thread) => thread.id !== leadThreadId && !underLead.has(thread.id) && !pinnedRoots.has(thread.id) && !underPinned.has(thread.id)),
       };
     }),
     loose,
