@@ -5,7 +5,7 @@
 // as shown, and every click, so `bb pages explore stats` can tell which kinds
 // earn their place.
 import { useComposer, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
 import { cn, Icon } from "@bb-studio/kit/ui";
 import { useExploreRpc } from "../../client";
@@ -69,65 +69,80 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
     composer.focus();
   };
 
-  const chips = [...items.reply.map((item) => ({ kind: "reply" as const, item })), ...items.do.map((item) => ({ kind: "do" as const, item }))];
+  const chip = (kind: "reply" | "do", item: ExploreItem) => (
+    <button
+      key={`${kind}:${item.label}`}
+      type="button"
+      onClick={() => draft(kind, item, `${item.emoji} ${item.label}`)}
+      title={kind === "do" ? "Draft this request in your message box" : "Draft this reply in your message box"}
+      className={cn(
+        "inline-flex h-6 items-center gap-1.5 border border-border bg-transparent px-2 text-xs text-foreground hover:bg-state-hover",
+        kind === "do" ? "rounded-md border-dashed" : "rounded-full",
+      )}
+    >
+      <span aria-hidden="true">{item.emoji}</span>
+      <span>{item.label}</span>
+    </button>
+  );
 
   return (
-    <section aria-label="Next" className="my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background">
-      {chips.length ? (
-        <div className="flex flex-wrap items-center gap-1.5 px-2 py-2" role="group" aria-label="Replies and actions">
-          {chips.map(({ kind, item }) => (
-            <button
-              key={`${kind}:${item.label}`}
-              type="button"
-              onClick={() => draft(kind, item, `${item.emoji} ${item.label}`)}
-              title={kind === "do" ? "Draft this request to the agent" : "Draft this reply"}
-              className={
-                kind === "do"
-                  ? "inline-flex h-6 items-center gap-1.5 rounded-md border border-dashed border-border bg-transparent px-2 text-xs text-foreground hover:bg-state-hover"
-                  : "inline-flex h-6 items-center gap-1.5 rounded-full border border-border bg-transparent px-2 text-xs text-foreground hover:bg-state-hover"
-              }
-            >
-              <span aria-hidden="true">{item.emoji}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
-          <a
-            href={SETTINGS_HREF}
-            aria-label="Next row settings"
-            title="Next row settings: turn it off for new agent sessions."
-            className="ml-auto flex size-6 items-center justify-center rounded text-muted-foreground/50 hover:bg-state-hover hover:text-foreground"
-          >
-            <Icon name="Settings" fallback="MoreHorizontal" className="size-3.5" />
-          </a>
-        </div>
+    <section aria-label="What next?" className="my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background py-1">
+      <header className="flex h-6 items-center gap-1.5 px-3 text-[11px] font-medium text-muted-foreground">
+        What next?
+        <a
+          href={SETTINGS_HREF}
+          aria-label="What next settings"
+          title="Settings: turn these suggestions off for new agent sessions."
+          className="ml-auto flex size-5 items-center justify-center rounded text-muted-foreground/50 hover:bg-state-hover hover:text-foreground"
+        >
+          <Icon name="Settings" fallback="MoreHorizontal" className="size-3.5" />
+        </a>
+      </header>
+      {items.reply.length ? (
+        <NextSection label="Reply" hint="Answer this message. Clicking one drafts it for you to send.">
+          <div className="flex flex-wrap gap-1.5">{items.reply.map((item) => chip("reply", item))}</div>
+        </NextSection>
+      ) : null}
+      {items.do.length ? (
+        <NextSection label="Ask for" hint="Things the agent can do next. Clicking one drafts the request for you to send.">
+          <div className="flex flex-wrap gap-1.5">{items.do.map((item) => chip("do", item))}</div>
+        </NextSection>
       ) : null}
       {items.btw.length ? (
-        <BtwNotes
-          notes={items.btw}
-          threadId={threadId}
-          messageId={messageId}
-          turnId={message.turnId}
-          onExplore={(item) => logClick("explore", item)}
-          onFix={(note) => draft("fix", note, `${BUG_EMOJI} Fix this: ${note.text}`)}
-          className={chips.length > 0 ? "border-t border-border/60" : undefined}
-        />
+        <NextSection label="By the way" hint="Things the agent noticed outside what you asked about.">
+          <BtwNotes
+            notes={items.btw}
+            threadId={threadId}
+            messageId={messageId}
+            turnId={message.turnId}
+            onExplore={(item) => logClick("explore", item)}
+            onFix={(note) => draft("fix", note, `${BUG_EMOJI} Fix this: ${note.text}`)}
+          />
+        </NextSection>
       ) : null}
     </section>
+  );
+}
+
+/** One kind of next step: a short label in the gutter, saying what its buttons are for. */
+function NextSection({ label, hint, children }: { label: string; hint: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="flex gap-3 px-3 py-1">
+      <span title={hint} className="w-16 shrink-0 cursor-help pt-1 text-[11px] leading-4 text-muted-foreground">
+        {label}
+      </span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
   );
 }
 
 const isBug = (note: BtwNote) => note.emoji === BUG_EMOJI;
 
 /** Notes back to the user, each with Tell me more (its explainer's state) and, for 🐛 notes, Fix this. */
-function BtwNotes({
-  notes,
-  onFix,
-  className,
-  ...target
-}: ExplainerTarget & { notes: readonly BtwNote[]; onFix(note: BtwNote): void; className?: string }) {
+function BtwNotes({ notes, onFix, ...target }: ExplainerTarget & { notes: readonly BtwNote[]; onFix(note: BtwNote): void }) {
   const { byLabel, busy, errors, act } = useExplainers(target);
   return (
-    <ul className={cn("divide-y divide-border/60", className)} aria-label="Things the agent noticed">
+    <ul className="space-y-1.5" aria-label="Things the agent noticed">
       {notes.map((note) => {
         const key = labelKey(note.label);
         const explainer = byLabel.get(key);
@@ -137,8 +152,8 @@ function BtwNotes({
         const more =
           state === "running" ? `Writing · ${progress}%` : state === "ready" ? "Open explanation" : state === "error" ? "Retry" : "Tell me more";
         return (
-          <li key={key} className="flex gap-2.5 px-3 py-2 text-sm">
-            <span aria-hidden className="w-5 shrink-0 text-center leading-5">
+          <li key={key} className="flex gap-2 pt-0.5 text-sm">
+            <span aria-hidden className="w-4 shrink-0 text-center leading-5">
               {note.emoji}
             </span>
             <p className="min-w-0 flex-1 leading-5 text-foreground">
