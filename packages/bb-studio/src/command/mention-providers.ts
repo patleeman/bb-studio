@@ -3,7 +3,7 @@ import type { Command } from "./command";
 import { isBroadcastHandle, matchingBroadcastMentions, matchingSpaceThreads } from "./mentions";
 
 export function registerMentionProviders(bb: BbPluginApi, command: Command) {
-  // Threads without a bot have no handle; their title is their name.
+  // Ordinary threads use their titles as names.
   bb.ui.registerMentionProvider({
     id: "space-threads", label: "This Space",
     async search({ query, threadId }) {

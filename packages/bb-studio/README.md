@@ -177,3 +177,13 @@ The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `
 ## Space Command view
 
 Open **Command view** from a Space’s sidebar heading. It shows the Space’s ordinary threads: Merged combines final replies, Grid shows native transcripts side by side, Active follows working threads, and Focus shows one thread. Send to the lead, pick a thread, @mention threads by title, or use @all. Files, drafts, permissions and send modes use BB’s composer.
+
+![A Space’s Command view with ordinary threads](assets/command-merged.png)
+
+Captured in staged stable BB 0.45.0 with the Launch work Space, ordinary Atlas and Scribe threads, and deterministic ORBIT-42 replies. Live assertions check thread membership, recipient selection, the breadcrumb, typed mention searches, draft retention, reactions, pane arrangement, and desktop/mobile layouts. The fixture puts its standing instructions in agent-only context, so native transcripts show the conversation.
+
+![Ordinary threads side by side in Grid](assets/command-grid.png)
+
+![Focus on one thread on a phone](assets/command-focus-mobile.png)
+
+The same run checks [Grid arrangement](assets/command-grid-arrange.png), [Focus](assets/command-focus.png), [compact Focus](assets/command-focus-compact.png), [Active](assets/command-active.png), and [phone Grid](assets/command-grid-mobile.png).

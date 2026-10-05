@@ -136,10 +136,27 @@ async function seedSmartReactionsThread(project, machine, orbitDir) {
 
 /** The Command view's deterministic fixture, in ordinary BB threads. */
 async function seedCommand(machine, project) {
-  const teams = join(fixturesDir, "command");
+  const commandFixtures = join(fixturesDir, "command");
   const makeThread = async (name, mission) => {
-    const text = await readFile(join(teams, mission), "utf8");
-    const thread = await bb("thread", "spawn", "--project", project.id, "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low", "--title", name, "--prompt", text + "\n\nFor this initial setup message, reply only Ready to work. Do not use tools or change files.");
+    const text = await readFile(join(commandFixtures, mission), "utf8");
+    // Seed standing context as agent-only input so native transcripts show the conversation.
+    const response = await fetch(`${serverUrl}/api/v1/threads`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id, origin: "app", environment: { type: "project-default" },
+        providerId: "codex", model: "gpt-6-luna", reasoningLevel: "low",
+        input: [
+          { type: "text", text: "Join the ORBIT-42 launch check.", mentions: [] },
+          { type: "text", visibility: "agent-only", mentions: [], text: text + "\n\nFor this initial setup message, reply only Ready to work. Do not use tools or change files." },
+        ],
+      }),
+    });
+    const thread = await response.json();
+    if (!response.ok || !thread.id) throw new Error(`Could not seed ${name}: ${JSON.stringify(thread)}`);
+    const renamed = await fetch(`${serverUrl}/api/v1/threads/${thread.id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: name }),
+    });
+    if (!renamed.ok) throw new Error(`Could not name the ${name} fixture`);
     await bb("thread", "wait", thread.id, "--timeout", "180s");
     return thread.id;
   };

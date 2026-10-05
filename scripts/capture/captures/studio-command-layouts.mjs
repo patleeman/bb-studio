@@ -56,7 +56,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
   for(const marker of ['[Studio Command message','Recipients:'])if(text.includes(marker))throw new Error('Native transcript exposed transport context: '+marker);
   if(!text.includes("Here's the ORBIT-42 launch brief."))throw new Error('Native transcript lost the owner request');
  })()`);
- return [
+ const captures = [
   { id: "studio-command-grid", packageDir: "bb-studio", fileName: "command-grid.png", setup: guard(async client => {
    const data = await open(client, "grid");
    await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
@@ -151,10 +151,12 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
    await open(client, "grid");
    await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
-   // Phone panes stack; scroll to the last one as a reader would, then return to the top.
-   await client.evaluate("document.querySelector('[data-channel-thread]:last-of-type').scrollIntoView({block:'start'})");
+   // Native transcripts virtualize offscreen panes. Read Atlas before scrolling to Scribe.
+   await client.evaluate("document.querySelector('[data-channel-thread]:first-of-type').scrollIntoView({block:'start'})");
    await client.waitForText("Ready. I checked the brief:");
    await concise(client);
+   await client.evaluate("document.querySelector('[data-channel-thread]:last-of-type').scrollIntoView({block:'start'})");
+   await client.waitForText("Ready. I'll keep the decision log");
    await client.evaluate("document.querySelector('.channel-thread-stage').scrollTop=0");
    await client.evaluate("(()=>{if(document.documentElement.scrollWidth>innerWidth)throw new Error('Grid overflows the phone');const composer=document.querySelector('[data-command-composer]');if(!composer||composer.getBoundingClientRect().bottom>innerHeight)throw new Error('Grid composer is offscreen');})()");
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
@@ -171,4 +173,5 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
  ];
+ return [...captures.filter(capture => capture.id !== "studio-command-active"), ...captures.filter(capture => capture.id === "studio-command-active")];
 };

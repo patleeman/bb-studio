@@ -31,7 +31,7 @@ all.
 
 [`apps/ios`](apps/ios/) is BB Studio for iPhone and Apple Watch: BB's threads,
 approvals, terminals and automations, plus native Studio, Pages, Talk, Draw,
-Artifacts, Tables and Teams. It talks to your BB server and uses the plugins
+Artifacts and Tables. It talks to your BB server and uses the plugins
 above; install `mobile` for push notifications. See its
 [README](apps/ios/README.md) to build it and ship it to TestFlight.
 
