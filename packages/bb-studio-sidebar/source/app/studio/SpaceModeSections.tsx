@@ -50,7 +50,7 @@ import {
 } from "./space-groups.js";
 import { SpaceStudioList, SpaceSubheading } from "./SpaceStudioList.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
-import { SpaceLeadRowContext, SpaceRowsContext } from "./SpaceThreadRow.js";
+import { SpaceRowsContext } from "./SpaceThreadRow.js";
 import { threadLineIds, threadLineStatusKey, useThreadLines } from "./useThreadLines.js";
 import {
   ALL_SPACES,
@@ -315,15 +315,9 @@ export function SpaceModeSections({
                     collapse={isAll ? { isCollapsed: collapsedSpaces.has(group.space.id), onToggleCollapsed: () => toggleSpaceCollapsed(group.space.id) } : undefined}
                   >
                     {group.lead ? (
-                      <div data-space-lead={group.lead.id} className="mb-1.5 rounded-md bg-sidebar-accent/40 pb-0.5">
-                        <div className="flex h-6 items-center gap-1 px-2 text-[11px] text-muted-foreground">
-                          <Icon name="Star" className="size-3" aria-hidden="true" />
-                          <span className="font-medium">Lead</span>
-                          {heartbeat ? <span className="truncate text-subtle-foreground">· heartbeat {cadenceLabel(heartbeat)}</span> : null}
-                        </div>
-                        <SpaceLeadRowContext.Provider value>
-                          {tree({ rootItems: group.leadItems, threads: [group.lead] })}
-                        </SpaceLeadRowContext.Provider>
+                      <div data-space-lead={group.lead.id}>
+                        <SpaceSubheading title={heartbeat ? `Lead · heartbeat ${cadenceLabel(heartbeat)}` : "Lead"} />
+                        {tree({ rootItems: group.leadItems, threads: [group.lead] })}
                       </div>
                     ) : null}
                     <SpaceStudioList

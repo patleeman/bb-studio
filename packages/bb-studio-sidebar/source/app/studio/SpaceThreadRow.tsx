@@ -12,9 +12,6 @@ export interface ThreadLine {
 /** By space only: the latest line of each thread whose line has loaded. */
 export const SpaceRowsContext = createContext<{ lines: Readonly<Record<string, ThreadLine>> } | null>(null);
 
-/** True inside a Space's pinned lead block, whose row is a little larger. */
-export const SpaceLeadRowContext = createContext(false);
-
 export type SpaceThreadState = "needs-you" | "working" | "error" | "unread" | "idle";
 
 const BUSY = new Set(["starting", "active", "stopping", "provisioning"]);
@@ -50,7 +47,7 @@ export function compactAge(at: number, now = Date.now()): string {
   return `${Math.floor(days / 365)}y`;
 }
 
-function SpaceThreadDot({ state, lead }: { state: SpaceThreadState; lead: boolean }) {
+function SpaceThreadDot({ state }: { state: SpaceThreadState }) {
   const { className, label } = DOT[state];
   return (
     <span
@@ -61,7 +58,7 @@ function SpaceThreadDot({ state, lead }: { state: SpaceThreadState; lead: boolea
       aria-label={label ?? undefined}
       aria-hidden={label ? undefined : true}
       title={label ?? undefined}
-      className={cn("mr-2 shrink-0 rounded-full", lead ? "size-2" : "size-[7px]", className)}
+      className={cn("mr-2 size-[7px] shrink-0 rounded-full", className)}
     />
   );
 }
@@ -92,17 +89,13 @@ export interface SpaceThreadRow {
  */
 export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null {
   const rows = useContext(SpaceRowsContext);
-  const lead = useContext(SpaceLeadRowContext);
   if (!rows) return null;
   const line = rows.lines[thread.id];
   const at = Math.max(thread.updatedAt, thread.latestAttentionAt, line?.at ?? 0);
   return {
-    className: cn(
-      lead && "text-[15px]",
-      line && "h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto",
-    ),
+    className: cn(line && "h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto"),
     style: line ? { rowGap: 0 } : undefined,
-    dot: <SpaceThreadDot state={spaceThreadState(thread)} lead={lead} />,
+    dot: <SpaceThreadDot state={spaceThreadState(thread)} />,
     time: (
       <time
         data-space-thread-time=""
@@ -117,7 +110,7 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
         data-space-thread-line={line.kind}
         className={cn(
           "pointer-events-none min-w-0 basis-full truncate pr-2 leading-4",
-          lead ? "pl-4 text-[13px]" : "pl-[15px] text-xs",
+          "pl-[15px] text-xs",
           LINE_TONE[line.kind],
           "group-data-[sidebar-touch-armed=true]/thread-row:hidden",
         )}
