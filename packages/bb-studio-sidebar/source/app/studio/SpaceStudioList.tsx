@@ -1,6 +1,6 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { openAppPath, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
+import { createStudioItem, openAppPath, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
@@ -79,6 +79,7 @@ const overviewSchema = z.object({
   providers: z.array(z.object({ pluginId: z.string(), name: z.string(), state: z.string(), kinds: z.array(kindSchema).catch([]) }).passthrough()),
 }).passthrough();
 const createdSchema = z.object({ href: z.string(), title: z.string().optional() });
+const projectSchema = z.object({ projectId: z.string() });
 
 type Kind = z.infer<typeof kindSchema> & { pluginId: string; providerName: string };
 
@@ -103,16 +104,22 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
     );
   };
   const create = async (kind: Kind) => {
-    if (kind.create?.mode === "event") {
-      window.dispatchEvent(new CustomEvent(kind.create.event, { detail: { projectId: defaultProjectId }, cancelable: true }));
-      return;
+    // An item the add-on makes in the browser needs the Space's project up front.
+    let projectId = defaultProjectId;
+    if (kind.create?.mode === "event" && !projectId) {
+      try {
+        ({ projectId } = await call("spaceProject", { id: spaceId }, projectSchema));
+      } catch (cause) {
+        toast.error(`Couldn't create a ${kind.label.toLowerCase()}: ${errorMessage(cause)}`);
+        return;
+      }
     }
-    try {
-      const { href } = await call("createInSpace", { id: spaceId, pluginId: kind.pluginId, kind: kind.id }, createdSchema);
-      onCreated(href);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
+    await createStudioItem(kind, {
+      projectId,
+      addOn: kind.providerName,
+      create: async () => (await call("createInSpace", { id: spaceId, pluginId: kind.pluginId, kind: kind.id }, createdSchema)).href,
+      open: onCreated,
+    });
   };
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
@@ -301,7 +308,6 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
   items: SpaceItems | undefined;
 }) {
   const sdk = useSdk();
-  const openCreated = (href: string) => openStudioItem(null, href);
   // Closed here until Studio's next list catches up.
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const key = (item: { pluginId: string; id: string }) => `${item.pluginId}:${item.id}`;
@@ -321,7 +327,7 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
   };
   const openKeys = new Set(open.map(key));
   const browsable = (items?.all ?? []).filter((item) => !openKeys.has(key(item)));
-  // Picked from the menu: open it, and list it as open in the Space.
+  // Picked or made from a menu: open it, and list it as open in the Space.
   const openPicked = (href: string) => {
     openStudioItem(null, href);
     void sdk.plugins.callRpc({ pluginId: "studio", method: "visitTab", input: { path: href } as never, outputSchema: z.unknown(), signal: AbortSignal.timeout(15_000) }).catch(() => {});
@@ -333,7 +339,7 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
         action={(
           <span className="inline-flex items-center gap-0.5">
             {browsable.length ? <BrowseMenu spaceName={spaceName} items={browsable} onPick={openPicked} /> : null}
-            <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openCreated} />
+            <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openPicked} />
           </span>
         )}
       />

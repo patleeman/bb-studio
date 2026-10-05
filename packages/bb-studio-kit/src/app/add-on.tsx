@@ -4,10 +4,10 @@
 // unless the add-on keeps its own page (`handOver={false}`).
 import { useBbContext, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { toast } from "sonner";
 import type { z as Zod } from "zod";
-import { mentionPrompt, type StudioCreateEventDetail, type StudioSchemas } from "../contract";
+import { mentionPrompt, type StudioSchemas } from "../contract";
 import { errorMessage } from "../format";
+import { createStudioItem } from "./create-item";
 import { CollectionPage, type CollectionHandlers, type CollectionItem, type CollectionKind } from "./collection";
 import { openAppPath, studioPath } from "./nav";
 import { useProjects } from "./pieces";
@@ -91,21 +91,11 @@ export function AddOnCollection({
     };
     return {
       onOpen: (item) => openAppPath(item.href),
-      onCreate: async (target, projectId) => {
-        if (!target.create) return;
-        if (target.create.mode === "event") {
-          const event = new CustomEvent<StudioCreateEventDetail>(target.create.event, { detail: { projectId }, cancelable: true });
-          window.dispatchEvent(event);
-          if (!event.defaultPrevented) toast.error(`${title} isn't ready yet. Reload BB and try again.`);
-          return;
-        }
-        try {
-          const { item } = await call("studio_create", { kind: target.id, projectId });
-          openAppPath(item.href);
-        } catch (cause) {
-          toast.error(`Couldn't create a ${target.label.toLowerCase()}: ${errorMessage(cause)}`);
-        }
-      },
+      onCreate: (target, projectId) => createStudioItem(target, {
+        projectId,
+        addOn: title,
+        create: async () => (await call("studio_create", { kind: target.id, projectId })).item.href,
+      }),
       onNewThread: (items) => navigate.toCompose({ initialPrompt: mentionPrompt(items), focusPrompt: true }),
       onMove: (items, projectId) => after(call("studio_move", { ids: ids(items), projectId })),
       onArchive: (items, archived) => after(call("studio_archive", { ids: ids(items), archived })),

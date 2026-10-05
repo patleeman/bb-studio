@@ -5,6 +5,7 @@
 // a space's items here.
 import {
   CollectionPage,
+  createStudioItem,
   ViewMoveMenu,
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +27,7 @@ import {
   type CollectionKind,
   type CollectionTag,
 } from "@bb-studio/kit/app";
-import { mentionPrompt, STUDIO_REALTIME_CHANNEL, type StudioCreateEventDetail } from "@bb-studio/kit/contract";
+import { mentionPrompt, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage, untitled } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -285,22 +286,11 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const handlers = useMemo<CollectionHandlers>(
     () => ({
       onOpen: (item) => openAppPath(item.href),
-      onCreate: async (target, projectId) => {
-        if (!target.create) return;
-        if (target.create.mode === "event") {
-          // Client-side creation, like starting a Talk recording.
-          const event = new CustomEvent<StudioCreateEventDetail>(target.create.event, { detail: { projectId }, cancelable: true });
-          window.dispatchEvent(event);
-          if (!event.defaultPrevented) toast.error(`${nameOf(target.pluginId)} isn't loaded yet. Reload BB and try again.`);
-          return;
-        }
-        try {
-          const { item } = await rpc.call("create", { pluginId: target.pluginId, kind: target.id, projectId });
-          openAppPath(item.href);
-        } catch (cause) {
-          toast.error(`Couldn't create a ${target.label.toLowerCase()}: ${errorMessage(cause)}`);
-        }
-      },
+      onCreate: (target, projectId) => createStudioItem(target, {
+        projectId,
+        addOn: nameOf(target.pluginId),
+        create: async () => (await rpc.call("create", { pluginId: target.pluginId, kind: target.id, projectId })).item.href,
+      }),
       onNewThread: (items) => navigate.toCompose({ initialPrompt: mentionPrompt(items), focusPrompt: true }),
       onDuplicate: async (item) => {
         try {

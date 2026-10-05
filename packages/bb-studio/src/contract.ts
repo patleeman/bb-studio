@@ -265,6 +265,8 @@ export const rpcContract = defineRpcContract({
   },
   /** An item made in the space's catch-all project, so it's in the space. */
   createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string(), title: z.string().optional() }) },
+  /** The project a space's new items go in, made first if the space has none: for items an add-on makes in the browser. */
+  spaceProject: { input: z.object({ id: spaceId }), output: z.object({ projectId: z.string() }) },
   /** Open threads to pick from when adding one to a space. */
   recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
   /** A space's lead and heartbeat. Clears a lead thread that was deleted, and turns its heartbeat off. */

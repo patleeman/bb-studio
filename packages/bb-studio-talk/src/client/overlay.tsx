@@ -11,7 +11,8 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { TalkRpcContract } from "../shared/contract";
-import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, holdKeyCode, tail } from "../shared/format";
+import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, holdKeyCode, recordingHref, tail } from "../shared/format";
+import type { StudioCreateEventDetail } from "@bb-studio/kit/contract";
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, useOpenCompanion } from "@bb-studio/kit/app";
 import { cn } from "@bb-studio/kit/ui";
@@ -40,16 +41,17 @@ function useControllerWiring(): void {
     });
   }, [values]);
   useEffect(() => talk.setContext({ projectId, threadId }), [projectId, threadId]);
-  // Studio's "New recording": start one in the chosen project and open its page
-  // in the main pane, where the sidebar opens every other new item.
+  // Studio's "New recording": start one in the chosen project, then let the
+  // menu open its page as it opens every other new item.
   useEffect(() => {
     const onNew = (event: Event) => {
       event.preventDefault();
-      const detail = (event as CustomEvent<{ projectId?: unknown }>).detail;
+      const detail = (event as CustomEvent<Partial<StudioCreateEventDetail> | null>).detail;
       const projectId = typeof detail?.projectId === "string" ? detail.projectId : null;
+      const opened = typeof detail?.opened === "function" ? detail.opened : (href: string) => openAppPath(href, { main: true });
       void talk.startRecording("recording", null, null, { projectId }).then(() => {
         const { recordingId, phase } = talk.getState();
-        if (recordingId && phase !== "idle") openAppPath(`/plugins/talk/${PANEL_PATH}/${recordingId}`, { main: true });
+        if (recordingId && phase !== "idle") opened(recordingHref(recordingId));
       });
     };
     window.addEventListener(NEW_RECORDING_EVENT, onNew);

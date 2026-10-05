@@ -22,6 +22,7 @@ export { ITEM_LINK_PILLS, ItemLinkText, ItemLinkTextarea } from "./item-links";
 export { itemReferenceFrom } from "./item-reference";
 export { ItemDirectiveCard } from "./directive-card";
 export { openAppPath, studioPath, panelHref } from "./nav";
+export { createStudioItem, type CreateStudioItemOptions } from "./create-item";
 export {
   Badge,
   Checkbox,

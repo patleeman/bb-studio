@@ -158,6 +158,12 @@ export interface StudioProviderInfo {
 
 export interface StudioCreateEventDetail {
   projectId: string | null;
+  /**
+   * The add-on calls this with the new item's href once it exists, and the
+   * New menu that asked opens it, as it opens an item made over RPC. Older
+   * menus leave it out; the add-on then opens the item in the main pane itself.
+   */
+  opened?(href: string): void;
 }
 
 /** The tag RPC schemas shared by Studio and optional tag clients. */

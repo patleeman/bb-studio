@@ -130,8 +130,10 @@ The same message at a 390-pixel viewport, with the source pill in view.
   dictation field, as [Pages](../bb-studio-pages) does for its editor. Talk
   dictates into it with the same pill, durability, and **Go back** handling
   as a composer. *Talk: Start or finish dictation* works in a focused field.
-- **Recordings as spoken notes.** **New recording** on the Recordings page, or
-  the command *Talk: Start or stop a recording*, records for as long as you
+- **Recordings as spoken notes.** **New → Recording** in any Studio menu (the
+  sidebar, a Space, the Recordings page, or Quick Open) starts one in that
+  project and opens its page in the main pane, as a new page would. The
+  command *Talk: Start or stop a recording* records for as long as you
   need without inserting anywhere. Use recordings for brain dumps, ideas,
   personal notes, or meetings. **Send to agent** opens a thread with the
   recording attached; mentions include its saved cleaned version when available.

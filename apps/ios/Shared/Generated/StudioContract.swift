@@ -6,6 +6,7 @@ public enum Studio {
     public static let command = "command"
     public static let commandFeed = "commandFeed"
     public static let commandSend = "commandSend"
+    public static let commandSpawn = "commandSpawn"
     public static let commandFocus = "commandFocus"
     public static let home = "home"
     public static let homeRespond = "homeRespond"
@@ -37,10 +38,12 @@ public enum Studio {
     public static let updateSpace = "updateSpace"
     public static let deleteSpace = "deleteSpace"
     public static let spaceMembers = "spaceMembers"
+    public static let addSpaceFolder = "addSpaceFolder"
     public static let spacesForThread = "spacesForThread"
     public static let pendingThreadSpaces = "pendingThreadSpaces"
     public static let moveToSpace = "moveToSpace"
     public static let createInSpace = "createInSpace"
+    public static let spaceProject = "spaceProject"
     public static let recentThreads = "recentThreads"
     public static let space_lead = "space_lead"
     public static let thread_lines = "thread_lines"
@@ -88,6 +91,8 @@ public enum Studio {
   public typealias CommandFeed = CommandFeedOutput
 
   public typealias CommandSend = CommandSendOutput
+
+  public typealias CommandSpawn = CommandSpawnOutput
 
   public typealias CommandFocus = CommandFocusOutput
 
@@ -163,6 +168,8 @@ public enum Studio {
 
   public typealias SpaceMembers = SpaceMembersOutput
 
+  public typealias AddSpaceFolder = AddSpaceFolderOutput
+
   public typealias SpacesForThread = SpacesForThreadOutput
 
   public typealias PendingThreadSpaces = PendingThreadSpacesOutput
@@ -170,6 +177,8 @@ public enum Studio {
   public typealias MoveToSpace = MoveToSpaceOutput
 
   public typealias CreateInSpace = CreateInSpaceOutput
+
+  public typealias SpaceProject = SpaceProjectOutput
 
   public typealias RecentThreadsInput = StudioJSONValue
 
@@ -270,10 +279,12 @@ public enum Studio {
   public struct CommandOutputSpace: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
+    public var defaultProjectId: String?
 
-    public init(id: String? = nil, name: String? = nil) {
+    public init(id: String? = nil, name: String? = nil, defaultProjectId: String? = nil) {
       self.id = id
       self.name = name
+      self.defaultProjectId = defaultProjectId
     }
   }
 
@@ -285,8 +296,10 @@ public enum Studio {
     public var updatedAt: Double?
     public var error: String?
     public var hasPendingInteraction: Bool?
+    public var unread: Bool?
+    public var alias: String?
 
-    public init(id: String? = nil, title: String? = nil, parentThreadId: String? = nil, status: String? = nil, updatedAt: Double? = nil, error: String? = nil, hasPendingInteraction: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, parentThreadId: String? = nil, status: String? = nil, updatedAt: Double? = nil, error: String? = nil, hasPendingInteraction: Bool? = nil, unread: Bool? = nil, alias: String? = nil) {
       self.id = id
       self.title = title
       self.parentThreadId = parentThreadId
@@ -294,6 +307,8 @@ public enum Studio {
       self.updatedAt = updatedAt
       self.error = error
       self.hasPendingInteraction = hasPendingInteraction
+      self.unread = unread
+      self.alias = alias
     }
   }
 
@@ -429,14 +444,18 @@ public enum Studio {
     public var attachments: [StudioJSONValue]?
     public var mode: CommandSendInputMode?
     public var permissionMode: CommandSendInputPermissionMode?
+    public var projectId: String?
+    public var toLeadByDefault: Bool?
 
-    public init(spaceId: String? = nil, threadIds: [String]? = nil, text: String? = nil, attachments: [StudioJSONValue]? = nil, mode: CommandSendInputMode? = nil, permissionMode: CommandSendInputPermissionMode? = nil) {
+    public init(spaceId: String? = nil, threadIds: [String]? = nil, text: String? = nil, attachments: [StudioJSONValue]? = nil, mode: CommandSendInputMode? = nil, permissionMode: CommandSendInputPermissionMode? = nil, projectId: String? = nil, toLeadByDefault: Bool? = nil) {
       self.spaceId = spaceId
       self.threadIds = threadIds
       self.text = text
       self.attachments = attachments
       self.mode = mode
       self.permissionMode = permissionMode
+      self.projectId = projectId
+      self.toLeadByDefault = toLeadByDefault
     }
   }
 
@@ -484,6 +503,279 @@ public enum Studio {
 
     public init(deliveries: [CommandSendOutputDeliveriesItem]? = nil) {
       self.deliveries = deliveries
+    }
+  }
+
+  public enum CommandSpawnInputRequestReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum CommandSpawnInputRequestPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum CommandSpawnInputRequestServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum CommandSpawnInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum CommandSpawnInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum CommandSpawnInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum CommandSpawnInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum CommandSpawnInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CommandSpawnInputRequestExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: CommandSpawnInputRequestExecutionInputSourcesModel?
+    public var permissionMode: CommandSpawnInputRequestExecutionInputSourcesPermissionMode?
+    public var providerId: CommandSpawnInputRequestExecutionInputSourcesProviderId?
+    public var reasoningLevel: CommandSpawnInputRequestExecutionInputSourcesReasoningLevel?
+    public var serviceTier: CommandSpawnInputRequestExecutionInputSourcesServiceTier?
+
+    public init(model: CommandSpawnInputRequestExecutionInputSourcesModel? = nil, permissionMode: CommandSpawnInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: CommandSpawnInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: CommandSpawnInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: CommandSpawnInputRequestExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct CommandSpawnInputRequest: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: CommandSpawnInputRequestReasoningLevel?
+    public var permissionMode: CommandSpawnInputRequestPermissionMode?
+    public var serviceTier: CommandSpawnInputRequestServiceTier?
+    public var executionInputSources: CommandSpawnInputRequestExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: CommandSpawnInputRequestReasoningLevel? = nil, permissionMode: CommandSpawnInputRequestPermissionMode? = nil, serviceTier: CommandSpawnInputRequestServiceTier? = nil, executionInputSources: CommandSpawnInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct CommandSpawnInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var request: CommandSpawnInputRequest?
+
+    public init(spaceId: String? = nil, request: CommandSpawnInputRequest? = nil) {
+      self.spaceId = spaceId
+      self.request = request
+    }
+  }
+
+  public struct CommandSpawnOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
     }
   }
 
@@ -2572,12 +2864,14 @@ public enum Studio {
     public var icon: String?
     public var description: String?
     public var defaultProjectId: String?
+    public var defaultProjectPath: String?
     public var name: String?
 
-    public init(icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, name: String? = nil) {
+    public init(icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, defaultProjectPath: String? = nil, name: String? = nil) {
       self.icon = icon
       self.description = description
       self.defaultProjectId = defaultProjectId
+      self.defaultProjectPath = defaultProjectPath
       self.name = name
     }
   }
@@ -2620,13 +2914,15 @@ public enum Studio {
     public var icon: String?
     public var description: String?
     public var defaultProjectId: String?
+    public var defaultProjectPath: String?
     public var id: String?
     public var name: String?
 
-    public init(icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, id: String? = nil, name: String? = nil) {
+    public init(icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, defaultProjectPath: String? = nil, id: String? = nil, name: String? = nil) {
       self.icon = icon
       self.description = description
       self.defaultProjectId = defaultProjectId
+      self.defaultProjectPath = defaultProjectPath
       self.id = id
       self.name = name
     }
@@ -2745,6 +3041,62 @@ public enum Studio {
 
     public init(space: SpaceMembersOutputSpace? = nil) {
       self.space = space
+    }
+  }
+
+  public struct AddSpaceFolderInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var path: String?
+
+    public init(id: String? = nil, path: String? = nil) {
+      self.id = id
+      self.path = path
+    }
+  }
+
+  public struct AddSpaceFolderOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var isDefault: Bool?
+    public var name: String?
+    public var color: String?
+    public var icon: String?
+    public var description: String?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var threadIds: [String]?
+    public var itemKeys: [String]?
+
+    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+      self.id = id
+      self.isDefault = isDefault
+      self.name = name
+      self.color = color
+      self.icon = icon
+      self.description = description
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.threadIds = threadIds
+      self.itemKeys = itemKeys
+    }
+  }
+
+  public struct AddSpaceFolderOutputProject: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct AddSpaceFolderOutput: Sendable, Hashable, Codable {
+    public var space: AddSpaceFolderOutputSpace?
+    public var project: AddSpaceFolderOutputProject?
+
+    public init(space: AddSpaceFolderOutputSpace? = nil, project: AddSpaceFolderOutputProject? = nil) {
+      self.space = space
+      self.project = project
     }
   }
 
@@ -2875,6 +3227,22 @@ public enum Studio {
     public init(href: String? = nil, title: String? = nil) {
       self.href = href
       self.title = title
+    }
+  }
+
+  public struct SpaceProjectInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct SpaceProjectOutput: Sendable, Hashable, Codable {
+    public var projectId: String?
+
+    public init(projectId: String? = nil) {
+      self.projectId = projectId
     }
   }
 

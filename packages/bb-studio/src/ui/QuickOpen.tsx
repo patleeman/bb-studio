@@ -1,4 +1,4 @@
-import { Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type FloatTarget, type OpenPlace } from "@bb-studio/kit/app";
+import { createStudioItem, Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type FloatTarget, type OpenPlace } from "@bb-studio/kit/app";
 import { untitled } from "@bb-studio/kit/format";
 import { mentionPrompt } from "@bb-studio/kit/contract";
 import { Dialog, DialogContent, DialogTitle } from "@bb-studio/kit/ui";
@@ -95,8 +95,14 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
       const provider = providers.find((entry) => entry.state === "ready" && entry.kinds.some((each) => each.id === kind && each.capabilities?.create));
       if (!provider) return;
       const target = provider.kinds.find((each) => each.id === kind);
-      if (target?.create?.mode === "event") { onClose(); window.dispatchEvent(new Event(target.create.event)); return; }
-      rpc.call("create", { pluginId: provider.pluginId, kind, projectId: context.projectId ?? null }).then(({ item }) => { onClose(); openAppPath(item.href); });
+      if (!target) return;
+      const projectId = context.projectId ?? null;
+      onClose();
+      void createStudioItem(target, {
+        projectId,
+        addOn: provider.name,
+        create: async () => (await rpc.call("create", { pluginId: provider.pluginId, kind, projectId })).item.href,
+      });
     } });
     return [
       ...([ ["page", "New page"], ["recording", "New recording"], ["drawing", "New drawing"], ["task", "New task"] ] as const)

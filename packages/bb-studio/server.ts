@@ -306,6 +306,14 @@ export default async function plugin(bb: BbPluginApi) {
     spaces.remove(id);
     tagsChanged();
   };
+  /** Where a space's new items go. Items follow their project, so a space without one gets its catch-all first. */
+  const spaceProject = async (id: string): Promise<string> => {
+    if (!spaces.get(id)) throw new Error("That space no longer exists.");
+    await folders.ensureCatchAll(id);
+    const projectId = spaces.get(id)?.defaultProjectId ?? null;
+    if (!projectId) throw new Error("This Space has no folder to create items in yet.");
+    return projectId;
+  };
   // Each space's optional lead thread and its heartbeat (src/space-lead.ts).
   const spaceLeads = new SpaceLeads({ db, sdk: bb.sdk, spaces, changed: tagsChanged });
   const threadLines = createThreadLines(bb.sdk);
@@ -510,15 +518,12 @@ export default async function plugin(bb: BbPluginApi) {
       };
     },
     createInSpace: async ({ id, pluginId, kind }) => {
-      if (!spaces.get(id)) throw new Error("That space no longer exists.");
-      // Items follow their project: make sure the Space has its catch-all project first.
-      await folders.ensureCatchAll(id);
-      const projectId = spaces.get(id)?.defaultProjectId ?? null;
-      if (!projectId) throw new Error("This Space has no folder to create items in yet.");
+      const projectId = await spaceProject(id);
       const { item } = await hub.call(pluginId, "studio_create", { kind, projectId });
       tagsChanged();
       return { href: item.href, title: item.title || "Untitled" };
     },
+    spaceProject: async ({ id }) => ({ projectId: await spaceProject(id) }),
     moveToSpace: async ({ id, items }) => {
       const { moved, unchanged, failed } = await moveItems(items, { spaceId: id });
       return { moved: moved.length, unchanged: unchanged.length, failed };
