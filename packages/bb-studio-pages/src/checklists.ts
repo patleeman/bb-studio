@@ -89,8 +89,28 @@ export class Checklists {
     return (this.db.prepare("SELECT * FROM checklist_handoffs WHERE thread_id = ?").get(threadId) as ChecklistHandoffRow | undefined) ?? null;
   }
 
-  /** Starts an agent on a checklist item and links its thread on the item. */
-  async handOff(input: { pageId: string; blockId: string; note?: string | null }): Promise<{ threadId: string }> {
+  /** Hand-offs being started, by page and short block id. */
+  private readonly starting = new Map<string, Promise<{ threadId: string }>>();
+
+  /**
+   * Starts an agent on a checklist item and links its thread on the item. While
+   * the item's last hand-off is still starting, working or waiting for input,
+   * returns that thread instead of starting another.
+   */
+  handOff(input: { pageId: string; blockId: string; note?: string | null }): Promise<{ threadId: string }> {
+    const key = `${input.pageId}:${input.blockId.replace(/-/g, "").slice(0, 8)}`;
+    const inFlight = this.starting.get(key);
+    if (inFlight) return inFlight;
+    const live = this.db
+      .prepare(`SELECT thread_id FROM checklist_handoffs WHERE page_id = ? AND block_id = ? AND state IN ('starting', 'working', 'needs-input') ORDER BY created_at DESC LIMIT 1`)
+      .get(input.pageId, key.slice(input.pageId.length + 1)) as { thread_id: string } | undefined;
+    if (live) return Promise.resolve({ threadId: live.thread_id });
+    const started = this.start(input).finally(() => this.starting.delete(key));
+    this.starting.set(key, started);
+    return started;
+  }
+
+  private async start(input: { pageId: string; blockId: string; note?: string | null }): Promise<{ threadId: string }> {
     const meta = this.store.meta(input.pageId);
     if (!meta) throw new Error("Page not found.");
     if (!meta.project_id) throw new Error("Move this page into a project so the agent has somewhere to work.");

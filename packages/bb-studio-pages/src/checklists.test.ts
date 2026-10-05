@@ -62,4 +62,20 @@ describe("checklists", () => {
     expect(read()).toBe(`- [ ] Ship it @[${checklistLabel("replied")}](thread:thr_new)\n  - [ ] Nested stays\n`);
     expect(db.prepare("SELECT * FROM checklist_handoffs WHERE page_id = ?").all(page.id)).toMatchObject([{ thread_id: "thr_new", state: "replied", note: "Done: shipped." }]);
   });
+
+  it("returns the item's live hand-off instead of starting a second thread", async () => {
+    const { service, checklists, bb } = setup(() => ({}));
+    let next = 0;
+    bb.sdk.threads.spawn.mockImplementation(async () => ({ id: `thr_${++next}` }));
+    const page = service.createPage({ projectId: "proj_1", parentId: null, title: "Plan", markdown: "- [ ] Ship it\n", actor: HUMAN_USER_ID });
+    const [item] = pageCheckboxes(readMarkdown(service.hub.open(page.id).doc, { ids: true }));
+    const [a, b] = await Promise.all([checklists.handOff({ pageId: page.id, blockId: item!.blockId }), checklists.handOff({ pageId: page.id, blockId: item!.blockId })]);
+    expect(a).toEqual({ threadId: "thr_1" });
+    expect(b).toEqual({ threadId: "thr_1" });
+    checklists.signal("thr_1", "active");
+    expect(await checklists.handOff({ pageId: page.id, blockId: item!.blockId })).toEqual({ threadId: "thr_1" });
+    expect(bb.sdk.threads.spawn).toHaveBeenCalledTimes(1);
+    checklists.signal("thr_1", "failed", "Boom");
+    expect(await checklists.handOff({ pageId: page.id, blockId: item!.blockId })).toEqual({ threadId: "thr_2" });
+  });
 });
