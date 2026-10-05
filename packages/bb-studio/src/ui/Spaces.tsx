@@ -81,10 +81,12 @@ export function SpaceDialog({
   const [description, setDescription] = useState(space?.description ?? "");
   // A new space gets a folder of its own unless the user picks a project, which then moves into it.
   const [project, setProject] = useState(space?.defaultProjectId ?? "");
-  // A folder that isn't a project yet; the server adds it as one on save. `typing` is the
-  // fallback when BB can't open a folder picker here, as in a browser on another machine.
+  // A folder that isn't a project yet; the server adds it as one on save. When BB can't
+  // open a folder picker here, as in a browser on another machine, `pickerError` says why
+  // and the user types the path instead.
   const [folder, setFolder] = useState("");
-  const [typing, setTyping] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const typing = pickerError !== null;
   const sdk = useSdk();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,14 +116,14 @@ export function SpaceDialog({
     setError(null);
     try {
       const hostId = (await sdk.system.config()).primaryHostId;
-      if (!hostId) throw new Error("No primary host");
+      if (!hostId) throw new Error("BB has no primary host connected");
       const { path } = await sdk.hosts.pickFolder({ hostId, clientHostId: hostId });
       if (!path) return;
       setFolder(path);
-      setTyping(false);
+      setPickerError(null);
       setProject(PICKED_FOLDER);
-    } catch {
-      setTyping(true);
+    } catch (cause) {
+      setPickerError(errorMessage(cause));
       setProject(PICKED_FOLDER);
     }
   };
@@ -179,7 +181,10 @@ export function SpaceDialog({
               <option value={PICK_FOLDER}>Choose a folder…</option>
             </select>
             {typing && project === PICKED_FOLDER ? (
-              <Input value={folder} placeholder="/Users/you/code/site" onChange={(event) => setFolder(event.target.value)} />
+              <>
+                <span className="text-xs text-muted-foreground">Couldn't open the folder picker ({pickerError.replace(/\.$/, "")}). Type the folder's path instead.</span>
+                <Input autoFocus value={folder} placeholder="/Users/you/code/site" onChange={(event) => setFolder(event.target.value)} />
+              </>
             ) : null}
             <span className="text-xs text-muted-foreground">
               {project === PICKED_FOLDER && folder && !typing ? `${folder} becomes a project in this space. ` : null}
