@@ -8,14 +8,12 @@ const SPACES = { spaces: [{ id: "sp_default", name: "Personal", isDefault: true 
 function fixture(spaceOf: Record<string, string> = {}, lead: string | null = null) {
   const host = createFakePluginHost({ pluginId: "studio", sdk: { threads: { send: async () => ({ delivery: "sent" } as never) } } });
   const x = { bb: host.bb, harness: host.harness, close: () => host.harness.lifecycle.dispose() };
-  x.harness.inspection.sdk.stub("plugins.callRpc", async (args: { method: string; outputSchema: { parse(value: unknown): unknown } }) => args.outputSchema.parse(
-    args.method === "spaces" ? SPACES : args.method === "space_of_threads" ? { threads: spaceOf } : { leadThreadId: lead },
-  ) as never);
   x.harness.inspection.sdk.stub("threads.get", async ({ threadId }: { threadId: string }) => makeThreadResponse({ id: threadId, title: threadId, status: "idle", updatedAt: threadId.length, archivedAt: threadId.startsWith("old") ? 5 : null }));
   x.harness.inspection.sdk.stub("threads.interactions.list", async ({ threadId }) => threadId === "ask" ? [{}] as never : []);
   x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [], timelinePage: { olderCursor: null, hasOlderRows: false } }));
   x.harness.inspection.sdk.stub("threads.events.list", async () => []);
-  return { ...x, command: new Command(x.bb) };
+  const spaces = { list: () => SPACES.spaces, spaceOfThreads: async () => spaceOf, lead: async () => lead };
+  return { ...x, command: new Command(x.bb, spaces) };
 }
 
 test("a Space's threads come from Studio, lead first, without archived ones", async () => {

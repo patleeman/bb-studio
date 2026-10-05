@@ -1,5 +1,4 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import { z } from "zod";
 import { commandContract, type CommandDelivery, type CommandEntry, type CommandSend, type CommandThread } from "./command-contract";
 import { errorMessage } from "@bb-studio/kit/format";
 const missingThread = (cause: unknown) => /(?:^|\b)(?:thread not found|thread does not exist|HTTP 404)(?:\b|$)/i.test(errorMessage(cause));
@@ -14,9 +13,12 @@ export const COMMAND_TOPIC = "command-changed";
 /** How long after the Command composer was focused its Space answers a bare @. */
 export const COMMAND_FOCUS_MS = 10 * 60_000;
 
-const spacesSchema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), isDefault: z.boolean().catch(false) }).passthrough()) });
-const spaceOfSchema = z.object({ threads: z.record(z.string(), z.string()) });
-const leadSchema = z.object({ leadThreadId: z.string().nullable() }).passthrough();
+/** Studio's own Space data, read in-process. */
+export type CommandSpaces = {
+  list(): readonly { id: string; name: string; isDefault: boolean }[];
+  spaceOfThreads(): Promise<Record<string, string>>;
+  lead(spaceId: string): Promise<string | null>;
+};
 
 const baseName = (path: string) => path.split(/[\\/]/).at(-1) || "Attachment";
 const withNames = (text: string, names: string[]) => [text, ...names.map(name => `📎 ${name}`)].filter(Boolean).join("\n\n");
@@ -80,7 +82,7 @@ export function mergeEntries(entries: CommandEntry[], limit = 100): CommandEntry
  * is stored here; Studio owns which threads a Space holds.
  */
 export class Command {
-  constructor(readonly bb: BbPluginApi, private readonly readSpaces?: () => readonly { id: string; name: string; isDefault: boolean }[]) {}
+  constructor(readonly bb: BbPluginApi, private readonly spaces: CommandSpaces) {}
   /** Mention providers aren't told which view asked, so the Command composer says which Space it is in. */
   private focused: { spaceId: string; at: number } | null = null;
   private shown = new Map<string, Awaited<ReturnType<Command["space"]>>>();
@@ -92,18 +94,12 @@ export class Command {
     if (!focused || now - focused.at > COMMAND_FOCUS_MS) return null;
     return this.shown.get(focused.spaceId) ?? await this.space(focused.spaceId);
   }
-  private studio<T>(method: string, input: unknown, outputSchema: z.ZodType<T>) {
-    return this.bb.sdk.plugins.callRpc({ pluginId: "studio", method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) });
-  }
   private row(thread: Listed, pending: boolean): CommandThread {
     return { id: thread.id, title: thread.title || thread.titleFallback || "New thread", parentThreadId: thread.parentThreadId ?? null, status: thread.status, updatedAt: thread.updatedAt, error: null, hasPendingInteraction: pending };
   }
   async space(spaceId: string) {
-    const [{ spaces }, { threads: spaceOf }, { leadThreadId }] = await Promise.all([
-      this.readSpaces ? Promise.resolve({ spaces: this.readSpaces() }) : this.studio("spaces", null, spacesSchema),
-      this.studio("space_of_threads", {}, spaceOfSchema),
-      this.studio("space_lead", { spaceId }, leadSchema),
-    ]);
+    const spaces = this.spaces.list();
+    const [spaceOf, leadThreadId] = await Promise.all([this.spaces.spaceOfThreads(), this.spaces.lead(spaceId)]);
     const space = spaces.find(each => each.id === spaceId);
     if (!space) throw new Error("This Space no longer exists.");
     const known = new Set(spaces.map(each => each.id));

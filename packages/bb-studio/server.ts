@@ -70,7 +70,12 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
   const spaces = new SpaceStore(db);
-  const command = new Command(bb, () => spaces.list());
+  // Space leads are set up below; Command only reads them after startup.
+  const command = new Command(bb, {
+    list: () => spaces.list(),
+    spaceOfThreads: () => spaceLeads.spaceOfThreads(),
+    lead: async (spaceId) => (await spaceLeads.get(spaceId)).leadThreadId,
+  });
   registerMentionProviders(bb, command);
   for (const event of ["thread.created", "thread.active", "thread.idle", "thread.failed", "thread.archived", "thread.unarchived", "thread.deleted"] as const)
     bb.events.on(event, () => command.changed());
