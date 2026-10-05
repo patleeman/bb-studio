@@ -10,9 +10,10 @@ import { errorMessage as message } from "@bb-studio/kit/format";
 // - The uploader drains the outbox in order; a segment is deleted locally only
 //   after the server has it on disk.
 // - The active recording is remembered in localStorage. After a reload the
-//   controller reopens the microphone and continues the same recording in a
-//   new capture session (shown as a paragraph break), and seals and uploads
-//   whatever the previous page left in the outbox.
+//   controller seals and uploads whatever the previous page left in the
+//   outbox. A capture that was live when the page went away comes back as
+//   interrupted (the last few seconds may be missing): the user acknowledges
+//   that, then resumes in a new capture session (a paragraph break) or stops.
 import { toast } from "sonner";
 import { useSyncExternalStore } from "react";
 import type {
@@ -465,12 +466,15 @@ export class TalkController {
     void this.kickUpload();
     const saved = this.readPersisted();
     if (!saved) return;
-    if (saved.captureInProgress) {
+    // Every capture writes this marker first; an older record without it
+    // that still says "recording" was live too.
+    const capturing = saved.captureInProgress === true || saved.phase === "recording";
+    if (capturing) {
       // A second tab must not mistake a live recorder for a crashed one.
       if (!(await this.acquireLock())) return;
       this.unlock();
     }
-    const interrupted = saved.localSaveFailed || saved.captureInProgress;
+    const interrupted = saved.localSaveFailed === true || capturing;
     const recoveryMessage = saved.localSaveFailed
       ? "This window closed after local audio saving failed."
       : "Capture was interrupted. The last unsaved audio may be missing.";
@@ -479,7 +483,6 @@ export class TalkController {
       this.set({ recordingId: saved.recordingId, kind: saved.kind, threadId: saved.threadId, field: parseField(saved.field),
         phase: "storage-error", localAudioLost: true, localSaveError: recoveryMessage });
     }
-    const epoch = this.startEpoch;
     let recording: Recording;
     try {
       recording = (await this.rpc!.call("recording_get", { id: saved.recordingId })).recording;
@@ -497,25 +500,13 @@ export class TalkController {
       field: parseField(saved.field),
       recording,
       recordedMs: recording.durationMs,
-      phase: interrupted ? "storage-error" : saved.phase === "recording" ? "starting" : saved.phase,
-      localAudioLost: interrupted === true,
+      phase: interrupted ? "storage-error" : saved.phase,
+      localAudioLost: interrupted,
       localSaveError: interrupted ? recoveryMessage : null,
     });
     void this.refresh();
     if (interrupted) return;
-    if (saved.phase === "recording") {
-      const locked = await this.acquireLock();
-      if (this.cancelled(epoch, locked)) return;
-      if (!locked) {
-        this.set(INITIAL);
-        return;
-      }
-      try {
-        await this.startCapture(epoch);
-      } catch (error) {
-        if (!(error instanceof StartCancelled)) this.set({ phase: "needs-resume" });
-      }
-    } else if (saved.phase === "finalizing") {
+    if (saved.phase === "finalizing") {
       void this.finalize();
     } else if (saved.phase === "transcribing") {
       this.pollWhileTranscribing();

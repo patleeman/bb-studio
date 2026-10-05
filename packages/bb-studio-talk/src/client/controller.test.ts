@@ -296,3 +296,15 @@ it("finishes a paused recording another window left, but not while its audio is 
   expect(call).toHaveBeenCalledWith("recording_state", { id: "rec_left", status: "finishing" });
   expect(controller.getState().phase).toBe("idle");
 });
+
+it("treats an older live-capture record without its marker as interrupted, not resumed", async () => {
+  localStorage.setItem("bb-plugin-talk:active", JSON.stringify({ recordingId: "rec_legacy", kind: "dictation", phase: "recording", threadId: "thr_origin", insert: true }));
+  const recording = { id: "rec_legacy", durationMs: 4000, status: "recording" };
+  const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(call).toHaveBeenCalledWith("recording_get", { id: "rec_legacy" }));
+  await vi.advanceTimersByTimeAsync(100);
+  expect(controller.getState()).toMatchObject({ phase: "storage-error", localAudioLost: true });
+  expect(Recorder.instances).toHaveLength(0);
+  expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+});
