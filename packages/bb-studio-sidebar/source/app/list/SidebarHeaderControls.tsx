@@ -34,6 +34,7 @@ export function SidebarHeaderControls({
   sectionId,
   onNewThread,
   showNewThread = true,
+  leadingAction,
   children,
   open,
   onOpenChange,
@@ -43,6 +44,8 @@ export function SidebarHeaderControls({
   sectionId?: SidebarSectionId;
   onNewThread?: () => void;
   showNewThread?: boolean;
+  /** A button before ⋯ in place of New thread. */
+  leadingAction?: ReactNode;
   children?: ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -58,14 +61,14 @@ export function SidebarHeaderControls({
   return (
     <SidebarRowControls
       primaryAction={
-        showNewThread ? (
+        leadingAction ?? (showNewThread ? (
           <SidebarControlButton
             label={`New thread in ${label}`}
             icon="MessageSquarePlus"
             onClick={() => onNewThread?.()}
             disabled={!onNewThread}
           />
-        ) : null
+        ) : null)
       }
     >
       <DropdownMenu open={open} onOpenChange={changeOpen}>

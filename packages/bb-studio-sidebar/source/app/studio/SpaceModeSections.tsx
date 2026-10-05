@@ -5,6 +5,7 @@ import { useSdk } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_CONTROL_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
+import { SidebarControlButton } from "../rows/SidebarRowControls.js";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import type { SidebarThread } from "../model/sidebar-thread.js";
 import {
@@ -378,8 +379,8 @@ export function resetTeamsInstalledForTest(): void {
 
 /**
  * A Space's plain heading: its mark (amber-dotted in All when a thread there
- * needs the user) and name, and ⋯ with New thread, Command view, Edit and
- * Delete. In All it collapses.
+ * needs the user) and name, a Command view button, and ⋯ with New thread,
+ * Command view, Edit and Delete. In All it collapses.
  */
 function SpaceSidebarSection({
   space,
@@ -404,6 +405,7 @@ function SpaceSidebarSection({
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const teams = useTeamsInstalled();
+  const openCommand = () => openAppPath(`/plugins/${TEAMS_PLUGIN_ID}/command/${encodeURIComponent(space.id)}`, { main: true });
   return (
     <SortableSidebarSection
       id={sectionId}
@@ -426,6 +428,7 @@ function SpaceSidebarSection({
           sectionId={sectionId}
           // New thread and New item live on the Space's Threads and Studio lists.
           showNewThread={false}
+          leadingAction={teams ? <SidebarControlButton label={`Command view for ${space.name}`} icon="GridView" onClick={openCommand} /> : null}
           onNewThread={onNewThread}
           open={actionsOpen}
           onOpenChange={setActionsOpen}
@@ -435,7 +438,7 @@ function SpaceSidebarSection({
             New thread here
           </DropdownMenuItem>
           {teams ? (
-            <DropdownMenuItem onSelect={() => openAppPath(`/plugins/${TEAMS_PLUGIN_ID}/command/${encodeURIComponent(space.id)}`, { main: true })}>
+            <DropdownMenuItem onSelect={openCommand}>
               <Icon name="GridView" />
               Command view
             </DropdownMenuItem>

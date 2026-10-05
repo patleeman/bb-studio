@@ -257,6 +257,10 @@ describe("thread-list plugin", () => {
     fireEvent.pointerDown(screen.getByRole("button", { name: "Alpha actions" }), { button: 0, ctrlKey: false });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Command view" }));
     expect(window.location.pathname).toBe("/plugins/bot-teams/command/sp_alpha");
+    // So does the button beside ⋯ on the heading.
+    window.history.pushState(null, "", "/");
+    fireEvent.click(screen.getByRole("button", { name: "Command view for Alpha" }));
+    expect(window.location.pathname).toBe("/plugins/bot-teams/command/sp_alpha");
     fireEvent.click(screen.getByRole("button", { name: "New thread in Alpha" }));
     expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_web", focusPrompt: true } });
     // An item opens in the main area (in place here, where BB can't split).
