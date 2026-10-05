@@ -144,4 +144,19 @@ describe("comment bodies", async () => {
   it("keep code blocks and nested list items", () => {
     expect(bodyText(textBody("Look:\n\n```ts\nconst x = 1;\n```\n\n- a\n  - b\n"))).toBe("Look:\nconst x = 1;\na\nb");
   });
+
+  it("won't reply to or resolve a deleted thread", async () => {
+    const { createThread, listThreads, reply, setResolved } = await import("./comments");
+    const { YjsThreadStore } = await import("@blocknote/core/yjs");
+    const { DefaultThreadStoreAuth } = await import("@blocknote/core/comments");
+    const { THREADS_MAP } = await import("./schema-config");
+    const doc = page("Budget\n");
+    const { threadId } = await createThread(doc, "user", { block: ids(doc)[0]!, text: "Hm" }, "user");
+    // The editor soft-deletes a thread when its last comment is deleted.
+    const commentId = listThreads(doc)[0]!.comments[0]!.id;
+    await new YjsThreadStore("user", doc.getMap(THREADS_MAP), new DefaultThreadStoreAuth("user", "editor")).deleteComment({ threadId, commentId, softDelete: true });
+    expect(listThreads(doc, { includeResolved: true })).toEqual([]);
+    expect(() => reply(doc, "user", threadId, "Late", "user")).toThrow(/No comment thread/);
+    expect(() => setResolved(doc, "user", threadId, true, "user")).toThrow(/No comment thread/);
+  });
 });

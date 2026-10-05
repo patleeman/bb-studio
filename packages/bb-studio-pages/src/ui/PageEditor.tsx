@@ -157,7 +157,10 @@ export function PageEditor({
     useCallback((onChange: () => void) => threadStore.subscribe(onChange), [threadStore]),
     () => {
       let count = 0;
-      for (const thread of threadStore.getThreads().values()) if (!thread.resolved && !thread.deletedAt) count += 1;
+      // ThreadData leaves out a soft-deleted thread's `deletedAt`; the Y.Map has it.
+      const raw = connection.doc.getMap(THREADS_MAP);
+      const deleted = (id: string) => Boolean((raw.get(id) as { get(key: string): unknown } | undefined)?.get("deletedAt"));
+      for (const thread of threadStore.getThreads().values()) if (!thread.resolved && !deleted(thread.id)) count += 1;
       return count;
     },
   );

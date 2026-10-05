@@ -65,13 +65,22 @@ export function textBody(text: string): unknown[] {
   return paragraphs;
 }
 
+/**
+ * Whether the editor soft-deleted a thread (deleting its last comment does).
+ * The thread store's ThreadData leaves `deletedAt` out, so read the Y.Map.
+ */
+function isDeleted(doc: Y.Doc, threadId: string): boolean {
+  const thread = doc.getMap(THREADS_MAP).get(threadId);
+  return !(thread instanceof Y.Map) || Boolean(thread.get("deletedAt"));
+}
+
 const time = (value: Date | number | undefined) => (value instanceof Date ? value.getTime() : Number(value ?? 0));
 
 export function listThreads(doc: Y.Doc, options: { includeResolved?: boolean } = {}): ThreadView[] {
   const anchors = commentAnchors(doc);
   const threads = [...store(doc, "reader").getThreads().values()] as ThreadData[];
   return threads
-    .filter((thread) => !thread.deletedAt && (options.includeResolved || !thread.resolved))
+    .filter((thread) => !isDeleted(doc, thread.id) && (options.includeResolved || !thread.resolved))
     .map((thread) => {
       const anchor = anchors.get(thread.id);
       return {
@@ -127,14 +136,14 @@ export function setResolved(doc: Y.Doc, author: string, threadId: string, resolv
 }
 
 function requireThread(doc: Y.Doc, threadId: string): void {
-  if (!doc.getMap(THREADS_MAP).has(threadId)) throw new Error(`No comment thread "${threadId}" on this page.`);
+  if (isDeleted(doc, threadId)) throw new Error(`No comment thread "${threadId}" on this page.`);
 }
 
 /** Raw thread data for change detection (comment ids and authors). */
 export function threadAuthors(doc: Y.Doc): Map<string, { resolved: boolean; comments: { id: string; author: string; text: string }[] }> {
   const out = new Map<string, { resolved: boolean; comments: { id: string; author: string; text: string }[] }>();
   for (const thread of store(doc, "reader").getThreads().values() as Iterable<ThreadData>) {
-    if (thread.deletedAt) continue;
+    if (isDeleted(doc, thread.id)) continue;
     out.set(thread.id, {
       resolved: thread.resolved,
       comments: thread.comments
