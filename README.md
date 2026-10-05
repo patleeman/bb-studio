@@ -98,6 +98,15 @@ Appearance before removing `studio-navigation`. Navigation visibility and order
 remain in BB's existing preferences. Saved drafts, quotes, page history and
 historical bot authors remain readable.
 
+Studio Teams (`bot-teams`) is retired and its package is deleted, so it gets no
+more updates. An installed copy keeps running until you remove it. Space Command
+now ships in Studio. Before removing Teams, export what you want to keep:
+`bb bots list --json` lists every bot, `bb bots show <bot> --json` prints a
+profile with its bot home, and `bb bots mission <bot>` and
+`bb bots memory <bot>` print its MISSION.md and MEMORY.md. Copy any bot home you
+still need, then run `bb plugin remove bot-teams`. Threads that worked as a bot
+remain ordinary BB threads.
+
 ## Development
 
 This is a pnpm workspace. [`@bb-studio/kit`](packages/bb-studio-kit/) holds the
