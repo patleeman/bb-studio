@@ -63,6 +63,13 @@ function queryArg(arg: string): string {
   return filter ? `${filter[1]}"${filter[2]}"` : `"${arg}"`;
 }
 
+import { HEALTH_REALTIME_CHANNEL, healthSchemas } from "@bb-studio/kit/health";
+import { HealthMonitor } from "./src/health";
+import { healthContract } from "./src/health-contract";
+
+/** How often Studio re-checks plugin health on its own. */
+const HEALTH_INTERVAL_MS = 3 * 60_000;
+
 export default async function plugin(bb: BbPluginApi) {
   await registerChat(bb);
   const hub = new StudioHub(bb.sdk);
@@ -948,6 +955,21 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
+  // Plugin health: the sidebar footer shows problems; see src/health.ts.
+  const health = new HealthMonitor({
+    sdk: bb.sdk,
+    schemas: healthSchemas(z),
+    kv: bb.storage.kv,
+    changed: (summary) => bb.realtime.publish(HEALTH_REALTIME_CHANNEL, summary),
+  });
+  bb.rpc.register(healthContract, {
+    "health.summary": ({ maxAgeMs }) => health.summary(maxAgeMs),
+    "health.hide": ({ key, hidden }) => health.hide(key, hidden),
+    "health.disable": ({ pluginId }) => health.disable(pluginId),
+  });
+  const healthTimer = setInterval(() => void health.check().catch((error) => bb.log.warn(`Plugin health check failed: ${errorText(error)}`)), HEALTH_INTERVAL_MS);
+  bb.onDispose(() => clearInterval(healthTimer));
+
   bb.cli.register({
     name: "studio",
     summary: "List BB Studio items across Pages, Talk, Draw and other add-ons",
@@ -957,6 +979,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "spaces", summary: "List spaces, their projects and how many items each has", usage: "bb studio spaces" },
       { name: "move", summary: "Move items or threads into a space, or items to a project", usage: "bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)" },
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
+      { name: "health", summary: "Check every plugin for setup problems and failures", usage: "bb studio health [--json]" },
       { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
       { name: "retitle", summary: "Give threads a short title now and keep it current as they grow", usage: "bb studio retitle (<thread-id>… | --self | --recent <count>)" },
     ],
@@ -969,11 +992,12 @@ export default async function plugin(bb: BbPluginApi) {
       };
       const SPECS: Record<string, CliSpec> = {
         list: { flags: ["--json", "--all"], options: ["--space", "--kind", "--tag", "--query"] },
+        health: { flags: ["--json"] },
         move: { options: ["--space", "--project"] },
         retitle: { flags: ["--self"], options: ["--recent"] },
       };
       const parsed = parseCliArgs(raw, SPECS[command ?? ""] ?? {});
-      const known = ["list", "tags", "spaces", "move", "providers", "reindex", "retitle"].includes(command ?? "");
+      const known = ["list", "tags", "spaces", "move", "providers", "health", "reindex", "retitle"].includes(command ?? "");
       if (!parsed.ok && known) return usage(`${USAGE[command!] ?? `bb studio ${command}`}\n${parsed.error}`);
       const rest = parsed.ok ? parsed.positional : [];
       const flag = (name: string) => parsed.ok && parsed.flags.has(name);
@@ -1031,6 +1055,16 @@ export default async function plugin(bb: BbPluginApi) {
                 `${provider.pluginId}\t${provider.state}\t${provider.kinds.map((kind) => kind.id).join(",") || "-"}${provider.detail ? `\t${provider.detail}` : ""}`,
             );
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
+          }
+          case "health": {
+            const summary = await health.check();
+            if (flag("--json")) return { exitCode: 0, stdout: `${JSON.stringify(summary, null, 2)}\n` };
+            const lines = [
+              ...summary.problems.map((problem) => `${problem.status}\t${problem.pluginId}\t${problem.title}${problem.hidden ? " (hidden)" : ""}${problem.detail ? `\n\t\t${problem.detail}` : ""}`),
+              ...summary.unanswered.map((entry) => `unknown\t${entry.pluginId}\tIts health check didn't answer: ${entry.error}`),
+              ...summary.healthy.map((entry) => `ok\t${entry.pluginId}\t${entry.titles.join("; ")}`),
+            ];
+            return { exitCode: summary.problems.some((problem) => !problem.hidden) ? 1 : 0, stdout: `${lines.join("\n") || "No problems found."}\n` };
           }
           case "reindex": {
             const count = await searchIndex.rebuild();

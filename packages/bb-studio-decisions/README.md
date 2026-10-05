@@ -143,6 +143,10 @@ bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning>]]
 
 Every command accepts `--json`.
 
+Studio's plugin health check (`bb studio health` and the sidebar footer)
+warns when no Jev provider is set up, when Jev failed in the last 30 minutes,
+or when the fallback model's provider is unavailable.
+
 ## For other plugins
 
 Studio Decisions publishes two plugin RPC methods under the plugin ID

@@ -10,6 +10,7 @@
     "./decisions-contract": "./src/decisions-contract.ts",
     "./decisions": "./src/decisions.ts",
     "./server": "./src/server/index.ts",
+    "./health": "./src/health.ts",
     "./ids": "./src/ids.ts",
     "./cli": "./src/cli.ts",
     "./format": "./src/format.ts",

@@ -16,10 +16,12 @@ import { ComposerSpaces } from "./src/ui/ComposerSpaces";
 import { ThreadSpaceLink } from "./src/ui/ThreadSpaceLink";
 import { ActivityPanel } from "./src/ui/HomePanel";
 import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
+import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter, SetupPage } from "./src/ui/health/HealthViews";
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
   if (path.startsWith("command/")) return <CommandPage subPath={path.slice("command/".length)} />;
+  if (path === SETUP_SUBPATH) return <SetupPage />;
   // "collection" is the old address of the landing page.
   return path === "activity" ? <ActivityPanel /> : <StudioPanel subPath={path} />;
 }
@@ -42,6 +44,9 @@ export default definePluginApp((app) => {
   // new thread joins under its composer.
   app.slots.experimental_threadHeaderAction({ id: "space-link", title: "Space", component: ThreadSpaceLink });
   app.composer.customize({ id: "thread-spaces", scopes: ["new-thread"], actions: [{ id: "spaces", component: ComposerSpaces }] });
+  // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
+  setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));
+  app.slots.experimental_appOverlay({ id: "health-watch", component: HealthWatch });
   app.commands.register({
     id: "search",
     title: "Studio: Search everything",

@@ -144,6 +144,7 @@ bb studio tags
 bb studio spaces
 bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)
 bb studio providers
+bb studio health [--json]
 bb studio reindex
 bb studio retitle (<thread-id>… | --self | --recent <count>)
 ```
@@ -167,6 +168,29 @@ bb studio retitle (<thread-id>… | --self | --recent <count>)
   dropped. Each add-on owns its data, editors, tools, CLI and mentions.
 
 See [`docs/studio.md`](../../docs/studio.md) for the design.
+
+## Plugin health
+
+Studio checks every enabled plugin when it starts and every 3 minutes after
+that. It reads two things:
+
+- **BB's own status for every plugin.** A plugin that needs setup, stopped
+  with an error, doesn't work with this BB version, or has a background
+  service that keeps restarting.
+- **Plugins' own checks.** A plugin can publish `studio_health` with
+  `registerHealth` from `@bb-studio/kit/health`. It reports problems only the
+  plugin can see, like a missing API key. Each problem has a fix link, which
+  defaults to the plugin's settings page. Studio Decisions reports a missing
+  or failing Jev provider and an unavailable fallback model.
+
+The **Plugin health** item in the sidebar footer lists the problems. It opens
+by itself when a problem you haven't seen appears. Each problem has three
+actions: **Fix** opens the place to fix it, **Turn off plugin** disables the
+plugin, and **Hide** hides it until it changes or goes away and comes back.
+**Open plugin setup** goes to the full list at `/plugins/studio/studio/setup`,
+which includes hidden problems, plugins whose check didn't answer, and what
+passed. `bb studio health` prints the same list and exits 1 when a problem
+isn't hidden.
 
 ## Development
 

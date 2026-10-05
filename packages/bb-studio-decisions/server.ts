@@ -2,6 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { errorMessage } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { personalProjectId } from "@bb-studio/kit/server";
+import { healthSchemas, pluginSettingsPath, registerHealth, type HealthCheck } from "@bb-studio/kit/health";
 import { z } from "zod";
 import {
   askBatch,
@@ -36,6 +37,8 @@ const watchIntervalMs = 1000;
 /** The standalone Smart Queue plugin decides the same messages; only one may. */
 const standaloneQueueId = "smart-queue";
 const standaloneCheckMs = 30_000;
+/** A Jev failure this recent still counts against its health. */
+const jevFailureWindowMs = 30 * 60_000;
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
@@ -168,10 +171,61 @@ export default async function plugin(bb: BbPluginApi) {
       problems,
     };
   }
+  // The latest Smart Queue Jev outcome, for the health check.
+  let jevFailure: { at: number; message: string } | null = null;
+  async function tracked<T>(attempt: Promise<T>): Promise<T> {
+    try {
+      const verdict = await attempt;
+      jevFailure = null;
+      return verdict;
+    } catch (error) {
+      if (!(error instanceof UnavailableError)) jevFailure = { at: Date.now(), message: errorMessage(error) };
+      throw error;
+    }
+  }
+  async function health(): Promise<HealthCheck[]> {
+    const { routes, problems } = await jevStatus();
+    const current = await fallback();
+    const checks: HealthCheck[] = [];
+    if (problems.length) {
+      checks.push({ id: "jev-settings", status: "degraded", title: "A Jev provider setting is invalid", detail: problems.join(" ") });
+    }
+    if (!routes.length) {
+      checks.push({
+        id: "jev-route",
+        status: current.mode === "off" ? "broken" : "degraded",
+        title: "No Jev provider is set up",
+        detail: current.mode === "off"
+          ? "The fallback model is off too, so Smart Queue queues every message as a follow-up and other plugins' decisions fail. Add a TypeSafe, Vercel AI Gateway, OpenRouter or OpenCode Zen key."
+          : "Every decision goes to the fallback model, which starts a full agent thread and takes seconds instead of milliseconds. Add a TypeSafe, Vercel AI Gateway, OpenRouter or OpenCode Zen key.",
+        fix: { label: "Add a key", path: pluginSettingsPath(bb.pluginId) },
+      });
+    } else if (jevFailure && Date.now() - jevFailure.at < jevFailureWindowMs) {
+      checks.push({
+        id: "jev-failing",
+        status: "degraded",
+        title: "Jev is failing",
+        detail: `Decisions are falling back to the slower model. Last error: ${jevFailure.message}`,
+      });
+    }
+    if (current.mode === "model") {
+      const provider = (await bb.sdk.providers.list()).find((candidate) => candidate.id === current.providerId);
+      if (!provider?.available) {
+        checks.push({
+          id: "fallback-provider",
+          status: routes.length ? "degraded" : "broken",
+          title: `The fallback model's provider, ${current.providerId}, is unavailable`,
+          detail: "Choose another fallback model, or sign in to that provider.",
+        });
+      }
+    }
+    return checks.length ? checks : [{ id: "jev-route", status: "ok", title: `Jev answers through ${routes.map((route) => route.name).join(", ")}` }];
+  }
   async function checkJev() {
     const started = Date.now();
     try {
       const verdict = await askJev(await config(), sampleSituation, AbortSignal.timeout(20_000));
+      jevFailure = null;
       return {
         ok: true as const,
         via: verdict.via ?? "Jev",
@@ -212,7 +266,7 @@ export default async function plugin(bb: BbPluginApi) {
   }
   bb.rpc.register(rpcContract, {
     "systemOne.ask": ({ caller, state, questions }) =>
-      answer(caller, "Jev", async () => askSystemOne(await config(), { state, questions }, AbortSignal.timeout(60_000))),
+      answer(caller, "Jev", async () => tracked(askSystemOne(await config(), { state, questions }, AbortSignal.timeout(60_000)))),
     "model.ask": ({ caller, requestId, hostId, prompt, providerId, modelSelection }) =>
       answer(caller, "Fallback model", async () =>
         runModel(
@@ -230,6 +284,7 @@ export default async function plugin(bb: BbPluginApi) {
     "jev.status": () => jevStatus(),
     "jev.check": () => checkJev(),
   });
+  registerHealth(bb, healthSchemas(z), health);
 
   async function situation(threadId: string, message: string, thread: ThreadInfo): Promise<Situation> {
     const [history, output] = await Promise.all([
@@ -295,7 +350,7 @@ export default async function plugin(bb: BbPluginApi) {
       const state = await situation(row.threadId, rowText(row), thread);
       return classify(
         {
-          jev: (s) => askJev(settingsNow, state, s),
+          jev: (s) => tracked(askJev(settingsNow, state, s)),
           model: async (s) =>
             askModel(
               bb,
