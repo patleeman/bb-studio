@@ -2,15 +2,14 @@ import layouts from "./studio-command-layouts.mjs";
 
 export default context => {
   const { pluginRpc, launchSpace, getLaunchSpaceId } = context;
-  const merged = async client => {
+  const overview = async client => {
     try {
       await launchSpace();
       const id = getLaunchSpaceId();
       await client.navigate(`/plugins/studio/studio/command/${id}`);
       await client.waitForSelector('[data-command-composer] .ProseMirror');
-      await client.clickAriaButtonWithPointer("Merged");
-      await client.waitForSelector('[data-command-timeline]');
-      await client.waitForText("Logged: release check passed.");
+      await client.waitForSelector('[data-command-panes] [data-channel-thread]');
+      await client.waitForSelector('[aria-label="Space threads"]');
       await client.waitForText("To Atlas");
       const { threads } = await pluginRpc("studio", "command", { spaceId: id });
       if (!threads.some(t => t.title === "Atlas") || !threads.some(t => t.title === "Scribe")) throw new Error("Command lost its ordinary threads");
@@ -42,7 +41,7 @@ export default context => {
     }
   };
   return [
-    { id: "studio-command-merged", packageDir: "bb-studio", fileName: "command-merged.png", privateSidebar: true, setup: merged },
+    { id: "studio-command", packageDir: "bb-studio", fileName: "command.png", privateSidebar: true, setup: overview },
     ...layouts(context),
   ];
 };

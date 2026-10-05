@@ -3,7 +3,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
  let fixture;
  const settleThreads = async space => {
   // Their fixed launch replies are already present. Freeze any remaining
-  // demo coordination so the Active check can start one known worker.
+  // demo coordination so the follow check can start one known worker.
   await Promise.all(space.threads.map(thread => bbCli(["thread", "stop", thread.id])));
  };
  const seed = async () => {
@@ -15,7 +15,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
   const existing = space.threads.find(thread => thread.title === "Release checklist");
   if (existing) return (fixture = { id: spaceId, threadId: existing.id });
   const { entries } = await pluginRpc("studio", "commandFeed", { spaceId });
-  if (entries.filter(entry => entry.role === "user" && entry.text.includes("Here's the ORBIT-42 launch brief.")).length !== 1) throw new Error("Merged layout shows the brief sent to two threads more than once");
+  if (entries.filter(entry => entry.role === "user" && entry.text.includes("Here's the ORBIT-42 launch brief.")).length !== 1) throw new Error("The feed shows the brief sent to two threads more than once");
   // An ordinary thread joins the Space beside the two other threads.
   const thread = JSON.parse(await bbCli(["thread", "spawn", "--project", projectId, "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low", "--title", "Release checklist", "--prompt", 'This is a deterministic UI fixture. Do not use tools or change files. Reply exactly with these two lines:\nThe launch checklist is ready.\n::reactions{items="✅ Approve|🔍 Review"}', "--json"]));
   await bbCli(["thread", "wait", thread.id, "--timeout", "1m"]);
@@ -24,18 +24,24 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
   return fixture;
  };
  const wait = (client, expression) => client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+20000;const tick=()=>(${expression})?resolve():Date.now()>end?reject(new Error('Command view assertion failed: '+${JSON.stringify(expression)})):setTimeout(tick,200);tick();})`, true);
- const mode = async (client, value) => {
-  await client.evaluate(`(()=>{const button=document.querySelector('[aria-label="Layout"] button[data-layout=${JSON.stringify(value)}]');if(!button)throw new Error('Missing view switcher button');button.click();})()`);
-  await client.waitForSelector(`[aria-label="Layout"] button[data-layout="${value}"][aria-pressed="true"]`);
-  await client.waitForSelector(value === "merged" ? "[data-command-timeline]" : `[data-channel-layout="${value}"]`);
+ const panes = "Array.from(document.querySelectorAll('[data-command-panes] [data-channel-thread]')).map(p=>p.getAttribute('data-channel-thread'))";
+ // Opens a thread from the list beside the composer; one already open stays put.
+ const show = (client, title) => client.evaluate(`(()=>{const row=Array.from(document.querySelectorAll('[aria-label="Space threads"] button[aria-pressed]')).find(b=>b.getAttribute('aria-label').startsWith(${JSON.stringify(title + ", ")}));if(!row)throw new Error('Missing thread row: '+${JSON.stringify(title)});if(row.getAttribute('aria-pressed')!=='true')row.click();})()`);
+ const follow = async client => {
+  await client.evaluate("(()=>{const back=Array.from(document.querySelectorAll('.channel-switcher-head button')).find(b=>b.textContent==='Follow work');if(back)back.click();})()");
+  await wait(client, `${panes}.length===1&&!!document.querySelector('[data-command-following]')`);
  };
- const open = async (client, value) => {
+ const open = async (client, titles = []) => {
   const data = await seed();
   await client.navigate(`/plugins/studio/studio/command/${data.id}`);
   await client.waitForSelector('[data-command-composer] .ProseMirror');
-  await mode(client, value);
+  await client.waitForSelector('[data-command-panes]');
+  await follow(client);
+  for (const title of titles) await show(client, title);
+  if (titles.length) await wait(client, `${panes}.length===${new Set(titles).size + 1}||${panes}.length===${new Set(titles).size}`);
   return data;
  };
+ const all = client => open(client, ["Atlas", "Scribe", "Release checklist"]).then(async data => { await wait(client, `${panes}.length===3`); return data; });
  const guard = setup => async client => {
   try { return await setup(client); }
   catch (error) {
@@ -44,8 +50,9 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    throw error;
   }
  };
- const margin = client => client.evaluate("(()=>{const box=document.querySelector('.channel-switcher');const scroller=document.querySelector('.channel-single .channel-pane-body > div > [class~=\\'overflow-y-auto\\']');if(!box||!scroller)throw new Error('Missing member box or thread transcript');const content=scroller.getBoundingClientRect().left+parseFloat(getComputedStyle(scroller).paddingLeft);if(box.getBoundingClientRect().right>content)throw new Error('Member box overlaps the transcript');if(scroller.getBoundingClientRect().width<innerWidth*0.6)throw new Error('Transcript does not scroll edge to edge');})()");
- const rows = "document.querySelectorAll('.channel-switcher-row > button').length";
+ // The thread list sits beside the composer, never over the panes.
+ const docked = client => client.evaluate("(()=>{const list=document.querySelector('.channel-switcher')?.getBoundingClientRect();const composer=document.querySelector('[data-command-composer]')?.getBoundingClientRect();const stage=document.querySelector('.channel-thread-stage')?.getBoundingClientRect();if(!list||!composer||!stage)throw new Error('Missing thread list, composer or panes');if(list.top<stage.bottom-1)throw new Error('Thread list overlaps the panes');if(innerWidth>820&&list.left<composer.right)throw new Error('Thread list is not beside the composer');})()");
+ const rows = "document.querySelectorAll('[aria-label=\"Space threads\"] button[aria-pressed]').length";
  const clearDraft = async client => {
   await client.evaluate("document.querySelector('[data-command-composer] .ProseMirror').focus()");
   for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "a", code: "KeyA", windowsVirtualKeyCode: 65, modifiers: 4 });
@@ -58,19 +65,22 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
  })()`);
  const captures = [
   { id: "studio-command-grid", packageDir: "bb-studio", fileName: "command-grid.png", setup: guard(async client => {
-   const data = await open(client, "grid");
-   await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
+   const data = await all(client);
    await client.waitForText("The launch checklist is ready.");
    await client.waitForSelector(`[data-channel-thread="${data.threadId}"] [aria-label="Suggested reactions"]`);
    await client.waitForText("Ready. I checked the brief:");
    await concise(client);
+   await docked(client);
    await clearDraft(client);
    await client.command("Input.insertText", { text: "Keep this Command draft." });
    await client.evaluate("(()=>{window.commandCaptureComposer=document.querySelector('[data-command-composer] .ProseMirror');return true;})()");
-   for (const value of ["merged", "active", "focus", "grid"]) {
-    await mode(client, value);
-    await client.evaluate("(()=>{const editor=document.querySelector('[data-command-composer] .ProseMirror');if(editor!==window.commandCaptureComposer||!editor.textContent.includes('Keep this Command draft.'))throw new Error('Layout switch lost the Command draft');})()");
-   }
+   // Closing panes and following again keep the draft.
+   await client.clickAriaButtonWithPointer("Close Scribe");
+   await wait(client, `${panes}.length===2&&!document.querySelector('[data-command-panes] [aria-label="Scribe transcript"]')`);
+   await follow(client);
+   for (const title of ["Atlas", "Scribe", "Release checklist"]) await show(client, title);
+   await wait(client, `${panes}.length===3`);
+   await client.evaluate("(()=>{const editor=document.querySelector('[data-command-composer] .ProseMirror');if(editor!==window.commandCaptureComposer||!editor.textContent.includes('Keep this Command draft.'))throw new Error('Opening and closing panes lost the Command draft');})()");
    await clearDraft(client);
    const reactionSelector = `[data-channel-thread="${data.threadId}"] [aria-label="Suggested reactions"] button`;
    const reactionText = await client.evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(reactionSelector)})).find(button=>button.textContent.includes('Approve'))?.textContent.trim()`);
@@ -84,11 +94,8 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    await client.evaluate("document.activeElement?.blur()");
   }) },
   { id: "studio-command-grid-arrange", packageDir: "bb-studio", fileName: "command-grid-arrange.png", setup: guard(async client => {
-   const data = await open(client, "grid");
-   await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
-   await client.evaluate("(()=>{const reset=Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Reset order');if(reset)reset.click();})()");
-   const order = "Array.from(document.querySelectorAll('[data-channel-thread]')).map(p=>p.getAttribute('data-channel-thread'))";
-   const before = await client.evaluate(order);
+   const data = await all(client);
+   const before = await client.evaluate(panes);
    const dragged = data.threadId, target = before.find(id => id !== dragged);
    // Drive the real pane handlers with a browser DataTransfer, holding the drag over the first other pane.
    await client.evaluate(`(()=>{const pane=id=>document.querySelector('[data-channel-thread="'+id+'"]');const dt=new DataTransfer();window.commandArrangeDrag=dt;const rect=pane(${JSON.stringify(target)}).getBoundingClientRect();pane(${JSON.stringify(dragged)}).querySelector('header').dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:dt}));pane(${JSON.stringify(target)}).dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt,clientX:rect.left+12,clientY:rect.top+rect.height/2}));})()`);
@@ -97,81 +104,74 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    return async () => {
     await client.evaluate(`(()=>{const dt=window.commandArrangeDrag;const pane=id=>document.querySelector('[data-channel-thread="'+id+'"]');pane(${JSON.stringify(target)}).dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));pane(${JSON.stringify(dragged)}).querySelector('header').dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:dt}));})()`);
     const expected = before.filter(id => id !== dragged).flatMap(id => id === target ? [dragged, id] : [id]);
-    await wait(client, `JSON.stringify(${order})===${JSON.stringify(JSON.stringify(expected))}`);
+    await wait(client, `JSON.stringify(${panes})===${JSON.stringify(JSON.stringify(expected))}`);
+    // The open panes and their order survive a reload.
     await client.navigate(`/plugins/studio/studio/command/${data.id}`);
     await client.waitForSelector('[data-command-composer] .ProseMirror');
-    await wait(client, `document.querySelectorAll('[data-channel-thread]').length===3&&JSON.stringify(${order})===${JSON.stringify(JSON.stringify(expected))}`);
-    await client.clickElementWithTextAndPointer("button.channel-reset-order", "Reset order");
-    await wait(client, `JSON.stringify(${order})===${JSON.stringify(JSON.stringify(before))}`);
+    await wait(client, `JSON.stringify(${panes})===${JSON.stringify(JSON.stringify(expected))}`);
    };
   }) },
-  { id: "studio-command-focus", packageDir: "bb-studio", fileName: "command-focus.png", setup: guard(async client => {
-   const data = await open(client, "grid");
-   await client.clickAriaButtonWithPointer("Focus Release checklist");
-   await wait(client, `document.querySelectorAll('[data-channel-thread]').length===1&&!!document.querySelector('[data-channel-thread="${data.threadId}"]')`);
+  { id: "studio-command-close", packageDir: "bb-studio", fileName: "command-close.png", setup: guard(async client => {
+   const data = await all(client);
+   // Closing hides a pane; the thread list opens it again.
+   await client.clickAriaButtonWithPointer("Close Release checklist");
+   await wait(client, `${panes}.length===2&&!${panes}.includes(${JSON.stringify(data.threadId)})&&document.querySelector('[aria-label="Space threads"] button[aria-label^="Release checklist, "]')?.getAttribute('aria-pressed')==='false'`);
+   await show(client, "Release checklist");
+   await wait(client, `${panes}.length===3&&${panes}[2]===${JSON.stringify(data.threadId)}`);
+   await client.clickAriaButtonWithPointer("Show only Release checklist");
+   await wait(client, `${panes}.length===1&&${panes}[0]===${JSON.stringify(data.threadId)}&&!document.querySelector('[data-command-following]')`);
    await client.waitForSelector(`[data-channel-thread="${data.threadId}"] [aria-label="Suggested reactions"]`);
    await wait(client, `${rows}===3&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Release checklist')`);
-   await margin(client);
+   await docked(client);
   }) },
-  { id: "studio-command-focus-compact", packageDir: "bb-studio", fileName: "command-focus-compact.png", setup: guard(async client => {
-   // A narrower window keeps the member box in the margin as avatars only.
-   await client.command("Emulation.setDeviceMetricsOverride", { width: 1040, height: 800, deviceScaleFactor: 1, mobile: false });
-   const data = await open(client, "focus");
-   await client.clickAriaButtonWithPointer("Release checklist, Idle");
-   await wait(client, `!!document.querySelector('[data-channel-thread="${data.threadId}"]')&&${rows}===3&&getComputedStyle(document.querySelector('.channel-switcher .channel-rail-name')).display==='none'`);
-   await margin(client);
-   return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-  }) },
-  { id: "studio-command-active", packageDir: "bb-studio", fileName: "command-active.png", setup: guard(async client => {
-   const data = await open(client, "active");
+  { id: "studio-command-follow", packageDir: "bb-studio", fileName: "command-follow.png", setup: guard(async client => {
+   const data = await open(client);
    const page = await pluginRpc("studio", "command", { spaceId: data.id });
-   const atlas = page.threads.find(thread => !thread.parentThreadId && thread.title === "Atlas");
-   if (!atlas) throw new Error("Missing Atlas's thread in the Space");
-   if (page.leadThreadId !== atlas.id) throw new Error("Atlas's thread is not the Space's lead");
-   const workers = [data.threadId, atlas.id];
-   const stop = () => Promise.all(workers.map(id => bbCli(["thread", "stop", id]).catch(() => {})));
-   for (const id of workers) await bbCli(["thread", "tell", id, "For a staged UI activity check, use the terminal to run sleep 45, then reply only Check finished. Change no files."]);
-   const panes = "Array.from(document.querySelectorAll('[data-channel-layout=\"active\"] [data-channel-thread]')).map(p=>p.getAttribute('data-channel-thread'))";
+   const scribe = page.threads.find(thread => !thread.parentThreadId && thread.title === "Scribe");
+   if (!scribe) throw new Error("Missing Scribe's thread in the Space");
+   const stop = () => bbCli(["thread", "stop", scribe.id]).catch(() => {});
+   await bbCli(["thread", "tell", scribe.id, "For a staged UI activity check, use the terminal to run sleep 45, then reply only Check finished. Change no files."]);
    try {
-    // Active shows every working thread side by side, beside the member box.
-    await wait(client, `${panes}.length===2&&${JSON.stringify(workers)}.every(id=>${panes}.includes(id))&&document.querySelectorAll('.channel-switcher-row[data-current][data-activity="Working"]').length===2`);
-    await client.evaluate("(()=>{const box=document.querySelector('.channel-switcher').getBoundingClientRect();const panes=Array.from(document.querySelectorAll('[data-channel-layout=\"active\"] [data-channel-thread]')).map(p=>p.getBoundingClientRect());if(panes.some(p=>p.left<box.right))throw new Error('Member box overlaps an Active pane');if(Math.abs(panes[0].top-panes[1].top)>2)throw new Error('Active panes are not side by side');})()");
+    // One pane follows whichever thread is working.
+    await wait(client, `${panes}.length===1&&${panes}[0]===${JSON.stringify(scribe.id)}&&!!document.querySelector('[data-command-following]')&&document.querySelector('[data-channel-thread] .channel-status')?.textContent.includes('Working')`);
+    await docked(client);
    } catch (error) { await stop(); throw error; }
    return async () => {
     await stop();
-    // Finished threads stay, and a pick joins them first without leaving Active.
-    await wait(client, `${panes}.length===2&&!document.querySelector('.channel-switcher-row[data-activity="Working"]')`);
-    await client.clickAriaButtonWithPointer("Scribe, Idle");
-    await wait(client, `!!document.querySelector('[data-channel-layout="active"]')&&${panes}.length===3&&!!document.querySelector('[aria-label="Stop showing Scribe"]')`);
-    await client.clickAriaButtonWithPointer("Stop showing Scribe");
-    await wait(client, `${panes}.length===2`);
+    // When the work stops the pane stays; opening another thread makes a grid.
+    await wait(client, `${panes}.length===1&&${panes}[0]===${JSON.stringify(scribe.id)}&&!document.querySelector('.channel-switcher-row[data-activity="Working"]')`);
+    await show(client, "Atlas");
+    await wait(client, `${panes}.length===2&&!document.querySelector('[data-command-following]')`);
+    await follow(client);
    };
   }) },
   { id: "studio-command-grid-mobile", packageDir: "bb-studio", fileName: "command-grid-mobile.png", privateSidebar: false, setup: guard(async client => {
    await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-   await open(client, "grid");
-   await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
+   await all(client);
    // Native transcripts virtualize offscreen panes. Read Atlas before scrolling to Scribe.
    await client.evaluate("document.querySelector('[data-channel-thread]:first-of-type').scrollIntoView({block:'start'})");
    await client.waitForText("Ready. I checked the brief:");
    await concise(client);
-   await client.evaluate("document.querySelector('[data-channel-thread]:last-of-type').scrollIntoView({block:'start'})");
+   await client.evaluate("document.querySelector('[data-channel-thread]:nth-of-type(2)').scrollIntoView({block:'start'})");
    await client.waitForText("Ready. I'll keep the decision log");
    await client.evaluate("document.querySelector('.channel-thread-stage').scrollTop=0");
-   await client.evaluate("(()=>{if(document.documentElement.scrollWidth>innerWidth)throw new Error('Grid overflows the phone');const composer=document.querySelector('[data-command-composer]');if(!composer||composer.getBoundingClientRect().bottom>innerHeight)throw new Error('Grid composer is offscreen');})()");
+   await client.evaluate("(()=>{if(document.documentElement.scrollWidth>innerWidth)throw new Error('Grid overflows the phone');const composer=document.querySelector('[data-command-composer]');if(!composer||composer.getBoundingClientRect().bottom>innerHeight)throw new Error('Grid composer is offscreen');const list=document.querySelector('.channel-switcher').getBoundingClientRect();if(list.bottom>composer.getBoundingClientRect().top+1)throw new Error('Phone thread chips are not above the composer');})()");
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
-  { id: "studio-command-focus-mobile", packageDir: "bb-studio", fileName: "command-focus-mobile.png", privateSidebar: false, setup: guard(async client => {
+  { id: "studio-command-follow-mobile", packageDir: "bb-studio", fileName: "command-follow-mobile.png", privateSidebar: false, setup: guard(async client => {
    await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-   await open(client, "grid");
-   await client.evaluate("document.querySelector('[aria-label=\"Focus Atlas\"]').closest('[data-channel-thread]').scrollIntoView({block:'start'})");
-   await client.clickAriaButtonWithPointer("Focus Atlas");
-   await client.waitForSelector('[data-channel-layout="focus"]');
+   await open(client, ["Atlas"]);
+   await client.clickAriaButtonWithPointer("Close Atlas");
+   await wait(client, `${panes}.length===1&&!!document.querySelector('[data-command-following]')`);
+   await show(client, "Atlas");
+   await client.evaluate("document.querySelector('[aria-label=\"Show only Atlas\"]')?.click()");
+   await wait(client, `${panes}.length===1`);
    await client.waitForText("Ready. I checked the brief:");
    await concise(client);
-   await client.evaluate("(()=>{if(document.querySelectorAll('[data-channel-thread]').length!==1||document.querySelectorAll('.channel-switcher-row > button').length!==3)throw new Error('Phone focus lost its selected thread or member row');if(document.documentElement.scrollWidth>innerWidth||document.querySelector('[data-command-composer]').getBoundingClientRect().bottom>innerHeight)throw new Error('Phone focus exceeds the viewport');})()");
+   await client.evaluate(`(()=>{if(${rows}!==3)throw new Error('Phone lost a thread chip');if(document.documentElement.scrollWidth>innerWidth||document.querySelector('[data-command-composer]').getBoundingClientRect().bottom>innerHeight)throw new Error('Phone view exceeds the viewport');})()`);
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
  ];
- return [...captures.filter(capture => capture.id !== "studio-command-active"), ...captures.filter(capture => capture.id === "studio-command-active")];
+ // The follow check starts real work, so it runs last.
+ return [...captures.filter(capture => capture.id !== "studio-command-follow"), ...captures.filter(capture => capture.id === "studio-command-follow")];
 };

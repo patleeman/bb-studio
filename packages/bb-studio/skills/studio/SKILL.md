@@ -106,4 +106,4 @@ quickly. Cmd/Ctrl+K is BB's thread search, not Studio's.
 
 ## Command view
 
-A Space’s Command view opens from its sidebar heading. It shows ordinary threads in Merged, Grid, Active, or Focus layouts. Messages go to the lead or picked threads; @all addresses every top-level thread. The addressed thread roster authorizes coordination for that request with bb thread log and bb thread tell. Scheduling uses Automations.
+A Space’s Command view opens from its sidebar heading. It shows ordinary threads as panes: one follows whichever thread is working until the owner opens more, which makes a grid; closed panes reopen from the thread list beside the composer. Messages go to the lead or picked threads; @all addresses every top-level thread. The addressed thread roster authorizes coordination for that request with bb thread log and bb thread tell. Scheduling uses Automations.

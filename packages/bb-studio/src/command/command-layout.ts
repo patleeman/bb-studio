@@ -1,15 +1,5 @@
 import type { CommandSpace, CommandThread } from "./command-contract";
 
-export const COMMAND_LAYOUTS = [
-  { id: "merged", label: "Merged", detail: "Final replies from every thread in one conversation." },
-  { id: "grid", label: "Grid", detail: "Every thread side by side." },
-  { id: "active", label: "Active", detail: "Working threads take the main area." },
-  { id: "focus", label: "Focus", detail: "One selected thread at a time." },
-] as const;
-export type CommandLayout = typeof COMMAND_LAYOUTS[number]["id"];
-export function commandLayout(value: unknown): CommandLayout {
-  return COMMAND_LAYOUTS.some(layout => layout.id === value) ? value as CommandLayout : "grid";
-}
 export function threadActivity(thread: CommandThread) {
   if (thread.error) return "Unavailable";
   if (thread.hasPendingInteraction) return "Needs input";
@@ -20,18 +10,10 @@ export function threadActivity(thread: CommandThread) {
 export function activeThreads(threads: CommandThread[]) {
   return threads.filter(thread => ["Working", "Needs input"].includes(threadActivity(thread)));
 }
-export function focusedThread(threads: CommandThread[], selected: string | null) {
-  return threads.find(thread => thread.id === selected) ?? activeThreads(threads)[0] ?? threads.find(thread => !thread.parentThreadId) ?? threads[0];
-}
 const ATTENTION = ["Needs input", "Failed", "Working", "Idle", "Unavailable"];
 /** Threads that need the owner first, then working ones, then the most recently updated. */
 export function byAttention(threads: CommandThread[]) {
   return [...threads].sort((a, b) => ATTENTION.indexOf(threadActivity(a)) - ATTENTION.indexOf(threadActivity(b)) || b.updatedAt - a.updatedAt);
-}
-/** Grid order: panes the owner arranged keep their places; the rest follow in attention order. */
-export function arrangeGrid(threads: CommandThread[], order: string[]) {
-  const placed = order.flatMap(id => threads.filter(thread => thread.id === id));
-  return [...placed, ...byAttention(threads.filter(thread => !order.includes(thread.id)))];
 }
 /** Moves `id` to just before or after `target` in the visible ids. */
 export function movePane(ids: string[], id: string, target: string, place: "before" | "after") {
@@ -41,17 +23,15 @@ export function movePane(ids: string[], id: string, target: string, place: "befo
   return [...rest.slice(0, at), id, ...rest.slice(at)];
 }
 /**
- * Active follows the work: every working thread in attention order, or what
- * it showed last when nothing works, with a thread the owner picked first.
- * With nothing to keep it shows the latest thread.
+ * The thread a lone pane follows: the one it shows while that keeps working,
+ * else the thread that most needs the owner, else what it showed, else the
+ * lead, else the latest.
  */
-export function followedThreads(threads: CommandThread[], pinned: string | null, previous: string[]) {
+export function followThread(threads: CommandThread[], current: string | null, leadThreadId: string | null) {
   const find = (id: string | null) => id ? threads.find(thread => thread.id === id) : undefined;
-  const pick = find(pinned), working = byAttention(activeThreads(threads));
-  const rest = (working.length ? working : previous.flatMap(id => find(id) ?? [])).filter(thread => thread !== pick);
-  if (pick || rest.length) return [...(pick ? [pick] : []), ...rest];
-  const latest = [...threads].filter(thread => !thread.parentThreadId && !thread.error).sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? threads[0];
-  return latest ? [latest] : [];
+  const now = find(current);
+  if (now && activeThreads([now]).length) return now;
+  return byAttention(activeThreads(threads))[0] ?? now ?? find(leadThreadId) ?? byAttention(threads.filter(thread => !thread.parentThreadId && !thread.error))[0] ?? threads[0];
 }
 /**
  * Who a message goes to: every thread or bot it mentions, otherwise the

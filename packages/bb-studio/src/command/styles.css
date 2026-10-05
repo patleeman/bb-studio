@@ -51,10 +51,6 @@
   flex-direction: column;
   overflow: hidden;
 }
-.channel-thread-layout:not([data-channel-layout="grid"]) {
-  position: relative;
-  container-type: inline-size;
-}
 .channel-thread-stage {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
@@ -97,7 +93,7 @@
   gap: 2px;
 }
 @media (hover: hover) {
-  .channel-thread-layout:not([data-channel-layout="focus"]) .channel-pane-actions { opacity: 0; transition: opacity 120ms; }
+  .channel-thread-stage:not([data-thread-count="1"]) .channel-pane-actions { opacity: 0; transition: opacity 120ms; }
   .channel-thread-pane:hover .channel-pane-actions,
   .channel-thread-pane:focus-within .channel-pane-actions { opacity: 1; }
 }
@@ -176,26 +172,6 @@
 .channel-thread-pane[data-drop-axis="y"]::after { left: 0; right: 0; width: auto; height: 3px; }
 .channel-thread-pane[data-drop-axis="y"][data-drop="before"]::after { top: 0; bottom: auto; }
 .channel-thread-pane[data-drop-axis="y"][data-drop="after"]::after { top: auto; bottom: 0; }
-.channel-reset-order {
-  margin-left: auto;
-  border-radius: 6px;
-  padding: 3px 8px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-.channel-reset-order:hover { color: var(--foreground); background: var(--state-hover); }
-
-/* Grid: members without a thread share one quiet row. */
-.channel-unstarted {
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  padding: 0 12px 12px;
-}
-/* Members that haven't started: a dashed outline wherever they appear. */
-
 .channel-rail-name {
   min-width: 0;
   flex: 1;
@@ -204,26 +180,57 @@
   white-space: nowrap;
 }
 
-/* Focus and Active: one transcript laid out like a thread page, with a
-   floating member box in the left margin to swap threads. */
+/* One pane reads like a thread page: the transcript scrolls edge to edge
+   and its content keeps the composer's width. */
+.channel-thread-stage[data-thread-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.channel-thread-stage[data-thread-count="1"] .channel-pane-body > div > [class~="overflow-y-auto"] {
+  padding-inline: max(8px, calc((100% - 760px) / 2));
+}
+
+/* The composer, with the Space's threads to its right so the panes keep the
+   whole width. The list is as tall as the composer and scrolls. */
+[data-command-view] { container-type: inline-size; }
+.command-dock {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 760px) 240px;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
 .channel-switcher {
+  position: relative;
+  min-width: 0;
+  min-height: 96px;
+}
+.channel-switcher-list {
   position: absolute;
-  z-index: 3;
-  top: 12px;
-  left: 12px;
+  inset: 0 0 28px;
   display: flex;
-  width: 216px;
-  max-height: calc(100% - 24px);
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   overflow-y: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px;
-  background: color-mix(in srgb, var(--foreground) 3%, var(--background));
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  border-radius: 12px;
+  padding: 4px;
   scrollbar-width: thin;
 }
+.channel-switcher-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 2px 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.channel-switcher-head > button {
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: var(--muted-foreground);
+}
+.channel-switcher-head > button:hover { color: var(--foreground); background: var(--state-hover); }
 .channel-switcher-row {
   display: flex;
   min-width: 0;
@@ -231,9 +238,9 @@
   align-items: center;
   border-radius: 6px;
 }
-.channel-switcher-row > button {
+.channel-switcher-row > button[aria-pressed] {
   display: flex;
-  height: 32px;
+  height: 28px;
   min-width: 0;
   flex: 1;
   align-items: center;
@@ -245,83 +252,35 @@
 }
 .channel-switcher-row:hover,
 .channel-switcher-row[data-current] { background: var(--state-hover); }
-.channel-switcher-row[data-current] > button { font-weight: 500; }
-.channel-switcher-row[data-fork] > button { padding-left: 28px; color: var(--muted-foreground); font-size: var(--text-xs); }
+.channel-switcher-row[data-current] > button[aria-pressed] { font-weight: 500; }
+.channel-switcher-row:not([data-current]) > button[aria-pressed] { color: var(--muted-foreground); }
+.channel-switcher-row[data-fork] > button[aria-pressed] { padding-left: 28px; font-size: var(--text-xs); }
 .channel-switcher-row[data-activity="Idle"] .channel-status-dot { display: none; }
 .channel-switcher-row > button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-.channel-switcher-actions { display: inline-flex; flex: 0 0 auto; padding-right: 2px; }
-.channel-switcher-actions .channel-pane-action { width: 24px; height: 24px; }
-
-.channel-thread-layout[data-channel-layout="focus"] .channel-thread-stage {
-  display: flex;
-  padding: 0;
-}
-/* Active: a closer grid of the threads at work, beside the member box. */
-.channel-thread-layout[data-channel-layout="active"] .channel-thread-stage {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
-  grid-auto-rows: minmax(420px, 1fr);
-  padding: 12px 16px 12px 244px;
-  gap: 16px;
-}
-.channel-thread-layout[data-channel-layout="active"] .channel-thread-stage[data-thread-count="1"] {
-  grid-template-columns: minmax(0, 960px);
-  justify-content: center;
-}
-.channel-single {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
-/* BB's transcript scrolls edge to edge; its content keeps the composer's width. */
-.channel-single .channel-pane-body > div > [class~="overflow-y-auto"] {
-  padding-inline: max(16px, calc((100% - 760px) / 2));
-  padding-top: 16px;
+.channel-switcher-close { width: 22px; height: 22px; margin-right: 2px; }
+@media (hover: hover) {
+  .channel-switcher-close { opacity: 0; }
+  .channel-switcher-row:hover .channel-switcher-close,
+  .channel-switcher-close:focus-visible { opacity: 1; }
 }
 
-/* When the margin is too narrow for names, the box shows avatars only. */
-@container (max-width: 1240px) {
-  .channel-switcher { width: 48px; padding: 6px 4px; }
-  .channel-switcher-row > button { justify-content: center; padding: 0; position: relative; }
-  .channel-switcher-row > button > .channel-rail-name,
-  .channel-switcher-actions { display: none; }
-  .channel-switcher-row[data-fork] > button { padding: 0; }
-  .channel-switcher-row > button > .channel-status-dot { position: absolute; top: 4px; right: 4px; }
-
-  .channel-single .channel-pane-body > div > [class~="overflow-y-auto"] {
-    padding-inline: max(72px, calc((100% - 760px) / 2)) max(16px, calc((100% - 760px) / 2));
-  }
-  .channel-thread-layout[data-channel-layout="active"] .channel-thread-stage { padding-left: 72px; }
-}
-/* Phones: the box becomes a row above the transcript. */
-@container (max-width: 640px) {
-  .channel-switcher {
+/* Narrow: the threads become a row of chips above the composer. */
+@container (max-width: 820px) {
+  .command-dock { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 0 12px 12px; }
+  .channel-switcher { order: -1; min-height: 0; }
+  .channel-switcher-list {
     position: static;
-    width: 100%;
-    max-height: none;
     flex-direction: row;
     gap: 4px;
     overflow-x: auto;
     border: none;
-    border-bottom: 1px solid var(--border);
-    border-radius: 0;
-    padding: 6px 8px;
-    box-shadow: none;
+    padding: 0;
     scrollbar-width: none;
   }
-  .channel-switcher-row > button { height: 36px; padding: 0 10px 0 4px; justify-content: flex-start; }
-  .channel-switcher-row > button > .channel-rail-name { display: block; max-width: 140px; }
-  .channel-switcher-row > button > .channel-status-dot { position: static; }
-  .channel-switcher-row[data-fork] > button { padding: 0 10px 0 6px; }
-
-  .channel-single .channel-pane-body > div > [class~="overflow-y-auto"] { padding-inline: 12px; }
-  .channel-thread-layout[data-channel-layout="active"] .channel-thread-stage {
-    grid-template-columns: minmax(0, 1fr);
-    grid-auto-rows: minmax(420px, 70svh);
-    padding: 8px;
-    gap: 8px;
-  }
+  .channel-switcher-head > span:first-child { display: none; }
+  .channel-switcher-row > button[aria-pressed] { height: 30px; padding: 0 10px 0 4px; }
+  .channel-switcher-row > button[aria-pressed] > .channel-rail-name { max-width: 140px; }
+  .channel-switcher-row[data-fork] > button[aria-pressed] { padding: 0 10px 0 6px; }
 }
 
 .channel-stage-empty {

@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { experimental_NewThreadComposer as NewThreadComposer, experimental_useSidebarThreadActions, Markdown, useBbNavigate, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, ItemTile, PageColumn, StudioBar, openCompanion } from "@bb-studio/kit/app";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { experimental_NewThreadComposer as NewThreadComposer, experimental_useSidebarThreadActions, useBbNavigate, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, PageColumn, StudioBar, openCompanion } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { errorMessage as message } from "@bb-studio/kit/format";
 import "./styles.css";
 const PLUGIN_ID = "studio";
 import type { rpcContract } from "../contract";
-import type { CommandAttachment, CommandEntry, CommandPermissionMode, CommandSpace } from "./command-contract";
+import type { CommandAttachment, CommandPermissionMode, CommandSpace } from "./command-contract";
 import { broadcastMentionText, spaceThreadMentionId } from "./mentions";
-import { CommandLayoutPicker, CommandThreads } from "./command-threads";
-import { commandLayout, recipients, type CommandLayout } from "./command-layout";
+import { CommandSwitcher, CommandThreads, useCommandPanes } from "./command-threads";
+import { recipients } from "./command-layout";
 import { handOffNewThreadSpace } from "../ui/ComposerSpaces";
 
 type Contract = typeof rpcContract;
@@ -29,7 +29,7 @@ const MODE_CHOICES: { id: CommandPermissionMode | null; label: string; detail: s
 const isNewThreadKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) && !event.altKey && (event.key.toLowerCase() === "n" ? !event.shiftKey : event.key.toLowerCase() === "o" && event.shiftKey);
 
 /** The last data each Space showed, so reopening the view draws at once while it refreshes. */
-const lastSpace = new Map<string, Space>(), lastFeed = new Map<string, CommandEntry[]>();
+const lastSpace = new Map<string, Space>();
 
 function Placeholder({ rows }: { rows: number }) {
   return <div role="status" aria-label="Loading" className="flex flex-col gap-3 motion-safe:animate-pulse">
@@ -78,21 +78,14 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
   const openThread = (threadId: string) => { if (!openCompanion({ kind: "thread", threadId })) navigate.toThread(threadId); };
   const [space, setSpace] = useState<Space | null>(() => lastSpace.get(spaceId) ?? null), [error, setError] = useState<string | null>(null);
-  const [entries, setEntries] = useState<CommandEntry[] | null>(() => lastFeed.get(spaceId) ?? null);
-  const [layout, setLayout] = useStored<CommandLayout>(`studio:command-layout:${spaceId}`, commandLayout);
   const [permission, setPermission] = useStored<CommandPermissionMode | null>(`studio:command-permission:${spaceId}`, value => MODE_CHOICES.find(choice => choice.id === value)?.id ?? null);
-  // The thread picked to reply to; Focus picks the thread it shows.
+  // The thread picked to reply to.
   const [reply, setReply] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
   const [focus, setFocus] = useState(0);
-  const generation = useRef(0), feedGeneration = useRef(0);
+  const generation = useRef(0);
   const load = useCallback(() => {
     const seq = ++generation.current;
     void rpc.call("command", { spaceId }).then(next => { if (seq === generation.current) { lastSpace.set(spaceId, next); setSpace(current => same(current, next) ? current : next); setError(null); } }, e => { if (seq === generation.current) setError(message(e)); });
-  }, [rpc, spaceId]);
-  const loadFeed = useCallback(() => {
-    const seq = ++feedGeneration.current;
-    void rpc.call("commandFeed", { spaceId }).then(next => { if (seq === feedGeneration.current) { lastFeed.set(spaceId, next.entries); setEntries(next.entries); } }, e => { if (seq === feedGeneration.current) setError(message(e)); });
   }, [rpc, spaceId]);
   useEffect(() => {
     load();
@@ -100,17 +93,12 @@ function CommandView({ spaceId }: { spaceId: string }) {
     const timer = setInterval(() => { if (document.visibilityState !== "hidden") load(); }, 3000);
     return () => { clearInterval(timer); generation.current++; };
   }, [load]);
-  useEffect(() => { if (layout === "merged") loadFeed(); }, [layout, loadFeed]);
   const soon = useRef<ReturnType<typeof setTimeout> | null>(null);
   useRealtime(COMMAND_TOPIC, () => {
     if (soon.current) return;
-    soon.current = setTimeout(() => { soon.current = null; load(); if (layout === "merged") loadFeed(); }, 500);
+    soon.current = setTimeout(() => { soon.current = null; load(); }, 500);
   });
   useEffect(() => () => { if (soon.current) clearTimeout(soon.current); }, []);
-  const timeline = useRef<HTMLDivElement>(null), followLatest = useRef(true);
-  useLayoutEffect(() => {
-    if (followLatest.current && timeline.current) timeline.current.scrollTop = timeline.current.scrollHeight;
-  }, [entries?.at(-1)?.id]);
 
   // Tells the "This Space" mention provider which Space's threads to offer.
   const markFocus = () => { void rpc.call("commandFocus", { spaceId }).catch(() => {}); };
@@ -145,13 +133,12 @@ function CommandView({ spaceId }: { spaceId: string }) {
     const command = /^\/(steer|followup|fork)\s+/.exec(text);
     let failure: string | null = null;
     try {
-      const threadIds = recipients(mentioned, everyone, layout === "focus" ? reply ?? selected : reply, space);
+      const threadIds = recipients(mentioned, everyone, reply, space);
       const result = await rpc.call("commandSend", { spaceId, threadIds, text: command ? text.slice(command[0].length) : text, attachments, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork", permissionMode: permission });
       const failures = result.deliveries.filter(d => d.status === "error");
       if (failures.length) failure = failures.map(d => d.error).join("\n");
-      else { setReply(null); followLatest.current = true; }
+      else setReply(null);
       load();
-      if (layout === "merged") loadFeed();
     } catch (e) { failure = message(e); }
     if (failure) { setError(failure); throw new Error(failure); }
   };
@@ -159,22 +146,9 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const threads = space?.threads ?? [];
   const thread = (id: string | null) => threads.find(t => t.id === id);
   const nameOf = (threadId: string) => thread(threadId)?.title || "Thread";
-  const target = layout === "focus" ? reply ?? selected : reply;
-  const defaultTo = target && thread(target) ? target : space?.leadThreadId ?? null;
-  const time = (at: number) => new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(at);
-  const working = threads.filter(t => !t.parentThreadId && ["starting", "active"].includes(t.status)).map(t => nameOf(t.id));
-  const renderEntry = (entry: CommandEntry, previous?: CommandEntry) => {
-    if (entry.role === "user") return <li key={entry.id} data-command-entry="user" className="ml-auto flex w-fit max-w-[70%] flex-col items-end gap-1">
-      <time className="text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>
-      <div className="max-w-full break-words rounded-xl border border-border-seam bg-surface-recessed px-4 py-2.5 text-sm leading-relaxed text-foreground"><Markdown content={entry.text} /></div>
-    </li>;
-    const continued = previous?.role === "assistant" && previous.threadId === entry.threadId && entry.createdAt - previous.createdAt < 5 * 60_000;
-    return <li key={entry.id} data-command-entry="assistant" className={`group/message rounded-lg px-2 ${continued ? "-mt-2" : ""}`}>
-      {!continued && <div className="mb-1.5 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={null} kindIcon="MessageSquare" size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => openThread(entry.threadId)}>{nameOf(entry.threadId)}</button><time className="shrink-0 text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time></div>}
-      <div className="min-w-0 break-words text-sm leading-relaxed"><Markdown content={entry.text} /></div>
-      <button type="button" className="mt-1 text-xs text-subtle-foreground hover:text-foreground" onClick={() => { setReply(entry.threadId); setFocus(value => value + 1); }}>Send to {nameOf(entry.threadId)}</button>
-    </li>;
-  };
+    const defaultTo = reply && thread(reply) ? reply : space?.leadThreadId ?? null;
+  const panes = useCommandPanes(spaceId, threads, space?.leadThreadId ?? null);
+  const pickReply = useCallback((threadId: string, focusComposer?: boolean) => { setReply(threadId); if (focusComposer) setFocus(value => value + 1); }, []);
   return <div className="relative flex h-full min-h-0 flex-col" data-command-view>
     <StudioBar>
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
@@ -184,20 +158,11 @@ function CommandView({ spaceId }: { spaceId: string }) {
       </nav>
       <div className="flex shrink-0 items-center gap-0.5">
         <NewThreadButton space={space?.space ?? null} />
-        <span aria-hidden className="mx-1 h-4 w-px bg-border" />
-        <CommandLayoutPicker value={layout} onChange={setLayout} />
       </div>
     </StudioBar>
-    {layout === "merged" ? <div data-command-timeline ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col px-4 pt-6 pb-8">
-      {(!space || !entries) && !error && <Placeholder rows={3} />}
-      {space && entries && !entries.length && <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
-        <p className="text-sm font-medium">{space.space.name}</p>
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">{space.threads.length ? "Message the lead, or @mention threads to message them together. Their replies land here." : "This Space has no threads yet."}</p>
-      </div>}
-      <ol className="flex flex-col gap-3">{(entries ?? []).map((entry, i, all) => renderEntry(entry, all[i - 1]))}</ol>
-      {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
-    </div></div> : !space ? <div className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-[760px] px-4 pt-6">{!error && <Placeholder rows={2} />}</div></div> : <CommandThreads spaceId={spaceId} threads={space.threads} leadThreadId={space.leadThreadId} layout={layout} selected={selected} onSelect={threadId => { setSelected(threadId); setReply(null); setLayout("focus"); }} onReply={(threadId, focusComposer) => { setReply(threadId); if (focusComposer) setFocus(value => value + 1); }} onOpen={openThread} />}
-    <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
+    {!space ? <div className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-[760px] px-4 pt-6">{!error && <Placeholder rows={2} />}</div></div> : <CommandThreads panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} onReply={pickReply} onOpen={openThread} />}
+    <div className="command-dock">
+    <div className="min-w-0">
       {/* Keep the existing draft key so moving Command preserves unsent messages. */}
       <div data-command-composer onFocusCapture={markFocus} onKeyDownCapture={event => { if (event.key === "@") markFocus(); }}><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
       <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
@@ -211,6 +176,8 @@ function CommandView({ spaceId }: { spaceId: string }) {
           </DropdownMenuContent></DropdownMenu>
       </div>
       {error && <div className="mt-2">{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</div>}
+    </div>
+    {space && <CommandSwitcher panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} />}
     </div>
   </div>;
 }
