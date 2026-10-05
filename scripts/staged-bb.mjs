@@ -165,6 +165,13 @@ async function seedCommand(machine, project) {
   const scribe = await makeThread("Scribe", "scribe-mission.md");
   const spaceId = await seedSpace("Launch work", [atlas, scribe]);
   await seedLaunch(spaceId, atlas, scribe);
+  // BB's automatic title can land after the first rename; name them again.
+  for (const [id, name] of [[atlas, "Atlas"], [scribe, "Scribe"]]) {
+    const renamed = await fetch(`${serverUrl}/api/v1/threads/${id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: name }),
+    });
+    if (!renamed.ok) throw new Error(`Could not name the ${name} fixture`);
+  }
 }
 
 /** A Studio Space holding these threads, the first one its lead. */
