@@ -20,7 +20,7 @@ import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport
 import type { SidebarThread } from "../model/sidebar-thread.js";
 import { SpaceLeadContext } from "./SpaceLead.js";
 import { SpaceMark } from "./SpaceSwitcher.js";
-import type { StudioSpace } from "./space-groups.js";
+import { createSpaceResolver, defaultSpaceId, projectSpaces, type StudioSpace } from "./space-groups.js";
 import {
   beginPendingSpaceMove,
   SPACE_CHANGED_EVENT,
@@ -72,6 +72,24 @@ export function useMoveThreadsToSpace(): (threadIds: readonly string[], space: S
 }
 
 /**
+ * The Space a thread shows in, as By space places it: its root's Space, else
+ * its project's Space, else the default Space.
+ */
+export function currentSpaceIdOf(
+  thread: SidebarThread,
+  spaces: readonly StudioSpace[],
+  spaceOf: Readonly<Record<string, string>>,
+): string | null {
+  return createSpaceResolver(
+    [thread],
+    spaceOf,
+    new Set(spaces.map((space) => space.id)),
+    defaultSpaceId(spaces),
+    projectSpaces(spaces),
+  )(thread);
+}
+
+/**
  * Move to Space ▸ in a top-level thread's menu: each Space, the thread's
  * current one checked. By space knows each thread's Space; elsewhere it's
  * looked up when the submenu opens.
@@ -85,13 +103,17 @@ export function MoveToSpaceItem({ thread, surface }: {
   const compact = useIsCompactViewport();
   const sdk = useSdk();
   const move = useMoveThreadsToSpace();
-  const [looked, setLooked] = useState<string | null | undefined>(undefined);
+  const [looked, setLooked] = useState<Record<string, string> | null | undefined>(undefined);
   if (state.status !== "ready" || state.spaces.length < 2) return null;
   if (thread.parentThreadId !== null || thread.archivedAt !== null) return null;
   // The phone drawer has no submenus.
   if (surface === "dropdown" && compact) return null;
-  const known = bySpace?.spaceIdOf(thread) ?? (state.threadsLoaded ? state.spaceOf[thread.id] ?? null : undefined);
-  const currentId = known !== undefined ? known : looked;
+  const known = bySpace?.spaceIdOf(thread)
+    ?? (state.threadsLoaded ? currentSpaceIdOf(thread, state.spaces, state.spaceOf) : undefined);
+  const currentId = known !== undefined ? known
+    : looked === undefined ? undefined
+    : looked === null ? null
+    : currentSpaceIdOf(thread, state.spaces, withPendingSpaceMoves(looked));
   const lookUp = (open: boolean) => {
     if (!open || known !== undefined || looked !== undefined) return;
     void sdk.plugins.callRpc({
@@ -100,7 +122,7 @@ export function MoveToSpaceItem({ thread, surface }: {
       input: {} as never,
       outputSchema: spaceOfSchema,
       signal: AbortSignal.timeout(10_000),
-    }).then((result) => setLooked(spaceOfSchema.parse(result).threads[thread.id] ?? null), () => setLooked(null));
+    }).then((result) => setLooked(spaceOfSchema.parse(result).threads), () => setLooked(null));
   };
 
   const Sub = surface === "context" ? ContextMenuSub : DropdownMenuSub;
