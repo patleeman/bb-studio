@@ -29,4 +29,14 @@ describe("bb pages", () => {
     expect(await run("show")).toMatchObject({ exitCode: 1, stderr: expect.stringContaining("usage:") });
     expect(await run("show", "--ids")).toMatchObject({ exitCode: 1, stderr: expect.stringContaining("usage:") });
   });
+
+  it("append from an agent saves a version first and shows its cursor, like pages_edit", async () => {
+    const { store, service, cli } = setup();
+    const page = service.createPage({ projectId: "proj_1", parentId: null, title: "Plan", markdown: "Before", actor: HUMAN_USER_ID });
+    const live = service.hub.open(page.id);
+    const result = await cli.run(["append", page.id, "After"], { projectId: "proj_1", threadId: "thr_1" } as never);
+    expect(result).toMatchObject({ exitCode: 0 });
+    expect(store.snapshots(page.id)).toMatchObject([{ actor: "agent:thr_1", label: "Before Agent · Fix bug" }]);
+    expect([...live.presences.keys()]).toEqual(["agent:thr_1"]);
+  });
 });

@@ -1,8 +1,9 @@
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 import { untitled } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { actorColor } from "./actors";
 import { HUMAN_USER_ID } from "./constants";
-import { applyEdits, readMarkdown } from "./doc";
+import { readMarkdown } from "./doc";
 import { errorText, type PagesService } from "./service";
 
 /** The `bb pages` CLI. `created` tells Studio an agent made a page. */
@@ -57,8 +58,9 @@ export function pagesCli(service: PagesService, created: (pageId: string, thread
             const markdown = words.join(" ").replace(/\\n/g, "\n");
             if (!ref || !markdown.trim()) return { exitCode: 1, stderr: "usage: bb pages append <page-id> <markdown…>\n" };
             const meta = service.requirePage(ref, ctx.projectId);
-            const origin = ctx.threadId ? `agent:${ctx.threadId}` : "cli";
-            applyEdits(service.hub.open(meta.id).doc, [{ op: "append", markdown }], origin);
+            // Like pages_edit: a version before the actor's first edit in a while, and its cursor.
+            const actor = ctx.threadId ? (await service.actorForThread(ctx.threadId)).actor : { key: "cli", name: "CLI", color: actorColor("cli") };
+            service.edit(meta.id, [{ op: "append", markdown }], actor);
             return { exitCode: 0, stdout: `Appended to ${meta.id}.\n` };
           }
           default:
