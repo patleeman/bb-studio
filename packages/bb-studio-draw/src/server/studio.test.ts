@@ -42,6 +42,16 @@ describe("the Draw Studio provider", () => {
     const png = await call("studio_export", { id: row.id, format: "png" });
     expect(Buffer.from(png.files[0].data, "base64").subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
   });
+  it("renders a drawing's text into PNG exports", async () => {
+    const { store, call } = setup();
+    const png = async (text: string) => {
+      const row = store.create({ name: text, by: "app" });
+      store.write(row.id, scene([element("text", { text, x: 0, y: 0, width: 200, height: 30, fontSize: 24, fontFamily: 5 })]), "editor");
+      return (await call("studio_export", { id: row.id, format: "png" })).files[0].data;
+    };
+    // Same frame; without fonts both render as the same empty image.
+    expect(await png("Hello")).not.toBe(await png("World"));
+  });
   it("describes drawings, which Studio can create", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);

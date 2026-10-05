@@ -82,9 +82,11 @@ function arrowhead(from: [number, number], to: [number, number], stroke: string)
 
 function fontFamily(value: unknown): string {
   // Excalidraw's families: 3 and 8 are monospace; 2, 6 and 7 sans; the rest handwritten.
-  if (value === 3 || value === 8) return "ui-monospace, Menlo, monospace";
-  if (value === 1 || value === 5) return "'Comic Sans MS', 'Segoe Print', cursive";
-  return "system-ui, -apple-system, 'Segoe UI', sans-serif";
+  // The first family in each list is a font PNG export loads (studio.ts).
+  if (value === 3 || value === 8) return "'Cascadia Code', ui-monospace, Menlo, monospace";
+  if (value === 1) return "Virgil, 'Comic Sans MS', 'Segoe Print', cursive";
+  if (value === 5) return "Excalifont, 'Comic Sans MS', 'Segoe Print', cursive";
+  return "'Liberation Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
 }
 
 function text(element: SceneElement): string {

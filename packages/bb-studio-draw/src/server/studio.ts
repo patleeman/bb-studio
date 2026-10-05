@@ -7,8 +7,9 @@ import { getNonDeletedElements, parseSceneData } from "../../lib/merge";
 import { DRAW_ICON, PLUGIN_ID, drawingHref, thumbnailUrl } from "../shared";
 import type { DrawingRow, DrawingStore } from "./store";
 import { sceneThumbnail } from "./thumbnail";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 
 // resvg's WebAssembly build: BB installs plugins without optional dependencies,
@@ -16,6 +17,24 @@ import { initWasm, Resvg } from "@resvg/resvg-wasm";
 let resvgReady: Promise<void> | undefined;
 const loadResvg = () =>
   (resvgReady ??= readFile(createRequire(import.meta.url).resolve("@resvg/resvg-wasm/index_bg.wasm")).then(initWasm));
+
+/**
+ * resvg-wasm can't see system fonts, so without these every PNG export drops
+ * its text. Excalidraw's package ships its own fonts as WOFF2, which resvg reads.
+ * Family names match those the thumbnail SVG asks for (see thumbnail.ts).
+ */
+const EXPORT_FONT_DIRS = ["Liberation", "Cascadia", "Virgil", "Excalifont"];
+const EXPORT_FONT_OPTIONS = { loadSystemFonts: false, defaultFontFamily: "Liberation Sans", sansSerifFamily: "Liberation Sans", monospaceFamily: "Cascadia Code", cursiveFamily: "Excalifont" };
+let exportFonts: Promise<Uint8Array[]> | undefined;
+const loadExportFonts = () =>
+  (exportFonts ??= (async () => {
+    // Resolves to <package>/dist/prod/index.js; the fonts sit beside it.
+    const root = join(dirname(createRequire(import.meta.url).resolve("@excalidraw/excalidraw")), "fonts");
+    const files = (await Promise.all(EXPORT_FONT_DIRS.map(async (dir) =>
+      (await readdir(join(root, dir))).filter((name) => name.endsWith(".woff2")).map((name) => join(root, dir, name)))))
+      .flat();
+    return Promise.all(files.map(async (file) => new Uint8Array(await readFile(file))));
+  })().catch(() => []));
 
 export const DRAWING_KIND: StudioKind = {
   id: "drawing",
@@ -129,8 +148,9 @@ export function registerStudio(
       const row = mustGet(id);
       if (format === "svg" || format === "png") {
         const svg = sceneThumbnail(parseSceneData(row.data)) ?? '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
-        if (format === "png") await loadResvg();
-        const bytes = format === "png" ? new Resvg(svg).render().asPng() : Buffer.from(svg);
+        const bytes = format === "png"
+          ? (await loadResvg(), new Resvg(svg, { font: { fontBuffers: await loadExportFonts(), ...EXPORT_FONT_OPTIONS } }).render().asPng())
+          : Buffer.from(svg);
         return { files: [{ name: `${row.name.trim() || "Untitled drawing"}.${format}`, mime: format === "png" ? "image/png" : "image/svg+xml", data: Buffer.from(bytes).toString("base64") }] };
       }
       if (format !== "excalidraw") throw new Error(`Unsupported drawing format: ${format}`);
