@@ -174,7 +174,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
     // The upload was copied into the recipient's project, where BB reads it.
     const { readdirSync } = await import("node:fs");
     const thread = JSON.parse(await bbCli(["thread", "show", data.threadId, "--json"]));
-    const dir = `${process.env.BB_DATA_DIR}/attachments/${thread.projectId}`;
+    const dir = `${process.env.BB_DATA_DIR}/attachments/${thread.thread.projectId}`;
     let copied = false;
     for (let tries = 0; tries < 20 && !copied; tries++) { try { copied = readdirSync(dir).some(name => name.startsWith("bb-command-attach")); } catch {} if (!copied) await sleep(500); }
     if (!copied) throw new Error(`The image was not copied into ${dir}`);
