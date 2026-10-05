@@ -46,3 +46,22 @@ export function recipients(mentioned: string[], everyone: boolean, picked: strin
   if (roots.length === 1) return roots;
   throw new Error("This Space has no lead. @mention a thread, or pick one to send to.");
 }
+
+/** BB's own New thread keys (⌘N, ⌘⇧O), which file the thread in this Space while Command is open. */
+export const isNewThreadKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) && !event.altKey && (event.key.toLowerCase() === "n" ? !event.shiftKey : event.key.toLowerCase() === "o" && event.shiftKey);
+
+/**
+ * Whether this Command view takes a New thread key press from BB: only while
+ * it's the view in use, with focus inside it (or, with nothing focused, the
+ * last click landed in it), it's visible, and no dialog is open. A view kept
+ * mounted in another split or a hidden tab leaves the key to BB. A key that
+ * is part of an IME composition is never taken.
+ */
+export function claimsNewThreadKey(event: KeyboardEvent, root: Element | null, clickedInside: boolean) {
+  if (!root || event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229 || !isNewThreadKey(event)) return false;
+  const doc = root.ownerDocument;
+  if (root.closest("[hidden], [inert], [aria-hidden='true']") || (typeof root.checkVisibility === "function" && !root.checkVisibility())) return false;
+  if (doc.querySelector('[role="dialog"], [role="alertdialog"]')) return false;
+  const active = doc.activeElement;
+  return active && active !== doc.body && active !== doc.documentElement ? root.contains(active) : clickedInside;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate, useSdk, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, PageColumn, StudioBar, Tooltip, openCompanion } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/ui";
@@ -10,7 +10,7 @@ import type { CommandAttachment, CommandPermissionMode, CommandSpace } from "./c
 import { broadcastMentionText, spaceThreadMentionId, typedAliases } from "./mentions";
 import { draftRecipients, useCommandDraft } from "./draft-recipients";
 import { CommandSwitcher, CommandThreads, useCommandPanes, type CommandPanes } from "./command-threads";
-import { recipients } from "./command-layout";
+import { claimsNewThreadKey, recipients } from "./command-layout";
 
 type Contract = typeof rpcContract;
 type Space = CommandSpace;
@@ -25,9 +25,6 @@ const MODE_CHOICES: { id: CommandPermissionMode | null; label: string; detail: s
   { id: "full", label: "Full Access", detail: "No sandbox and no approvals. The agent can run anything on your machine." },
 ];
 
-/** BB's own New thread keys (⌘N, ⌘⇧O), which file the thread in this Space while Command is open. */
-const isNewThreadKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) && !event.altKey && (event.key.toLowerCase() === "n" ? !event.shiftKey : event.key.toLowerCase() === "o" && event.shiftKey);
-
 /** The last data each Space showed, so reopening the view draws at once while it refreshes. */
 const lastSpace = new Map<string, Space>();
 
@@ -40,21 +37,24 @@ function Placeholder({ rows }: { rows: number }) {
 /** A poll that changed nothing keeps the old object, so the panes and composer don't re-render. */
 const same = (a: Space | null, b: Space) => !!a && JSON.stringify(a) === JSON.stringify(b);
 
-/** New thread in this Space: a draft pane in the grid. ⌘N opens it too while Command is open. */
-function NewThreadButton({ space, onNew }: { space: Space["space"] | null; onNew(): void }) {
+/** New thread in this Space: a draft pane in the grid. ⌘N opens it too while this view is in use. */
+function NewThreadButton({ space, onNew, root }: { space: Space["space"] | null; onNew(): void; root: RefObject<HTMLElement | null> }) {
   const latest = useRef({ space, onNew });
   latest.current = { space, onNew };
   useEffect(() => {
+    let clickedInside = false;
+    const onPointer = (event: PointerEvent) => { clickedInside = !!root.current?.contains(event.target as Node); };
     // Capture runs before BB's own handler, so the key starts the thread here instead.
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat || !latest.current.space || !isNewThreadKey(event) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      if (!latest.current.space || !claimsNewThreadKey(event, root.current, clickedInside)) return;
       event.preventDefault();
       event.stopPropagation();
       latest.current.onNew();
     };
+    window.addEventListener("pointerdown", onPointer, true);
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
+    return () => { window.removeEventListener("pointerdown", onPointer, true); window.removeEventListener("keydown", onKey, true); };
+  }, [root]);
   return <Tooltip label="New thread in this Space (⌘N)"><button type="button" aria-label={`New thread in ${space?.name ?? "this Space"}`} aria-keyshortcuts="Meta+N" className={ICON_BUTTON} disabled={!space} onClick={onNew}><Icon name="Plus" className="size-4" aria-hidden /></button></Tooltip>;
 }
 
@@ -186,8 +186,9 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const sdk = useSdk();
   // Reading a pane marks its thread read in BB too, then refreshes the dots.
   const markSeen = useCallback((threadId: string) => { void sdk.threads.markRead({ threadId }).then(load, () => {}); }, [sdk, load]);
+  const root = useRef<HTMLDivElement>(null);
   const pickReply = useCallback((threadId: string, focusComposer?: boolean) => { setReply(threadId); if (focusComposer) setFocus(value => value + 1); }, []);
-  return <div className="relative flex h-full min-h-0 flex-col" data-command-view>
+  return <div ref={root} className="relative flex h-full min-h-0 flex-col" data-command-view>
     <StudioBar>
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
         <BarCrumb><span className="truncate">{space?.space.name ?? "Space"}</span></BarCrumb>
@@ -196,7 +197,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
       </nav>
       <div className="flex shrink-0 items-center gap-0.5">
         <Tooltip label={panes.following ? "Following work: one pane shows whichever thread is working" : "Follow work: close the panes and show whichever thread is working"}><button type="button" aria-label="Follow work" aria-pressed={panes.following} className={ICON_BUTTON} disabled={!space} onClick={panes.follow}><Icon name="Zap" className="size-4" aria-hidden /></button></Tooltip>
-        <NewThreadButton space={space?.space ?? null} onNew={panes.newThread} />
+        <NewThreadButton space={space?.space ?? null} onNew={panes.newThread} root={root} />
       </div>
     </StudioBar>
     {!space ? <div className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-[760px] px-4 pt-6">{!error && <Placeholder rows={2} />}</div></div> : <CommandThreads panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} draftPane={<NewThreadPane space={space.space} panes={panes} onStarted={load} />} onReply={pickReply} onSeen={markSeen} onOpen={openThread} />}
