@@ -33,6 +33,12 @@ describe("the instructions", () => {
 describe("the worker prompt", () => {
   const hints = { read: ["src/queue.ts"], changed: ["src/billing.ts"], searched: ["backoff in src"] };
 
+  it("carries what the user was told about the finding", () => {
+    const prompt = workerPrompt({ item: { emoji: "🐛", label: "I noticed retries don't wait", why: "I noticed retries don't wait. If the server is down, it gets hammered." }, hints, parent: null, regenerating: false });
+    expect(prompt).toContain("What you told the user about it: I noticed retries don't wait. If the server is down, it gets hammered.");
+    expect(workerPrompt({ item: { emoji: "🐛", label: "x" }, hints, parent: null, regenerating: false })).not.toContain("What you told the user");
+  });
+
   it("carries the finding and the turn's files as data", () => {
     const prompt = workerPrompt({ item: { emoji: "🏗️", label: "How the job queue works" }, hints, parent: null, regenerating: false });
     expect(prompt).toContain("Finding: 🏗️ How the job queue works");

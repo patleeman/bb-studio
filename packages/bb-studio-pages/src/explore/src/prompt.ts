@@ -27,18 +27,17 @@ export const DEFAULT_REPLIES = ["👍 Looks good", "🔁 Try another way", "❓ 
 export function nextInstructions({ explore, replies }: { explore: boolean; replies: readonly string[] }): string {
   const example = [
     `reply="👍 Ship it|🧪 Add tests first"`,
-    ...(explore ? [`explore="🐛 Retries can hammer a down server — your new endpoint will retry too"`] : []),
+    ...(explore ? [`btw="🐛 I noticed the new endpoint retries without waiting between tries. If the server is down, it will get hammered."`] : []),
     `do="📄 Write up the migration plan as a page"`,
   ].join(" ");
   return [
     "The Next row is on. End a reply with one line that offers the user's likely next steps, when there are any:",
     `::${NEXT_DIRECTIVE}{${example}}`,
-    "Every attribute is optional; leave out the ones with nothing worth offering, and leave out the whole line when nothing is. Items are separated by |. Each is one emoji, a space, and a short label. Don't use double quotes or | inside a label.",
+    "Every attribute is optional; leave out the ones with nothing worth offering, and leave out the whole line when nothing is. Items are separated by |. Each is one emoji, a space, and its text. Don't use double quotes, braces or | inside an item.",
     `- reply: only when your reply asks the user to decide, choose, approve or answer. 2 to ${NEXT_LIMITS.reply} quick answers of at most 5 words; each must make sense as the user's whole reply.${replies.length ? ` Prefer these when they fit: ${replies.join(" | ")}. Write specific ones when your reply offers distinct options.` : ""}`,
     ...(explore
       ? [
-          `- explore: only when your answer involved reading code. 1 to ${NEXT_LIMITS.explore} things you noticed along the way but didn't cover. Write each for someone who hasn't read the code: a label of at most 8 plain words that names the behavior or risk, not identifiers or file names, such as "Retries can hammer a down server", never "Learn more about caching" or "pickComposer duplicated in two packages". After the label put " — " and the consequence for the user in at most 15 words: what breaks, costs them, or helps the work they're doing, such as "— the fix you just made won't reach the other plugin". `+
-          `Emoji: 🐛 suspicious or likely buggy, 🏗️ foundational subsystem, 🔗 connected code the answer depends on, 🕐 recently changed. Clicking one writes a Studio Page explaining it in the background; to write one yourself when asked, use explore_explain.`,
+          `- btw: only when your answer involved reading code. 1 to ${NEXT_LIMITS.btw} things you noticed along the way but didn't cover, told to the user the way a colleague would mention them in passing. Write each in plain English as one or two short sentences: start with "I noticed", say what you saw in words someone who hasn't read the code understands (no function, file or package names), then what it means for them, such as "If you fix a bug in one, the other keeps it." Under 40 words. Emoji: 🐛 looks broken or risky (these get a Fix this button), 🏗️ something the work rests on, 🔗 connected code that matters here, 🕐 changed recently. Every note gets a Tell me more button that writes a Studio Page explaining it; to write one yourself when asked, use explore_explain.`,
         ]
       : []),
     `- do: 1 to ${NEXT_LIMITS.do} concrete actions you could take next for the user, phrased as the instruction they'd give you, such as "📄 Write this up as a page", "🧵 Start a thread to fix the retry bug" or "📌 Add the decision to the Space brief". Clicking one drafts it for the user to send. Offer only what you can actually do, and never the step you just asked about in reply.`,
@@ -74,6 +73,7 @@ export function workerPrompt({ item, hints, parent, regenerating }: WorkerPrompt
       : "At the end of your last answer you listed things you noticed along the way. The user clicked this one:",
     "<explore-data>",
     `Finding: ${data(`${item.emoji} ${item.label}`, 300)}`,
+    ...(item.why ? [`What you told the user about it: ${data(item.why, 600)}`] : []),
     ...hintLines.map((line) => data(line, 4_000)),
     ...(parent ? [`Earlier explainer: ${data(parent.label, 300)}`, ...(parent.markdown ? ["", data(explainerText(parent.markdown), 20_000)] : [])] : []),
     "</explore-data>",

@@ -56,6 +56,8 @@ export interface ExploreInput {
   projectId?: string | null;
   emoji?: string;
   label: string;
+  /** What the user was told about the finding, for the explainer's writer. */
+  note?: string | null;
   parentId?: string | null;
 }
 
@@ -162,6 +164,7 @@ export class ExploreService {
         turnId: input.turnId ?? null,
         emoji: parsed.emoji,
         label: parsed.label,
+        note: input.note ?? null,
         projectId: input.projectId ?? null,
       });
     }
@@ -249,7 +252,7 @@ export class ExploreService {
       let parentMarkdown: string | null = null;
       if (parent?.page_id) parentMarkdown = await this.deps.pages.markdown(parent.page_id).catch(() => null);
       const prompt = workerPrompt({
-        item: { emoji: explainer.emoji, label: explainer.label },
+        item: { emoji: explainer.emoji, label: explainer.label, ...(explainer.note ? { why: explainer.note } : {}) },
         hints: context.hints,
         parent: parent ? { label: parent.label, markdown: parentMarkdown } : null,
         regenerating: kind === "regenerate",

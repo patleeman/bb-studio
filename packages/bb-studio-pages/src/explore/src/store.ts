@@ -17,6 +17,7 @@ export type ExplainerRow = {
   turn_id: string | null;
   emoji: string;
   label: string;
+  note: string | null;
   page_id: string | null;
   project_id: string | null;
   status: ExplainerStatus;
@@ -147,6 +148,8 @@ export const MIGRATIONS = [
      clicks INTEGER NOT NULL DEFAULT 0
    )`,
   `CREATE INDEX IF NOT EXISTS next_suggestions_shown ON next_suggestions (shown_at)`,
+  // What the user was told about a finding in the Next row, for its explainer's writer.
+  `ALTER TABLE explore_explainers ADD COLUMN note TEXT`,
 ];
 
 export type NextKindStats = { kind: NextKind; shown: number; clicked: number };
@@ -195,16 +198,17 @@ export class ExploreStore {
     turnId: string | null;
     emoji: string;
     label: string;
+    note?: string | null;
     projectId: string | null;
   }): ExplainerRow {
     const at = this.now();
     const id = newId("exp");
     this.db
       .prepare(
-        `INSERT INTO explore_explainers (id, key, parent_id, thread_id, message_id, turn_id, emoji, label, project_id, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+        `INSERT INTO explore_explainers (id, key, parent_id, thread_id, message_id, turn_id, emoji, label, note, project_id, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       )
-      .run(id, input.key, input.parentId, input.threadId, input.messageId, input.turnId, input.emoji, input.label, input.projectId, at, at);
+      .run(id, input.key, input.parentId, input.threadId, input.messageId, input.turnId, input.emoji, input.label, input.note ?? null, input.projectId, at, at);
     return this.explainer(id)!;
   }
 

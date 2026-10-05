@@ -44,7 +44,17 @@ export interface ExploreRowsProps {
   className?: string;
 }
 
-export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, dense = false, onExplore, className }: ExploreRowsProps) {
+export interface ExplainerTarget {
+  threadId: string;
+  messageId: string;
+  turnId: string | null;
+  parentId?: string | null;
+  /** A finding was clicked to open or write its explainer (not to regenerate it). */
+  onExplore?(item: ExploreItem): void;
+}
+
+/** The explainers for one message's findings, kept current, and what clicking a finding does. */
+export function useExplainers({ threadId, messageId, turnId, parentId = null, onExplore }: ExplainerTarget) {
   const rpc = useExploreRpc();
   const navigate = useBbNavigate();
   useMinuteTick();
@@ -75,7 +85,8 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
 
   const replace = (next: ExplainerView) => setExplainers((current) => [...current.filter((each) => each.id !== next.id), next]);
 
-  async function act(item: ExploreItem, explainer: ExplainerView | undefined, regenerate: boolean) {
+  /** `note` is what the user was told about the finding, for the explainer's writer. */
+  async function act(item: ExploreItem, explainer: ExplainerView | undefined, regenerate: boolean, note?: string) {
     const key = labelKey(item.label);
     if (busy[key]) return;
     if (!regenerate) onExplore?.(item);
@@ -91,7 +102,7 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
       const next =
         regenerate && explainer
           ? (await rpc.call("exploreRegenerate", { explainerId: explainer.id })).explainer
-          : (await rpc.call("explore", { threadId, messageId, turnId, emoji: item.emoji, label: item.label, parentId })).explainer;
+          : (await rpc.call("explore", { threadId, messageId, turnId, emoji: item.emoji, label: item.label, parentId, ...(note ? { note } : {}) })).explainer;
       replace(next);
       openExplainer(navigate, next);
     } catch (error) {
@@ -100,6 +111,12 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
       setBusy(({ [key]: _, ...rest }) => rest);
     }
   }
+
+  return { byLabel, busy, errors, act };
+}
+
+export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, dense = false, onExplore, className }: ExploreRowsProps) {
+  const { byLabel, busy, errors, act } = useExplainers({ threadId, messageId, turnId, parentId, onExplore });
 
   if (!items.length) return null;
   return (

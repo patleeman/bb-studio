@@ -1,6 +1,7 @@
-// The Next row at the end of a reply (`::next{reply="…" explore="…" do="…"}`):
-// quick replies and actions as buttons that draft into the composer, and
-// things to explore as Explore's rows. Each message logs its suggestions once
+// The Next row at the end of a reply (`::next{reply="…" btw="…" do="…"}`):
+// quick replies and actions as buttons that draft into the composer, then
+// notes about what the agent noticed, each with Tell me more (an explainer)
+// and, for 🐛 notes, Fix this. Each message logs its suggestions once
 // as shown, and every click, so `bb pages explore stats` can tell which kinds
 // earn their place.
 import { useComposer, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
@@ -9,10 +10,11 @@ import { toast } from "sonner";
 import { cn, Icon } from "@bb-studio/kit/ui";
 import { useExploreRpc } from "../../client";
 import { PLUGIN_ID } from "../constants";
-import { NEXT_KINDS, nextItemCount, parseNextItems, type NextKind } from "../next";
-import type { ExploreItem } from "../shared";
+import { BUG_EMOJI, nextItemCount, parseNextItems, type BtwNote, type NextKind } from "../next";
+import { labelKey, type ExploreItem } from "../shared";
 import { appendDraft, mountedComposers, pickComposer } from "./composer";
-import { ExploreRows } from "./rows";
+import { rowState } from "./explore";
+import { useExplainers, type ExplainerTarget } from "./rows";
 
 const SETTINGS_HREF = `/settings/plugins/${PLUGIN_ID}`;
 
@@ -33,7 +35,15 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
   const rpc = useExploreRpc();
   const items = useMemo(() => parseNextItems(attributes), [attributes]);
   const { threadId, id: messageId } = message;
-  const shown = useMemo(() => NEXT_KINDS.flatMap((kind) => items[kind].map((item) => ({ kind, ...item }))), [items]);
+  const shown = useMemo(
+    () => [
+      ...items.reply.map((item) => ({ kind: "reply" as const, emoji: item.emoji, label: item.label })),
+      ...items.do.map((item) => ({ kind: "do" as const, emoji: item.emoji, label: item.label })),
+      ...items.btw.map((note) => ({ kind: "explore" as const, emoji: note.emoji, label: note.label })),
+      ...items.btw.filter(isBug).map((note) => ({ kind: "fix" as const, emoji: note.emoji, label: note.label })),
+    ],
+    [items],
+  );
   const shownKey = JSON.stringify(shown);
 
   useEffect(() => {
@@ -45,16 +55,17 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
   if (nextItemCount(items) === 0) return null;
 
   const logClick = (kind: NextKind, item: ExploreItem) =>
-    void rpc.call("nextClicked", { threadId, messageId, kind, ...item }).catch(() => undefined);
+    void rpc.call("nextClicked", { threadId, messageId, kind, emoji: item.emoji, label: item.label }).catch(() => undefined);
 
-  const draft = (kind: NextKind, item: ExploreItem) => {
+  /** Adds `text` to the thread's draft; `item` is what the click log counts. */
+  const draft = (kind: NextKind, item: ExploreItem, text: string) => {
     const composer = pickComposer(mountedComposers, threadId);
     if (!composer) {
       toast.error("Open this thread's composer to use it, in the main view or Float.");
       return;
     }
     logClick(kind, item);
-    composer.updateText((current) => appendDraft(current, `${item.emoji} ${item.label}`));
+    composer.updateText((current) => appendDraft(current, text));
     composer.focus();
   };
 
@@ -68,7 +79,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
             <button
               key={`${kind}:${item.label}`}
               type="button"
-              onClick={() => draft(kind, item)}
+              onClick={() => draft(kind, item, `${item.emoji} ${item.label}`)}
               title={kind === "do" ? "Draft this request to the agent" : "Draft this reply"}
               className={
                 kind === "do"
@@ -90,18 +101,75 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
           </a>
         </div>
       ) : null}
-      {items.explore.length ? (
-        <ExploreRows
-          items={items.explore}
+      {items.btw.length ? (
+        <BtwNotes
+          notes={items.btw}
           threadId={threadId}
           messageId={messageId}
           turnId={message.turnId}
-          title={null}
-          dense
           onExplore={(item) => logClick("explore", item)}
-          className={cn("my-0 rounded-none border-0", chips.length > 0 && "border-t")}
+          onFix={(note) => draft("fix", note, `${BUG_EMOJI} Fix this: ${note.text}`)}
+          className={chips.length > 0 ? "border-t border-border/60" : undefined}
         />
       ) : null}
     </section>
+  );
+}
+
+const isBug = (note: BtwNote) => note.emoji === BUG_EMOJI;
+
+/** Notes back to the user, each with Tell me more (its explainer's state) and, for 🐛 notes, Fix this. */
+function BtwNotes({
+  notes,
+  onFix,
+  className,
+  ...target
+}: ExplainerTarget & { notes: readonly BtwNote[]; onFix(note: BtwNote): void; className?: string }) {
+  const { byLabel, busy, errors, act } = useExplainers(target);
+  return (
+    <ul className={cn("divide-y divide-border/60", className)} aria-label="Things the agent noticed">
+      {notes.map((note) => {
+        const key = labelKey(note.label);
+        const explainer = byLabel.get(key);
+        const error = errors[key] ?? null;
+        const state = error ? "error" : rowState(explainer);
+        const progress = Math.round(explainer?.job?.progress ?? 0);
+        const more =
+          state === "running" ? `Writing · ${progress}%` : state === "ready" ? "Open explanation" : state === "error" ? "Retry" : "Tell me more";
+        return (
+          <li key={key} className="flex gap-2.5 px-3 py-2 text-sm">
+            <span aria-hidden className="w-5 shrink-0 text-center leading-5">
+              {note.emoji}
+            </span>
+            <p className="min-w-0 flex-1 leading-5 text-foreground">
+              {note.text}{" "}
+              <span className="whitespace-nowrap text-xs">
+                <button
+                  type="button"
+                  onClick={() => void act(note, explainer, false, note.text)}
+                  disabled={Boolean(busy[key])}
+                  title={error ?? explainer?.job?.detail ?? "Write a page explaining this"}
+                  className={cn(
+                    "font-medium hover:underline disabled:cursor-progress",
+                    state === "error" ? "text-destructive" : "text-muted-foreground hover:text-foreground",
+                    state === "running" && "animate-pulse motion-reduce:animate-none",
+                  )}
+                >
+                  {more}
+                </button>
+                {isBug(note) ? (
+                  <>
+                    <span aria-hidden className="text-muted-foreground/50"> · </span>
+                    <button type="button" onClick={() => onFix(note)} title="Draft a request to fix this" className="font-medium text-muted-foreground hover:text-foreground hover:underline">
+                      Fix this
+                    </button>
+                  </>
+                ) : null}
+              </span>
+            </p>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

@@ -66,6 +66,8 @@ export const rpcContract = defineRpcContract({
       emoji: z.string().max(16).optional(),
       label: z.string().trim().min(1).max(MAX_LABEL_LENGTH * 2),
       parentId: explainerId.nullable().optional(),
+      /** What the user was told about the finding, in the Next row's words. */
+      note: z.string().trim().max(400).optional(),
     }),
     output: z.object({ explainer: explainerSchema, started: z.boolean() }),
   },

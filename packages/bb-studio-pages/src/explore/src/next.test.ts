@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { NEXT_LIMITS, parseNextItems, preferredReplies } from "./next";
+import { MAX_NOTE_LENGTH, NEXT_LIMITS, parseNextItems, preferredReplies } from "./next";
 import { INSTRUCTIONS_LIMIT, nextInstructions } from "./prompt";
 import { ExploreStore, MIGRATIONS } from "./store";
 import { appendDraft, pickComposer } from "./ui/composer";
@@ -9,29 +9,42 @@ describe("the ::next directive", () => {
   it("parses each group, capped and deduped", () => {
     const items = parseNextItems({
       reply: "👍 Ship it|👍 ship  it|❓ Why",
-      explore: "🐛 Retry backoff disagrees",
+      btw: "🐛 I noticed retries don't wait. If the server is down, it gets hammered.",
       do: "📄 One|📄 Two|📄 Three|📄 Four",
       other: "🙃 Ignored",
     });
     expect(items.reply.map((item) => item.label)).toEqual(["Ship it", "Why"]);
-    expect(items.explore).toEqual([{ emoji: "🐛", label: "Retry backoff disagrees" }]);
+    expect(items.btw).toEqual([
+      {
+        emoji: "🐛",
+        label: "I noticed retries don't wait. If the server is down, it gets hammered.",
+        text: "I noticed retries don't wait. If the server is down, it gets hammered.",
+      },
+    ]);
     expect(items.do).toHaveLength(NEXT_LIMITS.do);
   });
 
-  it("reads why an explore item matters, after an em dash", () => {
-    const items = parseNextItems({ explore: "🐛 Backoff disagrees — your retry fix depends on it|🏗️ Job queue -- the worker you touched|🔗 No reason|🐛 backoff  disagrees — again" });
-    expect(items.explore).toEqual([
-      { emoji: "🐛", label: "Backoff disagrees", why: "your retry fix depends on it" },
-      { emoji: "🏗️", label: "Job queue", why: "the worker you touched" },
-      { emoji: "🔗", label: "No reason" },
+  it("keeps a note's whole text, and cuts its explainer's label", () => {
+    const sentence = `I noticed ${"something long ".repeat(12)}here.`;
+    const [note] = parseNextItems({ btw: `🔗 ${sentence}` }).btw;
+    expect(note.text).toBe(sentence.replace(/\s+/g, " "));
+    expect(note.label.length).toBeLessThanOrEqual(80);
+    expect(parseNextItems({ btw: `🔗 ${"word ".repeat(80)}` }).btw[0].text.length).toBeLessThanOrEqual(MAX_NOTE_LENGTH);
+    // Without an emoji it gets the default one and keeps all its words.
+    expect(parseNextItems({ btw: "I noticed a thing." }).btw[0]).toMatchObject({ emoji: "🔎", text: "I noticed a thing." });
+    expect(parseNextItems({ btw: "🐛 One|🐛 one|🏗️ Two|🔗 Three|🕐 Four" }).btw).toHaveLength(NEXT_LIMITS.btw);
+  });
+
+  it("shows older explore items as notes", () => {
+    const items = parseNextItems({ explore: "🐛 Backoff disagrees — your retry fix depends on it|🕐 Re-entrant lock-free queue" });
+    expect(items.btw).toEqual([
+      { emoji: "🐛", label: "Backoff disagrees", text: "Backoff disagrees — your retry fix depends on it" },
+      { emoji: "🕐", label: "Re-entrant lock-free queue", text: "Re-entrant lock-free queue" },
     ]);
-    // A dash inside a word or label isn't a separator.
-    expect(parseNextItems({ explore: "🕐 Re-entrant lock-free queue" }).explore[0]).toEqual({ emoji: "🕐", label: "Re-entrant lock-free queue" });
-    expect(parseNextItems({ explore: `🐛 Long — ${"word ".repeat(60)}` }).explore[0].why?.length).toBeLessThanOrEqual(160);
   });
 
   it("has nothing for missing attributes", () => {
-    expect(parseNextItems({})).toEqual({ reply: [], explore: [], do: [] });
+    expect(parseNextItems({})).toEqual({ reply: [], btw: [], do: [] });
   });
 });
 
@@ -43,17 +56,17 @@ describe("the Next instructions", () => {
     const attributes = Object.fromEntries([...example.matchAll(/(\w+)="([^"]*)"/g)].map((match) => [match[1], match[2]]));
     const items = parseNextItems(attributes);
     expect(items.reply).toHaveLength(2);
-    expect(items.explore).toHaveLength(1);
-    expect(items.explore[0].why).toBeTruthy();
+    expect(items.btw).toHaveLength(1);
+    expect(items.btw[0].text).toMatch(/^I noticed /);
     expect(items.do).toHaveLength(1);
     expect(text).toContain("Prefer these when they fit: 👍 Agree | ❓ Clarify");
     expect(text).toContain("Don't also write ::reactions or ::explore lines");
   });
 
-  it("leave explore out when it's off", () => {
+  it("leave notes out when Explore is off", () => {
     const text = nextInstructions({ explore: false, replies: [] });
-    expect(text).not.toContain("explore=");
-    expect(text).not.toContain("- explore:");
+    expect(text).not.toContain("btw=");
+    expect(text).not.toContain("- btw:");
     expect(text).not.toContain("Prefer these");
   });
 
@@ -92,6 +105,7 @@ describe("the click log", () => {
       { kind: "reply", shown: 1, clicked: 0 },
       { kind: "explore", shown: 1, clicked: 0 },
       { kind: "do", shown: 2, clicked: 2 },
+      { kind: "fix", shown: 0, clicked: 0 },
     ]);
     expect(stats.top).toEqual([{ kind: "do", emoji: "📄", label: "Write it up", shown: 2, clicked: 2 }]);
   });

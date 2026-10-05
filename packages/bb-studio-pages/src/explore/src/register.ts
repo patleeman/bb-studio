@@ -76,8 +76,8 @@ export function registerExplore(bb: BbPluginApi, options: {
   // RPC ------------------------------------------------------------------------
 
   const rpc = {
-    explore: ({ threadId, messageId, turnId, emoji, label, parentId }: { threadId: string; messageId: string; turnId?: string | null; emoji?: string; label: string; parentId?: string | null }) => {
-      const result = service.explore({ threadId, messageId, turnId, emoji, label, parentId });
+    explore: ({ threadId, messageId, turnId, emoji, label, parentId, note }: { threadId: string; messageId: string; turnId?: string | null; emoji?: string; label: string; parentId?: string | null; note?: string }) => {
+      const result = service.explore({ threadId, messageId, turnId, emoji, label, parentId, note });
       return { explainer: service.view(result.explainer), started: result.started };
     },
     exploreRegenerate: ({ explainerId }: { explainerId: string }) => ({ explainer: service.view(service.regenerate(explainerId)) }),
