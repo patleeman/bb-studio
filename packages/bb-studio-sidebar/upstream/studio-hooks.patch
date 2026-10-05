@@ -625,13 +625,13 @@ index aa949ec..1fd7730 100644
 +export const sidebarHideEmptyProjectsAtom =
 +  createSyncedPreferenceAtom("hideEmptyProjects");
 diff --git a/source/app/rows/ThreadActionsMenu.tsx b/source/app/rows/ThreadActionsMenu.tsx
-index c9f9497..e9611fa 100644
+index c9f9497..863a2ef 100644
 --- a/source/app/rows/ThreadActionsMenu.tsx
 +++ b/source/app/rows/ThreadActionsMenu.tsx
 @@ -51,0 +52,4 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
 +import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
 +import { HideThreadItem } from "../studio/HiddenThreads.js";
-+import { SpaceLeadItem } from "../studio/SpaceLead.js";
++import { SpaceLeadItem, useIsSpaceLead } from "../studio/SpaceLead.js";
 +import { MoveToSpaceItem } from "../studio/MoveToSpace.js";
 @@ -257,0 +262 @@ function ThreadActionsMenuItems({
 +  const floatAvailable = useFloatAvailable();
@@ -644,28 +644,44 @@ index c9f9497..e9611fa 100644
 +            <FloatItem threadId={thread.id} surface={surface} />
 +          ) : null}
 +          {id === "split" && (onOpenInSplit || floatAvailable) ? separator : null}
+@@ -439,0 +451,2 @@ export function ThreadRowAction({
++  const isLead = useIsSpaceLead(thread);
++  if (id === "archive" && isLead && thread.archivedAt === null) return null;
+@@ -590 +603 @@ export function visibleThreadRowActions(
+-  available: { split: boolean; move: boolean },
++  available: { split: boolean; move: boolean; archive?: boolean },
+@@ -594 +607,3 @@ export function visibleThreadRowActions(
+-      (id !== "split" || available.split) && (id !== "move" || available.move),
++      (id !== "split" || available.split) &&
++      (id !== "move" || available.move) &&
++      (id !== "archive" || available.archive !== false),
 diff --git a/source/app/rows/ThreadRow.tsx b/source/app/rows/ThreadRow.tsx
-index 13d58a8..3a5f26d 100644
+index 13d58a8..536da90 100644
 --- a/source/app/rows/ThreadRow.tsx
 +++ b/source/app/rows/ThreadRow.tsx
-@@ -97,0 +98,2 @@ import {
+@@ -97,0 +98,3 @@ import {
 +import { StudioThreadBadge } from "../studio/StudioThreadBadge.js";
 +import { useSpaceThreadRow } from "../studio/SpaceThreadRow.js";
-@@ -339,0 +342 @@ function ThreadRowComponent({
++import { useIsSpaceLead } from "../studio/SpaceLead.js";
+@@ -339,0 +343 @@ function ThreadRowComponent({
 +  const spaceRow = useSpaceThreadRow(thread);
-@@ -474,0 +478 @@ function ThreadRowComponent({
+@@ -384,0 +389 @@ function ThreadRowComponent({
++  const isSpaceLead = useIsSpaceLead(thread);
+@@ -389,0 +395 @@ function ThreadRowComponent({
++      archive: !isSpaceLead || thread.archivedAt !== null,
+@@ -474,0 +481 @@ function ThreadRowComponent({
 +    spaceRow?.className,
-@@ -476 +480 @@ function ThreadRowComponent({
+@@ -476 +483 @@ function ThreadRowComponent({
 -  const rowStyle = getThreadRowStyle(options.depth);
 +  const rowStyle = { ...getThreadRowStyle(options.depth), ...spaceRow?.style };
-@@ -569,0 +574 @@ function ThreadRowComponent({
+@@ -569,0 +577 @@ function ThreadRowComponent({
 +              {spaceRow?.dot}
-@@ -595,0 +601 @@ function ThreadRowComponent({
+@@ -595,0 +604 @@ function ThreadRowComponent({
 +              <StudioThreadBadge threadId={thread.id} needsYou={!spaceRow && thread.hasPendingInteraction} />
-@@ -714,0 +721,2 @@ function ThreadRowComponent({
+@@ -714,0 +724,2 @@ function ThreadRowComponent({
 +                ) : spaceRow ? (
 +                  spaceRow.time
-@@ -761,0 +770 @@ function ThreadRowComponent({
+@@ -761,0 +773 @@ function ThreadRowComponent({
 +      {spaceRow?.line}
 diff --git a/source/shared/preferences.ts b/source/shared/preferences.ts
 index 98a5200..23d4bb5 100644

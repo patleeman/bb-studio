@@ -426,7 +426,7 @@ index d144f54..af836cb 100644
 -import { makeSidebarThread } from "./fixtures.js";
 +import { makeSidebarThread } from "../testing/fixtures.js";
 diff --git a/source/app/rows/ThreadRow.test.tsx b/source/app/rows/ThreadRow.test.tsx
-index 654f0a6..bb2700b 100644
+index 654f0a6..3dbc755 100644
 --- a/source/app/rows/ThreadRow.test.tsx
 +++ b/source/app/rows/ThreadRow.test.tsx
 @@ -21 +21 @@ import { NO_COLLAPSED_CHILD_ACTIVITY } from "../model/thread-activity.js";
@@ -435,15 +435,19 @@ index 654f0a6..bb2700b 100644
 @@ -301 +301 @@ describe("ThreadRow", () => {
 -      expect(slot.inspection.sdkCalls).toEqual([
 +      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
-@@ -465,0 +466 @@ describe("ThreadRow", () => {
+@@ -413,0 +414,3 @@ describe("ThreadRow", () => {
++    expect(
++      visibleThreadRowActions(["split", "move", "archive"], { split: true, move: true, archive: false }),
++    ).toEqual(["split", "move"]);
+@@ -465,0 +469 @@ describe("ThreadRow", () => {
 +      "Hide",
-@@ -501 +502 @@ describe("ThreadRow", () => {
+@@ -501 +505 @@ describe("ThreadRow", () => {
 -      expect(slot.inspection.sdkCalls).toEqual([
 +      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
-@@ -543 +544 @@ describe("ThreadRow", () => {
+@@ -543 +547 @@ describe("ThreadRow", () => {
 -      expect(slot.inspection.sdkCalls).toEqual([
 +      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
-@@ -571 +572 @@ describe("ThreadRow", () => {
+@@ -571 +575 @@ describe("ThreadRow", () => {
 -      expect(slot.inspection.sdkCalls).toEqual([
 +      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
 diff --git a/source/server.test.ts b/source/server.test.ts
