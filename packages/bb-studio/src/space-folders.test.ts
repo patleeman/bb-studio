@@ -45,4 +45,13 @@ describe("space folders", () => {
     expect(f.paths.every((path) => path.startsWith(`/fixture/Spaces/work-${f.space.id}/general`))).toBe(true);
     expect(folderSlug("../../escape / ü")).toBe("escape-u");
   });
+
+  it("adds a picked folder as a project once, and reuses one already there", async () => {
+    const f = setup();
+    const [a, b] = await Promise.all([f.folders.projectAt("/code/site/"), f.folders.projectAt("/code/site")]);
+    expect(a).toEqual({ id: "p0", name: "site", path: "/code/site" });
+    expect(b.id).toBe("p0");
+    expect((await f.folders.projectAt("/code/site")).id).toBe("p0");
+    expect(f.projects).toHaveLength(1);
+  });
 });

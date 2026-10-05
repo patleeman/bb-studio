@@ -15,7 +15,7 @@ import {
 } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@bb-studio/kit/ui";
-import { useRpc } from "@get-bb/plugin-sdk/app";
+import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
@@ -25,6 +25,13 @@ type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
 const PROJECT_REF = "bb-project";
 const THREAD_REF = "bb-thread";
+/** Default project options that aren't project ids. */
+const PICK_FOLDER = "pick-folder";
+const PICKED_FOLDER = "picked-folder";
+
+function folderName(path: string) {
+  return path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || path;
+}
 
 function threadIcon(thread: SpaceThreadView) {
   return thread.status === "active" || thread.status === "starting" ? "Loading" : "MessageSquare";
@@ -74,13 +81,25 @@ export function SpaceDialog({
   const [description, setDescription] = useState(space?.description ?? "");
   // A new space gets a folder of its own unless the user picks a project, which then moves into it.
   const [project, setProject] = useState(space?.defaultProjectId ?? "");
+  // A folder that isn't a project yet; the server adds it as one on save. `typing` is the
+  // fallback when BB can't open a folder picker here, as in a browser on another machine.
+  const [folder, setFolder] = useState("");
+  const [typing, setTyping] = useState(false);
+  const sdk = useSdk();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
     setBusy(true);
     setError(null);
-    const fields = { name: name.trim(), icon: icon.trim() || null, description: description.trim(), defaultProjectId: project || null };
+    const picked = project === PICKED_FOLDER;
+    const fields = {
+      name: name.trim(),
+      icon: icon.trim() || null,
+      description: description.trim(),
+      defaultProjectId: picked ? null : project || null,
+      ...(picked ? { defaultProjectPath: folder.trim() } : {}),
+    };
     try {
       const result = space ? await rpc.call("updateSpace", { id: space.id, ...fields }) : await rpc.call("createSpace", fields);
       onSaved(result.space);
@@ -88,6 +107,22 @@ export function SpaceDialog({
       setError(errorMessage(cause));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const pickFolder = async () => {
+    setError(null);
+    try {
+      const hostId = (await sdk.system.config()).primaryHostId;
+      if (!hostId) throw new Error("No primary host");
+      const { path } = await sdk.hosts.pickFolder({ hostId, clientHostId: hostId });
+      if (!path) return;
+      setFolder(path);
+      setTyping(false);
+      setProject(PICKED_FOLDER);
+    } catch {
+      setTyping(true);
+      setProject(PICKED_FOLDER);
     }
   };
 
@@ -130,7 +165,7 @@ export function SpaceDialog({
             <span className="text-xs font-medium text-muted-foreground">Default project</span>
             <select
               value={project}
-              onChange={(event) => setProject(event.target.value)}
+              onChange={(event) => (event.target.value === PICK_FOLDER ? void pickFolder() : setProject(event.target.value))}
               className="h-9 rounded-md border border-border bg-background px-2 text-sm"
             >
               {space?.defaultProjectId ? null : <option value="">{space ? "None" : "A new folder in ~/Spaces"}</option>}
@@ -139,8 +174,17 @@ export function SpaceDialog({
                   {each.name}
                 </option>
               ))}
+              {folder && !typing ? <option value={PICKED_FOLDER}>{folderName(folder)}</option> : null}
+              {typing ? <option value={PICKED_FOLDER}>A folder by path</option> : null}
+              <option value={PICK_FOLDER}>Choose a folder…</option>
             </select>
-            <span className="text-xs text-muted-foreground">New items and threads go here. A project you pick moves into the space with its items and threads.</span>
+            {typing && project === PICKED_FOLDER ? (
+              <Input value={folder} placeholder="/Users/you/code/site" onChange={(event) => setFolder(event.target.value)} />
+            ) : null}
+            <span className="text-xs text-muted-foreground">
+              {project === PICKED_FOLDER && folder && !typing ? `${folder} becomes a project in this space. ` : null}
+              New items and threads go here. A project you pick moves into the space with its items and threads.
+            </span>
           </label>
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
           <DialogFooter>
@@ -152,7 +196,7 @@ export function SpaceDialog({
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim() || busy}>
+            <Button type="submit" disabled={!name.trim() || busy || (project === PICKED_FOLDER && !folder.trim())}>
               {space ? "Save" : "Create space"}
             </Button>
           </DialogFooter>

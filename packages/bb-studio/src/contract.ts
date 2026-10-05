@@ -70,6 +70,8 @@ const spaceFields = z.object({
   icon: z.string().max(16).nullable().optional(),
   description: z.string().max(500).optional(),
   defaultProjectId: z.string().min(1).max(200).nullable().optional(),
+  /** A folder on the primary host to use as the default project instead; it becomes a BB project if it isn't one. */
+  defaultProjectPath: z.string().trim().min(1).max(4096).optional(),
 });
 /** `bb-project:<id>` for a whole project, or `bb-thread:<id>` for a thread. */
 const spaceMember = itemRef;

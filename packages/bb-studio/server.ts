@@ -96,7 +96,7 @@ export default async function plugin(bb: BbPluginApi) {
     projects: async () => (await bb.sdk.projects.list({ includePersonal: true })).map((project) => ({ id: project.id, name: project.name, path: (project.sources.find((source) => source.isDefault) ?? project.sources[0])?.path ?? null })),
     createProject: async (name, path) => {
       const hostId = (await bb.sdk.system.config()).primaryHostId;
-      if (!hostId) throw new Error("Connect the primary host before making a space.");
+      if (!hostId) throw new Error("Connect the primary host before adding a project.");
       const project = await bb.sdk.projects.create({ name, source: { type: "local_path", hostId, path } });
       return { id: project.id, name: project.name, path };
     },
@@ -464,7 +464,8 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     spaces: () => ({ spaces: spaces.list() }),
-    createSpace: async (input) => {
+    createSpace: async ({ defaultProjectPath, ...input }) => {
+      if (defaultProjectPath) input.defaultProjectId = (await folders.projectAt(defaultProjectPath)).id;
       const made = spaces.create(input);
       try {
         await folders.ensureCatchAll(made.id);
@@ -476,7 +477,8 @@ export default async function plugin(bb: BbPluginApi) {
       tagsChanged();
       return { space: spaces.get(made.id) ?? made };
     },
-    updateSpace: ({ id, ...input }) => {
+    updateSpace: async ({ id, defaultProjectPath, ...input }) => {
+      if (defaultProjectPath) input.defaultProjectId = (await folders.projectAt(defaultProjectPath)).id;
       const space = spaces.update(id, input);
       tagsChanged();
       return { space };
