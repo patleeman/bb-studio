@@ -30,6 +30,23 @@ const savePick = (projectId: string, ids: string[]) => {
   if (ids.length) sessionStorage.setItem(pendingKey(projectId), JSON.stringify(ids));
   else sessionStorage.removeItem(pendingKey(projectId));
 };
+// A New thread opened from a Space in Studio Sidebar or Navigation names the
+// Space here; the picker takes it once, for its project (or any, if null).
+const HANDOFF_KEY = "studio:new-thread-space";
+const HANDOFF_TTL_MS = 30_000;
+const takeHandoff = (projectId: string): string | null => {
+  try {
+    const raw = sessionStorage.getItem(HANDOFF_KEY);
+    if (!raw) return null;
+    const handoff: unknown = JSON.parse(raw);
+    if (!handoff || typeof handoff !== "object") return null;
+    const { spaceId, projectId: forProject, at } = handoff as Record<string, unknown>;
+    const stale = typeof at !== "number" || Date.now() - at > HANDOFF_TTL_MS || typeof spaceId !== "string";
+    if (!stale && typeof forProject === "string" && forProject !== projectId) return null;
+    sessionStorage.removeItem(HANDOFF_KEY);
+    return stale ? null : spaceId as string;
+  } catch { return null; }
+};
 const TRIGGER = "inline-flex h-6 min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0";
 
 /** A space's emoji, or the spaces icon: a colour dot here reads as a status. */
@@ -112,9 +129,24 @@ export function ComposerSpaces() {
     const previous = pickedFor.current;
     pickedFor.current = projectId;
     if (previous && previous !== projectId) void rpc.call("pendingThreadSpaces", { projectId: previous, ids: [] }).catch(() => {});
-    const saved = savedPick(projectId);
+    const handed = takeHandoff(projectId);
+    const saved = handed ? [handed] : savedPick(projectId);
+    if (handed) savePick(projectId, saved);
     setPicked(saved);
     void rpc.call("pendingThreadSpaces", { projectId, ids: saved }).catch(() => {});
+  }, [rpc, projectId]);
+  useEffect(() => {
+    if (!projectId) return;
+    // New thread from a Space while this composer is already open.
+    const onHandoff = () => {
+      const handed = takeHandoff(projectId);
+      if (!handed) return;
+      savePick(projectId, [handed]);
+      setPicked([handed]);
+      void rpc.call("pendingThreadSpaces", { projectId, ids: [handed] }).catch(() => {});
+    };
+    window.addEventListener(HANDOFF_KEY, onHandoff);
+    return () => window.removeEventListener(HANDOFF_KEY, onHandoff);
   }, [rpc, projectId]);
   useEffect(() => {
     if (!projectId) return;

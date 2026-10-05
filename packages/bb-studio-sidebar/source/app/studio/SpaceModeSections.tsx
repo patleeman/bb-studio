@@ -46,6 +46,7 @@ import { buildSpaceThreadGroups, createSpaceResolver, defaultSpaceId, spaceSecti
 import { SpaceStudioList, SpaceSubheading } from "./SpaceStudioList.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
 import { SpaceRowsContext } from "./SpaceThreadRow.js";
+import { handOffNewThreadSpace } from "./new-thread-space.js";
 import { threadLineIds, threadLineStatusKey, useThreadLines } from "./useThreadLines.js";
 import {
   ALL_SPACES,
@@ -60,6 +61,7 @@ import type { SpaceItems } from "./studioSpaces.js";
 
 /** Read by Studio Navigation's New thread row. */
 const SPACE_NEW_THREAD_PROJECT_KEY = "bb-studio:space-new-thread-project";
+const SPACE_NEW_THREAD_SPACE_KEY = "bb-studio:space-new-thread-space";
 
 export interface SpaceModeSectionsProps
   extends BuiltInSectionRenderState, GroupedModePinnedProps {
@@ -170,14 +172,23 @@ export function SpaceModeSections({
   // BB's New thread starts in the Space shown, as the Space's + does (Studio
   // Navigation reads this). All, or no Space, leaves New thread to bb.
   const newThreadProjectId = currentSpace?.defaultProjectId ?? null;
+  const newThreadSpaceId = newThreadProjectId ? currentSpace?.id ?? null : null;
   useEffect(() => {
     try {
-      if (newThreadProjectId) localStorage.setItem(SPACE_NEW_THREAD_PROJECT_KEY, newThreadProjectId);
-      else localStorage.removeItem(SPACE_NEW_THREAD_PROJECT_KEY);
+      if (newThreadProjectId && newThreadSpaceId) {
+        localStorage.setItem(SPACE_NEW_THREAD_PROJECT_KEY, newThreadProjectId);
+        localStorage.setItem(SPACE_NEW_THREAD_SPACE_KEY, newThreadSpaceId);
+      } else {
+        localStorage.removeItem(SPACE_NEW_THREAD_PROJECT_KEY);
+        localStorage.removeItem(SPACE_NEW_THREAD_SPACE_KEY);
+      }
     } catch { /* storage unavailable */ }
-  }, [newThreadProjectId]);
+  }, [newThreadProjectId, newThreadSpaceId]);
   useEffect(() => () => {
-    try { localStorage.removeItem(SPACE_NEW_THREAD_PROJECT_KEY); } catch { /* storage unavailable */ }
+    try {
+      localStorage.removeItem(SPACE_NEW_THREAD_PROJECT_KEY);
+      localStorage.removeItem(SPACE_NEW_THREAD_SPACE_KEY);
+    } catch { /* storage unavailable */ }
   }, []);
   useEffect(() => {
     if (!selectedThreadId || revealedFor.current === selectedThreadId) return;
@@ -310,7 +321,11 @@ export function SpaceModeSections({
               }
               const group = shownBySection.get(sectionId);
               if (!group) return null;
-              const newThread = () => onCreateThreadInProject(group.space.defaultProjectId);
+              // The composer's Space picker starts on this Space.
+              const newThread = () => {
+                handOffNewThreadSpace(group.space.id, group.space.defaultProjectId);
+                onCreateThreadInProject(group.space.defaultProjectId);
+              };
               const heartbeat = heartbeats[group.space.id] ?? null;
               return (
                 <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>

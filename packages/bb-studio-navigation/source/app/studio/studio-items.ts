@@ -49,6 +49,10 @@ export function useStudioNavigationItems(
 
 /** Studio Sidebar keeps the selected Space's default project here (By space, one Space shown). */
 export const SPACE_NEW_THREAD_PROJECT_KEY = "bb-studio:space-new-thread-project";
+/** And that Space's id, for the composer's Space picker. */
+export const SPACE_NEW_THREAD_SPACE_KEY = "bb-studio:space-new-thread-space";
+/** Read once by Studio's composer Space picker; see Studio Sidebar's new-thread-space.ts. */
+const NEW_THREAD_SPACE_HANDOFF = "studio:new-thread-space";
 
 /**
  * New thread starts in the Space the sidebar shows, as the Space's own + does.
@@ -59,8 +63,17 @@ export function useSpaceNewThread(): (item: ExperimentalSidebarNavigationItem, o
   return (item, openInSplit) => {
     if (item.action.kind !== "new-thread" || openInSplit) return false;
     let projectId: string | null = null;
-    try { projectId = localStorage.getItem(SPACE_NEW_THREAD_PROJECT_KEY); } catch { /* storage unavailable */ }
+    let spaceId: string | null = null;
+    try {
+      projectId = localStorage.getItem(SPACE_NEW_THREAD_PROJECT_KEY);
+      spaceId = localStorage.getItem(SPACE_NEW_THREAD_SPACE_KEY);
+    } catch { /* storage unavailable */ }
     if (!projectId) return false;
+    if (spaceId) {
+      const detail = { spaceId, projectId, at: Date.now() };
+      try { sessionStorage.setItem(NEW_THREAD_SPACE_HANDOFF, JSON.stringify(detail)); } catch { /* storage unavailable */ }
+      window.dispatchEvent(new CustomEvent(NEW_THREAD_SPACE_HANDOFF, { detail }));
+    }
     threads.openNewThread({ projectId, focusPrompt: true });
     return true;
   };
