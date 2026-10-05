@@ -158,7 +158,6 @@ placement assertions. All initial moves use the displayed Move menu.
 | --- | --- | --- | --- |
 | Studio's legacy collection address | Search input/query, seeded release notes and actual `/collection` target | [Main](../packages/bb-studio/assets/studio-collection-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-collection-companion-transfers-native.png) |
 | Studio Activity | Original period selector, selected 30 days and the nonexecuting staged thread | [Main](../packages/bb-studio/assets/studio-activity-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-activity-companion-transfers-native.png) |
-| Studio space without Pages | Original space-options control and synthetic fallback space | [Main](../packages/bb-studio/assets/studio-space-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-space-companion-transfers-native.png) |
 | Plain chat draft | Original prompt/file input, unsent wording and one selected attachment control | [Main](../packages/bb-studio-chat/assets/chat-plain-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/chat-plain-companion-transfers-native.png) |
 | Saved quote draft | Original prompt/file input, source quote, location, note, appended wording and one attachment control | [Main](../packages/bb-studio-chat/assets/chat-quote-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/chat-quote-companion-transfers-native.png) |
 
@@ -181,7 +180,7 @@ Use the prior command with the following capture IDs (and their `stable`
 equivalents):
 
 ```sh
-BB_CAPTURE_ONLY=suite-native-studio-collection,suite-native-studio-activity,suite-native-studio-space,suite-native-chat-plain,suite-native-chat-quote
+BB_CAPTURE_ONLY=suite-native-studio-collection,suite-native-studio-activity,suite-native-chat-plain,suite-native-chat-quote
 ```
 
 The integrated root checkpoint `19dbbf2` passes 1,641 JavaScript tests across

@@ -29,18 +29,20 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       fixture.active -= 1;
       if (fixture.active > 0 || !fixture.preferences) return;
       for (const id of Object.values(fixture.threads)) await bbCli(["thread", "delete", id, "--yes"]).catch(() => {});
-      for (const key of ["organizationMode", "hiddenThreads"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: fixture.preferences[key] });
+      for (const key of ["organizationMode", "hiddenThreads", "currentSpace"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: fixture.preferences[key] });
       Object.assign(fixture, { spaces: {}, threads: {}, preferences: null });
     };
     const showBySpace = async (client) => {
       await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: "project" });
       await pluginRpc("thread-list-plus", "setPreference", { key: "hiddenThreads", value: [] });
+      // By space shows one Space at a time: Launch, with the switcher's dots below.
+      await pluginRpc("thread-list-plus", "setPreference", { key: "currentSpace", value: fixture.spaces.launch.id });
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
       // Studio's own Spaces section shows until the list is organized by Space.
       await client.waitForSelector('[data-studio-sidebar-anchor="studio:spaces"]');
       await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: "space" });
       await client.waitForSelector(`[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]`, 20000);
-      for (const title of ["Launch", "Research", "Launch plan", "Paper notes", "Atlas weekly sync", "Loose idea"]) await client.waitForText(title);
+      for (const title of ["Launch", "Launch plan", "Launch checklist", "Release digest"]) await client.waitForText(title);
       const layout = JSON.parse(await client.evaluate(`JSON.stringify((() => {
         const sidebar = document.querySelector('[data-sidebar="sidebar"]');
         const section = (id) => sidebar.querySelector('[data-sidebar-section-id="' + id + '"]');
@@ -49,25 +51,28 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         return {
           labels,
           launch: ids(section("space:${fixture.spaces.launch.id}")),
-          research: ids(section("space:${fixture.spaces.research.id}")),
+          research: Boolean(section("space:${fixture.spaces.research.id}")),
+          dots: Array.from(sidebar.querySelectorAll('[data-sidebar-space-switcher] button[data-space-id]'), (el) => el.getAttribute('data-space-id')),
+          current: sidebar.querySelector('[data-sidebar-space-switcher] [aria-current="true"]')?.getAttribute('data-space-id') ?? null,
           studioSpaces: Boolean(document.querySelector('[data-studio-sidebar-anchor="studio:spaces"]')),
           emoji: section("space:${fixture.spaces.launch.id}")?.querySelector('[data-sidebar-space-mark]')?.textContent ?? null,
         };
       })())`));
-      const order = ["Launch", "Research"].map((label) => layout.labels.indexOf(label));
-      if (order.some((index) => index < 0) || order.some((index, i) => i > 0 && index < order[i - 1])) throw new Error(`By space sections are out of order: ${JSON.stringify(layout)}`);
+      if (!layout.labels.includes("Launch") || layout.labels.includes("Research") || layout.research) throw new Error(`By space should show only Launch: ${JSON.stringify(layout)}`);
       if (!["plan", "checklist", "digest"].every((key) => layout.launch.includes(fixture.threads[key]))) throw new Error(`Launch shows the wrong threads: ${JSON.stringify(layout)}`);
-      if (!["notes", "atlas"].every((key) => layout.research.includes(fixture.threads[key]))) throw new Error(`Research shows the wrong threads: ${JSON.stringify(layout)}`);
+      if (["notes", "atlas", "loose"].some((key) => layout.launch.includes(fixture.threads[key]))) throw new Error(`Launch shows another Space's threads: ${JSON.stringify(layout)}`);
+      const dots = [fixture.spaces.launch.id, fixture.spaces.research.id].map((id) => layout.dots.indexOf(id));
+      if (dots.some((index) => index < 0) || dots[1] < dots[0] || layout.current !== fixture.spaces.launch.id) throw new Error(`The Space switcher is wrong: ${JSON.stringify(layout)}`);
       if (layout.studioSpaces) throw new Error("Studio's Spaces section still shows in By space");
       if (layout.emoji !== "🚀") throw new Error(`Launch lacks its emoji: ${JSON.stringify(layout)}`);
     };
-    // The thread list from its first Space down through Research.
+    // The thread list from Launch's heading down to the Space switcher.
     const clip = async (client) => client.evaluate(`(() => {
       const sidebar = document.querySelector('[data-sidebar="sidebar"]').getBoundingClientRect();
       const first = document.querySelector('[data-sidebar-section-id^="space:"]').getBoundingClientRect();
-      const research = document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.research.id}"]').getBoundingClientRect();
+      const switcher = document.querySelector('[data-sidebar-space-switcher]').getBoundingClientRect();
       const top = Math.max(sidebar.y, first.y - 8);
-      return { x: sidebar.x, y: top, width: sidebar.width, height: Math.min(research.bottom + 8, sidebar.bottom) - top };
+      return { x: sidebar.x, y: top, width: sidebar.width, height: Math.min(switcher.bottom + 4, sidebar.bottom) - top };
     })()`);
     return [
       {
@@ -79,7 +84,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           try {
             await seed();
             await showBySpace(client);
-            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.research.id}"]')?.scrollIntoView({ block: 'end' })`);
+            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]')?.scrollIntoView({ block: 'start' })`);
             await sleep(350);
           } catch (error) { await cleanup(); throw error; }
           return cleanup;
@@ -117,7 +122,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
             await client.clickElementWithTextAndPointer(show, "Show");
             await waitFor(shown, "Release digest didn't come back after Show");
             await waitFor(async () => (await rowText())?.includes("Showing 1 hidden"), "Launch lacks the \"Showing 1 hidden\" row");
-            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.research.id}"]')?.scrollIntoView({ block: 'end' })`);
+            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]')?.scrollIntoView({ block: 'start' })`);
             await sleep(350);
           } catch (error) { await cleanup(); throw error; }
           return cleanup;

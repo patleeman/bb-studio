@@ -229,7 +229,6 @@ async function registerPages(bb: BbPluginApi) {
     tablePatchRows: (input) => embeds.table("patchRows", input),
     tableCreate: ({ pageId, ...input }) => embeds.createTable({ ...input, projectId: requireMeta(pageId).project_id }),
     recordingView: async ({ id }) => ({ recording: await embeds.recording(id) }),
-    spaceOfPage: async ({ id }) => ({ space: await embeds.spaceOfPage(id) }),
     markdown: ({ id }) => {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc) };

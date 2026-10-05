@@ -1,16 +1,17 @@
-// A space's dialogs, opened from anywhere by a window event: the Space's
-// options menu, and Pages for a space's brief page, since a plugin can't show
-// another's dialogs. After a change, a second event says so.
-import { openAppPath, useProjects } from "@bb-studio/kit/app";
+// A space's dialogs, opened from anywhere by a window event, such as the
+// Space's ⋯ menu in Studio Sidebar, since a plugin can't show another's
+// dialogs. After a change, a second event says so.
+import { useProjects } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
 import { SPACE_CHANGED_EVENT, SPACE_DIALOG_EVENT } from "../ids";
+import { SpaceHeartbeatDialog } from "./SpaceHeartbeat";
 import { AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceProjectsDialog } from "./Spaces";
 
-const DIALOGS = ["edit", "delete", "threads", "projects"] as const;
+const DIALOGS = ["edit", "delete", "threads", "projects", "heartbeat"] as const;
 type Dialog = (typeof DIALOGS)[number];
 
 export function ManageSpace() {
@@ -65,10 +66,7 @@ export function ManageSpace() {
           onConfirm={() => {
             close();
             rpc.call("deleteSpace", { id: space.id }).then(
-              () => {
-                toast.success(`Deleted the space ${space.name}`);
-                openAppPath("/plugins/studio/studio");
-              },
+              () => toast.success(`Deleted the space ${space.name}`),
               (cause: unknown) => toast.error(`Couldn't delete the space: ${errorMessage(cause)}`),
             );
           }}
@@ -78,5 +76,7 @@ export function ManageSpace() {
       return <AddThreadsDialog rpc={rpc} space={space} projects={projects} onClose={close} onChanged={changed} />;
     case "projects":
       return <SpaceProjectsDialog rpc={rpc} space={space} projects={projects} onClose={close} onChanged={changed} />;
+    case "heartbeat":
+      return <SpaceHeartbeatDialog space={space} onClose={close} />;
   }
 }

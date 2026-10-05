@@ -1,5 +1,5 @@
 diff --git a/source/app.test.tsx b/source/app.test.tsx
-index 4d15df5..085c8cd 100644
+index 4d15df5..c95c67b 100644
 --- a/source/app.test.tsx
 +++ b/source/app.test.tsx
 @@ -4,0 +5 @@ import { afterEach, describe, expect, it, vi } from "vitest";
@@ -14,7 +14,7 @@ index 4d15df5..085c8cd 100644
 +    sdk: { plugins: { callRpc: () => sdkResult({})() } },
 @@ -145,0 +150 @@ afterEach(() => {
 +  getDefaultStore().set(studioSpacesAtom, { status: "loading" });
-@@ -150,0 +156,110 @@ describe("thread-list plugin", () => {
+@@ -150,0 +156,143 @@ describe("thread-list plugin", () => {
 +  it("hides a thread from its row's menu, with Show and Unhide", async () => {
 +    const { rpcCalls } = renderList({ organizationMode: "project" });
 +    await screen.findByText("Later thread");
@@ -44,52 +44,85 @@ index 4d15df5..085c8cd 100644
 +    expect(document.querySelector("[data-sidebar-hidden-threads=pinned]")).toBeNull();
 +  });
 +
-+  it("groups threads and Studio items by Space, leaving the lead to its heading", async () => {
++  it("shows one Space at a time, with its lead on top and dots to switch", async () => {
 +    localStorage.removeItem("bb-studio:sidebar-organization");
 +    const threads = [
 +      ...THREADS,
 +      makeSidebarThread({ id: "thr_lead", projectId: "proj_web", title: "Alpha lead", createdAt: 1, updatedAt: 1, latestAttentionAt: 1, isUnread: false }),
++      makeSidebarThread({ id: "thr_ask", projectId: "proj_web", title: "Asks you", createdAt: 0, updatedAt: 0, latestAttentionAt: 0, isUnread: false, hasPendingInteraction: true }),
 +    ];
++    const studioCalls: { method: string; input: unknown }[] = [];
 +    const studio: Record<string, (input: unknown) => unknown> = {
 +      spaces: () => ({ spaces: [
-+        { id: "sp_alpha", name: "Alpha", color: "#f00", icon: "🚀", defaultProjectId: "proj_web", projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
-+        { id: "sp_beta", name: "Beta", color: "#00f", icon: null, defaultProjectId: null, projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
++        { id: "sp_alpha", name: "Alpha", color: "#f00", icon: "🚀", isDefault: true, defaultProjectId: "proj_web", projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
++        { id: "sp_beta", name: "Beta", color: "#00f", icon: null, isDefault: false, defaultProjectId: null, projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
 +      ] }),
-+      space_of_threads: () => ({ threads: { thr_parent: "sp_alpha", thr_lead: "sp_alpha", thr_later: "sp_beta", thr_personal: "sp_gone" } }),
-+      space_lead: (input) => ({ leadThreadId: (input as { spaceId: string }).spaceId === "sp_alpha" ? "thr_lead" : null }),
++      space_of_threads: () => ({ threads: { thr_parent: "sp_alpha", thr_lead: "sp_alpha", thr_ask: "sp_beta", thr_later: "sp_beta", thr_personal: "sp_gone" } }),
++      space_lead: (input) => ({ leadThreadId: (input as { spaceId: string }).spaceId === "sp_alpha" ? "thr_lead" : null, run: { enabled: true, cadence: "hourly", time: "09:00" } }),
++      space_set_lead: () => ({ leadThreadId: null, run: null }),
 +      spaceTree: () => ({ spaces: [
 +        { id: "sp_alpha", itemCount: 1, open: [{ pluginId: "pages", id: "pg_1", title: "Launch plan", icon: null, kindIcon: "FileText", href: "/plugins/pages/pages/pg_1" }] },
 +        { id: "sp_beta", itemCount: 0, open: [] },
 +      ] }),
 +    };
-+    const { inspection } = renderList({ organizationMode: "space" }, {
++    const { inspection, rpcCalls } = renderList({ organizationMode: "space" }, {
 +      sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads },
 +      sdk: { plugins: { callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
-+        if (pluginId === "studio" && studio[method]) return studio[method]!(input) as never;
-+        return {} as never;
++        if (pluginId !== "studio" || !studio[method]) return {} as never;
++        studioCalls.push({ method, input });
++        return studio[method]!(input) as never;
 +      } } },
 +    });
++    // The default Space shows first; threads in no Space are its.
 +    await screen.findByTitle("Alpha");
-+    expect(sectionHeaders()).toEqual(["Pinned", "Alpha", "Beta", "Threads"]);
-+    const alpha = screen.getByTitle("Alpha").closest("[data-sidebar-sticky-group]") as HTMLElement;
-+    expect(Array.from(alpha.querySelectorAll("[data-sidebar-thread-id]"), (el) => el.getAttribute("data-sidebar-thread-id"))).toEqual(["thr_parent", "thr_child"]);
-+    expect(alpha.querySelector("[data-sidebar-space-mark]")?.textContent).toBe("🚀");
-+    const rest = screen.getByTitle("Threads").closest("[data-sidebar-sticky-group]") as HTMLElement;
-+    expect(within(rest).getByText("Personal thread")).not.toBeNull();
++    expect(sectionHeaders()).toEqual(["Pinned", "Alpha"]);
 +    expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("space");
++    const alpha = () => screen.getByTitle("Alpha").closest("[data-sidebar-sticky-group]") as HTMLElement;
++    expect(alpha().querySelector("[data-sidebar-space-mark]")?.textContent).toBe("🚀");
++    const lead = alpha().querySelector("[data-space-lead=thr_lead]") as HTMLElement;
++    expect(lead.textContent).toContain("heartbeat hourly");
++    expect(Array.from(alpha().querySelectorAll("[data-sidebar-thread-id]"), (el) => el.getAttribute("data-sidebar-thread-id"))[0]).toBe("thr_lead");
++    expect(within(alpha()).getByText("Personal thread")).not.toBeNull();
++    expect(threadIds()).not.toContain("thr_later");
++    // The heading is plain: ⋯ has the Space's actions.
++    expect(screen.queryByRole("button", { name: "Open Alpha" })).toBeNull();
++    const dialogs: unknown[] = [];
++    const onDialog = (event: Event) => dialogs.push((event as CustomEvent).detail);
++    window.addEventListener("studio:space-dialog", onDialog);
++    fireEvent.pointerDown(screen.getByRole("button", { name: "Alpha actions" }), { button: 0, ctrlKey: false });
++    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit Space" }));
++    window.removeEventListener("studio:space-dialog", onDialog);
++    expect(dialogs).toEqual([{ spaceId: "sp_alpha", dialog: "edit" }]);
 +    fireEvent.click(screen.getByRole("button", { name: "New thread in Alpha" }));
 +    expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_web", focusPrompt: true } });
-+    fireEvent.click(screen.getByRole("button", { name: "Open Alpha" }));
-+    expect(window.location.pathname).toBe("/threads/thr_lead");
-+    // An item opens beside the lead: the request waits for the lead's page.
-+    expect(within(alpha).getByRole("button", { name: "Close Launch plan" })).not.toBeNull();
-+    const beta = screen.getByTitle("Beta").closest("[data-sidebar-sticky-group]") as HTMLElement;
-+    expect(within(beta).getByRole("button", { name: "New page, drawing or table" })).not.toBeNull();
-+    fireEvent.click(within(alpha).getByRole("link", { name: "Launch plan" }));
-+    expect(JSON.parse(sessionStorage.getItem("bb-studio:open-in-space") ?? "null")).toEqual({ threadId: "thr_lead", request: { kind: "item", path: "/plugins/pages/pages/pg_1", title: "Launch plan" } });
-+    // A Space without a lead still opens on Studio's Space page.
-+    fireEvent.click(screen.getByRole("button", { name: "Open Beta" }));
-+    expect(window.location.pathname).toBe("/plugins/studio/spaces/sp_beta");
++    // An item opens in the main area (in place here, where BB can't split).
++    fireEvent.click(within(alpha()).getByRole("link", { name: "Launch plan" }));
++    expect(window.location.pathname).toBe("/plugins/pages/pages/pg_1");
++    // Any thread can become the lead.
++    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_parent"]')!);
++    fireEvent.click(await screen.findByRole("menuitem", { name: "Make Space lead" }));
++    expect(studioCalls).toContainEqual({ method: "space_set_lead", input: { spaceId: "sp_alpha", threadId: "thr_parent" } });
++    await waitFor(() => expect(document.querySelector("[data-space-lead=thr_parent]")).not.toBeNull());
++    // The dots switch Spaces; Beta's needs you, and that thread comes first.
++    const switcher = screen.getByRole("navigation", { name: "Spaces" });
++    fireEvent.click(within(switcher).getByRole("button", { name: "Beta, needs you" }));
++    await screen.findByTitle("Beta");
++    expect(sectionHeaders()).toEqual(["Pinned", "Beta"]);
++    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "currentSpace", value: "sp_beta" } }));
++    expect(threadIds().filter((id) => id !== "thr_pinned")).toEqual(["thr_ask", "thr_later"]);
++    expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.parentElement?.querySelector("[data-sidebar-needs-you]")).not.toBeNull();
++    expect(document.querySelectorAll("[data-sidebar-needs-you]")).toHaveLength(1);
++    expect(screen.getByRole("button", { name: "New page, drawing or table" })).not.toBeNull();
++    const created: Event[] = [];
++    const onNew = (event: Event) => created.push(event);
++    window.addEventListener("studio:new-space", onNew);
++    fireEvent.click(within(switcher).getByRole("button", { name: "New Space" }));
++    window.removeEventListener("studio:new-space", onNew);
++    expect(created).toHaveLength(1);
++    // ⌃⌥← / ⌃⌥→ step through the Spaces.
++    fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
++    await screen.findByTitle("Alpha");
++    expect(sectionHeaders()).toEqual(["Pinned", "Alpha"]);
 +  });
 +
 +  it("falls back to By project while Studio has no Spaces", async () => {
@@ -125,7 +158,7 @@ index 4d15df5..085c8cd 100644
 +      unregister();
 +    }
 +  });
-@@ -303,0 +419,15 @@ describe("thread-list plugin", () => {
+@@ -303,0 +452,15 @@ describe("thread-list plugin", () => {
 +  it("opens the New project dialog from Threads", async () => {
 +    setPreferencesMirrorStorageForTest(null);
 +    renderList({ organizationMode: "project" }, {

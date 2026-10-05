@@ -3,7 +3,6 @@ import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { inSpace, PERSONAL_PROJECT_ID, PROJECT_REF, spaceAssignments, SpaceStore, THREAD_REF } from "./spaces";
-import { spacePageMarkdown } from "./space-page";
 import { TagStore } from "./tags";
 
 function stores() {
@@ -37,15 +36,6 @@ describe("spaces", () => {
     spaces.reconcileProjects(["outside"]);
     expect(spaces.defaultSpace().projectIds).toContain("outside");
     expect(() => spaces.remove(personal.id)).toThrow("can't be deleted");
-  });
-
-  it("keep their page, and start it as a brief", () => {
-    const { spaces } = stores();
-    const launch = spaces.create({ name: "Launch", description: "Q4 launch" });
-    expect(launch.pageId).toBeNull();
-    spaces.setPage(launch.id, "pg_1");
-    expect(spaces.get(launch.id)!.pageId).toBe("pg_1");
-    expect(spacePageMarkdown(launch)).toBe("Q4 launch\n\n## Plan\n\n## Decisions");
   });
 
   it("are kept apart from tags, and have unique names", () => {

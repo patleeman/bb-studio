@@ -584,12 +584,6 @@
       "coverage": "generated method"
     },
     {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "spacePage",
-      "coverage": "generated method"
-    },
-    {
       "file": "apps/ios/Shared/Studio.swift",
       "plugin": "studio",
       "method": "overview",

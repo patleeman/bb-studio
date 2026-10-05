@@ -1,45 +1,5 @@
 import SwiftUI
 
-// MARK: Opening a space
-
-/// A space opens as its page, which Studio makes from the space template the first time.
-struct SpaceRouteView: View {
-    let id: String
-    @EnvironmentObject private var app: AppModel
-    private let operation = ServerOperation()
-    private var client: BBClient { operation.client }
-    @State private var pageId: String?
-    @State private var error: String?
-    @State private var noPage = false
-
-    var body: some View {
-        Group {
-            if let pageId {
-                PageView(pageId: pageId).id(pageId)
-            } else if let error {
-                ContentUnavailableView("Couldn't open the space", systemImage: "exclamationmark.triangle", description: Text(error))
-            } else if noPage {
-                ContentUnavailableView(
-                    "No page for this space", systemImage: "doc.richtext",
-                    description: Text("A space opens as a page. Turn on BB Pages to see it."))
-            } else {
-                ProgressView()
-            }
-        }
-        .task {
-            do {
-                if case .page(let id)? = try await client.spacePage(id).flatMap(Route.init(href:)) {
-                    pageId = id
-                } else {
-                    noPage = true
-                }
-            } catch {
-                self.error = BBClient.describe(error, server: client.baseURL)
-            }
-        }
-    }
-}
-
 // MARK: Settings
 
 /// Which space the settings sheet edits; nil makes a new one.
@@ -227,7 +187,7 @@ struct ThreadSpacesMenu: View {
                 if !held.spaces.isEmpty {
                     Section("In spaces") {
                         ForEach(held.spaces) { space in
-                            Button { operation.complete(on: app) { app.push(.space(id: space.id)) } } label: {
+                            Button { operation.complete(on: app) { app.openStudio(space: space.id) } } label: {
                                 Label(held.inherited.contains(space.id) ? "\(name(space)) · Project" : name(space), systemImage: "arrow.up.right")
                             }
                         }

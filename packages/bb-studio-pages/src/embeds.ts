@@ -13,7 +13,6 @@ import { PLUGIN_ID, type RecordingCard } from "./contract";
 
 const MAX_TEXT = 20_000;
 const TALK_PLUGIN_ID = "talk";
-const STUDIO_PLUGIN_ID = "studio";
 
 const drawingSchema = z.object({ drawing: z.object({ id: z.string(), name: z.string(), updatedAt: z.number(), data: z.string() }).nullable() });
 
@@ -53,35 +52,9 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
   const table = <M extends keyof Tables>(method: M, input: z.input<Tables[M]["input"]>) =>
     call(TABLES_PLUGIN_ID, method, input, tablesContract[method].output) as Promise<z.infer<Tables[M]["output"]>>;
 
-  const spacesSchema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), icon: z.string().nullable(), description: z.string() })) });
-  /** Studio's spaces, as items to mention; the index leaves Studio's own out. */
-  const spaces = (): Promise<StudioIndexItem[]> =>
-    call(STUDIO_PLUGIN_ID, "spaces", null, spacesSchema).then(
-      ({ spaces }) =>
-        spaces.map((space) => ({
-          pluginId: STUDIO_PLUGIN_ID,
-          id: space.id,
-          kind: "space",
-          kindLabel: "Space",
-          kindIcon: "Layers",
-          title: untitled(space.name),
-          icon: space.icon,
-          preview: space.description || null,
-          facts: [],
-          badge: null,
-          thumbnailUrl: null,
-          href: `/plugins/${STUDIO_PLUGIN_ID}/spaces/${encodeURIComponent(space.id)}`,
-          updatedAt: 0,
-        })),
-      () => [],
-    );
-
   return {
-    /** Every add-on's items, then Studio's spaces. */
-    items: async () => {
-      const [items, spaceItems] = await Promise.all([index.items(), spaces()]);
-      return [...items, ...spaceItems];
-    },
+    /** Every add-on's items. */
+    items: () => index.items(),
     /** A new item from an add-on's Studio contract, as the index lists it. */
     async create(pluginId: string, kind: string, projectId: string | null): Promise<StudioIndexItem> {
       const [{ item }, info] = await Promise.all([
@@ -98,13 +71,6 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       return result;
     },
 
-    /** The space whose page this is; null when it's none's or Studio is gone. */
-    async spaceOfPage(pageId: string) {
-      const schema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), pageId: z.string().nullable().optional() })) });
-      const result = await call(STUDIO_PLUGIN_ID, "spaces", null, schema).catch(() => null);
-      const space = result?.spaces.find((each) => each.pageId === pageId);
-      return space ? { id: space.id, name: space.name } : null;
-    },
     async recording(id: string): Promise<RecordingCard | null> {
       const result = await call(TALK_PLUGIN_ID, "recording_get", { id }, recordingSchema).catch(() => null);
       if (!result) return null;

@@ -971,12 +971,6 @@
                   "items": {
                     "type": "string"
                   }
-                },
-                "pageId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
                 }
               },
               "required": [
@@ -988,8 +982,7 @@
                 "defaultProjectId",
                 "projectIds",
                 "threadIds",
-                "itemKeys",
-                "pageId"
+                "itemKeys"
               ],
               "additionalProperties": false
             }
@@ -3231,12 +3224,6 @@
                   "items": {
                     "type": "string"
                   }
-                },
-                "pageId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
                 }
               },
               "required": [
@@ -3248,8 +3235,7 @@
                 "defaultProjectId",
                 "projectIds",
                 "threadIds",
-                "itemKeys",
-                "pageId"
+                "itemKeys"
               ],
               "additionalProperties": false
             }
@@ -3351,12 +3337,6 @@
                 "items": {
                   "type": "string"
                 }
-              },
-              "pageId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
               }
             },
             "required": [
@@ -3368,8 +3348,7 @@
               "defaultProjectId",
               "projectIds",
               "threadIds",
-              "itemKeys",
-              "pageId"
+              "itemKeys"
             ],
             "additionalProperties": false
           }
@@ -3475,12 +3454,6 @@
                 "items": {
                   "type": "string"
                 }
-              },
-              "pageId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
               }
             },
             "required": [
@@ -3492,8 +3465,7 @@
               "defaultProjectId",
               "projectIds",
               "threadIds",
-              "itemKeys",
-              "pageId"
+              "itemKeys"
             ],
             "additionalProperties": false
           }
@@ -3644,12 +3616,6 @@
                 "items": {
                   "type": "string"
                 }
-              },
-              "pageId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
               }
             },
             "required": [
@@ -3661,8 +3627,7 @@
               "defaultProjectId",
               "projectIds",
               "threadIds",
-              "itemKeys",
-              "pageId"
+              "itemKeys"
             ],
             "additionalProperties": false
           }
@@ -3738,12 +3703,6 @@
                   "items": {
                     "type": "string"
                   }
-                },
-                "pageId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
                 }
               },
               "required": [
@@ -3755,8 +3714,7 @@
                 "defaultProjectId",
                 "projectIds",
                 "threadIds",
-                "itemKeys",
-                "pageId"
+                "itemKeys"
               ],
               "additionalProperties": false
             }
@@ -3810,38 +3768,6 @@
         },
         "required": [
           "ok"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "spacePage": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "href": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "href"
         ],
         "additionalProperties": false
       }
@@ -3980,18 +3906,6 @@
               "null"
             ]
           },
-          "pageId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "pageHref": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "defaultProjectId": {
             "type": [
               "string",
@@ -4050,15 +3964,13 @@
           "icon",
           "color",
           "leadThreadId",
-          "pageId",
-          "pageHref",
           "defaultProjectId",
           "run"
         ],
         "additionalProperties": false
       }
     },
-    "space_lead_setup": {
+    "space_set_lead": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -4068,196 +3980,23 @@
             "minLength": 1,
             "maxLength": 100
           },
-          "request": {
-            "type": "object",
-            "properties": {
-              "projectId": {
+          "threadId": {
+            "anyOf": [
+              {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "maxLength": 200
               },
-              "providerId": {
-                "type": "string",
-                "minLength": 1
-              },
-              "model": {
-                "type": "string"
-              },
-              "reasoningLevel": {
-                "type": "string",
-                "enum": [
-                  "none",
-                  "low",
-                  "medium",
-                  "high",
-                  "xhigh",
-                  "max",
-                  "ultra",
-                  "ultracode"
-                ]
-              },
-              "permissionMode": {
-                "type": "string",
-                "enum": [
-                  "accept-edits",
-                  "auto",
-                  "full"
-                ]
-              },
-              "serviceTier": {
-                "type": "string",
-                "enum": [
-                  "default",
-                  "fast"
-                ]
-              },
-              "executionInputSources": {
-                "type": "object",
-                "properties": {
-                  "model": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  },
-                  "permissionMode": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  },
-                  "providerId": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  },
-                  "reasoningLevel": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  },
-                  "serviceTier": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  }
-                }
-              },
-              "environment": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {
-                  "$ref": "#/$defs/__schema0"
-                }
-              },
-              "input": {
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {
-                    "$ref": "#/$defs/__schema1"
-                  }
-                }
-              },
-              "sendAt": {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "projectId",
-              "providerId",
-              "model",
-              "reasoningLevel",
-              "permissionMode",
-              "executionInputSources",
-              "environment",
-              "input"
             ]
           }
         },
         "required": [
           "spaceId",
-          "request"
-        ],
-        "$defs": {
-          "__schema0": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/__schema0"
-                }
-              },
-              {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {
-                  "$ref": "#/$defs/__schema0"
-                }
-              }
-            ]
-          },
-          "__schema1": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/__schema1"
-                }
-              },
-              {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {
-                  "$ref": "#/$defs/__schema1"
-                }
-              }
-            ]
-          }
-        }
+          "threadId"
+        ]
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4284,18 +4023,6 @@
               "null"
             ]
           },
-          "pageId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "pageHref": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "defaultProjectId": {
             "type": [
               "string",
@@ -4354,427 +4081,8 @@
           "icon",
           "color",
           "leadThreadId",
-          "pageId",
-          "pageHref",
           "defaultProjectId",
           "run"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "space_thread_start": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "spaceId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "request": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string",
-                "minLength": 1
-              },
-              "providerId": {
-                "type": "string",
-                "minLength": 1
-              },
-              "model": {
-                "type": "string"
-              },
-              "reasoningLevel": {
-                "type": "string",
-                "enum": [
-                  "none",
-                  "low",
-                  "medium",
-                  "high",
-                  "xhigh",
-                  "max",
-                  "ultra",
-                  "ultracode"
-                ]
-              },
-              "permissionMode": {
-                "type": "string",
-                "enum": [
-                  "accept-edits",
-                  "auto",
-                  "full"
-                ]
-              },
-              "serviceTier": {
-                "type": "string",
-                "enum": [
-                  "default",
-                  "fast"
-                ]
-              },
-              "executionInputSources": {
-                "type": "object",
-                "properties": {
-                  "model": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  },
-                  "permissionMode": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  },
-                  "providerId": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  },
-                  "reasoningLevel": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  },
-                  "serviceTier": {
-                    "type": "string",
-                    "enum": [
-                      "client-preference",
-                      "explicit"
-                    ]
-                  }
-                }
-              },
-              "environment": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {
-                  "$ref": "#/$defs/__schema0"
-                }
-              },
-              "input": {
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {
-                    "$ref": "#/$defs/__schema1"
-                  }
-                }
-              },
-              "sendAt": {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              }
-            },
-            "required": [
-              "projectId",
-              "providerId",
-              "model",
-              "reasoningLevel",
-              "permissionMode",
-              "executionInputSources",
-              "environment",
-              "input"
-            ]
-          }
-        },
-        "required": [
-          "spaceId",
-          "request"
-        ],
-        "$defs": {
-          "__schema0": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/__schema0"
-                }
-              },
-              {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {
-                  "$ref": "#/$defs/__schema0"
-                }
-              }
-            ]
-          },
-          "__schema1": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/__schema1"
-                }
-              },
-              {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {
-                  "$ref": "#/$defs/__schema1"
-                }
-              }
-            ]
-          }
-        }
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "threadId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "threadId"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "space_overview": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "spaceId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "spaceId"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "threads": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string"
-                },
-                "updatedAt": {
-                  "type": "number"
-                },
-                "parentThreadId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "isLead": {
-                  "type": "boolean"
-                },
-                "progress": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "progressAt": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "failureReason": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "blockedReason": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "title",
-                "status",
-                "updatedAt",
-                "parentThreadId",
-                "isLead"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "activity": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "threadId": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "isLead": {
-                  "type": "boolean"
-                },
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "progress",
-                    "failure",
-                    "blocked"
-                  ]
-                },
-                "summary": {
-                  "type": "string"
-                },
-                "at": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "id",
-                "threadId",
-                "title",
-                "isLead",
-                "kind",
-                "summary",
-                "at"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "ref": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                },
-                "href": {
-                  "type": "string"
-                },
-                "icon": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updatedAt": {
-                  "type": "number"
-                },
-                "kindLabel": {
-                  "type": "string"
-                },
-                "kindIcon": {
-                  "type": "string"
-                },
-                "preview": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updatedBy": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "user",
-                        "agent"
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              },
-              "required": [
-                "ref",
-                "title",
-                "kind",
-                "href",
-                "icon",
-                "updatedAt",
-                "kindLabel",
-                "kindIcon",
-                "preview",
-                "updatedBy"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "threads",
-          "activity",
-          "items"
         ],
         "additionalProperties": false
       }
@@ -4874,18 +4182,6 @@
               "null"
             ]
           },
-          "pageId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "pageHref": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "defaultProjectId": {
             "type": [
               "string",
@@ -4944,8 +4240,6 @@
           "icon",
           "color",
           "leadThreadId",
-          "pageId",
-          "pageHref",
           "defaultProjectId",
           "run"
         ],
@@ -5363,9 +4657,6 @@
                 "color": {
                   "type": "string"
                 },
-                "href": {
-                  "type": "string"
-                },
                 "items": {
                   "type": "array",
                   "items": {
@@ -5470,7 +4761,6 @@
                 "name",
                 "icon",
                 "color",
-                "href",
                 "items",
                 "itemCount",
                 "open"

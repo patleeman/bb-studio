@@ -1,6 +1,5 @@
 // Spaces in Studio: the dialogs that make a space and fill it with threads
-// and projects. A space itself opens on its lead's thread (ui/space). Spaces
-// are meta-projects (src/spaces.ts); only the user makes one here.
+// and projects. Spaces are meta-projects (src/spaces.ts); only the user makes one here.
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +20,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
 import type { rpcContract, SpaceThreadView, SpaceView } from "../contract";
-import { spaceViewHref } from "./space/routes";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -30,11 +28,6 @@ const THREAD_REF = "bb-thread";
 
 function threadIcon(thread: SpaceThreadView) {
   return thread.status === "active" || thread.status === "starting" ? "Loading" : "MessageSquare";
-}
-
-/** Where a space opens: the Space view, which goes to its lead's thread (ui/space). */
-export function spaceLink(space: SpaceView): string {
-  return spaceViewHref(space.id);
 }
 
 export function SpaceGlyph({ space, className }: { space: Pick<SpaceView, "icon" | "color">; className?: string }) {
@@ -319,7 +312,7 @@ function SpaceIconPicker({ icon, onChange }: { icon: string; onChange(icon: stri
           {icon || <Icon name="Plus" className="size-4 text-muted-foreground" />}
         </button>
       </DropdownMenuTrigger>
-      {/* Portaled out of Studio's styles, as on a space's page in Pages: bring them along. */}
+      {/* Portaled out of Studio's styles: bring them along. */}
       <DropdownMenuContent align="start" className="w-72 p-2" data-bb-plugin={STUDIO_PLUGIN_ID} data-bb-plugin-root="">
         <div className="grid grid-cols-8 gap-1">
           {SPACE_ICONS.map((each) => (

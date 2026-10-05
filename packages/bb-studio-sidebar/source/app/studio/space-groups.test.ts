@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { makeSidebarThread } from "../testing/fixtures.js";
 import { buildProjectThreadGroups, compareStandardThreads } from "../model/project-thread-groups.js";
-import { buildSpaceThreadGroups, spaceHref, type StudioSpace } from "./space-groups.js";
+import { buildSpaceThreadGroups, defaultSpaceId, type StudioSpace } from "./space-groups.js";
+import { neighbourSpaceId } from "./SpaceSwitcher.js";
 
 const spaces: StudioSpace[] = [
-  { id: "sp_b", name: "Beta", color: "#00f", icon: null, defaultProjectId: null },
-  { id: "sp_a", name: "Alpha", color: "#f00", icon: "🚀", defaultProjectId: "proj_a" },
+  { id: "sp_b", name: "Beta", color: "#00f", icon: null, defaultProjectId: null, isDefault: false },
+  { id: "sp_a", name: "Alpha", color: "#f00", icon: "🚀", defaultProjectId: "proj_a", isDefault: true },
 ];
 
 describe("By space grouping", () => {
@@ -19,13 +20,30 @@ describe("By space grouping", () => {
   ];
   const spaceOf = { newest: "sp_a", lead: "sp_a", beta: "sp_b", gone: "sp_deleted", child: "sp_b" };
 
-  it("keeps Studio's order, puts children with their root, and sends unknown Spaces to Threads", () => {
+  it("keeps Studio's order, puts children with their root, and sends threads in no Space to the default Space", () => {
     const { groups, loose } = buildSpaceThreadGroups(rows, spaces, spaceOf, { sp_a: "lead" });
     expect(groups.map((group) => [group.space.id, group.leadThreadId, group.lead?.id ?? null, group.threads.map((thread) => thread.id)])).toEqual([
       ["sp_b", null, null, ["beta"]],
-      ["sp_a", "lead", "lead", ["newest", "child"]],
+      ["sp_a", "lead", "lead", ["newest", "child", "none", "gone"]],
     ]);
-    expect(loose.map((thread) => thread.id)).toEqual(["none", "gone"]);
+    expect(loose).toEqual([]);
+  });
+
+  it("keeps threads loose only without Spaces", () => {
+    expect(buildSpaceThreadGroups(rows, [], spaceOf, {}).loose).toHaveLength(rows.length);
+  });
+
+  it("steps to the next or previous Space, wrapping around", () => {
+    expect(neighbourSpaceId(spaces, "sp_b", 1)).toBe("sp_a");
+    expect(neighbourSpaceId(spaces, "sp_a", 1)).toBe("sp_b");
+    expect(neighbourSpaceId(spaces, "sp_b", -1)).toBe("sp_a");
+    expect(neighbourSpaceId([], null, 1)).toBeNull();
+  });
+
+  it("takes Studio's default Space, else the first", () => {
+    expect(defaultSpaceId(spaces)).toBe("sp_a");
+    expect(defaultSpaceId(spaces.map((space) => ({ ...space, isDefault: false })))).toBe("sp_b");
+    expect(defaultSpaceId([])).toBeNull();
   });
 
   it("lists a Space with no threads", () => {
@@ -34,13 +52,9 @@ describe("By space grouping", () => {
     expect(loose).toEqual([]);
   });
 
-  it("lists the lead's workers at the top level, since the Space's heading opens the lead", () => {
+  it("lists the lead's workers at the top level, since the lead shows apart", () => {
     const threads = buildSpaceThreadGroups(rows, spaces, spaceOf, { sp_a: "lead" }).groups[1]!.threads;
     const items = buildProjectThreadGroups(threads, compareStandardThreads, new Set(), false);
-    expect(items.map((item) => item.kind === "thread" ? item.node.thread.id : item.kind)).toEqual(["newest", "child"]);
-  });
-
-  it("opens a Space at Studio's Space path", () => {
-    expect(spaceHref("sp a/b")).toBe("/plugins/studio/spaces/sp%20a%2Fb");
+    expect(items.map((item) => item.kind === "thread" ? item.node.thread.id : item.kind)).toEqual(["newest", "gone", "none", "child"]);
   });
 });

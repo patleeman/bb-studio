@@ -11,6 +11,8 @@ import type { StudioSpace } from "./space-groups.js";
  * every 30 seconds while By space shows.
  */
 export const STUDIO_CHANGED_EVENT = "bb-studio:studio-changed";
+/** Studio's event after one of its Space dialogs changes a Space; detail `{ spaceId }`. */
+export const SPACE_CHANGED_EVENT = "studio:space-changed";
 
 /**
  * The sidebar's organization, shared with Studio without the kit: Studio
@@ -37,10 +39,14 @@ const spacesSchema = z.object({
     color: z.string().catch("currentColor"),
     icon: z.string().nullable().catch(null),
     defaultProjectId: z.string().nullable().catch(null),
+    isDefault: z.boolean().catch(false),
   }).passthrough()),
 });
 const spaceOfSchema = z.object({ threads: z.record(z.string(), z.string()) });
-const leadSchema = z.object({ leadThreadId: z.string().nullable() }).passthrough();
+const leadSchema = z.object({
+  leadThreadId: z.string().nullable(),
+  run: z.object({ enabled: z.boolean(), cadence: z.string() }).passthrough().nullable().catch(null),
+}).passthrough();
 const treeSchema = z.object({
   spaces: z.array(z.object({
     id: z.string(),
@@ -85,6 +91,8 @@ export type StudioSpacesState =
     /** Thread id to Space id; empty until `threadsLoaded`. */
     spaceOf: Record<string, string>;
     leads: Record<string, string | null>;
+    /** Each Space's lead heartbeat cadence while it's on, such as "hourly". */
+    heartbeats: Record<string, string | null>;
     /** Each Space's Studio items; empty until `threadsLoaded`. */
     items: Record<string, SpaceItems>;
     threadsLoaded: boolean;
@@ -105,6 +113,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
   const sdk = useSdk();
   const setState = useSetAtom(studioSpacesAtom);
   const refreshRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     let active = true;
     let running = false;
@@ -119,24 +128,26 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
         const { spaces } = await call("spaces", null, spacesSchema);
         let spaceOf: Record<string, string> = {};
         let leads: Record<string, string | null> = {};
+        let heartbeats: Record<string, string | null> = {};
         let items: Record<string, SpaceItems> = {};
         if (spaceMode) {
           const [of, leadRows, tree] = await Promise.all([
             call("space_of_threads", {}, spaceOfSchema),
             Promise.all(spaces.map((space) => call("space_lead", { spaceId: space.id }, leadSchema)
-              .then((lead) => [space.id, lead.leadThreadId] as const, () => [space.id, null] as const))),
+              .then((lead) => [space.id, lead] as const, () => [space.id, null] as const))),
             // Items are a nicety: a failure leaves the lists empty, not the sidebar.
-            call("spaceTree", { threadsFor: [] }, treeSchema).catch(() => ({ spaces: [] })),
+            call("spaceTree", {}, treeSchema).catch(() => ({ spaces: [] })),
           ]);
           spaceOf = of.threads;
-          leads = Object.fromEntries(leadRows);
+          leads = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null]));
+          heartbeats = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId && lead.run?.enabled ? lead.run.cadence : null]));
           items = Object.fromEntries(tree.spaces.map((space) => [space.id, {
             open: space.open.map(({ pluginId, id, title, icon, kindIcon, href, pinned }) => ({ pluginId, id, title, icon, kindIcon, href, pinned })),
             count: space.itemCount,
           }]));
         }
-        const list = spaces.map(({ id, name, color, icon, defaultProjectId }) => ({ id, name, color, icon, defaultProjectId }));
-        if (active) setState({ status: "ready", spaces: list, spaceOf, leads, items, threadsLoaded: spaceMode });
+        const list = spaces.map(({ id, name, color, icon, defaultProjectId, isDefault }) => ({ id, name, color, icon, defaultProjectId, isDefault }));
+        if (active) setState({ status: "ready", spaces: list, spaceOf, leads, heartbeats, items, threadsLoaded: spaceMode });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         // Keep the last good load through a passing failure.
@@ -155,12 +166,14 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
     const poll = spaceMode ? setInterval(soon, 30_000) : null;
     window.addEventListener("focus", soon);
     window.addEventListener(STUDIO_CHANGED_EVENT, soon);
+    window.addEventListener(SPACE_CHANGED_EVENT, soon);
     return () => {
       active = false;
       if (timer) clearTimeout(timer);
       if (poll) clearInterval(poll);
       window.removeEventListener("focus", soon);
       window.removeEventListener(STUDIO_CHANGED_EVENT, soon);
+      window.removeEventListener(SPACE_CHANGED_EVENT, soon);
       refreshRef.current = () => {};
     };
   }, [sdk, setState, spaceMode]);

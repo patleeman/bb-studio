@@ -1,6 +1,5 @@
-// Data for Spaces as projects: a Space has a lead you talk to, its page beside
-// it, and threads that belong to it (one Space per thread). Loads are shared
-// per method and input, and refetch on Studio's change signal.
+// Data for Spaces: their threads (one Space per thread) and optional lead.
+// Loads are shared per method and input, and refetch on Studio's change signal.
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
@@ -110,17 +109,8 @@ export interface SpaceLead {
   icon: string | null;
   color: string;
   leadThreadId: string | null;
-  pageId: string | null;
-  pageHref: string | null;
   defaultProjectId: string | null;
   run: { enabled: boolean; cadence: Cadence; time?: string | null; cron?: string | null } | null;
-}
-
-export interface OverviewThread { id: string; title: string; status: string; updatedAt: number; parentThreadId: string | null; isLead: boolean; progress?: string | null; progressAt?: number | null; blockedReason?: string | null; failureReason?: string | null }
-export interface OverviewActivity { id: string; threadId: string; title: string; summary: string; at: number; kind: string }
-export interface OverviewItem {
-  ref: string; title: string; kind: string; href: string; icon: string | null; updatedAt: number;
-  kindLabel: string; kindIcon: string; preview: string | null; updatedBy: "user" | "agent" | null;
 }
 
 export function useSpaces() {
@@ -137,8 +127,4 @@ export function useSpaceOf() {
   const live = useLive<{ threads: Record<string, string> }>("space_of_threads", {}, { pollMs: 0 });
   const threads = live.data?.threads ?? {};
   return useCallback((threadId: string | null | undefined) => (threadId ? threads[threadId] ?? null : null), [threads]);
-}
-
-export function useSpaceOverview(spaceId: string | null) {
-  return useLive<{ threads: OverviewThread[]; items: OverviewItem[]; activity: OverviewActivity[] }>("space_overview", { spaceId }, { enabled: spaceId !== null, pollMs: 30_000 });
 }

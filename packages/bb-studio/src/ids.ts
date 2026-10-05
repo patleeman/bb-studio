@@ -13,8 +13,9 @@ export const NEW_SPACE_EVENT = "studio:new-space";
 
 /**
  * Window event that opens one of a space's dialogs from anywhere, such as the
- * Space's options menu or its brief page in Pages; detail `{ spaceId, dialog }`,
- * where dialog is "edit", "delete", "threads" or "projects".
+ * Space's ⋯ menu in Studio Sidebar; detail `{ spaceId, dialog }`, where dialog
+ * is "edit", "delete", "threads", "projects" or "heartbeat" (lead and
+ * heartbeat). Dispatch it cancelable: Studio cancels it when it opens one.
  */
 export const SPACE_DIALOG_EVENT = "studio:space-dialog";
 

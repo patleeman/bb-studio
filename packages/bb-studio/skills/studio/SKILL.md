@@ -69,26 +69,23 @@ work. A project in a space brings in all of its items and open threads, now
 and later. A thread is in a space when it was added to it or its project is.
 
 - `studio_list_spaces` lists the spaces and marks the ones this thread is in.
-- `studio_space_items` with `space` (a name), `add` and `remove` (item links)
-  and `thisThread` (`add` or `remove`) files items or this thread in a space.
+- `studio_space_items` with `space` (a name), `threads` (thread ids) and
+  `thisThread` (`add` or `remove`) files threads in a space. Items follow
+  their project, so they can't be filed one by one.
 - Only the user makes, renames or deletes spaces. Spaces aren't tags:
   `studio_tag_items` can't touch them. File things in a space when the user
   asks to.
-- A new thread whose first message links a space
-  (`/plugins/studio/spaces/<id>`) joins it.
-- What a thread in a space makes joins that space by itself: pages, drawings,
-  tables and new artifacts. So does a sub-page made under the
-  space's page or under an item in the space. Don't file those again.
+- What a thread in a space makes in the space's projects is in the space by
+  itself. Don't file those again.
+- A space may have a lead: one of its threads, which the user picks. A
+  Heartbeat can wake the lead on a schedule. Nothing else is made for a
+  space: no page, no lead thread.
 
 ## In the app
 
-Spaces are Studio items of kind Space: they list in the collection, are
-made from **New ▾ → Space**, and an open space shows as a tab in the
-sidebar's Studio section, with its items nested under it. A space opens its page in Pages, made from a
-template when the space is: an editable page with live widgets for making a
-thread or any add-on's item in it, its recent items, threads, channels and
-direct messages, and projects. The user writes around the widgets, moves or
-removes them, and puts them back from the slash menu. Studio Teams channels and direct
+Spaces show in the sidebar with their threads and Studio items; the user
+makes, edits and deletes them there, and picks a space's lead and Heartbeat
+from its ⋯ menu. Studio Teams channels and direct
 messages are threads, so they join a space as threads do. Each thread's
 header shows the spaces it's in, linking back to them, and adds it to
 another. The Studio panel

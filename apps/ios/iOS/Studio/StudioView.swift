@@ -480,7 +480,7 @@ struct StudioView: View {
         }
         .sheet(item: $spaceSheet) { sheet in
             SpaceSettingsSheet(space: sheet.space) { saved in
-                if let saved, sheet.space == nil { operation.complete(on: app) { app.studioPath.append(.space(id: saved.id)) } }
+                if let saved, sheet.space == nil { operation.complete(on: app) { app.studioSpace = saved.id } }
             }
         }
         .onChange(of: store.spaces) {
@@ -627,7 +627,6 @@ struct StudioView: View {
                         app.studioSpace = app.studioSpace == space.id ? nil : space.id
                     }
                     .contextMenu {
-                        Button { operation.complete(on: app) { app.studioPath.append(.space(id: space.id)) } } label: { Label("Open Space", systemImage: "arrow.up.right") }
                         Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
                     }
                 }
@@ -796,7 +795,6 @@ struct StudioView: View {
         case "excalidraw": .drawing(id: item.itemId)
         case "artifacts": .artifact(id: item.itemId)
         case "studio-tables": .table(id: item.itemId)
-        case "studio" where item.kind == "space": item.href.flatMap(Route.init(href:)) ?? .space(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
     }

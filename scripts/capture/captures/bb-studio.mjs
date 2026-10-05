@@ -150,36 +150,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     },
   },
   {
-    id: "studio-space",
-    packageDir: "bb-studio",
-    fileName: "space-page.png",
-    privateSidebar: true,
-    setup: async (client) => {
-      const pages = await seedPages();
-      let spaceId = null;
-      const cleanup = async () => {
-        if (spaceId) await pluginRpc("studio", "deleteSpace", { id: spaceId }).catch(() => {});
-        await pages.cleanup();
-      };
-      try {
-        const { space } = await pluginRpc("studio", "createSpace", { name: "Launch", icon: "🚀", description: "Everything for the Orbit launch: plans, notes and the people working on it.", defaultProjectId: projectId });
-        spaceId = space.id;
-        const { href } = await pluginRpc("studio", "spacePage", { id: space.id });
-        if (!href) throw new Error("The new space didn't get a page");
-        await client.navigate(href);
-        // The page is the Space's brief: its purpose, a plan and decisions. Live status is the lead's Status tab.
-        await client.waitForSelector(".ProseMirror[contenteditable=true]");
-        for (const label of ["Everything for the Orbit launch", "Plan", "Decisions"]) await client.waitForText(label);
-        if (await client.evaluate(`!!document.querySelector("[data-space-widget]")`)) throw new Error("The space page still shows live widgets");
-        await sleep(1000);
-      } catch (error) {
-        await cleanup();
-        throw error;
-      }
-      return cleanup;
-    },
-  },
-  {
     id: "studio-search",
     packageDir: "bb-studio",
     fileName: "search.png",

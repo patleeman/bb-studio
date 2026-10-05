@@ -35,13 +35,10 @@ public enum Studio {
     public static let spaceMembers = "spaceMembers"
     public static let spacesForThread = "spacesForThread"
     public static let pendingThreadSpaces = "pendingThreadSpaces"
-    public static let spacePage = "spacePage"
     public static let createInSpace = "createInSpace"
     public static let recentThreads = "recentThreads"
     public static let space_lead = "space_lead"
-    public static let space_lead_setup = "space_lead_setup"
-    public static let space_thread_start = "space_thread_start"
-    public static let space_overview = "space_overview"
+    public static let space_set_lead = "space_set_lead"
     public static let space_of_threads = "space_of_threads"
     public static let space_set_run = "space_set_run"
     public static let thread_handoff = "thread_handoff"
@@ -148,8 +145,6 @@ public enum Studio {
 
   public typealias PendingThreadSpaces = PendingThreadSpacesOutput
 
-  public typealias SpacePage = SpacePageOutput
-
   public typealias CreateInSpace = CreateInSpaceOutput
 
   public typealias RecentThreadsInput = StudioJSONValue
@@ -158,11 +153,7 @@ public enum Studio {
 
   public typealias SpaceLead = SpaceLeadOutput
 
-  public typealias SpaceLeadSetup = SpaceLeadSetupOutput
-
-  public typealias SpaceThreadStart = SpaceThreadStartOutput
-
-  public typealias SpaceOverview = SpaceOverviewOutput
+  public typealias SpaceSetLead = SpaceSetLeadOutput
 
   public typealias SpaceOfThreads = SpaceOfThreadsOutput
 
@@ -897,9 +888,8 @@ public enum Studio {
     public var projectIds: [String]?
     public var threadIds: [String]?
     public var itemKeys: [String]?
-    public var pageId: String?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil, pageId: String? = nil) {
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
       self.name = name
       self.color = color
@@ -909,7 +899,6 @@ public enum Studio {
       self.projectIds = projectIds
       self.threadIds = threadIds
       self.itemKeys = itemKeys
-      self.pageId = pageId
     }
   }
 
@@ -2317,9 +2306,8 @@ public enum Studio {
     public var projectIds: [String]?
     public var threadIds: [String]?
     public var itemKeys: [String]?
-    public var pageId: String?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil, pageId: String? = nil) {
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
       self.name = name
       self.color = color
@@ -2329,7 +2317,6 @@ public enum Studio {
       self.projectIds = projectIds
       self.threadIds = threadIds
       self.itemKeys = itemKeys
-      self.pageId = pageId
     }
   }
 
@@ -2365,9 +2352,8 @@ public enum Studio {
     public var projectIds: [String]?
     public var threadIds: [String]?
     public var itemKeys: [String]?
-    public var pageId: String?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil, pageId: String? = nil) {
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
       self.name = name
       self.color = color
@@ -2377,7 +2363,6 @@ public enum Studio {
       self.projectIds = projectIds
       self.threadIds = threadIds
       self.itemKeys = itemKeys
-      self.pageId = pageId
     }
   }
 
@@ -2415,9 +2400,8 @@ public enum Studio {
     public var projectIds: [String]?
     public var threadIds: [String]?
     public var itemKeys: [String]?
-    public var pageId: String?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil, pageId: String? = nil) {
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
       self.name = name
       self.color = color
@@ -2427,7 +2411,6 @@ public enum Studio {
       self.projectIds = projectIds
       self.threadIds = threadIds
       self.itemKeys = itemKeys
-      self.pageId = pageId
     }
   }
 
@@ -2497,9 +2480,8 @@ public enum Studio {
     public var projectIds: [String]?
     public var threadIds: [String]?
     public var itemKeys: [String]?
-    public var pageId: String?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil, pageId: String? = nil) {
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
       self.name = name
       self.color = color
@@ -2509,7 +2491,6 @@ public enum Studio {
       self.projectIds = projectIds
       self.threadIds = threadIds
       self.itemKeys = itemKeys
-      self.pageId = pageId
     }
   }
 
@@ -2539,9 +2520,8 @@ public enum Studio {
     public var projectIds: [String]?
     public var threadIds: [String]?
     public var itemKeys: [String]?
-    public var pageId: String?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil, pageId: String? = nil) {
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
       self.name = name
       self.color = color
@@ -2551,7 +2531,6 @@ public enum Studio {
       self.projectIds = projectIds
       self.threadIds = threadIds
       self.itemKeys = itemKeys
-      self.pageId = pageId
     }
   }
 
@@ -2580,22 +2559,6 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
-    }
-  }
-
-  public struct SpacePageInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct SpacePageOutput: Sendable, Hashable, Codable {
-    public var href: String?
-
-    public init(href: String? = nil) {
-      self.href = href
     }
   }
 
@@ -2721,290 +2684,31 @@ public enum Studio {
     public var icon: String?
     public var color: String?
     public var leadThreadId: String?
-    public var pageId: String?
-    public var pageHref: String?
     public var defaultProjectId: String?
     public var run: SpaceLeadOutputRun?
 
-    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, pageId: String? = nil, pageHref: String? = nil, defaultProjectId: String? = nil, run: SpaceLeadOutputRun? = nil) {
+    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, defaultProjectId: String? = nil, run: SpaceLeadOutputRun? = nil) {
       self.spaceId = spaceId
       self.name = name
       self.icon = icon
       self.color = color
       self.leadThreadId = leadThreadId
-      self.pageId = pageId
-      self.pageHref = pageHref
       self.defaultProjectId = defaultProjectId
       self.run = run
     }
   }
 
-  public enum SpaceLeadSetupInputRequestReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceLeadSetupInputRequestPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceLeadSetupInputRequestServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceLeadSetupInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceLeadSetupInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceLeadSetupInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceLeadSetupInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceLeadSetupInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceLeadSetupInputRequestExecutionInputSources: Sendable, Hashable, Codable {
-    public var model: SpaceLeadSetupInputRequestExecutionInputSourcesModel?
-    public var permissionMode: SpaceLeadSetupInputRequestExecutionInputSourcesPermissionMode?
-    public var providerId: SpaceLeadSetupInputRequestExecutionInputSourcesProviderId?
-    public var reasoningLevel: SpaceLeadSetupInputRequestExecutionInputSourcesReasoningLevel?
-    public var serviceTier: SpaceLeadSetupInputRequestExecutionInputSourcesServiceTier?
-
-    public init(model: SpaceLeadSetupInputRequestExecutionInputSourcesModel? = nil, permissionMode: SpaceLeadSetupInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: SpaceLeadSetupInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: SpaceLeadSetupInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: SpaceLeadSetupInputRequestExecutionInputSourcesServiceTier? = nil) {
-      self.model = model
-      self.permissionMode = permissionMode
-      self.providerId = providerId
-      self.reasoningLevel = reasoningLevel
-      self.serviceTier = serviceTier
-    }
-  }
-
-  public struct SpaceLeadSetupInputRequest: Sendable, Hashable, Codable {
-    public var projectId: String?
-    public var providerId: String?
-    public var model: String?
-    public var reasoningLevel: SpaceLeadSetupInputRequestReasoningLevel?
-    public var permissionMode: SpaceLeadSetupInputRequestPermissionMode?
-    public var serviceTier: SpaceLeadSetupInputRequestServiceTier?
-    public var executionInputSources: SpaceLeadSetupInputRequestExecutionInputSources?
-    public var environment: [String: StudioJSONValue]?
-    public var input: [[String: StudioJSONValue]]?
-    public var sendAt: Int?
-
-    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: SpaceLeadSetupInputRequestReasoningLevel? = nil, permissionMode: SpaceLeadSetupInputRequestPermissionMode? = nil, serviceTier: SpaceLeadSetupInputRequestServiceTier? = nil, executionInputSources: SpaceLeadSetupInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
-      self.projectId = projectId
-      self.providerId = providerId
-      self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
-      self.serviceTier = serviceTier
-      self.executionInputSources = executionInputSources
-      self.environment = environment
-      self.input = input
-      self.sendAt = sendAt
-    }
-  }
-
-  public struct SpaceLeadSetupInput: Sendable, Hashable, Codable {
+  public struct SpaceSetLeadInput: Sendable, Hashable, Codable {
     public var spaceId: String?
-    public var request: SpaceLeadSetupInputRequest?
+    public var threadId: String?
 
-    public init(spaceId: String? = nil, request: SpaceLeadSetupInputRequest? = nil) {
+    public init(spaceId: String? = nil, threadId: String? = nil) {
       self.spaceId = spaceId
-      self.request = request
+      self.threadId = threadId
     }
   }
 
-  public enum SpaceLeadSetupOutputRunCadence: Sendable, Hashable, Codable {
+  public enum SpaceSetLeadOutputRunCadence: Sendable, Hashable, Codable {
     case hourly
     case daily
     case weekdays
@@ -3052,13 +2756,13 @@ public enum Studio {
     }
   }
 
-  public struct SpaceLeadSetupOutputRun: Sendable, Hashable, Codable {
+  public struct SpaceSetLeadOutputRun: Sendable, Hashable, Codable {
     public var enabled: Bool?
-    public var cadence: SpaceLeadSetupOutputRunCadence?
+    public var cadence: SpaceSetLeadOutputRunCadence?
     public var time: String?
     public var cron: String?
 
-    public init(enabled: Bool? = nil, cadence: SpaceLeadSetupOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(enabled: Bool? = nil, cadence: SpaceSetLeadOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
       self.enabled = enabled
       self.cadence = cadence
       self.time = time
@@ -3066,443 +2770,23 @@ public enum Studio {
     }
   }
 
-  public struct SpaceLeadSetupOutput: Sendable, Hashable, Codable {
+  public struct SpaceSetLeadOutput: Sendable, Hashable, Codable {
     public var spaceId: String?
     public var name: String?
     public var icon: String?
     public var color: String?
     public var leadThreadId: String?
-    public var pageId: String?
-    public var pageHref: String?
     public var defaultProjectId: String?
-    public var run: SpaceLeadSetupOutputRun?
+    public var run: SpaceSetLeadOutputRun?
 
-    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, pageId: String? = nil, pageHref: String? = nil, defaultProjectId: String? = nil, run: SpaceLeadSetupOutputRun? = nil) {
+    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, defaultProjectId: String? = nil, run: SpaceSetLeadOutputRun? = nil) {
       self.spaceId = spaceId
       self.name = name
       self.icon = icon
       self.color = color
       self.leadThreadId = leadThreadId
-      self.pageId = pageId
-      self.pageHref = pageHref
       self.defaultProjectId = defaultProjectId
       self.run = run
-    }
-  }
-
-  public enum SpaceThreadStartInputRequestReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceThreadStartInputRequestPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceThreadStartInputRequestServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceThreadStartInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceThreadStartInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceThreadStartInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceThreadStartInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum SpaceThreadStartInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
-    case client_preference
-    case explicit
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "client-preference": self = .client_preference
-      case "explicit": self = .explicit
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .client_preference: try container.encode("client-preference")
-      case .explicit: try container.encode("explicit")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceThreadStartInputRequestExecutionInputSources: Sendable, Hashable, Codable {
-    public var model: SpaceThreadStartInputRequestExecutionInputSourcesModel?
-    public var permissionMode: SpaceThreadStartInputRequestExecutionInputSourcesPermissionMode?
-    public var providerId: SpaceThreadStartInputRequestExecutionInputSourcesProviderId?
-    public var reasoningLevel: SpaceThreadStartInputRequestExecutionInputSourcesReasoningLevel?
-    public var serviceTier: SpaceThreadStartInputRequestExecutionInputSourcesServiceTier?
-
-    public init(model: SpaceThreadStartInputRequestExecutionInputSourcesModel? = nil, permissionMode: SpaceThreadStartInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: SpaceThreadStartInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: SpaceThreadStartInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: SpaceThreadStartInputRequestExecutionInputSourcesServiceTier? = nil) {
-      self.model = model
-      self.permissionMode = permissionMode
-      self.providerId = providerId
-      self.reasoningLevel = reasoningLevel
-      self.serviceTier = serviceTier
-    }
-  }
-
-  public struct SpaceThreadStartInputRequest: Sendable, Hashable, Codable {
-    public var projectId: String?
-    public var providerId: String?
-    public var model: String?
-    public var reasoningLevel: SpaceThreadStartInputRequestReasoningLevel?
-    public var permissionMode: SpaceThreadStartInputRequestPermissionMode?
-    public var serviceTier: SpaceThreadStartInputRequestServiceTier?
-    public var executionInputSources: SpaceThreadStartInputRequestExecutionInputSources?
-    public var environment: [String: StudioJSONValue]?
-    public var input: [[String: StudioJSONValue]]?
-    public var sendAt: Int?
-
-    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: SpaceThreadStartInputRequestReasoningLevel? = nil, permissionMode: SpaceThreadStartInputRequestPermissionMode? = nil, serviceTier: SpaceThreadStartInputRequestServiceTier? = nil, executionInputSources: SpaceThreadStartInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
-      self.projectId = projectId
-      self.providerId = providerId
-      self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
-      self.serviceTier = serviceTier
-      self.executionInputSources = executionInputSources
-      self.environment = environment
-      self.input = input
-      self.sendAt = sendAt
-    }
-  }
-
-  public struct SpaceThreadStartInput: Sendable, Hashable, Codable {
-    public var spaceId: String?
-    public var request: SpaceThreadStartInputRequest?
-
-    public init(spaceId: String? = nil, request: SpaceThreadStartInputRequest? = nil) {
-      self.spaceId = spaceId
-      self.request = request
-    }
-  }
-
-  public struct SpaceThreadStartOutput: Sendable, Hashable, Codable {
-    public var threadId: String?
-
-    public init(threadId: String? = nil) {
-      self.threadId = threadId
-    }
-  }
-
-  public struct SpaceOverviewInput: Sendable, Hashable, Codable {
-    public var spaceId: String?
-
-    public init(spaceId: String? = nil) {
-      self.spaceId = spaceId
-    }
-  }
-
-  public struct SpaceOverviewOutputThreadsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var title: String?
-    public var status: String?
-    public var updatedAt: Double?
-    public var parentThreadId: String?
-    public var isLead: Bool?
-    public var progress: String?
-    public var progressAt: Double?
-    public var failureReason: String?
-    public var blockedReason: String?
-
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, updatedAt: Double? = nil, parentThreadId: String? = nil, isLead: Bool? = nil, progress: String? = nil, progressAt: Double? = nil, failureReason: String? = nil, blockedReason: String? = nil) {
-      self.id = id
-      self.title = title
-      self.status = status
-      self.updatedAt = updatedAt
-      self.parentThreadId = parentThreadId
-      self.isLead = isLead
-      self.progress = progress
-      self.progressAt = progressAt
-      self.failureReason = failureReason
-      self.blockedReason = blockedReason
-    }
-  }
-
-  public enum SpaceOverviewOutputActivityItemKind: Sendable, Hashable, Codable {
-    case progress
-    case failure
-    case blocked
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "progress": self = .progress
-      case "failure": self = .failure
-      case "blocked": self = .blocked
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .progress: try container.encode("progress")
-      case .failure: try container.encode("failure")
-      case .blocked: try container.encode("blocked")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceOverviewOutputActivityItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var threadId: String?
-    public var title: String?
-    public var isLead: Bool?
-    public var kind: SpaceOverviewOutputActivityItemKind?
-    public var summary: String?
-    public var at: Double?
-
-    public init(id: String? = nil, threadId: String? = nil, title: String? = nil, isLead: Bool? = nil, kind: SpaceOverviewOutputActivityItemKind? = nil, summary: String? = nil, at: Double? = nil) {
-      self.id = id
-      self.threadId = threadId
-      self.title = title
-      self.isLead = isLead
-      self.kind = kind
-      self.summary = summary
-      self.at = at
-    }
-  }
-
-  public enum SpaceOverviewOutputItemsItemUpdatedBy: Sendable, Hashable, Codable {
-    case user
-    case agent
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "user": self = .user
-      case "agent": self = .agent
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .user: try container.encode("user")
-      case .agent: try container.encode("agent")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceOverviewOutputItemsItem: Sendable, Hashable, Codable {
-    public var ref: String?
-    public var title: String?
-    public var kind: String?
-    public var href: String?
-    public var icon: String?
-    public var updatedAt: Double?
-    public var kindLabel: String?
-    public var kindIcon: String?
-    public var preview: String?
-    public var updatedBy: SpaceOverviewOutputItemsItemUpdatedBy?
-
-    public init(ref: String? = nil, title: String? = nil, kind: String? = nil, href: String? = nil, icon: String? = nil, updatedAt: Double? = nil, kindLabel: String? = nil, kindIcon: String? = nil, preview: String? = nil, updatedBy: SpaceOverviewOutputItemsItemUpdatedBy? = nil) {
-      self.ref = ref
-      self.title = title
-      self.kind = kind
-      self.href = href
-      self.icon = icon
-      self.updatedAt = updatedAt
-      self.kindLabel = kindLabel
-      self.kindIcon = kindIcon
-      self.preview = preview
-      self.updatedBy = updatedBy
-    }
-  }
-
-  public struct SpaceOverviewOutput: Sendable, Hashable, Codable {
-    public var threads: [SpaceOverviewOutputThreadsItem]?
-    public var activity: [SpaceOverviewOutputActivityItem]?
-    public var items: [SpaceOverviewOutputItemsItem]?
-
-    public init(threads: [SpaceOverviewOutputThreadsItem]? = nil, activity: [SpaceOverviewOutputActivityItem]? = nil, items: [SpaceOverviewOutputItemsItem]? = nil) {
-      self.threads = threads
-      self.activity = activity
-      self.items = items
     }
   }
 
@@ -3652,19 +2936,15 @@ public enum Studio {
     public var icon: String?
     public var color: String?
     public var leadThreadId: String?
-    public var pageId: String?
-    public var pageHref: String?
     public var defaultProjectId: String?
     public var run: SpaceSetRunOutputRun?
 
-    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, pageId: String? = nil, pageHref: String? = nil, defaultProjectId: String? = nil, run: SpaceSetRunOutputRun? = nil) {
+    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, defaultProjectId: String? = nil, run: SpaceSetRunOutputRun? = nil) {
       self.spaceId = spaceId
       self.name = name
       self.icon = icon
       self.color = color
       self.leadThreadId = leadThreadId
-      self.pageId = pageId
-      self.pageHref = pageHref
       self.defaultProjectId = defaultProjectId
       self.run = run
     }
@@ -4084,17 +3364,15 @@ public enum Studio {
     public var name: String?
     public var icon: String?
     public var color: String?
-    public var href: String?
     public var items: [SpaceTreeOutputSpacesItemItemsItem]?
     public var itemCount: Double?
     public var `open`: [SpaceTreeOutputSpacesItemOpenItem]?
 
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, href: String? = nil, items: [SpaceTreeOutputSpacesItemItemsItem]? = nil, itemCount: Double? = nil, `open`: [SpaceTreeOutputSpacesItemOpenItem]? = nil) {
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, items: [SpaceTreeOutputSpacesItemItemsItem]? = nil, itemCount: Double? = nil, `open`: [SpaceTreeOutputSpacesItemOpenItem]? = nil) {
       self.id = id
       self.name = name
       self.icon = icon
       self.color = color
-      self.href = href
       self.items = items
       self.itemCount = itemCount
       self.`open` = `open`

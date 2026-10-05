@@ -34,17 +34,17 @@ export interface TreeItem {
 }
 
 /**
- * The items a space shows: live ones, not background kinds or its own page,
+ * The items a space shows: live ones, not background kinds,
  * the newest `limit` of them, then in tree order. A sub-item nests under its
  * parent when both show; deeper than `TREE_DEPTH` it stays at the last level.
  */
 export function spaceTreeItems(
   space: Space,
   items: readonly TreeSource[],
-  options: { background: ReadonlySet<string>; kindIcon(item: TreeSource): string; pagesPluginId: string; limit?: number },
+  options: { background: ReadonlySet<string>; kindIcon(item: TreeSource): string; limit?: number },
 ): { items: TreeItem[]; count: number } {
   const held = items
-    .filter((item) => !item.archived && !options.background.has(`${item.pluginId}:${item.kind}`) && inSpace(space, item) && !(item.pluginId === options.pagesPluginId && item.id === space.pageId))
+    .filter((item) => !item.archived && !options.background.has(`${item.pluginId}:${item.kind}`) && inSpace(space, item))
     .sort((a, b) => b.updatedAt - a.updatedAt);
   const shown = held.slice(0, options.limit ?? TREE_ITEMS);
   const key = (pluginId: string, id: string) => `${pluginId}:${id}`;

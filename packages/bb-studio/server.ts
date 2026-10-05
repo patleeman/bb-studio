@@ -26,12 +26,10 @@ import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
-import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
+import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
-import { spaceViewHref } from "./src/ui/space/routes";
 import { SpaceFolders } from "./src/space-folders";
 import { spaceOpenItems, spaceTreeItems } from "./src/space-tree";
-import { PAGES_PLUGIN_ID, pageHref, spacePageMarkdown } from "./src/space-page";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
@@ -226,68 +224,6 @@ export default async function plugin(bb: BbPluginApi) {
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   };
-  const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean(), title: z.string().optional(), icon: z.string().optional() }).nullable() });
-  const callPages = <T extends z.ZodType>(method: string, input: unknown, outputSchema: T) =>
-    bb.sdk.plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) }) as Promise<z.infer<T>>;
-  const making = new Map<string, Promise<string | null>>();
-  /** A space's brief page, made from the space template if it has none; null without Pages. */
-  const spacePage = (id: string): Promise<string | null> => {
-    const pending = making.get(id);
-    if (pending) return pending;
-    const work = (async () => {
-      const space = spaces.get(id);
-      if (!space) throw new Error("That space no longer exists.");
-      if (space.pageId) {
-        const found = await callPages("get", { id: space.pageId }, pageResult).catch(() => undefined);
-        // Pages being down doesn't lose the page.
-        if (found === undefined) return space.pageId;
-        // An archived brief comes back rather than a new one being made.
-        if (found.page?.archived) await callPages("update", { id: space.pageId, archived: false }, pageResult).catch(() => {});
-        if (found.page) return space.pageId;
-      }
-      const made = await callPages(
-        "create",
-        { projectId: space.defaultProjectId, parentId: null, title: space.name, ...(space.icon ? { icon: space.icon } : {}), markdown: spacePageMarkdown(space) },
-        pageResult,
-      ).catch(() => null);
-      if (!made?.page) return null;
-      spaces.setPage(id, made.page.id);
-      tagsChanged();
-      return made.page.id;
-    })().finally(() => making.delete(id));
-    making.set(id, work);
-    return work;
-  };
-  /**
-   * A space's brief page keeps its name and icon: renaming the page renames
-   * the space, and deleting it leaves the space without a page. Checks the space pages among the changed ids, or all of
-   * them when Pages doesn't say which. Only Pages answering that a page is
-   * gone counts, never Pages being down.
-   */
-  const syncSpacePages = async (changed: string[] | null) => {
-    const candidates = spaces.list().filter((space) => space.pageId && (!changed || changed.includes(space.pageId)));
-    const found = await Promise.all(candidates.map((space) => callPages("get", { id: space.pageId }, pageResult).catch(() => undefined)));
-    let touched = false;
-    candidates.forEach((space, index) => {
-      const result = found[index];
-      if (!result) return;
-      if (!result.page) {
-        spaces.setPage(space.id, null);
-        touched = true;
-        return;
-      }
-      const name = result.page.title?.replace(/\s+/g, " ").trim().slice(0, MAX_TAG_NAME).trim();
-      const icon = result.page.icon === undefined ? space.icon : result.page.icon || null;
-      if ((!name || name === space.name) && icon === space.icon) return;
-      try {
-        spaces.update(space.id, { ...(name ? { name } : {}), icon });
-        touched = true;
-      } catch {
-        // Another tag or space has that name; the space keeps its own.
-      }
-    });
-    if (touched) tagsChanged();
-  };
   /** Deletes an add-on's items and forgets their tags, tabs and versions. */
   const deleteItems = async (pluginId: string, ids: string[]) => {
     const result = await hub.call(pluginId, "studio_delete", { ids });
@@ -298,20 +234,13 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   const deleteSpace = async (id: string) => {
-    const pageId = spaces.get(id)?.pageId;
     // A heartbeat that can't be turned off keeps the space, so deleting can be retried.
     await spaceLeads.removeSpace(id);
     spaces.remove(id);
-    // The page may hold the user's writing: archive it rather than delete it.
-    if (pageId) void callPages("update", { id: pageId, archived: true }, pageResult).catch(() => {});
     tagsChanged();
   };
-  /** A space's page keeps its name and icon. */
-  const renamePage = (space: Space) => {
-    if (space.pageId) void callPages("update", { id: space.pageId, title: space.name, icon: space.icon ?? "" }, pageResult).catch(() => {});
-  };
-  // Each space's lead thread works beside its page (src/space-lead.ts).
-  const spaceLeads = new SpaceLeads({ db, sdk: bb.sdk, spaces, ensurePage: spacePage, hub, changed: tagsChanged });
+  // Each space's optional lead thread and its heartbeat (src/space-lead.ts).
+  const spaceLeads = new SpaceLeads({ db, sdk: bb.sdk, spaces, changed: tagsChanged });
   /** A thread's space can change without a membership write; sidebars refetch space_of_threads. */
   const threadsMoved = () => { spaceLeads.threadsChanged(); tagsChanged(); };
   bb.events.on("thread.created", () => threadsMoved());
@@ -439,9 +368,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { space: spaces.get(made.id) ?? made };
     },
     updateSpace: ({ id, ...input }) => {
-      const before = spaces.get(id);
       const space = spaces.update(id, input);
-      if (before && (before.name !== space.name || before.icon !== space.icon)) renamePage(space);
       tagsChanged();
       return { space };
     },
@@ -449,16 +376,12 @@ export default async function plugin(bb: BbPluginApi) {
       await deleteSpace(id);
       return { ok: true };
     },
-    spacePage: async ({ id }) => {
-      const pageId = await spacePage(id);
-      return { href: pageId ? pageHref(pageId) : null };
-    },
     spaceTree: async () => {
       const all = spaces.list();
       if (!all.length) return { spaces: [] };
       const { items, providers } = await hub.overview();
       const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
-      const options = { background: backgroundKinds(providers), pagesPluginId: PAGES_PLUGIN_ID, kindIcon: (item: HubItem) => kindsOf.get(`${item.pluginId}:${item.kind}`)?.icon ?? "File" };
+      const options = { background: backgroundKinds(providers), kindIcon: (item: HubItem) => kindsOf.get(`${item.pluginId}:${item.kind}`)?.icon ?? "File" };
       const open = tabs.list();
       return {
         spaces: all.map((space) => {
@@ -468,7 +391,6 @@ export default async function plugin(bb: BbPluginApi) {
             name: space.name,
             icon: space.icon,
             color: space.color,
-            href: space.pageId ? pageHref(space.pageId) : spaceViewHref(space.id),
             items: tree.items,
             itemCount: tree.count,
             open: spaceOpenItems(space, open, items, options.kindIcon),
@@ -495,9 +417,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { space };
     },
     space_lead: ({ spaceId }) => spaceLeads.get(spaceId),
-    space_lead_setup: ({ spaceId, request }) => spaceLeads.setup(spaceId, request),
-    space_thread_start: ({ spaceId, request }) => spaceLeads.startThread(spaceId, request),
-    space_overview: ({ spaceId }) => spaceLeads.overview(spaceId),
+    space_set_lead: ({ spaceId, threadId }) => spaceLeads.setLead(spaceId, threadId),
     space_of_threads: async () => ({ threads: await spaceLeads.spaceOfThreads() }),
     space_set_run: ({ spaceId, ...run }) => spaceLeads.setRun(spaceId, run),
     thread_handoff: ({ threadId, request }) => spaceLeads.handoff(threadId, request),
@@ -539,7 +459,6 @@ export default async function plugin(bb: BbPluginApi) {
       for (const id of fresh === null ? [] : (ids ?? [])) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
       for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });
       services.forgetVersions(pluginId, [...(removed ?? []), ...(fresh === null ? [] : (ids ?? []).filter((id) => !byId.has(id)))]);
-      if (pluginId === PAGES_PLUGIN_ID) await syncSpacePages(ids || removed ? [...(ids ?? []), ...(removed ?? [])] : null);
       bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
       return { ok: true };
     },
@@ -769,7 +688,7 @@ export default async function plugin(bb: BbPluginApi) {
       const projects = space.projectIds.map((id) => projectNames.get(id) ?? id);
       return `- ${space.icon ? `${space.icon} ` : ""}${space.name}${current.some((each) => each.id === space.id) ? " (this thread)" : ""} — ${count} item${count === 1 ? "" : "s"}${
         projects.length ? `, projects: ${projects.join(", ")}` : ""
-      }${space.threadIds.length ? `, ${space.threadIds.length} added thread${space.threadIds.length === 1 ? "" : "s"}` : ""} (${spaceViewHref(space.id)})${space.description ? `\n  ${space.description}` : ""}`;
+      }${space.threadIds.length ? `, ${space.threadIds.length} added thread${space.threadIds.length === 1 ? "" : "s"}` : ""} (${space.id})${space.description ? `\n  ${space.description}` : ""}`;
     }).join("\n");
   };
 

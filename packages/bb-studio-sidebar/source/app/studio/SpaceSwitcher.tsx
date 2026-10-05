@@ -1,0 +1,159 @@
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import { cn } from "@/lib/utils";
+import { Icon } from "@/components/ui/icon";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SIDEBAR_CONTENT_SELECTOR } from "../ui/sidebar.js";
+import type { StudioSpace } from "./space-groups.js";
+
+/** Studio's New space dialog; no detail. */
+export const NEW_SPACE_EVENT = "studio:new-space";
+/** One of a Space's dialogs; detail `{ spaceId, dialog }`. */
+export const SPACE_DIALOG_EVENT = "studio:space-dialog";
+
+export function openSpaceDialog(spaceId: string, dialog: "edit" | "delete" | "heartbeat"): void {
+  window.dispatchEvent(new CustomEvent(SPACE_DIALOG_EVENT, { detail: { spaceId, dialog }, cancelable: true }));
+}
+
+/** The Space before or after `currentId`, wrapping around. */
+export function neighbourSpaceId(spaces: readonly StudioSpace[], currentId: string | null, step: -1 | 1): string | null {
+  if (!spaces.length) return null;
+  const index = spaces.findIndex((space) => space.id === currentId);
+  return spaces[(Math.max(index, 0) + step + spaces.length) % spaces.length]!.id;
+}
+
+/**
+ * ⌃⌥← / ⌃⌥→ anywhere, and a horizontal two-finger swipe over `area`, step
+ * through the Spaces. A swipe switches once per gesture.
+ */
+export function useSpaceSwitchGestures(area: RefObject<HTMLElement | null>, step: (direction: -1 | 1) => void): void {
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || !event.ctrlKey || !event.altKey || event.metaKey || event.shiftKey) return;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      stepRef.current(event.key === "ArrowLeft" ? -1 : 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  useEffect(() => {
+    const element = area.current;
+    if (!element) return;
+    let travel = 0;
+    let spent = false;
+    let idle: ReturnType<typeof setTimeout> | null = null;
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || Math.abs(event.deltaX) <= Math.abs(event.deltaY) * 2) return;
+      // The gesture (and its momentum) ends after a short quiet spell.
+      if (idle) clearTimeout(idle);
+      idle = setTimeout(() => { travel = 0; spent = false; }, 250);
+      if (spent) return;
+      travel += event.deltaX;
+      if (Math.abs(travel) < 120) return;
+      spent = true;
+      stepRef.current(travel > 0 ? 1 : -1);
+    };
+    element.addEventListener("wheel", onWheel, { passive: true });
+    return () => {
+      element.removeEventListener("wheel", onWheel);
+      if (idle) clearTimeout(idle);
+    };
+  }, [area]);
+}
+
+/**
+ * Lets `element` fill the rest of the sidebar's scroll area, so a switcher
+ * at its end sits at the bottom even when the list is short.
+ */
+export function useFillSidebar(element: RefObject<HTMLElement | null>): void {
+  useLayoutEffect(() => {
+    const target = element.current;
+    const content = target?.closest<HTMLElement>(SIDEBAR_CONTENT_SELECTOR);
+    if (!target || !content || typeof ResizeObserver === "undefined") return;
+    const fit = () => {
+      const style = getComputedStyle(content);
+      const offset = target.getBoundingClientRect().top - content.getBoundingClientRect().top + content.scrollTop;
+      const room = content.clientHeight - offset - (Number.parseFloat(style.paddingBottom) || 0);
+      target.style.minHeight = `${Math.max(0, Math.floor(room))}px`;
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(content);
+    return () => {
+      observer.disconnect();
+      target.style.minHeight = "";
+    };
+  }, [element]);
+}
+
+/** A Space's emoji, or a dot in its colour. */
+export function SpaceMark({ space, size = "sm" }: { space: StudioSpace; size?: "sm" | "md" }) {
+  return (
+    <span data-sidebar-space-mark="" aria-hidden="true" className="inline-flex size-4 shrink-0 items-center justify-center">
+      {space.icon
+        ? <span className={cn("leading-none", size === "md" ? "text-[15px]" : "text-[13px]")}>{space.icon}</span>
+        : <span className={cn("rounded-full", size === "md" ? "size-2.5" : "size-2")} style={{ background: space.color }} />}
+    </span>
+  );
+}
+
+/**
+ * Arc-style dots at the bottom of the list: one per Space in Studio's order,
+ * the current one highlighted, a small dot on any with a thread that needs
+ * the user, and + for a new Space.
+ */
+export function SpaceSwitcher({ spaces, currentId, attention, onSelect }: {
+  spaces: readonly StudioSpace[];
+  currentId: string | null;
+  attention: ReadonlySet<string>;
+  onSelect(spaceId: string): void;
+}) {
+  return (
+    <nav
+      aria-label="Spaces"
+      data-sidebar-space-switcher=""
+      className="sticky bottom-0 z-40 mt-auto flex items-center justify-center gap-0.5 bg-sidebar px-2 pt-1.5 pb-2"
+    >
+      {spaces.map((space) => {
+        const current = space.id === currentId;
+        const needsYou = attention.has(space.id);
+        return (
+          <Tooltip key={space.id}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={needsYou ? `${space.name}, needs you` : space.name}
+                aria-current={current ? "true" : undefined}
+                data-space-id={space.id}
+                onClick={() => onSelect(space.id)}
+                className={cn(
+                  "relative inline-flex size-7 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                  current ? "bg-sidebar-accent" : "opacity-60 hover:bg-sidebar-accent/60 hover:opacity-100",
+                )}
+              >
+                <SpaceMark space={space} size="md" />
+                {needsYou ? <span data-space-needs-you="" aria-hidden="true" className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" /> : null}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{space.name}</TooltipContent>
+          </Tooltip>
+        );
+      })}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label="New Space"
+            onClick={() => window.dispatchEvent(new CustomEvent(NEW_SPACE_EVENT, { cancelable: true }))}
+            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-60 outline-none transition-colors hover:bg-sidebar-accent/60 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          >
+            <Icon name="Plus" className="size-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">New Space</TooltipContent>
+      </Tooltip>
+    </nav>
+  );
+}

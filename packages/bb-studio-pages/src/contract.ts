@@ -214,11 +214,6 @@ export const rpcContract = defineRpcContract({
     output: z.object({ table: tableSchema }),
   },
 
-  /** The space whose page this is, through Studio; null for any other page or without Studio. */
-  spaceOfPage: {
-    input: z.object({ id: pageId }),
-    output: z.object({ space: z.object({ id: z.string(), name: z.string() }).nullable() }),
-  },
   recordingView: {
     input: z.object({ id: itemId }),
     output: z.object({ recording: recordingCardSchema.nullable() }),

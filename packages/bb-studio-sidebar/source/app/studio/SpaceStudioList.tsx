@@ -1,5 +1,5 @@
-import { useCallback, useState, type ReactNode } from "react";
-import { openFloat, useCanFloat } from "@bb-studio/kit/app";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import { openAppPath, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
@@ -20,8 +20,28 @@ import {
   SIDEBAR_ROW_GLYPH_SLOT_CLASS,
   SIDEBAR_ROW_INTERACTIVE_STATE_CLASS,
 } from "../rows/sidebarRowClasses.js";
-import type { OpenInSpaceRequest } from "./openInSpace.js";
 import type { SpaceItems } from "./studioSpaces.js";
+
+let splitting = false;
+
+/**
+ * Opens a Studio item in the main area: in a split beside the current pane,
+ * or in its place with `inPlace` (⌘/Ctrl-click) or when BB won't split.
+ * `anchor` is a link this plugin renders; BB splits a Mod-click on one.
+ */
+export function openStudioItem(anchor: HTMLAnchorElement | null, href: string, inPlace = false): void {
+  if (!inPlace) {
+    splitting = true;
+    try {
+      if (openPathInSplit(anchor, href)) return;
+    } catch {
+      // No split here; open in place.
+    } finally {
+      splitting = false;
+    }
+  }
+  openAppPath(href, { main: true });
+}
 
 /** "Studio" or "Threads" inside a Space, with its own controls on hover. */
 export function SpaceSubheading({ title, action }: { title: string; action?: ReactNode }) {
@@ -47,12 +67,13 @@ const createdSchema = z.object({ href: z.string(), title: z.string().optional() 
 
 type Kind = z.infer<typeof kindSchema> & { pluginId: string; providerName: string };
 
-/** + on the Studio list: every kind of Studio item, made in the Space's folder. */
-function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
+/** Every kind of Studio item, made in the Space's folder, from `children` (+ by default). */
+function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated, children }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
-  onCreated(request: OpenInSpaceRequest): void;
+  onCreated(href: string): void;
+  children?: ReactNode;
 }) {
   const sdk = useSdk();
   const [kinds, setKinds] = useState<Kind[] | null>(null);
@@ -73,8 +94,8 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
       return;
     }
     try {
-      const { href, title } = await call("createInSpace", { id: spaceId, pluginId: kind.pluginId, kind: kind.id }, createdSchema);
-      onCreated({ kind: "item", path: href, title: title ?? kind.label });
+      const { href } = await call("createInSpace", { id: spaceId, pluginId: kind.pluginId, kind: kind.id }, createdSchema);
+      onCreated(href);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -82,9 +103,11 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={`New Studio item in ${spaceName}`} title="New Studio item" className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")} onClick={(event) => event.stopPropagation()}>
-          <Icon name="Plus" className="size-3.5" />
-        </button>
+        {children ?? (
+          <button type="button" aria-label={`New Studio item in ${spaceName}`} title="New Studio item" className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")} onClick={(event) => event.stopPropagation()}>
+            <Icon name="Plus" className="size-3.5" />
+          </button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48" aria-label={`New in ${spaceName}`}>
         {(kinds ?? []).map((kind) => (
@@ -114,9 +137,13 @@ function openMenu(button: HTMLElement) {
   button.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom }));
 }
 
-/** An open Studio item: click opens it beside the lead; right-click or ⋯ has the rest, as a thread's menu does. */
-function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): void; onClose(): void }) {
+/**
+ * An open Studio item: click opens it in a split beside the current pane,
+ * ⌘/Ctrl-click in its place; right-click or ⋯ has the rest, as a thread's menu does.
+ */
+function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
   const sdk = useSdk();
+  const link = useRef<HTMLAnchorElement>(null);
   const canFloat = useCanFloat({ kind: "path", path: item.href, title: item.title });
   const [renaming, setRenaming] = useState(false);
   const call = (method: "archive" | "remove" | "rename", input: Record<string, unknown>) =>
@@ -148,12 +175,14 @@ function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): vo
       <ContextMenuTrigger asChild>
         <div className="group/item relative" data-space-studio-item={`${item.pluginId}:${item.id}`}>
           <a
+            ref={link}
             href={item.href}
             title={item.title}
             onClick={(event) => {
-              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              // The split's own Mod-click goes on to BB.
+              if (splitting || event.button !== 0 || event.shiftKey || event.altKey) return;
               event.preventDefault();
-              onOpen();
+              openStudioItem(link.current, item.href, event.metaKey || event.ctrlKey);
             }}
             onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); onClose(); } }}
             className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pr-14 pl-2 text-left")}
@@ -219,18 +248,19 @@ function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): vo
 }
 
 /**
- * A Space's open Studio items, like tabs: each opens beside the lead, and ×
+ * A Space's open Studio items, like tabs: each opens in the main area, and ×
  * closes it here without touching the item. Opening any of the Space's items
- * adds it; the Studio label, or the button beside +, opens the rest in a Studio tab.
+ * adds it; + makes a new one in the Space and opens it in a split.
  */
-export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, onOpen }: {
+export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
   items: SpaceItems | undefined;
-  onOpen(request: OpenInSpaceRequest): void;
 }) {
   const sdk = useSdk();
+  const splitLink = useRef<HTMLAnchorElement>(null);
+  const openCreated = (href: string) => openStudioItem(splitLink.current, href);
   // Closed here until Studio's next list catches up.
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const key = (item: { pluginId: string; id: string }) => `${item.pluginId}:${item.id}`;
@@ -246,31 +276,20 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, o
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
         title="Studio"
-        action={(
-          <span className="inline-flex items-center gap-0.5">
-            {total ? (
-              <button
-                type="button"
-                aria-label={`All Studio items in ${spaceName}`}
-                title={`All ${total} ${total === 1 ? "item" : "items"}`}
-                onClick={() => onOpen({ kind: "items" })}
-                className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
-              >
-                <Icon name="Layers" className="size-3.5" />
-              </button>
-            ) : null}
-            <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={onOpen} />
-          </span>
-        )}
+        action={<NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openCreated} />}
       />
+      {/* BB splits a Mod-click on a link this plugin renders; new items open through this one. */}
+      <a ref={splitLink} href="/" hidden aria-hidden="true" tabIndex={-1} onClick={(event) => { if (!splitting) event.preventDefault(); }} />
       {open.map((item) => (
-        <StudioItemRow key={key(item)} item={item} onOpen={() => onOpen({ kind: "item", path: item.href, title: item.title })} onClose={() => close(item)} />
+        <StudioItemRow key={key(item)} item={item} onClose={() => close(item)} />
       ))}
       {!open.length && !total ? (
-        <button type="button" onClick={() => onOpen({ kind: "new-item" })} className={quietRow}>
-          <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}><Icon name="Plus" className="size-3.5" /></span>
-          <span className="truncate">New page, drawing or table</span>
-        </button>
+        <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openCreated}>
+          <button type="button" className={quietRow}>
+            <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}><Icon name="Plus" className="size-3.5" /></span>
+            <span className="truncate">New page, drawing or table</span>
+          </button>
+        </NewItemMenu>
       ) : null}
     </div>
   );

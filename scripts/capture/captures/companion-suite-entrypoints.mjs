@@ -46,19 +46,6 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
       if (!thread) throw new Error("Activity fixture cannot find its seeded, nonexecuting thread");
       return { path: "/plugins/studio/studio/activity", ready: "select", initialValue: "30", visibleText: thread.title, cleanup: async () => {} };
     } },
-    { id: "studio-space", packageDir: "bb-studio", seed: async () => {
-      await requireStage();
-      let space;
-      const cleanup = async () => {
-        try { if (space) await pluginRpc("studio", "deleteSpace", { id: space.id }); }
-        finally { await bbCli(["plugin", "enable", "pages", "--json"]); }
-      };
-      try {
-        await bbCli(["plugin", "disable", "pages", "--json"]);
-        ({ space } = await pluginRpc("studio", "createSpace", { name: "Release companion checks", description: "A staged fallback space with Pages disabled.", defaultProjectId: projectId }));
-        return { path: `/plugins/studio/spaces/${space.id}`, ready: 'button[aria-label="Space options"]', visibleText: space.name, cleanup };
-      } catch (error) { await cleanup(); throw error; }
-    } },
     { id: "chat-plain", packageDir: "bb-studio-chat", seed: async () => ({ path: "/plugins/studio-chat/chats", ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent general conversation", attachment: true, cleanup: async () => {} }) },
     { id: "chat-quote", packageDir: "bb-studio-chat", seed: async client => {
       const { page, cleanup } = await seedPages();

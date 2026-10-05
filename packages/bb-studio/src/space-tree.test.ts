@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { Space } from "./spaces";
 import { spaceOpenItems, spaceTreeItems, type TreeSource } from "./space-tree";
 
-const space: Space = { id: "s1", isDefault: false, name: "Launch", color: "#000", icon: null, description: "", defaultProjectId: null, projectIds: ["proj_app"], threadIds: [], itemKeys: [], pageId: "home", createdAt: 0, updatedAt: 0 };
+const space: Space = { id: "s1", isDefault: false, name: "Launch", color: "#000", icon: null, description: "", defaultProjectId: null, projectIds: ["proj_app"], threadIds: [], itemKeys: [], createdAt: 0, updatedAt: 0 };
 const item = (pluginId: string, id: string, updatedAt: number, extra: Partial<TreeSource> = {}): TreeSource => ({ pluginId, id, kind: "page", title: id, icon: null, href: `/${id}`, updatedAt, projectId: "proj_app", parentId: null, archived: false, ...extra });
-const options = { background: new Set(["talk:note"]), kindIcon: () => "File", pagesPluginId: "pages" };
+const options = { background: new Set(["talk:note"]), kindIcon: () => "File" };
 
 describe("spaceTreeItems", () => {
   it("lists held items newest first, sub-pages under their parent", () => {
@@ -12,7 +12,6 @@ describe("spaceTreeItems", () => {
       item("pages", "a", 1),
       item("pages", "b", 3, { parentId: "a" }),
       item("pages", "c", 2, { parentId: "b" }),
-      item("pages", "home", 9),
       item("excalidraw", "d", 5, { projectId: "proj_app" }),
       item("pages", "other", 7, { projectId: null }),
       item("talk", "t1", 8, { kind: "note" }),

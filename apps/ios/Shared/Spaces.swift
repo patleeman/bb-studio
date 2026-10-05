@@ -3,7 +3,6 @@ import Foundation
 // MARK: Studio spaces
 
 /// A place the user gathers threads and projects in; items follow their project.
-/// It opens as its own page in Pages.
 public struct StudioSpace: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
@@ -17,13 +16,11 @@ public struct StudioSpace: Codable, Identifiable, Hashable, Sendable {
     /// BB projects whose items and threads all belong to the space.
     public var projectIds: [String]
     public var threadIds: [String]
-    /// The space's page, or nil before it has one.
-    public var pageId: String?
 
     public var emoji: String? { icon.flatMap { $0.isEmpty ? nil : $0 } }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, color, icon, description, defaultProjectId, projectIds, threadIds, pageId
+        case id, name, color, icon, description, defaultProjectId, projectIds, threadIds
     }
 
     public init(from decoder: Decoder) throws {
@@ -36,7 +33,6 @@ public struct StudioSpace: Codable, Identifiable, Hashable, Sendable {
         defaultProjectId = try? c.decode(String.self, forKey: .defaultProjectId)
         projectIds = (try? c.decode([String].self, forKey: .projectIds)) ?? []
         threadIds = (try? c.decode([String].self, forKey: .threadIds)) ?? []
-        pageId = try? c.decode(String.self, forKey: .pageId)
     }
 
     /// What Studio calls a whole project or a thread when adding one to a space.
@@ -95,11 +91,5 @@ extension BBClient {
 
     public func spacesForThread(_ threadId: String) async throws -> ThreadSpaces {
         try await rpc("studio", Studio.Method.spacesForThread, ["threadId": .string(threadId)])
-    }
-
-    /// The path of the space's page, made from the space template if it has none; nil without Pages.
-    public func spacePage(_ id: String) async throws -> String? {
-        let result: Studio.SpacePageOutput = try await rpc("studio", Studio.Method.spacePage, ["id": .string(id)])
-        return result.href
     }
 }

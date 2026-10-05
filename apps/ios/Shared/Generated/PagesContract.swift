@@ -19,7 +19,6 @@ public enum Pages {
     public static let tableUpdate = "tableUpdate"
     public static let tablePatchRows = "tablePatchRows"
     public static let tableCreate = "tableCreate"
-    public static let spaceOfPage = "spaceOfPage"
     public static let recordingView = "recordingView"
     public static let markdown = "markdown"
     public static let editableMarkdown = "editableMarkdown"
@@ -77,8 +76,6 @@ public enum Pages {
   public typealias TablePatchRows = TablePatchRowsOutput
 
   public typealias TableCreate = TableCreateOutput
-
-  public typealias SpaceOfPage = SpaceOfPageOutput
 
   public typealias RecordingView = RecordingViewOutput
 
@@ -2029,32 +2026,6 @@ public enum Pages {
 
     public init(table: TableCreateOutputTable? = nil) {
       self.table = table
-    }
-  }
-
-  public struct SpaceOfPageInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct SpaceOfPageOutputSpace: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-
-    public init(id: String? = nil, name: String? = nil) {
-      self.id = id
-      self.name = name
-    }
-  }
-
-  public struct SpaceOfPageOutput: Sendable, Hashable, Codable {
-    public var space: SpaceOfPageOutputSpace?
-
-    public init(space: SpaceOfPageOutputSpace? = nil) {
-      self.space = space
     }
   }
 

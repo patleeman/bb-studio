@@ -35,8 +35,6 @@ export interface Space {
   threadIds: string[];
   /** Always empty: items follow their project. Kept for clients that read it. */
   itemKeys: string[];
-  /** The space's home: a Pages page made from the space template, or null before it has one. */
-  pageId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -53,7 +51,7 @@ export type SpaceMember = ItemRef;
 
 type Row = {
   id: string; name: string; color: string; icon: string | null; description: string; default_project_id: string | null;
-  page_id: string | null; is_default: number; created_at: number; updated_at: number;
+  is_default: number; created_at: number; updated_at: number;
 };
 
 function spaceName(raw: string): string {
@@ -103,7 +101,6 @@ export class SpaceStore {
       projectIds: projects.filter((project) => project.space_id === row.id).map((project) => project.project_id),
       threadIds: threads.filter((thread) => thread.space_id === row.id).map((thread) => thread.thread_id),
       itemKeys: [],
-      pageId: row.page_id,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -244,12 +241,6 @@ export class SpaceStore {
       if (member.pluginId === THREAD_REF) this.threads.remove(id, member.id);
       else if (this.forProject(member.id).id === id) this.moveProject(member.id, this.defaultSpace().id);
     }
-  }
-
-  /** Sets or clears the space's home page. */
-  setPage(id: string, pageId: string | null): void {
-    this.require(id);
-    this.db.prepare("UPDATE spaces SET page_id = ? WHERE id = ?").run(pageId, id);
   }
 }
 

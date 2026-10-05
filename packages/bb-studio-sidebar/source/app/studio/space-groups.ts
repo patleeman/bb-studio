@@ -7,12 +7,19 @@ export interface StudioSpace {
   color: string;
   icon: string | null;
   defaultProjectId: string | null;
+  /** Studio's default Space (Personal): threads in no Space belong to it. */
+  isDefault: boolean;
+}
+
+/** The default Space: Studio's flagged one, else the first. */
+export function defaultSpaceId(spaces: readonly StudioSpace[]): string | null {
+  return (spaces.find((space) => space.isDefault) ?? spaces[0])?.id ?? null;
 }
 
 export interface SpaceThreadGroup {
   space: StudioSpace;
   leadThreadId: string | null;
-  /** The lead, when it's listed. The Space's heading opens it, so it isn't in `threads`. */
+  /** The lead, when it's listed. It shows above the Space's lists, so it isn't in `threads`. */
   lead: SidebarThread | null;
   /** Every other thread in the Space; the lead's workers show at the top level. */
   threads: SidebarThread[];
@@ -22,19 +29,17 @@ export function spaceSectionKey(spaceId: string): `space:${string}` {
   return `space:${spaceId}`;
 }
 
-export function spaceHref(spaceId: string): string {
-  return `/plugins/studio/spaces/${encodeURIComponent(spaceId)}`;
-}
-
 /**
  * Which known Space a thread shows under. A child stays with its root's Space
  * so a thread tree is never split; a root without a Space falls back to the
- * thread's own. Unknown Space ids count as no Space.
+ * thread's own. Unknown Space ids count as no Space, which is `fallback`
+ * (the default Space) when given.
  */
 export function createSpaceResolver(
   threads: readonly SidebarThread[],
   spaceOf: Readonly<Record<string, string>>,
   spaceIds: ReadonlySet<string>,
+  fallback: string | null = null,
 ): (thread: SidebarThread) => string | null {
   const byId = new Map(threads.map((thread) => [thread.id, thread]));
   const known = (id: string) => {
@@ -50,13 +55,14 @@ export function createSpaceResolver(
       seen.add(parent.id);
       root = parent;
     }
-    return known(root.id) ?? known(thread.id);
+    return known(root.id) ?? known(thread.id) ?? fallback;
   };
 }
 
 /**
  * One group per Space in Studio's order, each with its threads apart from the
- * lead, and the threads in no (known) Space for the closing Threads section.
+ * lead. Threads in no (known) Space join the default Space; `loose` holds
+ * them only when there are no Spaces at all.
  */
 export function buildSpaceThreadGroups(
   threads: readonly SidebarThread[],
@@ -64,7 +70,7 @@ export function buildSpaceThreadGroups(
   spaceOf: Readonly<Record<string, string>>,
   leads: Readonly<Record<string, string | null>>,
 ): { groups: SpaceThreadGroup[]; loose: SidebarThread[] } {
-  const resolve = createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)));
+  const resolve = createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), defaultSpaceId(spaces));
   const bySpace = new Map<string, SidebarThread[]>();
   const loose: SidebarThread[] = [];
   for (const thread of threads) {

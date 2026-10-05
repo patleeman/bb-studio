@@ -48,6 +48,7 @@ import { visibleProjects } from "../studio/visibleProjects.js";
 import { HiddenThreadsProvider, useHiddenThreads } from "../studio/useHiddenThreads.js";
 import { createSectionKeyResolver } from "../studio/hidden-threads.js";
 import { SpaceModeSections } from "../studio/SpaceModeSections.js";
+import { defaultSpaceId } from "../studio/space-groups.js";
 import { publishSidebarOrganization, useStudioSpaces, useStudioSpacesSync } from "../studio/studioSpaces.js";
 import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
 import {
@@ -1437,6 +1438,7 @@ function ProjectListComponent({
       personalProjectId,
       spaceOf: spaceData?.spaceOf ?? {},
       spaceIds: new Set(spaceData?.spaces.map((space) => space.id) ?? []),
+      defaultSpaceId: spaceData ? defaultSpaceId(spaceData.spaces) : null,
     }),
     [effectiveMode, personalProjectId, spaceData],
   );
@@ -1854,6 +1856,7 @@ function ProjectListComponent({
               spaces={spaceData.spaces}
               spaceOf={spaceData.spaceOf}
               leads={spaceData.leads}
+              heartbeats={spaceData.heartbeats}
               items={spaceData.items}
               threads={threads}
               draftThreadIds={draftThreadIds}

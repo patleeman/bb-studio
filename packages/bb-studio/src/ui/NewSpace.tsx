@@ -1,12 +1,12 @@
 // Makes a space from anywhere that offers New Space (the Spaces sidebar
-// section, the Spaces panel), then opens it. Nothing is preselected: a new
-// space gets its own folder unless the user picks a project to move in.
-import { openAppPath, useProjects } from "@bb-studio/kit/app";
+// section, or Studio Sidebar by NEW_SPACE_EVENT). Nothing is preselected: a
+// new space gets its own folder unless the user picks a project to move in.
+import { useProjects } from "@bb-studio/kit/app";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { rpcContract } from "../contract";
 import { NEW_SPACE_EVENT } from "../ids";
-import { SpaceDialog, spaceLink } from "./Spaces";
+import { SpaceDialog } from "./Spaces";
 
 export function NewSpace() {
   const rpc = useRpc<typeof rpcContract>();
@@ -27,10 +27,7 @@ export function NewSpace() {
       space={null}
       projects={projects}
       onClose={() => setMaking(false)}
-      onSaved={(saved) => {
-        setMaking(false);
-        openAppPath(spaceLink(saved));
-      }}
+      onSaved={() => setMaking(false)}
     />
   );
 }

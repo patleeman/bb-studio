@@ -1,8 +1,8 @@
 // The Studio collection: every add-on's items in one list, filtered by one
 // query (src/query.ts) from the bar above it and the rail beside it. The
 // panel's sub-path can start the query on a kind, so
-// /plugins/studio/studio/recording links to recordings. A space opens in the
-// Spaces panel (space/routes.ts); openCollectionQuery lists one here.
+// /plugins/studio/studio/recording links to recordings. openSpaceItems lists
+// a space's items here.
 import {
   CollectionPage,
   ViewMoveMenu,
@@ -15,7 +15,6 @@ import {
   EmptyState,
   Icon,
   ICON_BUTTON,
-  GHOST_BUTTON,
   itemKey,
   PageColumn,
   openAppPath,
@@ -38,7 +37,6 @@ import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type 
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
 import { SpaceGlyph } from "./Spaces";
-import { spaceViewHref } from "./space/routes";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
 const REFETCH_DEBOUNCE_MS = 300;
@@ -57,6 +55,11 @@ export function openCollectionQuery(navigate: ReturnType<typeof useBbNavigate>, 
   }
   window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: formatQuery(query) }));
   navigate.toPluginPanel("studio", { subPath: "" });
+}
+
+/** Opens the Studio collection on a space's items. */
+export function openSpaceItems(navigate: ReturnType<typeof useBbNavigate>, space: { name: string }): void {
+  openCollectionQuery(navigate, { filters: [{ field: "space", value: space.name }], text: "" });
 }
 
 /** The query, remembered across visits. */
@@ -228,7 +231,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   );
   const requested = decodeSegment(subPath.split("/").filter(Boolean)[0] ?? "") || "all";
   const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
-  const openSpace = useCallback((id: string | null) => id ? openAppPath(spaceViewHref(id)) : navigate.toPluginPanel("studio", { subPath: "" }), [navigate]);
 
   const [query, setQuery] = useStoredQuery(QUERY_KEY);
   // A link to a kind starts the query on it.
@@ -398,16 +400,9 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     } })),
   ];
 
-  // Filtering to a space links to it, where its threads and projects are.
   const filteredSpaces = (data?.spaces ?? []).filter((each) =>
     query.filters.some((filter) => filter.field === "space" && !filter.negate && filter.value.toLowerCase() === each.name.toLowerCase()),
   );
-  // The chip already names the space; this links to its page.
-  const spaceLinks = filteredSpaces.map((each) => (
-    <button key={each.id} type="button" className={GHOST_BUTTON} title={each.description || undefined} onClick={() => openSpace(each.id)}>
-      <SpaceGlyph space={each} className="text-sm leading-none" /> Open {each.name} <Icon name="ArrowRight" />
-    </button>
-  ));
   const collectionSpaces = useMemo(
     () => (data?.spaces ?? []).map((each) => ({ id: each.id, name: each.name, glyph: <SpaceGlyph space={each} className="w-3.5 text-center text-xs leading-none" /> })),
     [data?.spaces],
@@ -546,7 +541,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         filter={{
           bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} onOpenFilters={() => setFiltersOpen(true)} loading={!data || !projects.length} />,
           rail,
-          toolbar: spaceLinks.length ? <>{spaceLinks}</> : undefined,
           text: searchText,
           snippets,
           archived: compiled.archived,
@@ -560,16 +554,9 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   );
 }
 
-/** What an itemless space holds instead, since threads and projects live on its page. */
+/** An itemless space: its threads and projects are in the sidebar. */
 function spaceEmpty(spaces: readonly SpaceView[]): string {
-  // Added threads may since be archived, so this says what kinds, not how many.
-  const threads = spaces.some((each) => each.threadIds.length);
-  const projects = spaces.some((each) => each.projectIds.length);
-  const elsewhere = [threads ? "threads" : null, projects ? "projects" : null].filter(Boolean).join(" and ");
-  const which = spaces.length === 1 ? "this space" : "these spaces";
-  return elsewhere
-    ? `No items in ${which} yet. Its ${elsewhere} are in the space.`
-    : `No items in ${which} yet. Open it to add projects and threads.`;
+  return `No items in ${spaces.length === 1 ? "this space" : "these spaces"} yet.`;
 }
 
 /** A path segment, or "" for a malformed one like `100%`. */

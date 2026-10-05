@@ -1,6 +1,6 @@
 // The Spaces section of the sidebar: one row per Space, with a dot when one of
-// its threads needs you or a spinner while one runs. A row opens the Space
-// (its lead, with the page beside it); + makes a new one.
+// its threads needs you or a spinner while one runs. A row lists the Space's
+// items in Studio; + makes a new one.
 import {
   SIDEBAR_ROW,
   SIDEBAR_ROW_SELECTED,
@@ -10,7 +10,6 @@ import {
   cn,
   useSidebarHosted,
   useSidebarNavigated,
-  usePathname,
 } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import {
@@ -22,9 +21,10 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { useMemo, useSyncExternalStore } from "react";
 import { NEW_SPACE_EVENT, TABS_CHANNEL } from "../../ids";
+import { openSpaceItems } from "../StudioPanel";
 import { useSpaceOf, useSpaces } from "./data";
-import { RUNNING } from "./Overview";
-import { SPACES_PANEL, spaceViewHref } from "./routes";
+
+const RUNNING = new Set(["running", "starting", "active", "stopping", "provisioning"]);
 
 function Status({ threads }: { threads: readonly PluginSidebarThread[] }) {
   if (threads.some((thread) => thread.hasPendingInteraction)) return <span aria-label="Needs you" className="size-2 shrink-0 rounded-full bg-warning-foreground" />;
@@ -39,7 +39,6 @@ function SpacesList() {
   const { threadId } = useBbContext();
   const navigate = useBbNavigate();
   const navigated = useSidebarNavigated();
-  const pathname = usePathname();
   const bySpace = useMemo(() => {
     const map = new Map<string, PluginSidebarThread[]>();
     for (const thread of threads) {
@@ -54,13 +53,13 @@ function SpacesList() {
     <SidebarSection title="Spaces" actions={[{ label: "New Space", icon: "Plus", onClick: () => window.dispatchEvent(new CustomEvent(NEW_SPACE_EVENT, { cancelable: true })) }]}>
       <div className="space-y-px px-1">
         {(spaces ?? []).map((space) => {
-          const active = pathname === spaceViewHref(space.id) || activeSpace === space.id;
+          const active = activeSpace === space.id;
           return (
             <button
               key={space.id}
               type="button"
               aria-current={active ? "page" : undefined}
-              onClick={() => { navigate.toPluginPanel(SPACES_PANEL, { subPath: space.id }); navigated(); }}
+              onClick={() => { openSpaceItems(navigate, space); navigated(); }}
               className={cn(SIDEBAR_ROW, active && SIDEBAR_ROW_SELECTED)}
             >
               <span className="inline-flex size-4 shrink-0 items-center justify-center">

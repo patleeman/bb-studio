@@ -2,7 +2,6 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { spaceRunSchema, type SpaceRun } from "./contract";
-import type { HubItem } from "./hub";
 import { SpaceLeads } from "./space-lead";
 import { SpaceStore, THREAD_REF } from "./spaces";
 
@@ -54,16 +53,15 @@ async function setup(migrations = MIGRATIONS) {
   const spaces = new SpaceStore(db);
   const garden = spaces.create({ name: "Garden", defaultProjectId: "p" });
   const kitchen = spaces.create({ name: "Kitchen", defaultProjectId: "q" });
-  let pageCount = 0;
-  const pages = new Map<string, string>();
-  const ensurePage = vi.fn(async (spaceId: string) => {
-    if (!pages.has(spaceId)) { pages.set(spaceId, `pg_${++pageCount}`); spaces.setPage(spaceId, pages.get(spaceId)!); }
-    return pages.get(spaceId)!;
-  });
-  const items: HubItem[] = [];
   const changed = vi.fn();
-  const leads = new SpaceLeads({ db, sdk: bb.sdk, spaces, ensurePage, hub: { overview: async () => ({ items, providers: [] }) }, changed });
-  return { bb, db, spaces, leads, threads, spawn, get, archive, callRpc, automations, ensurePage, items, changed, garden, kitchen };
+  const leads = new SpaceLeads({ db, sdk: bb.sdk, spaces, changed });
+  return { bb, db, spaces, leads, threads, spawn, get, archive, callRpc, automations, changed, garden, kitchen };
+}
+
+/** Starts a thread in the Garden's project and makes it the space's lead. */
+async function lead(x: Awaited<ReturnType<typeof setup>>, spaceId = x.garden.id) {
+  const thread = await x.spawn({ projectId: "p", title: "Garden · lead" });
+  return x.leads.setLead(spaceId, thread.id);
 }
 
 it.each<[SpaceRun["cadence"], string]>([
@@ -73,7 +71,7 @@ it.each<[SpaceRun["cadence"], string]>([
   ["custom", "5,35 8-18/2 * JAN,MAR MON-FRI"],
 ])("schedules %s and reuses its automation when settings change", async (cadence, cron) => {
   const x = await setup();
-  await x.leads.setup(x.garden.id, request);
+  await lead(x);
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily", time: "08:30" });
   const run = { enabled: true, cadence, ...(cadence === "custom" ? { cron: `  ${cron}  ` } : {}) };
   expect(await x.leads.setRun(x.garden.id, run)).toMatchObject({ run: { enabled: true, cadence, time: "08:30", ...(cadence === "custom" ? { cron } : {}) } });
@@ -85,7 +83,7 @@ it.each<[SpaceRun["cadence"], string]>([
 
 it("retains custom cron when switched off and uses it when enabled again", async () => {
   const x = await setup();
-  await x.leads.setup(x.garden.id, request);
+  await lead(x);
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "custom", cron: "*/15 9-17 * * 1-5" });
   expect(await x.leads.setRun(x.garden.id, { enabled: false, cadence: "custom" })).toMatchObject({ run: { enabled: false, cadence: "custom", cron: "*/15 9-17 * * 1-5" } });
   expect(x.automations).toHaveLength(0);
@@ -100,7 +98,7 @@ it("migrates legacy settings and automation identity without changing them", asy
   x.bb.storage.migrate(x.db, MIGRATIONS);
   expect(x.leads.runs.get(x.garden.id)).toEqual({ enabled: true, cadence: "weekdays", time: "08:30" });
   expect(x.db.prepare("SELECT automation_id, automation_project_id, cron FROM space_runs WHERE space_id = ?").get(x.garden.id)).toEqual({ automation_id: "legacy", automation_project_id: "p", cron: null });
-  await x.leads.setup(x.garden.id, request);
+  await lead(x);
   x.callRpc.mockClear();
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "every6hours" });
   expect(x.callRpc.mock.calls.some(([arg]) => arg.method === "automations_create")).toBe(false);
@@ -109,7 +107,7 @@ it("migrates legacy settings and automation identity without changing them", asy
 
 it.each([undefined, "", "not a cron expression", "* * * *", "0 * * * * *", "60 * * * *", "0 24 * * *", "0 9 0 * *", "0 9 * 13 *", "0 9 * * 8", "*/0 * * * *", "5-1 * * * *", "1,,2 * * * *", "0 9 * * FUNDAY", "0 9 * * 1/garbage"])("rejects invalid custom cron %s before changing storage or automations", async (cron) => {
   const x = await setup();
-  await x.leads.setup(x.garden.id, request);
+  await lead(x);
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
   const before = x.leads.runs.get(x.garden.id);
   x.callRpc.mockClear();
@@ -129,7 +127,7 @@ it("accepts valid cron lists, ranges, names and steps at the contract boundary",
 
 it("keeps saved settings when Automations rejects a custom schedule", async () => {
   const x = await setup();
-  await x.leads.setup(x.garden.id, request);
+  await lead(x);
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily", time: "08:30" });
   const before = x.leads.runs.get(x.garden.id);
   x.callRpc.mockRejectedValueOnce(new Error("Automation schedule validation failed"));
@@ -138,43 +136,40 @@ it("keeps saved settings when Automations rejects a custom schedule", async () =
   expect(x.automations).toHaveLength(1);
 });
 
-it("sets up one lead per space, serialized and idempotent, and recreates a deleted lead", async () => {
+it("makes an existing thread the lead, adds it to the space, and clears a deleted lead", async () => {
   const x = await setup();
-  expect(await x.leads.get(x.garden.id)).toMatchObject({ spaceId: x.garden.id, name: "Garden", leadThreadId: null, pageId: null, run: null, defaultProjectId: "p" });
-  const [a, b] = await Promise.all([x.leads.setup(x.garden.id, request), x.leads.setup(x.garden.id, request)]);
-  expect(a).toEqual(b);
-  expect(a).toMatchObject({ leadThreadId: "t1", pageId: "pg_1", pageHref: "/plugins/pages/pages/pg_1" });
-  expect(x.spawn).toHaveBeenCalledTimes(1);
-  const args = x.spawn.mock.calls[0]![0] as unknown as { projectId: string; title: string; pluginMetadata: unknown; input: { text: string; visibility?: string }[] };
-  expect(args).toMatchObject({ projectId: "p", providerId: "codex", title: "Garden · lead", pluginMetadata: { role: "space-lead", spaceId: x.garden.id, pageId: "pg_1" } });
-  expect(args.input[0]).toMatchObject({ visibility: "agent-only" });
-  for (const text of ["/plugins/pages/pages/pg_1", "studio_space_items", "feed_post"]) expect(args.input[0]!.text).toContain(text);
-  expect(args.input[1]).toMatchObject({ text: "Grow tomatoes" });
-  expect(x.spaces.ownerOfThread({ id: "t1", projectId: "p" })).toBe(x.garden.id);
-  expect(x.spaces.get(x.garden.id)!.threadIds).toEqual(["t1"]);
-
-  x.threads.delete("t1");
-  expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: null, pageId: "pg_1" });
-  expect(await x.leads.setup(x.garden.id, request)).toMatchObject({ leadThreadId: "t2", pageId: "pg_1" });
+  expect(await x.leads.get(x.garden.id)).toMatchObject({ spaceId: x.garden.id, name: "Garden", leadThreadId: null, run: null, defaultProjectId: "p" });
+  const visitor = await x.spawn({ projectId: "q" });
+  await expect(x.leads.setLead(x.garden.id, "missing")).rejects.toThrow("no longer exists");
+  expect(await x.leads.setLead(x.garden.id, visitor.id)).toMatchObject({ leadThreadId: visitor.id });
+  // A thread from another space's project joins this one.
+  expect(x.spaces.threads.explicit(visitor.id)).toBe(x.garden.id);
+  // A thread already in the space through its project isn't added.
+  const local = await x.spawn({ projectId: "p" });
+  await x.leads.setLead(x.garden.id, local.id);
+  expect(x.spaces.threads.explicit(local.id)).toBeNull();
   expect(x.spawn).toHaveBeenCalledTimes(2);
+
+  x.threads.delete(local.id);
+  expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: null });
 });
 
-it("spawns a space without a default project's lead in Personal and keeps a failed spawn retryable", async () => {
+it("clearing the lead turns the heartbeat off; a new lead takes it over", async () => {
   const x = await setup();
-  const loose = x.spaces.create({ name: "Loose" });
-  x.spawn.mockRejectedValueOnce(new Error("Provider offline"));
-  await expect(x.leads.setup(loose.id, request)).rejects.toThrow("Provider offline");
-  expect(x.ensurePage).toHaveBeenCalledTimes(1);
-  const done = await x.leads.setup(loose.id, request);
-  expect(done.leadThreadId).toBe("t1");
-  expect(x.spawn.mock.calls[1]![0]).toMatchObject({ projectId: "proj_personal" });
+  await lead(x);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
+  const next = await x.spawn({ projectId: "p" });
+  await x.leads.setLead(x.garden.id, next.id);
+  const update = x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_update").at(-1)![0] as unknown as { input: { execution: { targetThreadId: string } } };
+  expect(update.input.execution.targetThreadId).toBe(next.id);
+  expect(await x.leads.setLead(x.garden.id, null)).toMatchObject({ leadThreadId: null, run: { enabled: false } });
+  expect(x.automations).toHaveLength(0);
 });
 
-it("starts threads in the space and keeps each thread in one space", async () => {
+it("keeps each thread in one space and maps threads to their space", async () => {
   const x = await setup();
-  const { threadId } = await x.leads.startThread(x.garden.id, request);
-  // The project picked in the composer is honored; the thread joins the space anyway.
-  expect(x.spawn.mock.calls[0]![0]).toMatchObject({ projectId: "elsewhere" });
+  const { id: threadId } = await x.spawn({ projectId: "p" });
+  x.spaces.add(x.garden.id, [{ pluginId: THREAD_REF, id: threadId }]);
   expect(x.spaces.threads.explicit(threadId)).toBe(x.garden.id);
   // Adding it elsewhere moves it; the explicit space beats the project's.
   x.spaces.add(x.kitchen.id, [{ pluginId: THREAD_REF, id: threadId }]);
@@ -185,28 +180,16 @@ it("starts threads in the space and keeps each thread in one space", async () =>
   x.spaces.removeMembers(x.kitchen.id, [{ pluginId: THREAD_REF, id: threadId }]);
   expect(x.spaces.ownerOfThread({ id: threadId, projectId: "p" })).toBe(x.garden.id);
   expect(() => x.spaces.add(x.kitchen.id, [{ pluginId: "pages", id: "pg" }])).toThrow("follow their project");
-});
 
-it("overviews implicit and explicit threads and the space's items", async () => {
-  const x = await setup();
-  await x.leads.setup(x.garden.id, request);
   const put = (id: string, projectId: string, extra: Partial<ReturnType<typeof makeThreadResponse>> = {}) => x.threads.set(id, makeThreadResponse({ id, projectId, title: id, updatedAt: 500, ...extra }));
   put("implicit", "p");
-  put("child", "p", { parentThreadId: "implicit" });
   put("archived", "p", { archivedAt: 3 });
   put("moved", "p");
-  put("visitor", "q", { updatedAt: 2000 });
+  put("visitor", "q");
   x.spaces.add(x.kitchen.id, [{ pluginId: THREAD_REF, id: "moved" }]);
   x.spaces.add(x.garden.id, [{ pluginId: THREAD_REF, id: "visitor" }]);
-  const item = (id: string, projectId: string | null, extra: Partial<HubItem> = {}) => ({ pluginId: "pages", id, kind: "page", title: id, href: `/p/${id}`, icon: null, projectId, updatedAt: 10, archived: false, ...extra }) as HubItem;
-  x.items.push(item("note", "p"), item("pg_1", "p"), item("old", "p", { archived: true }), item("other", "q"));
-  const { threads, items } = await x.leads.overview(x.garden.id);
-  expect(threads.map((t) => t.id)).toEqual(["visitor", "t1", "child", "implicit"]);
-  expect(threads.find((t) => t.id === "t1")).toMatchObject({ isLead: true, title: "Garden · lead" });
-  expect(threads.find((t) => t.id === "child")).toMatchObject({ parentThreadId: "implicit", isLead: false });
-  expect(items).toEqual([{ ref: "pages:note", title: "note", kind: "page", href: "/p/note", icon: null, updatedAt: 10, kindLabel: "page", kindIcon: "File", preview: null, updatedBy: null }]);
   const map = await x.leads.spaceOfThreads();
-  expect(map).toMatchObject({ t1: x.garden.id, implicit: x.garden.id, moved: x.kitchen.id, visitor: x.garden.id });
+  expect(map).toMatchObject({ implicit: x.garden.id, moved: x.kitchen.id, visitor: x.garden.id });
   expect(map.archived).toBeUndefined();
   // Cached until membership changes.
   expect(await x.leads.spaceOfThreads()).toBe(map);
@@ -217,7 +200,7 @@ it("overviews implicit and explicit threads and the space's items", async () => 
 it("turns the heartbeat on and off through Automations", async () => {
   const x = await setup();
   await expect(x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" })).rejects.toThrow("lead");
-  await x.leads.setup(x.garden.id, request);
+  await lead(x);
   expect(await x.leads.setRun(x.garden.id, { enabled: true, cadence: "weekdays", time: "08:30" })).toMatchObject({ run: { enabled: true, cadence: "weekdays", time: "08:30" } });
   const create = x.callRpc.mock.calls.find(([arg]) => arg.method === "automations_create")![0] as unknown as { input: { trigger: { cron: string }; execution: { targetThreadId: string; prompt: string } } };
   expect(create.input.trigger.cron).toBe("30 8 * * 1-5");
@@ -230,7 +213,7 @@ it("turns the heartbeat on and off through Automations", async () => {
 
 it("keeps a space's heartbeat row when Automations can't turn it off", async () => {
   const x = await setup();
-  await x.leads.setup(x.garden.id, request);
+  await lead(x);
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
   x.callRpc.mockRejectedValueOnce(Object.assign(new Error("Automations is down"), { status: 503 }));
   await expect(x.leads.removeSpace(x.garden.id)).rejects.toThrow("Automations is down");
@@ -242,14 +225,14 @@ it("keeps a space's heartbeat row when Automations can't turn it off", async () 
 
 it("hands a lead off to a new thread that stays the lead, once", async () => {
   const x = await setup();
-  await x.leads.setup(x.garden.id, request);
+  await lead(x);
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
   const { threadId } = await x.leads.handoff("t1", request);
   expect(threadId).toBe("t2");
   const args = x.spawn.mock.calls[1]![0] as unknown as { projectId: string; pluginMetadata: unknown; input: { text: string; visibility?: string }[] };
   expect(args).toMatchObject({ projectId: "p", pluginMetadata: { role: "space-lead", spaceId: x.garden.id, handoffFrom: "t1" } });
   expect(args.input[0]).toMatchObject({ visibility: "agent-only" });
-  for (const text of ["/threads/t1", "Planted the seeds.", "/plugins/pages/pages/pg_1"]) expect(args.input[0]!.text).toContain(text);
+  for (const text of ["/threads/t1", "Planted the seeds.", "lead"]) expect(args.input[0]!.text).toContain(text);
   expect(x.archive).toHaveBeenCalledWith({ threadId: "t1" });
   expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: "t2" });
   expect(x.spaces.threads.explicit("t2")).toBe(x.garden.id);
@@ -262,7 +245,8 @@ it("hands a lead off to a new thread that stays the lead, once", async () => {
 
 it("hands off a worker in place: an added thread stays added", async () => {
   const x = await setup();
-  const { threadId } = await x.leads.startThread(x.kitchen.id, request);
+  const { id: threadId } = await x.spawn({ projectId: "p" });
+  x.spaces.add(x.kitchen.id, [{ pluginId: THREAD_REF, id: threadId }]);
   const next = await x.leads.handoff(threadId, request);
   expect(x.spaces.threads.explicit(next.threadId)).toBe(x.kitchen.id);
   expect((x.spawn.mock.calls[1]![0] as unknown as { pluginMetadata: unknown }).pluginMetadata).toEqual({ handoffFrom: threadId });

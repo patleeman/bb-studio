@@ -15,7 +15,7 @@ list and its organization controls, and adds:
   accepts a folder path, creates the project through BB's Plugin SDK, and
   opens it.
 - **Hide empty projects** in **Filter → Projects** removes project groups with no visible threads. Selected, newly created, and renamed projects remain visible.
-- **By space** in **Threads ⋯ → Organize**, next to By project, By machine, and Custom. Each [Studio](../bb-studio) Space gets a section, in Studio's order, marked with its emoji or colour. Click a Space's name, or **Open Space** in its ⋯ menu, to open the Space on its lead thread; the lead isn't listed in the section. Inside, **Studio** lists the Space's open items, like tabs, and **Threads** its other threads (a child thread stays with its root). Opening any of the Space's items, from the collection or beside the lead, adds it; × closes it here without touching the item. Right-click an item, or click its ⋯, for Float, Pin, Rename, Copy link, Copy ID, Close, Archive and Delete; pinned items stay at the top. Studio items open beside the lead. Click **Studio**, or the stack button beside its **+**, to open a Studio tab beside the lead listing the Space's items that aren't open. **Studio**'s **+** makes any kind of Studio item in the Space; **Threads**' **+** starts a thread in the Space's default project, and Studio decides whether it joins the Space. Threads in no Space, or in a Space that no longer exists, go in a final **Threads** section. Space sections follow Studio's order, so they don't reorder by dragging, but threads still nest when dropped onto each other. While By space is on, Studio's own **Spaces** section steps aside. By space needs a Studio with Spaces: until Studio answers, the option is disabled with a hint, and a list already set to By space shows By project.
+- **By space** in **Threads ⋯ → Organize**, next to By project, By machine, and Custom. It shows one [Studio](../bb-studio) Space at a time, like Arc: a row of dots pinned to the bottom of the list, one per Space in Studio's order (its emoji, or a dot in its colour), switches Spaces; hover a dot for its name, and **+** makes a new Space. A dot with a small amber mark has a thread that needs you (a question or approval). **⌃⌥←** and **⌃⌥→**, or a horizontal two-finger swipe over the list, step to the previous or next Space. The window remembers its Space. Threads in no Space, or in a Space that no longer exists, belong to the default Space (Personal). The Space's heading has its mark and name; its ⋯ menu has **New thread here**, **Lead and heartbeat…**, **Edit Space**, and **Delete Space**. A Space's **lead** sits on top, under the heading, marked **Lead** with its heartbeat schedule when one is on; any thread's menu offers **Make Space lead** or **Remove as Space lead**. Below it, **Studio** lists the Space's open items, like tabs, and **Threads** its other threads (a child thread stays with its root), with threads that need you first and marked with an amber dot. Click an item to open it in a split beside the current pane, or ⌘/Ctrl-click to open it in place; × closes it here without touching the item. Right-click an item, or click its ⋯, for Float, Pin, Rename, Copy link, Copy ID, Close, Archive and Delete; pinned items stay at the top. **Studio**'s **+** makes any kind of Studio item in the Space and opens it in a split; **Threads**' **+** starts a thread in the Space's default project. Threads still nest when dropped onto each other. While By space is on, Studio's own **Spaces** section steps aside. By space needs a Studio with Spaces: until Studio answers, the option is disabled with a hint, and a list already set to By space shows By project.
 - **Hidden threads**: right-click a thread (or use its ⋯ menu) and choose **Hide**, and it leaves every section. A section that hides any ends with a quiet row such as "2 hidden · Show"; **Show** reveals them in that section until the window reloads, and **Hide** puts them away again. A revealed hidden thread's menu offers **Unhide**. Pinned threads and the open thread always show, as do Space leads in By space. BB's **Hide from list** still hides a whole section.
 - **Float** in each thread's menu, after **Open in split**, while
   [Float](../bb-studio-float) is installed. It opens the thread in a window
@@ -48,11 +48,11 @@ section sits above Threads, and that it has no scroll area of its own.
 
 The By space capture creates two Spaces, Launch (🚀) and Research, and adds
 "Launch plan", "Launch checklist", and "Release digest" to Launch, and "Paper
-notes" and "Atlas weekly sync" to Research. The demo project's threads sit in
-Studio's Personal Space, which comes first in Studio's order. The live check
-verifies the section order, each Space's threads, the Launch emoji, and that
-Studio's own Spaces section is gone while By space shows. No agent runs during
-this capture.
+notes" and "Atlas weekly sync" to Research, then shows Launch. The live check
+verifies that only Launch shows, with its threads and emoji, that the switcher
+at the bottom has a dot for each Space with Launch current, and that Studio's
+own Spaces section is gone while By space shows. No agent runs during this
+capture.
 
 ![A hidden thread revealed in its Space](assets/hidden-threads.png)
 
@@ -97,15 +97,20 @@ By space is stored like the other organizations, in the synced
 `space`), because this package owns its copy of BB's preference schema.
 Hidden threads are the synced `hiddenThreads` preference, a list of thread
 ids, so they follow across windows. Set it with
-`bb thread-list-plus prefs set hiddenThreads '["thr_…"]'`.
+`bb thread-list-plus prefs set hiddenThreads '["thr_…"]'`. The Space By space
+shows is the synced `currentSpace` preference (a Space id, or null for the
+default Space).
 
 Studio and this package talk without the kit. This package writes the
 organization it shows to `localStorage["bb-studio:sidebar-organization"]` and
 fires the `bb-studio:sidebar-organization` window event; Studio's Spaces
 section reads it and hides while it reads `space` (other windows follow
 through the storage event). Studio re-announces its realtime changes as the
-`bb-studio:studio-changed` window event, which makes By space refetch; it also
-refetches on focus and every 30 seconds.
+`bb-studio:studio-changed` window event, and fires `studio:space-changed`
+after its Space dialogs; either makes By space refetch, as do focus and a
+30-second poll. This package opens Studio's dialogs with the `studio:new-space`
+and `studio:space-dialog` (`{ spaceId, dialog }`) window events, and sets a
+lead through Studio's `space_set_lead` RPC.
 
 ## Development
 

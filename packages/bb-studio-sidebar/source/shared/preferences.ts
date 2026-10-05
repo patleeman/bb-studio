@@ -194,10 +194,10 @@ export const preferenceDefinitions = {
     "Machine ids whose rows are collapsed.",
     "sidebar.collapsedMachines",
   ),
-  collapsedSpaces: definePreference(
-    stringListSchema,
-    [],
-    "Studio Space ids whose sections are collapsed.",
+  currentSpace: definePreference(
+    listItemSchema.nullable(),
+    null,
+    "The Studio Space By space shows; null for the default Space.",
     null,
   ),
 } as const;

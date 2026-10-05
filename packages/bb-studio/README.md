@@ -5,7 +5,7 @@
 Studio opens on the collection: everything the Studio add-ons make, including pages, Talk
 recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
 kind, project and tag, and hand any of them to an agent. Spaces gather projects and
-threads into one place, each with a page and an optional lead thread.
+threads into one place, each with an optional lead thread.
 
 ## Staged preview
 
@@ -28,12 +28,6 @@ The **+** beside Studio opens a menu of the installed add-ons' creation actions.
 The staged capture checks keyboard opening, creates a page in the open thread's
 project, and checks that the plus stays visible while its menu is open.
 
-![Live BB screenshot of a space's page](assets/space-page.png)
-
-A staged "Launch" space's page in Pages: its brief, with the space's purpose
-and empty Plan and Decisions sections for its lead to keep current. Live
-status is the lead's Status tab, not the page.
-
 ![Live BB screenshot of Studio search](assets/search.png)
 
 Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
@@ -53,20 +47,16 @@ notes" query through Float, workbench, main, Float and workbench. The
 [stable capture](assets/companion-transfers-stable.png) checks Float/main
 round trips with the same input and visible seeded release notes.
 
-The same checks pass the legacy `/collection` address, Activity with its
-original **30 days** selector, and a space home with Pages actually disabled.
+The same checks pass the legacy `/collection` address and Activity with its
+original **30 days** selector.
 Activity now offers Move; the legacy address keeps its own target so moving
 it carries the existing search input.
 
 ![The original Activity view and period choice in the workbench](assets/studio-activity-companion-transfers-native.png)
 
 See the [stable Activity](assets/studio-activity-companion-transfers-stable.png),
-[stable legacy collection](assets/studio-collection-companion-transfers-stable.png),
-[native legacy collection](assets/studio-collection-companion-transfers-native.png),
-[stable space fallback](assets/studio-space-companion-transfers-stable.png) and
-[native space fallback](assets/studio-space-companion-transfers-native.png).
-The fallback capture deletes its synthetic space and re-enables Pages during
-cleanup. It runs only against the matching isolated capture environment.
+[stable legacy collection](assets/studio-collection-companion-transfers-stable.png)
+and [native legacy collection](assets/studio-collection-companion-transfers-native.png).
 
 
 - **Activity** (Studio's **…** menu) shows measured thread turns, duration and
@@ -98,9 +88,10 @@ cleanup. It runs only against the matching isolated capture environment.
   with no project, are in the default space, Personal. A new space gets its
   own catch-all project under `~/Spaces`, where its new threads and items go.
   A thread can also be added to a space by itself, which moves it there.
-  Opening a space opens its lead thread, with the Space's Status tab beside it (see
-  [`docs/space-leads.md`](../../docs/space-leads.md)). Deleting a space hands
-  its projects and threads back to Personal and archives its page.
+  A space can have a lead: one of its threads, which a Heartbeat wakes on a
+  schedule (see [`docs/spaces.md`](../../docs/spaces.md)). Nothing is made
+  for a space but its folder. Deleting a space hands its projects and threads
+  back to Personal.
 - **Shared actions**: select items (shift-click for a range) to start a
   **New thread** that mentions them, move them to a project, archive, or
   delete. Actions an add-on defines, like Talk's "Copy transcripts" or Draw's
@@ -110,9 +101,7 @@ cleanup. It runs only against the matching isolated capture environment.
   above your threads. × or middle-click closes a tab; closing the one on
   screen opens the next. The section's ⋯ menu groups tabs by app, sorts them,
   and closes other or all tabs. Studio keeps the tabs, so every window shows
-  the same ones, and closes tabs of deleted items. A space's tab lists what
-  the space holds under it, sub-pages under their pages, then its threads;
-  its icon turns into a chevron on hover to fold it.
+  the same ones, and closes tabs of deleted items.
 - **New ▾** creates any kind an installed add-on offers, in the current
   project. It always opens the full menu, even with a kind filter active.
 - **Takes over from the add-ons.** With Studio installed, each add-on's own

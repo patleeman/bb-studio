@@ -594,7 +594,7 @@ function ThreadRowComponent({
                   </TooltipContent>
                 </Tooltip>
               ) : null}
-              <StudioThreadBadge threadId={thread.id} />
+              <StudioThreadBadge threadId={thread.id} needsYou={thread.hasPendingInteraction} />
               <span
                 className={cn(
                   "bb-thread-title",

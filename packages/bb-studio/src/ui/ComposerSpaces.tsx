@@ -11,16 +11,15 @@ import {
   DropdownMenuTrigger,
   ComposerMore,
   Icon,
-  openAppPath,
   useComposerMoreSide,
 } from "@bb-studio/kit/app";
 import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
-import { useComposer, useComposerView, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useComposer, useComposerView, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
-import { spaceLink } from "./Spaces";
+import { openSpaceItems } from "./StudioPanel";
 
 const THREAD_REF = "bb-thread";
 const REFETCH_DEBOUNCE_MS = 300;
@@ -51,6 +50,7 @@ function SpacesPicker() {
   const view = useComposerView();
   const composer = useComposer();
   const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
   const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
   const projectId = view.scope.kind === "new-thread" ? view.scope.projectId : null;
   const [held, setHeld] = useState<{ spaces: SpaceView[]; inherited: string[] } | null>(null);
@@ -130,7 +130,7 @@ function SpacesPicker() {
       <DropdownMenuContent side={side} align="start" className="max-h-96 w-64 overflow-y-auto">
         {holding.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{threadId ? "In spaces" : "Joins"}</DropdownMenuLabel> : null}
         {holding.map((space) => (
-          <DropdownMenuItem key={space.id} onSelect={() => openAppPath(spaceLink(space))}>
+          <DropdownMenuItem key={space.id} onSelect={() => openSpaceItems(navigate, space)}>
             <SpaceMark space={space} /> {space.name}
             {inherited.includes(space.id) ? <span className="ml-auto text-xs text-muted-foreground">Project</span> : null}
           </DropdownMenuItem>

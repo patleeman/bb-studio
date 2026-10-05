@@ -62,8 +62,6 @@ const space = z.object({
   threadIds: z.array(z.string()),
   /** Always empty: items follow their project. */
   itemKeys: z.array(z.string()),
-  /** The space's brief page in Pages, or null before it has one. */
-  pageId: z.string().nullable(),
 });
 export type SpaceView = z.infer<typeof space>;
 const spaceId = z.string().min(1).max(100);
@@ -107,7 +105,6 @@ const treeSpace = z.object({
   name: z.string(),
   icon: z.string().nullable(),
   color: z.string(),
-  href: z.string(),
   items: z.array(itemLink.extend({ updatedAt: z.number(), parentId: z.string().nullable(), depth: z.number() })),
   /** Every item it holds; `items` stops at a cap. */
   itemCount: z.number(),
@@ -152,15 +149,13 @@ export const spaceRunSchema = z.object({
   cron: z.string().trim().min(1).max(100).refine(validCron, "Use a valid five-field cron expression (minute hour day month weekday).").optional(),
 });
 export type SpaceRun = z.infer<typeof spaceRunSchema>;
-/** A space as a meta-project: its lead thread works beside the space's page. */
+/** A space's optional lead thread and its heartbeat. */
 const spaceLead = z.object({
   spaceId: z.string(),
   name: z.string(),
   icon: z.string().nullable(),
   color: z.string(),
   leadThreadId: z.string().nullable(),
-  pageId: z.string().nullable(),
-  pageHref: z.string().nullable(),
   defaultProjectId: z.string().nullable(),
   run: spaceRunSchema.nullable(),
 });
@@ -168,26 +163,6 @@ export type SpaceLeadView = z.infer<typeof spaceLead>;
 /** The full request from experimental_NewThreadComposer; Studio picks the project. */
 const newThreadRequest = conversationRequestSchema(z);
 export type NewThreadRequestInput = z.output<typeof newThreadRequest>;
-const spaceOverview = z.object({
-  threads: z.array(z.object({
-    id: z.string(), title: z.string(), status: z.string(), updatedAt: z.number(), parentThreadId: z.string().nullable(), isLead: z.boolean(),
-    progress: z.string().nullable().optional(), progressAt: z.number().nullable().optional(),
-    failureReason: z.string().nullable().optional(), blockedReason: z.string().nullable().optional(),
-  })),
-  activity: z.array(z.object({
-    id: z.string(), threadId: z.string(), title: z.string(), isLead: z.boolean(),
-    kind: z.enum(["progress", "failure", "blocked"]), summary: z.string(), at: z.number(),
-  })),
-  /** `ref` is `<plugin>:<id>`. */
-  items: z.array(z.object({
-    ref: z.string(), title: z.string(), kind: z.string(), href: z.string(), icon: z.string().nullable(), updatedAt: z.number(),
-    /** The kind's name and icon. */
-    kindLabel: z.string(), kindIcon: z.string(),
-    preview: z.string().nullable(), updatedBy: z.enum(["user", "agent"]).nullable(),
-  })),
-});
-export type SpaceOverviewView = z.infer<typeof spaceOverview>;
-
 export const rpcContract = defineRpcContract({
   home: {
     input: z.object({ projectId: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(7) }),
@@ -271,23 +246,17 @@ export const rpcContract = defineRpcContract({
   spacesForThread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ spaces: z.array(space), inherited: z.array(z.string()) }) },
   /** Spaces picked in a project's new-thread composer; the next thread started there moves to the last one. */
   pendingThreadSpaces: { input: z.object({ projectId: z.string().min(1).max(200), ids: z.array(spaceId).max(50) }), output: z.object({ ok: z.boolean() }) },
-  /** A space's brief page, made from the space template if it has none; null without Pages. */
-  spacePage: { input: z.object({ id: spaceId }), output: z.object({ href: z.string().nullable() }) },
   /** An item made in the space's catch-all project, so it's in the space. */
   createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string(), title: z.string().optional() }) },
   /** Open threads to pick from when adding one to a space. */
   recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
-  /** A space's lead, page and heartbeat. Clears a lead thread that was deleted. */
+  /** A space's lead and heartbeat. Clears a lead thread that was deleted, and turns its heartbeat off. */
   space_lead: { input: z.object({ spaceId }), output: spaceLead },
-  /** Makes sure the space has its page and a lead thread; idempotent and serialized per space. */
-  space_lead_setup: { input: z.object({ spaceId, request: newThreadRequest }), output: spaceLead },
-  /** Starts a thread in the project picked in the composer and adds it to the space. */
-  space_thread_start: { input: z.object({ spaceId, request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
-  /** The space's open threads (added, or through its projects, unless another space holds them) and its items, newest first. */
-  space_overview: { input: z.object({ spaceId }), output: spaceOverview },
+  /** Makes an existing thread the space's lead, adding it to the space; null clears the lead and turns the heartbeat off. */
+  space_set_lead: { input: z.object({ spaceId, threadId: z.string().min(1).max(200).nullable() }), output: spaceLead },
   /** The one space each thread is in. Refetch on Studio's realtime channel. */
   space_of_threads: { input: z.object({}), output: z.object({ threads: z.record(z.string(), z.string()) }) },
-  /** Turns the lead's heartbeat on or off. */
+  /** Turns the lead's heartbeat on or off; on needs a lead. */
   space_set_run: { input: spaceRunSchema.omit({ time: true }).extend({ spaceId, time: spaceRunSchema.shape.time.optional() }), output: spaceLead },
   /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },

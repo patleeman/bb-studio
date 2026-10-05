@@ -17,8 +17,6 @@ enum Route: Hashable {
     case table(id: String)
     case terminals(scope: TerminalScope, title: String)
     case bot(id: String)
-    /// A Studio space, which opens its page.
-    case space(id: String)
     case feed
     case feedPost(id: String)
 }
@@ -29,10 +27,6 @@ extension Route {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
         if parts == ["plugins", "feed", "feed"] {
             self = .feed
-            return
-        }
-        if parts.count == 4, parts[0...2] == ["plugins", "studio", "spaces"] {
-            self = .space(id: parts[3].removingPercentEncoding ?? parts[3])
             return
         }
         guard parts.count == 4, parts[0] == "plugins" else { return nil }
@@ -186,7 +180,7 @@ final class AppModel: ObservableObject {
         case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
         case "bot": if let id { openStudio(kind: "bot", .bot(id: id)) }
-        case "space": if let id { openStudio(kind: nil, .space(id: id)) }
+        case "space": if let id { openStudio(space: id) }
         case "feed": open(.feed)
         case "post": if let id { openFeedPost(id) }
         case "dictate": startDictation(threadId: id)
