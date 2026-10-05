@@ -10,11 +10,10 @@ import { z } from "zod";
 import { rpcContract } from "./src/contract";
 import { EXPLORE_USAGE, registerExplore } from "./src/register";
 import { isExploreWorker } from "./src/worker";
-import { preferredReplies, REACTIONS_PLUGIN_ID } from "./src/next";
+import { trackReactionReplies } from "./src/reactions";
 import { DEFAULT_REPLIES, nextInstructions } from "./src/prompt";
 
 /** How often the Next row rereads Studio Reactions' saved replies. */
-const REPLIES_REFRESH_MS = 60_000;
 
 /** Explore's settings; Pages defines them under an `explore_` prefix. */
 export const EXPLORE_SETTINGS = {
@@ -57,27 +56,21 @@ export default async function plugin(bb: BbPluginApi) {
     workerTimeoutMs: () => workerTimeoutMinutes * 60_000,
   });
 
-  // The Next row prefers the replies saved in Studio Reactions. Settings are
-  // read asynchronously and `configure` is synchronous, so keep them fresh.
-  let replies = DEFAULT_REPLIES;
-  const refreshReplies = () =>
-    Promise.resolve().then(() => bb.sdk.plugins.getSettings({ pluginId: REACTIONS_PLUGIN_ID, signal: AbortSignal.timeout(10_000) })).then(
-      (result) => { replies = preferredReplies(result.values.emojiItems) ?? DEFAULT_REPLIES; },
-      () => { replies = DEFAULT_REPLIES; },
-    );
-  void refreshReplies();
-  const timer = setInterval(() => void refreshReplies(), REPLIES_REFRESH_MS);
-  timer.unref?.();
-  bb.onDispose(() => clearInterval(timer));
+  // The Next row's quick replies follow Studio Reactions' smart reactions
+  // setting. Settings are read asynchronously and `configure` is synchronous,
+  // so keep the answer fresh.
+  const replies = trackReactionReplies(bb.sdk, DEFAULT_REPLIES);
+  bb.onDispose(() => replies.dispose());
 
   bb.rpc.register(rpcContract, explore.rpc);
 
   // Explore workers write a page as their reply: no findings line, no explore tool.
-  bb.agents.configure((context) =>
-    isExploreWorker(context.pluginMetadata)
-      ? { tools: [], skills: [] }
-      : explore.configure(enabled, nextEnabled ? nextInstructions({ explore: enabled, replies }) : null),
-  );
+  bb.agents.configure((context) => {
+    if (isExploreWorker(context.pluginMetadata)) return { tools: [], skills: [] };
+    // Recheck for the next session; this one uses the latest answer.
+    void replies.refresh();
+    return explore.configure(enabled, nextEnabled ? nextInstructions({ explore: enabled, replies: replies.current() }) : null);
+  });
 
   bb.cli.register({
     name: "explore",

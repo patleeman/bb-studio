@@ -24,9 +24,10 @@ export function exploreInstructions(): string {
 export const DEFAULT_REPLIES = ["👍 Looks good", "🔁 Try another way", "❓ Explain more"];
 
 /** The Next row's instructions. They replace Explore's and Studio Reactions' smart reactions. */
-export function nextInstructions({ explore, replies }: { explore: boolean; replies: readonly string[] }): string {
+/** `replies` null: Studio Reactions' smart reactions are off, so the row offers no replies. */
+export function nextInstructions({ explore, replies }: { explore: boolean; replies: readonly string[] | null }): string {
   const example = [
-    `reply="👍 Ship it|🧪 Add tests first"`,
+    ...(replies ? [`reply="👍 Ship it|🧪 Add tests first"`] : []),
     ...(explore ? [`btw="🐛 I noticed the new endpoint retries without waiting between tries. If the server is down, it will get hammered."`] : []),
     `do="📄 Write up the migration plan as a page"`,
   ].join(" ");
@@ -34,7 +35,9 @@ export function nextInstructions({ explore, replies }: { explore: boolean; repli
     "The Next row is on. End a reply with one line that offers the user's likely next steps, when there are any:",
     `::${NEXT_DIRECTIVE}{${example}}`,
     "Every attribute is optional; leave out the ones with nothing worth offering, and leave out the whole line when nothing is. Items are separated by |. Each is one emoji, a space, and its text. Never put a straight double quote (\") or | inside an item, not even to quote a word: one stray \" breaks the whole line and the user sees raw text instead of buttons. Quote with ‘single’ or “curly” quotes instead.",
-    `- reply: only when your reply asks the user to decide, choose, approve or answer. 2 to ${NEXT_LIMITS.reply} quick answers of at most 5 words; each must make sense as the user's whole reply.${replies.length ? ` Prefer these when they fit: ${replies.join(" | ")}. Write specific ones when your reply offers distinct options.` : ""}`,
+    ...(replies
+      ? [`- reply: only when your reply asks the user to decide, choose, approve or answer. 2 to ${NEXT_LIMITS.reply} quick answers of at most 5 words; each must make sense as the user's whole reply.${replies.length ? ` Prefer these when they fit: ${replies.join(" | ")}. Write specific ones when your reply offers distinct options.` : ""}`]
+      : ["- No reply attribute: the user has quick replies turned off."]),
     ...(explore
       ? [
           `- btw: only when your answer involved reading code. 1 to ${NEXT_LIMITS.btw} things you noticed along the way but didn't cover, told to the user the way a colleague would mention them in passing. Write each in plain English as one or two short sentences: start with "I noticed", say what you saw in words someone who hasn't read the code understands (no function, file or package names), then what it means for them, such as "If you fix a bug in one, the other keeps it." Under 40 words. Emoji: 🐛 looks broken or risky (these get a Fix this button), 🏗️ something the work rests on, 🔗 connected code that matters here, 🕐 changed recently. Every note gets a Tell me more button that writes a Studio Page explaining it; to write one yourself when asked, use explore_explain.`,

@@ -240,7 +240,7 @@ Explore is experimental. Agents end answers that read code with a few things the
 
 With **Explore: End replies with a Next row** on (the default), agents end a reply with one compact **What next?** card instead of separate lines. Each row has a short label saying what its buttons are for; hover a label for more:
 
-- **Reply**: quick answers to this message, when it asks you something. The agent prefers the reactions saved in Studio Reactions. Clicking a reply or a request drafts it for you to send.
+- **Reply**: quick answers to this message, when it asks you something. These follow Studio Reactions: they appear only while it's installed with **Smart reactions** on, and the agent prefers your saved reactions. Clicking a reply or a request drafts it for you to send.
 - **Ask for**: things the agent offers to do next, such as "📄 Write this up as a page" or "🧵 Start a thread to fix the retry bug".
 - **By the way**: what the agent noticed along the way, told back to you in plain sentences: "I noticed the new endpoint retries without waiting between tries. If the server is down, it will get hammered." Each has **Tell me more**, which writes an explainer page and then opens it. Notes marked 🐛 also have **Fix this**, which drafts a request to fix it.
 
