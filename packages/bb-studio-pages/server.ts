@@ -1,4 +1,3 @@
-import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -14,7 +13,7 @@ import { rpcContract } from "./src/contract";
 import { studioEmbeds } from "./src/embeds";
 import { fetchPreview } from "./src/unfurl";
 import { createThread, listThreads, reply, setResolved } from "./src/comments";
-import { applyEdits, readMarkdown, textBlocks } from "./src/doc";
+import { readMarkdown, textBlocks } from "./src/doc";
 import type { Socket } from "./src/hub";
 import { errorText, pageUrl, PagesService, requestView, toView, truncate } from "./src/service";
 import { MIGRATIONS, PageStore } from "./src/store";
@@ -23,6 +22,7 @@ import { outgoingStudioLinks } from "./src/studio-links";
 import { agentConfiguration, registerTools } from "./src/tools";
 import { registerPagesWithExplore } from "./src/explore/integration";
 import { Checklists } from "./src/checklists";
+import { pagesCli } from "./src/cli";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
@@ -393,66 +393,7 @@ async function registerPages(bb: BbPluginApi) {
     },
   }));
 
-  bb.cli.register({
-    name: "pages",
-    summary: "Read and write BB Pages (collaborative documents)",
-    commands: [
-      { name: "list", summary: "List pages in the current project and global pages", usage: "bb pages list [--all]" },
-      { name: "show", summary: "Print a page (id or title) as Markdown", usage: "bb pages show <page-id> [--ids]" },
-      { name: "create", summary: "Create a page from a title and optional Markdown", usage: "bb pages create <title> [--global] [--markdown <text>]" },
-      { name: "append", summary: "Append Markdown to a page", usage: "bb pages append <page-id> <markdown…>" },
-    ],
-    async run(argv, ctx) {
-      const { command, rest } = subcommand(argv);
-      const flag = (name: string) => takeFlag(rest, name);
-      const option = (name: string) => takeOption(rest, name);
-      try {
-        switch (command) {
-          case "list": {
-            const pages = store.list(flag("--all") ? {} : { projectId: ctx.projectId ?? null });
-            if (!pages.length) return { exitCode: 0, stdout: "No pages.\n" };
-            const lines = pages.map(
-              (page) => `${page.id}\t${untitled(page.title)}\t${page.project_id ?? "global"}\t${new Date(page.updated_at).toISOString()}`,
-            );
-            return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
-          }
-          case "show": {
-            const ids = flag("--ids") === true;
-            const meta = service.requirePage(rest.join(" "), ctx.projectId);
-            return { exitCode: 0, stdout: readMarkdown(service.hub.open(meta.id).doc, { ids }) };
-          }
-          case "create": {
-            const global = flag("--global") === true;
-            const markdown = option("--markdown")?.replace(/\\n/g, "\n");
-            const title = rest.join(" ").trim();
-            if (!title) return { exitCode: 1, stderr: "usage: bb pages create <title> [--global] [--markdown <text>]\n" };
-            const page = service.createPage({
-              projectId: global ? null : (ctx.projectId ?? null),
-              parentId: null,
-              title,
-              markdown,
-              actor: ctx.threadId ? `agent:${ctx.threadId}` : HUMAN_USER_ID,
-            });
-            if (ctx.threadId) created(page.id, ctx.threadId);
-            return { exitCode: 0, stdout: `${page.id}\n` };
-          }
-          case "append": {
-            const [ref, ...words] = rest;
-            const markdown = words.join(" ").replace(/\\n/g, "\n");
-            if (!ref || !markdown.trim()) return { exitCode: 1, stderr: "usage: bb pages append <page-id> <markdown…>\n" };
-            const meta = service.requirePage(ref, ctx.projectId);
-            const origin = ctx.threadId ? `agent:${ctx.threadId}` : "cli";
-            applyEdits(service.hub.open(meta.id).doc, [{ op: "append", markdown }], origin);
-            return { exitCode: 0, stdout: `Appended to ${meta.id}.\n` };
-          }
-          default:
-            return usage("bb pages <list|show|create|append> …");
-        }
-      } catch (error) {
-        return { exitCode: 1, stderr: `${errorText(error)}\n` };
-      }
-    },
-  });
+  bb.cli.register(pagesCli(service, created));
 
   // Bot request lifecycle -----------------------------------------------------
 
