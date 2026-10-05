@@ -117,4 +117,7 @@ export const MIGRATIONS = [
      );`,
   `ALTER TABLE space_runs ADD COLUMN cron TEXT;`,
   `ALTER TABLE tabs ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE thread_titles (
+       thread_id TEXT PRIMARY KEY, title TEXT, prompts INTEGER NOT NULL, locked INTEGER NOT NULL, updated_at INTEGER NOT NULL
+     );`,
 ];

@@ -125,6 +125,15 @@ and [native legacy collection](assets/studio-collection-companion-transfers-nati
   dark. Teal-black and pale-teal surfaces, a coral accent, teal file paths.
   Pick **BB Studio** in Settings → Appearance, or run `bb theme set
   plugin:studio:bb-studio`.
+- **Short thread titles.** BB titles a thread once, from the start of its
+  first message. Studio renames new threads in 2–5 words after their first
+  turn, such as "Invoice PDF pagination bug", and again as the conversation
+  moves on (after 2, 4 and 8 requests, then every 8). The model sees the
+  first request, the latest ones and the agent's latest reply, and keeps the
+  current title while it still fits. A title you set, or one a thread was
+  spawned with, is never changed. Older threads keep their titles until you
+  run `bb studio retitle`. Turn it off with **Short thread titles** in
+  Studio's settings. Titles come from the fallback model in Studio Decisions.
 - **For agents**: the `studio_list_items`, `studio_tag_items` and
   `studio_delete_items` tools, the
   `bb studio` CLI, and a `studio` skill.
@@ -134,6 +143,7 @@ bb studio list [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
 bb studio tags
 bb studio providers
 bb studio reindex
+bb studio retitle (<thread-id>… | --self | --recent <count>)
 ```
 
 ## How it works

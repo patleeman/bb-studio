@@ -47,6 +47,9 @@ import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup }
 import { respondToNeed } from "./src/needs-you";
 import { zipFiles } from "./src/export-zip";
 import { SpaceLeads } from "./src/space-lead";
+import { requestTexts, ThreadTitler, TitleStore, type TitleThread } from "./src/thread-titles";
+import { askModel } from "@bb-studio/kit/decisions";
+import { primaryHostId } from "@bb-studio/kit/server";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -120,6 +123,47 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.archived", ({ thread }) => updateThread(thread.id, "archived"));
   bb.events.on("thread.deleted", ({ thread }) => updateThread(thread.id, "deleted"));
   bb.events.on("thread.unarchived", ({ thread }) => updateThread(thread.id, "idle"));
+  const titleThread = (thread: { id: string; title: string | null; visibility?: string | null; archivedAt?: number | null }): TitleThread =>
+    ({ id: thread.id, title: thread.title, hidden: thread.visibility === "hidden", archived: Boolean(thread.archivedAt) });
+  const titler = new ThreadTitler(new TitleStore(db), {
+    thread: async (threadId) => {
+      const thread = await bb.sdk.threads.get({ threadId }).catch(() => null);
+      return thread && thread.deletedAt == null ? titleThread(thread) : null;
+    },
+    context: async (threadId) => {
+      const requests = async () => {
+        // Events come 100 at a time; a thread past 1,000 requests counts as 1,000.
+        const events: { seq: number }[] = [];
+        for (let page = 0; page < 10; page++) {
+          const rows = await bb.sdk.threads.events.list({ threadId, order: "asc", limit: "100", types: ["client/turn/requested"], ...(events.length ? { afterSeq: String(events.at(-1)!.seq) } : {}) });
+          events.push(...rows);
+          if (rows.length < 100) break;
+        }
+        return events;
+      };
+      const [events, output] = await Promise.all([requests(), bb.sdk.threads.output({ threadId }).catch(() => ({ output: null }))]);
+      const prompts = requestTexts(events);
+      return { prompts: prompts.length > 4 ? [prompts[0]!, ...prompts.slice(-3)] : prompts, promptCount: prompts.length, output: output.output };
+    },
+    ask: async (threadId, prompt, signal) =>
+      (await askModel(bb, { caller: "studio", requestId: `title:${threadId}`, hostId: await primaryHostId(bb), providerId: null, prompt }, signal)).text,
+    rename: async (threadId, title) => { await bb.sdk.threads.update({ threadId, title }); },
+    log: (message) => bb.log.warn(message),
+  });
+  bb.onDispose(() => titler.dispose());
+  bb.events.on("thread.created", ({ thread }) => titler.created(titleThread(thread)));
+  const titleSettings = bb.settings.define({
+    autoTitles: {
+      type: "boolean",
+      label: "Short thread titles",
+      default: true,
+      description: "Name new threads in a few words after each turn, and rename them as the conversation moves on. Titles you set yourself are never changed.",
+    },
+  });
+  let autoTitles = (await titleSettings.get()).autoTitles;
+  titleSettings.onChange((next) => { autoTitles = next.autoTitles; });
+  bb.events.on("thread.idle", ({ thread }) => { if (autoTitles) void titler.idle(thread.id); });
+  bb.events.on("thread.deleted", ({ thread }) => titler.deleted(thread.id));
   // The composer does not expose a thread id to add-ons. Its first accepted
   // input still contains the item's link or mention, so link it when saved.
   const mentionProviders = mentionProviderLookup((pluginId, signal) => bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null, outputSchema: schemas.provider.studio_describe.output, signal }));
@@ -908,6 +952,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "move", summary: "Move items or threads into a space, or items to a project", usage: "bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)" },
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
       { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
+      { name: "retitle", summary: "Give threads a short title now and keep it current as they grow", usage: "bb studio retitle (<thread-id>… | --self | --recent <count>)" },
     ],
     async run(argv, ctx) {
       const { command, rest } = subcommand(argv);
@@ -971,8 +1016,32 @@ export default async function plugin(bb: BbPluginApi) {
             const count = await searchIndex.rebuild();
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
+          case "retitle": {
+            const recent = option("--recent");
+            const ids = flag("--self") && ctx.threadId ? [ctx.threadId, ...rest] : rest;
+            if (recent) {
+              const count = Number(recent);
+              if (!Number.isInteger(count) || count < 1 || count > 100) return usage("bb studio retitle --recent <1-100>");
+              const threads = await bb.sdk.threads.list({ limit: count, ...(ctx.projectId ? { projectId: ctx.projectId } : {}) });
+              ids.push(...threads.filter((thread) => thread.visibility !== "hidden" && thread.id !== ctx.threadId).map((thread) => thread.id));
+            }
+            if (!ids.length) return usage("bb studio retitle (<thread-id>… | --self | --recent <count>)");
+            const retitle = async (threadId: string) => {
+              const before = (await bb.sdk.threads.get({ threadId }).catch(() => null))?.title ?? "Untitled";
+              try {
+                const title = await titler.retitle(threadId);
+                return title ? `${threadId}\t${before} → ${title}` : `${threadId}\t${before} (kept)`;
+              } catch (error) {
+                return `${threadId}\tfailed: ${errorText(error)}`;
+              }
+            };
+            // A few at a time: each one runs a model session.
+            const lines: string[] = [];
+            for (let i = 0; i < ids.length; i += 4) lines.push(...(await Promise.all(ids.slice(i, i + 4).map(retitle))));
+            return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
+          }
           default:
-            return usage("bb studio <list|tags|spaces|move|providers|reindex> …");
+            return usage("bb studio <list|tags|spaces|move|providers|reindex|retitle> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
