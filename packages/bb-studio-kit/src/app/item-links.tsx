@@ -94,13 +94,17 @@ export function mentionQuery(value: string, caret: number): { start: number; que
   return match ? { start: caret - match[1]!.length - 1, query: match[1]! } : null;
 }
 
-/** Studio items matching `query`, newest first when it's empty; none without Studio. */
+/**
+ * Studio items matching `query`, newest first when it's empty; none without
+ * Studio. `query` says which search the results answer: until the latest one
+ * returns, they belong to an earlier query.
+ */
 function useItemSearch(query: string | null, exclude?: string) {
   const sdk = useSdk();
-  const [results, setResults] = useState<Result[]>([]);
+  const [search, setSearch] = useState<{ query: string | null; results: Result[] }>({ query: null, results: [] });
   useEffect(() => {
     if (query === null) {
-      setResults([]);
+      setSearch({ query: null, results: [] });
       return;
     }
     let live = true;
@@ -111,16 +115,16 @@ function useItemSearch(query: string | null, exclude?: string) {
           if (!live) return;
           // A search can find one item twice, as indexed and as a fallback match.
           const seen = new Set<string>(exclude ? [exclude] : []);
-          setResults(found.filter((result) => result.href.startsWith("/plugins/") && !seen.has(result.href) && seen.add(result.href)));
+          setSearch({ query, results: found.filter((result) => result.href.startsWith("/plugins/") && !seen.has(result.href) && seen.add(result.href)) });
         })
-        .catch(() => live && setResults([]));
+        .catch(() => live && setSearch({ query, results: [] }));
     }, 120);
     return () => {
       live = false;
       clearTimeout(timer);
     };
   }, [sdk, query, exclude]);
-  return results;
+  return search;
 }
 
 type TextareaProps = Omit<ComponentProps<"textarea">, "value" | "onChange"> & {
@@ -140,13 +144,20 @@ export const ItemLinkTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(f
   useImperativeHandle(ref, () => field.current!);
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const [active, setActive] = useState(0);
-  const results = useItemSearch(mention?.query ?? null, selfHref);
+  const search = useItemSearch(mention?.query ?? null, selfHref);
+  const results = search.results;
   const open = mention !== null && results.length > 0;
+  // Enter or Tab pressed before the typed query's results arrived: pick the
+  // first of those, not an item from the list still showing an earlier query.
+  const [waiting, setWaiting] = useState(false);
 
   const track = (element: HTMLTextAreaElement) => {
     const next = mentionQuery(element.value, element.selectionStart);
     setMention(next);
-    if (next?.query !== mention?.query) setActive(0);
+    if (next?.query !== mention?.query) {
+      setActive(0);
+      setWaiting(false);
+    }
   };
 
   const pick = (result: Result) => {
@@ -164,6 +175,14 @@ export const ItemLinkTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(f
     });
   };
 
+  useEffect(() => {
+    if (!waiting || !mention || search.query !== mention.query) return;
+    setWaiting(false);
+    if (search.results[0]) pick(search.results[0]);
+    // pick reads the latest render's state; run only when these change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waiting, search, mention]);
+
   const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (open && ["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) event.stopPropagation();
     if (open) {
@@ -174,7 +193,8 @@ export const ItemLinkTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(f
       }
       if ((event.key === "Enter" && !event.metaKey && !event.ctrlKey) || event.key === "Tab") {
         event.preventDefault();
-        pick(results[Math.min(active, results.length - 1)]!);
+        if (search.query === mention?.query) pick(results[Math.min(active, results.length - 1)]!);
+        else setWaiting(true);
         return;
       }
       if (event.key === "Escape") {
