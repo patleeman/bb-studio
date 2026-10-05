@@ -54,4 +54,12 @@ describe("space folders", () => {
     expect((await f.folders.projectAt("/code/site")).id).toBe("p0");
     expect(f.projects).toHaveLength(1);
   });
+
+  it("refuses a folder path that isn't absolute instead of making a broken project", async () => {
+    const f = setup();
+    await expect(f.folders.projectAt("~/code/site")).rejects.toThrow("full path");
+    await expect(f.folders.projectAt("code/site")).rejects.toThrow("full path");
+    expect(f.projects).toHaveLength(0);
+    expect((await f.folders.projectAt("C:\\code\\site")).path).toBe("C:\\code\\site");
+  });
 });

@@ -4,7 +4,7 @@
 // is reserved first (`space_folders`); a retry finds the project by that path
 // and never makes a second one.
 import type Database from "better-sqlite3";
-import { basename, join } from "node:path";
+import { basename, join, posix, win32 } from "node:path";
 import type { SpaceStore } from "./spaces";
 
 export interface FolderProject {
@@ -41,6 +41,10 @@ export class SpaceFolders {
   /** The BB project at a folder the user picked, made if there's none yet; concurrent calls share one. */
   projectAt(path: string): Promise<FolderProject> {
     const folder = path.replace(/(.)\/+$/, "$1");
+    // BB stores a project's path as given, so `~/code` or `code` would make a project nothing can open.
+    if (!posix.isAbsolute(folder) && !win32.isAbsolute(folder)) {
+      return Promise.reject(new Error(`Use the folder's full path, such as /Users/you/code/site, not ${JSON.stringify(path)}.`));
+    }
     const key = `path:${folder}`;
     const existing = this.pending.get(key);
     if (existing) return existing;
