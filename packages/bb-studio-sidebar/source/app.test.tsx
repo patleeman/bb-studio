@@ -155,22 +155,23 @@ afterEach(() => {
 });
 
 describe("thread-list plugin", () => {
-  it("hides a thread from its row's menu, with Show and Unhide", async () => {
+  it("hides a thread from its row's menu; the section's ⋯ shows and hides them", async () => {
     const { rpcCalls } = renderList({ organizationMode: "project" });
     await screen.findByText("Later thread");
-    const web = () => screen.getByTitle("Web").closest("[data-sidebar-sticky-group]") as HTMLElement;
+    const openWebMenu = () => fireEvent.pointerDown(screen.getByRole("button", { name: "Web actions" }), { button: 0, ctrlKey: false });
     fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_later"]')!);
     fireEvent.click(await screen.findByRole("menuitem", { name: "Hide" }));
     await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "hiddenThreads", value: ["thr_later"] } }));
     await waitFor(() => expect(threadIds()).not.toContain("thr_later"));
-    expect(web().querySelector('[data-sidebar-hidden-threads="project:proj_web"]')?.textContent).toContain("1 hidden");
-    fireEvent.click(within(web()).getByRole("button", { name: "Show 1 hidden" }));
+    expect(screen.queryByText(/1 hidden/)).toBeNull();
+    openWebMenu();
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Show 1 hidden thread" }));
     await screen.findByText("Later thread");
-    expect(web().querySelector("[data-sidebar-hidden-threads]")?.textContent).toContain("Showing 1 hidden");
     fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_later"]')!);
     expect(await screen.findByRole("menuitem", { name: "Unhide" })).not.toBeNull();
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    fireEvent.click(within(web()).getByRole("button", { name: "Hide 1 hidden" }));
+    openWebMenu();
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Hide hidden threads" }));
     await waitFor(() => expect(threadIds()).not.toContain("thr_later"));
   });
 
@@ -179,9 +180,8 @@ describe("thread-list plugin", () => {
     await screen.findByText("Pinned thread");
     expect(threadIds()).not.toContain("thr_parent");
     expect(threadIds()).not.toContain("thr_child");
-    const app = screen.getByTitle("App").closest("[data-sidebar-sticky-group]") as HTMLElement;
-    expect(app.querySelector('[data-sidebar-hidden-threads="project:proj_app"]')?.textContent).toContain("2 hidden");
-    expect(document.querySelector("[data-sidebar-hidden-threads=pinned]")).toBeNull();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "App actions" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByRole("menuitem", { name: "Show 2 hidden threads" })).not.toBeNull();
   });
 
   it.each(["project", "chronological"] as const)("keeps Archive off a Space lead outside By space (%s)", async (organizationMode) => {

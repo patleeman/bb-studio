@@ -446,38 +446,39 @@ index 063bfec..cdda13b 100644
 -              {option.label}
 +              {option.mode === "space" ? <SpaceOrganizeHint label={option.label} /> : option.label}
 diff --git a/source/app/list/ThreadListVisibility.tsx b/source/app/list/ThreadListVisibility.tsx
-index 3b0cf9e..35ba05d 100644
+index 3b0cf9e..afdf3f7 100644
 --- a/source/app/list/ThreadListVisibility.tsx
 +++ b/source/app/list/ThreadListVisibility.tsx
-@@ -216,0 +217,5 @@ export function ThreadListVisibility({
+@@ -36,0 +37 @@ import { CustomizeRowActionsContext } from "./customizeRowActionsContext.js";
++import { HiddenThreadsMenuItem } from "../studio/HiddenThreads.js";
+@@ -216,0 +218,5 @@ export function ThreadListVisibility({
 +/** The visibility group (section key) a component renders inside, if any. */
 +export function useThreadListVisibilityGroupId(): string | null {
 +  return useContext(GroupContext);
 +}
 +
+@@ -244,0 +251 @@ export function ThreadListVisibilityMenuItems({
++      {id !== null && <HiddenThreadsMenuItem sectionKey={id} surface={surface} />}
 diff --git a/source/app/list/TopLevelSidebarSection.tsx b/source/app/list/TopLevelSidebarSection.tsx
-index 74dd671..b4e6e82 100644
+index 74dd671..d83689e 100644
 --- a/source/app/list/TopLevelSidebarSection.tsx
 +++ b/source/app/list/TopLevelSidebarSection.tsx
-@@ -47,0 +48 @@ import { usePluginThreadRowStatusForThreads } from "./groupRollups.js";
-+import { HiddenThreadsRow } from "../studio/HiddenThreads.js";
-@@ -62,0 +64,2 @@ export interface TopLevelSidebarSectionProps {
+@@ -62,0 +63,2 @@ export interface TopLevelSidebarSectionProps {
 +  /** Studio: a mark before the label, such as a Space's emoji. */
 +  labelMark?: ReactNode;
-@@ -85,0 +89 @@ export function TopLevelSidebarSection({
+@@ -85,0 +88 @@ export function TopLevelSidebarSection({
 +  labelMark,
-@@ -183,0 +188 @@ export function TopLevelSidebarSection({
+@@ -183,0 +187 @@ export function TopLevelSidebarSection({
 +        labelMark && "mt-2",
-@@ -197 +202 @@ export function TopLevelSidebarSection({
+@@ -197 +201 @@ export function TopLevelSidebarSection({
 -          SIDEBAR_GROUP_TEXT_CLASS,
 +          labelMark ? "text-[13px] font-semibold text-sidebar-foreground" : SIDEBAR_GROUP_TEXT_CLASS,
-@@ -206,0 +212 @@ export function TopLevelSidebarSection({
+@@ -206,0 +211 @@ export function TopLevelSidebarSection({
 +          {labelEditor ? null : labelMark}
-@@ -297 +303,4 @@ export function TopLevelSidebarSection({
+@@ -297 +302,3 @@ export function TopLevelSidebarSection({
 -        <div className="mt-1">{children}</div>
 +        <div className="mt-1">
 +          {children}
-+          <HiddenThreadsRow />
 +        </div>
 diff --git a/source/app/list/useSidebarModeSectionOrder.ts b/source/app/list/useSidebarModeSectionOrder.ts
 index 5ca0d61..6ae884a 100644

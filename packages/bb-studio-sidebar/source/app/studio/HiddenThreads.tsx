@@ -1,7 +1,6 @@
 import { useAtom } from "jotai";
 import { ActionMenuItem } from "../ui/action-menu-items.js";
 import { sidebarHiddenThreadsAtom } from "../preferences/atoms.js";
-import { useThreadListVisibilityGroupId } from "../list/ThreadListVisibility.js";
 import { useHiddenThreadsState } from "./useHiddenThreads.js";
 
 /** Hide, or Unhide for a hidden thread that is showing, in a thread's actions menu. */
@@ -25,31 +24,24 @@ export function HideThreadItem({ threadId, surface }: {
 }
 
 /**
- * The last row of a section that hides threads: Show reveals them until the
- * window reloads, and Hide puts them away again.
+ * Show or hide a section's hidden threads, in its ⋯ menu. Showing lasts until
+ * the window reloads. Nothing when the section hides none.
  */
-export function HiddenThreadsRow() {
-  const sectionKey = useThreadListVisibilityGroupId();
+export function HiddenThreadsMenuItem({ sectionKey, surface = "dropdown" }: {
+  sectionKey: string;
+  surface?: "context" | "dropdown";
+}) {
   const state = useHiddenThreadsState();
-  if (!sectionKey || !state) return null;
-  const count = state.hidden.get(sectionKey) ?? 0;
-  if (count === 0) return null;
+  const count = state?.hidden.get(sectionKey) ?? 0;
+  if (!state || count === 0) return null;
   const revealed = state.revealed.has(sectionKey);
   return (
-    <div
-      data-sidebar-hidden-threads={sectionKey}
-      className="flex h-7 min-w-0 items-center gap-1 px-2 text-xs text-subtle-foreground max-md:pointer-coarse:h-9"
+    <ActionMenuItem
+      surface={surface}
+      icon={revealed ? "EyeOff" : "Eye"}
+      onSelect={() => state.setRevealed(sectionKey, !revealed)}
     >
-      <span className="min-w-0 truncate">{revealed ? `Showing ${count} hidden` : `${count} hidden`}</span>
-      <span aria-hidden="true">·</span>
-      <button
-        type="button"
-        className="shrink-0 rounded-sm text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-        aria-label={revealed ? `Hide ${count} hidden` : `Show ${count} hidden`}
-        onClick={() => state.setRevealed(sectionKey, !revealed)}
-      >
-        {revealed ? "Hide" : "Show"}
-      </button>
-    </div>
+      {revealed ? "Hide hidden threads" : `Show ${count} hidden ${count === 1 ? "thread" : "threads"}`}
+    </ActionMenuItem>
   );
 }

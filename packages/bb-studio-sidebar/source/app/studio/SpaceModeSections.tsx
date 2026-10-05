@@ -61,6 +61,7 @@ import {
 import { useMoveThreadsToSpace } from "./MoveToSpace.js";
 import { SpaceStudioList, SpaceSubheading } from "./SpaceStudioList.js";
 import { SpaceArchivedMenu } from "./SpaceArchivedMenu.js";
+import { HiddenThreadsMenuItem } from "./HiddenThreads.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
 import { setSpaceNewThreadTarget } from "./new-thread-space.js";
 import { SpaceRowsContext } from "./SpaceThreadRow.js";
@@ -568,6 +569,7 @@ function SpaceSidebarSection({
             <Icon name="Folder" />
             Projects…
           </DropdownMenuItem>
+          <HiddenThreadsMenuItem sectionKey={sectionId} />
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => openSpaceDialog(space.id, "heartbeat")}>
             <Icon name="Star" />

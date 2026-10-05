@@ -34,6 +34,7 @@ import {
 } from "./SidebarVisibilityControls.js";
 import { ThreadRowActionsCustomize } from "./ThreadRowActionsCustomize.js";
 import { CustomizeRowActionsContext } from "./customizeRowActionsContext.js";
+import { HiddenThreadsMenuItem } from "../studio/HiddenThreads.js";
 
 export interface ThreadListVisibilityGroup extends SidebarVisibilityItem {
   id: SidebarSectionId;
@@ -247,6 +248,7 @@ export function ThreadListVisibilityMenuItems({
   return (
     <>
       {leadingSeparator && <ActionMenuSeparator surface={surface} />}
+      {id !== null && <HiddenThreadsMenuItem sectionKey={id} surface={surface} />}
       {id !== null && (
         <Item onSelect={() => state.hide(id)}>
           <SidebarVisibilityActionContent visible label="Hide from list" />

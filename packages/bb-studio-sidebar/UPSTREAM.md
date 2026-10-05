@@ -42,8 +42,8 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/app/list/SidebarHeaderControls.test.tsx` | Check the empty project menu toggle. |
 | `source/app/list/ProjectList.modes.test.tsx`, `ProjectList.sectionCreate.test.tsx`, and `useSidebarThreadReveal.test.tsx` | Leave By space out of the stored-order probe, count the Automated threads divider, and check that an automated thread's group expands only when opened. |
 | `source/server.test.ts` | Check the new preference default and parsing. |
-| `source/app/list/TopLevelSidebarSection.tsx` | Add a label mark and a clickable label for Space sections, highlight the label of the open Space, and end each section with the hidden automated threads row. |
-| `source/app/list/ThreadListVisibility.tsx` | Expose the section key a component renders in. |
+| `source/app/list/TopLevelSidebarSection.tsx` | Add a label mark and a clickable label for Space sections, and highlight the label of the open Space. |
+| `source/app/list/ThreadListVisibility.tsx` | Expose the section key a component renders in, and add Show or Hide hidden threads to a section's menu. |
 | `source/app/list/useSidebarModeSectionOrder.ts` | Leave By space out of the stored section orders; it follows Studio's order. |
 | `source/app/model/sidebar-section-id.ts`, `sidebar-section-order.ts`, and `source/app/dnd/useSectionThreadDnd.ts` (group ids) | Accept `space:` section ids. |
 | `source/app/dnd/useSectionThreadDnd.ts` (group move) | Let By space move threads dropped on a Space's section, heading or dot into that Space through Studio. |

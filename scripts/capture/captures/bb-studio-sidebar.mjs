@@ -104,32 +104,46 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
             await showBySpace(client);
             const launch = `[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]`;
             const digest = `${launch} [data-sidebar-thread-id="${fixture.threads.digest}"]`;
-            const hiddenRow = `${launch} [data-sidebar-hidden-threads]`;
-            const rowText = () => client.evaluate(`document.querySelector(${JSON.stringify(hiddenRow)})?.textContent ?? null`);
             const waitFor = async (check, message) => {
               for (let started = Date.now(); Date.now() - started < 15000; await sleep(250)) if (await check()) return;
               throw new Error(message);
             };
             const shown = () => client.evaluate(`Boolean(document.querySelector(${JSON.stringify(digest)}))`);
+            const menuItem = (text) => client.evaluate(`Array.from(document.querySelectorAll('[role="menuitem"]')).some((item) => item.checkVisibility() && item.textContent?.trim() === ${JSON.stringify(text)})`);
+            const openLaunchMenu = async () => {
+              await client.evaluate(`document.querySelector(${JSON.stringify(launch)})?.scrollIntoView({ block: 'start' })`);
+              await sleep(200);
+              await client.clickAriaButtonWithPointer(`${fixture.spaces.launch.name} actions`);
+              await client.waitForSelector('[role="menuitem"]');
+            };
             // Hide Release digest from its row's real right-click menu.
             await client.openContextMenu(digest);
             await client.waitForSelector('[role="menuitem"]');
             await client.clickElementWithTextAndPointer('[role="menuitem"]', "Hide");
             await waitFor(async () => !(await shown()), "Release digest still shows after Hide");
-            await waitFor(async () => (await rowText())?.includes("1 hidden") && (await rowText())?.includes("Show"), "Launch lacks the \"1 hidden · Show\" row");
-            // The row can sit under the sidebar's footer, so bring it into view first.
-            const show = `${launch} [data-sidebar-hidden-threads] button[aria-label="Show 1 hidden"]`;
-            await client.evaluate(`document.querySelector(${JSON.stringify(show)})?.scrollIntoView({ block: "center" })`);
-            await sleep(200);
-            await client.clickElementWithTextAndPointer(show, "Show");
+            if (await client.evaluate(`Boolean(document.querySelector('[data-sidebar-hidden-threads]'))`)) throw new Error("A hidden-threads footer row still shows");
+            // Launch's ⋯ menu shows it again.
+            await openLaunchMenu();
+            await waitFor(() => menuItem("Show 1 hidden thread"), "Launch ⋯ lacks \"Show 1 hidden thread\"");
+            await client.clickElementWithTextAndPointer('[role="menuitem"]', "Show 1 hidden thread");
             await waitFor(shown, "Release digest didn't come back after Show");
-            await waitFor(async () => (await rowText())?.includes("Showing 1 hidden"), "Launch lacks the \"Showing 1 hidden\" row");
-            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]')?.scrollIntoView({ block: 'start' })`);
+            // Leave the menu open on its Hide hidden threads item for the capture.
+            await openLaunchMenu();
+            await waitFor(() => menuItem("Hide hidden threads"), "Launch ⋯ lacks \"Hide hidden threads\"");
             await sleep(350);
           } catch (error) { await cleanup(); throw error; }
           return cleanup;
         },
-        clip,
+        // The sidebar plus the open ⋯ menu beside it.
+        clip: async (client) => {
+          const base = await clip(client);
+          const menu = await client.evaluate(`(() => {
+            const rect = document.querySelector('[role="menu"]')?.getBoundingClientRect();
+            return rect ? { right: rect.right, bottom: rect.bottom } : null;
+          })()`);
+          if (!menu) return base;
+          return { ...base, width: Math.max(base.width, menu.right + 8 - base.x), height: Math.max(base.height, menu.bottom + 8 - base.y) };
+        },
       },
     ];
   })(),
