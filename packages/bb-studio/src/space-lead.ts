@@ -193,6 +193,9 @@ export class SpaceLeads {
     return this.serial(ledSpace ?? `thread:${threadId}`, async () => {
       const previous = db.prepare("SELECT new_thread_id, archived FROM space_thread_handoffs WHERE old_thread_id = ?").get(threadId) as { new_thread_id: string; archived: number } | undefined;
       const old = await this.deps.sdk.threads.get({ threadId });
+      // Leadership moves only while this thread, or its successor on a retry, is still the lead.
+      const current = ledSpace ? this.storedLead(ledSpace) : null;
+      const leading = ledSpace && current && (current === threadId || current === previous?.new_thread_id) ? ledSpace : null;
       const spaceId = ledSpace ?? this.spaceOf({ id: threadId, projectId: old.projectId ?? null });
       const space = this.deps.spaces.get(spaceId);
       const explicit = this.deps.spaces.threads.explicit(threadId) === spaceId;
@@ -216,12 +219,12 @@ export class SpaceLeads {
         db.prepare("INSERT INTO space_thread_handoffs (old_thread_id, new_thread_id, space_id, lead) VALUES (?, ?, ?, ?)").run(threadId, newId, space ? spaceId : null, ledSpace ? 1 : 0);
       }
       // The successor stays where the old thread was: a lead and an added thread explicitly, others through the project.
-      if (space && (ledSpace || explicit)) this.join(spaceId, newId);
-      if (ledSpace && space) {
-        this.saveLead(ledSpace, newId);
+      if (space && (leading || explicit)) this.join(spaceId, newId);
+      if (leading && space) {
+        this.saveLead(leading, newId);
         await this.deps.sdk.threads.unpin({ threadId: newId }).catch(() => {});
-        const run = this.runs.get(ledSpace);
-        if (run?.enabled) await this.runs.set(ledSpace, newId, run);
+        const run = this.runs.get(leading);
+        if (run?.enabled) await this.runs.set(leading, newId, run);
       }
       if (!previous?.archived) {
         await this.deps.sdk.threads.archive({ threadId });

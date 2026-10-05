@@ -265,6 +265,19 @@ it("hands a lead off to a new thread that stays the lead, once", async () => {
   expect(x.archive).toHaveBeenCalledTimes(1);
 });
 
+it("a repeated handoff of an old lead doesn't take the lead back from a newer one", async () => {
+  const x = await setup();
+  await lead(x);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
+  await x.leads.handoff("t1", request);
+  const other = await x.spawn({ projectId: "p" });
+  await x.leads.setLead(x.garden.id, other.id);
+  expect(await x.leads.handoff("t1", request)).toEqual({ threadId: "t2" });
+  expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: other.id, run: { enabled: true } });
+  const update = x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_update").at(-1)![0] as unknown as { input: { execution: { targetThreadId: string } } };
+  expect(update.input.execution.targetThreadId).toBe(other.id);
+});
+
 it("hands off a worker in place: an added thread stays added", async () => {
   const x = await setup();
   const { id: threadId } = await x.spawn({ projectId: "p" });
