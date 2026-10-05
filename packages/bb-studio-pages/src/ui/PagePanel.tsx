@@ -78,7 +78,7 @@ function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: st
               <Icon name="ArrowLeft" className="size-4" />
             </button>
           ) : null}
-          {page.icon ? <span className="shrink-0 text-base leading-none">{page.icon}</span> : <Icon name="FileText" className="size-4 shrink-0 text-muted-foreground" />}
+          {page.icon ? <span className="shrink-0 text-base leading-none">{page.icon}</span> : <Icon name="pages/pages" fallback="FileText" className="size-4 shrink-0 text-muted-foreground" />}
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{untitled(page.title)}</div>
             <div className="truncate text-[11px] text-muted-foreground">Edited {relativeTime(page.updatedAt)}</div>

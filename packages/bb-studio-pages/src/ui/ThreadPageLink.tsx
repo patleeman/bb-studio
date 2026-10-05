@@ -34,7 +34,7 @@ export function ThreadPageLink({ threadId, isCompactViewport }: PluginThreadHead
       )}
       onClick={() => navigate.toPluginPanel("pages", { subPath: `${page.id}/chat/${threadId}` })}
     >
-      {page.icon ? <span className="shrink-0 text-base leading-none">{page.icon}</span> : <Icon name="FileText" className="size-4 shrink-0" />}
+      {page.icon ? <span className="shrink-0 text-base leading-none">{page.icon}</span> : <Icon name="pages/pages" fallback="FileText" className="size-4 shrink-0" />}
       {isCompactViewport ? null : <span className="truncate">{title}</span>}
     </button>
   );

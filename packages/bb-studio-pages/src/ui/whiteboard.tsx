@@ -147,7 +147,7 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
         {editing ? (
           <>
             <ToolButton active={tool === "pen"} label="Pen" icon="Edit" onClick={() => setTool("pen")} />
-            <ToolButton active={tool === "eraser"} label="Eraser" icon="Trash2" onClick={() => setTool("eraser")} />
+            <ToolButton active={tool === "eraser"} label="Eraser" icon="Clean" onClick={() => setTool("eraser")} />
             <span className="mx-1 h-4 w-px bg-border" />
             {WHITEBOARD_COLORS.map((each) => (
               <button

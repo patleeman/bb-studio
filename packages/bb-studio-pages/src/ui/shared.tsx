@@ -77,7 +77,7 @@ export function PageMenu({
         ) : null}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Icon name="Folder" className="size-4" /> Move to project
+            <Icon name="MoveTo" className="size-4" /> Move to project
             <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="max-h-80 w-52 overflow-auto">
@@ -94,7 +94,7 @@ export function PageMenu({
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuItem onSelect={() => void update({ archived: !page.archived })}>
-          <Icon name="Archive" className="size-4" /> {page.archived ? "Restore from archive" : "Archive"}
+          <Icon name={page.archived ? "ArchiveRestore" : "Archive"} className="size-4" /> {page.archived ? "Restore from archive" : "Archive"}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

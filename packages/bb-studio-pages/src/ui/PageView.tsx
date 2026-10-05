@@ -115,7 +115,7 @@ function IconPicker({ page, rpc, children }: { page: PageMetaView; rpc: Rpc; chi
         </div>
         {page.icon ? (
           <DropdownMenuItem className="mt-1" onSelect={() => void rpc.call("update", { id: page.id, icon: "" })}>
-            Remove icon
+            <Icon name="X" className="size-4" /> Remove icon
           </DropdownMenuItem>
         ) : null}
       </DropdownMenuContent>
@@ -544,7 +544,7 @@ export function PageView({
           <PresenceStack presence={presence} />
           <DictateButton talk={talk} ready={Boolean(connection && ready && status !== "missing")} onToggle={() => toggleTalk(pageFieldKey(page.id))} />
           <button type="button" aria-label="Version history" title="Version history" className={cn(ICON_BUTTON, "max-md:hidden")} onClick={() => setDialog("history")}>
-            <Icon name="RotateCcw" className="size-4" />
+            <Icon name="Clock" className="size-4" />
           </button>
           <button
             type="button"
@@ -573,7 +573,7 @@ export function PageView({
                   <Icon name="Plus" className="size-4" /> Add a page inside
                 </DropdownMenuItem>
                 <DropdownMenuItem className="md:hidden" onSelect={() => setDialog("history")}>
-                  <Icon name="RotateCcw" className="size-4" /> Version history…
+                  <Icon name="Clock" className="size-4" /> Version history…
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => void rpc.call("markdown", { id: page.id }).then((result) => navigator.clipboard.writeText(result.markdown))}

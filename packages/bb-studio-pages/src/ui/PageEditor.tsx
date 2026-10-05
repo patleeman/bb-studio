@@ -283,7 +283,7 @@ export function PageEditor({
         subtext: "Embed another page as a card",
         aliases: ["subpage", "embed page"],
         group: "Media",
-        icon: <Icon name="FileText" className="size-4" />,
+        icon: <Icon name="pages/pages" fallback="FileText" className="size-4" />,
         onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "page" } }),
       },
       {
@@ -403,7 +403,7 @@ export function PageEditor({
       .map((candidate) => ({
         title: untitled(candidate.title),
         group: "Pages",
-        icon: candidate.icon ? <span className="text-base leading-none">{candidate.icon}</span> : <Icon name="FileText" className="size-4" />,
+        icon: candidate.icon ? <span className="text-base leading-none">{candidate.icon}</span> : <Icon name="pages/pages" fallback="FileText" className="size-4" />,
         onItemClick: insert("page", candidate.id, untitled(candidate.title)),
       }));
     const dates = [
