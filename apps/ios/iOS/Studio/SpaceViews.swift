@@ -158,10 +158,24 @@ final class ThreadSpacesModel: ObservableObject {
     @Published private(set) var spaceOf: [String: String] = [:]
     @Published private(set) var leadOfSpace: [String: String] = [:]
 
+    /// Without both the Spaces and where each thread is, the menu stays hidden: a
+    /// Studio without `space_of_threads` would show every thread in the default Space.
+    /// Other failures keep what was loaded.
     func load(_ threadId: String, client: BBClient) async {
-        guard let spaces = try? await client.studioSpaces() else { return }
-        self.spaces = spaces
-        spaceOf = (try? await client.spaceOfThreads()) ?? [:]
+        do {
+            async let listed = client.studioSpaces()
+            async let of = client.spaceOfThreads()
+            let (spaces, spaceOf) = try await (listed, of)
+            self.spaces = spaces
+            self.spaceOf = spaceOf
+        } catch {
+            if BBClient.isMissingRPC(error) {
+                spaces = []
+                spaceOf = [:]
+                leadOfSpace = [:]
+            }
+            return
+        }
         if let id = space(of: threadId, projectId: nil)?.id, let lead = try? await client.spaceLead(id) {
             leadOfSpace[id] = lead.threadId
         }
