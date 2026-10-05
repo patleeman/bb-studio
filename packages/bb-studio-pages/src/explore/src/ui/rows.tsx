@@ -36,10 +36,12 @@ export interface ExploreRowsProps {
   title?: string;
   /** Says, quietly, where to turn Explore off. Only for the end-of-reply rows the setting controls. */
   settingsHint?: boolean;
+  /** A finding was clicked to open or write its explainer (not to regenerate it). */
+  onExplore?(item: ExploreItem): void;
   className?: string;
 }
 
-export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, className }: ExploreRowsProps) {
+export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, onExplore, className }: ExploreRowsProps) {
   const rpc = useExploreRpc();
   const navigate = useBbNavigate();
   useMinuteTick();
@@ -73,6 +75,7 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
   async function act(item: ExploreItem, explainer: ExplainerView | undefined, regenerate: boolean) {
     const key = labelKey(item.label);
     if (busy[key]) return;
+    if (!regenerate) onExplore?.(item);
     setErrors(({ [key]: _, ...rest }) => rest);
     const state = rowState(explainer);
     // Written or being written: just open it.

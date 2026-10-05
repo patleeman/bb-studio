@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
+import { NEXT_KINDS, suggestionKey, type NextKind } from "./next";
 import { ACTIVE_JOB_STATUSES, STAGES, labelKey, type ExploreItem, type JobStatus } from "./shared";
 
 export type ExplainerStatus = "pending" | "generating" | "ready" | "error";
@@ -133,7 +134,24 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS explore_findings_post ON explore_findings (post_id)`,
   // Findings were kept for Studio Feed, which is gone.
   `DROP TABLE IF EXISTS explore_findings`,
+  // The Next row's suggestions: when each was first shown and clicked.
+  `CREATE TABLE IF NOT EXISTS next_suggestions (
+     key TEXT PRIMARY KEY,
+     thread_id TEXT NOT NULL,
+     message_id TEXT NOT NULL,
+     kind TEXT NOT NULL,
+     emoji TEXT NOT NULL,
+     label TEXT NOT NULL,
+     shown_at INTEGER NOT NULL,
+     clicked_at INTEGER,
+     clicks INTEGER NOT NULL DEFAULT 0
+   )`,
+  `CREATE INDEX IF NOT EXISTS next_suggestions_shown ON next_suggestions (shown_at)`,
 ];
+
+export type NextKindStats = { kind: NextKind; shown: number; clicked: number };
+export type NextLabelStats = { kind: NextKind; emoji: string; label: string; shown: number; clicked: number };
+export type NextStats = { since: number; kinds: NextKindStats[]; top: NextLabelStats[] };
 
 export class ExploreStore {
   constructor(
@@ -302,6 +320,41 @@ export class ExploreStore {
       explainerIds: [...new Set(rows.map((row) => row.explainer_id))],
       workerIds: rows.flatMap((row) => (row.worker_thread_id ? [row.worker_thread_id] : [])),
     };
+  }
+
+  // ----- the Next row's click log -----
+
+  /** Records suggestions as shown; ones already recorded keep their first time. */
+  nextShown(input: { threadId: string; messageId: string; items: readonly { kind: NextKind; emoji: string; label: string }[] }): void {
+    const insert = this.db.prepare(
+      `INSERT INTO next_suggestions (key, thread_id, message_id, kind, emoji, label, shown_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (key) DO NOTHING`,
+    );
+    const at = this.now();
+    this.db.transaction(() => {
+      for (const item of input.items) insert.run(suggestionKey({ ...input, ...item }), input.threadId, input.messageId, item.kind, item.emoji, item.label, at);
+    })();
+  }
+
+  /** Records a click, and the suggestion as shown if that was missed. */
+  nextClicked(input: { threadId: string; messageId: string; kind: NextKind; emoji: string; label: string }): void {
+    this.nextShown({ threadId: input.threadId, messageId: input.messageId, items: [input] });
+    this.db
+      .prepare("UPDATE next_suggestions SET clicks = clicks + 1, clicked_at = COALESCE(clicked_at, ?) WHERE key = ?")
+      .run(this.now(), suggestionKey(input));
+  }
+
+  /** Shown and clicked suggestions since a time, per kind, and the most clicked labels. */
+  nextStats(since: number, limit = 10): NextStats {
+    const kinds = this.db
+      .prepare("SELECT kind, COUNT(*) AS shown, COUNT(clicked_at) AS clicked FROM next_suggestions WHERE shown_at >= ? GROUP BY kind")
+      .all(since) as NextKindStats[];
+    const top = this.db
+      .prepare(
+        `SELECT kind, MIN(emoji) AS emoji, MIN(label) AS label, COUNT(*) AS shown, COUNT(clicked_at) AS clicked FROM next_suggestions
+         WHERE shown_at >= ? GROUP BY kind, LOWER(label) HAVING clicked > 0 ORDER BY clicked DESC, shown ASC LIMIT ?`,
+      )
+      .all(since, limit) as NextLabelStats[];
+    return { since, kinds: NEXT_KINDS.map((kind) => kinds.find((row) => row.kind === kind) ?? { kind, shown: 0, clicked: 0 }), top };
   }
 
   // ----- the "Explore" parent page per project -----

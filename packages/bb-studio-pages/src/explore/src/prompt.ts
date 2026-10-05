@@ -2,6 +2,7 @@
 // answer with what you noticed), and the worker's prompt (write the page,
 // as one HTML document).
 import { explainerText } from "./markdown";
+import { NEXT_DIRECTIVE, NEXT_LIMITS } from "./next";
 import { DIRECTIVE, MAX_FOLLOW_UPS, MAX_ITEMS, type ExploreItem } from "./shared";
 import type { TurnHints } from "./timeline";
 
@@ -16,6 +17,31 @@ export function exploreInstructions(): string {
     "Emoji: 🐛 suspicious or likely buggy, 🏗️ foundational subsystem, 🔗 connected code the answer depends on, 🕐 recently changed.",
     'Leave the line out when nothing is worth it; never pad it. Don\'t use double quotes or | inside a label. Put it on its own line, never inside a code block. If your message ends with a ::reactions line, put this line immediately before it; otherwise make it the last line.',
     "Clicking an item writes a Studio Page explaining it, in the background. To write one yourself when asked, use explore_explain.",
+  ].join("\n");
+}
+
+/** Replies to suggest when the user's Studio Reactions settings can't be read. */
+export const DEFAULT_REPLIES = ["👍 Looks good", "🔁 Try another way", "❓ Explain more"];
+
+/** The Next row's instructions. They replace Explore's and Studio Reactions' smart reactions. */
+export function nextInstructions({ explore, replies }: { explore: boolean; replies: readonly string[] }): string {
+  const example = [
+    `reply="👍 Ship it|🧪 Add tests first"`,
+    ...(explore ? [`explore="🐛 Retry backoff disagrees in billing"`] : []),
+    `do="📄 Write up the migration plan as a page"`,
+  ].join(" ");
+  return [
+    "The Next row is on. End a reply with one line that offers the user's likely next steps, when there are any:",
+    `::${NEXT_DIRECTIVE}{${example}}`,
+    "Every attribute is optional; leave out the ones with nothing worth offering, and leave out the whole line when nothing is. Items are separated by |. Each is one emoji, a space, and a short label. Don't use double quotes or | inside a label.",
+    `- reply: only when your reply asks the user to decide, choose, approve or answer. 2 to ${NEXT_LIMITS.reply} quick answers of at most 5 words; each must make sense as the user's whole reply.${replies.length ? ` Prefer these when they fit: ${replies.join(" | ")}. Write specific ones when your reply offers distinct options.` : ""}`,
+    ...(explore
+      ? [
+          `- explore: only when your answer involved reading code. 1 to ${NEXT_LIMITS.explore} things you noticed along the way but didn't cover, each a specific label of at most 8 words that says what the user would find, such as "Cache keys ignore the tenant id", never "Learn more about caching". Emoji: 🐛 suspicious or likely buggy, 🏗️ foundational subsystem, 🔗 connected code the answer depends on, 🕐 recently changed. Clicking one writes a Studio Page explaining it in the background; to write one yourself when asked, use explore_explain.`,
+        ]
+      : []),
+    `- do: 1 to ${NEXT_LIMITS.do} concrete actions you could take next for the user, phrased as the instruction they'd give you, such as "📄 Write this up as a page", "🧵 Start a thread to fix the retry bug" or "📌 Add the decision to the Space brief". Clicking one drafts it for the user to send. Offer only what you can actually do, and never the step you just asked about in reply.`,
+    "Put the line last, on its own line, never inside a code block. Don't also write ::reactions or ::explore lines.",
   ].join("\n");
 }
 

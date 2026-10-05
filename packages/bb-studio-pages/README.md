@@ -234,4 +234,20 @@ told not to.
 
 ## Explore
 
-Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page, opened in the thread's **Explore** tab. Agents can write an explainer themselves with the `explore_explain` tool. Explore keeps its explainers in its own `explore.db` next to Pages' database. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate`.
+Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page, opened in the thread's **Explore** tab. Agents can write an explainer themselves with the `explore_explain` tool. Explore keeps its explainers in its own `explore.db` next to Pages' database. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate|stats`.
+
+### Next row
+
+With **Explore: End replies with a Next row** on (the default), agents end a reply with one **Next** row instead of separate lines. The row has up to three kinds of suggestion:
+
+- **Replies**: quick answers when the reply asks you something. Clicking one drafts it in the composer. The agent prefers the reactions saved in Studio Reactions.
+- **Things to explore**: the findings above, which write explainer pages.
+- **Actions**: things the agent offers to do next, such as "📄 Write this up as a page", "🧵 Start a thread to fix the retry bug" or "📌 Add the decision to the Space brief". Clicking one drafts the request for you to send.
+
+The agent writes it as one line, and any group can be left out:
+
+```
+::next{reply="👍 Ship it|🧪 Add tests first" explore="🐛 Retry backoff disagrees" do="📄 Write up the plan as a page"}
+```
+
+Studio Reactions' smart reactions add nothing while the Next row is on. Pages logs each suggestion once when it's shown and counts its clicks. `bb pages explore stats [--days 30]` prints how often each kind is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines still render.

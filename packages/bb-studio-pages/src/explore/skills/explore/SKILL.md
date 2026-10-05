@@ -1,6 +1,6 @@
 ---
 name: explore
-description: Use when the user asks about Explore findings ("Along the way" rows at the end of a reply, explainer pages), asks you to explore or explain something you noticed, or about the `::explore` line in your instructions.
+description: Use when the user asks about Explore findings ("Along the way" rows at the end of a reply, explainer pages) or the Next row, asks you to explore or explain something you noticed, or about the `::explore` or `::next` line in your instructions.
 ---
 
 # Explore (experimental)
@@ -15,6 +15,13 @@ instructions ask you to end an answer that involved reading code with one
 line of findings you noticed but didn't cover:
 `::explore{items="🐛 Retry backoff disagrees in billing|🏗️ How the job queue works"}`.
 It goes just before a `::reactions` line if there is one, otherwise last.
+
+When the Next row is on (*End replies with a Next row*, the default), those
+findings go in the `explore` attribute of one `::next` line instead, next to
+`reply` (quick answers) and `do` (actions you offer to take):
+`::next{reply="👍 Ship it" explore="🐛 Retry backoff disagrees" do="📄 Write up the plan as a page"}`.
+Clicking a `reply` or `do` item drafts its text in the composer; when the user
+sends a `do` item, carry it out.
 
 The user sees the items as rows under **Along the way**. Clicking one writes
 an explainer page in the background, from a hidden copy of the thread, and
@@ -35,6 +42,7 @@ Use it when the user asks you to explore something yourself.
 bb pages explore list [--thread <thread id>]            # explainers: id, state, finding, page, thread
 bb pages explore open <explainer id>                    # page link, state and follow-ups
 bb pages explore regenerate <explainer id> [--wait]     # write it again in place (old version kept)
+bb pages explore stats [--days <days>]                  # Next row: shown and clicked per kind, top labels
 ```
 
 ## Limits

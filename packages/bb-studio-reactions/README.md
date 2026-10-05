@@ -54,6 +54,10 @@ The frontend draws that line as buttons. Items are separated by `|`, so
 labels can contain commas. The plugin shows at most 5 items, drops items longer
 than 60 characters, and drops items without both an emoji and a label.
 
+- Studio Pages' [Next row](../bb-studio-pages/README.md#next-row) offers
+  quick replies too, along with things to explore and actions, and prefers
+  your saved reactions. While Pages is enabled with the Next row on, smart
+  reactions add no instructions, so agents aren't asked for two lines.
 - Instructions apply when a thread's agent session starts or resumes, so turn
   the setting on before you start a thread. A running session keeps the
   instructions it started with.

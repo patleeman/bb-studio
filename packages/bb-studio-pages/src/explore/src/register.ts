@@ -18,6 +18,7 @@ import { MAX_LABEL_LENGTH, STAGES } from "./shared";
 import { ExploreStore, MIGRATIONS, type ExplainerRow } from "./store";
 import { walk } from "./timeline";
 import { exploreWorkers } from "./worker";
+import type { NextKind } from "./next";
 
 export const EXPLORE_TOOL = "explore_explain";
 
@@ -25,8 +26,12 @@ const USAGE = {
   list: "bb pages explore list [--thread <thread id>]",
   open: "bb pages explore open <explainer id>",
   regenerate: "bb pages explore regenerate <explainer id> [--wait]",
+  stats: "bb pages explore stats [--days <days>]",
 };
-export const EXPLORE_USAGE = `bb pages explore <list|open|regenerate> …`;
+export const EXPLORE_USAGE = `bb pages explore <list|open|regenerate|stats> …`;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const percent = (clicked: number, shown: number) => (shown ? `${Math.round((clicked / shown) * 100)}%` : "-");
 
 type CliResult = PluginCliResult;
 
@@ -89,6 +94,14 @@ export function registerExplore(bb: BbPluginApi, options: {
     explainers: ({ threadId, limit }: { threadId?: string; limit?: number }) => ({
       explainers: store.list({ threadId, limit }).map((row) => service.view(row)),
     }),
+    nextShown: (input: { threadId: string; messageId: string; items: { kind: NextKind; emoji: string; label: string }[] }) => {
+      store.nextShown(input);
+      return { ok: true as const };
+    },
+    nextClicked: (input: { threadId: string; messageId: string; kind: NextKind; emoji: string; label: string }) => {
+      store.nextClicked(input);
+      return { ok: true as const };
+    },
   };
 
   // Agents ---------------------------------------------------------------------
@@ -172,8 +185,18 @@ export function registerExplore(bb: BbPluginApi, options: {
         const settled = (await service.settled(id, ctx.signal)) ?? mustGet(id);
         return { exitCode: settled.status === "error" || !settled.page_id ? 1 : 0, stdout: `${describe(settled)}\n` };
       }
+      case "stats": {
+        const days = flags.values.days === undefined ? 30 : Number(flags.values.days);
+        if (!Number.isInteger(days) || days < 1) return fail(`usage: ${USAGE.stats}`);
+        const stats = store.nextStats(Date.now() - days * DAY_MS);
+        const kinds = stats.kinds.map((row) => [row.kind, row.shown, row.clicked, percent(row.clicked, row.shown)].join("\t"));
+        const top = stats.top.map((row) => [row.kind, `${row.emoji} ${row.label}`, `${row.clicked}/${row.shown}`].join("\t"));
+        const lines = [`Next row, last ${days} day${days === 1 ? "" : "s"}`, ["kind", "shown", "clicked", "rate"].join("\t"), ...kinds];
+        if (top.length) lines.push("", "Most clicked", ...top);
+        return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
+      }
       default:
-        return fail(`usage: ${EXPLORE_USAGE}\n  ${USAGE.list}\n  ${USAGE.open}\n  ${USAGE.regenerate}`);
+        return fail(`usage: ${EXPLORE_USAGE}\n  ${Object.values(USAGE).join("\n  ")}`);
     }
   }
 
@@ -186,7 +209,10 @@ export function registerExplore(bb: BbPluginApi, options: {
     service,
     rpc,
     cli,
-    /** What `bb.agents.configure` gives a thread: the tool, and the instructions when the setting is on. */
-    configure: (enabled: boolean) => ({ tools: [EXPLORE_TOOL], skills: [], ...(enabled ? { instructions } : {}) }),
+    /** What `bb.agents.configure` gives a thread: the tool, and the Next row's or Explore's instructions. */
+    configure: (enabled: boolean, next: string | null = null) => {
+      const text = next ?? (enabled ? instructions : null);
+      return { tools: [EXPLORE_TOOL], skills: [], ...(text ? { instructions: text } : {}) };
+    },
   };
 }

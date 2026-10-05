@@ -121,6 +121,6 @@ export async function registerPagesWithExplore(host: BbPluginApi, registerPages:
   const nested = exploreCli;
   if (pages) host.cli.register({ ...pages, commands: [
     ...pages.commands ?? [],
-    ...(nested ? [{ name: "explore", summary: nested.summary, usage: "bb pages explore <list|open|regenerate> …" }] : []),
+    ...(nested ? [{ name: "explore", summary: nested.summary, usage: "bb pages explore <list|open|regenerate|stats> …" }] : []),
   ], run: (argv, ctx) => argv[0] === "explore" && nested ? nested.run(argv.slice(1), ctx) : pages.run(argv, ctx) });
 }

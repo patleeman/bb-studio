@@ -2,6 +2,7 @@
 // types without server code.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { NEXT_KINDS } from "./next";
 import { JOB_STATUSES, MAX_LABEL_LENGTH } from "./shared";
 
 const explainerId = z.string().min(1).max(100);
@@ -50,6 +51,8 @@ export const explainerSchema = z.object({
   job: jobSchema.nullable(),
 });
 
+const nextItemSchema = z.object({ kind: z.enum(NEXT_KINDS), emoji: z.string().max(16), label: z.string().trim().min(1).max(MAX_LABEL_LENGTH * 2) });
+
 export type ExplainerView = z.infer<typeof explainerSchema>;
 export type JobView = z.infer<typeof jobSchema>;
 
@@ -92,5 +95,15 @@ export const rpcContract = defineRpcContract({
   explainers: {
     input: z.object({ threadId: threadId.optional(), limit: z.number().int().min(1).max(200).optional() }),
     output: z.object({ explainers: z.array(explainerSchema) }),
+  },
+  /** A message's Next row was shown; logged once per suggestion. */
+  nextShown: {
+    input: z.object({ threadId, messageId, items: z.array(nextItemSchema).max(20) }),
+    output: z.object({ ok: z.literal(true) }),
+  },
+  /** A Next suggestion was clicked. */
+  nextClicked: {
+    input: nextItemSchema.extend({ threadId, messageId }),
+    output: z.object({ ok: z.literal(true) }),
   },
 });
