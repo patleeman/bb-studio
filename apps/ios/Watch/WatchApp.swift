@@ -36,17 +36,6 @@ struct WatchInboxView: View {
                     }
                 }
             }
-            if !model.bots.isEmpty {
-                Section("Bots") {
-                    ForEach(model.bots, id: \.bot.id) { entry in
-                        NavigationLink {
-                            WatchThreadView(threadId: entry.thread.threadId, title: entry.bot.name)
-                        } label: {
-                            Text("\(entry.bot.avatar ?? "🤖") \(entry.bot.name)")
-                        }
-                    }
-                }
-            }
         }
         .navigationTitle("BB")
         .overlay { if model.loading && model.threads.isEmpty { ProgressView() } }

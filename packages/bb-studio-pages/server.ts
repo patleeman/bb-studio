@@ -8,7 +8,7 @@ import { untitled } from "@bb-studio/kit/format";
 import { createStudioNotifier } from "@bb-studio/kit/server";
 import * as Y from "yjs";
 import { z } from "zod";
-import { actorColor, BotDirectory } from "./src/bots";
+import { actorColor } from "./src/actors";
 import { FILES_PATH, HUMAN_USER_ID, MAX_UPLOAD_BYTES, MERMAID_PATH, PLUGIN_ID, PLUGIN_RPC_ACTOR, SYNC_PATH, UPLOAD_PATH } from "./src/constants";
 import { rpcContract } from "./src/contract";
 import { studioEmbeds } from "./src/embeds";
@@ -16,7 +16,7 @@ import { fetchPreview } from "./src/unfurl";
 import { createThread, listThreads, reply, setResolved } from "./src/comments";
 import { applyEdits, readMarkdown, textBlocks } from "./src/doc";
 import type { Socket } from "./src/hub";
-import { errorText, pageUrl, PagesService, requestView, toView, truncate, validateCron } from "./src/service";
+import { errorText, pageUrl, PagesService, requestView, toView, truncate } from "./src/service";
 import { MIGRATIONS, PageStore } from "./src/store";
 import { registerStudio } from "./src/studio";
 import { outgoingStudioLinks } from "./src/studio-links";
@@ -41,8 +41,7 @@ async function registerPages(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new PageStore(db, () => config.snapshotsPerPage);
-  const bots = new BotDirectory(bb);
-  const service = new PagesService(bb, store, bots);
+  const service = new PagesService(bb, store);
   const checklists = new Checklists(bb, db, service, store);
 
   // Live sync -----------------------------------------------------------------
@@ -167,10 +166,9 @@ async function registerPages(bb: BbPluginApi) {
   const authorNames = async (authors: string[]) => {
     const names = new Map<string, string>();
     const unique = [...new Set(authors)];
-    const directory = unique.some((author) => author.startsWith("bot:")) ? await bots.list().catch(() => null) : null;
     for (const author of unique) {
       if (author === HUMAN_USER_ID) names.set(author, "You");
-      else if (author.startsWith("bot:")) names.set(author, directory?.bots.find((bot) => `bot:${bot.id}` === author)?.name ?? "Bot");
+      else if (author.startsWith("bot:")) names.set(author, "Former bot");
       else if (author.startsWith("agent:thr_")) names.set(author, (await service.actorForThread(author.slice(6))).actor.name);
     }
     return names;
@@ -244,54 +242,9 @@ async function registerPages(bb: BbPluginApi) {
       return { page: toView(service.replaceMarkdown(id, markdown, snapshotName, actor)) };
     },
     search: ({ query, projectId }) => ({ pages: store.search(query, projectId).map(toView) }),
-    bots: async () => {
-      const result = await bots.list();
-      return {
-        available: result.available,
-        reason: result.available ? null : result.reason,
-        bots: result.bots.map(({ id, name, handle, avatar, description, working }) => ({ id, name, handle, avatar, description, working })),
-      };
-    },
     requests: ({ pageId }) => ({ requests: store.requests(pageId).map(requestView) }),
-    setRefresh: async ({ id, refresh }) => {
-      requireMeta(id);
-      if (refresh) {
-        const problem = validateCron(refresh.cron);
-        if (problem) throw new Error(`Invalid schedule: ${problem}`);
-        if (!(await bots.get(refresh.botId))) throw new Error("That bot isn't available in Studio Teams.");
-      }
-      store.setRefresh(id, refresh);
-      // A new schedule counts from now rather than firing for past slots.
-      if (refresh) store.markRefreshed(id, Date.now());
-      service.publish({ type: "page", pageId: id });
-      return { page: toView(requireMeta(id)) };
-    },
-    refreshNow: async ({ id }) => {
-      const request = await service.refresh(requireMeta(id), "manual");
-      if (!request) throw new Error("A refresh is already queued.");
-      return { request: requestView(request) };
-    },
     work: async ({ id, request }) => {
       const meta = requireMeta(id);
-      const message = request.input
-        .map((item) => (item.type === "text" && item.visibility !== "agent-only" ? item.text : ""))
-        .join("\n")
-        .trim();
-      // An @mentioned bot takes the work in its own thread; otherwise a plain
-      // agent does, so the composer works without Studio Teams.
-      const [bot] = message ? await bots.mentionedIn(message).catch(() => []) : [];
-      if (bot) {
-        const row = await service.dispatch(id, bot, "mention", {
-          dedupeKey: `work:${id}:${bot.id}:${Date.now()}`,
-          summary: truncate(message, 140),
-          prompt: service.requestPrompt(meta, ["The user asked you about a page:", message, "", "Make any page changes with pages_edit."]),
-        });
-        if (!row?.thread_id || row.status === "failed") throw new Error(row?.error ?? `Couldn't reach ${bot.name}.`);
-        const at = Date.now();
-        void services.linkThread({ threadId: row.thread_id, ref: { pluginId: PLUGIN_ID, id }, role: "work", state: "working", createdAt: at, updatedAt: at, metadata: { botId: bot.id } }).catch(() => { /* Studio is optional. */ });
-        service.publish({ type: "chats", pageId: id, threadId: row.thread_id });
-        return { threadId: row.thread_id, botName: bot.name };
-      }
       const markdown = readMarkdown(service.hub.open(id).doc, { ids: true });
       const thread = await bb.sdk.threads.spawn({
         ...request,
@@ -503,11 +456,6 @@ async function registerPages(bb: BbPluginApi) {
 
   // Bot request lifecycle -----------------------------------------------------
 
-  bb.events.on("thread.active", ({ thread }) => service.onThreadActive(thread.id));
-  bb.events.on("thread.idle", ({ thread, lastAssistantText }) =>
-    service.onThreadSettled(thread.id, { failed: false, text: lastAssistantText }),
-  );
-  bb.events.on("thread.failed", ({ thread, error }) => service.onThreadSettled(thread.id, { failed: true, text: error }));
   // Checklist items handed to agents follow their thread.
   bb.events.on("thread.active", ({ thread }) => checklists.signal(thread.id, "active"));
   bb.events.on("thread.idle", ({ thread, lastAssistantText }) => checklists.signal(thread.id, "idle", lastAssistantText));
@@ -517,7 +465,6 @@ async function registerPages(bb: BbPluginApi) {
   bb.events.on("thread.unarchived", ({ thread }) => checklists.signal(thread.id, "unarchived"));
   bb.events.on("thread.deleted", ({ thread }) => checklists.signal(thread.id, "deleted"));
 
-  bb.background.schedule("pages-refresh", "* * * * *", () => service.runDueRefreshes());
 
   bb.onDispose(() => {
     studioNotifier.dispose();

@@ -1,6 +1,6 @@
 import Foundation
 
-// Shapes mirror BB's public API (`/api/v1`) and the Bot Teams and Talk plugin
+// Shapes mirror BB's public API (`/api/v1`) and the Talk plugin
 // RPC contracts. Only the fields the app reads are decoded.
 
 public struct ThreadEntry: Codable, Identifiable, Hashable, Sendable {
@@ -411,54 +411,6 @@ public struct SidebarPreferences: Codable, Hashable, Sendable {
         self.sectionOrder = sectionOrder
         self.collapsedProjects = collapsedProjects
     }
-}
-
-// MARK: Bot Teams
-
-public struct Bot: Codable, Identifiable, Hashable, Sendable {
-    public var id: String
-    public var name: String
-    public var avatar: String?
-    public var description: String?
-    public var retired: Bool?
-    public var handle: String?
-    /// The bot's own selection, applied to a new thread that takes its profile.
-    public var providerId: String?
-    public var model: String?
-    public var reasoningLevel: String?
-    public var permissionMode: String?
-}
-
-/// A thread that works as a bot: an ordinary thread with the bot's profile
-/// attached. Listed on the bot's page.
-public struct ProfileThread: Codable, Identifiable, Hashable, Sendable {
-    public var threadId: String
-    public var title: String
-    public var archived: Bool
-    public var updatedAt: Double
-
-    public var id: String { threadId }
-}
-
-/// A bot's latest thread with its profile, which the Watch messages.
-public struct DirectThread: Codable, Hashable, Sendable {
-    public var threadId: String
-    public var indicator: String?
-    public var status: String?
-}
-
-/// A bot's MISSION.md or MEMORY.md. `version` is a hash of the text.
-public struct BotDocument: Codable, Sendable, Hashable {
-    public var text: String
-    public var version: String
-
-    public static let files = ["MISSION.md", "MEMORY.md"]
-}
-
-public struct BotTeamsList: Codable, Sendable {
-    public var bots: [Bot]
-    /// Each bot's latest thread with its profile.
-    public var directThreads: [String: DirectThread]
 }
 
 // MARK: Talk

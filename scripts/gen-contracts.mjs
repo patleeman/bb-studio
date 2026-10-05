@@ -12,7 +12,6 @@ if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check")) {
 
 const plugins = [
   ["studio", "Studio", "../packages/bb-studio/src/contract.ts", "rpcContract"],
-  ["bot-teams", "BotTeams", "../packages/bb-studio-teams/client-contract.ts", "rpcContract"],
   ["talk", "Talk", "../packages/bb-studio-talk/src/shared/contract.ts", "rpcContract"],
   ["pages", "Pages", "../packages/bb-studio-pages/src/contract.ts", "rpcContract"],
   ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "rpcContract"],

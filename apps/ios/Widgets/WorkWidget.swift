@@ -53,7 +53,7 @@ struct WorkWidget: Widget {
             WorkWidgetView(entry: entry).containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("BB work")
-        .description("Bot attention, pending approvals, and running agents.")
+        .description("Pending approvals and running agents.")
         .supportedFamilies([.systemMedium, .systemLarge])
     }
 }

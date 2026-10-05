@@ -25,14 +25,12 @@ extension ThreadEntry {
 /// The inbox as last loaded, shared with the widgets through the app group.
 public struct InboxSnapshot: Codable, Sendable {
     public var threads: [ThreadEntry]
-    public var botTeams: BotTeamsList?
     public var projectNames: [String: String]
 
     public static let cacheKey = "inbox"
 
-    public init(threads: [ThreadEntry], botTeams: BotTeamsList?, projectNames: [String: String]) {
+    public init(threads: [ThreadEntry], projectNames: [String: String]) {
         self.threads = threads
-        self.botTeams = botTeams
         self.projectNames = projectNames
     }
 }

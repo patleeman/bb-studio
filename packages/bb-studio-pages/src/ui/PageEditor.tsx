@@ -398,14 +398,6 @@ export function PageEditor({
     const insert = (kind: string, target: string, label: string) => () => {
       editor.insertInlineContent([{ type: "mention", props: { kind, target, label } } as never, " "]);
     };
-    const botItems = botsRef.current.map((bot) => ({
-      title: bot.name,
-      subtext: bot.description || `@${bot.handle}`,
-      aliases: [bot.handle],
-      group: "Bots",
-      icon: <span className="text-base leading-none">{bot.avatar}</span>,
-      onItemClick: insert("bot", bot.id, bot.name),
-    }));
     const pageItems = pagesRef.current
       .filter((candidate) => candidate.id !== page.id && !candidate.archived)
       .map((candidate) => ({
@@ -466,7 +458,7 @@ export function PageEditor({
         // Studio suggestions are optional.
       }
     }
-    return uniqueTitles(filterSuggestionItems([...botItems, ...pageItems, ...dates, ...threadItems, ...studioItems], query).slice(0, 30));
+    return uniqueTitles(filterSuggestionItems([...pageItems, ...dates, ...threadItems, ...studioItems], query).slice(0, 30));
   }, [editor, sdk, ui, page.id, page.projectId]);
 
   return (

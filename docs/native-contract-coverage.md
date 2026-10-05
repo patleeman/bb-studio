@@ -1,7 +1,7 @@
 # Native plugin contract coverage
 
 `pnpm gen:contracts` generates JSON schemas and Swift models from each included
-plugin's actual RPC contract: Studio, Pages, Draw, Talk, Chat, Teams, Tables,
+plugin's actual RPC contract: Studio, Pages, Draw, Talk, Chat, Tables,
 Artifacts, Mobile and Decisions.
 
 `pnpm check:contracts` also checks the generated
@@ -21,14 +21,13 @@ The first inventory found a real drift: native Studio Chat called the removed
 `lastThread` method. It now calls `home` and reads `thread.threadId`, with a
 transport regression for linked and unlinked items.
 
-`pnpm check:native-payloads` validates 11 representative request/response
-fixtures against the generated plugin schemas. Six
+`pnpm check:native-payloads` validates 5 representative request/response
+fixtures against the generated plugin schemas. Five
 [`NativePayloadContractTests`](../apps/ios/Tests/NativePayloadContractTests.swift)
 then call the real Swift wrappers, decode their serialized transport requests,
 compare them with those same fixtures, and check response decoding:
 
 - Talk recording creation, audio segment upload and transcript reads.
-- Bots document revision tokens.
 - Tables text, number, boolean, list, relation and null cell values.
 - Studio Chat's start envelope.
 

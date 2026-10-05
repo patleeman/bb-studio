@@ -1,5 +1,7 @@
 # Studio workbench entry-point audit
 
+This document records earlier work. Teams and bot profiles have since been retired; Space Command view now belongs to Studio.
+
 This checkpoint covers all 17 marketplace plugins and the shared Kit. Source
 coverage and live evidence are listed separately. The delivery goal remains
 active: the native companion host has not shipped in stable BB.
@@ -31,7 +33,7 @@ another desktop chat panel.
 | Draw | Retained canvas, shared item Chat and companion-aware related references | [Original first-move canvas and compact header](../packages/bb-studio-draw/README.md) |
 | Artifacts | Retained viewer, text/image/HTML quotes through shared Chat | [Viewer/quote formats and compact controls](../packages/bb-studio-artifacts/README.md) |
 | Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio-tables/README.md) |
-| Teams | Bot Chat and profile-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Conversation reuse](../packages/bb-studio-teams/README.md) |
+| Teams | Bot Chat and profile-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Conversation reuse](https://github.com/patleeman/bb-studio/blob/1c713787/packages/bb-studio-teams/README.md) |
 | Sidebar | Thread Float action uses `openFloat`; ordinary navigation/split stays host-owned | [Real sidebar first moves](../packages/bb-studio-float/README.md) |
 | Navigation | Host panel activation/split plus Studio's shared Quick Open placement | [Keyboard/focus checks](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/search-accessibility/README.md) |
 | Reactions | Composer bridge selects the displayed message's thread; drafts quotes/reactions into it | [Settings, selection and message actions](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/reactions-explore/README.md); native right-click remains open |
@@ -71,7 +73,7 @@ requested placement and one saved tab for its target.
 | Artifacts | HTML iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-artifacts/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-artifacts/assets/companion-transfers-native.png) |
 | Talk | Recording title input; existing playback proof is linked above | [Main](../packages/bb-studio-talk/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-talk/assets/companion-transfers-native.png) |
 | Tables | Title input and seeded table row | [Main](../packages/bb-studio-tables/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-tables/assets/companion-transfers-native.png) |
-| Teams | Original profile input and unsaved name, preserving `/profile` route | [Main](../packages/bb-studio-teams/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-teams/assets/companion-transfers-native.png) |
+| Teams | Original profile input and unsaved name, preserving `/profile` route | [Main](https://github.com/patleeman/bb-studio/blob/1c713787/packages/bb-studio-teams/assets/companion-transfers-stable.png) | [Workbench](https://github.com/patleeman/bb-studio/blob/1c713787/packages/bb-studio-teams/assets/companion-transfers-native.png) |
 
 These checks exposed three defects: Teams reset resolved model defaults and
 accepted picker-only updates, profile moves used a different route from the

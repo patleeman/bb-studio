@@ -65,7 +65,7 @@ export async function askTitle(
   return (await askModel(bb, request, signal)).text;
 }
 
-export function decisionsClient(bb: BbPluginApi, caller = "bot-teams"): { jev: JevAsk; model: ModelAsk } {
+export function decisionsClient(bb: BbPluginApi, caller = "studio"): { jev: JevAsk; model: ModelAsk } {
   return {
     jev: async (state, questions, signal) => (await askSystemOne(bb, { caller, state, questions }, signal)).answers,
     model: async (request, signal) => (await askModel(bb, { caller, ...request }, signal)).text,

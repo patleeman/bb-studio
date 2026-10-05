@@ -32,10 +32,6 @@
       "source": "./packages/bb-studio-artifacts"
     },
     {
-      "name": "bot-teams",
-      "source": "./packages/bb-studio-teams"
-    },
-    {
       "name": "thread-list-plus",
       "source": "./packages/bb-studio-sidebar"
     },

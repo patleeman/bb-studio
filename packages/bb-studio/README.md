@@ -73,10 +73,10 @@ and [native legacy collection](assets/studio-collection-companion-transfers-nati
 
 
 - **Activity** (Studio's **…** menu) shows measured thread turns, duration and
-  failures, Teams bot usage and configured limits, and recent Studio changes.
+  failures and recent Studio changes.
   Choose 1, 7 or 30 days. The `home` RPC returns this data, plus what needs
   you (pending approvals and questions, and unresolved comment replies or
-  mentions), active threads and bots, recent items and today's automations,
+  mentions), active threads, recent items and today's automations,
   for other clients such as the iOS app's Today view.
 - **One collection** (sidebar → Studio): every add-on's items in one list,
   with search over titles and content, filters by kind, project, space and
@@ -173,3 +173,7 @@ workspace), because BB's Git install runs `npm install` from it.
 Pages and drawings can be saved as templates from an item's menu. The New menu lists those templates.
 
 The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `exportItem`, and `exportBulk` RPCs. `exportBulk` returns a base64 ZIP containing the provider's files. Individual exports use the item's menu. Template fields use `{{name}}` style variables; unknown variables remain visible.
+
+## Space Command view
+
+Open **Command view** from a Space’s sidebar heading. It shows the Space’s ordinary threads: Merged combines final replies, Grid shows native transcripts side by side, Active follows working threads, and Focus shows one thread. Send to the lead, pick a thread, @mention threads by title, or use @all. Files, drafts, permissions and send modes use BB’s composer.

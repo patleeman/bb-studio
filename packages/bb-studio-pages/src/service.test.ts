@@ -18,7 +18,7 @@ function setup() {
   const store = new PageStore(db);
   const events: unknown[] = [];
   const bb = { realtime: { publish: (_channel: string, event: unknown) => events.push(event) } };
-  const service = new PagesService(bb as never, store, {} as never);
+  const service = new PagesService(bb as never, store);
   services.push(service);
   const actor = { key: PLUGIN_RPC_ACTOR, name: "Agent", color: "#000" };
   return { store, service, events, actor };

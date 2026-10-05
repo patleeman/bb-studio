@@ -88,7 +88,7 @@ export function toStudioItem(meta: PageMeta, markdown: string | null): StudioIte
     updatedBy: meta.updated_by === HUMAN_USER_ID ? "user" : meta.updated_by ? "agent" : null,
     preview: markdown === null ? null : excerpt(markdown),
     facts: [],
-    badge: meta.refresh_bot_id && meta.refresh_cron ? { label: "Auto-refresh", tone: "neutral" } : null,
+    badge: null,
     thumbnailUrl: null,
     href: `/plugins/${PLUGIN_ID}/pages/${meta.id}`,
     archived: meta.archived_at !== null,

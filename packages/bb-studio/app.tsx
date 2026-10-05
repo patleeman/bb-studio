@@ -1,3 +1,4 @@
+import { CommandPage } from "./src/command/command-view";
 // bb-studio frontend: the Studio collection, one nav panel whose
 // sub-path filters it to a kind, the sidebar's Studio tabs and Spaces, the
 // Space dialogs other plugins open by window event, each thread's space
@@ -16,6 +17,7 @@ import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
+  if (path.startsWith("command/")) return <CommandPage subPath={path.slice("command/".length)} />;
   // "collection" is the old address of the landing page.
   return path === "activity" ? <ActivityPanel /> : <StudioPanel subPath={path} />;
 }

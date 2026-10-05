@@ -21,7 +21,7 @@ describe("home activity", () => {
     const hub = { overview: async () => ({ providers: [], items: [] }) };
     const services = { activity: () => [], openComments: () => [] };
     const result = await homeData(sdk as never, hub as never, services as never, { list: async () => null } as never, "p1");
-    expect(result.working.bots).toBeNull();
+    expect(result.working).not.toHaveProperty("bots");
     expect(result.automations).toBeNull();
   });
 

@@ -165,7 +165,6 @@ final class WatchModel: ObservableObject {
 
     @Published private(set) var client: BBClient
     @Published var threads: [ThreadEntry] = []
-    @Published var bots: [(bot: Bot, thread: DirectThread)] = []
     @Published var error: String?
     @Published var loading = false
     private var loadGeneration = 0
@@ -192,7 +191,7 @@ final class WatchModel: ObservableObject {
         serverSelection = UUID()
         AppGroup.defaults.set(url.absoluteString, forKey: "serverURL")
         client = Self.makeClient(url, selection: serverSelection)
-        threads = []; bots = []; error = nil; loading = false
+        threads = []; error = nil; loading = false
         WidgetCenter.shared.reloadAllTimelines()
     }
 
@@ -204,7 +203,6 @@ final class WatchModel: ObservableObject {
         defer { if generation == loadGeneration { loading = false } }
         do {
             async let threadList = client.threads(limit: 60)
-            async let teams = try? client.botTeams()
             let loadedThreads = try await threadList
                 .filter { $0.parentThreadId == nil && $0.visibility != "hidden" }
                 .sorted { a, b in
@@ -215,9 +213,6 @@ final class WatchModel: ObservableObject {
             guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             threads = loadedThreads
             StatusSnapshot(ThreadSummary(threads), serverURL: client.baseURL).save()
-            if let teams = await teams, generation == loadGeneration, client.baseURL == self.client.baseURL {
-                bots = teams.bots.compactMap { bot in teams.directThreads[bot.id].map { (bot, $0) } }
-            }
             guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             error = nil
         } catch {

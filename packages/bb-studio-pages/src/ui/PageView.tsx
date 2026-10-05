@@ -13,9 +13,9 @@ import {
 } from "@bb-studio/kit/ui";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
-import type { BotView, PageMetaView, RequestView } from "../contract";
+import type { PageMetaView, RequestView } from "../contract";
 import { PageConnection } from "./connection";
-import { HistoryDialog, KeepUpdatedDialog } from "./dialogs";
+import { HistoryDialog } from "./dialogs";
 import { PageChat } from "./PageChat";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import { PageEditor, type SidePanel } from "./PageEditor";
@@ -265,23 +265,17 @@ const STATUS_VERB: Record<RequestView["status"], string> = {
   failed: "couldn't finish",
 };
 
-/** Bot requests, the keep-updated schedule and page chats, behind one pill. */
+/** Previous requests, the keep-updated schedule and page chats, behind one pill. */
 function ActivityPill({
   page,
-  refreshBot,
   requests,
   chats,
   onOpenThread,
-  onConfigure,
-  onRefresh,
 }: {
   page: PageMetaView;
-  refreshBot: BotView | undefined;
   requests: RequestView[];
   chats: Chat[];
   onOpenThread(threadId: string): void;
-  onConfigure(): void;
-  onRefresh(): void;
 }) {
   if (!page.refresh && !requests.length && !chats.length) return null;
   const active = requests.filter((request) => request.status === "queued" || request.status === "working");
@@ -306,26 +300,10 @@ function ActivityPill({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[70vh] w-80 overflow-auto">
-        {page.refresh ? (
-          <>
-            <DropdownMenuLabel className="font-normal text-muted-foreground">
-              Kept updated by <span className="text-foreground">{refreshBot ? `${refreshBot.avatar} ${refreshBot.name}` : "a bot"}</span>
-              {page.refresh.nextAt
-                ? ` · next ${new Date(page.refresh.nextAt).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`
-                : ""}
-            </DropdownMenuLabel>
-            <DropdownMenuItem onSelect={onRefresh}>
-              <Icon name="RotateCcw" className="size-4" /> Refresh now
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onConfigure}>
-              <Icon name="SlidersHorizontal" className="size-4" /> Update settings…
-            </DropdownMenuItem>
-          </>
-        ) : null}
         {requests.length ? (
           <>
             {page.refresh ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Bot requests</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Previous requests</DropdownMenuLabel>
             {requests.slice(0, 8).map((request) => (
               <DropdownMenuItem
                 key={request.id}
@@ -442,7 +420,6 @@ export function PageView({
     return () => void root.removeProperty(FLOAT_RIGHT_VAR);
   }, [floatAvailable, inFloat, besideComments]);
 
-  const refreshBot = page.refresh ? bots.bots.find((bot) => bot.id === page.refresh!.botId) : undefined;
   const shown = { ...page, title };
 
   return (
@@ -566,12 +543,9 @@ export function PageView({
           <>
           <ActivityPill
             page={page}
-            refreshBot={refreshBot}
             requests={requests}
             chats={chats}
             onOpenThread={openThread}
-            onConfigure={() => setDialog("refresh")}
-            onRefresh={() => void rpc.call("refreshNow", { id: page.id }).catch((error: unknown) => window.alert(String(error)))}
           />
           <PresenceStack presence={presence} />
           <DictateButton talk={talk} ready={Boolean(connection && ready && status !== "missing")} onToggle={() => toggleTalk(pageFieldKey(page.id))} />
@@ -604,13 +578,6 @@ export function PageView({
                 <DropdownMenuItem onSelect={onCreateInside}>
                   <Icon name="Plus" className="size-4" /> Add a page inside
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setDialog("refresh")} disabled={!bots.available}>
-                  <Icon name="Repeat" className="size-4" />
-                  <span className="flex min-w-0 flex-col">
-                    Keep updated…
-                    {!bots.available ? <span className="text-xs text-muted-foreground">{bots.reason ?? "Studio Teams is not available."}</span> : null}
-                  </span>
-                </DropdownMenuItem>
                 <DropdownMenuItem className="md:hidden" onSelect={() => setDialog("history")}>
                   <Icon name="RotateCcw" className="size-4" /> Version history…
                 </DropdownMenuItem>
@@ -627,7 +594,6 @@ export function PageView({
         }
       />
 
-      <KeepUpdatedDialog open={dialog === "refresh"} onClose={() => setDialog(null)} page={page} bots={bots} rpc={rpc} />
       <HistoryDialog open={dialog === "history"} onClose={() => setDialog(null)} page={page} bots={bots.bots} rpc={rpc} />
     </div>
   );

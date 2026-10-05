@@ -15,7 +15,6 @@ enum Route: Hashable {
     case artifact(id: String)
     case table(id: String)
     case terminals(scope: TerminalScope, title: String)
-    case bot(id: String)
 }
 
 extension Route {
@@ -30,7 +29,6 @@ extension Route {
         case ("excalidraw", "drawings"): self = .drawing(id: id)
         case ("talk", "recordings"): self = .recording(id: id)
         case ("studio-tables", "tables"): self = .table(id: id)
-        case ("bot-teams", "bots"): self = .bot(id: id)
         default: return nil
         }
     }
@@ -148,7 +146,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`, `bbstudio://space/<id>`,
+    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://space/<id>`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://web`.
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
@@ -169,7 +167,6 @@ final class AppModel: ObservableObject {
         case "pages": openStudio(kind: "page")
         case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
-        case "bot": if let id { openStudio(kind: "bot", .bot(id: id)) }
         case "space": if let id { openStudio(space: id) }
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording

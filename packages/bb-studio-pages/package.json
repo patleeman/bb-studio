@@ -9,7 +9,7 @@
   },
   "bb": {
     "name": "Studio Pages",
-    "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, or let one keep a page up to date.",
+    "description": "Part of BB Studio. Collaborative pages you write with your agents, with live editing, comments, version history and ordinary agent chats.",
     "branding": {
       "icon": "./icons/pages.svg",
       "experimental_icons": {
@@ -30,7 +30,6 @@
     "@blocknote/react": "0.55.0",
     "@blocknote/shadcn": "0.55.0",
     "@tiptap/pm": "3.31.3",
-    "cron-parser": "5.10.1",
     "lib0": "0.2.119",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm": "^3.1.0",

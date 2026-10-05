@@ -39,7 +39,7 @@ function Row({ title, detail, href }: { title: string; detail?: string; href?: s
     : <div className="flex items-center gap-3 px-3 py-2 text-sm">{content}</div>;
 }
 
-/** Measured thread and bot usage over a period, opened from Studio's options menu. */
+/** Measured thread usage over a period, opened from Studio's options menu. */
 export function ActivityPanel() {
   const navigate = useBbNavigate();
   const [periodDays, setPeriodDays] = useState(7);
@@ -59,7 +59,6 @@ export function ActivityPanel() {
     {!data && !error ? <p className="text-sm text-muted-foreground">Loading activity…</p> : null}
     {data ? <div className="mt-4 space-y-6">
       <Section title="Threads">{data.dashboard.threads.length ? data.dashboard.threads.map((thread) => <Row key={thread.id} title={thread.title} detail={`${thread.turns} turns · ${thread.failures} errors · ${Math.round(thread.durationMs / 60000)} min · ${thread.status}`} href={`/threads/${thread.id}`} />) : <Row title="No thread activity in this period" />}</Section>
-      {data.dashboard.bots ? <Section title="Bots">{data.dashboard.bots.length ? data.dashboard.bots.map((bot) => <Row key={bot.id} title={bot.name} detail={`${bot.turns} turns · ${bot.failures} errors · ${Math.round(bot.durationMs / 60000)} min${bot.limits ? ` · limit ${bot.limits.turnsPerDay}/day` : ""}`} />) : <Row title="No bots in this project" />}</Section> : null}
       {data.activity.length ? <Section title="Recent changes">{data.activity.map((event) => <Row key={event.id} title={event.summary || "Untitled"} detail={`${event.verb} · ${new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" }).format(event.at)}`} href={event.href} />)}</Section> : null}
     </div> : null}
   </PageColumn>;

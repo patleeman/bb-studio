@@ -95,7 +95,6 @@ struct RouteDestination: View {
         case .artifact(let id): ArtifactView(id: id)
         case .table(let id): StudioTableView(id: id).id(id)
         case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
-        case .bot(let id): BotView(id: id)
         }
     }
 }

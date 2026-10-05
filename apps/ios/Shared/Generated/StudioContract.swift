@@ -3,6 +3,10 @@ import Foundation
 
 public enum Studio {
   public enum Method {
+    public static let command = "command"
+    public static let commandFeed = "commandFeed"
+    public static let commandSend = "commandSend"
+    public static let commandFocus = "commandFocus"
     public static let home = "home"
     public static let homeRespond = "homeRespond"
     public static let overview = "overview"
@@ -70,6 +74,14 @@ public enum Studio {
     public static let versionCreate = "versionCreate"
     public static let versionRead = "versionRead"
   }
+
+  public typealias Command = CommandOutput
+
+  public typealias CommandFeed = CommandFeedOutput
+
+  public typealias CommandSend = CommandSendOutput
+
+  public typealias CommandFocus = CommandFocusOutput
 
   public typealias Home = HomeOutput
 
@@ -223,6 +235,250 @@ public enum Studio {
 
   public typealias VersionRead = VersionReadOutput
 
+  public struct CommandInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct CommandOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct CommandOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var parentThreadId: String?
+    public var status: String?
+    public var updatedAt: Double?
+    public var error: String?
+    public var hasPendingInteraction: Bool?
+
+    public init(id: String? = nil, title: String? = nil, parentThreadId: String? = nil, status: String? = nil, updatedAt: Double? = nil, error: String? = nil, hasPendingInteraction: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.parentThreadId = parentThreadId
+      self.status = status
+      self.updatedAt = updatedAt
+      self.error = error
+      self.hasPendingInteraction = hasPendingInteraction
+    }
+  }
+
+  public struct CommandOutput: Sendable, Hashable, Codable {
+    public var space: CommandOutputSpace?
+    public var leadThreadId: String?
+    public var threads: [CommandOutputThreadsItem]?
+
+    public init(space: CommandOutputSpace? = nil, leadThreadId: String? = nil, threads: [CommandOutputThreadsItem]? = nil) {
+      self.space = space
+      self.leadThreadId = leadThreadId
+      self.threads = threads
+    }
+  }
+
+  public struct CommandFeedInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public enum CommandFeedOutputEntriesItemRole: Sendable, Hashable, Codable {
+    case user
+    case assistant
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "assistant": self = .assistant
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .assistant: try container.encode("assistant")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CommandFeedOutputEntriesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var threadId: String?
+    public var role: CommandFeedOutputEntriesItemRole?
+    public var text: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, threadId: String? = nil, role: CommandFeedOutputEntriesItemRole? = nil, text: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.threadId = threadId
+      self.role = role
+      self.text = text
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct CommandFeedOutput: Sendable, Hashable, Codable {
+    public var entries: [CommandFeedOutputEntriesItem]?
+
+    public init(entries: [CommandFeedOutputEntriesItem]? = nil) {
+      self.entries = entries
+    }
+  }
+
+  public enum CommandSendInputMode: Sendable, Hashable, Codable {
+    case auto
+    case steer
+    case followup
+    case fork
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "auto": self = .auto
+      case "steer": self = .steer
+      case "followup": self = .followup
+      case "fork": self = .fork
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .auto: try container.encode("auto")
+      case .steer: try container.encode("steer")
+      case .followup: try container.encode("followup")
+      case .fork: try container.encode("fork")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum CommandSendInputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CommandSendInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var threadIds: [String]?
+    public var text: String?
+    public var attachments: [StudioJSONValue]?
+    public var mode: CommandSendInputMode?
+    public var permissionMode: CommandSendInputPermissionMode?
+
+    public init(spaceId: String? = nil, threadIds: [String]? = nil, text: String? = nil, attachments: [StudioJSONValue]? = nil, mode: CommandSendInputMode? = nil, permissionMode: CommandSendInputPermissionMode? = nil) {
+      self.spaceId = spaceId
+      self.threadIds = threadIds
+      self.text = text
+      self.attachments = attachments
+      self.mode = mode
+      self.permissionMode = permissionMode
+    }
+  }
+
+  public enum CommandSendOutputDeliveriesItemStatus: Sendable, Hashable, Codable {
+    case sent
+    case queued
+    case error
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "sent": self = .sent
+      case "queued": self = .queued
+      case "error": self = .error
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .sent: try container.encode("sent")
+      case .queued: try container.encode("queued")
+      case .error: try container.encode("error")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CommandSendOutputDeliveriesItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var status: CommandSendOutputDeliveriesItemStatus?
+    public var error: String?
+
+    public init(threadId: String? = nil, status: CommandSendOutputDeliveriesItemStatus? = nil, error: String? = nil) {
+      self.threadId = threadId
+      self.status = status
+      self.error = error
+    }
+  }
+
+  public struct CommandSendOutput: Sendable, Hashable, Codable {
+    public var deliveries: [CommandSendOutputDeliveriesItem]?
+
+    public init(deliveries: [CommandSendOutputDeliveriesItem]? = nil) {
+      self.deliveries = deliveries
+    }
+  }
+
+  public struct CommandFocusInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct CommandFocusOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
   public struct HomeInput: Sendable, Hashable, Codable {
     public var projectId: String?
     public var periodDays: Int?
@@ -329,25 +585,11 @@ public enum Studio {
     }
   }
 
-  public struct HomeOutputWorkingBotsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var projectId: String?
-
-    public init(id: String? = nil, name: String? = nil, projectId: String? = nil) {
-      self.id = id
-      self.name = name
-      self.projectId = projectId
-    }
-  }
-
   public struct HomeOutputWorking: Sendable, Hashable, Codable {
     public var threads: [HomeOutputWorkingThreadsItem]?
-    public var bots: [HomeOutputWorkingBotsItem]?
 
-    public init(threads: [HomeOutputWorkingThreadsItem]? = nil, bots: [HomeOutputWorkingBotsItem]? = nil) {
+    public init(threads: [HomeOutputWorkingThreadsItem]? = nil) {
       self.threads = threads
-      self.bots = bots
     }
   }
 
@@ -481,49 +723,13 @@ public enum Studio {
     }
   }
 
-  public struct HomeOutputDashboardBotsItemLimits: Sendable, Hashable, Codable {
-    public var turnsPerHour: Double?
-    public var turnsPerDay: Double?
-    public var minutesPerTurn: Double?
-    public var concurrentForks: Double?
-
-    public init(turnsPerHour: Double? = nil, turnsPerDay: Double? = nil, minutesPerTurn: Double? = nil, concurrentForks: Double? = nil) {
-      self.turnsPerHour = turnsPerHour
-      self.turnsPerDay = turnsPerDay
-      self.minutesPerTurn = minutesPerTurn
-      self.concurrentForks = concurrentForks
-    }
-  }
-
-  public struct HomeOutputDashboardBotsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var turns: Double?
-    public var failures: Double?
-    public var durationMs: Double?
-    public var active: Double?
-    public var limits: HomeOutputDashboardBotsItemLimits?
-
-    public init(id: String? = nil, name: String? = nil, turns: Double? = nil, failures: Double? = nil, durationMs: Double? = nil, active: Double? = nil, limits: HomeOutputDashboardBotsItemLimits? = nil) {
-      self.id = id
-      self.name = name
-      self.turns = turns
-      self.failures = failures
-      self.durationMs = durationMs
-      self.active = active
-      self.limits = limits
-    }
-  }
-
   public struct HomeOutputDashboard: Sendable, Hashable, Codable {
     public var periodDays: Double?
     public var threads: [HomeOutputDashboardThreadsItem]?
-    public var bots: [HomeOutputDashboardBotsItem]?
 
-    public init(periodDays: Double? = nil, threads: [HomeOutputDashboardThreadsItem]? = nil, bots: [HomeOutputDashboardBotsItem]? = nil) {
+    public init(periodDays: Double? = nil, threads: [HomeOutputDashboardThreadsItem]? = nil) {
       self.periodDays = periodDays
       self.threads = threads
-      self.bots = bots
     }
   }
 

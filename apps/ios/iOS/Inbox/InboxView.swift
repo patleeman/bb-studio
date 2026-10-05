@@ -8,9 +8,6 @@ final class InboxModel: ObservableObject {
     @Published var children: [String: [ThreadEntry]] = [:]
     @Published var sidebar: SidebarBootstrap?
     @Published var preferences: SidebarPreferences?
-    @Published var botTeams: BotTeamsList?
-    /// The bot each thread works as, by thread id; most threads have none.
-    @Published var threadBots: [String: String] = [:]
     @Published var projectNames: [String: String] = [:]
     @Published var error: String?
     @Published var loaded = false
@@ -18,7 +15,7 @@ final class InboxModel: ObservableObject {
     private var listener: UUID?
     private var reloadTask: Task<Void, Never>?
     private var reloadDue: ContinuousClock.Instant?
-    private var reloadBots = false
+    private var reloadPreferences = false
     private var lastReload = ContinuousClock.now - .seconds(60)
     private var savedSignature: Int?
 
@@ -32,11 +29,9 @@ final class InboxModel: ObservableObject {
                 // A running agent appends events several times a second, and nothing
                 // in the list shows them; its status changes bring the fresh row.
                 let streaming = !changes.isEmpty && changes.allSatisfy { $0 == "events-appended" }
-                self?.scheduleReload(client, bots: false, within: streaming ? .seconds(30) : .milliseconds(400))
-            case .pluginSignal(let pluginId, _, _) where pluginId == "bot-teams":
-                self?.scheduleReload(client, bots: true)
+                self?.scheduleReload(client, refreshPreferences: false, within: streaming ? .seconds(30) : .milliseconds(400))
             case .connected:
-                self?.scheduleReload(client, bots: true)
+                self?.scheduleReload(client, refreshPreferences: true)
             default:
                 break
             }
@@ -45,8 +40,8 @@ final class InboxModel: ObservableObject {
 
     /// Change signals arrive in bursts while agents run: coalesce them, and
     /// reload at most every few seconds, since each reload is a sidebar fetch.
-    private func scheduleReload(_ client: BBClient, bots: Bool, within delay: Duration = .milliseconds(400)) {
-        reloadBots = reloadBots || bots
+    private func scheduleReload(_ client: BBClient, refreshPreferences: Bool, within delay: Duration = .milliseconds(400)) {
+        reloadPreferences = reloadPreferences || refreshPreferences
         let due = max(ContinuousClock.now + delay, lastReload + .seconds(3))
         reloadDue = min(reloadDue ?? due, due)
         guard reloadTask == nil else { return }
@@ -60,9 +55,9 @@ final class InboxModel: ObservableObject {
                 }
                 reloadDue = nil
                 lastReload = .now
-                let bots = reloadBots
-                reloadBots = false
-                await load(client, bots: bots)
+                let refreshPreferences = reloadPreferences
+                reloadPreferences = false
+                await load(client, refreshPreferences: refreshPreferences)
             }
             reloadTask = nil
         }
@@ -72,19 +67,16 @@ final class InboxModel: ObservableObject {
     func restore() {
         guard !loaded, let snapshot = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey, serverURL: serverURL) else { return }
         threads = snapshot.threads
-        botTeams = snapshot.botTeams
         projectNames = snapshot.projectNames
         loaded = true
     }
 
-    func load(_ client: BBClient, bots: Bool = true) async {
+    func load(_ client: BBClient, refreshPreferences: Bool = true) async {
         guard client.baseURL == serverURL else { return }
         do {
             async let sidebar = client.sidebar()
             // Every assignment re-renders the inbox, so only on change.
-            if bots, let teams = try? await client.botTeams(), !Self.same(teams, botTeams) { botTeams = teams }
-            if bots, let rows = try? await client.threadBots(), rows != threadBots { threadBots = rows }
-            if preferences == nil || bots, let prefs = try? await client.sidebarPreferences(), prefs != preferences {
+            if preferences == nil || refreshPreferences, let prefs = try? await client.sidebarPreferences(), prefs != preferences {
                 preferences = prefs
             }
             let bootstrap = try await sidebar
@@ -107,7 +99,7 @@ final class InboxModel: ObservableObject {
             guard serverURL == ServerScope.selectedURL else { return }
             Spotlight.index(self.threads, projectNames: projectNames, serverURL: serverURL)
             error = nil
-            let snapshot = InboxSnapshot(threads: self.threads, botTeams: botTeams, projectNames: projectNames)
+            let snapshot = InboxSnapshot(threads: self.threads, projectNames: projectNames)
             let signature = Self.encoded(snapshot)?.hashValue
             if signature == nil || signature != savedSignature {
                 DiskCache.save(snapshot, as: InboxSnapshot.cacheKey, serverURL: serverURL)
@@ -152,7 +144,7 @@ final class InboxModel: ObservableObject {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }
-        await load(client, bots: false)
+        await load(client, refreshPreferences: false)
     }
 
     func archive(_ client: BBClient, _ thread: ThreadEntry) async {
@@ -164,7 +156,7 @@ final class InboxModel: ObservableObject {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }
-        await load(client, bots: false)
+        await load(client, refreshPreferences: false)
     }
 
     func delete(_ client: BBClient, _ thread: ThreadEntry) async {
@@ -176,7 +168,7 @@ final class InboxModel: ObservableObject {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }
-        await load(client, bots: false)
+        await load(client, refreshPreferences: false)
     }
 
     func search(_ client: BBClient, _ query: String) async {
@@ -250,11 +242,6 @@ final class InboxModel: ObservableObject {
         }
     }
 
-    /// The active bot a thread works as, for its row's avatar.
-    func bot(for threadId: String) -> Bot? {
-        guard let id = threadBots[threadId] else { return nil }
-        return botTeams?.bots.first { $0.id == id && $0.retired != true }
-    }
 
 
 }
@@ -392,8 +379,7 @@ struct InboxView: View {
     private func threadLink(_ thread: ThreadEntry, showsProject: Bool, depth: Int) -> some View {
         NavigationLink(value: Route.thread(id: thread.id)) {
             ThreadRow(
-                thread: thread, project: showsProject ? model.projectNames[thread.projectId] : nil,
-                bot: model.bot(for: thread.id))
+                thread: thread, project: showsProject ? model.projectNames[thread.projectId] : nil)
                 .padding(.leading, CGFloat(depth) * 18)
         }
         .swipeActions(edge: .leading) { leadingActions(thread) }
@@ -409,8 +395,7 @@ struct InboxView: View {
                     NavigationLink(value: Route.thread(id: hit.thread.id)) {
                         VStack(alignment: .leading, spacing: 4) {
                             ThreadRow(
-                                thread: hit.thread, project: model.projectNames[hit.thread.projectId],
-                                bot: model.bot(for: hit.thread.id))
+                                thread: hit.thread, project: model.projectNames[hit.thread.projectId])
                             if let snippet = hit.snippet {
                                 Text(snippet).font(.caption).foregroundStyle(.secondary).lineLimit(2).padding(.leading, 18)
                             }
@@ -537,16 +522,13 @@ struct ConnectionBanner: View {
 struct ThreadRow: View {
     let thread: ThreadEntry
     var project: String?
-    /// The bot the thread works as; its avatar leads the title.
-    var bot: Bot?
     @ObservedObject private var muted = MutedThreads.shared
     /// Written by the thread screen as the reader types; see `Drafts`.
     @AppStorage private var draft: Data?
 
-    init(thread: ThreadEntry, project: String? = nil, bot: Bot? = nil) {
+    init(thread: ThreadEntry, project: String? = nil) {
         self.thread = thread
         self.project = project
-        self.bot = bot
         _draft = AppStorage(ServerScope.key("draft.\(thread.id)"))
     }
 
@@ -555,11 +537,6 @@ struct ThreadRow: View {
             StatusDot(thread: thread).padding(.top, 6)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    // Only threads working as a bot get the avatar; others keep their inset.
-                    if let bot {
-                        Text(bot.avatar?.isEmpty == false ? bot.avatar! : "🤖")
-                            .accessibilityLabel("Working as \(bot.name)")
-                    }
                     Text(ThreadTitles.resolve(thread.displayTitle))
                         .font(.body.weight(thread.isUnread ? .semibold : .regular))
                         .lineLimit(2)
@@ -603,17 +580,5 @@ struct StatusDot: View {
         if thread.hasPendingInteraction == true { return .orange }
         if thread.isRunning { return .green }
         return .blue
-    }
-}
-
-struct BotRow: View {
-    let bot: Bot
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Text(bot.avatar ?? "🤖").font(.title3)
-            Text(bot.name).lineLimit(1)
-            Spacer()
-        }
     }
 }

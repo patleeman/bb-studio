@@ -43,11 +43,6 @@ struct ThreadView: View {
     @State private var openingFile: OpenFile?
     @State private var newTitle = ""
     @State private var reviewingPlan: PlanReview?
-    /// The bot this thread works as: `.some(nil)` for none, nil where it
-    /// can't work as a bot (bot work threads, no Bot Teams).
-    @State private var profile: String??
-    @State private var profileBot: Bot?
-    @State private var choosingProfile = false
     /// Set while the composer holds a rewrite of the last message.
     @State private var editing = false
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
@@ -138,14 +133,6 @@ struct ThreadView: View {
         .sheet(isPresented: $choosingModel) {
             ExecutionSheet(threadId: model.threadId, providerId: model.thread?.providerId)
         }
-        .sheet(isPresented: $choosingProfile) {
-            if let thread = model.thread, case .some(let botId) = profile {
-                ThreadProfileSheet(thread: thread, botId: botId) { id in
-                    profile = .some(id)
-                    Task { await loadProfileBot() }
-                }
-            }
-        }
         .sheet(isPresented: $editingFull) {
             FullComposer(text: $draft, canSend: canSend, send: {
                 editingFull = false
@@ -193,12 +180,6 @@ struct ThreadView: View {
             }
             if runningPlugins.split(separator: ",").contains("studio") {
                 Task { await spaces.load(model.threadId, client: client) }
-            }
-            if runningPlugins.split(separator: ",").contains("bot-teams") {
-                Task {
-                    profile = try? await client.threadProfile(model.threadId)
-                    await loadProfileBot()
-                }
             }
             await model.load()
         }
@@ -294,12 +275,6 @@ struct ThreadView: View {
                         renaming = true
                     } label: { Label("Rename", systemImage: "pencil") }
                     Button { choosingModel = true } label: { Label("Model & permissions", systemImage: "cpu") }
-                    if case .some(let botId) = profile {
-                        Button { choosingProfile = true } label: {
-                            Label(botId == nil ? "Work as bot" : "Working as \(profileBot?.name ?? "an archived bot")",
-                                systemImage: "person.crop.circle")
-                        }
-                    }
                     if model.thread?.environmentId != nil {
                         Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
                         Button { app.push(.terminals(scope: .thread(model.threadId), title: "Terminals")) } label: {
@@ -677,11 +652,6 @@ struct ThreadView: View {
         composerFocused = true
     }
 
-    /// The attached bot, for its avatar and name.
-    private func loadProfileBot() async {
-        guard case .some(.some(let id)) = profile else { return profileBot = nil }
-        profileBot = try? await client.profiles().first { $0.id == id }
-    }
 
     private var composer: some View {
         VStack(spacing: 6) {
@@ -743,12 +713,6 @@ struct ThreadView: View {
             }
             AttachmentStrip(items: $attachments)
             HStack(alignment: .bottom, spacing: 4) {
-                if case .some(.some) = profile {
-                    Button { choosingProfile = true } label: {
-                        Text(profileBot?.avatar ?? "🤖").font(.title3).frame(width: 36, height: 36)
-                    }
-                    .accessibilityLabel("Working as \(profileBot?.name ?? "an archived bot")")
-                }
                 AttachmentMenu(items: $attachments)
                 Button { dictating = true } label: {
                     Image(systemName: "mic.fill").font(.title3).frame(width: 36, height: 36)

@@ -114,7 +114,7 @@ export const commentThreadSchema = z.object({
   updatedAt: z.number(),
 });
 
-// What BB's new-thread composer submits, whitelisted like Studio Teams does. Core
+// What BB's new-thread composer submits, whitelisted at the RPC boundary. Core
 // threads.spawn validates the host-owned environment and prompt input.
 export const chatRequestSchema = conversationRequestSchema(z);
 
@@ -247,26 +247,9 @@ export const rpcContract = defineRpcContract({
     input: z.object({ query: z.string().max(200), projectId: projectId.optional() }),
     output: z.object({ pages: z.array(pageMetaSchema) }),
   },
-  bots: {
-    input: z.null(),
-    output: z.object({ available: z.boolean(), reason: z.string().nullable(), bots: z.array(botSchema) }),
-  },
-  requests: {
-    input: z.object({ pageId }),
-    output: z.object({ requests: z.array(requestSchema) }),
-  },
-  setRefresh: {
-    input: z.object({
-      id: pageId,
-      refresh: z.object({ botId: z.string(), cron: z.string().min(1).max(120), instructions: z.string().max(4000) }).nullable(),
-    }),
-    output: z.object({ page: pageMetaSchema }),
-  },
-  refreshNow: {
-    input: z.object({ id: pageId }),
-    output: z.object({ request: requestSchema }),
-  },
-  /** Starts an agent thread about the page, or hands it to a bot the message @mentions. */
+  /** Historical requests remain readable after bot profiles are removed. */
+  requests: { input: z.object({ pageId }), output: z.object({ requests: z.array(requestSchema) }) },
+  /** Starts an ordinary agent thread about the page. */
   work: {
     input: z.object({ id: pageId, request: chatRequestSchema }),
     output: z.object({ threadId: z.string(), botName: z.string().nullable() }),

@@ -53,7 +53,6 @@ const ITEMS = [
   item("__bb__/new-thread", "New thread"),
   STUDIO,
   item("pages/pages", "Pages"),
-  item("bot-teams/bots", "Teams"),
   item("excalidraw/drawings", "Drawings"),
   item("weather/forecast", "Forecast"),
   item("artifacts/artifacts", "Artifacts"),
@@ -89,7 +88,6 @@ describe("Studio Navigation", () => {
     expect(rowOrder()).toEqual([
       "__bb__/new-thread",
       "studio/studio",
-      "bot-teams/bots",
       "weather/forecast",
       "__bb__/skills",
     ]);
@@ -100,7 +98,6 @@ describe("Studio Navigation", () => {
       item("pages/explainers", "Explore"),
       item("float/companions", "Companions"),
       item("studio-chat/chats", "Chat", { isVisible: false }),
-      item("bot-teams/command", "Command"),
     ];
     renderNavigation([...ITEMS, ...retired]);
     for (const entry of retired) {
@@ -152,9 +149,8 @@ describe("Studio Navigation", () => {
           "__bb__/new-thread",
           "weather/forecast",
           "pages/pages",
-          "studio/studio",
           "excalidraw/drawings",
-          "bot-teams/bots",
+          "studio/studio",
           "artifacts/artifacts",
           "talk/recordings",
           "studio-tables/tables",

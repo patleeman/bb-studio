@@ -15,7 +15,6 @@ agent.
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
 | [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
-| [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bot profiles that ordinary threads work as, with shared memory and missions, and a Command view to talk to a Space's threads at once. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | One Chat action opens an item's linked conversation or a new composer. Choose or start another from its menu. |
 | [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that adds Studio apps' sections above your threads and can organize threads by Space. |
@@ -49,13 +48,12 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    `bb marketplace refresh bb-studio` instead.
 2. Ask me whether to install all of these plugins or only some. List them with
    a one-line description each:
-   - studio: the Studio collection; recommended, since the others plug into it
+   - studio: the Studio collection, Spaces and Command view; recommended, since the others plug into it
    - pages: collaborative pages
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
    - studio-tables: structured tables with views and CSV import and export
-   - bot-teams: bot profiles threads work as, and a Command view per Space
    - studio-chat: Chat on Studio items, with New conversation and Choose conversation in its menu
    - float: a panel of tabs for threads, views and Studio items, docked
      or dragged anywhere

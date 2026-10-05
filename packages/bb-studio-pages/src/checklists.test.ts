@@ -29,7 +29,7 @@ function setup(rpc: (method: string, input: unknown) => unknown) {
       threads: { spawn: vi.fn(async () => ({ id: "thr_new" })) },
     },
   };
-  const service = new PagesService(bb as never, store, {} as never);
+  const service = new PagesService(bb as never, store);
   services.push(service);
   return { db, store, service, calls, bb, checklists: new Checklists(bb as never, db, service, store) };
 }

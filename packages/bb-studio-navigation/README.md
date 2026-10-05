@@ -12,7 +12,7 @@ the Studio rows that another surface already opens:
 | Explore | Always. Explore's panel in [Studio Pages](../bb-studio-pages); explainers open from their links. |
 | Companions | Always. [Float](../bb-studio-float)'s dock and toggle open it. |
 | Chat | Always. [Studio Chat](../bb-studio-chat) starts chats from Studio items and its overlay. |
-| Command | Always. Each Space's ⋯ menu in [Studio Sidebar](../bb-studio-sidebar) opens [Studio Teams](../bb-studio-teams)' Command view. |
+| Command | Always. Each Space's ⋯ menu in [Studio Sidebar](../bb-studio-sidebar) opens [Studio](../bb-studio)'s Command view. |
 
 Left-out rows are in neither the rows nor **More**; their plugins still run
 and their links still open. Everything else stays: BB's own rows (New thread,

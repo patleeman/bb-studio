@@ -1,3 +1,5 @@
+import { Command } from "./src/command/command";
+import { registerMentionProviders } from "./src/command/mention-providers";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
@@ -39,7 +41,6 @@ import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
 import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
-import { routeCommentMentions } from "./src/comment-routing";
 import { homeData } from "./src/home";
 import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { respondToNeed } from "./src/needs-you";
@@ -64,6 +65,10 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
   const spaces = new SpaceStore(db);
+  const command = new Command(bb, () => spaces.list());
+  registerMentionProviders(bb, command);
+  for (const event of ["thread.created", "thread.active", "thread.idle", "thread.failed", "thread.archived", "thread.unarchived", "thread.deleted"] as const)
+    bb.events.on(event, () => command.changed());
   spaces.reconcileProjects((await bb.sdk.projects.list({ includePersonal: true })).map((project) => project.id));
   // A new space gets its own catch-all project under ~/Spaces (src/space-folders.ts).
   const folders = new SpaceFolders(db, spaces, {
@@ -333,6 +338,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   bb.rpc.register(rpcContract, {
+    ...command.handlers(),
     home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, providerComments, projectId, periodDays),
     homeRespond: async (input) => {
       await respondToNeed(bb.sdk, input);
@@ -603,10 +609,6 @@ export default async function plugin(bb: BbPluginApi) {
     commentCreate: async (input) => {
       const delegated = await providerComments.create(input);
       const comment = delegated ?? services.addComment(input);
-      if (!delegated) {
-        const item = (await hub.get(input.ref.pluginId, [input.ref.id]))[0];
-        void routeCommentMentions(bb.sdk, input.body, item?.href ?? `${input.ref.pluginId}:${input.ref.id}`).catch(() => { /* Teams is optional. */ });
-      }
       changes.append(null);
       bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
       return { comment };

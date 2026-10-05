@@ -25,10 +25,7 @@ public enum Pages {
     public static let editDocument = "editDocument"
     public static let replaceMarkdown = "replaceMarkdown"
     public static let search = "search"
-    public static let bots = "bots"
     public static let requests = "requests"
-    public static let setRefresh = "setRefresh"
-    public static let refreshNow = "refreshNow"
     public static let work = "work"
     public static let chats = "chats"
     public static let chatPage = "chatPage"
@@ -89,15 +86,7 @@ public enum Pages {
 
   public typealias Search = SearchOutput
 
-  public typealias BotsInput = StudioJSONValue
-
-  public typealias Bots = BotsOutput
-
   public typealias Requests = RequestsOutput
-
-  public typealias SetRefresh = SetRefreshOutput
-
-  public typealias RefreshNow = RefreshNowOutput
 
   public typealias Work = WorkOutput
 
@@ -2261,36 +2250,6 @@ public enum Pages {
     }
   }
 
-  public struct BotsOutputBotsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var handle: String?
-    public var avatar: String?
-    public var description: String?
-    public var working: Bool?
-
-    public init(id: String? = nil, name: String? = nil, handle: String? = nil, avatar: String? = nil, description: String? = nil, working: Bool? = nil) {
-      self.id = id
-      self.name = name
-      self.handle = handle
-      self.avatar = avatar
-      self.description = description
-      self.working = working
-    }
-  }
-
-  public struct BotsOutput: Sendable, Hashable, Codable {
-    public var available: Bool?
-    public var reason: String?
-    public var bots: [BotsOutputBotsItem]?
-
-    public init(available: Bool? = nil, reason: String? = nil, bots: [BotsOutputBotsItem]? = nil) {
-      self.available = available
-      self.reason = reason
-      self.bots = bots
-    }
-  }
-
   public struct RequestsInput: Sendable, Hashable, Codable {
     public var pageId: String?
 
@@ -2393,185 +2352,6 @@ public enum Pages {
 
     public init(requests: [RequestsOutputRequestsItem]? = nil) {
       self.requests = requests
-    }
-  }
-
-  public struct SetRefreshInputRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-    }
-  }
-
-  public struct SetRefreshInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var refresh: SetRefreshInputRefresh?
-
-    public init(id: String? = nil, refresh: SetRefreshInputRefresh? = nil) {
-      self.id = id
-      self.refresh = refresh
-    }
-  }
-
-  public struct SetRefreshOutputPageRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-    public var lastAt: Double?
-    public var nextAt: Double?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil, lastAt: Double? = nil, nextAt: Double? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-      self.lastAt = lastAt
-      self.nextAt = nextAt
-    }
-  }
-
-  public struct SetRefreshOutputPage: Sendable, Hashable, Codable {
-    public var id: String?
-    public var projectId: String?
-    public var parentId: String?
-    public var title: String?
-    public var icon: String?
-    public var position: Double?
-    public var createdAt: Double?
-    public var updatedAt: Double?
-    public var updatedBy: String?
-    public var archived: Bool?
-    public var refresh: SetRefreshOutputPageRefresh?
-
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil, refresh: SetRefreshOutputPageRefresh? = nil) {
-      self.id = id
-      self.projectId = projectId
-      self.parentId = parentId
-      self.title = title
-      self.icon = icon
-      self.position = position
-      self.createdAt = createdAt
-      self.updatedAt = updatedAt
-      self.updatedBy = updatedBy
-      self.archived = archived
-      self.refresh = refresh
-    }
-  }
-
-  public struct SetRefreshOutput: Sendable, Hashable, Codable {
-    public var page: SetRefreshOutputPage?
-
-    public init(page: SetRefreshOutputPage? = nil) {
-      self.page = page
-    }
-  }
-
-  public struct RefreshNowInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public enum RefreshNowOutputRequestKind: Sendable, Hashable, Codable {
-    case mention
-    case comment
-    case refresh
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "mention": self = .mention
-      case "comment": self = .comment
-      case "refresh": self = .refresh
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .mention: try container.encode("mention")
-      case .comment: try container.encode("comment")
-      case .refresh: try container.encode("refresh")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum RefreshNowOutputRequestStatus: Sendable, Hashable, Codable {
-    case queued
-    case working
-    case done
-    case failed
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "queued": self = .queued
-      case "working": self = .working
-      case "done": self = .done
-      case "failed": self = .failed
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .queued: try container.encode("queued")
-      case .working: try container.encode("working")
-      case .done: try container.encode("done")
-      case .failed: try container.encode("failed")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RefreshNowOutputRequest: Sendable, Hashable, Codable {
-    public var id: String?
-    public var botId: String?
-    public var botName: String?
-    public var threadId: String?
-    public var kind: RefreshNowOutputRequestKind?
-    public var blockId: String?
-    public var commentThreadId: String?
-    public var summary: String?
-    public var status: RefreshNowOutputRequestStatus?
-    public var error: String?
-    public var result: String?
-    public var createdAt: Double?
-    public var updatedAt: Double?
-
-    public init(id: String? = nil, botId: String? = nil, botName: String? = nil, threadId: String? = nil, kind: RefreshNowOutputRequestKind? = nil, blockId: String? = nil, commentThreadId: String? = nil, summary: String? = nil, status: RefreshNowOutputRequestStatus? = nil, error: String? = nil, result: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
-      self.id = id
-      self.botId = botId
-      self.botName = botName
-      self.threadId = threadId
-      self.kind = kind
-      self.blockId = blockId
-      self.commentThreadId = commentThreadId
-      self.summary = summary
-      self.status = status
-      self.error = error
-      self.result = result
-      self.createdAt = createdAt
-      self.updatedAt = updatedAt
-    }
-  }
-
-  public struct RefreshNowOutput: Sendable, Hashable, Codable {
-    public var request: RefreshNowOutputRequest?
-
-    public init(request: RefreshNowOutputRequest? = nil) {
-      self.request = request
     }
   }
 

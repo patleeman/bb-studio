@@ -17,12 +17,6 @@ export default context => {
       await pluginRpc("studio-tables", "insert", { id: table.id, values: { name: "Review notes" } });
       return { path: `/plugins/studio-tables/tables/${table.id}`, ready: 'input[aria-label="Table title"]', cleanup: () => pluginRpc("studio-tables", "remove", { id: table.id }) };
     } },
-    { id: "teams", packageDir: "bb-studio-teams", seed: async () => {
-      const { bots } = await pluginRpc("bot-teams", "list", null);
-      const existing = bots.find(b => b.handle === "atlas");
-      const bot = existing ?? await pluginRpc("bot-teams", "create", { name: "Companion profile check", mission: "Wait for explicit owner input. No scheduled work.", intervalMinutes: 0 });
-      return { path: `/plugins/bot-teams/bots/${bot.id}/profile`, ready: '[aria-label="Bot profile"] input[id$="-name"]', cleanup: async () => { if (!existing) await pluginRpc("bot-teams", "retire", { id: bot.id, retired: true }); } };
-    } },
     ...entrypoints(context),
   ];
   return fixtures.map(fixture => ({

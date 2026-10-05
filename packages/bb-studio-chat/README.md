@@ -72,7 +72,6 @@ its saved route. See [plain/main](assets/chat-plain-companion-transfers-stable.p
   linked conversation until you choose one.
 - **Viewing chip.** Float thread tabs name the Studio item in the main pane.
   That label does not add it to the conversation automatically.
-- **Bots.** Studio Teams bots have their own chat.
   Chat leaves their composer unobstructed and does not discover another item
   conversation.
 

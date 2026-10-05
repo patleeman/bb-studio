@@ -201,66 +201,6 @@
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "list",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "document",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "saveDocument",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "profiles",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "threadProfile",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "setThreadProfile",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "pendingThreadProfile",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "threadBots",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "profileThreads",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "newConversation",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "talk",
       "method": "recording_create",
       "coverage": "literal method checked against contract"

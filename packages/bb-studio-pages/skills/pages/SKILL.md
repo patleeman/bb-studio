@@ -1,6 +1,6 @@
 ---
 name: pages
-description: Use when the user refers to a BB Page — a /plugins/pages/pages/<id> link, a page mention, "the launch page", a doc they want written or kept up to date — or asks you to read, write, comment on, or restructure a page, or how Pages and its Studio Teams integration work.
+description: Use when the user refers to a BB Page — a /plugins/pages/pages/<id> link, a page mention, "the launch page", a doc they want written or kept up to date — or asks you to read, write, comment on, or restructure a page, or how Pages works.
 ---
 
 # Pages
@@ -11,7 +11,7 @@ prunes older versions only when that page next saves a version. It never
 changes the current page text.
 
 Pages are collaborative documents inside BB. The user edits them live in the
-Pages panel while agents and Studio Teams bots edit the same document through
+Pages panel while agents edit the same document through
 tools. Every change merges in real time (Yjs), so nobody's typing is
 overwritten.
 
@@ -112,31 +112,7 @@ is absent. Existing page chat links still work. The thread also appears in
 the sidebar, and its header links back to the page. Its first message carries the page id and
 its Markdown with block ids as hidden context. The copy can go stale as the
 user types, so read the page again right before you edit it with
-`pages_edit`. This works without Studio Teams.
-
-## Studio Teams integration
-
-These need the Studio Teams plugin. Each request runs in the bot's own DM thread
-with its configured model and reasoning level.
-
-- **@mention a bot in a page.** Typing `@` and picking a bot in the page
-  sends it the surrounding block as a request, plus the page. The bot edits
-  the page and usually leaves a comment on that block saying what it did.
-- **@mention a bot in a comment.** The bot answers in the same thread. Bots
-  that have already replied in a thread see every new human reply there.
-- **Hand off from the page composer.** Mentioning a bot in the page's
-  "Work with this page…" box sends it that message as a request about the
-  page.
-- **Keep updated.** A page can have an owner bot, a cron schedule, and
-  instructions. On each run the bot brings the page up to date. **Refresh
-  now** runs it immediately.
-
-Requests show in the page's **Activity** menu as queued, working, done, or
-failed. Picking one opens its thread through the shared companion system.
-
-When you are a bot handling one of these requests, follow its instructions:
-edit with `pages_edit`, then reply in the named comment thread with
-`pages_comment_reply` or start one with `pages_comment`.
+`pages_edit`.
 
 ## Dictation
 

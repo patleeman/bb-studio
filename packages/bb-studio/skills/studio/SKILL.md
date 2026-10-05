@@ -91,8 +91,7 @@ and later. A thread is in a space when it was added to it or its project is.
 
 Spaces show in the sidebar with their threads and Studio items; the user
 makes, edits and deletes them there, and picks a space's lead and Heartbeat
-from its ⋯ menu. Studio Teams bot conversations
-are threads, so they join a space as threads do. Each thread's
+from its ⋯ menu. Each thread's
 header shows its space, links back to it, and moves the thread to another.
 Each Studio item's ⋯ menu, the collection's row menu and its bulk **Move**
 offer **Move to** a space or a project. The Studio panel
@@ -104,3 +103,7 @@ to its kind; the add-ons' sidebar rows can be hidden from Studio's ⋯ menu.
 Cmd/Ctrl+Shift+K (palette: **Studio: Search everything**) opens Studio search over
 any page, matching titles and content; point the user there to find an item
 quickly. Cmd/Ctrl+K is BB's thread search, not Studio's.
+
+## Command view
+
+A Space’s Command view opens from its sidebar heading. It shows ordinary threads in Merged, Grid, Active, or Focus layouts. Messages go to the lead or picked threads; @all addresses every top-level thread. The addressed thread roster authorizes coordination for that request with bb thread log and bb thread tell. Scheduling uses Automations.

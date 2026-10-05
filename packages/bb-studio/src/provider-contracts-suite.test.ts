@@ -9,10 +9,6 @@ import { registerStudio as registerTalk } from "../../bb-studio-talk/src/server/
 import { memoryStore as talkStore, addSegment } from "../../bb-studio-talk/src/test/db";
 import { registerStudio as registerArtifacts } from "../../bb-studio-artifacts/src/server/studio";
 import { memoryStore as artifactStore, bytes } from "../../bb-studio-artifacts/src/test/db";
-import { registerStudio as registerBots } from "../../bb-studio-teams/studio-provider";
-import { createTestStore } from "../../bb-studio-teams/test/test-store";
-import { botSchema } from "../../bb-studio-teams/contract";
-import { Runtime } from "../../bb-studio-teams/mission-runtime";
 import tablesPlugin from "../../bb-studio-tables/server";
 import { schemas } from "./contract";
 import { StudioHub, type HubSdk } from "./hub";
@@ -38,7 +34,7 @@ providerConformance("Pages", () => {
   for (const sql of PAGE_MIGRATIONS) db.exec(sql);
   const store = new PageStore(db);
   const { handlers, bb, events } = registration();
-  const service = new PagesService(bb as never, store, {} as never);
+  const service = new PagesService(bb as never, store);
   registerPages(bb as never, service, schemas);
   return {
     pluginId: "pages", kind: "page", handlers,
@@ -84,28 +80,6 @@ providerConformance("Artifacts", () => {
     seed: (projectId) => store.save({ name: "conformance.md", mime: "text/markdown", bytes: bytes("Conformance artifact body"), projectId, by: "agent" }).artifact.id,
     notificationCount: () => changed.length,
     editTitle: (id, title) => { store.update(id, { title }, "app"); },
-    close: () => { db.close(); },
-  };
-});
-
-providerConformance("Bots", () => {
-  const db = new Database(":memory:");
-  const store = createTestStore(db);
-  const { handlers, bb, events } = registration();
-  const runtime = new Runtime(bb as never, store);
-  registerBots(bb as never, schemas, {
-    bots: () => store.all(), activity: () => store.botActivitySummary(),
-    retire: (id, retired) => runtime.retire(id, retired),
-  });
-  return {
-    pluginId: "bot-teams", kind: "bot", handlers, expectedContent: "Conformance bot content", projectId: null, canDelete: false,
-    seed: () => {
-      const id = `bot_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
-      store.put(botSchema.parse({ id, name: "Conformance bot", description: "Conformance bot content", handle: id, home: "/unused/conformance", projectId: "proj_private", hostId: "local", createdAt: 1, updatedAt: 1, lastWakeAt: 0, error: null }));
-      return id;
-    },
-    notificationCount: () => events.length,
-    editTitle: (id, title) => { store.put({ ...store.get(id), name: title, updatedAt: 2 }); },
     close: () => { db.close(); },
   };
 });

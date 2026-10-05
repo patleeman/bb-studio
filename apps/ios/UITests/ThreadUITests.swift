@@ -687,37 +687,6 @@ final class ThreadUITests: XCTestCase {
         }
     }
 
-    /// A bot's Mission and Memory open from the bot. Read-only on a real bot: edit is
-    /// started and cancelled, and the file's version is checked to be unchanged.
-    func testBotDocuments() throws {
-        let bots = (rpc("bot-teams", "list", NSNull())?["bots"] as? [[String: Any]]) ?? []
-        let bot = try XCTUnwrap(bots.first { $0["retired"] as? Bool != true })
-        let id = try XCTUnwrap(bot["id"] as? String)
-        let before = try XCTUnwrap(rpc("bot-teams", "document", ["id": id, "file": "MISSION.md"])?["version"] as? String)
-        app.open(URL(string: "bbstudio://bot/\(id)")!)
-        let mission = app.buttons["Mission"]
-        XCTAssertTrue(mission.waitForExistence(timeout: 10), "bot files")
-        XCTAssertTrue(app.buttons["Memory"].exists)
-        shot("bot-files")
-        mission.tap()
-        XCTAssertTrue(app.navigationBars["Mission"].buttons["Edit"].waitForExistence(timeout: 10), "mission loaded")
-        shot("bot-mission")
-        app.navigationBars["Mission"].buttons["Edit"].tap()
-        let editor = app.textViews["botDocumentEditor"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 5), "editor")
-        XCTAssertFalse(app.navigationBars["Mission"].buttons["Save"].isEnabled, "nothing to save yet")
-        editor.typeText("QA")
-        XCTAssertTrue(app.navigationBars["Mission"].buttons["Save"].isEnabled, "edited")
-        shot("bot-mission-edit")
-        app.navigationBars["Mission"].buttons["Cancel"].tap()
-        XCTAssertTrue(app.navigationBars["Mission"].buttons["Edit"].waitForExistence(timeout: 5), "back to reading")
-        let after = rpc("bot-teams", "document", ["id": id, "file": "MISSION.md"])?["version"] as? String
-        XCTAssertEqual(before, after, "mission untouched")
-        app.navigationBars["Mission"].buttons.element(boundBy: 0).tap()
-        app.buttons["Memory"].tap()
-        XCTAssertTrue(app.navigationBars["Memory"].buttons["Edit"].waitForExistence(timeout: 10), "memory loaded")
-        shot("bot-memory")
-    }
 
     /// The Save to Studio sheet on a scratch thread that never runs, so there's nothing to save.
     func testSaveToStudio() throws {
@@ -995,13 +964,6 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(wait(10) { !tagged() }, "tag removed")
     }
 
-    func testOldBotLinkOpens() throws {
-        // A link from before the rename still opens.
-        app.open(URL(string: "bbgo://bot/bot_32fb8c40db41abea")!)
-        XCTAssertTrue(app.staticTexts["Chief of Staff"].firstMatch.waitForExistence(timeout: 10), "bot screen")
-        XCTAssertTrue(app.staticTexts["Threads"].waitForExistence(timeout: 5) || app.staticTexts["THREADS"].exists, "threads")
-        shot("bot-view")
-    }
 
     /// Finds two scratch pages by their text, renames and deletes a scratch
     /// tag, archives one page and deletes both from select mode.

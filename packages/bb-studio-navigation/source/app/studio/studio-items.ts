@@ -25,8 +25,6 @@ export const RETIRED_PANELS = [
   "float/companions",
   // Studio Chat's panel; chats start from Studio items and the overlay.
   "studio-chat/chats",
-  // Teams' per-Space Command view; the sidebar's Space menu opens it.
-  "bot-teams/command",
 ];
 
 export function studioNavigationItems(

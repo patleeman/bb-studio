@@ -7,7 +7,7 @@ import SwiftUI
 final class StudioStore: ObservableObject {
     let serverURL = ServerScope.selectedURL
     static var shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tables", "bot-teams"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tables"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []

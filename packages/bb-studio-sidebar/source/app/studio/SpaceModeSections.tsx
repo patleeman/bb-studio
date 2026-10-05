@@ -381,20 +381,20 @@ export function SpaceModeSections({
   );
 }
 
-const TEAMS_PLUGIN_ID = "bot-teams";
-let teamsInstalled: Promise<boolean> | null = null;
+const COMMAND_PLUGIN_ID = "studio";
+let commandInstalled: Promise<boolean> | null = null;
 
-/** Whether Studio Teams is installed and running; checked once per window. */
-function useTeamsInstalled(): boolean {
+/** Whether Studio is installed and running; checked once per window. */
+function useCommandInstalled(): boolean {
   const sdk = useSdk();
   const [installed, setInstalled] = useState(false);
   useEffect(() => {
     let live = true;
-    teamsInstalled ??= sdk.plugins.list().then(
-      ({ plugins }) => plugins.some((plugin) => plugin.id === TEAMS_PLUGIN_ID && plugin.enabled && plugin.status !== "error" && plugin.status !== "incompatible"),
+    commandInstalled ??= sdk.plugins.list().then(
+      ({ plugins }) => plugins.some((plugin) => plugin.id === COMMAND_PLUGIN_ID && plugin.enabled && plugin.status !== "error" && plugin.status !== "incompatible"),
       () => false,
     );
-    void teamsInstalled.then((value) => live && setInstalled(value));
+    void commandInstalled.then((value) => live && setInstalled(value));
     return () => {
       live = false;
     };
@@ -402,9 +402,9 @@ function useTeamsInstalled(): boolean {
   return installed;
 }
 
-/** Forget the cached Studio Teams check. */
-export function resetTeamsInstalledForTest(): void {
-  teamsInstalled = null;
+/** Forget the cached Studio check. */
+export function resetCommandInstalledForTest(): void {
+  commandInstalled = null;
 }
 
 /**
@@ -434,8 +434,8 @@ function SpaceSidebarSection({
   children: ReactNode;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
-  const teams = useTeamsInstalled();
-  const openCommand = () => openAppPath(`/plugins/${TEAMS_PLUGIN_ID}/command/${encodeURIComponent(space.id)}`, { main: true });
+  const command = useCommandInstalled();
+  const openCommand = () => openAppPath(`/plugins/${COMMAND_PLUGIN_ID}/studio/command/${encodeURIComponent(space.id)}`, { main: true });
   return (
     <SortableSidebarSection
       id={sectionId}
@@ -458,7 +458,7 @@ function SpaceSidebarSection({
           sectionId={sectionId}
           // New thread and New item live on the Space's Threads and Studio lists.
           showNewThread={false}
-          leadingAction={teams ? <SidebarControlButton label={`Command view for ${space.name}`} icon="GridView" onClick={openCommand} /> : null}
+          leadingAction={command ? <SidebarControlButton label={`Command view for ${space.name}`} icon="GridView" onClick={openCommand} /> : null}
           onNewThread={onNewThread}
           open={actionsOpen}
           onOpenChange={setActionsOpen}
@@ -467,7 +467,7 @@ function SpaceSidebarSection({
             <Icon name="MessageSquarePlus" />
             New thread here
           </DropdownMenuItem>
-          {teams ? (
+          {command ? (
             <DropdownMenuItem onSelect={openCommand}>
               <Icon name="GridView" />
               Command view

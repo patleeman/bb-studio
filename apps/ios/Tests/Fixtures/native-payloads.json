@@ -95,21 +95,6 @@
     }
   },
   {
-    "id": "bot-document",
-    "plugin": "bot-teams",
-    "method": "saveDocument",
-    "input": {
-      "id": "bot_aaaaaaaaaaaaaaaa",
-      "file": "MEMORY.md",
-      "text": "Updated memory",
-      "version": "sha-v1"
-    },
-    "output": {
-      "text": "Updated memory",
-      "version": "sha-v2"
-    }
-  },
-  {
     "id": "table-read",
     "plugin": "studio-tables",
     "method": "get",

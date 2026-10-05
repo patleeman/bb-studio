@@ -27,16 +27,15 @@ do not have to maintain competing defaults.
 
 | Plugin | Important controls and location | Outcome |
 | --- | --- | --- |
-| Studio | Saved views, query filters, spaces, tags, and sidebar item visibility/order; theme in BB Appearance | Existing controls cover the hub. Saved content and version history remain until explicitly removed. |
+| Studio | Saved views, query filters, spaces, tags, Command layout and approval mode, and sidebar item visibility/order; theme in BB Appearance | Existing controls cover the hub. Saved content and version history remain until explicitly removed. |
 | Studio Chat | BB's new-conversation composer selects project, environment, provider/model, reasoning, and permissions; existing chats use native thread controls | Existing controls cover execution choices. |
 | Float | Resize/dock/reorder on each panel; show/hide command; shortcuts in BB Keyboard | Existing controls cover layout and access. |
-| Pages | Page location, icon, chat, refresh bot/schedule/instructions, history and restore | Added global version-retention setting. |
+| Pages | Page location, icon, chat, history and restore | Added global version-retention setting. |
 | Explore | Suggest-findings and daily-digest switches in plugin settings | Added digest hour and explainer time limit. The explainer inherits its source thread's model. |
 | Talk | Microphone replacement, segment length, automatic titles/summaries, hold key, audio retention; cleanup toggle per device in the recorder; playback controls on recordings | Added the 3 model pickers and numeric validation. Transcription still uses BB AI services. |
 | Draw | Excalidraw's canvas controls and item-level title, project, export, and deletion | Existing controls cover drawing preferences. There is no background model job to configure. |
 | Artifacts | Explicit save/upload, project placement, item versions, preview/download/export, archive/delete | Existing item controls cover storage actions; no automatic expiry is imposed. |
 | Tasks | Archive-thread-on-done switch; board columns/views; per-task assignee, priority, due/reminder/recurrence; handoff provider/model/environment | Existing controls cover task behavior and agent execution. |
-| Teams | Bot profile model, fallback, reasoning, permissions, mission interval and limits; Command view layout and approval mode | Existing profile and Command view controls cover these choices. |
 | Sidebar | Organization, sorting/direction, grouping, hidden/collapsed groups, row actions, provider icons, and background-thread visibility | Existing sidebar preferences cover layout. |
 | Navigation | BB Appearance chooses the navigation provider; native Customize sidebar controls visibility/order | Uses BB's existing preferences. |
 | Mobile | APNs credentials/environment/bundle and Expo endpoint in plugin settings; mute per thread; notification permission and presentation in BB/iOS | Relay configuration already exists. BB's Push notifications plugin owns event selection. |

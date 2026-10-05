@@ -12,31 +12,12 @@ import { useProjects, type BotsState, type Rpc } from "./shared";
 
 export function usePagesData(rpc: Rpc) {
   const [pages, setPages] = useState<PageMetaView[] | null>(null);
-  const [bots, setBots] = useState<BotsState>({ available: false, reason: null, bots: [] });
+  const [bots] = useState<BotsState>({ available: false, reason: null, bots: [] });
   // The collection reports its own load errors; a failed refresh keeps the last list.
   const refetch = useCallback(() => {
     rpc.call("tree", {}).then((result) => setPages(result.pages), () => {});
   }, [rpc]);
-  const refetchBots = useCallback(() => {
-    rpc.call("bots", null).then(setBots, () => {});
-  }, [rpc]);
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-  // Polls so the panel notices Studio Teams being installed, enabled or edited;
-  // a hidden tab waits until it's shown again.
-  useEffect(() => {
-    const poll = () => {
-      if (document.visibilityState === "visible") refetchBots();
-    };
-    poll();
-    const timer = setInterval(poll, 30_000);
-    document.addEventListener("visibilitychange", poll);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", poll);
-    };
-  }, [refetchBots]);
+  useEffect(() => { refetch(); }, [refetch]);
   return { pages, bots, refetch };
 }
 

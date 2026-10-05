@@ -51,9 +51,9 @@ describe("toStudioItem", () => {
     });
   });
 
-  it("tells agents from people and flags kept-updated and archived pages", () => {
+  it("tells agents from people and keeps retired refresh settings out of the collection", () => {
     const item = toStudioItem(meta({ icon: "", updated_by: "agent:thr_x", refresh_bot_id: "bot", refresh_cron: "0 9 * * *", archived_at: 5 }), null);
-    expect(item).toMatchObject({ icon: null, updatedBy: "agent", preview: null, archived: true, badge: { label: "Auto-refresh" } });
+    expect(item).toMatchObject({ icon: null, updatedBy: "agent", preview: null, archived: true, badge: null });
   });
 });
 
@@ -76,7 +76,7 @@ describe("the Studio provider", async () => {
       realtime: { publish: (_channel: string, event: unknown) => events.push(event) },
       rpc: { register: (_contract: unknown, registered: typeof handlers) => (handlers = registered) },
     };
-    const service = new PagesService(bb as never, store, {} as never);
+    const service = new PagesService(bb as never, store);
     registerStudio(bb as never, service, studioSchemas(z));
     const create = (title: string, projectId: string | null, parentId: string | null = null) =>
       service.createPage({ projectId, parentId, title, actor: HUMAN_USER_ID }).id;

@@ -10,11 +10,6 @@ export default context => {
       await pluginRpc("studio-tables", "insert", { id: table.id, values: { name: "Review notes" } });
       return { path: `/plugins/studio-tables/tables/${table.id}`, ready: 'input[aria-label="Table title"]', cleanup: () => pluginRpc("studio-tables", "remove", { id: table.id }) };
     } },
-    { id: "teams", packageDir: "bb-studio-teams", seed: async () => {
-      const { bots } = await pluginRpc("bot-teams", "list", null);
-      const bot = bots.find(b => b.handle === "atlas"); if (!bot) throw new Error("Missing staged Atlas profile");
-      return { path: `/plugins/bot-teams/bots/${bot.id}/profile`, ready: '[aria-label="Bot sections"]', cleanup: async () => {} };
-    } },
   ];
   return fixtures.map(fixture => ({
     id: `${fixture.id}-compact-header`, packageDir: fixture.packageDir, fileName: "compact-header.png", privateSidebar: false,

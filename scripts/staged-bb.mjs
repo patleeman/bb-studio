@@ -134,41 +134,19 @@ async function seedSmartReactionsThread(project, machine, orbitDir) {
   return thread;
 }
 
-/**
- * Studio Teams' README fixture: four bots, a Launch work Space whose threads
- * work as Atlas (its lead) and Scribe and give the fixed replies their
- * missions spell out, a Design review Space with Quinn's thread, and Atlas's
- * memory of the launch.
- */
-async function seedTeams(machine) {
-  const teams = join(fixturesDir, "teams");
-  const profile = ["--provider", "codex", "--model", "gpt-6-luna", "--reasoning", "low", "--interval", "0", "--machine", machine.id];
-  await bb("bots", "create", "Atlas", "--description", "Research and verify the facts", "--avatar", "🧭", ...profile, "--mission-file", join(teams, "atlas-mission.md"));
-  await bb("bots", "create", "Scribe", "--description", "Record decisions and next steps", "--avatar", "📝", ...profile, "--mission-file", join(teams, "scribe-mission.md"));
-  await bb("bots", "create", "Quinn", "--description", "Review designs for clarity", "--avatar", "🎨", ...profile, "--mission", "Review designs for the owner.");
-  await bb("bots", "create", "Relay", "--description", "Hand work between threads", "--avatar", "📡", ...profile, "--mission", "Hand work between threads for the owner.");
-  await bb("bots", "memory", "atlas", "--text", "# Memory\n\n- ORBIT-42 ships in the Friday release window.\n- Scribe owns the release-check log.\n");
-  const { bots } = await pluginRpc("bot-teams", "list", null);
-  const botThread = async handle => (await pluginRpc("bot-teams", "newConversation", {id:bots.find(b=>b.handle===handle).id})).threadId;
-  // The bots answer on a real model, which now and then fails a turn or goes
-  // off script. A Space that misses a reply is reported, deleted and seeded
-  // again with fresh threads, so the screenshots never show a repeated message.
-  for (let attempt = 1; ; attempt++) {
-    const atlas = await botThread("atlas"), scribe = await botThread("scribe");
-    const spaceId = await seedSpace("Launch work", [atlas, scribe]);
-    try {
-      await seedLaunch(spaceId, atlas, scribe);
-      break;
-    } catch (error) {
-      console.error(`Launch work, attempt ${attempt}: ${error.message}`);
-      const { entries } = await pluginRpc("bot-teams", "commandFeed", {spaceId});
-      for (const entry of entries) console.error(`  ${entry.role}: ${entry.text.slice(0, 160)}`);
-      for (const bot of (await pluginRpc("bot-teams", "list", null)).bots) console.error(`  @${bot.handle}: ${bot.working ? "working" : "idle"}${bot.error ? `, error: ${bot.error}` : ""}`);
-      await pluginRpc("studio", "deleteSpace", {id:spaceId});
-      if (attempt === 3) throw error;
-    }
-  }
-  await seedSpace("Design review", [await botThread("quinn")]);
+/** The Command view's deterministic fixture, in ordinary BB threads. */
+async function seedCommand(machine, project) {
+  const teams = join(fixturesDir, "command");
+  const makeThread = async (name, mission) => {
+    const text = await readFile(join(teams, mission), "utf8");
+    const thread = await bb("thread", "spawn", "--project", project.id, "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low", "--title", name, "--prompt", text + "\n\nFor this initial setup message, reply only Ready to work. Do not use tools or change files.");
+    await bb("thread", "wait", thread.id, "--timeout", "180s");
+    return thread.id;
+  };
+  const atlas = await makeThread("Atlas", "atlas-mission.md");
+  const scribe = await makeThread("Scribe", "scribe-mission.md");
+  const spaceId = await seedSpace("Launch work", [atlas, scribe]);
+  await seedLaunch(spaceId, atlas, scribe);
 }
 
 /** A Studio Space holding these threads, the first one its lead. */
@@ -179,10 +157,10 @@ async function seedSpace(name, threadIds) {
   return space.id;
 }
 
-/** The Launch work conversation, sent from its Command view: each bot's fixed reply, from its mission file. */
+/** The Launch work conversation, sent from its Command view: each thread's fixed reply, from its instructions. */
 async function seedLaunch(spaceId, atlas, scribe) {
-  const send = (threadIds, text) => pluginRpc("bot-teams","commandSend",{spaceId,threadIds,text});
-  const replied = start => async () => (await pluginRpc("bot-teams","commandFeed",{spaceId})).entries.some(e=>e.role==="assistant"&&e.text.startsWith(start));
+  const send = (threadIds, text) => pluginRpc("studio","commandSend",{spaceId,threadIds,text});
+  const replied = start => async () => (await pluginRpc("studio","commandFeed",{spaceId})).entries.some(e=>e.role==="assistant"&&e.text.startsWith(start));
   // Each reply takes 10 to 20 seconds when the turn works.
   const timeout = 180000;
   await send([atlas, scribe], "@atlas @scribe Here's the ORBIT-42 launch brief. The owner is Atlas, Scribe keeps the release-check log, and release is Friday. Are you both ready?");
@@ -256,7 +234,7 @@ async function start() {
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
   const smartReactionsThread = !capturePlugin || ["emoji-react", "artifacts"].includes(capturePlugin)
     ? await seedSmartReactionsThread(project, machine, orbitDir) : null;
-  if (!capturePlugin || capturePlugin === "bot-teams") await seedTeams(machine);
+  if (!capturePlugin || capturePlugin === "studio" || capturePlugin === "studio-navigation") await seedCommand(machine, project);
 
   const envFile = join(stagedDir, "capture.env");
   await writeFile(

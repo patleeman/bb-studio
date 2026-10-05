@@ -1,12 +1,10 @@
 # Studio Pages
 
-> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
+> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make. See the [suite overview](../../README.md).
 
 Collaborative documents for BB that you write together with your agents.
 Pages gives you a Notion-style block editor with live multiplayer editing,
-comments, charts, and embeds. It also connects to
-[Studio Teams](../bb-studio-teams): @mention a bot in a page to hand it
-work, or give a page an owner bot that keeps it up to date on a schedule.
+comments, charts, embeds, and ordinary agent chats.
 
 With Studio Talk installed, the microphone in a comment box lets you dictate
 new comments, replies, and edits. Stop dictation to insert the transcript at
@@ -149,9 +147,8 @@ afterwards.
   retained companion tabs and preserves its existing composer draft keys.
   New conversation focuses `/plugins/pages/pages/<id>/compose`; it keeps
   drafts and attachments while you navigate other pages. The page's Chat
-  action updates when that draft becomes a thread. This works
-  without Studio Teams.
-- **Version history.** Pages saves a version before an agent's or bot's first
+  action updates when that draft becomes a thread.
+- **Version history.** Pages saves a version before an agent's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.
 
@@ -172,37 +169,6 @@ page:
 Talk does the recording, transcription, and durability. Pages only marks the
 editor as a Talk dictation field and inserts the text Talk hands it. Without
 Talk, the dictation controls are hidden.
-
-## Studio Teams integration
-
-Needs the Studio Teams plugin. Requests run in each bot's DM thread with the
-bot's configured model and reasoning level.
-
-- **@mention a bot in the page.** Write what you need and mention the bot in
-  the same block, for example *"@Scribe fill this table in from the pricing
-  thread"*. The bot reads the page, makes the edit, and leaves a comment on
-  that block saying what it did.
-- **@mention a bot in a comment.** The bot answers in the thread and makes
-  any change you asked for. Once a bot has replied in a thread, your later
-  replies there go to it too.
-- **@mention a bot in "Work with this page…".** The message goes to that
-  bot as a request about the whole page, in its own thread.
-- **Keep updated.** Pick an owner bot, a schedule (hourly, every morning,
-  weekday mornings, Monday mornings, or a custom cron), and what to keep
-  current. The bot revisits the page on that schedule. **Refresh now** runs it
-  immediately.
-
-The **Activity** menu at the top right shows each request as queued,
-working, done, or failed, and opens its thread in a card on the page. It
-also lists the page's chats and its Keep updated schedule. Pages remembers which mentions and comments it
-has already sent, so bots are never asked twice.
-
-Without Studio Teams, pages, comments, agent tools, and **Work with this page**
-work as usual. **Keep updated…** is disabled and says Studio Teams isn't
-installed or enabled. A mention or comment for a
-bot made while Studio Teams is unavailable, for example while it reloads, waits
-and is sent once Studio Teams is back, as long as the BB server hasn't restarted
-in between.
 
 ## For agents
 

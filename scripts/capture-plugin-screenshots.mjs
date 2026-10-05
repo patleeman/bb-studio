@@ -41,7 +41,7 @@ try {
       const outputPath = join(repoRoot, "packages", capture.packageDir, "assets", capture.fileName ?? "staged-preview.png");
       // Use BB's real collapsed-sidebar state so publication does not expose
       // unrelated local projects/threads alongside the deterministic fixtures.
-      const privateSidebar = capture.privateSidebar !== false && !capture.showSidebar && (capture.privateSidebar || (capture.packageDir === "bb-studio-teams" && capture.id !== "bots-forks"));
+      const privateSidebar = capture.privateSidebar !== false && !capture.showSidebar && (capture.privateSidebar || capture.id.startsWith("studio-command"));
       const collapsedSidebar = privateSidebar && await client.evaluate(`(() => {
         const sidebar = document.querySelector('[data-sidebar="sidebar"]');
         if (['closed', 'collapsed'].includes(sidebar?.closest('[data-state]')?.getAttribute('data-state'))) return false;

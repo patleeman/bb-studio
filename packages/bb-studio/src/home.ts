@@ -6,12 +6,7 @@ import type { ProviderComments } from "./provider-comments";
 import { needsYouData } from "./needs-you";
 import { backgroundKinds } from "./query";
 
-const teams = z.object({
-  bots: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string(), working: z.boolean() })),
-  directConversations: z.record(z.string(), z.array(z.object({ botId: z.string(), threadId: z.string() }))),
-});
 const automation = z.object({ id: z.string(), name: z.string(), projectId: z.string(), enabled: z.boolean(), nextRunAt: z.number().nullable() });
-const usage = z.object({ turns: z.number(), forks: z.number(), active: z.number(), errors: z.number(), routingMilliseconds: z.number(), limits: z.object({ turnsPerHour: z.number(), turnsPerDay: z.number(), minutesPerTurn: z.number(), concurrentForks: z.number() }) });
 
 type Sdk = Pick<BbPluginApi["sdk"], "plugins" | "threads" | "projects">;
 const day = (date: Date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
@@ -43,12 +38,10 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
   const available = new Set(installed.plugins.filter((plugin) => plugin.enabled && ["running", "degraded", "starting"].includes(plugin.status)).map((plugin) => plugin.id));
   const call = <T>(pluginId: string, method: string, input: unknown, outputSchema: z.ZodType<T>) =>
     sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema, signal: AbortSignal.timeout(5000) });
-  const roster = available.has("bot-teams") ? await call("bot-teams", "list", null, teams).catch(() => null) : null;
   const needsYou = await needsYouData(sdk, services, providerComments, overview.items, projectId);
   const activeThreads = threadList.filter((thread) => ["active", "starting", "pending", "stopping"].includes(thread.status));
   const working = {
     threads: activeThreads.map((thread) => ({ id: thread.id, title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, projectId: thread.projectId })).slice(0, 12),
-    bots: roster?.bots.filter((bot) => bot.working && (!projectId || bot.projectId === projectId)).map((bot) => ({ id: bot.id, name: bot.name, projectId: bot.projectId })) ?? null,
   };
   const background = backgroundKinds(overview.providers);
   const recent = overview.items.filter((item) => !item.archived && !background.has(`${item.pluginId}:${item.kind}`) && sameProject(item, projectId)).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map((item) => ({ pluginId: item.pluginId, id: item.id, title: item.title, href: item.href, kind: item.kind, updatedAt: item.updatedAt }));
@@ -67,20 +60,5 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
     const events = await sdk.threads.events.list({ threadId: thread.id, order: "desc", limit: "500", types: ["turn/started", "turn/completed"] }).catch(() => []);
     return { id: thread.id, title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, ...summarizeTurns(events.map((event) => ({ type: event.type, createdAt: event.createdAt, data: { status: event.type === "turn/completed" ? event.data.status : undefined } })), since) };
   }));
-  const direct = roster ? Object.values(roster.directConversations).flat() : [];
-  const directStats = await Promise.all(direct.map(async (entry) => {
-    const events = await sdk.threads.events.list({ threadId: entry.threadId, order: "desc", limit: "500", types: ["turn/started", "turn/completed"] }).catch(() => []);
-    return { botId: entry.botId, ...summarizeTurns(events.map((event) => ({ type: event.type, createdAt: event.createdAt, data: { status: event.type === "turn/completed" ? event.data.status : undefined } })), since) };
-  }));
-  const bots = roster ? await Promise.all(roster.bots.filter((bot) => !projectId || bot.projectId === projectId).map(async (bot) => {
-    const summary = await call("bot-teams", "usage", { id: bot.id, kind: "bot" }, usage).catch(() => null);
-
-    const botDirect = directStats.filter((entry) => entry.botId === bot.id);
-    return { id: bot.id, name: bot.name,
-      turns: botDirect.reduce((total, entry) => total + entry.turns, 0),
-      failures: botDirect.reduce((total, entry) => total + entry.failures, 0),
-      durationMs: botDirect.reduce((total, entry) => total + entry.durationMs, 0),
-      active: summary?.active ?? 0, limits: summary?.limits ?? null };
-  })) : null;
-  return { needsYou, working, recent, automations, activity, dashboard: { periodDays, threads, bots } };
+  return { needsYou, working, recent, automations, activity, dashboard: { periodDays, threads } };
 }

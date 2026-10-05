@@ -125,7 +125,7 @@ destination when one is already open.
   route offers Show companion, and closing the companion returns the same
   editor to an available main pane.
 - **Float actions.** BB has no slot in its own thread menu or next to the
-  sidebar toggle, so Float is offered in Studio Sidebar's, Studio Teams' and
+  sidebar toggle, so Float is offered in Studio Sidebar's and
   Studio's own row menus, the item menu, and the palette.
 - **Item gestures.** Only marked elements and links get them; an item a
   plugin draws without a mark keeps the browser's behavior.

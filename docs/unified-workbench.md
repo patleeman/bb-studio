@@ -1,5 +1,7 @@
 # Unified Studio workbench
 
+This document records earlier work. Teams and bot profiles have since been retired; Space Command view now belongs to Studio.
+
 The active delivery goal covers the entire Studio suite. A conversation is
 a BB thread. A companion is a tab showing a thread or plugin view. The same
 companion stack can dock in BB's right workbench or float; an individual tab
@@ -176,7 +178,7 @@ pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
 [Artifacts](../packages/bb-studio-artifacts/assets/compact-header.png),
 [Talk](../packages/bb-studio-talk/assets/compact-header.png),
 [Tables](../packages/bb-studio-tables/assets/compact-header.png), and
-[Teams](../packages/bb-studio-teams/assets/compact-header.png).
+[Teams](https://github.com/patleeman/bb-studio/blob/1c713787/packages/bb-studio-teams/assets/compact-header.png).
 Each checks the primary Chat action, every visible header button's bounds
 and hit target, page overflow, and the Related popover at 390 by 844 pixels.
 Visual review caught Tables' sticky grid header covering Export and More;

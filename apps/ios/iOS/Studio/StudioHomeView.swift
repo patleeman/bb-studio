@@ -42,16 +42,11 @@ struct StudioHomeView: View {
                                 Text("Needs you").foregroundStyle(Color.primary.opacity(0.75))
                             }
                         }
-                        if home.working?.threads?.isEmpty == false || home.working?.bots?.isEmpty == false {
+                        if home.working?.threads?.isEmpty == false {
                             Section {
                                 ForEach(Array((home.working?.threads ?? []).enumerated()), id: \.offset) { _, thread in
                                     if let id = thread.id {
                                         NavigationLink(value: Route.thread(id: id)) { Label(thread.title ?? "Thread", systemImage: "bubble.left") }
-                                    }
-                                }
-                                ForEach(Array((home.working?.bots ?? []).enumerated()), id: \.offset) { _, bot in
-                                    if let id = bot.id {
-                                        NavigationLink(value: Route.bot(id: id)) { Label(bot.name ?? "Bot", systemImage: "person.crop.square") }
                                     }
                                 }
                             } header: {

@@ -1,5 +1,7 @@
 # BB Studio codebase and product review — 2 October 2026
 
+This document records earlier work. Teams and bot profiles have since been retired; Space Command view now belongs to Studio.
+
 This report records the first review pass. The repair goal remains active;
 see the [issue and evidence ledger](review-issues.md) for subsequent fixes and
 open verification. The priorities below describe findings at that checkpoint.
@@ -71,7 +73,7 @@ retained Pages conversation composers, Talk model selection, Explore scheduling
 controls, and Pages version retention. Those features were already in progress;
 they are included in the integration assessment rather than attributed solely
 to this review. See the [settings audit](settings-audit.md),
-[Teams documentation](../packages/bb-studio-teams/README.md), and
+[Teams documentation](https://github.com/patleeman/bb-studio/blob/1c713787/packages/bb-studio-teams/README.md), and
 [Pages documentation](../packages/bb-studio-pages/README.md).
 
 New channel messages now keep routing metadata in agent-only context. The

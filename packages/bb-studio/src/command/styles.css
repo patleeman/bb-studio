@@ -1,0 +1,348 @@
+/* The Command view embeds BB's composer for its editor, files and voice. Each
+   recipient runs its own thread, so the new-thread pickers don't apply. */
+[data-command-composer] [aria-label^="Provider, model and reasoning"],
+[data-command-composer] [aria-label="Send options"],
+[data-command-composer] [data-promptbox-shell] > form ~ div { display: none; }
+
+.channel-pane-action:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* Status: a dot and a word. Only states that matter get color. */
+.channel-thread-layout { --channel-working: #4f8ff7; }
+.channel-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.channel-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+  opacity: 0.45;
+}
+[data-activity="Working"] > .channel-status-dot,
+[data-activity="Working"] .channel-status-dot {
+  background: var(--channel-working);
+  opacity: 1;
+  animation: bot-presence 1.3s ease-in-out infinite;
+}
+[data-activity="Needs input"] .channel-status-dot { background: var(--warning, #bf973f); opacity: 1; }
+[data-activity="Failed"] .channel-status-dot,
+[data-activity="Unavailable"] .channel-status-dot { background: var(--destructive); opacity: 1; }
+.channel-status[data-activity="Working"] { color: var(--foreground); }
+.channel-status[data-activity="Needs input"] { color: var(--warning, #bf973f); }
+.channel-status[data-activity="Failed"] { color: var(--destructive); }
+@media (prefers-reduced-motion: reduce) {
+  [data-activity="Working"] .channel-status-dot { animation: none; }
+}
+
+.channel-thread-layout {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+.channel-thread-layout:not([data-channel-layout="grid"]) {
+  position: relative;
+  container-type: inline-size;
+}
+.channel-thread-stage {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  grid-auto-rows: minmax(360px, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  padding: 12px;
+  overflow: auto;
+}
+.channel-thread-stage[data-thread-count="0"] { display: flex; }
+
+/* Panes */
+.channel-thread-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+.channel-thread-pane[data-activity="Working"] { border-color: color-mix(in srgb, var(--channel-working) 60%, var(--border)); }
+.channel-thread-pane[data-activity="Needs input"] { border-color: color-mix(in srgb, var(--warning, #bf973f) 65%, var(--border)); }
+.channel-thread-pane[data-activity="Failed"] { border-color: color-mix(in srgb, var(--destructive) 55%, var(--border)); }
+.channel-thread-pane > header {
+  display: flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.channel-pane-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+@media (hover: hover) {
+  .channel-thread-layout:not([data-channel-layout="focus"]) .channel-pane-actions { opacity: 0; transition: opacity 120ms; }
+  .channel-thread-pane:hover .channel-pane-actions,
+  .channel-thread-pane:focus-within .channel-pane-actions { opacity: 1; }
+}
+.channel-pane-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+}
+.channel-pane-action:hover {
+  color: var(--foreground);
+  background: var(--state-hover);
+}
+.channel-pane-body {
+  min-height: 0;
+  flex: 1;
+}
+.channel-thread-pane > footer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+.channel-thread-pane > footer > button {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  padding: 3px 8px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.channel-thread-pane > footer > button:hover { color: var(--foreground); background: var(--state-hover); }
+
+/* Grid: drag a pane by its header to rearrange. */
+.channel-thread-pane { position: relative; }
+.channel-thread-pane > header[data-arrangeable] { cursor: grab; padding-left: 4px; }
+.channel-thread-pane > header[data-arrangeable]:active { cursor: grabbing; }
+.channel-pane-grip {
+  display: inline-flex;
+  width: 20px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--subtle-foreground, var(--muted-foreground));
+  cursor: grab;
+}
+.channel-pane-grip:hover { color: var(--foreground); }
+.channel-pane-grip:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+@media (hover: hover) {
+  .channel-pane-grip { opacity: 0; transition: opacity 120ms; }
+  .channel-thread-pane:hover .channel-pane-grip,
+  .channel-pane-grip:focus-visible { opacity: 1; }
+}
+.channel-thread-pane[data-dragging] { opacity: 0.45; }
+.channel-thread-pane[data-drop]::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  border-radius: 2px;
+  background: var(--channel-working);
+  pointer-events: none;
+}
+.channel-thread-pane[data-drop="before"]::after,
+.channel-thread-pane[data-drop="after"]::after { top: 0; bottom: 0; width: 3px; }
+.channel-thread-pane[data-drop="before"]::after { left: 0; }
+.channel-thread-pane[data-drop="after"]::after { right: 0; }
+.channel-thread-pane[data-drop-axis="y"]::after { left: 0; right: 0; width: auto; height: 3px; }
+.channel-thread-pane[data-drop-axis="y"][data-drop="before"]::after { top: 0; bottom: auto; }
+.channel-thread-pane[data-drop-axis="y"][data-drop="after"]::after { top: auto; bottom: 0; }
+.channel-reset-order {
+  margin-left: auto;
+  border-radius: 6px;
+  padding: 3px 8px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.channel-reset-order:hover { color: var(--foreground); background: var(--state-hover); }
+
+/* Grid: members without a thread share one quiet row. */
+.channel-unstarted {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 0 12px 12px;
+}
+/* Members that haven't started: a dashed outline wherever they appear. */
+
+.channel-rail-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Focus and Active: one transcript laid out like a thread page, with a
+   floating member box in the left margin to swap threads. */
+.channel-switcher {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  width: 216px;
+  max-height: calc(100% - 24px);
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--foreground) 3%, var(--background));
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  scrollbar-width: thin;
+}
+.channel-switcher-row {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  border-radius: 6px;
+}
+.channel-switcher-row > button {
+  display: flex;
+  height: 32px;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  padding: 0 8px 0 4px;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.channel-switcher-row:hover,
+.channel-switcher-row[data-current] { background: var(--state-hover); }
+.channel-switcher-row[data-current] > button { font-weight: 500; }
+.channel-switcher-row[data-fork] > button { padding-left: 28px; color: var(--muted-foreground); font-size: var(--text-xs); }
+.channel-switcher-row[data-activity="Idle"] .channel-status-dot { display: none; }
+.channel-switcher-row > button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.channel-switcher-actions { display: inline-flex; flex: 0 0 auto; padding-right: 2px; }
+.channel-switcher-actions .channel-pane-action { width: 24px; height: 24px; }
+
+.channel-thread-layout[data-channel-layout="focus"] .channel-thread-stage {
+  display: flex;
+  padding: 0;
+}
+/* Active: a closer grid of the threads at work, beside the member box. */
+.channel-thread-layout[data-channel-layout="active"] .channel-thread-stage {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  grid-auto-rows: minmax(420px, 1fr);
+  padding: 12px 16px 12px 244px;
+  gap: 16px;
+}
+.channel-thread-layout[data-channel-layout="active"] .channel-thread-stage[data-thread-count="1"] {
+  grid-template-columns: minmax(0, 960px);
+  justify-content: center;
+}
+.channel-single {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+/* BB's transcript scrolls edge to edge; its content keeps the composer's width. */
+.channel-single .channel-pane-body > div > [class~="overflow-y-auto"] {
+  padding-inline: max(16px, calc((100% - 760px) / 2));
+  padding-top: 16px;
+}
+
+/* When the margin is too narrow for names, the box shows avatars only. */
+@container (max-width: 1240px) {
+  .channel-switcher { width: 48px; padding: 6px 4px; }
+  .channel-switcher-row > button { justify-content: center; padding: 0; position: relative; }
+  .channel-switcher-row > button > .channel-rail-name,
+  .channel-switcher-actions { display: none; }
+  .channel-switcher-row[data-fork] > button { padding: 0; }
+  .channel-switcher-row > button > .channel-status-dot { position: absolute; top: 4px; right: 4px; }
+
+  .channel-single .channel-pane-body > div > [class~="overflow-y-auto"] {
+    padding-inline: max(72px, calc((100% - 760px) / 2)) max(16px, calc((100% - 760px) / 2));
+  }
+  .channel-thread-layout[data-channel-layout="active"] .channel-thread-stage { padding-left: 72px; }
+}
+/* Phones: the box becomes a row above the transcript. */
+@container (max-width: 640px) {
+  .channel-switcher {
+    position: static;
+    width: 100%;
+    max-height: none;
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 6px 8px;
+    box-shadow: none;
+    scrollbar-width: none;
+  }
+  .channel-switcher-row > button { height: 36px; padding: 0 10px 0 4px; justify-content: flex-start; }
+  .channel-switcher-row > button > .channel-rail-name { display: block; max-width: 140px; }
+  .channel-switcher-row > button > .channel-status-dot { position: static; }
+  .channel-switcher-row[data-fork] > button { padding: 0 10px 0 6px; }
+
+  .channel-single .channel-pane-body > div > [class~="overflow-y-auto"] { padding-inline: 12px; }
+  .channel-thread-layout[data-channel-layout="active"] .channel-thread-stage {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(420px, 70svh);
+    padding: 8px;
+    gap: 8px;
+  }
+}
+
+.channel-stage-empty {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+.channel-stage-empty > p { max-width: 380px; }
+
+@media (max-width: 700px) {
+  .channel-thread-stage {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(420px, 70svh);
+    padding: 8px;
+    gap: 8px;
+  }
+}

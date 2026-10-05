@@ -21,7 +21,7 @@ export async function pluginRpc(pluginId, method, input) {
   return payload.result;
 }
 
-// The Launch work Space seeded by staged-bb.mjs: threads working as Atlas (its lead) and Scribe.
+// The Launch work Space seeded by staged-bb.mjs: ordinary threads named Atlas (its lead) and Scribe.
 export const launchReplies = [
  "Ready. I'll keep the decision log for ORBIT-42 and post next steps after each check.",
  "Release check passed: the brief, owner, and Friday window all line up.",
@@ -33,10 +33,10 @@ export async function launchSpace() {
  const { spaces } = await pluginRpc("studio","spaces",null);
  const space = spaces.find(s=>s.name==="Launch work");
  if(!space)throw new Error("Seed Launch work before capturing.");
- const { entries } = await pluginRpc("bot-teams","commandFeed",{spaceId:space.id});
+ const { entries } = await pluginRpc("studio","commandFeed",{spaceId:space.id});
  for(const reply of launchReplies)if(!entries.some(e=>e.role==="assistant"&&e.text.startsWith(reply.slice(0,40))))throw new Error(`Missing seeded reply: ${reply}`);
  launchSpaceId=space.id;
- return (await pluginRpc("bot-teams","command",{spaceId:space.id})).leadThreadId;
+ return (await pluginRpc("studio","command",{spaceId:space.id})).leadThreadId;
 }
 
 /** Run the bb CLI as the owner, not as the thread this script may run inside. */
