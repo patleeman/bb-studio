@@ -1,5 +1,5 @@
 // The Studio collection: every add-on's items in one list, filtered by one
-// query (src/query.ts) from the bar above it and the rail beside it. The
+// query (src/query.ts) from search and the filter menus above it. The
 // panel's sub-path can start the query on a kind, so
 // /plugins/studio/studio/recording links to recordings. openSpaceItems lists
 // a space's items here.
@@ -35,7 +35,8 @@ import type { ProviderView, rpcContract, SavedViewView, SidebarView, SpaceView, 
 import { applyItemChanges } from "../partial";
 import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
-import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
+import { QueryBar } from "./QueryBar";
+import { FilterToolbar } from "./FilterToolbar";
 import { SpaceGlyph } from "./Spaces";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
@@ -279,7 +280,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   };
   const onlyKind = only("kind");
   const onlyProject = only("project");
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const nameOf = useCallback((pluginId: string) => providers.find((provider) => provider.pluginId === pluginId)?.name ?? pluginId, [providers]);
 
   const handlers = useMemo<CollectionHandlers>(
@@ -496,20 +496,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       toast.error(`Couldn't delete the view: ${errorMessage(cause)}`);
     }
   };
-  // null while loading still holds the rail's room.
-  const rail = data ? (
-    <FacetRail
-      query={query}
-      vocabulary={vocabulary}
-      counts={counts}
-      onChange={setQuery}
-      spaces={data.spaces}
-      views={data.views}
-      onSaveView={() => void saveView()}
-      onDeleteView={(view) => void deleteView(view)}
-      tags={data.tags}
-    />
-  ) : null;
   const empty = compiled.unknown.length
     ? `Nothing is called ${compiled.unknown.map((filter) => `${filter.field}:${filter.value}`).join(", ")}.`
     : compiled.archived
@@ -539,17 +525,14 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         headerActions={headerActions}
         handlers={handlers}
         filter={{
-          bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} onOpenFilters={() => setFiltersOpen(true)} loading={!data || !projects.length} />,
-          rail,
+          bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} loading={!data || !projects.length} />,
+          toolbar: <FilterToolbar query={query} vocabulary={vocabulary} counts={counts} onChange={setQuery} spaces={data?.spaces ?? []} views={data?.views ?? []} tags={data?.tags ?? []} onSaveView={() => void saveView()} onDeleteView={(view) => void deleteView(view)} />,
           text: searchText,
           snippets,
           archived: compiled.archived,
           empty,
         }}
       />
-      <FiltersDialog open={filtersOpen} onClose={() => setFiltersOpen(false)}>
-        {rail}
-      </FiltersDialog>
     </>
   );
 }

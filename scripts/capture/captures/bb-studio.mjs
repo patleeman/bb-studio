@@ -126,11 +126,15 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:query:all", "")`);
         await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('input[aria-label="Search and filter studio"]');
-        await client.waitForSelector('nav[aria-label="Filters"]');
-        const rail = await client.evaluate(`document.querySelector('nav[aria-label="Filters"]')?.innerText ?? ""`);
-        for (const label of ["Space", "Launch review", "Kind", "Pages", "Recordings", "Drawings", "Project", "Orbit"]) {
-          if (!rail.includes(label)) throw new Error(`The filter rail didn't show ${label}: ${rail}`);
-        }
+        await client.waitForAriaButton("Filter by space");
+        await client.waitForAriaButton("Filter by kind");
+        if (await client.evaluate(`!!document.querySelector('aside[aria-label="Filters"]')`)) throw new Error("Studio still reserves space for a filter rail");
+        await client.clickAriaButtonWithPointer("Filter by space");
+        await client.waitForAriaButton("Launch review");
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+        await client.clickAriaButtonWithPointer("Filter by kind");
+        for (const label of ["Pages", "Recordings", "Drawings"]) await client.waitForAriaButton(label);
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
         await client.waitForText("Pages");
         await client.waitForText("Recordings");
         await client.waitForText("Drawings");
@@ -149,6 +153,70 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       return cleanup;
     },
   },
+  ...[false, true].map((mobile) => ({
+    id: mobile ? "studio-filters-mobile" : "studio-filters",
+    packageDir: "bb-studio",
+    fileName: mobile ? "filters-mobile.png" : "filters.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const pages = await seedPages();
+      let viewId = null;
+      const cleanup = async () => {
+        if (viewId) await pluginRpc("studio", "deleteView", { id: viewId }).catch(() => {});
+        await pages.cleanup();
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+      };
+      const escape = () => client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+      try {
+        await client.command("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1440, height: mobile ? 844 : 1000, deviceScaleFactor: 1, mobile });
+        await client.navigate("/plugins/studio/studio/collection");
+        await client.evaluate(`localStorage.setItem('studio:query:all', 'kind:Pages'); localStorage.setItem('studio:collection:view', 'list')`);
+        await client.navigate("/plugins/studio/studio/collection");
+        await client.waitForAriaButton("Remove Kind Pages");
+        // A persisted plural label resolves to the same checkbox as kind:page.
+        await client.clickAriaButtonWithPointer("Filter by kind");
+        await client.waitForSelector('button[aria-label="Pages"][aria-pressed="true"]');
+        await client.clickAriaButtonWithPointer("Pages");
+        if (await client.evaluate(`!!document.querySelector('button[aria-label="Remove Kind Pages"]')`)) throw new Error("The checkbox failed to remove a stored plural filter");
+        await client.clickAriaButtonWithPointer("Pages");
+        await escape();
+        await client.waitForAriaButton("Remove Kind Pages");
+        await client.evaluate(`document.querySelector('input[aria-label="Search and filter studio"]').focus()`);
+        await client.command("Input.insertText", { text: "Offline" });
+        await client.waitForText("Offline mode launch");
+        if (await client.evaluate(`document.querySelector('input[aria-label="Search and filter studio"]').getAttribute('aria-expanded') !== 'false'`)) throw new Error("Ordinary search opened query syntax suggestions");
+        await client.clickAriaButtonWithPointer("Clear search");
+        await client.waitForAriaButton("Remove Kind Pages");
+        await client.clickAriaButtonWithPointer("Options for Kind Pages");
+        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Exclude Pages");
+        const excluded = await client.evaluate(`localStorage.getItem('studio:query:all')`);
+        if (excluded !== '-kind:page') throw new Error(`Exclude produced ${excluded}`);
+        await client.clickAriaButtonWithPointer("Options for Kind Pages");
+        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Include Pages");
+        await client.clickElementWithTextAndPointer('button', "More filters");
+        await client.waitForSelector('[role="dialog"] section[aria-label="Project"]');
+        await client.waitForAriaButton("Orbit");
+        await client.clickAriaButtonWithPointer("Orbit");
+        await escape();
+        await client.waitForAriaButton("Remove Project Orbit");
+        await client.evaluate(`window.prompt = () => 'Launch pages'`);
+        await client.clickAriaButtonWithPointer("Save view");
+        const overview = await pluginRpc("studio", "overview", null);
+        viewId = overview.views.find((view) => view.name === 'Launch pages')?.id;
+        if (!viewId) throw new Error("Save view did not persist the filter query");
+        await client.clickElementWithTextAndPointer('button', "Clear filters");
+        await client.clickElementWithTextAndPointer('button', "Views");
+        await client.clickElementWithTextAndPointer('button', "Launch pages");
+        await client.waitForAriaButton("Remove Project Orbit");
+        await client.waitForAriaButton("Remove Kind Pages");
+        await client.waitForText("Offline mode launch");
+        const layout = await client.evaluate(`(() => { const field = document.querySelector('input[aria-label="Search and filter studio"]'); return { inside: !field.parentElement.querySelector('[aria-label^="Remove "]'), overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
+        if (!layout.inside || layout.overflow) throw new Error(`Invalid filter layout: ${JSON.stringify(layout)}`);
+        await sleep(600);
+      } catch (error) { await cleanup(); throw error; }
+      return cleanup;
+    },
+  })),
   {
     id: "studio-search",
     packageDir: "bb-studio",
