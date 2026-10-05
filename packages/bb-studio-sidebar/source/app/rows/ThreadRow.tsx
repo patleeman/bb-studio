@@ -97,6 +97,7 @@ import {
 } from "./ThreadStatusGlyph.js";
 import { StudioThreadBadge } from "../studio/StudioThreadBadge.js";
 import { useSpaceThreadRow } from "../studio/SpaceThreadRow.js";
+import { useIsSpaceLead } from "../studio/SpaceLead.js";
 
 const SIDEBAR_TITLE_DOUBLE_CLICK_MS = 400;
 
@@ -385,11 +386,13 @@ function ThreadRowComponent({
     actions.open(thread.id, { split: true });
   }, [actions, thread.id]);
   const sectionMove = useThreadSectionMove();
+  const isSpaceLead = useIsSpaceLead(thread);
   const rowActionIds = visibleThreadRowActions(
     useAtomValue(threadRowActionsAtom),
     {
       split: splitAvailable,
       move: canMoveThreadToSection(sectionMove, thread),
+      archive: !isSpaceLead || thread.archivedAt !== null,
     },
   );
   const parentOptions = options.kind === "parent" ? options : null;

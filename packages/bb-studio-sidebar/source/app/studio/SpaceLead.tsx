@@ -16,6 +16,13 @@ export interface SpaceLeadState {
 
 export const SpaceLeadContext = createContext<SpaceLeadState | null>(null);
 
+/** Whether the thread leads its Space. A lead can't be archived until it's demoted. */
+export function useIsSpaceLead(thread: SidebarThread): boolean {
+  const state = useContext(SpaceLeadContext);
+  const spaceId = state?.spaceIdOf(thread) ?? null;
+  return spaceId !== null && state?.leads[spaceId] === thread.id;
+}
+
 /** Make Space lead, or Remove as Space lead, in a thread's menu while By space shows. */
 export function SpaceLeadItem({ thread, surface }: {
   thread: SidebarThread;

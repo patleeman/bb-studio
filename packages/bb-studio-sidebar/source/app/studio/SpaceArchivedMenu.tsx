@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { openAppPath } from "@bb-studio/kit/app";
 import { experimental_useSidebarThreads, type PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { cn } from "@/lib/utils";
@@ -32,36 +32,64 @@ export function spaceArchivedThreads(
     .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
 }
 
+/** How many archived threads the menu lists before asking for a search. */
+export const ARCHIVED_MENU_LIMIT = 10;
+
+/** The archived threads to list for a search: the newest matches, up to the limit. */
+export function searchArchivedThreads(
+  threads: readonly PluginSidebarThread[],
+  query: string,
+  limit = ARCHIVED_MENU_LIMIT,
+): { shown: PluginSidebarThread[]; hidden: number } {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = terms.length
+    ? threads.filter((thread) => {
+      const title = thread.displayTitle.toLowerCase();
+      return terms.every((term) => title.includes(term));
+    })
+    : threads;
+  return { shown: matches.slice(0, limit), hidden: Math.max(0, matches.length - limit) };
+}
+
 /** Loads archived threads only while the menu is open. */
-function ArchivedItems({ space, spaces, spaceOf, activeThreads }: {
+function ArchivedItems({ space, spaces, spaceOf, activeThreads, query }: {
   space: StudioSpace;
   spaces: readonly StudioSpace[];
   spaceOf: Readonly<Record<string, string>>;
   activeThreads: readonly PluginSidebarThread[];
+  query: string;
 }) {
   const state = experimental_useSidebarThreads({ experimental_lifecycles: ["archived"] });
   const archived = useMemo(
     () => spaceArchivedThreads(state.threads, space, spaces, spaceOf, activeThreads),
     [activeThreads, space, spaceOf, spaces, state.threads],
   );
+  const { shown, hidden } = useMemo(() => searchArchivedThreads(archived, query), [archived, query]);
   const more = state.experimental_archived;
+  const searching = query.trim() !== "";
   const loading = state.status === "loading" || more?.status === "loading";
   return (
     <>
-      {archived.map((thread) => (
+      {shown.map((thread) => (
         <DropdownMenuItem key={thread.id} textValue={thread.displayTitle} onSelect={() => openAppPath(thread.href, { main: true })}>
           <span className="min-w-0 flex-1 truncate">{thread.displayTitle}</span>
           {thread.archivedAt ? <span className="shrink-0 text-xs tabular-nums text-subtle-foreground">{compactAge(thread.archivedAt)}</span> : null}
         </DropdownMenuItem>
       ))}
-      {more?.hasNextPage ? (
+      {hidden > 0 ? (
+        <DropdownMenuItem disabled className="text-xs">
+          {searching ? `${hidden} more match${hidden === 1 ? "" : "es"}, refine the search` : "Search to find older threads"}
+        </DropdownMenuItem>
+      ) : searching && more?.hasNextPage ? (
         <DropdownMenuItem disabled={more.isFetchingNextPage} onSelect={(event) => { event.preventDefault(); void more.fetchNextPage(); }}>
-          {more.isFetchingNextPage ? "Loading…" : "Load more"}
+          {more.isFetchingNextPage ? "Searching…" : "Search older threads"}
         </DropdownMenuItem>
       ) : null}
       {state.status === "error" || more?.status === "error" ? <DropdownMenuItem disabled>Couldn't load archived threads</DropdownMenuItem>
         : loading ? <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
-          : !archived.length && !more?.hasNextPage ? <DropdownMenuItem disabled>No archived threads</DropdownMenuItem> : null}
+          : !shown.length && !(searching && more?.hasNextPage)
+            ? <DropdownMenuItem disabled>{searching ? "No matching threads" : "No archived threads"}</DropdownMenuItem>
+            : null}
     </>
   );
 }
@@ -75,8 +103,16 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
   activeThreads: readonly PluginSidebarThread[];
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  // The menu focuses itself on open; the search takes focus after it.
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => searchRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={(next) => { setOpen(next); if (!next) setQuery(""); }}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -88,8 +124,32 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
           <Icon name="Archive" className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-80 w-64 overflow-auto" aria-label={`Archived threads in ${space.name}`}>
-        {open ? <ArchivedItems space={space} spaces={spaces} spaceOf={spaceOf} activeThreads={activeThreads} /> : null}
+      <DropdownMenuContent
+        align="end"
+        className="max-h-80 w-64 overflow-auto"
+        aria-label={`Archived threads in ${space.name}`}
+      >
+        <div className="sticky -top-1 z-10 -mx-1 -mt-1 bg-popover px-1 pt-1 pb-1">
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            placeholder="Search archived threads"
+            aria-label={`Search archived threads in ${space.name}`}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              // Keep typing out of the menu's typeahead; arrow down moves into the list.
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                event.currentTarget.closest("[role=menu]")?.querySelector<HTMLElement>("[role=menuitem]:not([data-disabled])")?.focus();
+              } else if (event.key !== "Escape" && event.key !== "Tab") {
+                event.stopPropagation();
+              }
+            }}
+            className="h-7 w-full rounded-sm border border-input bg-transparent px-2 text-sm outline-none placeholder:text-subtle-foreground focus:border-ring"
+          />
+        </div>
+        {open ? <ArchivedItems space={space} spaces={spaces} spaceOf={spaceOf} activeThreads={activeThreads} query={query} /> : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

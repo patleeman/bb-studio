@@ -51,7 +51,7 @@ import {
 import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
 import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
 import { HideThreadItem } from "../studio/HiddenThreads.js";
-import { SpaceLeadItem } from "../studio/SpaceLead.js";
+import { SpaceLeadItem, useIsSpaceLead } from "../studio/SpaceLead.js";
 import { MoveToSpaceItem } from "../studio/MoveToSpace.js";
 import { useCustomizeThreadRowActions } from "../list/customizeRowActionsContext.js";
 
@@ -448,6 +448,8 @@ export function ThreadRowAction({
   onRename: () => void;
   variant: ThreadRowActionVariant;
 }) {
+  const isLead = useIsSpaceLead(thread);
+  if (id === "archive" && isLead && thread.archivedAt === null) return null;
   if (id === "move") {
     return variant.kind === "menu" ? (
       <ThreadSectionMoveMenu
@@ -598,11 +600,13 @@ function ThreadQuickActionButton({
 
 export function visibleThreadRowActions(
   actionIds: readonly ThreadRowActionId[],
-  available: { split: boolean; move: boolean },
+  available: { split: boolean; move: boolean; archive?: boolean },
 ): ThreadRowActionId[] {
   return actionIds.filter(
     (id) =>
-      (id !== "split" || available.split) && (id !== "move" || available.move),
+      (id !== "split" || available.split) &&
+      (id !== "move" || available.move) &&
+      (id !== "archive" || available.archive !== false),
   );
 }
 

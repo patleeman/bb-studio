@@ -411,6 +411,9 @@ describe("ThreadRow", () => {
     expect(
       visibleThreadRowActions(["split", "move", "archive"], { split: true, move: true }),
     ).toEqual(["split", "move", "archive"]);
+    expect(
+      visibleThreadRowActions(["split", "move", "archive"], { split: true, move: true, archive: false }),
+    ).toEqual(["split", "move"]);
   });
 
   it("offers Move only on rows that can move", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeSidebarThread } from "../testing/fixtures.js";
-import { spaceArchivedThreads } from "./SpaceArchivedMenu.js";
+import { searchArchivedThreads, spaceArchivedThreads } from "./SpaceArchivedMenu.js";
 import type { StudioSpace } from "./space-groups.js";
 
 const spaces: StudioSpace[] = [
@@ -31,5 +31,22 @@ describe("spaceArchivedThreads", () => {
     const parentSpaceOf = { parent: "sp_b" };
     expect(spaceArchivedThreads(archived, spaces[0]!, spaces, parentSpaceOf, [parent]).map((thread) => thread.id)).toEqual(["kid"]);
     expect(spaceArchivedThreads(archived, spaces[1]!, spaces, parentSpaceOf, [parent])).toEqual([]);
+  });
+});
+
+describe("searchArchivedThreads", () => {
+  const threads = Array.from({ length: 12 }, (_, index) =>
+    makeSidebarThread({ id: `t${index}`, title: index % 2 ? `Invoice fix ${index}` : `Plugin audit ${index}`, archivedAt: 100 - index }));
+
+  it("lists only the newest threads until a search", () => {
+    const { shown, hidden } = searchArchivedThreads(threads, "  ");
+    expect(shown.map((thread) => thread.id)).toEqual(threads.slice(0, 10).map((thread) => thread.id));
+    expect(hidden).toBe(2);
+  });
+
+  it("matches every word of the search in the title, ignoring case", () => {
+    expect(searchArchivedThreads(threads, "INVOICE 1", 10).shown.map((thread) => thread.id)).toEqual(["t1", "t11"]);
+    expect(searchArchivedThreads(threads, "audit", 3)).toMatchObject({ hidden: 3 });
+    expect(searchArchivedThreads(threads, "nothing").shown).toEqual([]);
   });
 });
