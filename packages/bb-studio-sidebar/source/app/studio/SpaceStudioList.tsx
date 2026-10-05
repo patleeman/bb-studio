@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { openAppPath, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
@@ -294,6 +294,13 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
   // Closed here until Studio's next list catches up.
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const key = (item: { pluginId: string; id: string }) => `${item.pluginId}:${item.id}`;
+  // Once a list leaves an item out, Studio has it closed; opening it again must show it.
+  useEffect(() => {
+    setClosed((current) => {
+      const still = new Set((items?.open ?? []).map(key).filter((each) => current.has(each)));
+      return still.size === current.size ? current : still;
+    });
+  }, [items]);
   const open = (items?.open ?? []).filter((item) => !closed.has(key(item)));
   const total = items?.count ?? 0;
   const close = (item: SpaceItems["open"][number]) => {
