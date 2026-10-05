@@ -13,7 +13,7 @@ import {
 import type { TalkRpcContract } from "../shared/contract";
 import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, holdKeyCode, tail } from "../shared/format";
 import { Icon } from "@bb-studio/kit/ui";
-import { useOpenCompanion } from "@bb-studio/kit/app";
+import { openAppPath, useOpenCompanion } from "@bb-studio/kit/app";
 import { cn } from "@bb-studio/kit/ui";
 import { talk, useTalkState, type TalkState } from "./controller";
 import { useDraggable } from "./draggable";
@@ -40,7 +40,8 @@ function useControllerWiring(): void {
     });
   }, [values]);
   useEffect(() => talk.setContext({ projectId, threadId }), [projectId, threadId]);
-  // Studio's "New recording": start one in the chosen project and open its page.
+  // Studio's "New recording": start one in the chosen project and open its page
+  // in the main pane, where the sidebar opens every other new item.
   useEffect(() => {
     const onNew = (event: Event) => {
       event.preventDefault();
@@ -48,12 +49,12 @@ function useControllerWiring(): void {
       const projectId = typeof detail?.projectId === "string" ? detail.projectId : null;
       void talk.startRecording("recording", null, null, { projectId }).then(() => {
         const { recordingId, phase } = talk.getState();
-        if (recordingId && phase !== "idle") open({ kind: "path", path: `/plugins/talk/${PANEL_PATH}/${recordingId}` });
+        if (recordingId && phase !== "idle") openAppPath(`/plugins/talk/${PANEL_PATH}/${recordingId}`, { main: true });
       });
     };
     window.addEventListener(NEW_RECORDING_EVENT, onNew);
     return () => window.removeEventListener(NEW_RECORDING_EVENT, onNew);
-  }, [open]);
+  }, []);
   useRealtime(RECORDING_CHANGED, (payload) => {
     const id = (payload as { id?: unknown } | null)?.id;
     if (typeof id === "string") void talk.refresh(id);
