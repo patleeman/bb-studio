@@ -180,9 +180,9 @@ export function useStudioSpaces(): StudioSpacesState {
 }
 
 /**
- * Loads Studio's Spaces. Outside By space it only checks they exist, for the
- * Organize menu; in By space it also loads each thread's Space, each Space's
- * lead, and each Space's Studio items. A Studio without Spaces leaves the state unavailable.
+ * Loads Studio's Spaces and each Space's lead in every mode: the Organize
+ * menu needs the Spaces and archive needs the leads. In By space it also
+ * loads each thread's Space and each Space's Studio items. A Studio without Spaces leaves the state unavailable.
  */
 export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): void {
   const sdk = useSdk();
@@ -206,23 +206,25 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
         let leads: Record<string, string | null> = {};
         let heartbeats: Record<string, string | null> = {};
         let items: Record<string, SpaceItems> = {};
+        // Leads load in every mode: a lead can't be archived from any view.
+        const leadsLoad = Promise.all(spaces.map((space) => call("space_lead", { spaceId: space.id }, leadSchema)
+          .then((lead) => [space.id, lead] as const, () => [space.id, null] as const)));
         if (spaceMode) {
-          const [of, leadRows, tree] = await Promise.all([
+          const [of, tree] = await Promise.all([
             call("space_of_threads", {}, spaceOfSchema),
-            Promise.all(spaces.map((space) => call("space_lead", { spaceId: space.id }, leadSchema)
-              .then((lead) => [space.id, lead] as const, () => [space.id, null] as const))),
             // Items are a nicety: a failure leaves the lists empty, not the sidebar.
             call("spaceTree", {}, treeSchema).catch(() => ({ spaces: [] })),
           ]);
           spaceOf = withPendingSpaceMoves(of.threads, loadSeq);
-          leads = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null]));
-          heartbeats = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId && lead.run?.enabled ? lead.run.cadence : null]));
           items = Object.fromEntries(tree.spaces.map((space) => [space.id, {
             open: space.open.map(({ pluginId, id, title, icon, kindIcon, href, pinned, kindLabel, updatedAt, preview }) => ({ pluginId, id, title, icon, kindIcon, href, pinned, kindLabel, updatedAt, preview })),
             all: space.items.map(({ pluginId, id, title, icon, kindIcon, href, updatedAt }) => ({ pluginId, id, title, icon, kindIcon, href, updatedAt })),
             count: space.itemCount,
           }]));
         }
+        const leadRows = await leadsLoad;
+        leads = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null]));
+        heartbeats = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId && lead.run?.enabled ? lead.run.cadence : null]));
         const list = spaces.map(({ id, name, color, icon, defaultProjectId, isDefault, projectIds }) => ({ id, name, color, icon, defaultProjectId, isDefault, projectIds }));
         if (active) setState({ status: "ready", spaces: list, spaceOf, leads, heartbeats, items, threadsLoaded: spaceMode });
       } catch (error) {

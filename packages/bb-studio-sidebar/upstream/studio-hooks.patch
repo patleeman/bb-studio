@@ -373,6 +373,28 @@ index afa82d9..5226b31 100644
 +      {projectCreation.dialog}
 @@ -1861,0 +2028 @@ function ProjectListComponent({
 +    </HiddenThreadsProvider>
+diff --git a/source/app/list/ProjectRow.tsx b/source/app/list/ProjectRow.tsx
+index 11c1c06..dd79bb7 100644
+--- a/source/app/list/ProjectRow.tsx
++++ b/source/app/list/ProjectRow.tsx
+@@ -60,0 +61,2 @@ import { getMutationErrorMessage } from "../ui/mutation-errors.js";
++import { isSpaceLeadThread, leadSafeArchiveIds } from "../studio/SpaceLead.js";
++import { studioSpacesAtom } from "../studio/studioSpaces.js";
+@@ -709,0 +712 @@ function useArchiveEnvironmentThreadGroupAction({
++  const studioSpaces = useAtomValue(studioSpacesAtom);
+@@ -713,2 +716,7 @@ function useArchiveEnvironmentThreadGroupAction({
+-    void sdk.environments
+-      .archiveThreads({ environmentId })
++    // A Space lead stays: archive the rest one by one instead of the whole environment.
++    const leadSafe = leadSafeArchiveIds(threads, (threadId) => isSpaceLeadThread(studioSpaces, threadId));
++    const archive = leadSafe === null
++      ? sdk.environments.archiveThreads({ environmentId })
++      : Promise.all(leadSafe.map((threadId) => sdk.threads.archive({ threadId })))
++        .then((results) => ({ archivedThreadIds: results.flatMap((result) => result.archivedThreadIds) }));
++    void archive
+@@ -738 +746 @@ function useArchiveEnvironmentThreadGroupAction({
+-  }, [environmentId, navigate, projectId, sdk, selectedThreadId, threads]);
++  }, [environmentId, navigate, projectId, sdk, selectedThreadId, studioSpaces, threads]);
 diff --git a/source/app/list/SidebarHeaderControls.tsx b/source/app/list/SidebarHeaderControls.tsx
 index ec076ad..f48ba59 100644
 --- a/source/app/list/SidebarHeaderControls.tsx

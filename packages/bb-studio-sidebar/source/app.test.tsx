@@ -184,6 +184,32 @@ describe("thread-list plugin", () => {
     expect(document.querySelector("[data-sidebar-hidden-threads=pinned]")).toBeNull();
   });
 
+  it.each(["project", "chronological"] as const)("keeps Archive off a Space lead outside By space (%s)", async (organizationMode) => {
+    const studioCalls: string[] = [];
+    renderList({ organizationMode, rowActions: ["archive"] }, {
+      sdk: { plugins: {
+        callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
+          if (pluginId !== "studio") return {} as never;
+          studioCalls.push(method);
+          if (method === "spaces") return { spaces: [{ id: "sp_alpha", name: "Alpha", color: "#f00", icon: null, isDefault: true, defaultProjectId: null, projectIds: [] }] } as never;
+          if (method === "space_lead") return { leadThreadId: (input as { spaceId: string }).spaceId === "sp_alpha" ? "thr_parent" : null, run: null } as never;
+          return {} as never;
+        },
+      } },
+    });
+    await screen.findByText("Parent thread");
+    const row = (id: string) => document.querySelector(`[data-sidebar-thread-id="${id}"]`)!.closest("[data-sidebar-rename-row]") as HTMLElement;
+    await waitFor(() => expect(within(row("thr_parent")).queryByRole("button", { name: "Archive thread" })).toBeNull());
+    expect(studioCalls).not.toContain("space_of_threads");
+    expect(within(row("thr_later")).getByRole("button", { name: "Archive thread" })).not.toBeNull();
+    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_parent"]')!);
+    expect(await screen.findByRole("menuitem", { name: "Hide" })).not.toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Archive" })).toBeNull();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_later"]')!);
+    expect(await screen.findByRole("menuitem", { name: "Archive" })).not.toBeNull();
+  });
+
   it("shows one Space at a time, with its lead on top and dots to switch", async () => {
     localStorage.removeItem("bb-studio:sidebar-organization");
     const threads = [

@@ -1,5 +1,5 @@
 diff --git a/source/app.test.tsx b/source/app.test.tsx
-index 4d15df5..c477bb5 100644
+index 4d15df5..5f7c6d5 100644
 --- a/source/app.test.tsx
 +++ b/source/app.test.tsx
 @@ -4,0 +5 @@ import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,7 @@ index 4d15df5..c477bb5 100644
 @@ -145,0 +151,2 @@ afterEach(() => {
 +  getDefaultStore().set(studioSpacesAtom, { status: "loading" });
 +  resetCommandInstalledForTest();
-@@ -150,0 +158,190 @@ describe("thread-list plugin", () => {
+@@ -150,0 +158,216 @@ describe("thread-list plugin", () => {
 +  it("hides a thread from its row's menu, with Show and Unhide", async () => {
 +    const { rpcCalls } = renderList({ organizationMode: "project" });
 +    await screen.findByText("Later thread");
@@ -44,6 +44,32 @@ index 4d15df5..c477bb5 100644
 +    const app = screen.getByTitle("App").closest("[data-sidebar-sticky-group]") as HTMLElement;
 +    expect(app.querySelector('[data-sidebar-hidden-threads="project:proj_app"]')?.textContent).toContain("2 hidden");
 +    expect(document.querySelector("[data-sidebar-hidden-threads=pinned]")).toBeNull();
++  });
++
++  it.each(["project", "chronological"] as const)("keeps Archive off a Space lead outside By space (%s)", async (organizationMode) => {
++    const studioCalls: string[] = [];
++    renderList({ organizationMode, rowActions: ["archive"] }, {
++      sdk: { plugins: {
++        callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) => {
++          if (pluginId !== "studio") return {} as never;
++          studioCalls.push(method);
++          if (method === "spaces") return { spaces: [{ id: "sp_alpha", name: "Alpha", color: "#f00", icon: null, isDefault: true, defaultProjectId: null, projectIds: [] }] } as never;
++          if (method === "space_lead") return { leadThreadId: (input as { spaceId: string }).spaceId === "sp_alpha" ? "thr_parent" : null, run: null } as never;
++          return {} as never;
++        },
++      } },
++    });
++    await screen.findByText("Parent thread");
++    const row = (id: string) => document.querySelector(`[data-sidebar-thread-id="${id}"]`)!.closest("[data-sidebar-rename-row]") as HTMLElement;
++    await waitFor(() => expect(within(row("thr_parent")).queryByRole("button", { name: "Archive thread" })).toBeNull());
++    expect(studioCalls).not.toContain("space_of_threads");
++    expect(within(row("thr_later")).getByRole("button", { name: "Archive thread" })).not.toBeNull();
++    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_parent"]')!);
++    expect(await screen.findByRole("menuitem", { name: "Hide" })).not.toBeNull();
++    expect(screen.queryByRole("menuitem", { name: "Archive" })).toBeNull();
++    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
++    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_later"]')!);
++    expect(await screen.findByRole("menuitem", { name: "Archive" })).not.toBeNull();
 +  });
 +
 +  it("shows one Space at a time, with its lead on top and dots to switch", async () => {
@@ -207,7 +233,7 @@ index 4d15df5..c477bb5 100644
 +      unregister();
 +    }
 +  });
-@@ -303,0 +501,15 @@ describe("thread-list plugin", () => {
+@@ -303,0 +527,15 @@ describe("thread-list plugin", () => {
 +  it("opens the New project dialog from Threads", async () => {
 +    setPreferencesMirrorStorageForTest(null);
 +    renderList({ organizationMode: "project" }, {

@@ -58,6 +58,8 @@ import {
   ConfirmDeleteDialogContent,
 } from "../ui/ConfirmDeleteDialog.js";
 import { getMutationErrorMessage } from "../ui/mutation-errors.js";
+import { isSpaceLeadThread, leadSafeArchiveIds } from "../studio/SpaceLead.js";
+import { studioSpacesAtom } from "../studio/studioSpaces.js";
 import { useSidebarRename, useSidebarRenameState } from "../rows/SidebarInlineRename.js";
 import { Button } from "@/components/ui/button";
 import {
@@ -707,11 +709,17 @@ function useArchiveEnvironmentThreadGroupAction({
 }: UseArchiveEnvironmentThreadGroupActionArgs): UseArchiveEnvironmentThreadGroupActionResult {
   const navigate = useBbNavigate();
   const sdk = useSdk();
+  const studioSpaces = useAtomValue(studioSpacesAtom);
   const [archiveThreadsPending, setArchiveThreadsPending] = useState(false);
   const onArchiveThreads = useCallback(() => {
     setArchiveThreadsPending(true);
-    void sdk.environments
-      .archiveThreads({ environmentId })
+    // A Space lead stays: archive the rest one by one instead of the whole environment.
+    const leadSafe = leadSafeArchiveIds(threads, (threadId) => isSpaceLeadThread(studioSpaces, threadId));
+    const archive = leadSafe === null
+      ? sdk.environments.archiveThreads({ environmentId })
+      : Promise.all(leadSafe.map((threadId) => sdk.threads.archive({ threadId })))
+        .then((results) => ({ archivedThreadIds: results.flatMap((result) => result.archivedThreadIds) }));
+    void archive
       .then((response) => {
         toast.success(
           formatArchivedEnvironmentThreadsToastTitle({
@@ -735,7 +743,7 @@ function useArchiveEnvironmentThreadGroupAction({
         );
       })
       .finally(() => setArchiveThreadsPending(false));
-  }, [environmentId, navigate, projectId, sdk, selectedThreadId, threads]);
+  }, [environmentId, navigate, projectId, sdk, selectedThreadId, studioSpaces, threads]);
 
   return {
     archiveThreadsPending,

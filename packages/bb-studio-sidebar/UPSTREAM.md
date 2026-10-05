@@ -42,7 +42,8 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/app/list/useSidebarModeSectionOrder.ts` | Leave By space out of the stored section orders; it follows Studio's order. |
 | `source/app/model/sidebar-section-id.ts`, `sidebar-section-order.ts`, and `source/app/dnd/useSectionThreadDnd.ts` (group ids) | Accept `space:` section ids. |
 | `source/app/dnd/useSectionThreadDnd.ts` (group move) | Let By space move threads dropped on a Space's section, heading or dot into that Space through Studio. |
-| `source/app/rows/ThreadActionsMenu.tsx` | Insert Float after Open in split, and Move to Space beside Move. |
+| `source/app/list/ProjectRow.tsx` | An environment's Archive threads leaves a Space lead and its ancestors, archiving the rest one by one. |
+| `source/app/rows/ThreadActionsMenu.tsx` | Insert Float after Open in split, and Move to Space beside Move; drop Archive from a Space lead in every organization. |
 | `source/app/rows/ThreadRow.tsx` | Show a Studio app's badge, such as a bot's avatar, and the automated thread mark before the title; in By space, draw the two-line row (status dot, age, latest line) from `studio/SpaceThreadRow.tsx`. |
 
 The restored upstream tests have import path changes for the relocated
