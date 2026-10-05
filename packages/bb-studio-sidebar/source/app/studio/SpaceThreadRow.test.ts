@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeSidebarThread } from "../testing/fixtures.js";
-import { compactAge, SPACE_THREAD_DOT, SPACE_THREAD_TITLE, spaceThreadState } from "./SpaceThreadRow.js";
+import { compactAge, SPACE_THREAD_DOT, SPACE_THREAD_PILL, SPACE_THREAD_TITLE, spaceThreadState } from "./SpaceThreadRow.js";
 import { threadLineIds, THREAD_LINES_LIMIT } from "./useThreadLines.js";
 
 describe("By space rows", () => {
@@ -23,6 +23,8 @@ describe("By space rows", () => {
     }
     expect(SPACE_THREAD_TITLE.idle).toContain("text-muted-foreground");
     expect(SPACE_THREAD_DOT.idle.className).toBe("invisible");
+    expect([SPACE_THREAD_PILL["needs-you"]?.label, SPACE_THREAD_PILL.error?.label, SPACE_THREAD_PILL.unread?.label]).toEqual(["Needs you", "Failed", "Done"]);
+    expect([SPACE_THREAD_PILL.working, SPACE_THREAD_PILL.idle]).toEqual([null, null]);
   });
 
   it("writes a compact age", () => {

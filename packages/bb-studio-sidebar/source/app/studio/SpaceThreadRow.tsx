@@ -39,6 +39,18 @@ export const SPACE_THREAD_TITLE: Record<SpaceThreadState, string | null> = {
   idle: "[&_.bb-thread-title]:text-muted-foreground",
 };
 
+/**
+ * A thread that waits on you swaps its age for a filled pill that says why:
+ * the time doesn't matter until you've opened it.
+ */
+export const SPACE_THREAD_PILL: Record<SpaceThreadState, { className: string; label: string } | null> = {
+  "needs-you": { className: "bg-warning text-neutral-950", label: "Needs you" },
+  error: { className: "bg-destructive text-white", label: "Failed" },
+  unread: { className: "bg-blue-500 text-white", label: "Done" },
+  working: null,
+  idle: null,
+};
+
 /** "now", "5m", "3h", "2d", "3w", "4mo" or "1y" since `at`. */
 export function compactAge(at: number, now = Date.now()): string {
   const minutes = Math.floor(Math.max(0, now - at) / 60_000);
@@ -81,14 +93,14 @@ export interface SpaceThreadRow {
   style: CSSProperties | undefined;
   /** The status dot before the title; it replaces BB's status glyph. */
   dot: ReactNode;
-  /** The relative time where BB shows the status glyph, or a Done pill on an unread result. */
+  /** The relative time where BB shows the status glyph, or a pill when the thread waits on you. */
   time: ReactNode;
   /** The latest line under the title, or a blank one until it loads. */
   line: ReactNode;
 }
 
 /**
- * By space's two-line row: a status dot, the title and its age (or Done) on line one,
+ * By space's two-line row: a status dot, the title and its age (or a pill) on line one,
  * the thread's latest line, muted, on line two. The line wraps onto its own
  * row of the flex container and ignores the pointer, so a click on it opens
  * the thread like the rest of the row. A thread with no line yet, such as one
@@ -104,13 +116,13 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
     className: cn("h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto", SPACE_THREAD_TITLE[state]),
     style: { rowGap: 0 },
     dot: <SpaceThreadDot state={state} />,
-    time: state === "unread" ? (
+    time: SPACE_THREAD_PILL[state] ? (
       <span
-        data-space-thread-done=""
+        data-space-thread-pill={state}
         className="absolute inset-y-0 right-1 flex items-center"
       >
-        <span className="rounded-full bg-blue-500 px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide text-white">
-          Done
+        <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide", SPACE_THREAD_PILL[state].className)}>
+          {SPACE_THREAD_PILL[state].label}
         </span>
       </span>
     ) : (

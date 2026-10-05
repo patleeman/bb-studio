@@ -268,9 +268,9 @@ describe("thread-list plugin", () => {
     expect(row("thr_busy").querySelector("[data-space-thread-dot]")?.getAttribute("data-space-thread-dot")).toBe("working");
     expect(row("thr_parent").querySelector("[data-space-thread-dot]")?.getAttribute("data-space-thread-dot")).toBe("unread");
     expect(row("thr_parent").querySelector("[data-space-thread-line]")).toBeNull();
-    // An unread result swaps its age for a Done pill; a read thread keeps its age.
+    // A thread that waits on you swaps its age for a pill; the rest keep their age.
     expect(row("thr_parent").querySelector("[data-space-thread-time]")).toBeNull();
-    expect(row("thr_parent").querySelector("[data-space-thread-done]")?.textContent).toBe("Done");
+    expect(row("thr_parent").querySelector("[data-space-thread-pill=unread]")?.textContent).toBe("Done");
     expect(row("thr_busy").querySelector("[data-space-thread-time]")?.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
     expect(row("thr_parent").querySelector("[data-sidebar-thread-trailing-indicator]")).toBeNull();
     // The heading is plain: ⋯ has the Space's actions.
@@ -309,6 +309,7 @@ describe("thread-list plugin", () => {
     expect(threadIds().filter((id) => id !== "thr_pinned")).toEqual(["thr_ask", "thr_later"]);
     expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.parentElement?.querySelector("[data-sidebar-needs-you]")).not.toBeNull();
     expect(document.querySelectorAll("[data-sidebar-needs-you]")).toHaveLength(1);
+    expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.closest("[data-sidebar-rename-row]")?.querySelector("[data-space-thread-pill=needs-you]")?.textContent).toBe("Needs you");
     // Beta has no Studio items, so its Studio starts collapsed.
     expect(screen.queryByText("No items")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand Studio" }));
