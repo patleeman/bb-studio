@@ -32,7 +32,7 @@ export function spaceArchivedThreads(
     .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
 }
 
-/** How many archived threads the menu lists before asking for a search. */
+/** How many archived threads the menu lists at first, and how many more each Load more adds. */
 export const ARCHIVED_MENU_LIMIT = 10;
 
 /** The archived threads to list for a search: the newest matches, up to the limit. */
@@ -52,19 +52,21 @@ export function searchArchivedThreads(
 }
 
 /** Loads archived threads only while the menu is open. */
-function ArchivedItems({ space, spaces, spaceOf, activeThreads, query }: {
+function ArchivedItems({ space, spaces, spaceOf, activeThreads, query, limit, onLoadMore }: {
   space: StudioSpace;
   spaces: readonly StudioSpace[];
   spaceOf: Readonly<Record<string, string>>;
   activeThreads: readonly PluginSidebarThread[];
   query: string;
+  limit: number;
+  onLoadMore: () => void;
 }) {
   const state = experimental_useSidebarThreads({ experimental_lifecycles: ["archived"] });
   const archived = useMemo(
     () => spaceArchivedThreads(state.threads, space, spaces, spaceOf, activeThreads),
     [activeThreads, space, spaceOf, spaces, state.threads],
   );
-  const { shown, hidden } = useMemo(() => searchArchivedThreads(archived, query), [archived, query]);
+  const { shown, hidden } = useMemo(() => searchArchivedThreads(archived, query, limit), [archived, limit, query]);
   const more = state.experimental_archived;
   const searching = query.trim() !== "";
   const loading = state.status === "loading" || more?.status === "loading";
@@ -76,18 +78,22 @@ function ArchivedItems({ space, spaces, spaceOf, activeThreads, query }: {
           {thread.archivedAt ? <span className="shrink-0 text-xs tabular-nums text-subtle-foreground">{compactAge(thread.archivedAt)}</span> : null}
         </DropdownMenuItem>
       ))}
-      {hidden > 0 ? (
-        <DropdownMenuItem disabled className="text-xs">
-          {searching ? `${hidden} more match${hidden === 1 ? "" : "es"}, refine the search` : "Search to find older threads"}
-        </DropdownMenuItem>
-      ) : searching && more?.hasNextPage ? (
-        <DropdownMenuItem disabled={more.isFetchingNextPage} onSelect={(event) => { event.preventDefault(); void more.fetchNextPage(); }}>
-          {more.isFetchingNextPage ? "Searching…" : "Search older threads"}
+      {hidden > 0 || more?.hasNextPage ? (
+        <DropdownMenuItem
+          disabled={more?.isFetchingNextPage}
+          onSelect={(event) => {
+            event.preventDefault();
+            onLoadMore();
+            // Everything loaded is on show: fetch the next page of archived threads.
+            if (hidden === 0) void more?.fetchNextPage();
+          }}
+        >
+          {more?.isFetchingNextPage ? "Loading…" : "Load more"}
         </DropdownMenuItem>
       ) : null}
       {state.status === "error" || more?.status === "error" ? <DropdownMenuItem disabled>Couldn't load archived threads</DropdownMenuItem>
         : loading ? <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
-          : !shown.length && !(searching && more?.hasNextPage)
+          : !shown.length && !more?.hasNextPage
             ? <DropdownMenuItem disabled>{searching ? "No matching threads" : "No archived threads"}</DropdownMenuItem>
             : null}
     </>
@@ -104,6 +110,7 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(ARCHIVED_MENU_LIMIT);
   const searchRef = useRef<HTMLInputElement>(null);
   // The menu focuses itself on open; the search takes focus after it.
   useEffect(() => {
@@ -112,7 +119,7 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
     return () => cancelAnimationFrame(frame);
   }, [open]);
   return (
-    <DropdownMenu open={open} onOpenChange={(next) => { setOpen(next); if (!next) setQuery(""); }}>
+    <DropdownMenu open={open} onOpenChange={(next) => { setOpen(next); if (!next) { setQuery(""); setLimit(ARCHIVED_MENU_LIMIT); } }}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -136,7 +143,7 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
             value={query}
             placeholder="Search archived threads"
             aria-label={`Search archived threads in ${space.name}`}
-            onChange={(event) => setQuery(event.currentTarget.value)}
+            onChange={(event) => { setQuery(event.currentTarget.value); setLimit(ARCHIVED_MENU_LIMIT); }}
             onKeyDown={(event) => {
               // Keep typing out of the menu's typeahead; arrow down moves into the list.
               if (event.key === "ArrowDown") {
@@ -149,7 +156,7 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
             className="h-7 w-full rounded-sm border border-input bg-transparent px-2 text-sm outline-none placeholder:text-subtle-foreground focus:border-ring"
           />
         </div>
-        {open ? <ArchivedItems space={space} spaces={spaces} spaceOf={spaceOf} activeThreads={activeThreads} query={query} /> : null}
+        {open ? <ArchivedItems space={space} spaces={spaces} spaceOf={spaceOf} activeThreads={activeThreads} query={query} limit={limit} onLoadMore={() => setLimit((current) => current + ARCHIVED_MENU_LIMIT)} /> : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
