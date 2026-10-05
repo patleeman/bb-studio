@@ -29,6 +29,7 @@ public enum BotTeams {
     public static let command = "command"
     public static let commandFeed = "commandFeed"
     public static let commandSend = "commandSend"
+    public static let commandFocus = "commandFocus"
   }
 
   public typealias CreateBotSetupThread = CreateBotSetupThreadOutput
@@ -94,6 +95,8 @@ public enum BotTeams {
   public typealias CommandFeed = CommandFeedOutput
 
   public typealias CommandSend = CommandSendOutput
+
+  public typealias CommandFocus = CommandFocusOutput
 
   public enum CreateBotSetupThreadInputReasoningLevel: Sendable, Hashable, Codable {
     case none
@@ -3231,6 +3234,22 @@ public enum BotTeams {
 
     public init(deliveries: [CommandSendOutputDeliveriesItem]? = nil) {
       self.deliveries = deliveries
+    }
+  }
+
+  public struct CommandFocusInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct CommandFocusOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 }
