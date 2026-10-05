@@ -9,6 +9,8 @@ enum Route: Hashable {
     case automation(Automation)
     case usage
     case archived
+    /// A Space's archived threads.
+    case spaceArchived(id: String)
     case drawings
     case drawing(id: String)
     case recording(id: String)
@@ -69,6 +71,12 @@ final class AppModel: ObservableObject {
     @Published var studioKind: String?
     /// The Studio tab's space filter; nil for every space.
     @Published var studioSpace: String?
+    /// The Space Home shows in By space: a Space id, `all`, or nil to follow the web sidebar's.
+    @Published var homeSpace: String? {
+        didSet { UserDefaults.standard.set(homeSpace, forKey: ServerScope.key("homeSpace", serverURL: serverURL)) }
+    }
+    /// The project New Thread starts in, set by a Space's New Thread Here.
+    @Published var newThreadSpace: String?
     @Published var sheet: Sheet?
     @Published var notificationError: String?
     /// Opens the new-thread composer, optionally prefilled.
@@ -86,6 +94,7 @@ final class AppModel: ObservableObject {
         let client = BBClient()
         self.client = client
         realtime = BBRealtime(client: client)
+        homeSpace = UserDefaults.standard.string(forKey: ServerScope.key("homeSpace", serverURL: client.baseURL))
         // Started when the scene becomes active, so a background launch (a watch
         // relay, a Live Activity token) doesn't open a socket.
         realtime.subscribeThreadList()
@@ -112,6 +121,7 @@ final class AppModel: ObservableObject {
         sheet = nil
         realtime.stop()
         client = BBClient(baseURL: url)
+        homeSpace = UserDefaults.standard.string(forKey: ServerScope.key("homeSpace", serverURL: url))
         realtime = BBRealtime(client: client)
         realtime.start()
         realtime.subscribeThreadList()
@@ -120,6 +130,7 @@ final class AppModel: ObservableObject {
         studioPath = []
         lastThreadId = ""
         newThreadDraft = nil
+        newThreadSpace = nil
         replyThreadId = nil
         Outbox.shared.flush()
         TalkOutbox.shared.kick()
@@ -167,7 +178,7 @@ final class AppModel: ObservableObject {
         case "pages": openStudio(kind: "page")
         case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
-        case "space": if let id { openStudio(space: id) }
+        case "space": if let id { openSpace(id) }
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
@@ -181,9 +192,18 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func newThread(text: String = "") {
+    /// `space` starts it in that Space's project and puts it in the Space.
+    func newThread(text: String = "", space: String? = nil) {
         tab = .inbox
+        newThreadSpace = space
         newThreadDraft = text
+    }
+
+    /// Home, showing the Space: its lead, open items and threads.
+    func openSpace(_ id: String) {
+        tab = .inbox
+        path = []
+        homeSpace = id
     }
 
     func openThread(_ id: String) {

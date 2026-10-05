@@ -15,6 +15,10 @@ struct NewThreadView: View {
     @State private var dictating = false
     @State private var creating = false
     @State private var error: String?
+    /// Studio's Spaces; empty without Studio.
+    @State private var spaces: [StudioSpace] = []
+    /// The Space the thread goes in; empty for its project's.
+    @State private var spaceId: String
 
     // Execution options. Empty means the project default.
     @State private var defaults: ExecutionChoice?
@@ -24,15 +28,26 @@ struct NewThreadView: View {
     @State private var reasoning = ""
     @State private var permissionMode = ""
 
-    init(text: String = "") {
+    init(text: String = "", spaceId: String? = nil) {
         _text = State(initialValue: text)
+        _spaceId = State(initialValue: spaceId ?? "")
     }
+
+    private var space: StudioSpace? { spaces.first { $0.id == spaceId } }
 
     var body: some View {
         NavigationStack {
             Form {
-                Picker("Project", selection: $projectId) {
-                    ForEach(projects) { Text($0.name).tag($0.id) }
+                Section {
+                    if spaces.count > 1 {
+                        Picker("Space", selection: $spaceId) {
+                            Text("Project's Space").tag("")
+                            ForEach(spaces) { Text($0.label).tag($0.id) }
+                        }
+                    }
+                    Picker("Project", selection: $projectId) {
+                        ForEach(projects) { Text($0.name).tag($0.id) }
+                    }
                 }
                 Section("Workspace") {
                     Picker("Use", selection: $workspace) {
@@ -97,8 +112,16 @@ struct NewThreadView: View {
                 DictationView(threadId: nil, autoStart: true) { text += (text.isEmpty ? "" : " ") + $0 }
             }
             .task {
+                async let listed = try? client.studioSpaces()
                 projects = (try? await client.projects()) ?? []
+                spaces = await listed ?? []
+                if !spaceId.isEmpty, space == nil { spaceId = "" }
+                // A Space's new threads start in its default project, as its + does on the web.
+                if let project = space?.defaultProjectId, projects.contains(where: { $0.id == project }) { projectId = project }
                 if !projects.contains(where: { $0.id == projectId }) { projectId = projects.first?.id ?? "" }
+            }
+            .onChange(of: spaceId) {
+                if let project = space?.defaultProjectId, projects.contains(where: { $0.id == project }) { projectId = project }
             }
             .task(id: projectId) {
                 guard !projectId.isEmpty else { return }
@@ -169,6 +192,7 @@ struct NewThreadView: View {
                 let text = self.text
                 let attachments = self.attachments
                 let selectedWorkspace = self.selectedWorkspace
+                let space = self.space
                 let choice = ExecutionChoice(
                     providerId: providerId.isEmpty ? nil : providerId,
                     model: modelId.isEmpty ? nil : modelId,
@@ -178,6 +202,10 @@ struct NewThreadView: View {
                 let thread = try await client.createThread(
                     projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
                     options: choice, workspace: selectedWorkspace)
+                // A thread is in its project's Space unless added to another.
+                if let space, !space.projectIds.contains(projectId) {
+                    try? await client.moveThreads([thread.id], toSpace: space.id)
+                }
                 return thread
             }, completion: { thread in
                 dismiss()

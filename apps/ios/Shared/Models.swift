@@ -398,18 +398,27 @@ public struct SidebarBootstrap: Codable, Sendable {
     public var personalProject: ProjectThreads
 }
 
-/// The web sidebar's layout choices (thread-list plugin `listPreferences`).
+/// The web sidebar's layout choices (`listPreferences` of Studio Sidebar, or BB's Thread List).
 public struct SidebarPreferences: Codable, Hashable, Sendable {
-    /// `chronological`, `project` or `machine`.
+    /// `chronological`, `project`, `machine`, or `space` (Studio Sidebar's By space).
     public var organizationMode: String?
     /// `pinned`, `project:<id>` and `threads`, in the user's order.
     public var sectionOrder: [String]?
     public var collapsedProjects: [String]?
+    /// Studio Sidebar: the Space By space shows, `all`, or nil for the default Space.
+    public var currentSpace: String?
+    /// Studio Sidebar: threads hidden from every section unless pinned, open, or a Space's lead.
+    public var hiddenThreads: [String]?
 
-    public init(organizationMode: String? = nil, sectionOrder: [String]? = nil, collapsedProjects: [String]? = nil) {
+    public init(
+        organizationMode: String? = nil, sectionOrder: [String]? = nil, collapsedProjects: [String]? = nil,
+        currentSpace: String? = nil, hiddenThreads: [String]? = nil
+    ) {
         self.organizationMode = organizationMode
         self.sectionOrder = sectionOrder
         self.collapsedProjects = collapsedProjects
+        self.currentSpace = currentSpace
+        self.hiddenThreads = hiddenThreads
     }
 }
 

@@ -1,8 +1,11 @@
 import SwiftUI
 
-/// Archived threads, newest first, with swipe to restore.
+/// Archived threads, newest first, with swipe to restore; with `spaceId`, only that Space's.
 struct ArchivedView: View {
+    var spaceId: String?
     @EnvironmentObject private var app: AppModel
+    /// Which Space each thread is in, for `spaceId`.
+    @State private var assignment: SpaceAssignment?
     @State private var threads: [ThreadEntry] = []
     @State private var loaded = false
     @State private var more = true
@@ -55,18 +58,32 @@ struct ArchivedView: View {
             }
         }
         .searchable(text: $query, prompt: "Search loaded threads")
-        .navigationTitle("Archived")
+        .navigationTitle(spaceId == nil ? "Archived" : "Archived in \(spaceName)")
         .refreshable { await load() }
         .task { if !loaded { await load() } }
         .sensoryFeedback(.success, trigger: done)
     }
 
+    private var spaceName: String {
+        assignment?.spaces.first { $0.id == spaceId }?.name ?? "Space"
+    }
+
     private var shown: [ThreadEntry] {
-        query.isEmpty ? threads : threads.filter { $0.displayTitle.localizedCaseInsensitiveContains(query) }
+        var list = threads
+        if let spaceId, let assignment {
+            let byId = Dictionary(threads.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            list = list.filter { assignment.spaceId(of: $0, among: byId) == spaceId }
+        }
+        return query.isEmpty ? list : list.filter { $0.displayTitle.localizedCaseInsensitiveContains(query) }
     }
 
     private func load(more: Bool = false) async {
         do {
+            if spaceId != nil, !more || assignment == nil {
+                async let spaces = app.client.studioSpaces()
+                async let spaceOf = app.client.spaceOfThreads()
+                assignment = try await SpaceAssignment(spaces: spaces, spaceOf: spaceOf)
+            }
             let page = try await app.client.archivedThreads(limit: Self.page, offset: more ? threads.count : 0)
             if more {
                 let seen = Set(threads.map(\.id))

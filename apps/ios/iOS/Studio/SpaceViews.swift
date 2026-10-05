@@ -64,7 +64,7 @@ struct SpaceSettingsSheet: View {
                 } footer: {
                     Text("New items and threads made in the space go to this project.")
                 }
-                if let current, !isNew {
+                if let current, !isNew, !current.isDefault {
                     Section {
                         Button("Delete Space", role: .destructive) { confirmingDelete = true }.disabled(busy)
                     } footer: {
@@ -140,6 +140,7 @@ struct SpaceSettingsSheet: View {
             try await studio.deleteSpace(current, client: client)
             guard client.baseURL == app.serverURL else { return }
             if app.studioSpace == current.id { app.studioSpace = nil }
+            if app.homeSpace == current.id { app.homeSpace = nil }
             operation.complete(on: app) { dismiss() }
             operation.complete(on: app) { done(nil) }
         } catch {
@@ -148,80 +149,100 @@ struct SpaceSettingsSheet: View {
     }
 }
 
-// MARK: A thread's spaces
+// MARK: A thread's Space
 
-/// The spaces a thread is in, for its menu.
+/// The one Space a thread is in, and the Spaces it could move to, for its menu.
 @MainActor
 final class ThreadSpacesModel: ObservableObject {
-    @Published private(set) var held: ThreadSpaces?
-    @Published private(set) var all: [StudioSpace] = []
+    @Published private(set) var spaces: [StudioSpace] = []
+    @Published private(set) var spaceOf: [String: String] = [:]
+    @Published private(set) var leadOfSpace: [String: String] = [:]
 
     func load(_ threadId: String, client: BBClient) async {
-        held = try? await client.spacesForThread(threadId)
-        all = held == nil ? [] : (try? await client.studioSpaces()) ?? []
+        guard let spaces = try? await client.studioSpaces() else { return }
+        self.spaces = spaces
+        spaceOf = (try? await client.spaceOfThreads()) ?? [:]
+        if let id = space(of: threadId, projectId: nil)?.id, let lead = try? await client.spaceLead(id) {
+            leadOfSpace[id] = lead.threadId
+        }
     }
 
-    var others: [StudioSpace] { all.filter { space in held?.spaces.contains { $0.id == space.id } != true } }
-    var removable: [StudioSpace] { (held?.spaces ?? []).filter { held?.inherited.contains($0.id) != true } }
-    var available: Bool { held.map { !$0.spaces.isEmpty || !all.isEmpty } ?? false }
+    /// As the web sidebar decides: where Studio lists it, else its project's Space, else the default.
+    func space(of threadId: String, projectId: String?) -> StudioSpace? {
+        let assignment = SpaceAssignment(spaces: spaces, spaceOf: spaceOf)
+        let id = spaceOf[threadId].flatMap { id in spaces.contains { $0.id == id } ? id : nil }
+            ?? projectId.flatMap { project in spaces.first { $0.projectIds.contains(project) }?.id }
+            ?? assignment.defaultSpaceId
+        return spaces.first { $0.id == id }
+    }
 
-    func change(_ space: StudioSpace, add: Bool, threadId: String, client: BBClient) async throws {
-        let ref = (pluginId: StudioSpace.threadRef, id: threadId)
-        try await client.spaceMembers(space.id, add: add ? [ref] : [], remove: add ? [] : [ref])
+    func move(_ threadId: String, to space: StudioSpace, client: BBClient) async throws {
+        spaceOf[threadId] = space.id
+        try await client.moveThreads([threadId], toSpace: space.id)
         await load(threadId, client: client)
+    }
+
+    func setLead(_ threadId: String?, of space: StudioSpace, reload threadIdToReload: String, client: BBClient) async throws {
+        leadOfSpace[space.id] = threadId
+        try await client.setSpaceLead(space.id, threadId: threadId)
+        await load(threadIdToReload, client: client)
     }
 }
 
-/// A submenu that opens the thread's spaces, adds it to another, or takes it out of one.
+/// A submenu that opens the thread's Space, moves it to another, or makes it the Space's lead.
 struct ThreadSpacesMenu: View {
     @ObservedObject var model: ThreadSpacesModel
     let threadId: String
+    var projectId: String?
+    /// Child threads stay with their root's Space.
+    var isChild = false
     var failed: (String) -> Void
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
 
     var body: some View {
-        if model.available, let held = model.held {
+        if let current = model.space(of: threadId, projectId: projectId) {
             Menu {
-                if !held.spaces.isEmpty {
-                    Section("In spaces") {
-                        ForEach(held.spaces) { space in
-                            Button { operation.complete(on: app) { app.openStudio(space: space.id) } } label: {
-                                Label(held.inherited.contains(space.id) ? "\(name(space)) · Project" : name(space), systemImage: "arrow.up.right")
+                Button { operation.complete(on: app) { app.openSpace(current.id) } } label: {
+                    Label("Open \(current.name)", systemImage: "arrow.up.right")
+                }
+                if !isChild {
+                    let isLead = model.leadOfSpace[current.id] == threadId
+                    Button { setLead(isLead ? nil : threadId, of: current) } label: {
+                        Label(isLead ? "Remove as Space Lead" : "Make Space Lead", systemImage: isLead ? "star.slash" : "star")
+                    }
+                    if model.spaces.count > 1 {
+                        Section("Move to Space") {
+                            ForEach(model.spaces) { space in
+                                Button { move(to: space) } label: {
+                                    if space.id == current.id { Label(space.label, systemImage: "checkmark") } else { Text(space.label) }
+                                }
+                                .disabled(space.id == current.id)
                             }
                         }
                     }
                 }
-                if !model.others.isEmpty {
-                    Section("Add to space") {
-                        ForEach(model.others) { space in
-                            Button { change(space, add: true) } label: { Label(name(space), systemImage: "plus") }
-                        }
-                    }
-                }
-                if !model.removable.isEmpty {
-                    Section {
-                        ForEach(model.removable) { space in
-                            Button { change(space, add: false) } label: { Label("Remove from \(space.name)", systemImage: "xmark") }
-                        }
-                    }
-                }
             } label: {
-                Label(held.spaces.isEmpty ? "Add to Space" : "Spaces: \(held.spaces.map(\.name).joined(separator: ", "))",
-                    systemImage: "square.stack.3d.up")
+                Label("Space: \(current.label)", systemImage: "square.stack.3d.up")
             }
         }
     }
 
-    private func name(_ space: StudioSpace) -> String {
-        space.emoji.map { "\($0) \(space.name)" } ?? space.name
-    }
-
-    private func change(_ space: StudioSpace, add: Bool) {
+    private func move(to space: StudioSpace) {
         Task {
             do {
-                try await model.change(space, add: add, threadId: threadId, client: client)
+                try await model.move(threadId, to: space, client: client)
+            } catch {
+                failed(BBClient.describe(error, server: client.baseURL))
+            }
+        }
+    }
+
+    private func setLead(_ lead: String?, of space: StudioSpace) {
+        Task {
+            do {
+                try await model.setLead(lead, of: space, reload: threadId, client: client)
             } catch {
                 failed(BBClient.describe(error, server: client.baseURL))
             }

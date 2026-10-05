@@ -287,7 +287,10 @@ struct ThreadView: View {
                             Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
                         }
                     }
-                    ThreadSpacesMenu(model: spaces, threadId: model.threadId) { model.error = $0 }
+                    ThreadSpacesMenu(
+                        model: spaces, threadId: model.threadId, projectId: model.thread?.projectId,
+                        isChild: model.thread?.parentThreadId != nil
+                    ) { model.error = $0 }
                     if let sourcePage {
                         Button { app.push(.page(id: sourcePage.id)) } label: {
                             Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")

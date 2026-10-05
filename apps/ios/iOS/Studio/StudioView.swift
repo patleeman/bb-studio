@@ -764,6 +764,16 @@ struct StudioView: View {
                         }
                     }
                 } label: { Label("Move to Project", systemImage: "folder") }
+                if store.spaces.count > 1 {
+                    Menu {
+                        ForEach(store.spaces) { space in
+                            Button { Task { await move(item, toSpace: space) } } label: {
+                                if item.spaces?.contains(space.id) == true { Label(space.label, systemImage: "checkmark") } else { Text(space.label) }
+                            }
+                            .disabled(item.spaces?.contains(space.id) == true)
+                        }
+                    } label: { Label("Move to Space", systemImage: "square.stack.3d.up") }
+                }
                 if store.info(item)?.canArchive == true {
                     Button { Task { await archive(item) } } label: {
                         Label(item.archived ? "Restore from Archive" : "Archive", systemImage: item.archived ? "tray.and.arrow.up" : "archivebox")
@@ -853,14 +863,14 @@ struct StudioView: View {
 
     private var emptyText: String {
         if let space = app.studioSpace.flatMap(store.space) {
-            return "Nothing in \(space.name) yet. Add items from their menus, or make them on the space's page."
+            return "Nothing in \(space.name) yet. Make one with New, or move items here from their menus."
         }
         return switch app.studioKind {
         case "page": "Pages you and your agents write show up here."
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
-        case "space": "Spaces gather items, threads and projects. Make one with New."
+        case "space": "Spaces gather threads and Studio items. Make one with New."
         default: "Pages, recordings, dictations, drawings and artifacts show up here."
         }
     }
@@ -902,9 +912,30 @@ struct StudioView: View {
 
     private func create(_ kind: StudioKindInfo) async {
         let projectId = project.isEmpty || project == "none" ? nil : project
+        // Filtered to a Space, a new item goes in its folder so it shows there.
+        if projectId == nil, let space = app.studioSpace {
+            do {
+                let href = try await client.createInSpace(space, pluginId: kind.pluginId, kind: kind.id)
+                if let route = Route(href: href) { operation.complete(on: app) { app.studioPath.append(route) } }
+                await store.load(client)
+            } catch {
+                flash(BBClient.describe(error, server: client.baseURL))
+            }
+            return
+        }
         do {
             let item = try await store.create(kind, projectId: projectId, client: client)
             if let route = route(item) { operation.complete(on: app) { app.studioPath.append(route) } }
+        } catch {
+            flash(BBClient.describe(error, server: client.baseURL))
+        }
+    }
+
+    private func move(_ item: StudioItem, toSpace space: StudioSpace) async {
+        do {
+            try await client.moveItems([(pluginId: item.pluginId, id: item.itemId)], toSpace: space.id)
+            flash("Moved to \(space.name)")
+            await store.load(client)
         } catch {
             flash(BBClient.describe(error, server: client.baseURL))
         }
