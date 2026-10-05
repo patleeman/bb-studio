@@ -33,7 +33,10 @@ export interface ExploreRowsProps {
   turnId: string | null;
   /** Follow-ups of an explainer: explored from the same message, under it. */
   parentId?: string | null;
-  title?: string;
+  /** The header's title, or null for no header (inside the Next row). */
+  title?: string | null;
+  /** Tighter rows, for the Next row. */
+  dense?: boolean;
   /** Says, quietly, where to turn Explore off. Only for the end-of-reply rows the setting controls. */
   settingsHint?: boolean;
   /** A finding was clicked to open or write its explainer (not to regenerate it). */
@@ -41,7 +44,7 @@ export interface ExploreRowsProps {
   className?: string;
 }
 
-export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, onExplore, className }: ExploreRowsProps) {
+export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, dense = false, onExplore, className }: ExploreRowsProps) {
   const rpc = useExploreRpc();
   const navigate = useBbNavigate();
   useMinuteTick();
@@ -100,8 +103,8 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
 
   if (!items.length) return null;
   return (
-    <section aria-label={title} className={cn("my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background", className)}>
-      <header className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-xs text-muted-foreground">
+    <section aria-label={title ?? "Things you might want to look at"} className={cn("my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background", className)}>
+      {title === null ? null : <header className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-xs text-muted-foreground">
         <Icon name={EXPLORE_ICON} fallback="Search" className="size-3.5" />
         {title}
         {settingsHint ? (
@@ -113,8 +116,8 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
             Turn off in settings
           </a>
         ) : null}
-      </header>
-      <ul className="divide-y divide-border/60 border-t border-border/60">
+      </header>}
+      <ul className={cn("divide-y divide-border/60", title !== null && "border-t border-border/60")}>
         {items.map((item) => {
           const key = labelKey(item.label);
           const explainer = byLabel.get(key);
@@ -123,6 +126,7 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
               key={key}
               item={item}
               explainer={explainer}
+              dense={dense}
               pending={Boolean(busy[key])}
               clickError={errors[key] ?? null}
               onOpen={() => void act(item, explainer, false)}
@@ -138,6 +142,7 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
 function ExploreRow({
   item,
   explainer,
+  dense,
   pending,
   clickError,
   onOpen,
@@ -145,6 +150,7 @@ function ExploreRow({
 }: {
   item: ExploreItem;
   explainer: ExplainerView | undefined;
+  dense: boolean;
   pending: boolean;
   clickError: string | null;
   onOpen(): void;
@@ -177,15 +183,15 @@ function ExploreRow({
         onClick={onOpen}
         disabled={pending}
         title={title}
-        className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left hover:bg-state-hover disabled:cursor-progress"
+        className={cn("flex min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-state-hover disabled:cursor-progress", dense ? "py-1.5" : "py-2")}
       >
         <span aria-hidden className="w-5 shrink-0 text-center text-base leading-none">
           {item.emoji}
         </span>
         {item.why ? (
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm text-foreground">{item.label}</span>
-            <span className="line-clamp-2 text-xs text-muted-foreground">{item.why}</span>
+          <span className="line-clamp-2 min-w-0 flex-1 text-sm text-foreground">
+            {item.label}
+            <span className="text-muted-foreground"> · {item.why}</span>
           </span>
         ) : (
           <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.label}</span>

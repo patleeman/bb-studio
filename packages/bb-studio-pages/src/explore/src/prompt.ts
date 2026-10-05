@@ -27,7 +27,7 @@ export const DEFAULT_REPLIES = ["👍 Looks good", "🔁 Try another way", "❓ 
 export function nextInstructions({ explore, replies }: { explore: boolean; replies: readonly string[] }): string {
   const example = [
     `reply="👍 Ship it|🧪 Add tests first"`,
-    ...(explore ? [`explore="🐛 Retry backoff disagrees in billing — your retry fix depends on it"`] : []),
+    ...(explore ? [`explore="🐛 Retries can hammer a down server — your new endpoint will retry too"`] : []),
     `do="📄 Write up the migration plan as a page"`,
   ].join(" ");
   return [
@@ -37,7 +37,8 @@ export function nextInstructions({ explore, replies }: { explore: boolean; repli
     `- reply: only when your reply asks the user to decide, choose, approve or answer. 2 to ${NEXT_LIMITS.reply} quick answers of at most 5 words; each must make sense as the user's whole reply.${replies.length ? ` Prefer these when they fit: ${replies.join(" | ")}. Write specific ones when your reply offers distinct options.` : ""}`,
     ...(explore
       ? [
-          `- explore: only when your answer involved reading code. 1 to ${NEXT_LIMITS.explore} things you noticed along the way but didn't cover, each a specific label of at most 8 words that says what the user would find, such as "Cache keys ignore the tenant id", never "Learn more about caching". After the label put " — " and why the user would care, in at most 15 words, tied to what they're doing, such as "— your new endpoint reads this cache". Emoji: 🐛 suspicious or likely buggy, 🏗️ foundational subsystem, 🔗 connected code the answer depends on, 🕐 recently changed. Clicking one writes a Studio Page explaining it in the background; to write one yourself when asked, use explore_explain.`,
+          `- explore: only when your answer involved reading code. 1 to ${NEXT_LIMITS.explore} things you noticed along the way but didn't cover. Write each for someone who hasn't read the code: a label of at most 8 plain words that names the behavior or risk, not identifiers or file names, such as "Retries can hammer a down server", never "Learn more about caching" or "pickComposer duplicated in two packages". After the label put " — " and the consequence for the user in at most 15 words: what breaks, costs them, or helps the work they're doing, such as "— the fix you just made won't reach the other plugin". `+
+          `Emoji: 🐛 suspicious or likely buggy, 🏗️ foundational subsystem, 🔗 connected code the answer depends on, 🕐 recently changed. Clicking one writes a Studio Page explaining it in the background; to write one yourself when asked, use explore_explain.`,
         ]
       : []),
     `- do: 1 to ${NEXT_LIMITS.do} concrete actions you could take next for the user, phrased as the instruction they'd give you, such as "📄 Write this up as a page", "🧵 Start a thread to fix the retry bug" or "📌 Add the decision to the Space brief". Clicking one drafts it for the user to send. Offer only what you can actually do, and never the step you just asked about in reply.`,
