@@ -281,3 +281,18 @@ it("does not let the server discard a recording as empty while its audio is set 
   expect(vi.mocked(toast.error).mock.calls.flat().join(" ")).toMatch(/kept on this device/);
   expect(controller.getState().phase).toBe("idle");
 });
+
+it("finishes a paused recording another window left, but not while its audio is still here", async () => {
+  const recording = { id: "rec_left", kind: "recording", durationMs: 20_000, status: "paused", wordCount: 3, failedCount: 0, pendingCount: 0 };
+  const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
+  const local = { recordingId: "rec_left", sessionId: "s", index: 0, startedAt: 1, mimeType: "audio/webm", lastPartAt: 1, durationMs: 1000, complete: true, parts: [new ArrayBuffer(1)] };
+  vi.mocked(Outbox.prototype.all).mockResolvedValue([local]);
+  await expect(controller.finishRecording("rec_left")).rejects.toThrow(/still on this device/);
+  expect(call).not.toHaveBeenCalledWith("recording_state", expect.anything());
+  vi.mocked(Outbox.prototype.all).mockResolvedValue([]);
+  await controller.finishRecording("rec_left");
+  expect(call).toHaveBeenCalledWith("recording_state", { id: "rec_left", status: "finishing" });
+  expect(controller.getState().phase).toBe("idle");
+});

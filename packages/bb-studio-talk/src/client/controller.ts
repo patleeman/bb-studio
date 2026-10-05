@@ -619,6 +619,23 @@ export class TalkController {
   }
 
   /**
+   * Finishes a paused or interrupted recording that no window is capturing,
+   * e.g. one whose window closed. Refuses while some of its audio is still
+   * on this device, so the server can't finish (or discard) it without that.
+   */
+  async finishRecording(id: string): Promise<Recording | null> {
+    if (!this.rpc) throw new Error("Talk is still loading.");
+    if (this.state.recordingId === id && this.state.phase !== "idle") {
+      await this.stop(false);
+      return null;
+    }
+    if ((await this.outbox.all()).some((segment) => segment.recordingId === id)) {
+      throw new Error("Some of this recording's audio is still on this device. Let it upload, or retry or discard it under Unsent audio, then finish.");
+    }
+    return this.rpc.call("recording_state", { id, status: "finishing" });
+  }
+
+  /**
    * The composer mic: start dictating into this composer, or finish. Only the
    * composer the dictation started in finishes it; other mics say where it is.
    */

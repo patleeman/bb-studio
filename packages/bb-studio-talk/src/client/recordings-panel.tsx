@@ -492,16 +492,25 @@ function RecordingDetail({ id }: { id: string }) {
                 </button>
               ) : null}
             </>
-          ) : recording.status !== "finishing" && !recording.audioRemoved ? (
-            <button
-              type="button"
-              className={OUTLINE_BUTTON}
-              disabled={state.phase !== "idle"}
-              onClick={() => void talk.continueRecording(recording)}
-            >
-              <Icon name="Mic" /> {recording.status === "interrupted" ? "Resume recording" : "Record more"}
-            </button>
-          ) : null}
+          ) : (
+            <>
+              {recording.status !== "finishing" && !recording.audioRemoved ? (
+                <button
+                  type="button"
+                  className={OUTLINE_BUTTON}
+                  disabled={state.phase !== "idle"}
+                  onClick={() => void talk.continueRecording(recording)}
+                >
+                  <Icon name="Mic" /> {recording.status === "interrupted" ? "Resume recording" : "Record more"}
+                </button>
+              ) : null}
+              {recording.status === "paused" || recording.status === "interrupted" ? (
+                <button type="button" className={OUTLINE_BUTTON} onClick={() => run(() => talk.finishRecording(id))}>
+                  <Icon name="Square" /> Finish
+                </button>
+              ) : null}
+            </>
+          )}
         </div>
 
         {segments.length > 0 && !recording.audioRemoved ? (

@@ -235,7 +235,9 @@ The same message at a 390-pixel viewport, with the source pill in view.
   deleted. Stop it first.
 - **Interrupted recordings.** If a capture stops reporting for two minutes,
   for example because the laptop closed or the app was killed, the recording
-  is marked *Interrupted*. **Resume recording** on its page continues it.
+  is marked *Interrupted*. **Resume recording** on its page continues it, and
+  **Finish** ends a paused or interrupted recording no window is capturing.
+  Finish waits until none of its audio is left on this device.
 - **Failed transcription.** Failed pieces retry with backoff for about nine hours.
   If the voice service is off, they retry every 10 minutes. **Retry** requeues
   pieces that gave up and retries waiting ones at once. When a dictation you
