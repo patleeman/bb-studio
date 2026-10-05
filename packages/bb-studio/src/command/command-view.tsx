@@ -10,7 +10,7 @@ import type { CommandAttachment, CommandPermissionMode, CommandSpace } from "./c
 import { broadcastMentionText, spaceThreadMentionId, typedAliases } from "./mentions";
 import { draftRecipients, useCommandDraft } from "./draft-recipients";
 import { CommandSwitcher, CommandThreads, useCommandPanes, type CommandPanes } from "./command-threads";
-import { claimsNewThreadKey, recipients } from "./command-layout";
+import { claimsNewThreadKey, partialFailure, sendPlan, type CommandRetry } from "./command-layout";
 
 type Contract = typeof rpcContract;
 type Space = CommandSpace;
@@ -107,6 +107,8 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const [permission, setPermission] = useStored<CommandPermissionMode | null>(`studio:command-permission:${spaceId}`, value => MODE_CHOICES.find(choice => choice.id === value)?.id ?? null);
   // The thread picked to reply to.
   const [reply, setReply] = useState<string | null>(null);
+  // After a send that reached only some recipients, the kept draft resends to the rest.
+  const [retry, setRetry] = useState<CommandRetry | null>(null);
   const draft = useCommandDraft(spaceId);
   const [focus, setFocus] = useState(0);
   const generation = useRef(0);
@@ -127,6 +129,9 @@ function CommandView({ spaceId }: { spaceId: string }) {
   });
   useEffect(() => () => { if (soon.current) clearTimeout(soon.current); }, []);
 
+  const threads = space?.threads ?? [];
+  const thread = (id: string | null) => threads.find(t => t.id === id);
+  const nameOf = (threadId: string) => thread(threadId)?.title || "Thread";
   // Tells the "This Space" mention provider which Space's threads to offer.
   const markFocus = () => { void rpc.call("commandFocus", { spaceId }).catch(() => {}); };
   /** BB's composer submits rich input: mentions pick recipients and files ride along. Throwing keeps the draft. */
@@ -164,20 +169,22 @@ function CommandView({ spaceId }: { spaceId: string }) {
     const command = /^\/(steer|followup|fork)\s+/.exec(text);
     let failure: string | null = null;
     try {
-      const threadIds = recipients(mentioned, everyone, reply, space);
-      const toLeadByDefault = !everyone && !mentioned.length && !reply;
+      const { threadIds, toLeadByDefault } = sendPlan(mentioned, everyone, reply, space, retry);
       const result = await rpc.call("commandSend", { spaceId, threadIds, text: command ? text.slice(command[0].length) : text, attachments, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork", permissionMode: permission, projectId: request.projectId, toLeadByDefault });
       const failures = result.deliveries.filter(d => d.status === "error");
-      if (failures.length) failure = failures.map(d => d.error).join("\n");
-      else setReply(null);
+      const missed = partialFailure(threadIds, result.deliveries);
+      if (missed) {
+        // Keep the draft, but send it again only to the threads that missed it.
+        setRetry({ threadIds: missed, toLeadByDefault });
+        const reached = threadIds.filter(id => !missed.includes(id));
+        failure = `Sent to ${reached.map(nameOf).join(", ")}, but not to ${missed.map(nameOf).join(", ")}. Send again to retry only ${missed.length === 1 ? "that thread" : "those threads"}.\n${failures.map(d => d.error).join("\n")}`;
+      } else if (failures.length) failure = failures.map(d => d.error).join("\n");
+      else { setReply(null); setRetry(null); }
       load();
     } catch (e) { failure = message(e); }
     if (failure) { setError(failure); throw new Error(failure); }
   };
 
-  const threads = space?.threads ?? [];
-  const thread = (id: string | null) => threads.find(t => t.id === id);
-  const nameOf = (threadId: string) => thread(threadId)?.title || "Thread";
     const defaultTo = reply && thread(reply) ? reply : space?.leadThreadId ?? null;
   // Mentions in the draft decide who it goes to, ahead of the picked thread.
   const addressed = draftRecipients(draft, threads);
@@ -207,7 +214,8 @@ function CommandView({ spaceId }: { spaceId: string }) {
       <div data-command-composer data-command-space={spaceId} onFocusCapture={markFocus} onKeyDownCapture={event => { if (event.key === "@") markFocus(); }}><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
       <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          {addressed === "everyone" ? <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">everyone</span></span></span>
+          {retry ? <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">Retry to {retry.threadIds.map((id, i) => <span key={id}>{i ? ", " : ""}<span className="text-foreground">{nameOf(id)}</span></span>)}</span><Tooltip label="Send to the draft’s recipients instead"><button type="button" aria-label="Don’t retry" className={ROW_ICON_BUTTON} onClick={() => { setRetry(null); setError(null); }}><Icon name="X" className="size-3.5" /></button></Tooltip></span>
+          : addressed === "everyone" ? <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">everyone</span></span></span>
           : addressed.length ? <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To {addressed.map((id, i) => <span key={id}>{i ? ", " : ""}{aliasOf(id) && <span className="channel-alias" aria-hidden>{aliasOf(id)}</span>}<span className="text-foreground">{nameOf(id)}</span></span>)}</span></span>
           : defaultTo && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">{nameOf(defaultTo)}</span>{defaultTo === space?.leadThreadId && !reply ? " · lead" : ""}</span>{reply && <Tooltip label="Send to the lead instead"><button type="button" aria-label="Send to the lead instead" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></Tooltip>}</span>}
         </div>
@@ -219,7 +227,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
       </div>
       {error && <div className="mt-2">{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</div>}
     </div>
-    {space && <CommandSwitcher panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} targets={addressed === "everyone" ? space.threads.filter(t => !t.parentThreadId).map(t => t.id) : addressed.length ? addressed : defaultTo ? [defaultTo] : []} onReply={pickReply} />}
+    {space && <CommandSwitcher panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} targets={retry ? retry.threadIds : addressed === "everyone" ? space.threads.filter(t => !t.parentThreadId).map(t => t.id) : addressed.length ? addressed : defaultTo ? [defaultTo] : []} onReply={pickReply} />}
     </div>
   </div>;
 }

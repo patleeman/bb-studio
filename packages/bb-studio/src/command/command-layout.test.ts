@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, test } from "vitest";
-import { activeThreads, byAttention, claimsNewThreadKey, followThread, movePane, threadActivity } from "./command-layout";
+import { activeThreads, byAttention, claimsNewThreadKey, followThread, movePane, partialFailure, sendPlan, threadActivity } from "./command-layout";
 import type { CommandThread } from "./command-contract";
 const thread = (id: string, status: string, extra: Partial<CommandThread> = {}): CommandThread => ({ id, title: id, status, parentThreadId: null, updatedAt: 1, error: null, ...extra });
 test("active view includes working ordinary threads and input requests, excluding unavailable and idle threads", () => {
@@ -53,4 +53,18 @@ test("⌘N belongs to a Command view only while it's in use, visible, and not co
   view.removeAttribute("hidden");
   doc.body.insertAdjacentHTML("beforeend", `<div role="dialog"></div>`);
   expect(claimsNewThreadKey(key(), view, false)).toBe(false);
+});
+
+test("after a send reaches only some recipients, resending the kept draft goes only to the rest", () => {
+  const space = { space: { id: "s", name: "S", defaultProjectId: null }, leadThreadId: "lead", threads: ["lead", "b", "c"].map(id => thread(id, "idle")) };
+  const first = sendPlan(["b", "c"], false, null, space, null);
+  expect(first).toEqual({ threadIds: ["b", "c"], toLeadByDefault: false });
+  const missed = partialFailure(first.threadIds, [{ status: "sent" }, { status: "error" }]);
+  expect(missed).toEqual(["c"]);
+  // The draft still says @b @c, but b already has it.
+  expect(sendPlan(["b", "c"], false, null, space, { threadIds: missed!, toLeadByDefault: false })).toEqual({ threadIds: ["c"], toLeadByDefault: false });
+  expect(partialFailure(["b", "c"], [{ status: "error" }, { status: "error" }])).toBeNull();
+  expect(partialFailure(["b"], [{ status: "queued" }])).toBeNull();
+  expect(() => sendPlan([], false, null, space, { threadIds: ["gone"], toLeadByDefault: true })).toThrow("left this Space");
+  expect(sendPlan([], false, null, space, null)).toEqual({ threadIds: ["lead"], toLeadByDefault: true });
 });

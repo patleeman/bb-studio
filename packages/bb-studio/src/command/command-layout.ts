@@ -47,6 +47,33 @@ export function recipients(mentioned: string[], everyone: boolean, picked: strin
   throw new Error("This Space has no lead. @mention a thread, or pick one to send to.");
 }
 
+/** A send that reached some recipients but not others: resending goes only to these. */
+export type CommandRetry = { threadIds: string[]; toLeadByDefault: boolean };
+
+/**
+ * Who a send goes to and whether it fell to the lead. A pending retry wins
+ * over the draft's mentions, so resending a kept draft never repeats it to
+ * threads that already have it.
+ */
+export function sendPlan(mentioned: string[], everyone: boolean, picked: string | null, space: CommandSpace, retry: CommandRetry | null): CommandRetry {
+  if (retry) {
+    const threadIds = retry.threadIds.filter(id => space.threads.some(thread => thread.id === id));
+    if (!threadIds.length) throw new Error("The threads it didn't reach have left this Space. Dismiss the retry to send it again.");
+    return { threadIds, toLeadByDefault: retry.toLeadByDefault };
+  }
+  return { threadIds: recipients(mentioned, everyone, picked, space), toLeadByDefault: !everyone && !mentioned.length && !picked };
+}
+
+/**
+ * The recipients a send didn't reach, when it reached others too (BB returns
+ * one delivery per recipient, in order). Null when it reached all or none,
+ * since then resending to the draft's own recipients repeats nothing.
+ */
+export function partialFailure(threadIds: readonly string[], deliveries: readonly { status: string }[]) {
+  const failed = threadIds.filter((_, i) => deliveries[i]?.status === "error");
+  return failed.length && failed.length < threadIds.length ? failed : null;
+}
+
 /** BB's own New thread keys (⌘N, ⌘⇧O), which file the thread in this Space while Command is open. */
 export const isNewThreadKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) && !event.altKey && (event.key.toLowerCase() === "n" ? !event.shiftKey : event.key.toLowerCase() === "o" && event.shiftKey);
 
