@@ -107,3 +107,6 @@ quickly. Cmd/Ctrl+K is BB's thread search, not Studio's.
 ## Command view
 
 A Space’s Command view opens from its sidebar heading. It shows ordinary threads as panes: one follows whichever thread is working until the owner opens more, which makes a grid; closed panes reopen from the thread list beside the composer. Messages go to the lead or picked threads; @all addresses every top-level thread. The addressed thread roster authorizes coordination for that request with bb thread log and bb thread tell. Scheduling uses Automations.
+
+- Each thread in the Space has a one-letter alias (`a`, `b`, … then `a2`), shown on its pane; the owner types `@b` to address that thread. A thread keeps its alias while it is in the Space, shown or not, and a letter freed by a thread that left isn't reused until the other letters are taken.
+- A message that addresses nobody goes to the lead. Its agent-only context lists the Space's threads with their aliases and asks the lead to forward it with `bb thread tell <threadId>` when it is clearly meant for one of them, then say in one line where it went, or else handle it itself. Attached files are copied into every listed thread's project, so the same relative paths work after forwarding. Pasted images can't be forwarded through `bb thread tell`; the lead says so and asks the owner to send them to that thread.
