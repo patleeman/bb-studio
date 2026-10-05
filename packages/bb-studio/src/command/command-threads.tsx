@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { ThreadChat } from "@get-bb/plugin-sdk/app";
 import { Icon, ItemTile, Tooltip } from "@bb-studio/kit/app";
 import type { CommandThread } from "./command-contract";
@@ -70,8 +70,13 @@ const Transcript = memo(function Transcript({ threadId, onReply, choose }: { thr
   const follow = useFollowLatest();
   const latest = useRef({ onReply, choose });
   latest.current = { onReply, choose };
+  // Clicking into a pane to read or scroll leaves "To" alone. Acting on one of
+  // its messages, like a suggested reaction that drafts an answer, replies to it.
+  const acted = (event: MouseEvent<HTMLDivElement>) => {
+    if ((event.target as Element).closest?.("button, [role='button'], [role='menuitem']")) latest.current.onReply(threadId);
+  };
   const actions = useMemo(() => [{ id: "command-reply", title: "Send to this thread", icon: "ArrowTurnBackward", run: () => latest.current.choose(threadId) }], [threadId]);
-  return <div ref={follow} className="channel-pane-body" onPointerDownCapture={() => latest.current.onReply(threadId)} onFocusCapture={() => latest.current.onReply(threadId)}>
+  return <div ref={follow} className="channel-pane-body" onClickCapture={acted}>
     <ThreadChat threadId={threadId} variant="timeline" layout="contained" className="h-full" messageActions={actions} />
   </div>;
 }, (a, b) => a.threadId === b.threadId);

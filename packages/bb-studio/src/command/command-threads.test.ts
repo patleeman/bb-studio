@@ -185,6 +185,19 @@ test("an unread thread's pane and row stand out until the owner clicks into the 
   act(() => { (container.querySelector('[data-channel-thread="done"] header') as HTMLElement).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); });
   expect(state.seen).not.toHaveBeenCalled();
 });
+test("clicking or focusing a pane doesn't change who the draft goes to; acting on a message does", () => {
+  render([row("lead", "idle"), row("run", "active")], "lead");
+  const body = container.querySelector('[data-channel-thread="run"] .channel-pane-body') as HTMLElement;
+  act(() => { body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); body.dispatchEvent(new FocusEvent("focusin", { bubbles: true })); });
+  expect(state.reply).not.toHaveBeenCalled();
+  // A control in the transcript, like a suggested reaction, answers that thread.
+  const reaction = document.createElement("button");
+  body.append(reaction);
+  act(() => reaction.click());
+  expect(state.reply).toHaveBeenLastCalledWith("run");
+  act(() => (body.querySelector("[data-native-thread]") as HTMLButtonElement).click());
+  expect(state.reply).toHaveBeenLastCalledWith("run", true);
+});
 test("panes and rows show each thread's alias, and the lit arrows follow every addressed thread", () => {
   render([row("lead", "idle", { alias: "a" }), row("run", "active", { alias: "b" })], "lead");
   switcher("lead");
