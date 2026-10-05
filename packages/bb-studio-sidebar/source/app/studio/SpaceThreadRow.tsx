@@ -64,9 +64,9 @@ function SpaceThreadDot({ state }: { state: SpaceThreadState }) {
 }
 
 const LINE_TONE: Record<ThreadLine["kind"], string> = {
-  progress: "text-muted-foreground",
-  failure: "text-destructive",
-  blocked: "text-warning",
+  progress: "text-subtle-foreground",
+  failure: "text-destructive/80",
+  blocked: "text-warning/80",
 };
 
 /** What a By space row adds to BB's thread row; null in every other view. */

@@ -40,12 +40,12 @@ describe("spaceOpenItems", () => {
   it("keeps the Space's open items in tab order, dropping archived ones and other Spaces' items", () => {
     const items = [item("pages", "a", 1), item("pages", "b", 2), item("pages", "gone", 3, { archived: true }), item("pages", "elsewhere", 4, { projectId: "proj_other" })];
     const tabs = ["b", "elsewhere", "gone", "missing", "a"].map((id) => ({ pluginId: "pages", id, pinned: false }));
-    expect(spaceOpenItems(space, tabs, items, () => "File").map((each) => each.id)).toEqual(["b", "a"]);
+    expect(spaceOpenItems(space, tabs, items, () => ({ icon: "File", label: "Page" })).map((each) => each.id)).toEqual(["b", "a"]);
   });
 
   it("carries each tab's pinned flag in tab order", () => {
     const items = [item("pages", "a", 1), item("pages", "b", 2)];
     const tabs = [{ pluginId: "pages", id: "a", pinned: true }, { pluginId: "pages", id: "b", pinned: false }];
-    expect(spaceOpenItems(space, tabs, items, () => "File").map((each) => [each.id, each.pinned])).toEqual([["a", true], ["b", false]]);
+    expect(spaceOpenItems(space, tabs, items, () => ({ icon: "File", label: "Page" })).map((each) => [each.id, each.pinned])).toEqual([["a", true], ["b", false]]);
   });
 });

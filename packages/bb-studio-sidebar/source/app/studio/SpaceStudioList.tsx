@@ -15,12 +15,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   SIDEBAR_CONTROL_BUTTON_CLASS,
-  SIDEBAR_GROUP_TEXT_CLASS,
   SIDEBAR_ROW_BASE_CLASS,
   SIDEBAR_ROW_GLYPH_SLOT_CLASS,
   SIDEBAR_ROW_INTERACTIVE_STATE_CLASS,
 } from "../rows/sidebarRowClasses.js";
-import type { SpaceItems } from "./studioSpaces.js";
+import type { SpaceBrowseItem, SpaceItems } from "./studioSpaces.js";
+import { compactAge } from "./SpaceThreadRow.js";
+import { CHROME_SECTION_LABEL_CLASS } from "@/components/ui/chrome-style-tokens";
 
 let splitting = false;
 
@@ -44,11 +45,11 @@ export function openStudioItem(anchor: HTMLAnchorElement | null, href: string, i
 }
 
 /** "Studio" or "Threads" inside a Space, with its own controls on hover. */
-export function SpaceSubheading({ title, action }: { title: string; action?: ReactNode }) {
+export function SpaceSubheading({ title, action, showAction = false }: { title: string; action?: ReactNode; showAction?: boolean }) {
   return (
-    <div className={cn("group/sub flex h-7 items-center gap-1 pr-0.5 pl-2 text-xs", SIDEBAR_GROUP_TEXT_CLASS)}>
+    <div className={cn("group/sub flex h-7 items-center gap-1 pr-0.5 pl-2", CHROME_SECTION_LABEL_CLASS)}>
       <span className="min-w-0 flex-1 truncate">{title}</span>
-      {action ? <span className="opacity-0 transition-opacity group-hover/sub:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">{action}</span> : null}
+      {action ? <span className={cn(showAction ? "opacity-100" : "opacity-0", "transition-opacity group-hover/sub:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100")}>{action}</span> : null}
     </div>
   );
 }
@@ -185,14 +186,21 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
               openStudioItem(link.current, item.href, event.metaKey || event.ctrlKey);
             }}
             onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); onClose(); } }}
-            className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pr-14 pl-2 text-left")}
+            className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "h-auto flex-wrap items-center pr-12 pb-1.5 pl-2 text-left max-md:pointer-coarse:h-auto")}
+            style={{ rowGap: 0 }}
           >
             <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}>
               {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
             </span>
             {renaming ? null : <span className="min-w-0 flex-1 truncate">{item.title}</span>}
+            <span className="pointer-events-none min-w-0 basis-full truncate pl-6 text-xs leading-4 text-subtle-foreground">{item.preview ?? item.kindLabel}</span>
           </a>
-          {item.pinned && !renaming ? <Icon name="Pin" aria-label="Pinned" className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-subtle-foreground group-hover/item:hidden group-focus-within/item:hidden" /> : null}
+          {renaming ? null : (
+            <span className="pointer-events-none absolute top-1.5 right-1 flex items-center gap-1 text-xs tabular-nums text-subtle-foreground group-hover/item:hidden group-focus-within/item:hidden">
+              {item.pinned ? <Icon name="Pin" aria-label="Pinned" className="size-3" /> : null}
+              {item.updatedAt ? compactAge(item.updatedAt) : null}
+            </span>
+          )}
           {renaming ? (
             <input
               autoFocus
@@ -208,7 +216,7 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
               className="absolute inset-y-0.5 right-1 left-8 rounded-sm border border-sidebar-ring bg-sidebar px-1.5 text-sm outline-none"
             />
           ) : null}
-          <span className="absolute top-1/2 right-0.5 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">
+          <span className="absolute top-0.5 right-0.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">
             <button
               type="button"
               aria-label={`Close ${item.title}`}
@@ -247,6 +255,28 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
   );
 }
 
+/** The Space's items that aren't open, newest first; type to jump to one. */
+function BrowseMenu({ spaceName, items, onPick }: { spaceName: string; items: readonly SpaceBrowseItem[]; onPick(href: string): void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" aria-label={`Open a Studio item in ${spaceName}`} title="Open an item" className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")} onClick={(event) => event.stopPropagation()}>
+          <Icon name="Layers" className="size-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-80 w-64 overflow-auto" aria-label={`Studio items in ${spaceName}`}>
+        {items.map((item) => (
+          <DropdownMenuItem key={`${item.pluginId}:${item.id}`} textValue={item.title} onSelect={() => onPick(item.href)}>
+            {item.icon ? <span className="w-4 text-center text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
+            <span className="min-w-0 flex-1 truncate">{item.title}</span>
+            {item.updatedAt ? <span className="shrink-0 text-xs tabular-nums text-subtle-foreground">{compactAge(item.updatedAt)}</span> : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /**
  * A Space's open Studio items, like tabs: each opens in the main area, and ×
  * closes it here without touching the item. Opening any of the Space's items
@@ -271,12 +301,25 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
     void sdk.plugins.callRpc({ pluginId: "studio", method: "closeTabs", input: { items: [{ pluginId: item.pluginId, id: item.id }] } as never, outputSchema: z.object({ ok: z.boolean() }), signal: AbortSignal.timeout(15_000) })
       .catch(() => setClosed((current) => { const next = new Set(current); next.delete(key(item)); return next; }));
   };
+  const openKeys = new Set(open.map(key));
+  const browsable = (items?.all ?? []).filter((item) => !openKeys.has(key(item)));
+  // Picked from the menu: open it beside, and list it as open in the Space.
+  const openPicked = (href: string) => {
+    openStudioItem(splitLink.current, href);
+    void sdk.plugins.callRpc({ pluginId: "studio", method: "visitTab", input: { path: href } as never, outputSchema: z.unknown(), signal: AbortSignal.timeout(15_000) }).catch(() => {});
+  };
   const quietRow = cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pl-2 text-left text-muted-foreground");
   return (
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
         title="Studio"
-        action={<NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openCreated} />}
+        showAction={!open.length}
+        action={(
+          <span className="inline-flex items-center gap-0.5">
+            {browsable.length ? <BrowseMenu spaceName={spaceName} items={browsable} onPick={openPicked} /> : null}
+            <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openCreated} />
+          </span>
+        )}
       />
       {/* BB splits a Mod-click on a link this plugin renders; new items open through this one. */}
       <a ref={splitLink} href="/" hidden aria-hidden="true" tabIndex={-1} onClick={(event) => { if (!splitting) event.preventDefault(); }} />

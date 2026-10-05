@@ -3405,8 +3405,11 @@ public enum Studio {
     public var kindIcon: String?
     public var href: String?
     public var pinned: Bool?
+    public var kindLabel: String?
+    public var updatedAt: Double?
+    public var preview: String?
 
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil, pinned: Bool? = nil) {
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil, pinned: Bool? = nil, kindLabel: String? = nil, updatedAt: Double? = nil, preview: String? = nil) {
       self.pluginId = pluginId
       self.id = id
       self.title = title
@@ -3414,6 +3417,9 @@ public enum Studio {
       self.kindIcon = kindIcon
       self.href = href
       self.pinned = pinned
+      self.kindLabel = kindLabel
+      self.updatedAt = updatedAt
+      self.preview = preview
     }
   }
 

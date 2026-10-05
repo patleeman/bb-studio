@@ -71,14 +71,19 @@ export function spaceTreeItems(
   return { items: out, count: held.length };
 }
 
-export interface OpenItem { pluginId: string; id: string; title: string; icon: string | null; kindIcon: string; href: string; pinned: boolean }
+export interface OpenItem {
+  pluginId: string; id: string; title: string; icon: string | null; kindIcon: string; href: string; pinned: boolean;
+  /** For the sidebar's second line: the kind's name, when it last changed, and a glimpse of its text. */
+  kindLabel: string; updatedAt: number; preview: string | null;
+}
 
 /** The Space's items among the open tabs, in tab order (pinned first); archived and missing ones drop out. */
-export function spaceOpenItems<T extends TreeSource>(space: Space, tabs: readonly { pluginId: string; id: string; pinned: boolean }[], items: readonly T[], kindIcon: (item: T) => string): OpenItem[] {
+export function spaceOpenItems<T extends TreeSource & { preview?: string | null }>(space: Space, tabs: readonly { pluginId: string; id: string; pinned: boolean }[], items: readonly T[], kind: (item: T) => { icon: string; label: string }): OpenItem[] {
   const byKey = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item]));
   return tabs.flatMap((tab) => {
     const item = byKey.get(`${tab.pluginId}:${tab.id}`);
     if (!item || item.archived || !inSpace(space, item)) return [];
-    return [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: kindIcon(item), href: item.href, pinned: tab.pinned }];
+    const { icon, label } = kind(item);
+    return [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: icon, href: item.href, pinned: tab.pinned, kindLabel: label, updatedAt: item.updatedAt, preview: item.preview?.trim() || null }];
   });
 }

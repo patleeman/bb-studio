@@ -395,7 +395,7 @@ export default async function plugin(bb: BbPluginApi) {
             color: space.color,
             items: tree.items,
             itemCount: tree.count,
-            open: spaceOpenItems(space, open, items, options.kindIcon),
+            open: spaceOpenItems(space, open, items, (item) => { const kind = kindsOf.get(`${item.pluginId}:${item.kind}`); return { icon: kind?.icon ?? "File", label: kind?.label ?? item.kind }; }),
           };
         }),
       };

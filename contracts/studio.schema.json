@@ -4805,6 +4805,18 @@
                       },
                       "pinned": {
                         "type": "boolean"
+                      },
+                      "kindLabel": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      },
+                      "preview": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
                       }
                     },
                     "required": [
@@ -4814,7 +4826,10 @@
                       "icon",
                       "kindIcon",
                       "href",
-                      "pinned"
+                      "pinned",
+                      "kindLabel",
+                      "updatedAt",
+                      "preview"
                     ],
                     "additionalProperties": false
                   }

@@ -59,6 +59,18 @@ const treeSchema = z.object({
       kindIcon: z.string().catch("File"),
       href: z.string(),
       pinned: z.boolean().catch(false),
+      kindLabel: z.string().catch(""),
+      updatedAt: z.number().catch(0),
+      preview: z.string().nullable().catch(null),
+    }).passthrough()).catch([]),
+    items: z.array(z.object({
+      pluginId: z.string(),
+      id: z.string(),
+      title: z.string(),
+      icon: z.string().nullable().catch(null),
+      kindIcon: z.string().catch("File"),
+      href: z.string(),
+      updatedAt: z.number().catch(0),
     }).passthrough()).catch([]),
   }).passthrough()),
 });
@@ -73,11 +85,27 @@ export interface SpaceSidebarItem {
   href: string;
   /** Pinned items stay at the top of the Space's list. */
   pinned: boolean;
+  kindLabel: string;
+  updatedAt: number;
+  preview: string | null;
+}
+
+/** One of the Space's items, open or not, newest first, for the browse menu. */
+export interface SpaceBrowseItem {
+  pluginId: string;
+  id: string;
+  title: string;
+  icon: string | null;
+  kindIcon: string;
+  href: string;
+  updatedAt: number;
 }
 
 export interface SpaceItems {
   /** The Space's items open as tabs, in the order they were opened. */
   open: SpaceSidebarItem[];
+  /** The Space's newest items, open or not; Studio caps the list. */
+  all: SpaceBrowseItem[];
   /** Every item the Space holds, open or not. */
   count: number;
 }
@@ -142,7 +170,8 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
           leads = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null]));
           heartbeats = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId && lead.run?.enabled ? lead.run.cadence : null]));
           items = Object.fromEntries(tree.spaces.map((space) => [space.id, {
-            open: space.open.map(({ pluginId, id, title, icon, kindIcon, href, pinned }) => ({ pluginId, id, title, icon, kindIcon, href, pinned })),
+            open: space.open.map(({ pluginId, id, title, icon, kindIcon, href, pinned, kindLabel, updatedAt, preview }) => ({ pluginId, id, title, icon, kindIcon, href, pinned, kindLabel, updatedAt, preview })),
+            all: space.items.map(({ pluginId, id, title, icon, kindIcon, href, updatedAt }) => ({ pluginId, id, title, icon, kindIcon, href, updatedAt })),
             count: space.itemCount,
           }]));
         }
