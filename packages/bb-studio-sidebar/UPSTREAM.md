@@ -31,8 +31,8 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/app/list/SidebarHeaderControls.tsx` | Add the project action to the creation context, and let a section put its own button, such as Command view, in place of New thread. |
 | `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, empty project, By space, per-section Automated threads, and Needs me sort menu items. |
 | `source/app/preferences/atoms.ts` | Expose synced empty project, Automated threads, and collapsed Space preferences. |
-| `source/app/model/project-thread-groups.ts`, `thread-activity.ts`, and the `attention` branch of `getSidebarThreadComparator` in `ProjectList.tsx` | Add the Needs me sort: threads waiting on the user first, then working ones, then the rest. |
-| `source/app/list/sortComparator.test.ts` | Check the Needs me tiers and direction. |
+| `source/app/model/project-thread-groups.ts`, `thread-activity.ts`, and the `attention` branch of `getSidebarThreadComparator` in `ProjectList.tsx` | Add the Needs me sort: threads waiting on the user first, then working ones, then the rest. A parent or group ranks by its most urgent descendant, so `buildSortedItems` honors a comparator's `compareItems`. |
+| `source/app/list/sortComparator.test.ts` | Check the Needs me tiers, direction, and descendant ranking. |
 | `source/shared/preferences.ts` | Add the `attention` sort, the `space` organization and `space:` groups, and define synced empty project, Automated threads, and collapsed Space preferences. |
 | `source/app/list/SidebarHeaderControls.test.tsx` | Check the empty project menu toggle. |
 | `source/app/list/ProjectList.modes.test.tsx`, `ProjectList.sectionCreate.test.tsx`, and `useSidebarThreadReveal.test.tsx` | Leave By space out of the stored-order probe, count the Automated threads divider, and check that an automated thread's group expands only when opened. |

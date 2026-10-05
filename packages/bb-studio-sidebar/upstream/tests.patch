@@ -312,13 +312,15 @@ index 738d0ad..7c4b9c3 100644
 -    ).toEqual(["New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
 +    ).toEqual(["New project", "New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
 diff --git a/source/app/list/sortComparator.test.ts b/source/app/list/sortComparator.test.ts
-index 411fa38..8ecac74 100644
+index 411fa38..863a96e 100644
 --- a/source/app/list/sortComparator.test.ts
 +++ b/source/app/list/sortComparator.test.ts
-@@ -15 +15 @@ import {
+@@ -4,0 +5 @@ import {
++  buildProjectThreadGroups,
+@@ -15 +16 @@ import {
 -} from "../model/fixtures.js";
 +} from "../testing/fixtures.js";
-@@ -201,0 +202,25 @@ describe("getSidebarThreadComparator", () => {
+@@ -201,0 +203,49 @@ describe("getSidebarThreadComparator", () => {
 +  it("needs me lists waiting threads first, then working, then the rest", () => {
 +    const readOld = thread({ id: "thr_read", lastReadAt: 9, latestAttentionAt: 9 });
 +    const working = thread({ id: "thr_working", status: "active", lastReadAt: 8, latestAttentionAt: 8 });
@@ -342,6 +344,30 @@ index 411fa38..8ecac74 100644
 +      "thr_working",
 +      "thr_read",
 +    ]);
++  });
++
++  it("needs me ranks a parent by its most urgent descendant", () => {
++    const idleNewer = thread({ id: "thr_idle", lastReadAt: 9, latestAttentionAt: 9 });
++    const parent = thread({ id: "thr_parent", lastReadAt: 5, latestAttentionAt: 5 });
++    const asking = thread({
++      id: "thr_child",
++      parentThreadId: "thr_parent",
++      hasPendingInteraction: true,
++      lastReadAt: 4,
++      latestAttentionAt: 4,
++    });
++    const comparator = getSidebarThreadComparator("attention");
++    for (const grouped of [true, false]) {
++      const items = buildProjectThreadGroups(
++        [idleNewer, parent, asking],
++        comparator,
++        new Set(),
++        grouped,
++      );
++      expect(
++        items.map((item) => (item.kind === "thread" ? item.node.thread.id : item.kind)),
++      ).toEqual(["thr_parent", "thr_idle"]);
++    }
 +  });
 +
 diff --git a/source/app/list/useSidebarThreadReveal.test.tsx b/source/app/list/useSidebarThreadReveal.test.tsx

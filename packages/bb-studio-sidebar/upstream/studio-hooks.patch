@@ -128,7 +128,7 @@ index 39258e5..b1a5413 100644
 @@ -1373,0 +1450 @@ export function useSectionThreadDnd({
 +      groupMove,
 diff --git a/source/app/list/ProjectList.tsx b/source/app/list/ProjectList.tsx
-index afa82d9..f534539 100644
+index afa82d9..5226b31 100644
 --- a/source/app/list/ProjectList.tsx
 +++ b/source/app/list/ProjectList.tsx
 @@ -38 +38,4 @@ import { getCollapsedChildActivity } from "../model/thread-activity.js";
@@ -146,60 +146,65 @@ index afa82d9..f534539 100644
 +import { defaultSpaceId, projectSpaces } from "../studio/space-groups.js";
 +import { publishSidebarOrganization, useStudioSpaces, useStudioSpacesSync } from "../studio/studioSpaces.js";
 +import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
-@@ -66,0 +78 @@ import {
+@@ -66,0 +78,2 @@ import {
 +  compareByNeedsMe,
-@@ -99,0 +112 @@ import {
++  compareItemsByNeedsMe,
+@@ -99,0 +113 @@ import {
 +  sidebarHideEmptyProjectsAtom,
-@@ -143 +156 @@ export { PROJECT_LIST_ACTION_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
+@@ -143 +157 @@ export { PROJECT_LIST_ACTION_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
 -type ThreadListStatus = "loading" | "ready" | "unavailable";
 +export type ThreadListStatus = "loading" | "ready" | "unavailable";
-@@ -155 +168 @@ interface ToggleCollapsedIdListArgs {
+@@ -155 +169 @@ interface ToggleCollapsedIdListArgs {
 -type ToggleCollapsedId = (id: string) => void;
 +export type ToggleCollapsedId = (id: string) => void;
-@@ -174 +187 @@ const EMPTY_SECTION_DEFINITIONS: readonly SidebarSectionDefinition[] = [];
+@@ -174 +188 @@ const EMPTY_SECTION_DEFINITIONS: readonly SidebarSectionDefinition[] = [];
 -function getProjectThreadListState({
 +export function getProjectThreadListState({
-@@ -191 +204 @@ function getProjectThreadListState({
+@@ -191 +205 @@ function getProjectThreadListState({
 -function toggleCollapsedIdList({
 +export function toggleCollapsedIdList({
-@@ -314,0 +328,4 @@ export function getSidebarThreadComparator(
+@@ -314,0 +329,8 @@ export function getSidebarThreadComparator(
 +  if (normalizedSort === "attention") {
 +    // Tiers always lead; direction only flips the order inside a tier.
-+    return (left, right) => compareByNeedsMe(left, right, multiplier);
++    const comparator: ThreadComparator = (left, right) =>
++      compareByNeedsMe(left, right, multiplier);
++    comparator.compareItems = (left, right) =>
++      compareItemsByNeedsMe(left, right, multiplier);
++    return comparator;
 +  }
-@@ -395 +412 @@ function ProjectListSectionMoveScope({
+@@ -395 +417 @@ function ProjectListSectionMoveScope({
 -interface BuiltInSectionRenderState {
 +export interface BuiltInSectionRenderState {
-@@ -405,0 +423 @@ interface ActiveSidebarModeSectionsProps {
+@@ -405,0 +428 @@ interface ActiveSidebarModeSectionsProps {
 +  renderSpace?: () => ReactNode;
-@@ -412,0 +431 @@ export function ActiveSidebarModeSections({
+@@ -412,0 +436 @@ export function ActiveSidebarModeSections({
 +  renderSpace,
-@@ -413,0 +433 @@ export function ActiveSidebarModeSections({
+@@ -413,0 +438 @@ export function ActiveSidebarModeSections({
 +  if (mode === "space" && renderSpace) return renderSpace();
-@@ -419 +439 @@ export function ActiveSidebarModeSections({
+@@ -419 +444 @@ export function ActiveSidebarModeSections({
 -interface GroupedModePinnedProps {
 +export interface GroupedModePinnedProps {
-@@ -429 +449 @@ interface GroupedModePinnedProps {
+@@ -429 +454 @@ interface GroupedModePinnedProps {
 -function buildGroupSectionItem(
 +export function buildGroupSectionItem(
-@@ -457 +477 @@ function buildGroupSectionItem(
+@@ -457 +482 @@ function buildGroupSectionItem(
 -function useGroupedModeThreadDnd({
 +export function useGroupedModeThreadDnd({
-@@ -466,0 +487 @@ function useGroupedModeThreadDnd({
+@@ -466,0 +492 @@ function useGroupedModeThreadDnd({
 +  groupMove,
-@@ -476,0 +498 @@ function useGroupedModeThreadDnd({
+@@ -476,0 +503 @@ function useGroupedModeThreadDnd({
 +  groupMove?: SectionThreadGroupMove;
-@@ -493,0 +516 @@ function useGroupedModeThreadDnd({
+@@ -493,0 +521 @@ function useGroupedModeThreadDnd({
 +    groupMove,
-@@ -522,0 +546 @@ interface ProjectModeSectionsProps
+@@ -522,0 +551 @@ interface ProjectModeSectionsProps
 +  createdProjectId: string | null;
-@@ -548,0 +573 @@ function ProjectModeSections({
+@@ -548,0 +578 @@ function ProjectModeSections({
 +  createdProjectId,
-@@ -558,0 +584,3 @@ function ProjectModeSections({
+@@ -558,0 +589,3 @@ function ProjectModeSections({
 +  const hideEmptyProjects = useAtomValue(sidebarHideEmptyProjectsAtom);
 +  const rename = useSidebarRenameState();
 +  const [dragging, setDragging] = useState(false);
-@@ -593,2 +621,10 @@ function ProjectModeSections({
+@@ -593,2 +626,10 @@ function ProjectModeSections({
 -      projects
 -        .filter((project) => !project.isPersonal)
 +      visibleProjects({
@@ -212,7 +217,7 @@ index afa82d9..f534539 100644
 +        dragging,
 +        ready: status === "ready",
 +      })
-@@ -603 +639,10 @@ function ProjectModeSections({
+@@ -603 +644,10 @@ function ProjectModeSections({
 -    [projects, status, threadsByProject],
 +    [
 +      projects,
@@ -224,7 +229,7 @@ index afa82d9..f534539 100644
 +      createdProjectId,
 +      dragging,
 +    ],
-@@ -696,0 +742,30 @@ function ProjectModeSections({
+@@ -696,0 +747,30 @@ function ProjectModeSections({
 +  const projectThreadDnd = threadDnd && {
 +    ...threadDnd,
 +    dndContextProps: {
@@ -255,18 +260,18 @@ index afa82d9..f534539 100644
 +      },
 +    },
 +  };
-@@ -794 +869,4 @@ function ProjectModeSections({
+@@ -794 +874,4 @@ function ProjectModeSections({
 -      <ReorderableSidebarSectionOrderList order={order} threadDnd={threadDnd}>
 +      <ReorderableSidebarSectionOrderList
 +        order={order}
 +        threadDnd={projectThreadDnd}
 +      >
-@@ -1347,0 +1426 @@ function ProjectListComponent({
+@@ -1347,0 +1431 @@ function ProjectListComponent({
 +  const projectCreation = useProjectCreation(onProjectSelect);
-@@ -1349 +1428 @@ function ProjectListComponent({
+@@ -1349 +1433 @@ function ProjectListComponent({
 -  const { status, sections, projects, personalProject, archived } =
 +  const { status, sections, projects: allProjects, personalProject, archived } =
-@@ -1351,0 +1431,28 @@ function ProjectListComponent({
+@@ -1351,0 +1436,28 @@ function ProjectListComponent({
 +  const selectedThreadId = activeThreadId ?? undefined;
 +  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
 +  const threadCount = useMemo(() => allProjects.reduce((count, project) => count + project.threads.length, 0), [allProjects]);
@@ -295,7 +300,7 @@ index afa82d9..f534539 100644
 +  );
 +  const hiddenThreads = useHiddenThreads({ projects: allProjects, sectionKeyOf, keepIds });
 +  const projects = hiddenThreads.projects;
-@@ -1359 +1466,9 @@ function ProjectListComponent({
+@@ -1359 +1471,9 @@ function ProjectListComponent({
 -  const selectedThreadId = activeThreadId ?? undefined;
 +  const allThreads = useMemo(() => allProjects.flatMap((project) => project.threads), [allProjects]);
 +  useSidebarThreadRevealCore({
@@ -306,7 +311,7 @@ index afa82d9..f534539 100644
 +    personalProjectId,
 +    hiddenThreadIds: hiddenThreads.hiddenIds,
 +  });
-@@ -1411,0 +1527,8 @@ function ProjectListComponent({
+@@ -1411,0 +1532,8 @@ function ProjectListComponent({
 +  // A Space's new thread starts in its default project; Studio decides
 +  // whether the thread joins the Space (by the project), not this list.
 +  const handleCreateThreadInProject = useCallback(
@@ -315,17 +320,17 @@ index afa82d9..f534539 100644
 +    },
 +    [openRootComposeForProject, personalProjectId],
 +  );
-@@ -1566 +1688,0 @@ function ProjectListComponent({
+@@ -1566 +1693,0 @@ function ProjectListComponent({
 -  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
-@@ -1723 +1845 @@ function ProjectListComponent({
+@@ -1723 +1850 @@ function ProjectListComponent({
 -  if (threadListStatus === "loading" || !preferencesReady) {
 +  if (threadListStatus === "loading" || !preferencesReady || (spaceMode && !spaceData)) {
-@@ -1731,0 +1854 @@ function ProjectListComponent({
+@@ -1731,0 +1859 @@ function ProjectListComponent({
 +    <HiddenThreadsProvider value={hiddenThreads.state}>
-@@ -1733,0 +1857,2 @@ function ProjectListComponent({
+@@ -1733,0 +1862,2 @@ function ProjectListComponent({
 +        onNewProject: projectCreation.openDialog,
 +        isCreatingProject: projectCreation.isCreating,
-@@ -1740 +1865,35 @@ function ProjectListComponent({
+@@ -1740 +1870,35 @@ function ProjectListComponent({
 -          mode={organizationMode}
 +          mode={effectiveMode}
 +          renderSpace={() => spaceData && (
@@ -362,11 +367,11 @@ index afa82d9..f534539 100644
 +              onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
 +            />
 +          )}
-@@ -1804,0 +1964 @@ function ProjectListComponent({
+@@ -1804,0 +1969 @@ function ProjectListComponent({
 +              createdProjectId={projectCreation.createdProjectId}
-@@ -1860,0 +2021 @@ function ProjectListComponent({
+@@ -1860,0 +2026 @@ function ProjectListComponent({
 +      {projectCreation.dialog}
-@@ -1861,0 +2023 @@ function ProjectListComponent({
+@@ -1861,0 +2028 @@ function ProjectListComponent({
 +    </HiddenThreadsProvider>
 diff --git a/source/app/list/SidebarHeaderControls.tsx b/source/app/list/SidebarHeaderControls.tsx
 index ec076ad..f48ba59 100644
@@ -485,14 +490,14 @@ index b2ccb13..4b26725 100644
 @@ -252,0 +261 @@ export function useSidebarThreadRevealCore({
 +    hiddenThreadIds,
 diff --git a/source/app/model/project-thread-groups.ts b/source/app/model/project-thread-groups.ts
-index 19ef687..8d2f796 100644
+index 19ef687..f1bb60d 100644
 --- a/source/app/model/project-thread-groups.ts
 +++ b/source/app/model/project-thread-groups.ts
 @@ -5,0 +6 @@ import {
 +  threadAttentionState,
 @@ -6,0 +8 @@ import {
 +  type ThreadAttentionState,
-@@ -127,0 +130,27 @@ export function compareStandardThreads(
+@@ -127,0 +130,67 @@ export function compareStandardThreads(
 +const NEEDS_ME_RANK: Record<ThreadAttentionState, number> = {
 +  "needs-you": 0,
 +  error: 0,
@@ -520,6 +525,54 @@ index 19ef687..8d2f796 100644
 +  return direction * compareByLatestAttentionAtDescending(left, right);
 +}
 +
++const mostUrgentThreadByItem = new WeakMap<ProjectThreadItem, SidebarThread | null>();
++
++/** The thread in an item or any of its descendants that most needs the user. */
++function mostUrgentThread(item: ProjectThreadItem): SidebarThread | null {
++  const cached = mostUrgentThreadByItem.get(item);
++  if (cached !== undefined) return cached;
++  const threads = getProjectThreadItemDescendants([item]);
++  const urgent =
++    threads.length === 0
++      ? null
++      : threads.reduce((best, thread) =>
++          compareByNeedsMe(thread, best) < 0 ? thread : best,
++        );
++  mostUrgentThreadByItem.set(item, urgent);
++  return urgent;
++}
++
++/**
++ * "Needs me" for rows: a parent, environment group or section ranks by the
++ * most urgent of itself and its descendants, so a collapsed parent with a
++ * child waiting on the user still comes first.
++ */
++export function compareItemsByNeedsMe(
++  left: ProjectThreadItem,
++  right: ProjectThreadItem,
++  direction: 1 | -1 = 1,
++): number {
++  // Sections keep their defined order.
++  if (left.kind === "section" && right.kind === "section") return 0;
++  const leftThread = mostUrgentThread(left);
++  const rightThread = mostUrgentThread(right);
++  if (leftThread && rightThread) {
++    const comparison = compareByNeedsMe(leftThread, rightThread, direction);
++    if (comparison !== 0) return comparison;
++  } else if (leftThread || rightThread) {
++    return leftThread ? -1 : 1;
++  }
++  return compareCodepoint(getSidebarDndItemId(left), getSidebarDndItemId(right));
++}
++
+@@ -143,0 +213,3 @@ function compareProjectThreadItems(
++  if (compareThreads.compareItems) {
++    return compareThreads.compareItems(left, right);
++  }
+@@ -227,0 +300,3 @@ function buildSortedItems(
++    if (compareThreads.compareItems) {
++      return nodes.map(buildThreadItem).sort(compareThreads.compareItems);
++    }
 diff --git a/source/app/model/sidebar-section-id.ts b/source/app/model/sidebar-section-id.ts
 index c0bbdbc..7b39176 100644
 --- a/source/app/model/sidebar-section-id.ts

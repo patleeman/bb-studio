@@ -154,6 +154,46 @@ export function compareByNeedsMe(
   return direction * compareByLatestAttentionAtDescending(left, right);
 }
 
+const mostUrgentThreadByItem = new WeakMap<ProjectThreadItem, SidebarThread | null>();
+
+/** The thread in an item or any of its descendants that most needs the user. */
+function mostUrgentThread(item: ProjectThreadItem): SidebarThread | null {
+  const cached = mostUrgentThreadByItem.get(item);
+  if (cached !== undefined) return cached;
+  const threads = getProjectThreadItemDescendants([item]);
+  const urgent =
+    threads.length === 0
+      ? null
+      : threads.reduce((best, thread) =>
+          compareByNeedsMe(thread, best) < 0 ? thread : best,
+        );
+  mostUrgentThreadByItem.set(item, urgent);
+  return urgent;
+}
+
+/**
+ * "Needs me" for rows: a parent, environment group or section ranks by the
+ * most urgent of itself and its descendants, so a collapsed parent with a
+ * child waiting on the user still comes first.
+ */
+export function compareItemsByNeedsMe(
+  left: ProjectThreadItem,
+  right: ProjectThreadItem,
+  direction: 1 | -1 = 1,
+): number {
+  // Sections keep their defined order.
+  if (left.kind === "section" && right.kind === "section") return 0;
+  const leftThread = mostUrgentThread(left);
+  const rightThread = mostUrgentThread(right);
+  if (leftThread && rightThread) {
+    const comparison = compareByNeedsMe(leftThread, rightThread, direction);
+    if (comparison !== 0) return comparison;
+  } else if (leftThread || rightThread) {
+    return leftThread ? -1 : 1;
+  }
+  return compareCodepoint(getSidebarDndItemId(left), getSidebarDndItemId(right));
+}
+
 function representativeThread(item: ProjectThreadItem): SidebarThread {
   switch (item.kind) {
     case "thread":
@@ -170,6 +210,9 @@ function compareProjectThreadItems(
   right: ProjectThreadItem,
   compareThreads: ThreadComparator,
 ): number {
+  if (compareThreads.compareItems) {
+    return compareThreads.compareItems(left, right);
+  }
   return compareThreads(
     representativeThread(left),
     representativeThread(right),
@@ -254,6 +297,9 @@ function buildSortedItems(
   }
 
   if (!groupEnvironmentThreads) {
+    if (compareThreads.compareItems) {
+      return nodes.map(buildThreadItem).sort(compareThreads.compareItems);
+    }
     nodes.sort((left, right) => compareThreads(left.thread, right.thread));
     return nodes.map(buildThreadItem);
   }

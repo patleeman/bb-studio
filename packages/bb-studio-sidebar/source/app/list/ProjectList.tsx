@@ -76,6 +76,7 @@ import {
   CHRONOLOGICAL_CONTAINER_ID,
   compareByCreatedAtDescending,
   compareByNeedsMe,
+  compareItemsByNeedsMe,
   compareStandardThreads,
   createSidebarProjectIdResolver,
   isSidebarProjectThread,
@@ -327,7 +328,11 @@ export function getSidebarThreadComparator(
   }
   if (normalizedSort === "attention") {
     // Tiers always lead; direction only flips the order inside a tier.
-    return (left, right) => compareByNeedsMe(left, right, multiplier);
+    const comparator: ThreadComparator = (left, right) =>
+      compareByNeedsMe(left, right, multiplier);
+    comparator.compareItems = (left, right) =>
+      compareItemsByNeedsMe(left, right, multiplier);
+    return comparator;
   }
   const base =
     normalizedSort === "created"

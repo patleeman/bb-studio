@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getSidebarThreadComparator } from "./ProjectList.js";
 import { getThreadSidebarExpansion } from "./useSidebarThreadReveal.js";
 import {
+  buildProjectThreadGroups,
   CHRONOLOGICAL_CONTAINER_ID,
   type ProjectThreadNode,
   type ProjectThreadItem,
@@ -222,6 +223,30 @@ describe("getSidebarThreadComparator", () => {
       "thr_working",
       "thr_read",
     ]);
+  });
+
+  it("needs me ranks a parent by its most urgent descendant", () => {
+    const idleNewer = thread({ id: "thr_idle", lastReadAt: 9, latestAttentionAt: 9 });
+    const parent = thread({ id: "thr_parent", lastReadAt: 5, latestAttentionAt: 5 });
+    const asking = thread({
+      id: "thr_child",
+      parentThreadId: "thr_parent",
+      hasPendingInteraction: true,
+      lastReadAt: 4,
+      latestAttentionAt: 4,
+    });
+    const comparator = getSidebarThreadComparator("attention");
+    for (const grouped of [true, false]) {
+      const items = buildProjectThreadGroups(
+        [idleNewer, parent, asking],
+        comparator,
+        new Set(),
+        grouped,
+      );
+      expect(
+        items.map((item) => (item.kind === "thread" ? item.node.thread.id : item.kind)),
+      ).toEqual(["thr_parent", "thr_idle"]);
+    }
   });
 
   it("alphabetical lists A→Z", () => {
