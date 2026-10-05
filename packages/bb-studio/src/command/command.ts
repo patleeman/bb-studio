@@ -1,7 +1,7 @@
 import type { BbPluginApi, NewThreadRequest, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { commandContract, type CommandDelivery, type CommandEntry, type CommandSend, type CommandThread } from "./command-contract";
 import { errorMessage } from "@bb-studio/kit/format";
-import { assignAliases } from "./mentions";
+import { aliasState, assignAliases } from "./mentions";
 const missingThread = (cause: unknown) => /(?:^|\b)(?:thread not found|thread does not exist|HTTP 404)(?:\b|$)/i.test(errorMessage(cause));
 
 type Timeline = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["timeline"]>>;
@@ -100,13 +100,24 @@ export class Command {
   private row(thread: Listed, pending: boolean): CommandThread {
     return { id: thread.id, title: thread.title || thread.titleFallback || "New thread", parentThreadId: thread.parentThreadId ?? null, status: thread.status, updatedAt: thread.updatedAt, error: null, hasPendingInteraction: pending, unread: thread.latestAttentionAt > (thread.lastReadAt ?? 0) };
   }
-  /** Each shown thread's one-letter name, kept per Space. */
-  private async aliases(spaceId: string, threadIds: string[]) {
-    const key = `command-aliases:${spaceId}`;
-    const previous = (await this.bb.storage.kv.get<Record<string, string>>(key)) ?? {};
-    const next = assignAliases(previous, threadIds);
-    if (JSON.stringify(next) !== JSON.stringify(previous)) await this.bb.storage.kv.set(key, next);
-    return next;
+  private aliasing = new Map<string, Promise<unknown>>();
+  /**
+   * One-letter names for every thread in the Space, shown or not, kept per
+   * Space. Calls for a Space run one at a time so two refreshes can't hand
+   * out the same letter twice.
+   */
+  private aliases(spaceId: string, memberIds: string[], keepIds: string[]) {
+    const run = async () => {
+      const key = `command-aliases:${spaceId}`;
+      const stored = await this.bb.storage.kv.get<unknown>(key);
+      const previous = aliasState(stored);
+      const next = assignAliases(previous, memberIds, keepIds);
+      if (JSON.stringify(next) !== JSON.stringify(stored)) await this.bb.storage.kv.set(key, next);
+      return next.aliases;
+    };
+    const result = (this.aliasing.get(spaceId) ?? Promise.resolve()).then(run, run);
+    this.aliasing.set(spaceId, result.catch(() => {}));
+    return result;
   }
   async space(spaceId: string) {
     const spaces = this.spaces.list();
@@ -117,6 +128,8 @@ export class Command {
     // Threads in no Space, or in one since deleted, belong to the default Space.
     const inSpace = (threadId: string) => spaceOf[threadId] && known.has(spaceOf[threadId]!) ? spaceOf[threadId] === spaceId : space.isDefault;
     const found = new Map<string, Listed>();
+    // Archived members aren't shown, but they're still in the Space and keep their alias.
+    const archived: string[] = [];
     if (space.isDefault) {
       for (let offset = 0;; offset += 100) {
         const page = await this.bb.sdk.threads.list({ archived: false, limit: 100, offset });
@@ -129,6 +142,7 @@ export class Command {
         try {
           const thread = await this.bb.sdk.threads.get({ threadId });
           if (thread.archivedAt === null || threadId === leadThreadId) found.set(threadId, thread);
+          else archived.push(threadId);
         } catch (cause) { if (!missingThread(cause)) throw cause; }
       }));
     }
@@ -136,7 +150,8 @@ export class Command {
       try { found.set(leadThreadId, await this.bb.sdk.threads.get({ threadId: leadThreadId })); }
       catch (cause) { if (!missingThread(cause)) throw cause; }
     }
-    const ordered = [...found.values()].sort((a, b) => Number(b.id === leadThreadId) - Number(a.id === leadThreadId) || b.updatedAt - a.updatedAt).slice(0, COMMAND_LIMIT);
+    const members = [...found.values()].sort((a, b) => Number(b.id === leadThreadId) - Number(a.id === leadThreadId) || b.updatedAt - a.updatedAt);
+    const ordered = members.slice(0, COMMAND_LIMIT);
     const threads = await Promise.all(ordered.map(async thread => {
       const pending = await this.bb.sdk.threads.interactions.list({ threadId: thread.id }).then(rows => rows.length > 0, () => false);
       return this.row(thread, pending);
@@ -144,7 +159,8 @@ export class Command {
     // A fork shows under its parent only while the parent is shown too.
     const shown = new Set(threads.map(thread => thread.id));
     for (const thread of threads) if (thread.parentThreadId && !shown.has(thread.parentThreadId)) thread.parentThreadId = null;
-    const aliases = await this.aliases(spaceId, threads.map(thread => thread.id));
+    // Every member keeps its alias, including threads past the shown limit.
+    const aliases = await this.aliases(spaceId, members.map(thread => thread.id), archived);
     for (const thread of threads) thread.alias = aliases[thread.id];
     const result = { space: { id: space.id, name: space.name, defaultProjectId: space.defaultProjectId }, leadThreadId: leadThreadId && shown.has(leadThreadId) ? leadThreadId : null, threads };
     this.shown.set(spaceId, result);

@@ -22,28 +22,51 @@ export const matchingBroadcastMentions = (query: string) =>
 export const spaceThreadMentionId = (itemId: string) =>
   itemId.startsWith("space-threads:") ? itemId.slice("space-threads:".length) || null : null;
 
+/** A Space's one-letter names, and the letters its departed threads left behind, oldest first. */
+export type AliasState = { aliases: Record<string, string>; released: string[] };
+
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+
+/** Reads what an earlier version stored too: a bare thread-to-alias record. */
+export function aliasState(stored: unknown): AliasState {
+  if (!stored || typeof stored !== "object") return { aliases: {}, released: [] };
+  const value = stored as Partial<AliasState>;
+  if (value.aliases && typeof value.aliases === "object" && Array.isArray(value.released)) return { aliases: { ...value.aliases }, released: value.released.filter(alias => typeof alias === "string") };
+  return { aliases: Object.fromEntries(Object.entries(stored).filter(([, alias]) => typeof alias === "string")), released: [] };
+}
+
 /**
  * One-letter names for a Space's threads, quick to read on a pane and to
- * type as @a. A thread keeps its letter while it's in the Space; a new one
- * takes the first free letter, then a2, b2 and so on.
+ * type as @a. `memberIds` is every thread in the Space, not only the shown
+ * ones: a thread keeps its letter until it leaves the Space. A departed
+ * thread's letter isn't reused while an unused letter is left, so @b never
+ * quietly names a different thread. A new thread takes the first unused
+ * letter, then the longest-released one, then a2, b2 and so on.
  */
-export function assignAliases(previous: Readonly<Record<string, string>>, threadIds: readonly string[]) {
-  const next: Record<string, string> = {};
-  for (const id of threadIds) if (previous[id]) next[id] = previous[id];
-  const taken = new Set(Object.values(next));
-  const letters = "abcdefghijklmnopqrstuvwxyz";
-  let round = 1, at = 0;
-  for (const id of threadIds) {
-    if (next[id]) continue;
-    let alias: string;
-    do {
-      alias = letters[at]! + (round > 1 ? round : "");
-      if (++at === letters.length) { at = 0; round++; }
-    } while (taken.has(alias));
-    taken.add(alias);
-    next[id] = alias;
+export function assignAliases(previous: AliasState, memberIds: readonly string[], keepIds: readonly string[] = []): AliasState {
+  // keepIds are members that hold on to a letter they have without getting a new one (archived threads).
+  const members = new Set([...memberIds, ...keepIds]);
+  const aliases: Record<string, string> = {};
+  const released = [...previous.released];
+  for (const [id, alias] of Object.entries(previous.aliases)) {
+    if (members.has(id)) aliases[id] = alias;
+    else if (!released.includes(alias)) released.push(alias);
   }
-  return next;
+  const taken = new Set(Object.values(aliases));
+  for (let i = released.length - 1; i >= 0; i--) if (taken.has(released[i]!)) released.splice(i, 1);
+  const pick = () => {
+    const fresh = [...LETTERS].find(letter => !taken.has(letter) && !released.includes(letter));
+    if (fresh) return fresh;
+    if (released.length) return released.shift()!;
+    for (let round = 2;; round++) for (const letter of LETTERS) if (!taken.has(letter + round)) return letter + round;
+  };
+  for (const id of memberIds) {
+    if (aliases[id]) continue;
+    const alias = pick();
+    taken.add(alias);
+    aliases[id] = alias;
+  }
+  return { aliases, released };
 }
 
 /** `@a` typed as text, not picked from the menu: the aliases it names. */

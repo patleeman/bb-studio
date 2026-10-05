@@ -158,6 +158,34 @@ test("each thread in a Space gets a one-letter alias that it keeps", async () =>
   } finally { await x.close(); }
 });
 
+test("aliases cover threads past the shown limit, and a departed thread's letter isn't reused", async () => {
+  const spaceOf: Record<string, string> = {};
+  // Thread IDs are padded so updatedAt (the ID's length in the fixture) orders them: t0 is the oldest.
+  const ids = Array.from({ length: 34 }, (_, i) => `t${"x".repeat(i)}`);
+  const x = fixture(spaceOf);
+  try {
+    spaceOf[ids[33]!] = "sp_launch";
+    spaceOf[ids[32]!] = "sp_launch";
+    const first = await x.command.space("sp_launch");
+    expect(first.threads.map(t => t.alias)).toEqual(["a", "b"]);
+    // 32 newer threads push the first two out of view; they keep a and b.
+    for (const id of ids.slice(0, 32)) spaceOf[id] = "sp_launch";
+    await x.command.space("sp_launch");
+    const stored = await x.bb.storage.kv.get<{ aliases: Record<string, string> }>("command-aliases:sp_launch");
+    expect([stored!.aliases[ids[33]!], stored!.aliases[ids[32]!]]).toEqual(["a", "b"]);
+  } finally { await x.close(); }
+  // In a smaller Space, the thread named a leaves; the next new thread doesn't take a.
+  const small: Record<string, string> = { lead: "sp_launch", fix: "sp_launch" };
+  const y = fixture(small, "lead");
+  try {
+    expect((await y.command.space("sp_launch")).threads.map(t => [t.id, t.alias])).toEqual([["lead", "a"], ["fix", "b"]]);
+    delete small.fix;
+    await y.command.space("sp_launch");
+    small.fresh = "sp_launch";
+    expect((await y.command.space("sp_launch")).threads.map(t => [t.id, t.alias])).toEqual([["lead", "a"], ["fresh", "c"]]);
+  } finally { await y.close(); }
+});
+
 test("attachments uploaded in the composer's project are copied to each recipient's project", async () => {
   const x = fixture({ a: "sp_launch", b: "sp_launch" });
   try {

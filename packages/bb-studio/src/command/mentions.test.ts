@@ -37,16 +37,36 @@ test("picked Space threads carry their thread ID", () => {
   assert.equal(spaceThreadMentionId("bots:thr_1"), null);
 });
 
-test("aliases are single letters that stick to their threads, and new threads take the first free one", async () => {
+test("aliases are single letters that stick to their threads, and new threads take the first unused one", async () => {
   const { assignAliases, typedAliases } = await import("./mentions");
-  const first = assignAliases({}, ["lead", "fix", "inbox"]);
-  assert.deepEqual(first, { lead: "a", fix: "b", inbox: "c" });
-  // fix leaves; inbox keeps c, a new thread takes b.
-  assert.deepEqual(assignAliases(first, ["lead", "inbox", "new"]), { lead: "a", inbox: "c", new: "b" });
-  const many = assignAliases({}, Array.from({ length: 28 }, (_, i) => `t${i}`));
-  assert.equal(many.t25, "z");
-  assert.equal(many.t26, "a2");
+  const first = assignAliases({ aliases: {}, released: [] }, ["lead", "fix", "inbox"]);
+  assert.deepEqual(first, { aliases: { lead: "a", fix: "b", inbox: "c" }, released: [] });
+  // fix leaves; inbox keeps c, and a new thread takes d, not fix's b.
+  const second = assignAliases(first, ["lead", "inbox", "new"]);
+  assert.deepEqual(second, { aliases: { lead: "a", inbox: "c", new: "d" }, released: ["b"] });
+  const many = assignAliases({ aliases: {}, released: [] }, Array.from({ length: 28 }, (_, i) => `t${i}`));
+  assert.equal(many.aliases.t25, "z");
+  assert.equal(many.aliases.t26, "a2");
   assert.deepEqual(typedAliases("@b fix this, and @C too. Not me@d or @all or @bb"), ["b", "c"]);
+});
+
+test("a released letter comes back only once every other letter is in use, oldest first", async () => {
+  const { assignAliases } = await import("./mentions");
+  const ids = Array.from({ length: 26 }, (_, i) => `t${i}`);
+  const full = assignAliases({ aliases: {}, released: [] }, ids);
+  // t1 (b) leaves, then t0 (a).
+  const gone = assignAliases(assignAliases(full, ids.filter(id => id !== "t1")), ids.slice(2));
+  assert.deepEqual(gone.released, ["b", "a"]);
+  const next = assignAliases(gone, [...ids.slice(2), "n1", "n2", "n3"]);
+  assert.deepEqual([next.aliases.n1, next.aliases.n2, next.aliases.n3], ["b", "a", "a2"]);
+  assert.deepEqual(next.released, []);
+});
+
+test("archived members keep their letter without taking a new one, and old stored aliases still read", async () => {
+  const { assignAliases, aliasState } = await import("./mentions");
+  const state = aliasState({ lead: "a", fix: "b" });
+  assert.deepEqual(state, { aliases: { lead: "a", fix: "b" }, released: [] });
+  assert.deepEqual(assignAliases(state, ["lead"], ["fix", "never"]), { aliases: { lead: "a", fix: "b" }, released: [] });
 });
 
 test("a typed alias finds its thread first in the mention menu", () => {
