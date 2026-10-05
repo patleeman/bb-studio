@@ -388,7 +388,7 @@ export function SpaceModeSections({
                       title="Threads"
                       action={(
                         <span className="inline-flex items-center gap-0.5">
-                          <SpaceArchivedMenu space={group.space} spaces={spaces} spaceOf={spaceOf} />
+                          <SpaceArchivedMenu space={group.space} spaces={spaces} spaceOf={spaceOf} activeThreads={threads} />
                           <button
                             type="button"
                             aria-label={`New thread in ${group.space.name}`}

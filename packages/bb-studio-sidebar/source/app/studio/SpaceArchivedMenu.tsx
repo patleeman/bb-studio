@@ -13,28 +13,37 @@ import { SIDEBAR_CONTROL_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
 import { compactAge } from "./SpaceThreadRow.js";
 import { createSpaceResolver, defaultSpaceId, projectSpaces, type StudioSpace } from "./space-groups.js";
 
-/** The Space's archived threads, newest archived first. */
+/**
+ * The Space's archived threads, newest archived first. An archived child of
+ * an active parent goes with that parent's Space, so the resolver also sees
+ * the sidebar's active threads.
+ */
 export function spaceArchivedThreads(
   threads: readonly PluginSidebarThread[],
   space: StudioSpace,
   spaces: readonly StudioSpace[],
   spaceOf: Readonly<Record<string, string>>,
+  activeThreads: readonly PluginSidebarThread[] = [],
 ): PluginSidebarThread[] {
   const archived = threads.filter((thread) => thread.archivedAt !== null);
-  const resolve = createSpaceResolver(archived, spaceOf, new Set(spaces.map((each) => each.id)), defaultSpaceId(spaces), projectSpaces(spaces));
+  const resolve = createSpaceResolver([...activeThreads, ...archived], spaceOf, new Set(spaces.map((each) => each.id)), defaultSpaceId(spaces), projectSpaces(spaces));
   return archived
     .filter((thread) => resolve(thread) === space.id)
     .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
 }
 
 /** Loads archived threads only while the menu is open. */
-function ArchivedItems({ space, spaces, spaceOf }: {
+function ArchivedItems({ space, spaces, spaceOf, activeThreads }: {
   space: StudioSpace;
   spaces: readonly StudioSpace[];
   spaceOf: Readonly<Record<string, string>>;
+  activeThreads: readonly PluginSidebarThread[];
 }) {
   const state = experimental_useSidebarThreads({ experimental_lifecycles: ["archived"] });
-  const archived = useMemo(() => spaceArchivedThreads(state.threads, space, spaces, spaceOf), [space, spaceOf, spaces, state.threads]);
+  const archived = useMemo(
+    () => spaceArchivedThreads(state.threads, space, spaces, spaceOf, activeThreads),
+    [activeThreads, space, spaceOf, spaces, state.threads],
+  );
   const more = state.experimental_archived;
   const loading = state.status === "loading" || more?.status === "loading";
   return (
@@ -58,10 +67,12 @@ function ArchivedItems({ space, spaces, spaceOf }: {
 }
 
 /** Beside a Space's Threads +: its archived threads, to open one. */
-export function SpaceArchivedMenu({ space, spaces, spaceOf }: {
+export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
   space: StudioSpace;
   spaces: readonly StudioSpace[];
   spaceOf: Readonly<Record<string, string>>;
+  /** The sidebar's threads, so archived children follow their parent's Space. */
+  activeThreads: readonly PluginSidebarThread[];
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -78,7 +89,7 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf }: {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-80 w-64 overflow-auto" aria-label={`Archived threads in ${space.name}`}>
-        {open ? <ArchivedItems space={space} spaces={spaces} spaceOf={spaceOf} /> : null}
+        {open ? <ArchivedItems space={space} spaces={spaces} spaceOf={spaceOf} activeThreads={activeThreads} /> : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

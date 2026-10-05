@@ -23,4 +23,13 @@ describe("spaceArchivedThreads", () => {
     expect(spaceArchivedThreads(threads, spaces[1]!, spaces, spaceOf).map((thread) => thread.id)).toEqual(["new", "child", "old"]);
     expect(spaceArchivedThreads(threads, spaces[0]!, spaces, spaceOf).map((thread) => thread.id)).toEqual(["project", "beta"]);
   });
+
+  it("puts an archived child of an active parent in the parent's Space", () => {
+    const parent = makeSidebarThread({ id: "parent", projectId: "proj_b", archivedAt: null });
+    const child = makeSidebarThread({ id: "kid", parentThreadId: "parent", archivedAt: 2 });
+    const archived = [child];
+    const parentSpaceOf = { parent: "sp_b" };
+    expect(spaceArchivedThreads(archived, spaces[0]!, spaces, parentSpaceOf, [parent]).map((thread) => thread.id)).toEqual(["kid"]);
+    expect(spaceArchivedThreads(archived, spaces[1]!, spaces, parentSpaceOf, [parent])).toEqual([]);
+  });
 });
