@@ -62,7 +62,7 @@ export function SpaceHeartbeatDialog({ space, onClose }: { space: SpaceView; onC
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Lead and heartbeat · {space.name}</DialogTitle>
-          <DialogDescription>The lead is one of the Space's threads. The heartbeat wakes it on a schedule to check the Space and report to your Inbox.</DialogDescription>
+          <DialogDescription>The lead is one of the Space's threads. The heartbeat wakes it on a schedule to check the Space and post to your Feed.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2 text-sm">
           <label className="block space-y-1">

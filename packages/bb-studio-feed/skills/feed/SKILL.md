@@ -3,18 +3,15 @@ name: feed
 description: Use when the user asks you to post to the feed, publish a report or update, check what agents have posted, follow up on a feed story, or about posting with feed_post.
 ---
 
-# Inbox (Studio Feed)
+# Studio Feed
 
 The feed is one list of what agents report: briefings, alerts, research
-results, automation runs. The user reads it as Reports in the Inbox, on
-desktop and phone, below the threads waiting on them.
+results, automation runs. The user reads it on desktop and phone.
 
 ## Posting
 
-Bot threads (a profile, a recurring schedule, or both) send meaningful final
-results to the Inbox automatically. No posting tool is
-needed for those updates. Use feed_post for a deliberate report when your
-task or the user asks for one. Never post
+Post when your task, your automation's prompt, or the user asks you to, or
+when a scheduled or automated run has a result worth reading later. Never post
 chat, status, or "nothing new". When there is nothing new, finish without a final assistant message.
 
 Call `feed_post`:

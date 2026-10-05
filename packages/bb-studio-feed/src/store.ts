@@ -71,6 +71,10 @@ export const MIGRATIONS = [
   // Studio Teams channels are gone.
   `ALTER TABLE feed_posts DROP COLUMN channel_id`,
   `ALTER TABLE feed_posts DROP COLUMN channel_name`,
+  // The Inbox's automatic results are gone.
+  `DROP TABLE IF EXISTS inbox_jobs`,
+  `DROP TABLE IF EXISTS inbox_checkpoints`,
+  `DROP TABLE IF EXISTS inbox_updates`,
 ];
 
 /** A linked page's preview; empty strings when it has none. */

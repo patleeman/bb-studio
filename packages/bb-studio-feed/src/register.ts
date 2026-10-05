@@ -7,7 +7,6 @@
 //     when it's installed), realtime, and phone notifications (Studio Mobile).
 //   - It adds the RPC handlers, the feed_* tools, the instructions for
 //     `bb.agents.configure`, and `bb feed …`.
-import { registerAutomatic } from "./automatic";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 import { STUDIO_PLUGIN_ID, studioSchemas } from "@bb-studio/kit/contract";
 import { relativeTime } from "@bb-studio/kit/format";
@@ -52,7 +51,7 @@ const MAX_EMBED_TEXT = 6_000;
 /** How long an item's preview is trusted before asking its add-on again. */
 const EMBED_CACHE_MS = 60_000;
 
-export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => NotifyMode; automaticNotify?: () => boolean }) {
+export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => NotifyMode }) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new FeedStore(db);
@@ -225,9 +224,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
 
   // RPC ------------------------------------------------------------------------
 
-  const automatic = registerAutomatic(bb, db, { notify: options.automaticNotify ?? (() => false) });
   const rpc = {
-    ...automatic,
     attention: async ({ cursor, limit }: { cursor?: string; limit?: number }) => {
       const page = store.list({ attention: true, cursor, limit: limit ?? 40 });
       return { posts: await views(page.rows), nextCursor: page.nextCursor };
@@ -268,10 +265,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     read: async ({ postId, read }: { postId: string; read: boolean }) => ({ post: await one(service.markRead(postId, read)) }),
     remove: ({ postId }: { postId: string }) => ({ removed: service.remove(postId) }),
     seen: ({ at }: { at?: number }) => {
-      const lastSeenAt = service.seen(at);
-      db.prepare("UPDATE inbox_updates SET read_at = ? WHERE at <= ? AND read_at IS NULL").run(lastSeenAt, lastSeenAt);
-      bb.realtime.publish(REALTIME_CHANNEL, { type: "automatic" });
-      return { lastSeenAt };
+      return { lastSeenAt: service.seen(at) };
     },
     unread: () => {
       const lastSeenAt = store.lastSeenAt();
@@ -303,7 +297,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
   bb.agents.registerTool({
     name: "feed_post",
     description:
-      "Publish a post to the Inbox (Studio Feed), which the user reads on desktop and phone. Returns the post's card line: end your reply with it so the post shows where you wrote it. " +
+      "Publish a post to Studio Feed, which the user reads on desktop and phone. Returns the post's card line: end your reply with it so the post shows where you wrote it. " +
       "Use it for a result the user would want to find later or act on, never for chat, status or nothing new.",
     presentation: { label: { pending: "Posting to the feed", completed: "Posted to the feed" } },
     parameters: z.object({
@@ -338,7 +332,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
   bb.agents.registerTool({
     name: "feed_list",
     description:
-      "List Inbox (Studio Feed) posts, newest first (a story once, by its newest post). Use it to see what agents have reported, or before posting an update to a story.",
+      "List Studio Feed posts, newest first (a story once, by its newest post). Use it to see what agents have reported, or before posting an update to a story.",
     presentation: { label: { pending: "Reading the feed", completed: "Read the feed" } },
     parameters: z.object({
       topic: z.string().max(MAX_TOPIC).optional(),

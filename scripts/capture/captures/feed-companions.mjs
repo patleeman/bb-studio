@@ -62,7 +62,7 @@ export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => ({
       await client.dragBy(`[data-studio-tab="pages:${page.id}"] a`, 0, 0);
       await client.waitForSelector('[data-studio-item-header]');
       await retained(true);
-      await client.clickElementWithTextAndPointer('[data-sidebar] a, [data-sidebar] button', "Inbox");
+      await client.clickElementWithTextAndPointer('[data-sidebar] a, [data-sidebar] button', "Feed");
       await client.waitForText(post.title);
       await client.evaluate(`(() => { const article = [...document.querySelectorAll('main article')].find(each => each.innerText.includes(${JSON.stringify(post.title)})); const toggle = article?.querySelector('button[aria-expanded]'); if (toggle?.getAttribute('aria-expanded') === 'false') toggle.click(); return true; })()`);
       await client.clickElementWithTextAndPointer('main button', post.threadTitle ?? "Open thread");

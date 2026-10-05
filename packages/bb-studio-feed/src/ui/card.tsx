@@ -1,7 +1,7 @@
 // `::post{id="…"}` at the end of a reply: the post it made, as a card
 // in the thread. The card finds its post by the directive line. It
 // says what kind of post it is (urgent, its topic, which update of a story),
-// and opens it in the Inbox or marks it read without leaving the conversation.
+// and opens it in the Feed or marks it read without leaving the conversation.
 import { Badge, GHOST_BUTTON, ItemDirectiveCard, cn } from "@bb-studio/kit/app";
 import { relativeTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
@@ -42,13 +42,13 @@ export function PostCard({ attributes }: PluginMessageDirectiveProps) {
   }, [post, tries, load]);
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = feedEvent(payload);
-    // "seen": read or unread changed, here or in the Inbox.
+    // "seen": read or unread changed, here or in the Feed.
     if (event?.type === "post" || event?.type === "seen" || (event?.type === "removed" && event.postId === post?.id)) load();
   });
 
   if (post === undefined || (post === null && tries < RETRIES)) {
     // Not published (yet): show what the line says, quietly.
-    return <ItemDirectiveCard state="ready" kind="post" icon={FEED_ICON} title={attributes.title ?? "Post"} details={post === undefined ? "Inbox" : "Posting to the feed…"} />;
+    return <ItemDirectiveCard state="ready" kind="post" icon={FEED_ICON} title={attributes.title ?? "Post"} details={post === undefined ? "Feed" : "Posting to the feed…"} />;
   }
   if (!post) return <ItemDirectiveCard state="deleted" kind="post" icon={FEED_ICON} />;
   return <PostCardView post={post} onOpen={() => discuss.openPost(post)} onRead={(read) => markRead(post, read)} />;
@@ -65,14 +65,14 @@ function PostCardView({ post, onOpen, onRead }: { post: PostView; onOpen(): void
   const thumbnail = post.image && !post.body.includes(post.image) ? post.image : null;
   return (
     <article
-      aria-label={`Inbox update: ${post.title}`}
+      aria-label={`Feed post: ${post.title}`}
       className={cn("my-2 w-full max-w-md overflow-hidden rounded-lg border bg-background", urgent ? "border-destructive/50" : "border-border/70")}
     >
       <div className="flex items-start gap-3 px-3 pt-2.5">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             <Icon name={FEED_ICON} className="size-3.5" />
-            <span>Inbox</span>
+            <span>Feed</span>
             {urgent ? <Badge label="Urgent" tone="danger" /> : null}
             {post.resolvedAt ? <Badge label="Resolved" tone="success" /> : null}
             {post.topic ? <span className="rounded bg-foreground/[0.06] px-1.5 py-px text-foreground/80">{post.topic}</span> : null}
@@ -88,7 +88,7 @@ function PostCardView({ post, onOpen, onRead }: { post: PostView; onOpen(): void
       </div>
       <div className="flex items-center gap-1 px-1.5 pt-1 pb-1.5">
         <button type="button" className={cn(GHOST_BUTTON, "h-7 px-2 text-xs")} onClick={onOpen}>
-          <Icon name="ArrowUpRight" className="size-3.5" /> Open in Inbox
+          <Icon name="ArrowUpRight" className="size-3.5" /> Open in Feed
         </button>
         <button type="button" className={cn(GHOST_BUTTON, "h-7 px-2 text-xs")} onClick={() => onRead(!post.read)}>
           <Icon name={post.read ? "Circle" : "Check"} className="size-3.5" /> {post.read ? "Mark unread" : "Mark read"}

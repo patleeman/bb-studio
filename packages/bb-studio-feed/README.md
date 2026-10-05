@@ -4,55 +4,16 @@
 > own. With [Studio Teams](../bb-studio-teams) it knows which bot posted.
 > With [Studio Mobile](../bb-studio-mobile) it notifies your phone.
 
-The Inbox collects meaningful final results automatically from bot threads:
-a thread with a profile, a recurring agent automation, or both. A one-time
-schedule does not opt a thread in. Ordinary threads stay out by default.
-Thread headers have no Inbox control.
-
-From the top, the Inbox shows **Needs you** (threads waiting on your answer or
-approval), **Failed** (failed threads, queued messages that could not be sent,
-and failed automations), automatic **New results**, and optional **Reports**.
-Empty attention sections stay hidden. One result per thread updates in place;
-reading the source thread marks that result read. Having a thread pane open
-does not suppress delivery.
-
-Studio Decisions filters final replies, using the previous result to suppress
-repeats. It tries Jev first, then the configured fallback model. Empty replies and short “nothing new” messages never call the model.
-Explicit report cards do not create a duplicate automatic update. If Decisions
-cannot answer, the result remains visible with a filtering notice. Headlines
-use the first nonempty line of the original reply, limited to 140 characters.
-
-Pending triage survives reloads. Collection starts when this feature is first
-enabled, without importing old conversations. Later starts recover completions
-missed while Feed was unloaded. Failed work appears independently of triage.
-Automation failures refresh once a minute because stable BB has no automation
-lifecycle event.
-
-**Urgent bot notifications** is a separate setting, off by default. When enabled,
-only confident, urgent, unread automatic results notify Studio Mobile. Existing
-**Phone notifications** continues to control deliberate reports.
-
-The plugin remains `feed`, with the `bb feed` CLI and `feed_*` tools. Existing
-reports, story keys and links keep working.
-
-## Automatic Inbox preview
-
-![Automatic results above deliberate reports](assets/automatic-inbox-desktop.jpg)
-
-The staged check on stable BB 0.45.0 exercises the Inbox worker with a local
-fixture, automatic eligibility, host read marks, and the additive database upgrade.
-The same result fits a [390-pixel mobile viewport](assets/automatic-inbox-mobile.jpg).
-Lifecycle tests cover automatic profile and recurring-schedule eligibility,
-quiet replies, coalescing, reload persistence, failed startup recovery, pruning
-deleted threads, and phone notification opt-in. No agent was started for the browser fixture.
+One feed of what your agents report: morning briefings, alerts, research
+digests, automation results. Any agent can post to it from any thread or
+automation. You read it as one list on desktop and phone.
 
 ## Staged preview
 
 ![The Feed reader with the launch post open in place, previewing its linked checklist page, and a Needs you rail](assets/staged-preview.png)
 
-This capture predates the Inbox. It shows the **Feed** page, now the Inbox's
-**Reports**, whose **Needs you** rail is now **Urgent**, in a staged BB
-(`node scripts/staged-bb.mjs start`).
+This is the **Feed** page in a staged BB (`node scripts/staged-bb.mjs start`).
+The capture predates the rename of the rail's **Needs you** to **Urgent**.
 The capture seeds nine posts with `bb feed post` from seven authors:
 - three updates to one **Harlem Line** commute story
 - an urgent Ops alert
@@ -127,10 +88,10 @@ and the tool returns a card line for it:
 The agent ends its reply with that line, and the reply shows the post as a
 card in the thread where it was written. The card shows the
 title, an **Urgent** badge, the topic, which update of a story it is, and
-whether you've read it, with **Open in Inbox** and **Mark read**.
+whether you've read it, with **Open in Feed** and **Mark read**.
 
-Agents use `feed_post` for a deliberate report when their task or you ask for
-one. Ordinary bot results reach the Inbox without a tool call. A run with
+Agents post when their task, their automation's prompt or you ask them to,
+and unasked when a scheduled run has a result worth reading later. A run with
 nothing to say stays quiet. To request a richer report, specify the title,
 topic and story in the task.
 Agents are told to lead with a picture when they have one and to link the
@@ -149,15 +110,7 @@ the tools it started with.
 
 ## Reading
 
-- **Inbox** in the sidebar opens the Inbox. **Needs you** at the top lists
-  threads whose agent is waiting on you for an approval or an answer, most
-  recent first, with why when BB says (for example "Thread needs user
-  input"). Click one to open the thread. It reads BB's live thread list, so
-  a thread leaves as soon as you answer it.
-- **Failed** lists failed threads, queued messages that could not be sent,
-  and failed automations. **New results** lists automatic bot results, one
-  per thread, each with **Mark read**.
-- **Reports** below them is the reader: one stream, newest first, with the
+- **Feed** in the sidebar opens a reader: one stream, newest first, with the
   day in the margin. Older posts load as you scroll. A story is listed once,
   by its newest post. Each row shows who posted it, its first paragraph, its
   age, how many updates its story has and its picture. A rail lists unresolved
@@ -165,12 +118,10 @@ the tools it started with.
   feed pages. Reading an alert leaves it there; **Resolve** closes that post and
   **Reopen** restores it. **Older alerts** loads further outstanding posts.
   The rail lists stories with updates under **Developing**.
-- **Unread** posts are bold with a dot. The count next to **Inbox** in the
-  sidebar adds threads waiting on you, failed threads and automations,
-  stories with an unread post, and unread automatic results; it turns red
-  while a thread waits. **Read** posts dim to one line. **Mark all read**
-  reads every report and automatic result; each row has its own read and
-  unread button.
+- **Unread** posts are bold with a dot, and the count next to **Feed** in the
+  sidebar counts stories with an unread post. **Read** posts dim to one line.
+  **Mark all read** reads every post; each row has its own read and unread
+  button.
 - **Filters** search titles, report text, and authors. Combine search with a
   topic, **Unread only**, and **From / Through** dates, then choose **Apply
   filters**. Dates include the full local calendar day. **Clear filters**

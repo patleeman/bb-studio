@@ -11,15 +11,11 @@ const NOTIFY_MODES = ["urgent", "all", "off"] as const;
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
-    automaticNotify: {
-      type: "boolean", label: "Urgent bot notifications", default: false,
-      description: "Send a phone alert when automatic Inbox filtering finds a result requiring immediate attention. Inbox updates are always collected.",
-    },
     instructions: {
       type: "boolean",
       label: "Tell agents how to post",
       description:
-        "Agents get instructions for optional reports with feed_post. Bot results reach the Inbox automatically. This setting controls posting instructions for new sessions.",
+        "Agents get instructions for posting reports with feed_post. This setting controls posting instructions for new sessions.",
       default: true,
     },
     notify: {
@@ -33,7 +29,6 @@ export default async function plugin(bb: BbPluginApi) {
   // `bb.agents.configure` is synchronous, so keep the latest values in memory.
   const read = (values: Record<string, unknown>) => ({
     enabled: values.instructions !== false,
-    automaticNotify: values.automaticNotify === true,
     notify: (NOTIFY_MODES as readonly unknown[]).includes(values.notify) ? (values.notify as NotifyMode) : "urgent",
   });
   let current = read(await settings.get());
@@ -41,7 +36,7 @@ export default async function plugin(bb: BbPluginApi) {
     current = read(next);
   });
 
-  const feed = registerFeed(bb, { notifyMode: () => current.notify, automaticNotify: () => current.automaticNotify });
+  const feed = registerFeed(bb, { notifyMode: () => current.notify });
   bb.rpc.register(rpcContract, feed.rpc);
   bb.agents.configure(() => feed.configure(current.enabled));
 

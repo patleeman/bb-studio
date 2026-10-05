@@ -5,9 +5,7 @@ export const PLUGIN_ID = "feed";
 export const PANEL_PATH = "feed";
 export const REALTIME_CHANNEL = "feed";
 export const FEED_ICON = "feed/feed";
-/** The panel is the Inbox: threads that need you, then the feed's posts. */
-export const INBOX_ICON = "feed/inbox";
-export const INBOX_TITLE = "Inbox";
+export const FEED_TITLE = "Feed";
 
 /** The card directive a reply ends with: `::post{id="post_…"}`. */
 export const DIRECTIVE = "post";
