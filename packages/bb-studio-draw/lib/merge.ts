@@ -204,8 +204,15 @@ export function applyElementUpserts(
   }
 
   const now = Date.now();
+  const deletions = [...(options.deletedElementIds ?? [])];
   for (const el of upserts) {
     if (!el || typeof el.id !== "string" || !el.id) continue;
+    // A tombstone (e.g. from `show --raw` or a full .excalidraw file) is a
+    // deletion, not an upsert: forcing it live would resurrect it.
+    if (el.isDeleted === true) {
+      deletions.push(el.id);
+      continue;
+    }
     const existing = byId.get(el.id);
     const incVersion = typeof el.version === "number" ? el.version : 1;
     if (existing && isDeleted(existing) && incVersion <= elementVersion(existing)) {
@@ -236,9 +243,9 @@ export function applyElementUpserts(
     });
   }
 
-  for (const id of options.deletedElementIds ?? []) {
+  for (const id of deletions) {
     const existing = byId.get(id);
-    if (!existing) continue;
+    if (!existing || isDeleted(existing)) continue;
     byId.set(id, {
       ...existing,
       isDeleted: true,

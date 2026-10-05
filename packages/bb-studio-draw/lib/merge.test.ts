@@ -59,6 +59,17 @@ describe("applyElementUpserts", () => {
     expect(scene.elements.map((el) => el.id)).toEqual(["r1", "t1"]);
     expect(scene.elements[1]?.version).toBe(1);
   });
+
+  it("doesn't bring a raw scene's deleted elements back to life", () => {
+    const tombstone = { ...rect, id: "gone", index: "a1", isDeleted: true, version: 5 };
+    const scene = applyElementUpserts(stored([]), [rect, tombstone]);
+    expect(scene.elements.map((el) => el.id)).toEqual(["r1"]);
+  });
+
+  it("deletes a live element sent as a tombstone", () => {
+    const scene = applyElementUpserts(stored([rect]), [{ ...rect, isDeleted: true }]);
+    expect(scene.elements[0]).toMatchObject({ id: "r1", isDeleted: true, version: 4 });
+  });
 });
 
 describe("elementsChanged", () => {
