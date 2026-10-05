@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { experimental_NewThreadComposer as NewThreadComposer, experimental_useSidebarThreadActions, useBbNavigate, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, PageColumn, StudioBar, openCompanion } from "@bb-studio/kit/app";
+import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, PageColumn, StudioBar, Tooltip, openCompanion } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { errorMessage as message } from "@bb-studio/kit/format";
 import "./styles.css";
@@ -65,7 +65,7 @@ function NewThreadButton({ space }: { space: Space["space"] | null }) {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open]);
-  return <button type="button" aria-label={`New thread in ${space?.name ?? "this Space"}`} aria-keyshortcuts="Meta+N" title="New thread in this Space (⌘N)" className={ICON_BUTTON} disabled={!space} onClick={open}><Icon name="Plus" className="size-4" aria-hidden /></button>;
+  return <Tooltip label="New thread in this Space (⌘N)"><button type="button" aria-label={`New thread in ${space?.name ?? "this Space"}`} aria-keyshortcuts="Meta+N" className={ICON_BUTTON} disabled={!space} onClick={open}><Icon name="Plus" className="size-4" aria-hidden /></button></Tooltip>;
 }
 
 function useStored<T extends string | null>(key: string, read: (value: string | null) => T) {
@@ -157,7 +157,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
         <BarCrumb current>Command</BarCrumb>
       </nav>
       <div className="flex shrink-0 items-center gap-0.5">
-        <button type="button" aria-label="Follow work" aria-pressed={panes.following} title={panes.following ? "Following work: one pane shows whichever thread is working" : "Follow work: close the panes and show whichever thread is working"} className={ICON_BUTTON} disabled={!space} onClick={panes.follow}><Icon name="Zap" className="size-4" aria-hidden /></button>
+        <Tooltip label={panes.following ? "Following work: one pane shows whichever thread is working" : "Follow work: close the panes and show whichever thread is working"}><button type="button" aria-label="Follow work" aria-pressed={panes.following} className={ICON_BUTTON} disabled={!space} onClick={panes.follow}><Icon name="Zap" className="size-4" aria-hidden /></button></Tooltip>
         <NewThreadButton space={space?.space ?? null} />
       </div>
     </StudioBar>
@@ -168,7 +168,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
       <div data-command-composer onFocusCapture={markFocus} onKeyDownCapture={event => { if (event.key === "@") markFocus(); }}><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
       <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          {defaultTo && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">{nameOf(defaultTo)}</span>{defaultTo === space?.leadThreadId && !reply ? " · lead" : ""}</span>{reply && <button type="button" aria-label="Send to the lead instead" title="Send to the lead instead" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button>}</span>}
+          {defaultTo && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">{nameOf(defaultTo)}</span>{defaultTo === space?.leadThreadId && !reply ? " · lead" : ""}</span>{reply && <Tooltip label="Send to the lead instead"><button type="button" aria-label="Send to the lead instead" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></Tooltip>}</span>}
         </div>
         <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Approval mode" className={`inline-flex h-6 min-w-0 items-center gap-1 rounded-md px-1 text-xs font-medium leading-tight transition-colors hover:bg-state-hover data-[state=open]:bg-state-active ${permission === "full" ? "text-warning-text" : "text-muted-foreground hover:text-foreground"}`}><span className="truncate">{MODE_CHOICES.find(choice => choice.id === permission)!.label}</span><Icon name="ChevronDown" className="size-3 shrink-0" /></button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-72">

@@ -14,6 +14,7 @@ export * from "./overlay-trigger";
 export * from "./responsive-overlay";
 export * from "./select";
 export * from "./textarea";
+export * from "./tooltip";
 export * from "./utils";
 export * from "./hooks/use-compact-viewport";
 export * from "./hooks/use-media-query";

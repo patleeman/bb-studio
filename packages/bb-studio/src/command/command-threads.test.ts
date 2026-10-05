@@ -6,7 +6,8 @@ import { CommandSwitcher, CommandThreads, useCommandPanes } from "./command-thre
 import type { CommandThread } from "./command-contract";
 const state = vi.hoisted(() => ({ reply: vi.fn(), select: vi.fn(), open: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ ThreadChat: ({ threadId, variant, messageActions }: any) => React.createElement("button", { "data-native-thread": threadId, "data-variant": variant, onClick: () => messageActions[0].run({ threadId }) }, "Native transcript") }));
-vi.mock("@bb-studio/kit/app", () => ({ ItemTile: () => null, Icon: () => null }));
+const tooltips = vi.hoisted(() => [] as unknown[]);
+vi.mock("@bb-studio/kit/app", () => ({ ItemTile: () => null, Icon: () => null, Tooltip: ({ label, children }: { label: unknown; children: unknown }) => { tooltips.push(label); return children; } }));
 let root: Root, container: HTMLDivElement;
 const row = (id: string, status: string, extra: Partial<CommandThread> = {}): CommandThread => ({ id, title: id, status, parentThreadId: null, updatedAt: 1, error: null, ...extra });
 function View({ threads, leadThreadId }: { threads: CommandThread[]; leadThreadId: string | null }) {
@@ -127,4 +128,11 @@ test("each row in the thread list sends to its thread, and the recipient's arrow
   expect(state.reply).toHaveBeenCalledWith("run", true);
   // Panes no longer carry their own send button.
   expect(container.querySelector('[data-channel-thread] [aria-label="Send to run"]')).toBeNull();
+});
+test("controls explain themselves in tooltips, not title attributes", () => {
+  tooltips.length = 0;
+  render([row("lead", "idle"), row("run", "active"), row("child", "idle", { parentThreadId: "run" })], "lead");
+  switcher("lead");
+  expect(container.querySelectorAll("[title]")).toHaveLength(0);
+  expect(tooltips).toEqual(expect.arrayContaining(["Close the other panes", "Send to run", "Messages go to lead", "Open child", "Close this pane"]));
 });

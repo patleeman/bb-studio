@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { ThreadChat } from "@get-bb/plugin-sdk/app";
-import { Icon, ItemTile } from "@bb-studio/kit/app";
+import { Icon, ItemTile, Tooltip } from "@bb-studio/kit/app";
 import type { CommandThread } from "./command-contract";
 import { byAttention, followThread, movePane, threadActivity } from "./command-layout";
 
@@ -158,21 +158,21 @@ export function CommandThreads({ panes, threads, leadThreadId, onReply, onOpen }
       <header draggable={arrangeable || undefined} data-arrangeable={arrangeable || undefined}
         onDragStart={arrangeable ? event => { event.dataTransfer.setData(PANE_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setDragImage(event.currentTarget.parentElement!, 24, 20); setDragging(thread.id); } : undefined}
         onDragEnd={arrangeable ? endDrag : undefined}>
-        {arrangeable && <button type="button" className="channel-pane-grip" aria-label={`Move ${label(thread)}`} title="Drag to rearrange. Arrow keys move it too." onKeyDown={event => nudge(event, thread.id)}><Icon name="DragDropVertical" className="size-3.5" /></button>}
+        {arrangeable && <Tooltip label="Drag to rearrange. Arrow keys move it too."><button type="button" className="channel-pane-grip" aria-label={`Move ${label(thread)}`} onKeyDown={event => nudge(event, thread.id)}><Icon name="DragDropVertical" className="size-3.5" /></button></Tooltip>}
         <ItemTile icon={null} kindIcon="MessageSquare" size="sm" />
         <span className="min-w-0 flex-1">
-          <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" type="button" onClick={() => onOpen(thread.id)} title={`Open ${thread.title}`}>{label(thread)}</button>
+          <Tooltip label={`Open ${thread.title}`}><button className="block max-w-full truncate text-left text-sm font-medium hover:underline" type="button" onClick={() => onOpen(thread.id)}>{label(thread)}</button></Tooltip>
         </span>
         {thread.id === leadThreadId && <span className="shrink-0 text-xs text-subtle-foreground" data-command-lead>Lead</span>}
-        {following && <span className="shrink-0 text-xs text-subtle-foreground" title="This pane switches to whichever thread is working. Open another thread to keep this one." data-command-following>Following</span>}
+        {following && <Tooltip label="This pane switches to whichever thread is working. Open another thread to keep this one."><span className="shrink-0 text-xs text-subtle-foreground" data-command-following>Following</span></Tooltip>}
         <Status thread={thread} withTime />
         <span className="channel-pane-actions">
-          {arrangeable && <button type="button" aria-label={`Show only ${label(thread)}`} title="Close the other panes" onClick={() => panes.only(thread.id)} className="channel-pane-action"><Icon name="Maximize2" className="size-3.5" /></button>}
-          {!following && <button type="button" aria-label={`Close ${label(thread)}`} title={arrangeable ? "Close. Open it again from the thread list." : "Close and follow the work again"} onClick={() => panes.close(thread.id)} className="channel-pane-action"><Icon name="X" className="size-3.5" /></button>}
+          {arrangeable && <Tooltip label="Close the other panes"><button type="button" aria-label={`Show only ${label(thread)}`} onClick={() => panes.only(thread.id)} className="channel-pane-action"><Icon name="Maximize2" className="size-3.5" /></button></Tooltip>}
+          {!following && <Tooltip label={arrangeable ? "Close. Open it again from the thread list." : "Close and follow the work again"}><button type="button" aria-label={`Close ${label(thread)}`} onClick={() => panes.close(thread.id)} className="channel-pane-action"><Icon name="X" className="size-3.5" /></button></Tooltip>}
         </span>
       </header>
       {thread.error ? <p className="p-4 text-sm text-destructive">{thread.error}</p> : <Transcript threadId={thread.id} onReply={onReply} choose={choose} />}
-      {forks.length > 0 && <footer aria-label="Forks">{forks.map(child => <button type="button" key={child.id} onClick={() => panes.open(child.id)} title={`Open ${child.title}`}><Icon name="GitBranch" className="size-3 shrink-0" aria-hidden /><span className="truncate">{child.title}</span><Status thread={child} /></button>)}</footer>}
+      {forks.length > 0 && <footer aria-label="Forks">{forks.map(child => <Tooltip key={child.id} label={`Open ${child.title}`}><button type="button" onClick={() => panes.open(child.id)}><Icon name="GitBranch" className="size-3 shrink-0" aria-hidden /><span className="truncate">{child.title}</span><Status thread={child} /></button></Tooltip>)}</footer>}
     </section>;
   };
 
@@ -205,14 +205,14 @@ export function CommandSwitcher({ panes, threads, leadThreadId, target, onReply 
       {rows.map(thread => {
         const open = shown.has(thread.id), activity = threadActivity(thread);
         return <div key={thread.id} className="channel-switcher-row" data-current={open || undefined} data-fork={thread.parentThreadId ? "" : undefined} data-activity={activity}>
-          <button type="button" className="channel-switcher-pick" aria-pressed={open} onClick={() => panes.open(thread.id)} aria-label={`${thread.title}, ${activity}${open ? ", open" : ""}`} title={open ? `${thread.title} · ${activity}` : `Open ${thread.title} · ${activity}`}>
+          <Tooltip label={open ? `${thread.title} · ${activity}` : `Open ${thread.title} · ${activity}`}><button type="button" className="channel-switcher-pick" aria-pressed={open} onClick={() => panes.open(thread.id)} aria-label={`${thread.title}, ${activity}${open ? ", open" : ""}`}>
             <span className="channel-switcher-check" aria-hidden>{open && <Icon name="Check" className="size-3.5" />}</span>
             <span className="channel-rail-name">{thread.title}</span>
             {thread.id === leadThreadId && <span className="shrink-0 text-xs text-subtle-foreground">Lead</span>}
             <span className="channel-status-dot" aria-hidden />
-          </button>
-          <button type="button" className="channel-pane-action channel-switcher-send" aria-pressed={thread.id === target} aria-label={`Send to ${thread.title}`} title={thread.id === target ? `Messages go to ${thread.title}` : `Send to ${thread.title}`} onClick={() => onReply(thread.id, true)}><Icon name="ArrowTurnBackward" className="size-3.5" /></button>
-          {open && !panes.following && <button type="button" className="channel-pane-action channel-switcher-close" aria-label={`Close ${thread.title}`} title="Close this pane" onClick={() => panes.close(thread.id)}><Icon name="X" className="size-3" /></button>}
+          </button></Tooltip>
+          <Tooltip label={thread.id === target ? `Messages go to ${thread.title}` : `Send to ${thread.title}`}><button type="button" className="channel-pane-action channel-switcher-send" aria-pressed={thread.id === target} aria-label={`Send to ${thread.title}`} onClick={() => onReply(thread.id, true)}><Icon name="ArrowTurnBackward" className="size-3.5" /></button></Tooltip>
+          {open && !panes.following && <Tooltip label="Close this pane"><button type="button" className="channel-pane-action channel-switcher-close" aria-label={`Close ${thread.title}`} onClick={() => panes.close(thread.id)}><Icon name="X" className="size-3" /></button></Tooltip>}
         </div>;
       })}
     </div>
