@@ -28,6 +28,21 @@ struct RootView: View {
                 .tag(Tab.settings)
         }
         .tabViewStyle(.sidebarAdaptable)
+        .overlay(alignment: .bottom) {
+            if let notice = model.notice {
+                Text(notice)
+                    .font(.subheadline.weight(.medium))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial, in: .capsule)
+                    .padding(.horizontal)
+                    .padding(.bottom, 64)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.snappy, value: model.notice)
         .alert("Notification unavailable", isPresented: Binding(
             get: { model.notificationError != nil },
             set: { if !$0 { model.notificationError = nil } }

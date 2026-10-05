@@ -202,14 +202,21 @@ struct NewThreadView: View {
                 let thread = try await client.createThread(
                     projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
                     options: choice, workspace: selectedWorkspace)
-                // A thread is in its project's Space unless added to another.
+                // A thread is in its project's Space unless added to another. The thread
+                // exists either way, so a failed move is a notice, not a failed create.
+                var notice: String?
                 if let space, !space.projectIds.contains(projectId) {
-                    try? await client.moveThreads([thread.id], toSpace: space.id)
+                    do {
+                        try await client.moveThreads([thread.id], toSpace: space.id)
+                    } catch {
+                        notice = "Couldn't add the thread to \(space.name): \(BBClient.describe(error, server: client.baseURL))"
+                    }
                 }
-                return thread
-            }, completion: { thread in
+                return (thread, notice)
+            }, completion: { created in
                 dismiss()
-                app.openThread(thread.id)
+                app.openThread(created.0.id)
+                if let notice = created.1 { app.flash(notice) }
             })
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

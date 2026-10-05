@@ -79,6 +79,8 @@ final class AppModel: ObservableObject {
     @Published var newThreadSpace: String?
     @Published var sheet: Sheet?
     @Published var notificationError: String?
+    /// A brief message over the whole app for something that went partly wrong, like Studio's flash.
+    @Published private(set) var notice: String?
     /// Opens the new-thread composer, optionally prefilled.
     @Published var newThreadDraft: String?
     /// Set by `bbstudio://reply/<id>`; that thread focuses its composer.
@@ -241,6 +243,15 @@ final class AppModel: ObservableObject {
         studioKind = nil
         studioSpace = id
         openStudio(kind: nil)
+    }
+
+    /// Shows `message` at the bottom of the app for a few seconds.
+    func flash(_ message: String) {
+        notice = message
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            if notice == message { notice = nil }
+        }
     }
 
     func startDictation(threadId: String? = nil) {
