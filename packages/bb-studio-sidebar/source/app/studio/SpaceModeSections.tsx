@@ -44,6 +44,7 @@ import {
 import { toggleCollapsedIdList } from "../list/ProjectList.js";
 import { buildSpaceThreadGroups, createSpaceResolver, defaultSpaceId, spaceSectionKey, type StudioSpace, projectSpaces } from "./space-groups.js";
 import { SpaceStudioList, SpaceSubheading } from "./SpaceStudioList.js";
+import { SpaceArchivedMenu } from "./SpaceArchivedMenu.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
 import { SpaceRowsContext } from "./SpaceThreadRow.js";
 import { handOffNewThreadSpace } from "./new-thread-space.js";
@@ -354,15 +355,18 @@ export function SpaceModeSections({
                     <SpaceSubheading
                       title="Threads"
                       action={(
-                        <button
-                          type="button"
-                          aria-label={`New thread in ${group.space.name}`}
-                          title="New thread"
-                          onClick={newThread}
-                          className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
-                        >
-                          <Icon name="Plus" className="size-3.5" />
-                        </button>
+                        <span className="inline-flex items-center gap-0.5">
+                          <SpaceArchivedMenu space={group.space} spaces={spaces} spaceOf={spaceOf} />
+                          <button
+                            type="button"
+                            aria-label={`New thread in ${group.space.name}`}
+                            title="New thread"
+                            onClick={newThread}
+                            className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
+                          >
+                            <Icon name="Plus" className="size-3.5" />
+                          </button>
+                        </span>
                       )}
                     />
                     {tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId })}
