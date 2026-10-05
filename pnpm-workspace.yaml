@@ -7,3 +7,7 @@ allowBuilds:
 # live sources in the workspace instead.
 overrides:
   '@bb-studio/kit': link:./packages/bb-studio-kit
+# Several agents share this checkout. pnpm 11 reinstalls stale dependencies
+# before every script by default, which can purge node_modules under another
+# thread; warn instead and run `pnpm install` deliberately.
+verifyDepsBeforeRun: warn
