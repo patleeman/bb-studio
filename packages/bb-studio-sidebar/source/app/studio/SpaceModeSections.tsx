@@ -35,7 +35,12 @@ import {
 import { ReorderableSidebarSectionOrderList } from "../list/ReorderableSidebarSectionOrderList.js";
 import { ThreadListVisibility, ThreadListVisibilityGroupScope } from "../list/ThreadListVisibility.js";
 import { SidebarHeaderControls } from "../list/SidebarHeaderControls.js";
-import { sidebarCurrentSpaceAtom, sidebarGroupThreadsByEnvironmentAtom } from "../preferences/atoms.js";
+import {
+  sidebarCollapsedSpacesAtom,
+  sidebarCurrentSpaceAtom,
+  sidebarGroupThreadsByEnvironmentAtom,
+} from "../preferences/atoms.js";
+import { toggleCollapsedIdList } from "../list/ProjectList.js";
 import {
   buildSpaceThreadGroups,
   createSpaceResolver,
@@ -45,7 +50,10 @@ import {
 } from "./space-groups.js";
 import { SpaceStudioList, SpaceSubheading } from "./SpaceStudioList.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
+import { SpaceLeadRowContext, SpaceRowsContext } from "./SpaceThreadRow.js";
+import { threadLineIds, threadLineStatusKey, useThreadLines } from "./useThreadLines.js";
 import {
+  ALL_SPACES,
   neighbourSpaceId,
   openSpaceDialog,
   SpaceMark,
@@ -96,10 +104,12 @@ function cadenceLabel(cadence: string): string {
 }
 
 /**
- * By space: one Space at a time, Arc-style. The current Space shows its lead
- * on top, its open Studio items and its threads; threads in no Space belong
- * to the default Space. Dots pinned to the bottom switch Spaces, as do
- * ⌃⌥← / ⌃⌥→ and a horizontal swipe over the list.
+ * By space: one Space at a time, Arc-style, or All of them stacked. A Space
+ * shows its lead on top, its open Studio items and its threads; threads in no
+ * Space belong to the default Space. Dots pinned to the bottom switch between
+ * All and each Space, as do ⌃⌥← / ⌃⌥→ and a horizontal swipe over the list.
+ * Thread rows get two lines: a status dot, the title and its age, then the
+ * thread's latest line from Studio.
  */
 export function SpaceModeSections({
   collapsedEnvironmentIds,
@@ -133,10 +143,19 @@ export function SpaceModeSections({
   const groupThreadsByEnvironment = useAtomValue(sidebarGroupThreadsByEnvironmentAtom);
   const [storedSpaceId, setStoredSpaceId] = useAtom(sidebarCurrentSpaceAtom);
   const fallbackSpaceId = defaultSpaceId(spaces);
-  const currentSpace = spaces.find((space) => space.id === storedSpaceId)
-    ?? spaces.find((space) => space.id === fallbackSpaceId)
-    ?? null;
+  const isAll = storedSpaceId === ALL_SPACES && spaces.length > 0;
+  const currentSpace = isAll ? null
+    : spaces.find((space) => space.id === storedSpaceId)
+      ?? spaces.find((space) => space.id === fallbackSpaceId)
+      ?? null;
+  const currentId = isAll ? ALL_SPACES : currentSpace?.id ?? null;
   const switchTo = useCallback((spaceId: string) => setStoredSpaceId(spaceId), [setStoredSpaceId]);
+  const [collapsedSpaceList, setCollapsedSpaceList] = useAtom(sidebarCollapsedSpacesAtom);
+  const collapsedSpaces = useMemo(() => new Set(collapsedSpaceList), [collapsedSpaceList]);
+  const toggleSpaceCollapsed = useCallback(
+    (spaceId: string) => setCollapsedSpaceList((current) => toggleCollapsedIdList({ current, id: spaceId })),
+    [setCollapsedSpaceList],
+  );
 
   const resolveSpace = useMemo(
     () => createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), fallbackSpaceId),
@@ -148,7 +167,7 @@ export function SpaceModeSections({
     return spaceId ? [spaceId] : [];
   })), [resolveSpace, threads]);
 
-  // Opening a thread from elsewhere shows its Space.
+  // Opening a thread from elsewhere shows its Space; All expands it.
   const revealedFor = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!selectedThreadId || revealedFor.current === selectedThreadId) return;
@@ -156,14 +175,17 @@ export function SpaceModeSections({
     if (!thread) return;
     revealedFor.current = selectedThreadId;
     const spaceId = resolveSpace(thread);
-    if (spaceId && spaceId !== currentSpace?.id && !effectivePinnedThreadIds.has(thread.id)) switchTo(spaceId);
-  }, [currentSpace?.id, effectivePinnedThreadIds, resolveSpace, selectedThreadId, switchTo, threads]);
+    if (!spaceId || effectivePinnedThreadIds.has(thread.id)) return;
+    if (isAll) {
+      if (collapsedSpaces.has(spaceId)) toggleSpaceCollapsed(spaceId);
+    } else if (spaceId !== currentSpace?.id) switchTo(spaceId);
+  }, [collapsedSpaces, currentSpace?.id, effectivePinnedThreadIds, isAll, resolveSpace, selectedThreadId, switchTo, threads, toggleSpaceCollapsed]);
 
   const area = useRef<HTMLDivElement>(null);
   useFillSidebar(area);
   useSpaceSwitchGestures(area, (step) => {
-    const next = neighbourSpaceId(spaces, currentSpace?.id ?? null, step);
-    if (next && next !== currentSpace?.id) switchTo(next);
+    const next = neighbourSpaceId(spaces, currentId, step);
+    if (next && next !== currentId) switchTo(next);
   });
 
   const nonPinnedThreads = useMemo(
@@ -174,33 +196,46 @@ export function SpaceModeSections({
     () => buildSpaceThreadGroups(nonPinnedThreads, spaces, spaceOf, leads),
     [leads, nonPinnedThreads, spaceOf, spaces],
   );
-  const group = useMemo(() => {
-    const found = groups.find((candidate) => candidate.space.id === currentSpace?.id);
-    if (!found) return null;
-    const sectionId = spaceSectionKey(found.space.id);
-    const item = buildGroupSectionItem(found.space.id, sectionId, found.space.name, found.threads, compareThreads, draftThreadIds, groupThreadsByEnvironment);
-    item.group.items = needsYouFirst(item.group.items);
-    const leadItems = found.lead ? buildProjectThreadGroups([found.lead], compareThreads, draftThreadIds, false) : [];
-    const all = found.lead ? [found.lead, ...found.threads] : found.threads;
-    return { ...found, sectionId, item, leadItems, all, activity: getCollapsedChildActivity(all, draftThreadIds) };
-  }, [compareThreads, currentSpace?.id, draftThreadIds, groupThreadsByEnvironment, groups]);
+  // The Spaces on show: the current one, or every one in All.
+  const shown = useMemo(() => groups
+    .filter((candidate) => isAll || candidate.space.id === currentSpace?.id)
+    .map((found) => {
+      const sectionId = spaceSectionKey(found.space.id);
+      const item = buildGroupSectionItem(found.space.id, sectionId, found.space.name, found.threads, compareThreads, draftThreadIds, groupThreadsByEnvironment);
+      item.group.items = needsYouFirst(item.group.items);
+      const leadItems = found.lead ? buildProjectThreadGroups([found.lead], compareThreads, draftThreadIds, false) : [];
+      const all = found.lead ? [found.lead, ...found.threads] : found.threads;
+      return { ...found, sectionId, item, leadItems, all, activity: getCollapsedChildActivity(all, draftThreadIds) };
+    }), [compareThreads, currentSpace?.id, draftThreadIds, groupThreadsByEnvironment, groups, isAll]);
+  const shownBySection = useMemo(() => new Map(shown.map((candidate) => [candidate.sectionId as SidebarSectionId, candidate])), [shown]);
+
+  // Latest lines for the threads on show: leads first, then by recency.
+  const lineIds = useMemo(() => {
+    const open = shown.filter((candidate) => !isAll || !collapsedSpaces.has(candidate.space.id));
+    return threadLineIds(
+      open.flatMap((candidate) => candidate.lead ? [candidate.lead] : []),
+      [...open.flatMap((candidate) => candidate.threads), ...pinnedThreads],
+    );
+  }, [collapsedSpaces, isAll, pinnedThreads, shown]);
+  const lines = useThreadLines(lineIds, useMemo(() => threadLineStatusKey(threads, lineIds), [lineIds, threads]));
+  const rows = useMemo(() => ({ lines }), [lines]);
 
   const showThreads = spaces.length === 0;
   const order = useMemo<SidebarSectionId[]>(
     () => [
       ...(showPinnedSection ? ["pinned" as const] : []),
-      ...(group ? [group.sectionId] : []),
+      ...shown.map((candidate) => candidate.sectionId),
       ...(showThreads ? ["threads" as const] : []),
     ],
-    [group, showPinnedSection, showThreads],
+    [shown, showPinnedSection, showThreads],
   );
   const looseItems = useMemo<ProjectThreadItem[]>(
     () => buildProjectThreadGroups(loose, compareThreads, draftThreadIds, groupThreadsByEnvironment),
     [compareThreads, draftThreadIds, groupThreadsByEnvironment, loose],
   );
   const rootItems = useMemo<ProjectThreadItem[]>(
-    () => [...looseItems, ...(group ? [group.item] : [])],
-    [group, looseItems],
+    () => [...looseItems, ...shown.map((candidate) => candidate.item)],
+    [looseItems, shown],
   );
   // Threads still nest by dropping one onto another; sections don't reorder.
   const threadDnd = useGroupedModeThreadDnd({
@@ -242,6 +277,7 @@ export function SpaceModeSections({
 
   return (
     <SpaceLeadContext.Provider value={leadState}>
+      <SpaceRowsContext.Provider value={rows}>
       <div ref={area} data-sidebar-space-area="" className="flex min-w-0 flex-col">
         <ThreadListVisibility groups={[]} order={[]} onOrderChange={noop} label="Spaces" selectedThreadId={selectedThreadId}>
           <ReorderableSidebarSectionOrderList order={order} threadDnd={threadDnd}>
@@ -262,7 +298,8 @@ export function SpaceModeSections({
                   </ThreadListVisibilityGroupScope>
                 ) : builtInSection;
               }
-              if (!group || sectionId !== group.sectionId) return null;
+              const group = shownBySection.get(sectionId);
+              if (!group) return null;
               const newThread = () => onCreateThreadInProject(group.space.defaultProjectId);
               const heartbeat = heartbeats[group.space.id] ?? null;
               return (
@@ -274,6 +311,8 @@ export function SpaceModeSections({
                     activity={group.activity}
                     threads={group.all}
                     consumeClickSuppression={consumeClickSuppression}
+                    needsYou={isAll && attention.has(group.space.id)}
+                    collapse={isAll ? { isCollapsed: collapsedSpaces.has(group.space.id), onToggleCollapsed: () => toggleSpaceCollapsed(group.space.id) } : undefined}
                   >
                     {group.lead ? (
                       <div data-space-lead={group.lead.id} className="mb-1.5 rounded-md bg-sidebar-accent/40 pb-0.5">
@@ -282,7 +321,9 @@ export function SpaceModeSections({
                           <span className="font-medium">Lead</span>
                           {heartbeat ? <span className="truncate text-subtle-foreground">· heartbeat {cadenceLabel(heartbeat)}</span> : null}
                         </div>
-                        {tree({ rootItems: group.leadItems, threads: [group.lead] })}
+                        <SpaceLeadRowContext.Provider value>
+                          {tree({ rootItems: group.leadItems, threads: [group.lead] })}
+                        </SpaceLeadRowContext.Provider>
                       </div>
                     ) : null}
                     <SpaceStudioList
@@ -313,9 +354,10 @@ export function SpaceModeSections({
           </ReorderableSidebarSectionOrderList>
         </ThreadListVisibility>
         {spaces.length ? (
-          <SpaceSwitcher spaces={spaces} currentId={currentSpace?.id ?? null} attention={attention} onSelect={switchTo} />
+          <SpaceSwitcher spaces={spaces} currentId={currentId} attention={attention} onSelect={switchTo} />
         ) : null}
       </div>
+      </SpaceRowsContext.Provider>
     </SpaceLeadContext.Provider>
   );
 }
@@ -346,7 +388,11 @@ export function resetTeamsInstalledForTest(): void {
   teamsInstalled = null;
 }
 
-/** The current Space's plain heading: its mark and name, and ⋯ with New thread, Command view, Edit and Delete. */
+/**
+ * A Space's plain heading: its mark (amber-dotted in All when a thread there
+ * needs the user) and name, and ⋯ with New thread, Command view, Edit and
+ * Delete. In All it collapses.
+ */
 function SpaceSidebarSection({
   space,
   sectionId,
@@ -354,6 +400,8 @@ function SpaceSidebarSection({
   activity,
   threads,
   consumeClickSuppression,
+  needsYou = false,
+  collapse,
   children,
 }: {
   space: StudioSpace;
@@ -362,6 +410,8 @@ function SpaceSidebarSection({
   activity: ReturnType<typeof getCollapsedChildActivity>;
   threads: readonly SidebarThread[];
   consumeClickSuppression?: Parameters<typeof SortableSidebarSection>[0]["consumeClickSuppression"];
+  needsYou?: boolean;
+  collapse?: { isCollapsed: boolean; onToggleCollapsed: () => void };
   children: ReactNode;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -371,7 +421,13 @@ function SpaceSidebarSection({
       id={sectionId}
       sectionId={sectionId}
       label={space.name}
-      labelMark={<SpaceMark space={space} />}
+      labelMark={needsYou ? (
+        <span className="relative inline-flex">
+          <SpaceMark space={space} />
+          <span data-space-needs-you="" role="img" aria-label="Needs you" className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-warning" />
+        </span>
+      ) : <SpaceMark space={space} />}
+      collapseControl={collapse}
       disabled
       dropParentKey={sectionId}
       actionsMobileAlways

@@ -35,7 +35,7 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/app/list/useSidebarModeSectionOrder.ts` | Leave By space out of the stored section orders; it follows Studio's order. |
 | `source/app/model/sidebar-section-id.ts`, `sidebar-section-order.ts`, and `source/app/dnd/useSectionThreadDnd.ts` (group ids) | Accept `space:` section ids. |
 | `source/app/rows/ThreadActionsMenu.tsx` | Insert Float after Open in split. |
-| `source/app/rows/ThreadRow.tsx` | Show a Studio app's badge, such as a bot's avatar, and the automated thread mark before the title. |
+| `source/app/rows/ThreadRow.tsx` | Show a Studio app's badge, such as a bot's avatar, and the automated thread mark before the title; in By space, draw the two-line row (status dot, age, latest line) from `studio/SpaceThreadRow.tsx`. |
 
 The restored upstream tests have import path changes for the relocated
 fixture and expectations for Studio menu items, preferences, and presence calls. Studio's own

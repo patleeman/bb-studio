@@ -197,7 +197,13 @@ export const preferenceDefinitions = {
   currentSpace: definePreference(
     listItemSchema.nullable(),
     null,
-    "The Studio Space By space shows; null for the default Space.",
+    "The Studio Space By space shows: a Space id, \"all\" for every Space, or null for the default Space.",
+    null,
+  ),
+  collapsedSpaces: definePreference(
+    stringListSchema,
+    [],
+    "Studio Space ids collapsed in By space's All view.",
     null,
   ),
 } as const;

@@ -96,6 +96,7 @@ import {
   type ThreadStatusGlyphProps,
 } from "./ThreadStatusGlyph.js";
 import { StudioThreadBadge } from "../studio/StudioThreadBadge.js";
+import { useSpaceThreadRow } from "../studio/SpaceThreadRow.js";
 
 const SIDEBAR_TITLE_DOUBLE_CLICK_MS = 400;
 
@@ -338,6 +339,7 @@ function ThreadRowComponent({
     : undefined;
   const shortcut = useSidebarThreadShortcut(thread.id);
   const pluginThreadRowStatus = useSidebarThreadRowStatus(thread.id);
+  const spaceRow = useSpaceThreadRow(thread);
   const { hasUnsubmittedDraft: hasComposerDraft } = useSidebarThreadDraft(
     thread.id,
   );
@@ -473,8 +475,9 @@ function ThreadRowComponent({
     "data-[sidebar-touch-armed=true]:!bg-transparent",
     nestTargetState && NEST_TARGET_STATE_CLASS[nestTargetState],
     reorderPlacement && REORDER_PLACEMENT_CLASS[reorderPlacement],
+    spaceRow?.className,
   );
-  const rowStyle = getThreadRowStyle(options.depth);
+  const rowStyle = { ...getThreadRowStyle(options.depth), ...spaceRow?.style };
   const parentGuideLeft =
     options.depth > 0 ? getSidebarThreadGroupLineLeft(options.depth - 1) : null;
   const isActionsOpen = isDropdownActionsOpen || isContextActionsOpen;
@@ -568,6 +571,7 @@ function ThreadRowComponent({
             </span>
           ) : (
             <>
+              {spaceRow?.dot}
               {provider ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -594,7 +598,7 @@ function ThreadRowComponent({
                   </TooltipContent>
                 </Tooltip>
               ) : null}
-              <StudioThreadBadge threadId={thread.id} needsYou={thread.hasPendingInteraction} />
+              <StudioThreadBadge threadId={thread.id} needsYou={!spaceRow && thread.hasPendingInteraction} />
               <span
                 className={cn(
                   "bb-thread-title",
@@ -714,6 +718,8 @@ function ThreadRowComponent({
                       isWorking={splitIndicatorIsWorking}
                     />
                   </span>
+                ) : spaceRow ? (
+                  spaceRow.time
                 ) : (
                   <ThreadTrailingIndicator
                     {...trailingIndicatorState}
@@ -761,6 +767,7 @@ function ThreadRowComponent({
           </span>
         )}
       </span>
+      {spaceRow?.line}
     </>
   );
 

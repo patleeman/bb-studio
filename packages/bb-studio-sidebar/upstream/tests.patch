@@ -1,5 +1,5 @@
 diff --git a/source/app.test.tsx b/source/app.test.tsx
-index 4d15df5..65146a8 100644
+index 4d15df5..8178d64 100644
 --- a/source/app.test.tsx
 +++ b/source/app.test.tsx
 @@ -4,0 +5 @@ import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,7 @@ index 4d15df5..65146a8 100644
 @@ -145,0 +151,2 @@ afterEach(() => {
 +  getDefaultStore().set(studioSpacesAtom, { status: "loading" });
 +  resetTeamsInstalledForTest();
-@@ -150,0 +158,150 @@ describe("thread-list plugin", () => {
+@@ -150,0 +158,186 @@ describe("thread-list plugin", () => {
 +  it("hides a thread from its row's menu, with Show and Unhide", async () => {
 +    const { rpcCalls } = renderList({ organizationMode: "project" });
 +    await screen.findByText("Later thread");
@@ -52,6 +52,7 @@ index 4d15df5..65146a8 100644
 +      ...THREADS,
 +      makeSidebarThread({ id: "thr_lead", projectId: "proj_web", title: "Alpha lead", createdAt: 1, updatedAt: 1, latestAttentionAt: 1, isUnread: false }),
 +      makeSidebarThread({ id: "thr_ask", projectId: "proj_web", title: "Asks you", createdAt: 0, updatedAt: 0, latestAttentionAt: 0, isUnread: false, hasPendingInteraction: true }),
++      makeSidebarThread({ id: "thr_busy", projectId: "proj_web", title: "Busy", createdAt: 0, updatedAt: 0, latestAttentionAt: 0, isUnread: false, status: "active" }),
 +    ];
 +    const studioCalls: { method: string; input: unknown }[] = [];
 +    const studio: Record<string, (input: unknown) => unknown> = {
@@ -59,7 +60,12 @@ index 4d15df5..65146a8 100644
 +        { id: "sp_alpha", name: "Alpha", color: "#f00", icon: "🚀", isDefault: true, defaultProjectId: "proj_web", projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
 +        { id: "sp_beta", name: "Beta", color: "#00f", icon: null, isDefault: false, defaultProjectId: null, projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
 +      ] }),
-+      space_of_threads: () => ({ threads: { thr_parent: "sp_alpha", thr_lead: "sp_alpha", thr_ask: "sp_beta", thr_later: "sp_beta", thr_personal: "sp_gone" } }),
++      space_of_threads: () => ({ threads: { thr_parent: "sp_alpha", thr_lead: "sp_alpha", thr_busy: "sp_alpha", thr_ask: "sp_beta", thr_later: "sp_beta", thr_personal: "sp_gone" } }),
++      thread_lines: () => ({ lines: {
++        thr_lead: { text: "Screenshot capture · 31 of 44", kind: "progress", at: 1 },
++        thr_busy: { text: "Typecheck failed", kind: "failure", at: 1 },
++        thr_ask: { text: "Fix the layout, or loosen the check?", kind: "blocked", at: 1 },
++      } }),
 +      space_lead: (input) => ({ leadThreadId: (input as { spaceId: string }).spaceId === "sp_alpha" ? "thr_lead" : null, run: { enabled: true, cadence: "hourly", time: "09:00" } }),
 +      space_set_lead: () => ({ leadThreadId: null, run: null }),
 +      spaceTree: () => ({ spaces: [
@@ -89,6 +95,17 @@ index 4d15df5..65146a8 100644
 +    expect(Array.from(alpha().querySelectorAll("[data-sidebar-thread-id]"), (el) => el.getAttribute("data-sidebar-thread-id"))[0]).toBe("thr_lead");
 +    expect(within(alpha()).getByText("Personal thread")).not.toBeNull();
 +    expect(threadIds()).not.toContain("thr_later");
++    // Two-line rows: a status dot, the title and its age, then the latest line, leads first.
++    await waitFor(() => expect(lead.querySelector("[data-space-thread-line]")?.textContent).toBe("Screenshot capture · 31 of 44"));
++    expect(studioCalls.find((call) => call.method === "thread_lines")?.input).toEqual({ threadIds: ["thr_lead", "thr_pinned", "thr_parent", "thr_child", "thr_personal", "thr_busy"] });
++    const row = (id: string) => document.querySelector(`[data-sidebar-thread-id="${id}"]`)!.closest("[data-sidebar-rename-row]") as HTMLElement;
++    expect(row("thr_busy").querySelector("[data-space-thread-line]")?.getAttribute("data-space-thread-line")).toBe("failure");
++    expect(row("thr_busy").querySelector("[data-space-thread-line]")?.className).toContain("text-destructive");
++    expect(row("thr_busy").querySelector("[data-space-thread-dot]")?.getAttribute("data-space-thread-dot")).toBe("working");
++    expect(row("thr_parent").querySelector("[data-space-thread-dot]")?.getAttribute("data-space-thread-dot")).toBe("unread");
++    expect(row("thr_parent").querySelector("[data-space-thread-line]")).toBeNull();
++    expect(row("thr_parent").querySelector("[data-space-thread-time]")?.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
++    expect(row("thr_parent").querySelector("[data-sidebar-thread-trailing-indicator]")).toBeNull();
 +    // The heading is plain: ⋯ has the Space's actions.
 +    expect(screen.queryByRole("button", { name: "Open Alpha" })).toBeNull();
 +    const dialogs: unknown[] = [];
@@ -128,10 +145,29 @@ index 4d15df5..65146a8 100644
 +    fireEvent.click(within(switcher).getByRole("button", { name: "New Space" }));
 +    window.removeEventListener("studio:new-space", onNew);
 +    expect(created).toHaveLength(1);
-+    // ⌃⌥← / ⌃⌥→ step through the Spaces.
++    await waitFor(() => expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')!.closest("[data-sidebar-rename-row]")!.querySelector("[data-space-thread-line]")?.className).toContain("text-warning"));
++    // ⌃⌥← / ⌃⌥→ step through All and the Spaces; All stacks every Space.
 +    fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
-+    await screen.findByTitle("Alpha");
-+    expect(sectionHeaders()).toEqual(["Pinned", "Alpha"]);
++    await waitFor(() => expect(sectionHeaders()).toEqual(["Pinned", "Alpha", "Beta"]));
++    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "currentSpace", value: "all" } }));
++    expect(within(switcher).getByRole("button", { name: "All Spaces" }).getAttribute("aria-current")).toBe("true");
++    const beta = () => screen.getByTitle("Beta").closest("[data-sidebar-sticky-group]") as HTMLElement;
++    expect(beta().querySelector("[data-space-needs-you]")).not.toBeNull();
++    expect(alpha().querySelector("[data-space-needs-you]")).toBeNull();
++    fireEvent.click(screen.getByRole("button", { name: "Collapse Beta section" }));
++    await waitFor(() => expect(within(beta()).queryByText("Asks you")).toBeNull());
++    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "collapsedSpaces", value: ["sp_beta"] } }));
++    fireEvent.click(screen.getByRole("button", { name: "Expand Beta section" }));
++    await within(beta()).findByText("Asks you");
++    fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
++    await waitFor(() => expect(sectionHeaders()).toEqual(["Pinned", "Alpha"]));
++  });
++
++  it("keeps BB's one-line rows outside By space", async () => {
++    renderList({ organizationMode: "chronological" });
++    await screen.findByText("Parent thread");
++    expect(document.querySelector("[data-space-thread-dot]")).toBeNull();
++    expect(document.querySelector("[data-space-thread-time]")).toBeNull();
 +  });
 +
 +  it("falls back to By project while Studio has no Spaces", async () => {
@@ -167,7 +203,7 @@ index 4d15df5..65146a8 100644
 +      unregister();
 +    }
 +  });
-@@ -303,0 +461,15 @@ describe("thread-list plugin", () => {
+@@ -303,0 +497,15 @@ describe("thread-list plugin", () => {
 +  it("opens the New project dialog from Threads", async () => {
 +    setPreferencesMirrorStorageForTest(null);
 +    renderList({ organizationMode: "project" }, {

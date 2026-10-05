@@ -14,11 +14,15 @@ export function openSpaceDialog(spaceId: string, dialog: "edit" | "delete" | "he
   window.dispatchEvent(new CustomEvent(SPACE_DIALOG_EVENT, { detail: { spaceId, dialog }, cancelable: true }));
 }
 
-/** The Space before or after `currentId`, wrapping around. */
+/** The `currentSpace` value for All, which stacks every Space. */
+export const ALL_SPACES = "all";
+
+/** The view before or after `currentId` (All, then each Space), wrapping around. */
 export function neighbourSpaceId(spaces: readonly StudioSpace[], currentId: string | null, step: -1 | 1): string | null {
   if (!spaces.length) return null;
-  const index = spaces.findIndex((space) => space.id === currentId);
-  return spaces[(Math.max(index, 0) + step + spaces.length) % spaces.length]!.id;
+  const ids = [ALL_SPACES, ...spaces.map((space) => space.id)];
+  const index = ids.indexOf(currentId ?? "");
+  return ids[((index < 0 ? 1 : index) + step + ids.length) % ids.length]!;
 }
 
 /**
@@ -100,8 +104,8 @@ export function SpaceMark({ space, size = "sm" }: { space: StudioSpace; size?: "
 }
 
 /**
- * Arc-style dots at the bottom of the list: one per Space in Studio's order,
- * the current one highlighted, a small dot on any with a thread that needs
+ * Arc-style dots at the bottom of the list: All first, then one per Space in
+ * Studio's order, the current one highlighted, a small dot on any with a thread that needs
  * the user, and + for a new Space.
  */
 export function SpaceSwitcher({ spaces, currentId, attention, onSelect }: {
@@ -116,6 +120,24 @@ export function SpaceSwitcher({ spaces, currentId, attention, onSelect }: {
       data-sidebar-space-switcher=""
       className="sticky bottom-0 z-40 mt-auto flex items-center justify-center gap-0.5 bg-sidebar px-2 pt-1.5 pb-2"
     >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label="All Spaces"
+            aria-current={currentId === ALL_SPACES ? "true" : undefined}
+            data-space-id={ALL_SPACES}
+            onClick={() => onSelect(ALL_SPACES)}
+            className={cn(
+              "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+              currentId === ALL_SPACES ? "bg-sidebar-accent text-sidebar-foreground" : "opacity-60 hover:bg-sidebar-accent/60 hover:opacity-100",
+            )}
+          >
+            <Icon name="GridView" className="size-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">All Spaces</TooltipContent>
+      </Tooltip>
       {spaces.map((space) => {
         const current = space.id === currentId;
         const needsYou = attention.has(space.id);

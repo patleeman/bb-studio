@@ -56,15 +56,17 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           current: sidebar.querySelector('[data-sidebar-space-switcher] [aria-current="true"]')?.getAttribute('data-space-id') ?? null,
           studioSpaces: Boolean(document.querySelector('[data-studio-sidebar-anchor="studio:spaces"]')),
           emoji: section("space:${fixture.spaces.launch.id}")?.querySelector('[data-sidebar-space-mark]')?.textContent ?? null,
+          statusDots: section("space:${fixture.spaces.launch.id}")?.querySelectorAll('[data-space-thread-dot]').length ?? 0,
         };
       })())`));
       if (!layout.labels.includes("Launch") || layout.labels.includes("Research") || layout.research) throw new Error(`By space should show only Launch: ${JSON.stringify(layout)}`);
       if (!["plan", "checklist", "digest"].every((key) => layout.launch.includes(fixture.threads[key]))) throw new Error(`Launch shows the wrong threads: ${JSON.stringify(layout)}`);
       if (["notes", "atlas", "loose"].some((key) => layout.launch.includes(fixture.threads[key]))) throw new Error(`Launch shows another Space's threads: ${JSON.stringify(layout)}`);
       const dots = [fixture.spaces.launch.id, fixture.spaces.research.id].map((id) => layout.dots.indexOf(id));
-      if (dots.some((index) => index < 0) || dots[1] < dots[0] || layout.current !== fixture.spaces.launch.id) throw new Error(`The Space switcher is wrong: ${JSON.stringify(layout)}`);
+      if (layout.dots[0] !== "all" || dots.some((index) => index < 0) || dots[1] < dots[0] || layout.current !== fixture.spaces.launch.id) throw new Error(`The Space switcher is wrong: ${JSON.stringify(layout)}`);
       if (layout.studioSpaces) throw new Error("Studio's Spaces section still shows in By space");
       if (layout.emoji !== "🚀") throw new Error(`Launch lacks its emoji: ${JSON.stringify(layout)}`);
+      if (layout.statusDots < layout.launch.length) throw new Error(`Launch's rows lack their status dots: ${JSON.stringify(layout)}`);
     };
     // The thread list from Launch's heading down to the Space switcher.
     const clip = async (client) => client.evaluate(`(() => {

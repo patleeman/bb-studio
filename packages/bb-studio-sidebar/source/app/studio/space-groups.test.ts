@@ -33,10 +33,12 @@ describe("By space grouping", () => {
     expect(buildSpaceThreadGroups(rows, [], spaceOf, {}).loose).toHaveLength(rows.length);
   });
 
-  it("steps to the next or previous Space, wrapping around", () => {
+  it("steps through All and each Space, wrapping around", () => {
+    expect(neighbourSpaceId(spaces, "all", 1)).toBe("sp_b");
     expect(neighbourSpaceId(spaces, "sp_b", 1)).toBe("sp_a");
-    expect(neighbourSpaceId(spaces, "sp_a", 1)).toBe("sp_b");
-    expect(neighbourSpaceId(spaces, "sp_b", -1)).toBe("sp_a");
+    expect(neighbourSpaceId(spaces, "sp_a", 1)).toBe("all");
+    expect(neighbourSpaceId(spaces, "all", -1)).toBe("sp_a");
+    expect(neighbourSpaceId(spaces, "sp_b", -1)).toBe("all");
     expect(neighbourSpaceId([], null, 1)).toBeNull();
   });
 

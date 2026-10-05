@@ -368,14 +368,15 @@ index 0915245..4fef2e5 100644
 +    value.startsWith("machine:") ||
 +    value.startsWith("space:")
 diff --git a/source/app/preferences/atoms.ts b/source/app/preferences/atoms.ts
-index aa949ec..12529db 100644
+index aa949ec..1fd7730 100644
 --- a/source/app/preferences/atoms.ts
 +++ b/source/app/preferences/atoms.ts
-@@ -3,0 +4,3 @@ import { createSyncedPreferenceAtom } from "./synced-preference-atom.js";
+@@ -3,0 +4,4 @@ import { createSyncedPreferenceAtom } from "./synced-preference-atom.js";
 +export const sidebarHiddenThreadsAtom = createSyncedPreferenceAtom("hiddenThreads");
 +export const sidebarCurrentSpaceAtom = createSyncedPreferenceAtom("currentSpace");
++export const sidebarCollapsedSpacesAtom = createSyncedPreferenceAtom("collapsedSpaces");
 +
-@@ -46,0 +50,2 @@ export const sidebarShowProviderIconsAtom =
+@@ -46,0 +51,2 @@ export const sidebarShowProviderIconsAtom =
 +export const sidebarHideEmptyProjectsAtom =
 +  createSyncedPreferenceAtom("hideEmptyProjects");
 diff --git a/source/app/rows/ThreadActionsMenu.tsx b/source/app/rows/ThreadActionsMenu.tsx
@@ -397,15 +398,30 @@ index c9f9497..0f5b250 100644
 +          ) : null}
 +          {id === "split" && (onOpenInSplit || floatAvailable) ? separator : null}
 diff --git a/source/app/rows/ThreadRow.tsx b/source/app/rows/ThreadRow.tsx
-index 13d58a8..7b6da8c 100644
+index 13d58a8..3a5f26d 100644
 --- a/source/app/rows/ThreadRow.tsx
 +++ b/source/app/rows/ThreadRow.tsx
-@@ -97,0 +98 @@ import {
+@@ -97,0 +98,2 @@ import {
 +import { StudioThreadBadge } from "../studio/StudioThreadBadge.js";
-@@ -595,0 +597 @@ function ThreadRowComponent({
-+              <StudioThreadBadge threadId={thread.id} needsYou={thread.hasPendingInteraction} />
++import { useSpaceThreadRow } from "../studio/SpaceThreadRow.js";
+@@ -339,0 +342 @@ function ThreadRowComponent({
++  const spaceRow = useSpaceThreadRow(thread);
+@@ -474,0 +478 @@ function ThreadRowComponent({
++    spaceRow?.className,
+@@ -476 +480 @@ function ThreadRowComponent({
+-  const rowStyle = getThreadRowStyle(options.depth);
++  const rowStyle = { ...getThreadRowStyle(options.depth), ...spaceRow?.style };
+@@ -569,0 +574 @@ function ThreadRowComponent({
++              {spaceRow?.dot}
+@@ -595,0 +601 @@ function ThreadRowComponent({
++              <StudioThreadBadge threadId={thread.id} needsYou={!spaceRow && thread.hasPendingInteraction} />
+@@ -714,0 +721,2 @@ function ThreadRowComponent({
++                ) : spaceRow ? (
++                  spaceRow.time
+@@ -761,0 +770 @@ function ThreadRowComponent({
++      {spaceRow?.line}
 diff --git a/source/shared/preferences.ts b/source/shared/preferences.ts
-index 98a5200..c260e32 100644
+index 98a5200..977d54e 100644
 --- a/source/shared/preferences.ts
 +++ b/source/shared/preferences.ts
 @@ -12,0 +13 @@ export const organizationModeSchema = z.enum([
@@ -433,10 +449,16 @@ index 98a5200..c260e32 100644
 @@ -133 +146 @@ export const preferenceDefinitions = {
 -    "Groups moved into More: threads, project:<id>, section:<id>, or machine:<id>.",
 +    "Groups moved into More: threads, project:<id>, section:<id>, machine:<id>, or space:<id>.",
-@@ -183,0 +197,6 @@ export const preferenceDefinitions = {
+@@ -183,0 +197,12 @@ export const preferenceDefinitions = {
 +  currentSpace: definePreference(
 +    listItemSchema.nullable(),
 +    null,
-+    "The Studio Space By space shows; null for the default Space.",
++    "The Studio Space By space shows: a Space id, \"all\" for every Space, or null for the default Space.",
++    null,
++  ),
++  collapsedSpaces: definePreference(
++    stringListSchema,
++    [],
++    "Studio Space ids collapsed in By space's All view.",
 +    null,
 +  ),
