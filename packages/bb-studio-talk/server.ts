@@ -24,7 +24,7 @@ import { MIGRATIONS, TalkStore } from "./src/server/store";
 import { refuseWhileCapturing, registerStudio } from "./src/server/studio";
 import { generateTitle } from "./src/server/titles";
 import { Transcriber } from "./src/server/transcriber";
-import { generateRecordingSummary } from "./src/server/meetings";
+import { Summaries, generateRecordingSummary } from "./src/server/meetings";
 import { cleanTranscript } from "./src/server/cleanup";
 import { talkModels } from "./src/server/models";
 import { HOLD_KEY_OPTIONS } from "./src/shared/format";
@@ -148,25 +148,12 @@ export default async function plugin(bb: BbPluginApi) {
       .finally(() => titling.delete(id));
   }
 
-  const summarizing = new Set<string>();
-  async function meetingNotes(id: string, regenerate = false): Promise<void> {
-    const recording = store.recording(id);
-    if (!recording || recording.kind !== "recording" || recording.status !== "done" || recording.failedCount || !recording.wordCount) return;
-    if (!regenerate && recording.meetingNotes) return;
-    if (summarizing.has(id)) {
-      if (regenerate) throw new Error("A summary is already being generated.");
-      return;
-    }
-    summarizing.add(id);
-    try {
-      const transcript = store.transcript(id);
-      const notes = await generateRecordingSummary(bb, id, transcript, lifetime.signal, await models.get("summary"));
-      // A resumed recording may gain text while the model is working.
-      if (store.transcript(id) === transcript && store.saveMeetingNotes(id, notes)) changed(id);
-    } finally {
-      summarizing.delete(id);
-    }
-  }
+  const summaries = new Summaries({
+    store,
+    summarize: async (id, transcript) => generateRecordingSummary(bb, id, transcript, lifetime.signal, await models.get("summary")),
+    changed,
+  });
+  const meetingNotes = (id: string, regenerate = false) => summaries.run(id, regenerate);
   function maybeSummarize(id: string): void {
     if (!config.autoMeetingNotes) return;
     void meetingNotes(id).catch((error) => {

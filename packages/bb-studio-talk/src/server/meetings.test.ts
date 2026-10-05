@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { addSegment, memoryStore } from "../test/db";
-import { parseRecordingSummary, recordingSummaryPrompt } from "./meetings";
+import { Summaries, parseRecordingSummary, recordingSummaryPrompt } from "./meetings";
 
 describe("recording summaries", () => {
   it("parses a general summary without a meeting template", () => {
@@ -32,4 +32,30 @@ describe("recording summaries", () => {
     store.setStatus(id, "recording");
     expect(store.recording(id)?.meetingNotes).toBeNull();
   });
+
+  it("summarizes a resumed recording that finishes while a stale summary runs", async () => {
+    const { store } = memoryStore();
+    const id = "rec_bbbbbbbb";
+    store.create({ id, kind: "recording", projectId: null, threadId: null });
+    addSegment(store, id, "sessiona", 0, 100);
+    store.markTranscribed(id, "sessiona-0", "First part.");
+    store.setStatus(id, "finishing");
+    const pending: ((notes: { summary: string }) => void)[] = [];
+    const summarize = vi.fn((_id: string, transcript: string) => new Promise<{ summary: string }>((resolve) => pending.push(() => resolve({ summary: transcript }))));
+    const summaries = new Summaries({ store, summarize, changed: () => {} });
+    const first = summaries.run(id);
+    // Record more, then finish again while the first summary is still running.
+    store.setStatus(id, "recording");
+    addSegment(store, id, "sessionb", 0, 200);
+    store.markTranscribed(id, "sessionb-0", "Second part.");
+    store.setStatus(id, "finishing");
+    await summaries.run(id);
+    pending.shift()!({ summary: "" });
+    await vi.waitFor(() => expect(pending).toHaveLength(1));
+    pending.shift()!({ summary: "" });
+    await first;
+    expect(summarize).toHaveBeenCalledTimes(2);
+    expect(store.recording(id)?.meetingNotes).toEqual({ summary: "First part.\n\nSecond part." });
+  });
 });
+

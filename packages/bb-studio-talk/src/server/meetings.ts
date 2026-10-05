@@ -3,6 +3,7 @@ import { askModel } from "@bb-studio/kit/decisions";
 import { primaryHostId } from "@bb-studio/kit/server";
 import type { ModelSelection } from "@bb-studio/kit/decisions-contract";
 import { meetingNotesSchema, type MeetingNotes } from "../shared/contract";
+import type { TalkStore } from "./store";
 
 export function parseRecordingSummary(text: string): MeetingNotes {
   const json = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -32,4 +33,46 @@ export async function generateRecordingSummary(bb: BbPluginApi, id: string, tran
   }, signal);
   if (!result.text) throw new Error("The model returned no recording summary.");
   return parseRecordingSummary(result.text);
+}
+
+/**
+ * Runs one summary per recording at a time. A finish that arrives while a
+ * summary is running (a resumed recording) asks for another run, which goes
+ * ahead once the running one turns out stale.
+ */
+export class Summaries {
+  private readonly running = new Set<string>();
+  private readonly again = new Set<string>();
+
+  constructor(
+    private readonly deps: {
+      store: Pick<TalkStore, "recording" | "transcript" | "saveMeetingNotes">;
+      summarize(id: string, transcript: string): Promise<MeetingNotes>;
+      changed(id: string): void;
+    },
+  ) {}
+
+  async run(id: string, regenerate = false): Promise<void> {
+    const { store } = this.deps;
+    const recording = store.recording(id);
+    if (!recording || recording.kind !== "recording" || recording.status !== "done" || recording.failedCount || !recording.wordCount) return;
+    if (!regenerate && recording.meetingNotes) return;
+    if (this.running.has(id)) {
+      if (regenerate) throw new Error("A summary is already being generated.");
+      this.again.add(id);
+      return;
+    }
+    this.running.add(id);
+    let saved = false;
+    try {
+      const transcript = store.transcript(id);
+      const notes = await this.deps.summarize(id, transcript);
+      // A resumed recording may gain text while the model is working.
+      saved = store.transcript(id) === transcript && store.saveMeetingNotes(id, notes);
+      if (saved) this.deps.changed(id);
+    } finally {
+      this.running.delete(id);
+    }
+    if (this.again.delete(id) && !saved) await this.run(id);
+  }
 }
