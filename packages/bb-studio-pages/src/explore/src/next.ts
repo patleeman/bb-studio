@@ -9,7 +9,7 @@
 // explainer) and, for 🐛 notes, Fix this. Replies from before `btw` carry
 // `explore="🐛 Label — why"` instead; those show as notes too. Attributes come
 // from the model, so parsing caps and dedupes them.
-import { labelKey, MAX_ITEMS, parseExploreItem, parseExploreItems, type ExploreItem } from "./shared";
+import { labelKey, MAX_ITEMS, MAX_LABEL_LENGTH, parseExploreItem, parseExploreItems, type ExploreItem } from "./shared";
 
 export const NEXT_DIRECTIVE = "next";
 
@@ -81,21 +81,41 @@ function cutText(text: string, max: number): string {
   return `${(space > max / 2 ? room.slice(0, space) : room).trimEnd()}…`;
 }
 
-/** `btw` notes: an emoji and one or two sentences. */
+/** A short, stable hash of a note's text (FNV-1a), to tell apart notes that start the same. */
+export function noteHash(text: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of labelKey(text)) {
+    hash ^= char.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36).padStart(7, "0");
+}
+
+/**
+ * `btw` notes: an emoji and one or two sentences. A note's label (its
+ * explainer's identity) is its first words; when two different notes start
+ * the same, the later one's label ends with a hash of its whole text, so the
+ * first keeps the label older explainers were saved under.
+ */
 export function parseBtwNotes(raw: string | undefined, max: number = NEXT_LIMITS.btw): BtwNote[] {
   if (typeof raw !== "string") return [];
-  const seen = new Set<string>();
+  const labels = new Set<string>();
+  const texts = new Set<string>();
   const notes: BtwNote[] = [];
   for (const part of raw.slice(0, 4_000).split("|")) {
     const item = parseExploreItem(part);
     if (!item) continue;
     // parseExploreItem cleans the same way, so a leading emoji is exactly `item.emoji`.
     const whole = clean(part);
-    const text = cutText(whole.startsWith(item.emoji) ? whole.slice(item.emoji.length).trim() : whole, MAX_NOTE_LENGTH);
-    const key = labelKey(item.label);
-    if (!text || seen.has(key)) continue;
-    seen.add(key);
-    notes.push({ emoji: item.emoji, label: item.label, text });
+    const full = whole.startsWith(item.emoji) ? whole.slice(item.emoji.length).trim() : whole;
+    const text = cutText(full, MAX_NOTE_LENGTH);
+    if (!text || texts.has(labelKey(full))) continue;
+    texts.add(labelKey(full));
+    let label = item.label;
+    if (labels.has(labelKey(label))) label = `${cutText(full, MAX_LABEL_LENGTH - 9)} #${noteHash(full)}`;
+    if (labels.has(labelKey(label))) continue;
+    labels.add(labelKey(label));
+    notes.push({ emoji: item.emoji, label, text });
     if (notes.length >= max) break;
   }
   return notes;

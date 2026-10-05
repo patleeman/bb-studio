@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { MAX_NOTE_LENGTH, NEXT_LIMITS, parseNextItems, preferredReplies } from "./next";
+import { MAX_LABEL_LENGTH, parseExploreItem } from "./shared";
 import { INSTRUCTIONS_LIMIT, nextInstructions } from "./prompt";
 import { ExploreStore, MIGRATIONS, NEXT_LOG_DAYS } from "./store";
 import { appendDraft, pickComposer } from "./ui/composer";
@@ -61,6 +62,18 @@ describe("the Next instructions", () => {
     expect(items.do).toHaveLength(1);
     expect(text).toContain("Prefer these when they fit: 👍 Agree | ❓ Clarify");
     expect(text).toContain("Don't also write ::reactions or ::explore lines");
+  });
+
+  it("keeps notes apart when they start the same, and the first keeps its old label", () => {
+    const start = "I noticed the retry loop in the billing worker and the retry loop in the email worker share";
+    const first = `${start} one counter. If one fails, both stop.`;
+    const second = `${start} one timer. If one is slow, both wait.`;
+    const notes = parseNextItems({ btw: `🐛 ${first}|🐛 ${second}|🐛 ${first}` }).btw;
+    expect(notes.map((note) => note.text)).toEqual([first, second]);
+    expect(notes[0].label).toBe(parseExploreItem(`🐛 ${first}`)!.label);
+    expect(notes[1].label).not.toBe(notes[0].label);
+    expect(notes[1].label.length).toBeLessThanOrEqual(MAX_LABEL_LENGTH);
+    expect(parseNextItems({ btw: `🐛 ${first}|🐛 ${second}` }).btw[1].label).toBe(notes[1].label);
   });
 
   it("tell the agent how to quote, since one straight double quote turns the whole line into raw text", () => {
