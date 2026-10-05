@@ -76,7 +76,7 @@ describe("the Studio provider", async () => {
     registerStudio(bb as never, service, studioSchemas(z));
     const create = (title: string, projectId: string | null, parentId: string | null = null) =>
       service.createPage({ projectId, parentId, title, actor: HUMAN_USER_ID }).id;
-    return { store, events, create, call: async (method: string, input: unknown): Promise<any> => handlers[method]!(input) };
+    return { store, service, events, create, call: async (method: string, input: unknown): Promise<any> => handlers[method]!(input) };
   }
 
   it("describes one kind and lists archived pages too", async () => {
@@ -99,6 +99,17 @@ describe("the Studio provider", async () => {
     expect(store.list({ includeArchived: true }).some((page) => page.parent_id === item.id && page.title === "Next step")).toBe(true);
     const copy = await call("studio_duplicate", { id: child, projectId: null, includeChildren: false });
     expect(copy.item.title).toBe("Next step (copy)");
+  });
+
+  it("duplicates an open page's unsaved edits", async () => {
+    const { store, service, create, call } = setup();
+    const { applyEdits } = await import("./doc");
+    const id = create("Plan", "proj_a");
+    applyEdits(service.hub.open(id).doc, [{ op: "append", markdown: "Typed just now" }], "user");
+    expect(store.get(id)!.markdown).not.toContain("Typed just now");
+    const { item } = await call("studio_duplicate", { id, projectId: "proj_a", includeChildren: false });
+    expect(store.get(item.id)!.markdown).toContain("Typed just now");
+    service.hub.disposeAll();
   });
 
   it("moves sub-pages along, and detaches a page from a parent left behind", async () => {

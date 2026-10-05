@@ -104,8 +104,10 @@ export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: 
     const render = (value: string) => variables ? fillTemplate(value, variables) : value;
     const make = (pageId: string, parentId: string | null): StudioItem => {
       const page = requireMeta(pageId);
+      // An open page's newest edits may not be saved yet; comments stay behind.
+      const source = service.hub.has(pageId) ? readMarkdown(service.hub.open(pageId).doc) : (store.get(pageId)?.markdown ?? "");
       const created = service.createPage({ projectId, parentId, title: render(variables ? page.title : copyTitle(page.title)), icon: page.icon,
-        markdown: render(store.get(pageId)?.markdown ?? ""), actor: HUMAN_USER_ID });
+        markdown: render(source), actor: HUMAN_USER_ID });
       let markdown = store.get(created.id)?.markdown ?? "";
       for (const file of store.files(pageId)) {
         const nextId = store.addFile(created.id, file.name, file.mime, file.data);
