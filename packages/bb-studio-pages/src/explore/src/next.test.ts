@@ -4,7 +4,7 @@ import { MAX_NOTE_LENGTH, NEXT_LIMITS, parseNextItems, preferredReplies } from "
 import { MAX_LABEL_LENGTH, parseExploreItem } from "./shared";
 import { INSTRUCTIONS_LIMIT, nextInstructions } from "./prompt";
 import { ExploreStore, MIGRATIONS, NEXT_LOG_DAYS } from "./store";
-import { appendDraft, pickComposer } from "./ui/composer";
+import { appendDraft } from "./ui/composer";
 
 describe("the ::next directive", () => {
   it("parses each group, capped and deduped", () => {
@@ -173,14 +173,6 @@ describe("the click log's size", () => {
 });
 
 describe("drafting", () => {
-  const thread = (threadId: string) => ({ scope: { kind: "thread" as const, threadId } });
-  const fresh = { scope: { kind: "new-thread" as const } };
-
-  it("picks the message's thread, then a new thread, never another thread", () => {
-    expect(pickComposer([thread("a"), fresh, thread("b")] as never[], "a")).toEqual(thread("a"));
-    expect(pickComposer([fresh, thread("b")] as never[], "a")).toEqual(fresh);
-    expect(pickComposer([thread("b")] as never[], "a")).toBeNull();
-  });
 
   it("adds the suggestion after the draft", () => {
     expect(appendDraft("", "👍 Ship it")).toBe("👍 Ship it");

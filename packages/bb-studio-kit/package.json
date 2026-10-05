@@ -18,6 +18,7 @@
     "./tables": "./src/tables/index.ts",
     "./table-grid": "./src/tables/grid/index.ts",
     "./app": "./src/app/index.ts",
+    "./composer": "./src/composer.tsx",
     "./ui": "./src/ui/index.ts",
     "./chat-contract": "./src/chat-contract.ts",
     "./chat-schemas": "./src/chat-schemas.ts"

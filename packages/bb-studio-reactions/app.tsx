@@ -16,11 +16,9 @@
 // 3. Settings — BB owns the single settings form. A read-only preview shows
 //    whether saved menu settings need a window reload. Applying never disables
 //    the plugin. Static action registrations read one snapshot at setup.
-import { useEffect } from "react";
 import { toast } from "sonner";
 import {
   definePluginApp,
-  useComposer,
   useSettings,
   type PluginComposerApi,
   type PluginMessageActionContext,
@@ -30,7 +28,7 @@ import { Button } from "@bb-studio/kit/ui";
 import { parseEmojiItems } from "./src/emoji-items";
 import { menuSettings, needsMenuReload, type MenuSettings } from "./src/settings";
 import { mountActionDecoration } from "./src/action-decoration";
-import { pickComposer } from "./src/composer-target";
+import { ComposerBridge, composerFor } from "@bb-studio/kit/composer";
 import {
   composeReactionDraft,
   type QuotePosition,
@@ -62,26 +60,11 @@ function readSettingsSnapshot(): MenuSettings {
 
 // ---------------------------------------------------------------------------
 // Composer bridge: `messageAction` runs are host chrome (plain callbacks, no
-// hooks), so a banner component registers the bound `useComposer()` API in a
-// module list. Banners mount in every composer layout (actions do not mount in
-// compact), and the bridge renders nothing. Several composers can be mounted
-// at once (a floating chat over the main view); `pickComposer` finds the one
-// for the reacted-to message's thread.
+// hooks), so the kit's `ComposerBridge`, mounted as a banner, registers each
+// composer, and `composerFor` finds the one for the reacted-to message's
+// thread. Banners mount in every composer layout (actions do not mount in
+// compact).
 // ---------------------------------------------------------------------------
-
-const mountedComposers: PluginComposerApi[] = [];
-
-function ComposerBridge() {
-  const composer = useComposer();
-  useEffect(() => {
-    mountedComposers.push(composer);
-    return () => {
-      const index = mountedComposers.indexOf(composer);
-      if (index !== -1) mountedComposers.splice(index, 1);
-    };
-  }, [composer]);
-  return null;
-}
 
 /** Draft the reaction: quote and reaction text in the configured order. */
 function draftReaction(
@@ -130,7 +113,7 @@ function SmartReactions({ attributes, message }: PluginMessageDirectiveProps) {
           size="sm"
           className="h-7 rounded-full px-2.5 text-xs font-normal"
           onClick={() => {
-            const composer = pickComposer(mountedComposers, message.threadId);
+            const composer = composerFor(message.threadId);
             if (composer === null) {
               toast.error(
                 "Open this thread's composer to react, in the main view or Float.",
@@ -200,7 +183,7 @@ export default definePluginApp((app) => {
         id: `emoji-react-${index + 1}`,
         title: item.emoji || item.label || item.text,
         run(context: PluginMessageActionContext) {
-          const composer = pickComposer(mountedComposers, context.threadId);
+          const composer = composerFor(context.threadId);
           if (composer === null) {
             toast.error(
               "Open this thread's composer to react, in the main view or Float.",

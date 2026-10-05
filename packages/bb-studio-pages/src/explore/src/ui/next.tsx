@@ -4,7 +4,7 @@
 // and, for 🐛 notes, Fix this. Each message logs its suggestions once
 // as shown, and every click, so `bb pages explore stats` can tell which kinds
 // earn their place.
-import { useComposer, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import type { PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
 import { cn, Icon } from "@bb-studio/kit/ui";
@@ -12,7 +12,8 @@ import { useExploreRpc } from "../../client";
 import { PLUGIN_ID } from "../constants";
 import { BUG_EMOJI, nextItemCount, parseNextItems, type BtwNote, type NextKind } from "../next";
 import { labelKey, type ExploreItem } from "../shared";
-import { appendDraft, mountedComposers, pickComposer } from "./composer";
+import { composerFor } from "@bb-studio/kit/composer";
+import { appendDraft } from "./composer";
 import { rowState } from "./explore";
 import { useExplainers, type ExplainerTarget } from "./rows";
 
@@ -22,19 +23,6 @@ const CHIP = "inline-flex h-6 items-center gap-1.5 border border-border bg-trans
 /** Replies are round; things the agent does (Ask for, Tell me more, Fix this) are dashed squares. */
 const REPLY_CHIP = `${CHIP} rounded-full`;
 const ACTION_CHIP = `${CHIP} rounded-md border-dashed`;
-
-/** Keeps each mounted composer's API where message directives can reach it. Renders nothing. */
-export function ComposerBridge() {
-  const composer = useComposer();
-  useEffect(() => {
-    mountedComposers.push(composer);
-    return () => {
-      const index = mountedComposers.indexOf(composer);
-      if (index !== -1) mountedComposers.splice(index, 1);
-    };
-  }, [composer]);
-  return null;
-}
 
 export function NextDirective({ attributes, message }: PluginMessageDirectiveProps) {
   const rpc = useExploreRpc();
@@ -64,7 +52,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
 
   /** Adds `text` to the thread's draft; `item` is what the click log counts. */
   const draft = (kind: NextKind, item: ExploreItem, text: string) => {
-    const composer = pickComposer(mountedComposers, threadId);
+    const composer = composerFor(threadId);
     if (!composer) {
       toast.error("Open this thread's composer to use it, in the main view or Float.");
       return;

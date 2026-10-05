@@ -4,7 +4,8 @@ import { DIRECTIVE, PANEL_ACTION } from "./src/shared";
 import { EXPLAINERS_PATH, EXPLORE_ICON, threadExplainersPath } from "./src/ui/explore";
 import { ExplainersPage, ExplainerTab } from "./src/ui/panel";
 import { ExploreDirective } from "./src/ui/rows";
-import { ComposerBridge, NextDirective } from "./src/ui/next";
+import { ComposerBridge } from "@bb-studio/kit/composer";
+import { NextDirective } from "./src/ui/next";
 import { NEXT_DIRECTIVE } from "./src/next";
 
 export function registerExploreApp(app: PluginAppBuilder) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickComposer } from "./composer-target";
+import { pickComposer } from "./composer";
 
 const main = { name: "main", scope: { kind: "new-thread", projectId: null } } as const;
 const floated = { name: "floated", scope: { kind: "thread", threadId: "thr_a" } } as const;
