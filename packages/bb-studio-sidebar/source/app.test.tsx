@@ -327,6 +327,16 @@ describe("thread-list plugin", () => {
     await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "collapsedSpaces", value: ["sp_beta"] } }));
     fireEvent.click(screen.getByRole("button", { name: "Expand Beta section" }));
     await within(beta()).findByText("Asks you");
+    // Each Space's Studio and Threads fold away on their own.
+    fireEvent.click(within(beta()).getByRole("button", { name: "Collapse Threads" }));
+    await waitFor(() => expect(within(beta()).queryByText("Asks you")).toBeNull());
+    await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "collapsedSpaceSections", value: ["sp_beta:threads"] } }));
+    fireEvent.click(within(beta()).getByRole("button", { name: "Collapse Studio" }));
+    await waitFor(() => expect(within(beta()).queryByText("No items")).toBeNull());
+    fireEvent.click(within(beta()).getByRole("button", { name: "Expand Threads" }));
+    fireEvent.click(within(beta()).getByRole("button", { name: "Expand Studio" }));
+    await within(beta()).findByText("Asks you");
+    expect(within(beta()).getByText("No items")).not.toBeNull();
     fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
     await waitFor(() => expect(sectionHeaders()).toEqual(["Pinned", "Alpha"]));
   });

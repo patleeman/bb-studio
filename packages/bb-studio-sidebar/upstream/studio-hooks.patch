@@ -635,15 +635,16 @@ index d7acf98..51e80d8 100644
 +  return "idle";
 +}
 diff --git a/source/app/preferences/atoms.ts b/source/app/preferences/atoms.ts
-index aa949ec..1fd7730 100644
+index aa949ec..ee1dd77 100644
 --- a/source/app/preferences/atoms.ts
 +++ b/source/app/preferences/atoms.ts
-@@ -3,0 +4,4 @@ import { createSyncedPreferenceAtom } from "./synced-preference-atom.js";
+@@ -3,0 +4,5 @@ import { createSyncedPreferenceAtom } from "./synced-preference-atom.js";
 +export const sidebarHiddenThreadsAtom = createSyncedPreferenceAtom("hiddenThreads");
 +export const sidebarCurrentSpaceAtom = createSyncedPreferenceAtom("currentSpace");
 +export const sidebarCollapsedSpacesAtom = createSyncedPreferenceAtom("collapsedSpaces");
++export const sidebarCollapsedSpaceSectionsAtom = createSyncedPreferenceAtom("collapsedSpaceSections");
 +
-@@ -46,0 +51,2 @@ export const sidebarShowProviderIconsAtom =
+@@ -46,0 +52,2 @@ export const sidebarShowProviderIconsAtom =
 +export const sidebarHideEmptyProjectsAtom =
 +  createSyncedPreferenceAtom("hideEmptyProjects");
 diff --git a/source/app/rows/ThreadActionsMenu.tsx b/source/app/rows/ThreadActionsMenu.tsx
@@ -706,7 +707,7 @@ index 13d58a8..536da90 100644
 @@ -761,0 +773 @@ function ThreadRowComponent({
 +      {spaceRow?.line}
 diff --git a/source/shared/preferences.ts b/source/shared/preferences.ts
-index 98a5200..23d4bb5 100644
+index 98a5200..fb842be 100644
 --- a/source/shared/preferences.ts
 +++ b/source/shared/preferences.ts
 @@ -12,0 +13 @@ export const organizationModeSchema = z.enum([
@@ -736,7 +737,7 @@ index 98a5200..23d4bb5 100644
 @@ -133 +147 @@ export const preferenceDefinitions = {
 -    "Groups moved into More: threads, project:<id>, section:<id>, or machine:<id>.",
 +    "Groups moved into More: threads, project:<id>, section:<id>, machine:<id>, or space:<id>.",
-@@ -183,0 +198,12 @@ export const preferenceDefinitions = {
+@@ -183,0 +198,18 @@ export const preferenceDefinitions = {
 +  currentSpace: definePreference(
 +    listItemSchema.nullable(),
 +    null,
@@ -747,5 +748,11 @@ index 98a5200..23d4bb5 100644
 +    stringListSchema,
 +    [],
 +    "Studio Space ids collapsed in By space's All view.",
++    null,
++  ),
++  collapsedSpaceSections: definePreference(
++    stringListSchema,
++    [],
++    "Sections collapsed inside a Studio Space, as \"<space id>:lead\", \":studio\" or \":threads\".",
 +    null,
 +  ),

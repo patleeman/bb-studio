@@ -51,11 +51,33 @@ export function openStudioItem(anchor: HTMLAnchorElement | null, href: string, s
   openAppPath(href, { main: true });
 }
 
-/** "Studio" or "Threads" inside a Space, with its own controls on hover. */
-export function SpaceSubheading({ title, action }: { title: string; action?: ReactNode }) {
+export type SpaceSubheadingCollapse = { isCollapsed: boolean; onToggleCollapsed(): void };
+
+/**
+ * "Lead", "Studio" or "Threads" inside a Space, with its own controls on
+ * hover. With `collapse`, the title folds the section away.
+ */
+export function SpaceSubheading({ title, action, collapse }: { title: string; action?: ReactNode; collapse?: SpaceSubheadingCollapse }) {
   return (
     <div className={cn(SIDEBAR_HOVER_ACTIONS_ROW_CLASS, "flex h-7 items-center gap-1 pr-0.5 pl-2", CHROME_SECTION_LABEL_CLASS)}>
-      <span className="min-w-0 flex-1 truncate">{title}</span>
+      {collapse ? (
+        <button
+          type="button"
+          aria-expanded={!collapse.isCollapsed}
+          aria-label={collapse.isCollapsed ? `Expand ${title}` : `Collapse ${title}`}
+          onClick={collapse.onToggleCollapsed}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-left outline-none focus-visible:underline"
+        >
+          <span className="min-w-0 truncate">{title}</span>
+          <Icon
+            name="ChevronRight"
+            aria-hidden="true"
+            className={cn("size-3 shrink-0 transition-transform duration-150", !collapse.isCollapsed && cn(SIDEBAR_HOVER_ACTIONS_CLASS, "rotate-90"))}
+          />
+        </button>
+      ) : (
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+      )}
       {action ? (
         <span
           className={cn(SIDEBAR_HOVER_ACTIONS_CLASS, "inline-flex shrink-0 items-center has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100")}
@@ -301,11 +323,12 @@ function BrowseMenu({ spaceName, items, onPick }: { spaceName: string; items: re
  * closes it here without touching the item. Opening any of the Space's items
  * adds it; + makes a new one in the Space and opens it.
  */
-export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }: {
+export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, collapse }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
   items: SpaceItems | undefined;
+  collapse?: SpaceSubheadingCollapse;
 }) {
   const sdk = useSdk();
   // Closed here until Studio's next list catches up.
@@ -336,6 +359,7 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
         title="Studio"
+        collapse={collapse}
         action={(
           <span className="inline-flex items-center gap-0.5">
             {browsable.length ? <BrowseMenu spaceName={spaceName} items={browsable} onPick={openPicked} /> : null}
@@ -343,10 +367,10 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items }:
           </span>
         )}
       />
-      {open.map((item) => (
+      {collapse?.isCollapsed ? null : open.map((item) => (
         <StudioItemRow key={key(item)} item={item} onClose={() => close(item)} />
       ))}
-      {open.length ? null : (
+      {collapse?.isCollapsed || open.length ? null : (
         <EmptyState
           message={total ? "Nothing open" : "No items"}
           icon="File"

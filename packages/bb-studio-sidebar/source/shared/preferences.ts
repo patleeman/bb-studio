@@ -207,6 +207,12 @@ export const preferenceDefinitions = {
     "Studio Space ids collapsed in By space's All view.",
     null,
   ),
+  collapsedSpaceSections: definePreference(
+    stringListSchema,
+    [],
+    "Sections collapsed inside a Studio Space, as \"<space id>:lead\", \":studio\" or \":threads\".",
+    null,
+  ),
 } as const;
 
 export type PreferenceKey = keyof typeof preferenceDefinitions;

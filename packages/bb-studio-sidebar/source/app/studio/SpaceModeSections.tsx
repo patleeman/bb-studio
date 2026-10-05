@@ -41,6 +41,7 @@ import type { SectionThreadDndState, SectionThreadGroupMove } from "../dnd/useSe
 import { ThreadListVisibility, ThreadListVisibilityGroupScope } from "../list/ThreadListVisibility.js";
 import { SidebarHeaderControls } from "../list/SidebarHeaderControls.js";
 import {
+  sidebarCollapsedSpaceSectionsAtom,
   sidebarCollapsedSpacesAtom,
   sidebarCurrentSpaceAtom,
   sidebarGroupThreadsByEnvironmentAtom,
@@ -169,6 +170,14 @@ export function SpaceModeSections({
     (spaceId: string) => setCollapsedSpaceList((current) => toggleCollapsedIdList({ current, id: spaceId })),
     [setCollapsedSpaceList],
   );
+  const [collapsedSectionList, setCollapsedSectionList] = useAtom(sidebarCollapsedSpaceSectionsAtom);
+  const sectionCollapse = useCallback((spaceId: string, section: "lead" | "studio" | "threads") => {
+    const id = `${spaceId}:${section}`;
+    return {
+      isCollapsed: collapsedSectionList.includes(id),
+      onToggleCollapsed: () => setCollapsedSectionList((current) => toggleCollapsedIdList({ current, id })),
+    };
+  }, [collapsedSectionList, setCollapsedSectionList]);
 
   const resolveSpace = useMemo(
     () => createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), fallbackSpaceId, projectSpaces(spaces)),
@@ -359,6 +368,8 @@ export function SpaceModeSections({
                 onCreateThreadInProject(group.space.defaultProjectId);
               };
               const heartbeat = heartbeats[group.space.id] ?? null;
+              const leadCollapse = sectionCollapse(group.space.id, "lead");
+              const threadsCollapse = sectionCollapse(group.space.id, "threads");
               return (
                 <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>
                   <SpaceDropArea spaceId={group.space.id}>
@@ -374,8 +385,8 @@ export function SpaceModeSections({
                   >
                     {group.lead ? (
                       <div data-space-lead={group.lead.id}>
-                        <SpaceSubheading title={heartbeat ? `Lead · heartbeat ${cadenceLabel(heartbeat)}` : "Lead"} />
-                        {tree({ rootItems: group.leadItems, threads: group.leadThreads })}
+                        <SpaceSubheading title={heartbeat ? `Lead · heartbeat ${cadenceLabel(heartbeat)}` : "Lead"} collapse={leadCollapse} />
+                        {leadCollapse.isCollapsed ? null : tree({ rootItems: group.leadItems, threads: group.leadThreads })}
                       </div>
                     ) : null}
                     <SpaceStudioList
@@ -383,9 +394,11 @@ export function SpaceModeSections({
                       spaceName={group.space.name}
                       defaultProjectId={group.space.defaultProjectId}
                       items={items[group.space.id]}
+                      collapse={sectionCollapse(group.space.id, "studio")}
                     />
                     <SpaceSubheading
                       title="Threads"
+                      collapse={threadsCollapse}
                       action={(
                         <span className="inline-flex items-center gap-0.5">
                           <SpaceArchivedMenu space={group.space} spaces={spaces} spaceOf={spaceOf} activeThreads={threads} />
@@ -401,7 +414,7 @@ export function SpaceModeSections({
                         </span>
                       )}
                     />
-                    {tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId })}
+                    {threadsCollapse.isCollapsed ? null : tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId })}
                   </SpaceSidebarSection>
                   </SpaceDropArea>
                 </ThreadListVisibilityGroupScope>
