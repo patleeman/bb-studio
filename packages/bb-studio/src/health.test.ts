@@ -110,9 +110,31 @@ describe("HealthMonitor", () => {
   it("announces only real changes, and reuses a fresh result", async () => {
     const { instance, changed } = monitor({ a: [broken] });
     await instance.check();
+    await instance.check();
     const latest = await instance.check();
-    expect(changed).toHaveBeenCalledTimes(1);
+    // New, then lasting; the third check changes nothing.
+    expect(changed).toHaveBeenCalledTimes(2);
     expect(await instance.summary(60_000)).toBe(latest);
+    instance.dispose();
+  });
+
+  it("calls a problem lasting only once a second check finds it too", async () => {
+    vi.useFakeTimers();
+    try {
+      const checks: Record<string, HealthCheck[] | Error> = { a: [broken] };
+      const { instance } = monitor(checks);
+      expect((await instance.check()).problems[0]!.lasting).toBe(false);
+      // A new problem is checked again soon, without waiting for the next round.
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect((await instance.summary(60_000)).problems[0]!.lasting).toBe(true);
+      checks.a = [];
+      await instance.check();
+      checks.a = [broken];
+      expect((await instance.check()).problems[0]!.lasting).toBe(false);
+      instance.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("turns a plugin off", async () => {

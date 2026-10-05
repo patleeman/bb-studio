@@ -2,7 +2,7 @@
 // item opens by itself when a problem appears that the user hasn't seen.
 import { openAppPath, studioPath } from "@bb-studio/kit/app";
 import { Button, cn, Icon } from "@bb-studio/kit/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Problem } from "../../health-contract";
 import { useHealth, type HealthApi } from "./use-health";
 
@@ -25,17 +25,29 @@ function readSeen(): Set<string> {
   }
 }
 
-/** Renders nothing; opens the footer item when a new problem shows up. */
+/**
+ * Renders nothing; opens the footer item when a lasting problem shows up that
+ * the user hasn't seen, and closes it again once every problem it showed is
+ * fixed or hidden.
+ */
 export function HealthWatch() {
   const { summary } = useHealth();
+  const opened = useRef(false);
   useEffect(() => {
     if (!summary) return;
     const visible = summary.problems.filter((problem) => !problem.hidden).map((problem) => problem.key);
+    const lasting = summary.problems.filter((problem) => !problem.hidden && problem.lasting).map((problem) => problem.key);
     const seen = readSeen();
-    const fresh = visible.some((key) => !seen.has(key));
+    const fresh = lasting.some((key) => !seen.has(key));
     // Forget problems that went away, so one that comes back shows again.
-    localStorage.setItem(SEEN_KEY, JSON.stringify(visible));
-    if (fresh) footer?.open();
+    localStorage.setItem(SEEN_KEY, JSON.stringify(lasting));
+    if (fresh) {
+      opened.current = true;
+      footer?.open();
+    } else if (!visible.length && opened.current) {
+      opened.current = false;
+      footer?.close();
+    }
   }, [summary]);
   return null;
 }
@@ -93,6 +105,9 @@ export function HealthFooter({ dismiss }: { dismiss(): void }) {
           {!summary ? "Checking plugins…" : visible.length ? `${visible.length} plugin ${visible.length === 1 ? "problem" : "problems"}` : "Plugins are working"}
         </span>
         <Button size="sm" variant="ghost" disabled={health.busy} onClick={() => void health.checkAgain()}>Check again</Button>
+        <Button size="icon" variant="ghost" className="size-7" aria-label="Close" onClick={dismiss}>
+          <Icon name="X" />
+        </Button>
       </div>
       {error ? <p className="px-0.5 text-xs text-destructive">{error}</p> : null}
       {visible.length ? (

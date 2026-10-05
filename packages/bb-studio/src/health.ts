@@ -28,7 +28,7 @@ export interface HealthSdk {
   };
 }
 
-type Found = Omit<Problem, "key" | "hidden"> & { checkId: string };
+type Found = Omit<Problem, "key" | "hidden" | "lasting"> & { checkId: string };
 
 /** BB's own plugin status, as a problem, or null when there's none. */
 export function statusProblem(plugin: HealthPluginEntry): Found | null {
@@ -106,7 +106,7 @@ export async function checkHealth(sdk: HealthSdk, schemas: HealthSchemas, hidden
   const problems = found
     .map(({ checkId, ...problem }) => {
       const key = problemKey({ ...problem, checkId });
-      return { ...problem, key, hidden: hidden.has(key) };
+      return { ...problem, key, hidden: hidden.has(key), lasting: false };
     })
     .sort((a, b) => rank[a.status] - rank[b.status] || a.pluginName.localeCompare(b.pluginName) || a.title.localeCompare(b.title));
   const byName = (a: { pluginName: string }, b: { pluginName: string }) => a.pluginName.localeCompare(b.pluginName);
@@ -114,6 +114,8 @@ export async function checkHealth(sdk: HealthSdk, schemas: HealthSchemas, hidden
 }
 
 const HIDDEN_KEY = "health-hidden";
+/** A new problem is checked again this soon, to tell a lasting one from a reload. */
+const CONFIRM_MS = 30_000;
 
 /** Keeps the latest result, the problems the user hid, and tells the app when either changes. */
 export class HealthMonitor {
@@ -121,6 +123,7 @@ export class HealthMonitor {
   private inFlight: Promise<HealthSummary> | null = null;
   /** Changes to the hidden list, one at a time, so a check can't undo a Hide made while it ran. */
   private hiding: Promise<unknown> = Promise.resolve();
+  private confirming: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly deps: {
     sdk: HealthSdk;
@@ -167,6 +170,14 @@ export class HealthMonitor {
       return { ...checked, problems: checked.problems.map((problem) => ({ ...problem, hidden: hidden.has(problem.key) })) };
     });
     const previous = this.latest;
+    const before = new Set(previous?.problems.map((problem) => problem.key));
+    next.problems = next.problems.map((problem) => ({ ...problem, lasting: before.has(problem.key) }));
+    if (next.problems.some((problem) => !problem.lasting) && !this.confirming) {
+      this.confirming = setTimeout(() => {
+        this.confirming = undefined;
+        void this.check().catch(() => {});
+      }, CONFIRM_MS);
+    }
     this.latest = next;
     if (!previous || fingerprint(previous) !== fingerprint(next)) this.deps.changed(next);
     return next;
@@ -186,6 +197,10 @@ export class HealthMonitor {
       return this.latest;
     }
     return this.check();
+  }
+
+  dispose(): void {
+    clearTimeout(this.confirming);
   }
 
   async disable(pluginId: string): Promise<HealthSummary> {

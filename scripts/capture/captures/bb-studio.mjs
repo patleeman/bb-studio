@@ -281,7 +281,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       await client.navigate(`/projects/${projectId}`);
       await client.evaluate(`localStorage.removeItem("studio:health-seen")`);
       await client.navigate(`/projects/${projectId}`);
-      await client.waitForText("No Jev provider is set up", 30000);
+      // Studio confirms a new problem 30 seconds after it first finds it.
+      await client.waitForText("No Jev provider is set up", 90000);
       await client.waitForText("Studio Decisions");
       await client.waitForText("Add a key");
       await client.waitForText("Turn off plugin");

@@ -12,6 +12,8 @@ export const problemSchema = z.object({
   detail: z.string().nullable(),
   fix: z.object({ label: z.string(), path: z.string() }),
   hidden: z.boolean(),
+  /** Found by two checks in a row, so not a plugin that's only reloading. */
+  lasting: z.boolean(),
 });
 export type Problem = z.infer<typeof problemSchema>;
 

@@ -184,7 +184,9 @@ that. It reads two things:
   or failing Jev provider and an unavailable fallback model.
 
 The **Plugin health** item in the sidebar footer lists the problems. It opens
-by itself when a problem you haven't seen appears. Each problem has three
+by itself when a problem you haven't seen is found twice in a row, 30 seconds
+apart, so a plugin that's only reloading doesn't open it. It closes by itself
+once those problems are fixed or hidden, or with its close button. Each problem has three
 actions: **Fix** opens the place to fix it, **Turn off plugin** disables the
 plugin, and **Hide** hides it until it changes or goes away and comes back.
 **Open plugin setup** goes to the full list at `/plugins/studio/studio/setup`,

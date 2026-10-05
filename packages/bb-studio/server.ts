@@ -968,7 +968,7 @@ export default async function plugin(bb: BbPluginApi) {
     "health.disable": ({ pluginId }) => health.disable(pluginId),
   });
   const healthTimer = setInterval(() => void health.check().catch((error) => bb.log.warn(`Plugin health check failed: ${errorText(error)}`)), HEALTH_INTERVAL_MS);
-  bb.onDispose(() => clearInterval(healthTimer));
+  bb.onDispose(() => { clearInterval(healthTimer); health.dispose(); });
 
   bb.cli.register({
     name: "studio",
