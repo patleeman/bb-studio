@@ -68,5 +68,5 @@ Artifacts is a BB Studio add-on. With the Studio plugin installed, artifacts
 appear in Studio's single collection next to pages, drawings and recordings,
 where they can be moved between projects, archived, searched (by
 description, file name and text) and deleted. The user can also save files
-from any reply with its "Save to Studio" action, and turn a Markdown or text
+from a thread with the Artifacts thread panel, and turn a Markdown or text
 artifact into a Studio page.

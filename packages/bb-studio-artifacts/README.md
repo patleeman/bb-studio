@@ -61,12 +61,10 @@ Studio Chat's New in Float and Open in Float.
   coordinates) goes to the artifact's thread, which is the thread that made
   it unless you've picked another. Without Studio Chat, BB's composer opens
   with the quote. PDFs aren't supported yet.
-- **Save to Studio from a thread.** Each message's action bar has
-  **Save to Studio**, which opens a side panel with the files that reply created,
-  changed, or generated, with the new ones already ticked. The panel also lists
-  the thread's storage files and what the thread has already saved. The same
-  panel is **Artifacts** in the thread panel launcher, where it shows the
-  latest reply.
+- **Save from a thread.** **Artifacts** in the thread panel launcher opens a
+  side panel with the files the latest reply created, changed, or generated,
+  with the new ones already ticked. The panel also lists the thread's storage
+  files and what the thread has already saved.
 - **Capture from iPhone.** The Capture sheet accepts a photo or file and saves
   it directly as an artifact in the selected default project.
 - **Agents save too.** The `artifacts_save`, `artifacts_list` and

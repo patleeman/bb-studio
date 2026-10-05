@@ -3,12 +3,10 @@
 // Surfaces:
 //   - navPanel "Artifacts": Studio's collection of artifacts, and the viewer
 //     at artifacts/<id>. With Studio installed, Studio's page takes over.
-//   - messageAction "Save to Studio": opens the picker below for that reply.
 //   - threadPanelAction "Artifacts": the files a reply made and the
 //     thread's storage files, to save; and what the thread already saved.
 //   - messageDirective `::artifact{id="art_…"}`: a card in a reply.
 //   - mention provider (server): `@artifact` works in every composer.
-import { toast } from "sonner";
 import { FloatPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ArtifactCard } from "./components/artifact-card";
@@ -36,16 +34,6 @@ export default definePluginApp((app) => {
     icon: SAVE_ICON,
     layout: "flush",
     component: SavePicker,
-  });
-
-  app.slots.messageAction({
-    id: "save-to-studio",
-    title: "Save to Studio",
-    icon: SAVE_ICON,
-    run: ({ message, openPanel }) => {
-      const opened = openPanel({ actionId: PICKER, title: "Artifacts", params: { seq: message.sourceSeqEnd } });
-      if (!opened) toast.error("Open this thread on its own to save its files.");
-    },
   });
 
   app.slots.messageDirective({ id: "artifact", component: ArtifactCard });

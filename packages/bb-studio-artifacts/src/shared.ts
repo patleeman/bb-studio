@@ -4,7 +4,7 @@ export const PLUGIN_ID = "artifacts";
 /** The nav panel: /plugins/artifacts/artifacts, and artifacts/<id> for one artifact. */
 export const PANEL_PATH = "artifacts";
 export const ARTIFACT_ICON = "artifacts/artifact";
-/** "Save to Studio" on messages, the side panel and the picker. */
+/** The Artifacts thread panel and its "Save to Studio" button. */
 export const SAVE_ICON = "artifacts/save";
 /** Realtime channel: the server says when an artifact changed. */
 export const REALTIME_CHANNEL = "artifacts";
