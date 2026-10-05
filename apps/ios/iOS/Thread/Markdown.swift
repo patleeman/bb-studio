@@ -315,8 +315,8 @@ struct Directive {
         self.attributes = attributes
     }
 
-    /// The last line can offer up to five short "emoji label" replies.
-    static func reactions(in text: String) -> [String] {
+    /// The directive on the reply's last non-empty line, outside code blocks.
+    static func last(in text: String) -> Directive? {
         var inCode = false
         var last: String?
         for line in text.components(separatedBy: "\n") {
@@ -324,9 +324,77 @@ struct Directive {
             if trimmed.hasPrefix("```") { inCode.toggle() }
             if !trimmed.isEmpty { last = inCode ? nil : trimmed }
         }
-        guard let last, let directive = Directive(line: last), directive.name == "reactions",
+        return last.flatMap(Directive.init(line:))
+    }
+
+    /// The last line can offer up to five short "emoji label" replies.
+    static func reactions(in text: String) -> [String] {
+        guard let directive = last(in: text), directive.name == "reactions",
             let raw = directive.attributes["items"] else { return [] }
         return parseReactions(raw)
+    }
+
+    /// Pages' Next row, `::next{reply="👍 Ship it|❓ Why" do="📄 Write up the plan as a page"}`:
+    /// quick replies and requests, each drafted as "emoji label". Notes (`btw`,
+    /// and the older `explore`) open explainers, which the app doesn't have, so
+    /// they're left out. Parsed as Pages' next.ts does.
+    struct Next: Equatable {
+        var reply: [String]
+        var ask: [String]
+        var isEmpty: Bool { reply.isEmpty && ask.isEmpty }
+    }
+
+    static func next(in text: String) -> Next {
+        guard let directive = last(in: text), directive.name == "next" else { return Next(reply: [], ask: []) }
+        return Next(reply: parseNextItems(directive.attributes["reply"], max: 5),
+            ask: parseNextItems(directive.attributes["do"], max: 3))
+    }
+
+    /// `|`-separated "emoji label" items, cleaned, capped and deduped by label.
+    /// An item without an emoji gets 🔎; one without a label is dropped.
+    static func parseNextItems(_ raw: String?, max: Int) -> [String] {
+        guard let raw else { return [] }
+        var seen = Set<String>()
+        var items: [String] = []
+        for part in String(raw.prefix(4_000)).components(separatedBy: "|") {
+            let cleaned = String(String.UnicodeScalarView(part.unicodeScalars.map {
+                $0.value < 0x20 || "\"{}".unicodeScalars.contains($0) ? " " : $0
+            }))
+            let text = cleaned.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            guard let first = text.first else { continue }
+            var emoji = "🔎"
+            var label = text
+            if isEmoji(first) {
+                emoji = String(first)
+                label = text.dropFirst().trimmingCharacters(in: .whitespaces)
+            }
+            label = cutLabel(label)
+            guard !label.isEmpty, seen.insert(label.lowercased()).inserted else { continue }
+            items.append("\(emoji) \(label)")
+            if items.count >= max { break }
+        }
+        return items
+    }
+
+    /// Pictographs, flags and keycaps, but not a plain leading digit or `#`.
+    private static func isEmoji(_ character: Character) -> Bool {
+        guard let scalar = character.unicodeScalars.first, scalar.properties.isEmoji else { return false }
+        if scalar.isASCII { return character.unicodeScalars.contains("\u{20E3}") }
+        return true
+    }
+
+    /// A label is a line: longer ones are cut at a word, with an ellipsis.
+    private static func cutLabel(_ label: String, max: Int = 80) -> String {
+        guard label.utf16.count > max else { return label }
+        var room = ""
+        for character in label {
+            if room.utf16.count + character.utf16.count > max - 1 { break }
+            room.append(character)
+        }
+        if let space = room.lastIndex(of: " "), room.distance(from: room.startIndex, to: space) > max / 2 {
+            room = String(room[..<space])
+        }
+        return room.trimmingCharacters(in: .whitespaces) + "…"
     }
 
     static func parseReactions(_ raw: String) -> [String] {

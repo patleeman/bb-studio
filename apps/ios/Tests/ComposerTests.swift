@@ -17,6 +17,33 @@ final class ComposerTests: XCTestCase {
         XCTAssertEqual(Directive.reactions(in: "::reactions{items=\"\(long)|❓ Why\"}"), ["❓ Why"])
     }
 
+    func testNextRowParsing() {
+        let next = Directive.next(in: "Done.\n::next{reply=\"👍 Ship it|🧪 Add tests first\" explore=\"🐛 Something\" do=\"📄 Write up the plan as a page\"}")
+        XCTAssertEqual(next.reply, ["👍 Ship it", "🧪 Add tests first"])
+        XCTAssertEqual(next.ask, ["📄 Write up the plan as a page"])
+        // Explore and btw notes need an explainer, so they're left out; a reply alone is fine.
+        XCTAssertEqual(Directive.next(in: "::next{btw=\"🐛 It breaks\" explore=\"🐛 Why\"}").isEmpty, true)
+        XCTAssertEqual(Directive.next(in: "::next{do=\"🧵 Start a thread\"}"), .init(reply: [], ask: ["🧵 Start a thread"]))
+        // No emoji gets 🔎; emoji without a space, variation selectors, keycaps and flags split; dupes and empties drop.
+        XCTAssertEqual(Directive.parseNextItems("Ship it|🐛Retry| 🏗️  How it  works |1️⃣ First|🇺🇸 Flag||👍 ship IT|3 tries|🐛", max: 9),
+            ["🔎 Ship it", "🐛 Retry", "🏗️ How it works", "1️⃣ First", "🇺🇸 Flag", "🔎 3 tries"])
+        XCTAssertEqual(Directive.parseNextItems((1...9).map { "🔢 Option \($0)" }.joined(separator: "|"), max: 5).count, 5)
+        let long = Directive.parseNextItems("🐢 " + String(repeating: "slow ", count: 30), max: 5)
+        XCTAssertEqual(long.count, 1)
+        XCTAssertTrue(long[0].hasSuffix("slow…"))
+        XCTAssertLessThanOrEqual(long[0].count, 82)
+        // A stray quote or brace doesn't crash, and the directive must be the last line outside code.
+        _ = Directive.next(in: "::next{reply=\"👍 Ship \"it\"|❓ Why\" do=\"📄 {x}\"}")
+        _ = Directive.next(in: "::next{reply=\"👍 Ship it}")
+        XCTAssertEqual(Directive.parseNextItems("👍 \"Ship\" {it}", max: 5), ["👍 Ship it"])
+        XCTAssertTrue(Directive.next(in: "```\n::next{reply=\"👍 Ship it\"}\n```").isEmpty)
+        XCTAssertTrue(Directive.next(in: "::next{reply=\"👍 Ship it\"}\nLater").isEmpty)
+        // ::reactions still works alongside, and neither reads the other's line.
+        XCTAssertEqual(Directive.reactions(in: "::reactions{items=\"👍 Agree|❓ Why\"}"), ["👍 Agree", "❓ Why"])
+        XCTAssertEqual(Directive.reactions(in: "::next{reply=\"👍 Agree\"}"), [])
+        XCTAssertTrue(Directive.next(in: "::reactions{items=\"👍 Agree\"}").isEmpty)
+    }
+
     func testCommandAndReactionParsing() {
         XCTAssertEqual(CommandSuggestions.query(in: "/review"), "review")
         XCTAssertEqual(CommandSuggestions.query(in: "Please /review"), "review")

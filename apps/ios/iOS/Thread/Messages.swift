@@ -42,6 +42,13 @@ struct MessageBubble: View {
                 if !reactions.isEmpty {
                     ReactionChips(items: reactions, react: react)
                 }
+                let next = Directive.next(in: text)
+                if !next.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !next.reply.isEmpty { ReactionChips(items: next.reply, react: react) }
+                        if !next.ask.isEmpty { ReactionChips(items: next.ask, request: true, react: react) }
+                    }
+                }
             }
         }
     }
@@ -220,6 +227,8 @@ struct ImageViewer: View {
 /// Suggested replies under an assistant message. A tap drafts the reply.
 struct ReactionChips: View {
     let items: [String]
+    /// Requests for the agent (the Next row's `do`), drawn dashed as in BB web.
+    var request = false
     let react: (String) -> Void
     @State private var taps = 0
 
@@ -235,11 +244,11 @@ struct ReactionChips: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(.fill.secondary, in: .capsule)
-                        .overlay(Capsule().strokeBorder(.separator))
+                        .overlay(Capsule().strokeBorder(.separator, style: StrokeStyle(lineWidth: 1, dash: request ? [4, 3] : [])))
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Drafts this reply")
-                .accessibilityIdentifier("reaction")
+                .accessibilityHint(request ? "Drafts this request" : "Drafts this reply")
+                .accessibilityIdentifier(request ? "next-request" : "reaction")
             }
         }
         .sensoryFeedback(.selection, trigger: taps)
