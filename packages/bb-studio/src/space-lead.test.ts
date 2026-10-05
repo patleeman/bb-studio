@@ -223,6 +223,17 @@ it("keeps a space's heartbeat row when Automations can't turn it off", async () 
   expect(x.automations).toHaveLength(0);
 });
 
+it("refuses to remove the default space without touching its lead or heartbeat", async () => {
+  const x = await setup();
+  const personal = x.spaces.defaultSpace().id;
+  await lead(x, personal);
+  await x.leads.setRun(personal, { enabled: true, cadence: "daily" });
+  await expect(x.leads.removeSpace(personal)).rejects.toThrow("default space");
+  expect(x.leads.runs.get(personal)).toMatchObject({ enabled: true });
+  expect((await x.leads.get(personal)).leadThreadId).toBe("t1");
+  expect(x.automations).toHaveLength(1);
+});
+
 it("hands a lead off to a new thread that stays the lead, once", async () => {
   const x = await setup();
   await lead(x);

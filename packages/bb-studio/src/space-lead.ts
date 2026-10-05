@@ -134,6 +134,8 @@ export class SpaceLeads {
    */
   removeSpace(spaceId: string): Promise<void> {
     return this.serial(spaceId, async () => {
+      // Checked here, not only in SpaceStore.remove: that runs after the lead and heartbeat are gone.
+      if (this.deps.spaces.get(spaceId)?.isDefault) throw new Error("The default space can't be deleted.");
       const run = this.runs.get(spaceId);
       if (run?.enabled) await this.runs.set(spaceId, null, { ...run, enabled: false });
       this.deps.db.prepare("DELETE FROM space_leads WHERE space_id = ?").run(spaceId);
