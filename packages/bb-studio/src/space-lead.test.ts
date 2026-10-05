@@ -166,6 +166,17 @@ it("clearing the lead turns the heartbeat off; a new lead takes it over", async 
   expect(x.automations).toHaveLength(0);
 });
 
+it("keeps the old lead when the heartbeat can't move to the new one", async () => {
+  const x = await setup();
+  await lead(x);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
+  const next = await x.spawn({ projectId: "q" });
+  x.threads.set(next.id, { ...next, providerId: null } as never);
+  await expect(x.leads.setLead(x.garden.id, next.id)).rejects.toThrow("provider");
+  expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: "t1", run: { enabled: true } });
+  expect(x.spaces.threads.explicit(next.id)).toBeNull();
+});
+
 it("keeps each thread in one space and maps threads to their space", async () => {
   const x = await setup();
   const { id: threadId } = await x.spawn({ projectId: "p" });

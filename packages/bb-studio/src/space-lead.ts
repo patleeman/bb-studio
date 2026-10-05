@@ -104,9 +104,10 @@ export class SpaceLeads {
       if (threadId) {
         const thread = await this.thread(threadId);
         if (!thread) throw new Error("That thread no longer exists.");
+        // Move the heartbeat first: if it can't target the new thread, the old lead stays.
+        if (run?.enabled) await this.runs.set(spaceId, threadId, run);
         if (this.spaceOf({ id: threadId, projectId: thread.projectId ?? null }) !== spaceId) this.join(spaceId, threadId);
         this.saveLead(spaceId, threadId);
-        if (run?.enabled) await this.runs.set(spaceId, threadId, run);
       } else {
         if (run?.enabled) await this.runs.set(spaceId, null, { ...run, enabled: false });
         this.saveLead(spaceId, null);
