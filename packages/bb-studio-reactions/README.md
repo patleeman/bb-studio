@@ -82,9 +82,10 @@ emoji-only selection entries, and cleanup when the plugin is disabled.
 
 A live thread in the staged BB, run on GPT-6.1-Sol with smart reactions on. It
 asked whether to use SQLite or Postgres for a small todo app, and the
-assistant's reply ends with its suggested reactions, SQLite and Postgres. The
-capture script also clicks SQLite and checks that the reply was drafted in the
-composer. The staged BB passes the thread's ID as
+assistant's reply ends with its suggested reactions, SQLite and Postgres. With
+Pages installed, as here, they show as the **Reply** row of Pages' "What next?"
+card; without it, as Studio Reactions' own buttons. The capture accepts either,
+then clicks SQLite and checks that the reply was drafted in the composer. The staged BB passes the thread's ID as
 `BB_CAPTURE_SMART_REACTIONS_THREAD_ID`.
 
 ## Settings
