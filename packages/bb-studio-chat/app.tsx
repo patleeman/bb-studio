@@ -1,8 +1,8 @@
 import { definePluginApp, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { FloatPanels, openAppPath, panelHref, retainPanel, useStudioPresent } from "@bb-studio/kit/app";
+import { RetainedPanels, openAppPath, panelHref, retainPanel, useStudioPresent } from "@bb-studio/kit/app";
 import { useEffect } from "react";
 
-/** Old bookmarks and restored Float tabs reach Studio's retained composers. */
+/** Old bookmarks reach Studio's retained composers. */
 function LegacyChat({ subPath }: { subPath: string }) {
   const navigate = useBbNavigate();
   const present = useStudioPresent();
@@ -11,6 +11,6 @@ function LegacyChat({ subPath }: { subPath: string }) {
 }
 
 export default definePluginApp(app => {
-  app.slots.experimental_appOverlay({ id: "legacy-chat-routes", component: () => <FloatPanels path="chats" render={subPath => <LegacyChat subPath={subPath} />} /> });
+  app.slots.experimental_appOverlay({ id: "retained-chats", component: () => <RetainedPanels path="chats" render={subPath => <LegacyChat subPath={subPath} />} /> });
   app.slots.navPanel({ id: "chats", path: "chats", title: "Chat upgrade", icon: "MessageSquare", component: retainPanel("chats", LegacyChat) });
 });

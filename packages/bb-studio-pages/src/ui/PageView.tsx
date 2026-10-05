@@ -1,7 +1,6 @@
 import { untitled } from "@bb-studio/kit/format";
 import { ThreadTitle, useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, ITEM_TITLE, useFloatAvailable, useInFloat, useStudioChatPresent, useOpenCompanion } from "@bb-studio/kit/app";
-import { FLOAT_RIGHT_VAR } from "@bb-studio/kit/contract";
+import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, ITEM_TITLE, useStudioChatPresent, useOpenMain } from "@bb-studio/kit/app";
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DropdownMenu,
@@ -392,10 +391,8 @@ export function PageView({
     }
   });
 
-  const floatAvailable = useFloatAvailable();
-  const inFloat = useInFloat();
   const studioChat = useStudioChatPresent();
-  const open = useOpenCompanion();
+  const open = useOpenMain();
   const openThread = useCallback((threadId: string) => {
     setChatThread(threadId);
     open({ kind: "thread", threadId });
@@ -406,14 +403,6 @@ export function PageView({
     openedRoute.current = chatThreadId;
     openThread(chatThreadId);
   }, [chatThreadId, openThread]);
-  // Keeps the windows clear of the comments card.
-  const besideComments = sidePanel === "comments";
-  useEffect(() => {
-    if (!floatAvailable || inFloat || !besideComments || !window.matchMedia("(min-width: 768px)").matches) return;
-    const root = document.documentElement.style;
-    root.setProperty(FLOAT_RIGHT_VAR, "344px");
-    return () => void root.removeProperty(FLOAT_RIGHT_VAR);
-  }, [floatAvailable, inFloat, besideComments]);
 
   const shown = { ...page, title };
 
@@ -530,7 +519,7 @@ export function PageView({
         onBack={onBack}
         item={{ title: title || "Untitled", href: `/plugins/pages/pages/${page.id}` }}
         leading={<>
-          {inFloat ? null : <Breadcrumbs page={shown} pages={pages} />}
+          <Breadcrumbs page={shown} pages={pages} />
           <SavingDot connection={connection} titleSaving={titleSave.status === "pending" || titleSave.status === "saving"} />
         </>}
         chatAction={studioChat === false ? <PageChat page={page} threadId={chatThread ?? chats[0]?.threadId ?? null} /> : undefined}

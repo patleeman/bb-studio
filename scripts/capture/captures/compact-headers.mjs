@@ -17,7 +17,6 @@ export default context => {
       const { path, ready, cleanup } = await fixture.seed();
       let sidebarToggle;
       const forget = async () => {
-        await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`).catch(() => {});
         await cleanup();
         if (sidebarToggle) await client.evaluate(`document.querySelector('button[aria-label=${JSON.stringify(sidebarToggle)}]')?.click()`);
         await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
@@ -33,8 +32,6 @@ export default context => {
       };
       try {
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-        if (await client.evaluate(`location.origin === 'null'`)) await client.navigate('/plugins/studio/studio');
-        await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`);
         await client.navigate(path);
         await client.waitForSelector(ready);
         sidebarToggle = await client.evaluate(`(() => {
@@ -51,11 +48,6 @@ export default context => {
           return !!button?.checkVisibility() && !button.disabled;
         })()`);
         if (!chat) throw new Error(`${fixture.id} has no available compact Chat action`);
-        if (await client.evaluate(`!!document.querySelector('.bb-float-stack button[aria-label="Floating tab actions"]')`)) {
-          await client.clickAriaButtonWithPointer("Floating tab actions");
-          const all = await client.evaluate(`Array.from(document.querySelectorAll('[role="menuitem"]')).some(item => item.textContent.trim() === 'Close all')`);
-          await client.clickElementWithTextAndPointer('[role="menuitem"]', all ? "Close all" : "Close tab");
-        }
         if (fixture.id === "draw") {
           await client.dragBy('canvas.excalidraw__canvas', 0, 0);
           await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "!", code: "Digit1", modifiers: 8 });

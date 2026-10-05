@@ -11,10 +11,10 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { TalkRpcContract } from "../shared/contract";
-import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, holdKeyCode, recordingHref, tail } from "../shared/format";
+import { NEW_RECORDING_EVENT, RECORDING_CHANGED, formatClock, holdKeyCode, recordingHref, tail } from "../shared/format";
 import type { StudioCreateEventDetail } from "@bb-studio/kit/contract";
 import { Icon } from "@bb-studio/kit/ui";
-import { openAppPath, useOpenCompanion } from "@bb-studio/kit/app";
+import { openAppPath, useOpenMain } from "@bb-studio/kit/app";
 import { cn } from "@bb-studio/kit/ui";
 import { talk, useTalkState, type TalkState } from "./controller";
 import { useDraggable } from "./draggable";
@@ -30,7 +30,7 @@ function useControllerWiring(): void {
   const { values } = useSettings();
   const { projectId, threadId } = useBbContext();
   const navigate = useBbNavigate();
-  const open = useOpenCompanion();
+  const open = useOpenMain();
   useEffect(() => talk.attach(rpc), [rpc]);
   useEffect(() => talk.setNavigator(navigate, open), [navigate, open]);
   useEffect(() => {
@@ -48,7 +48,7 @@ function useControllerWiring(): void {
       event.preventDefault();
       const detail = (event as CustomEvent<Partial<StudioCreateEventDetail> | null>).detail;
       const projectId = typeof detail?.projectId === "string" ? detail.projectId : null;
-      const opened = typeof detail?.opened === "function" ? detail.opened : (href: string) => openAppPath(href, { main: true });
+      const opened = typeof detail?.opened === "function" ? detail.opened : (href: string) => openAppPath(href);
       void talk.startRecording("recording", null, null, { projectId }).then(() => {
         const { recordingId, phase } = talk.getState();
         if (recordingId && phase !== "idle") opened(recordingHref(recordingId));
@@ -207,7 +207,7 @@ function statusLabel(state: TalkState, online: boolean): string {
 export function TalkOverlay() {
   useControllerWiring();
   const state = useTalkState();
-  const open = useOpenCompanion();
+  const open = useOpenMain();
   const online = useOnline();
   const [expanded, toggleExpanded] = useExpanded(state);
   const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError && !state.localSaveError);
@@ -235,7 +235,7 @@ export function TalkOverlay() {
   const canResume = state.phase === "paused" || state.phase === "needs-resume";
   const canStop = canPause || canResume || state.phase === "starting";
   const openRecording = () => {
-    if (state.recordingId) open({ kind: "path", path: `/plugins/talk/${PANEL_PATH}/${state.recordingId}` });
+    if (state.recordingId) open({ kind: "path", path: recordingHref(state.recordingId) });
   };
   const title = state.recording?.titleSource === "pending" ? null : state.recording?.title;
   const away = !talk.isAtSource();

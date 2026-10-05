@@ -63,8 +63,8 @@ image quote retains crop, edited prompt and file after reload and resize
 (1d78bb2). Real Task Hand off exposed a missing hostId (ed12a98); bot re-send exposed
 label-based duplicate handoffs (6bec6a4). Both are fixed and verified live in
 ba0ae10, including exact retained draft/file and two bot responses sharing one
-conversation. The [workbench entry-point audit](workbench-entrypoint-audit.md)
-records all 17 plugins, representative transfers across all eleven retained
+conversation. The workbench entry-point audit (removed with Float on 5 October 2026)
+recorded all 17 plugins, representative transfers across all eleven retained
 content plugins, seven route variants and interrupted/repeated drag checks
 through e0f5dd8. The owner has stopped further work and confirmed that both owned stable and patched-core runtimes and capture processes are stopped; their ports are closed.
 

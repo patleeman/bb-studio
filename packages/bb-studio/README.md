@@ -49,28 +49,13 @@ content, each showing the matching text with the match in bold.
 
 ## What you get
 
-The collection header's **Move** menu offers **Float this** and **Open in
-split**. Companion controls return it to the main view or, on a host with
-native companion support, move it to the right workbench.
-
-![The original Studio collection moved into the right workbench](assets/companion-transfers-native.png)
-
-The isolated transfer check keeps the same search input and its "Release
-notes" query through Float, workbench, main, Float and workbench. The
-[stable capture](assets/companion-transfers-stable.png) checks Float/main
-round trips with the same input and visible seeded release notes.
-
-The same checks pass the legacy `/collection` address and Activity with its
-original **30 days** selector.
-Activity now offers Move; the legacy address keeps its own target so moving
-it carries the existing search input.
-
-![The original Activity view and period choice in the workbench](assets/studio-activity-companion-transfers-native.png)
-
-See the [stable Activity](assets/studio-activity-companion-transfers-stable.png),
-[stable legacy collection](assets/studio-collection-companion-transfers-stable.png)
-and [native legacy collection](assets/studio-collection-companion-transfers-native.png).
-
+Everything opens in BB's main view, and the Studio sidebar lists what you
+open. ⌘/Ctrl-click an item or thread link, or choose **Open in split** from
+its menu, to open it in a split instead. Right-click any Studio item or
+thread link, anywhere, for **Open**, **Open in split**, **Copy reference**
+(**Copy link** for a thread) and **New thread with this**. Item, collection and
+Activity headers have an **Open in split** button. An editor you leave stays
+open in the background, so it's as you left it when you come back.
 
 - **Activity** (Studio's **…** menu) shows measured thread turns, duration and
   failures and recent Studio changes.
@@ -233,12 +218,15 @@ The same run checks [the overview](assets/command.png), [rearranging panes](asse
 ## Item chat
 
 Studio owns each item's **Chat** action, conversation picker, linked thread and
-quotes. A new conversation keeps the item's context, project and draft; a quote
-returns to its linked thread or stays in a retained composer until sent.
-Pages keeps its page-chat history; standalone Pages still provides its own chat
-when Studio is absent. Float remains an optional companion host.
+quotes. **Chat** opens the item's linked thread in the main view. Without one,
+a compact new-conversation composer opens in the bottom-right corner, and
+sending opens the new thread in the main view. A new conversation keeps the
+item's context, project and draft; a quote goes to its linked thread, or opens
+the corner composer with the quote when there is none. Pages keeps its
+page-chat history; standalone Pages still provides its own chat when Studio is
+absent.
 
 Existing Studio Chat installs must [migrate their links](../bb-studio-chat/README.md)
 before removing the old plugin. Old draft keys and quote storage are retained.
 
-![Studio item chat with a staged drawing and retained draft](assets/chat-preview.png)
+![Studio item chat with a staged drawing and its draft](assets/chat-preview.png)

@@ -5,7 +5,7 @@
 // plugin bundles its own copy of the kit, so each has its own registry.
 //
 // More than one composer can be mounted at once (the main view plus a
-// floating chat, a side chat, a split). A draft belongs in the composer that
+// split, or Studio Chat's corner composer). A draft belongs in the composer that
 // writes to the message's thread. Failing that, a new-thread composer takes
 // it. A composer bound to another thread never does, since that would send
 // the draft to the wrong conversation.

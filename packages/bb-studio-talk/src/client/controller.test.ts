@@ -170,12 +170,12 @@ it("keeps a pre-capture warning when both audio and later marker writes fail", a
   expect(insertDictationIntoComposer).not.toHaveBeenCalled();
 });
 
-it("dictates into a retained thread companion while the main thread changes", async () => {
-  const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "thread:thr_side";
+it("dictates into the thread of the composer it started in, such as a split's, while the main thread changes", async () => {
+  const wrapper = document.createElement("div");
   const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
   Object.defineProperty(prompt, "offsetParent", { get: () => wrapper.hidden ? null : document.body });
   wrapper.append(prompt); document.body.append(wrapper);
-  const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_main" }));
+  const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_side" }));
   const recording = { id: "rec_source", durationMs: 0, status: "recording" };
   const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments: [] } : recording);
   const controller = new TalkController(); controller.attach({ call } as never);
@@ -184,7 +184,7 @@ it("dictates into a retained thread companion while the main thread changes", as
   const open = vi.fn(); controller.setNavigator(navigate as never, open);
   await controller.startRecording("dictation", prompt);
   expect(controller.getState().threadId).toBe("thr_side");
-  expect(call).toHaveBeenCalledWith("recording_create", { kind: "dictation", threadId: "thr_side", projectId: null });
+  expect(call).toHaveBeenCalledWith("recording_create", { kind: "dictation", threadId: "thr_side", projectId: "proj_main" });
   controller.setContext({ projectId: "proj_other", threadId: "thr_other" });
   expect(controller.dictationComposer()).toBe(prompt);
   expect(controller.isAtSource()).toBe(true);
@@ -196,8 +196,9 @@ it("dictates into a retained thread companion while the main thread changes", as
 });
 
 it("returns to the exact new-conversation route and selected project", async () => {
-  const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "path:/plugins/pages/pages/pg_source/compose";
-  const prompt = document.createElement("div"); prompt.dataset.promptbox = ""; wrapper.append(prompt); document.body.append(wrapper);
+  const path = "/plugins/pages/pages/pg_source/compose";
+  history.pushState(null, "", path);
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = ""; document.body.append(prompt);
   Object.defineProperty(prompt, "offsetParent", { value: document.body });
   const unregister = registerComposerSource(prompt, () => ({ kind: "new-thread", projectId: "proj_selected" }));
   const recording = { id: "rec_compose", durationMs: 0, status: "recording" };
@@ -207,19 +208,20 @@ it("returns to the exact new-conversation route and selected project", async () 
   const navigate = { toThread: vi.fn(), toPluginPanel: vi.fn(), toCompose: vi.fn() };
   const open = vi.fn(); controller.setNavigator(navigate as never, open);
   await controller.startRecording("dictation", prompt);
+  history.pushState(null, "", "/threads/thr_elsewhere");
   expect(controller.getState().threadId).toBeNull();
   expect(call).toHaveBeenCalledWith("recording_create", { kind: "dictation", threadId: null, projectId: "proj_selected" });
-  controller.goToSource(); expect(open).toHaveBeenCalledWith({ kind: "path", path: "/plugins/pages/pages/pg_source/compose" });
+  controller.goToSource(); expect(open).toHaveBeenCalledWith({ kind: "path", path });
   expect(navigate.toCompose).not.toHaveBeenCalled();
   unregister(); await controller.stop(false);
+  history.pushState(null, "", "/");
 });
 
-
-it("delivers waiting dictation to the visible companion rather than the main thread", async () => {
-  const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "thread:thr_side";
+it("delivers waiting dictation to the visible composer of its thread rather than the main thread's", async () => {
   const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
   Object.defineProperty(prompt, "offsetParent", { value: document.body });
-  wrapper.append(prompt); document.body.append(wrapper);
+  document.body.append(prompt);
+  const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_side" }));
   writePending(addPending({}, "thr_side", "The side conversation's dictation."));
   const controller = new TalkController();
   controller.setContext({ threadId: "thr_main", projectId: "proj_main" });
@@ -227,15 +229,18 @@ it("delivers waiting dictation to the visible companion rather than the main thr
   await vi.advanceTimersByTimeAsync(1500);
   expect(insertDictationIntoComposer).toHaveBeenCalledWith(prompt, "The side conversation's dictation.", []);
   expect(readPending()).toEqual({});
+  unregister();
 });
 
-it("holds a new draft's pending dictation until that exact companion is visible", async () => {
-  const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "path:/plugins/pages/pages/pg_source/compose"; wrapper.hidden = true;
+it("holds a new draft's pending dictation until its page's composer is visible", async () => {
+  const path = "/plugins/pages/pages/pg_source/compose";
+  history.pushState(null, "", path);
+  const wrapper = document.createElement("div"); wrapper.hidden = true;
   const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
   Object.defineProperty(prompt, "offsetParent", { get: () => wrapper.hidden ? null : document.body });
   wrapper.append(prompt); document.body.append(wrapper);
-  const key = "compose:/plugins/pages/pages/pg_source/compose";
-  writePending(addPending({}, key, "Return to the original draft."));
+  const unregister = registerComposerSource(prompt, () => ({ kind: "new-thread", projectId: "proj_selected" }));
+  writePending(addPending({}, `compose:${path}`, "Return to the original draft."));
   const controller = new TalkController();
   controller.setContext({ threadId: "thr_main", projectId: "proj_main" });
   controller.attach({ call: vi.fn() } as never);
@@ -246,7 +251,10 @@ it("holds a new draft's pending dictation until that exact companion is visible"
   await vi.advanceTimersByTimeAsync(1500);
   expect(insertDictationIntoComposer).toHaveBeenCalledWith(prompt, "Return to the original draft.", []);
   expect(readPending()).toEqual({});
+  unregister();
+  history.pushState(null, "", "/");
 });
+
 
 it("neither inserts nor finishes a dictation while one of its pieces is set aside", async () => {
   const recording = { id: "rec_partial", kind: "dictation", durationMs: 50_000, status: "done", wordCount: 4, failedCount: 0, pendingCount: 0 };

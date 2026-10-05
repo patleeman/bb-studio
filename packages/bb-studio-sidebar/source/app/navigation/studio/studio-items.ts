@@ -22,7 +22,7 @@ export const HUB_PANELS = [
 export const RETIRED_PANELS = [
   // Explore's panel inside Pages; explainers open from their links.
   "pages/explainers",
-  // Float's Companions panel; Float's dock and toggle reach it.
+  // The retired Float plugin's Companions panel, while it's still installed.
   "float/companions",
   // Studio Chat's panel; chats start from Studio items and the overlay.
   "studio/chats",

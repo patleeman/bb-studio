@@ -1,4 +1,4 @@
-import { FloatPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
+import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useEffect } from "react";
 import { PagePanel } from "./src/ui/PagePanel";
@@ -28,8 +28,8 @@ function TalkBridge() {
 export default definePluginApp((app) => {
   // Explore: "Along the way" findings and their explainer pages.
   registerExploreApp(app);
-  // Shows the panel in Float windows open on its paths.
-  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="pages" render={(subPath) => <PagesPanel subPath={subPath} />} /> });
+  // Keeps the panel's views alive across route changes (with retainPanel).
+  app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="pages" render={(subPath) => <PagesPanel subPath={subPath} />} /> });
   app.slots.navPanel({ id: "pages", title: "Pages", icon: "pages/pages", path: "pages", component: retainPanel("pages", PagesPanel), headerContent: StudioBarSlot });
   app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
   app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });

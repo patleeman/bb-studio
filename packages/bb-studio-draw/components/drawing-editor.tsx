@@ -27,7 +27,7 @@ import {
   ItemMenu,
   openNewItemThread,
   useStudioChatPresent,
-  useOpenCompanion,
+  useOpenMain,
   cn,
 } from "@bb-studio/kit/app";
 
@@ -69,8 +69,8 @@ export function DrawingEditor({
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
-  const openCompanion = useOpenCompanion();
-  // Studio Chat's New in Float bar starts threads; the menu only offers it without one.
+  const openMain = useOpenMain();
+  // Studio Chat's Chat button starts threads; the menu only offers it without one.
   const studioChat = useStudioChatPresent();
   const isDark = useIsDark();
   const [name, setName] = useState("");
@@ -335,7 +335,7 @@ export function DrawingEditor({
             });
             await draftStore.remove(draft.id, draft.token);
             await checkDrafts();
-            openCompanion({ kind: "path", path: drawingHref(drawing.id), title: drawing.name });
+            openMain({ kind: "path", path: drawingHref(drawing.id), title: drawing.name });
             return;
           }
           await rpc.call("saveDrawing", { id: drawingId, data: draft.data, expectedUpdatedAt: draft.baseRevision });

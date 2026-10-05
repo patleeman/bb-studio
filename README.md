@@ -15,7 +15,6 @@ agent.
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
 | [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
-| [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Thread lists organized by Space, project, section or machine, plus navigation without duplicate Studio rows. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
@@ -52,8 +51,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
    - studio-tables: structured tables with views and CSV import and export
-   - float: a panel of tabs for threads, views and Studio items, docked
-     or dragged anywhere
    - thread-list-plus: Studio Sidebar; thread organization and sidebar navigation
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
@@ -88,10 +85,14 @@ plugin deletes its settings and secrets, so note them first.
 ## Consolidation upgrades
 
 Chat now ships in Studio, and Navigation ships in Studio Sidebar. New installs
-need 11 plugins. For an existing install, update Studio and the old Chat plugin,
+need 10 plugins. For an existing install, update Studio and the old Chat plugin,
 then run `bb studio-chat migrate`. Wait for **Migration complete** before
 removing the bridge. Keep it for older native clients or chat bookmarks that
 still address `studio-chat`.
+
+Float is retired: threads and Studio items open in the main view, or in a
+split with ⌘-click, and the sidebar lists what you open. Update every Studio
+plugin, then remove it with `bb plugin remove float`.
 
 Update Studio Sidebar and select its **Studio Navigation** provider in
 Appearance before removing `studio-navigation`. Navigation visibility and order

@@ -18,7 +18,7 @@ export interface CreateStudioItemOptions {
 
 /** Makes one item of `kind` and opens it. Reports failures as toasts. */
 export async function createStudioItem(kind: Pick<StudioKind, "label" | "create">, options: CreateStudioItemOptions): Promise<void> {
-  const open = options.open ?? ((href: string) => openAppPath(href, { main: true }));
+  const open = options.open ?? ((href: string) => openAppPath(href));
   if (!kind.create) return;
   if (kind.create.mode === "event") {
     // Made in the browser, like a Talk recording: the add-on's frontend makes it and reports back.

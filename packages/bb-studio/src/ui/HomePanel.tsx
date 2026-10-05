@@ -1,4 +1,4 @@
-import { BarCrumb, BarSeparator, PageColumn, SECTION_TITLE, StudioBar, ViewMoveMenu, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
+import { BarCrumb, BarSeparator, PageColumn, SECTION_TITLE, StudioBar, OpenInSplitButton, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -53,7 +53,7 @@ export function ActivityPanel() {
         <BarCrumb current>Activity</BarCrumb>
       </nav>
       <select aria-label="Period" value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))} className="h-7 rounded-md bg-transparent px-1.5 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground"><option value={1}>Today</option><option value={7}>7 days</option><option value={30}>30 days</option></select>
-      <ViewMoveMenu item={{ href: "/plugins/studio/studio/activity", title: "Activity" }} onBack={back} />
+      <OpenInSplitButton item={{ href: "/plugins/studio/studio/activity", title: "Activity" }} />
     </StudioBar>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     {!data && !error ? <p className="text-sm text-muted-foreground">Loading activity…</p> : null}

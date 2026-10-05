@@ -155,7 +155,7 @@ export function StudioEmbed({ kind, target, onEdit, onTargetChange }: {
 
 function ItemEmbed({ kind, target, onEdit }: { kind: StudioEmbedKind | "item"; target: string; onEdit?: () => void }) {
   const { item, loading } = useStudioItem(kind, target);
-  const link = item ? studioItemProps({ href: item.href, title: item.title, icon: item.kindIcon }, { drag: false }) : {};
+  const link = item ? studioItemProps({ href: item.href, title: item.title, icon: item.kindIcon }) : {};
   return (
     <div className="overflow-hidden" {...link}>
       <ItemHeader item={item} kind={kind} target={target} loading={loading} onEdit={onEdit} />

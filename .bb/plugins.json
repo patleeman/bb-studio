@@ -8,10 +8,6 @@
       "source": "./packages/bb-studio"
     },
     {
-      "name": "float",
-      "source": "./packages/bb-studio-float"
-    },
-    {
       "name": "pages",
       "source": "./packages/bb-studio-pages"
     },

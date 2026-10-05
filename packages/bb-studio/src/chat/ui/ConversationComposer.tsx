@@ -1,5 +1,5 @@
 import { useBbNavigate, useRpc, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { NewConversationComposer, openCompanion, OUTLINE_BUTTON, panelHref, useCompanionNavigate, type ConversationSubmit } from "@bb-studio/kit/app";
+import { NewConversationComposer, OUTLINE_BUTTON, panelHref, type ConversationSubmit } from "@bb-studio/kit/app";
 import { errorMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useState } from "react";
 import type { rpcContract, Viewed } from "../contract";
@@ -36,7 +36,6 @@ export function ConversationComposer({ item, quote, draftKey, focusRequest, onSu
 export function ConversationPage({ subPath }: PluginNavPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
-  const navigateCompanion = useCompanionNavigate();
   const [loaded, setLoaded] = useState<{ item: Viewed | null; quote?: ItemQuote; quoteId?: string; draftKey: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -68,7 +67,6 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
     const { threadId } = await rpc.call("chat.start", { item: loaded.item ? { pluginId: loaded.item.pluginId, id: loaded.item.id } : null, request });
     if (quoteId) void quoteDrafts.remove(quoteId).catch(() => {});
     if (loaded.item) window.dispatchEvent(new CustomEvent(CONVERSATION_STARTED, { detail: { pluginId: loaded.item.pluginId, id: loaded.item.id } }));
-    const target = { kind: "thread" as const, threadId };
-    if (!navigateCompanion(target) && !openCompanion(target, { tag: "studio-chat:item" })) navigate.toThread(threadId);
+    navigate.toThread(threadId);
   }} />;
 }

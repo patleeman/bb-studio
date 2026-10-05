@@ -648,32 +648,24 @@ index aa949ec..ee1dd77 100644
 +export const sidebarHideEmptyProjectsAtom =
 +  createSyncedPreferenceAtom("hideEmptyProjects");
 diff --git a/source/app/rows/ThreadActionsMenu.tsx b/source/app/rows/ThreadActionsMenu.tsx
-index c9f9497..863a2ef 100644
+index c9f9497..5cb8c93 100644
 --- a/source/app/rows/ThreadActionsMenu.tsx
 +++ b/source/app/rows/ThreadActionsMenu.tsx
-@@ -51,0 +52,4 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
-+import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
+@@ -51,0 +52,3 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
 +import { HideThreadItem } from "../studio/HiddenThreads.js";
 +import { SpaceLeadItem, useIsSpaceLead } from "../studio/SpaceLead.js";
 +import { MoveToSpaceItem } from "../studio/MoveToSpace.js";
-@@ -257,0 +262 @@ function ThreadActionsMenuItems({
-+  const floatAvailable = useFloatAvailable();
-@@ -327 +332,7 @@ function ThreadActionsMenuItems({
--          {id === "split" && onOpenInSplit ? separator : null}
+@@ -326,0 +330,3 @@ function ThreadActionsMenuItems({
 +          {id === "move" ? <MoveToSpaceItem thread={thread} surface={surface} /> : null}
 +          {id === "archive" ? <HideThreadItem threadId={thread.id} surface={surface} /> : null}
 +          {id === "archive" ? <SpaceLeadItem thread={thread} surface={surface} /> : null}
-+          {id === "split" && floatAvailable ? (
-+            <FloatItem threadId={thread.id} surface={surface} />
-+          ) : null}
-+          {id === "split" && (onOpenInSplit || floatAvailable) ? separator : null}
-@@ -439,0 +451,2 @@ export function ThreadRowAction({
+@@ -439,0 +446,2 @@ export function ThreadRowAction({
 +  const isLead = useIsSpaceLead(thread);
 +  if (id === "archive" && isLead && thread.archivedAt === null) return null;
-@@ -590 +603 @@ export function visibleThreadRowActions(
+@@ -590 +598 @@ export function visibleThreadRowActions(
 -  available: { split: boolean; move: boolean },
 +  available: { split: boolean; move: boolean; archive?: boolean },
-@@ -594 +607,3 @@ export function visibleThreadRowActions(
+@@ -594 +602,3 @@ export function visibleThreadRowActions(
 -      (id !== "split" || available.split) && (id !== "move" || available.move),
 +      (id !== "split" || available.split) &&
 +      (id !== "move" || available.move) &&

@@ -55,7 +55,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
   const draft = (kind: NextKind, item: ExploreItem, text: string) => {
     const composer = composerFor(threadId);
     if (!composer) {
-      toast.error("Open this thread's composer to use it, in the main view or Float.");
+      toast.error("Open this thread's composer to use it, in the main view or a split.");
       return;
     }
     logClick(kind, item);

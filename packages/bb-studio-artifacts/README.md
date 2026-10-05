@@ -15,7 +15,7 @@ agent to save it.
 ![The compact Artifacts header](assets/compact-header.png)
 
 The live 390-pixel viewer shows the seeded Q3 HTML report. **Chat** stays
-visible while **Item actions** exposes related items, placement, and the
+visible while **Item actions** exposes related items, Open in split, and the
 artifact controls.
 These compact captures run on stable BB 0.45.0 with the full suite installed
 from pushed commit 786fd2f. They check viewport bounds, button hit targets,
@@ -28,8 +28,7 @@ HTML report, "Q3 usage report", saved twice from a staged thread's workspace.
 The viewer shows version 2 in its sandboxed frame, under Studio's shared item
 header, with Related, the artifact's thread ("Pick a database for the todo
 app", the staged thread that saved it), the Preview/Source toggle, Copy,
-Download and the ⋯ menu. That thread waits as a docked Float tab, beside
-Studio Chat's New in Float and Open in Float.
+Download and the ⋯ menu.
 
 ## What you get
 

@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from "react";
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ItemChatHost } from "@bb-studio/kit/app";
 import type { Viewed } from "../contract";
 import { ChatOverlay } from "./ChatOverlay";
-import { quoteDrafts } from "./conversation-drafts";
 
 const state = vi.hoisted(() => ({
   path: "/plugins/pages/pages/main",
@@ -13,8 +12,6 @@ const state = vi.hoisted(() => ({
   host: null as ItemChatHost | null,
   composer: null as any,
   picker: null as any,
-  float: vi.fn((_target: unknown, _options?: unknown) => true),
-  available: false,
   navigate: { toThread: vi.fn() },
   error: vi.fn(),
 }));
@@ -23,7 +20,6 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_Icon: () => null,
   useRpc: () => state.rpc,
   useBbNavigate: () => state.navigate,
-  useComposer: () => ({ scope: { kind: "none" } }),
   experimental_NewThreadComposer: (props: any) => {
     state.composer = props;
     return <textarea aria-label="New conversation" defaultValue={props.initialPrompt} />;
@@ -33,14 +29,9 @@ vi.mock("@bb-studio/kit/app", async () => ({
   NewConversationComposer: (await import("../../../../bb-studio-kit/src/app/new-conversation")).NewConversationComposer,
   cn: (...classes: string[]) => classes.join(" "),
   usePathname: () => state.path,
-  useFloatAvailable: () => state.available,
-  useCompanionNavigate: () => () => false,
-  openCompanion: state.float,
   itemChatChanged: () => {},
   setItemChatHost: (host: ItemChatHost) => { state.host = host; return () => { state.host = null; }; },
   Icon: () => null,
-  FloatDockPortal: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  FloatThreadLeading: () => null,
 }));
 vi.mock("sonner", () => ({ toast: { error: state.error } }));
 vi.mock("./ThreadPicker", () => ({
@@ -65,9 +56,7 @@ beforeEach(async () => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
   state.path = main.href;
-  state.available = false;
   state.composer = state.picker = null;
-  state.float.mockReturnValue(true);
   state.rpc.call.mockImplementation(async (method, input) => {
     if (method === "chat.viewing") return { item: main };
     if (method === "chat.subject") return { item: input.id === companion.id ? companion : main };
@@ -85,17 +74,6 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); });
 
 describe("item Chat actions", () => {
-  it("opens one canonical companion destination for an item's new composer", async () => {
-    state.available = true;
-    await render();
-    await actHost(host => host.start!(companion));
-    const expected = { kind: "path", path: `/plugins/studio/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: companion.pluginId, id: companion.id }))}`, title: "Chat: Companion drawing", icon: "MessageSquare" };
-    expect(state.float).toHaveBeenCalledWith(expected);
-    expect(container.querySelector("textarea")).toBeNull();
-    await actHost(host => host.start!(companion));
-    expect(state.float.mock.calls.filter(([target]) => (target as any).kind === "path").map(([target]) => target)).toEqual([expected, expected]);
-  });
-
   it("refreshes an item's home after a retained composer creates its thread", async () => {
     state.rpc.call.mockClear();
     await act(async () => { window.dispatchEvent(new CustomEvent("bb-studio-chat:started", { detail: { pluginId: companion.pluginId, id: companion.id } })); });
@@ -113,42 +91,7 @@ describe("item Chat actions", () => {
     expect(state.host!.home(companion)).toEqual(thread);
   });
 
-  it("keeps the quote available if durable storage is unavailable", async () => {
-    state.available = true;
-    vi.spyOn(quoteDrafts, "save").mockRejectedValue(new Error("Storage unavailable"));
-    await render();
-    await actHost(host => host.send(companion, quote));
-    expect(state.error).toHaveBeenCalledWith("Storage unavailable");
-    expect(state.composer.initialPrompt).toContain(quote.text);
-    expect(container.querySelector("textarea")).not.toBeNull();
-  });
-
-  it("doesn't open a quote whose storage finished after a newer Chat action", async () => {
-    state.available = true;
-    let release!: (draft: any) => void;
-    vi.spyOn(quoteDrafts, "save").mockImplementation(() => new Promise(resolve => { release = resolve; }));
-    const remove = vi.spyOn(quoteDrafts, "remove").mockResolvedValue();
-    await render();
-    await actHost(host => host.send(companion, quote));
-    await actHost(host => host.start!(main));
-    await act(async () => { release({ id: "stale" }); });
-    expect(remove).toHaveBeenCalledWith("stale");
-    expect(state.float.mock.calls.filter(([target]) => (target as any).kind === "path")).toHaveLength(1);
-    expect(state.float).toHaveBeenCalledWith(expect.objectContaining({ title: "Chat: Main page" }));
-  });
-
-  it("removes the saved quote when Float can't open it and composes in the overlay", async () => {
-    state.available = true;
-    state.float.mockReturnValue(false);
-    vi.spyOn(quoteDrafts, "save").mockResolvedValue({ id: "unopened" } as any);
-    const remove = vi.spyOn(quoteDrafts, "remove").mockResolvedValue();
-    await render();
-    await actHost(host => host.send(companion, quote));
-    expect(remove).toHaveBeenCalledWith("unopened");
-    expect(state.composer.initialPrompt).toContain(quote.text);
-  });
-
-  it("keeps an image quote in the submission without Float", async () => {
+  it("keeps an image quote in the submission", async () => {
     const image = "data:image/png;base64,aGVsbG8=";
     await actHost(host => host.send(companion, { ...quote, image }));
     expect(container.querySelector("img")?.src).toBe(image);
@@ -169,7 +112,7 @@ describe("item Chat actions", () => {
     const request = { input: [{ type: "text", text: "Fix it" }] };
     await act(async () => { await state.composer.onSubmit(request); });
     expect(state.rpc.call).toHaveBeenCalledWith("chat.start", { item: { pluginId: companion.pluginId, id: companion.id }, request });
-    expect(state.float).toHaveBeenCalledWith({ kind: "thread", threadId: "created_thread" }, { tag: "studio-chat:item" });
+    expect(state.navigate.toThread).toHaveBeenCalledWith("created_thread");
   });
 
   it("links a picked conversation to the companion instead of the main item", async () => {
@@ -192,9 +135,9 @@ describe("item Chat actions", () => {
   it("continues the linked conversation and can explicitly start another", async () => {
     await actHost((host) => host.choose(companion));
     await act(async () => { state.picker.onPick("picked_thread"); });
-    state.float.mockClear();
+    state.navigate.toThread.mockClear();
     await actHost((host) => host.open(companion));
-    expect(state.float).toHaveBeenCalledWith({ kind: "thread", threadId: "picked_thread" }, { tag: "studio-chat:item" });
+    expect(state.navigate.toThread).toHaveBeenCalledWith("picked_thread");
     expect(container.querySelector("textarea")).toBeNull();
     await actHost((host) => host.start!(companion));
     expect(container.querySelector("textarea")).not.toBeNull();
@@ -258,8 +201,7 @@ describe("item Chat actions", () => {
     expect(container.textContent).toContain("Connection lost");
   });
 
-  it("falls back to the main thread view when Float is absent", async () => {
-    state.float.mockReturnValue(false);
+  it("opens a picked conversation in the main thread view", async () => {
     await actHost((host) => host.choose(companion));
     await act(async () => { state.picker.onPick("picked_thread"); });
     expect(state.navigate.toThread).toHaveBeenCalledWith("picked_thread");

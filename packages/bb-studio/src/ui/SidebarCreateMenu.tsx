@@ -28,7 +28,7 @@ export function SidebarCreateMenu({ onNavigate }: { onNavigate(): void }) {
       projectId,
       addOn: target.providerName,
       create: async () => (await rpc.call("create", { pluginId: target.pluginId, kind: target.id, projectId })).item.href,
-      open: (href) => { openAppPath(href, { main: true }); onNavigate(); },
+      open: (href) => { openAppPath(href); onNavigate(); },
     });
   };
   return (

@@ -1,4 +1,4 @@
-import { createStudioItem, Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type FloatTarget, type OpenPlace } from "@bb-studio/kit/app";
+import { createStudioItem, Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type OpenPlace, type OpenTarget } from "@bb-studio/kit/app";
 import { untitled } from "@bb-studio/kit/format";
 import { mentionPrompt } from "@bb-studio/kit/contract";
 import { Dialog, DialogContent, DialogTitle } from "@bb-studio/kit/ui";
@@ -119,15 +119,14 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => setSelected((index) => Math.min(index, Math.max(0, rows.length - 1))), [rows.length]);
   useEffect(() => { list.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" }); }, [selected]);
   const { open: openTarget, anchor } = useOpenTarget();
-  // Mod opens a result in a split and Shift floats it, as clicking an item does anywhere.
-  const placeFor = (event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): OpenPlace =>
-    event.metaKey || event.ctrlKey ? "split" : event.shiftKey ? "float" : "main";
+  // Mod opens a result in a split, as clicking an item does anywhere.
+  const placeFor = (event: { metaKey: boolean; ctrlKey: boolean }): OpenPlace => event.metaKey || event.ctrlKey ? "split" : "main";
   const activate = (row: Row | undefined, place: OpenPlace = "main") => {
     if (!row) return;
     if (row.type === "command") return row.run();
     onClose();
     const threadId = threadLinkId(row.hit.href);
-    const target: FloatTarget = threadId
+    const target: OpenTarget = threadId
       ? { kind: "thread", threadId, title: untitled(row.hit.title) }
       : { kind: "path", path: row.hit.href, title: untitled(row.hit.title), icon: kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)?.icon };
     if (place === "main" && !threadId) openAppPath(row.hit.href);
@@ -168,7 +167,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
         {error ? <p className="px-3 py-4 text-sm text-destructive">{error}</p> : null}
         {!loading && !results.length && query && !error ? <p className="px-3 py-3 text-sm text-muted-foreground">{freshness.status?.state === "current" && !freshness.error ? "No matches." : "No matches in the available results."}</p> : null}
       </div>
-      <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground"><span>↑↓ to move</span><span>↵ to open</span><span>⌘↵ in a split</span><span>⇧↵ to float</span><span>esc to close</span></div>
+      <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground"><span>↑↓ to move</span><span>↵ to open</span><span>⌘↵ in a split</span><span>esc to close</span></div>
       {anchor}
     </DialogContent>
   </Dialog>;

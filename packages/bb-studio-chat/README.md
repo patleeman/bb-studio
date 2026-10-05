@@ -22,10 +22,10 @@ store keep their original names so unsent text, attachments and quotes survive.
 
 ## Staged preview
 
-![Studio item chat in a Float tab, composing a quote about an image](assets/staged-preview.png)
+![Studio item chat composing a quote about an image](assets/staged-preview.png)
 
 The capture shows the chat that now ships in Studio, which this bridge forwards
 to: a staged "Release diagram" image open in Studio, with its **Chat about
-"Release diagram"** composer in a Float tab. The draft quotes a cropped area of
+"Release diagram"** composer. The draft quotes a cropped area of
 the image, adds a note and attaches `release-review.txt`. This package has no UI
 of its own; Studio's captures and behavior tests cover chat.

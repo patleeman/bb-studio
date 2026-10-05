@@ -73,7 +73,7 @@ function ArchivedItems({ space, spaces, spaceOf, activeThreads, query, limit, on
   return (
     <>
       {shown.map((thread) => (
-        <DropdownMenuItem key={thread.id} textValue={thread.displayTitle} onSelect={() => openAppPath(thread.href, { main: true })}>
+        <DropdownMenuItem key={thread.id} textValue={thread.displayTitle} onSelect={() => openAppPath(thread.href)}>
           <span className="min-w-0 flex-1 truncate">{thread.displayTitle}</span>
           {thread.archivedAt ? <span className="shrink-0 text-xs tabular-nums text-subtle-foreground">{compactAge(thread.archivedAt)}</span> : null}
         </DropdownMenuItem>

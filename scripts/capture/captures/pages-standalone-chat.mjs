@@ -18,7 +18,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
       if (disabled) await bbCli(["plugin", "enable", "studio", "--json"]);
       for (const id of threads) await bbCli(["thread", "delete", id, "--yes", "--json"]);
       await cleanup();
-      await client.evaluate("sessionStorage.removeItem('bb-studio-float:windows'); delete window.bbPageDraft").catch(() => {});
+      await client.evaluate("delete window.bbPageDraft").catch(() => {});
       await rm(directory, { recursive: true, force: true });
       if (mobile) {
         if (sidebarToggle) await client.evaluate(`document.querySelector('button[aria-label=${JSON.stringify(sidebarToggle)}]')?.click()`);
@@ -36,14 +36,39 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
       await client.clickAriaButtonWithPointer("Chat options");
       await client.clickElementWithTextAndPointer('[role=menuitem]', "New conversation");
     };
-    const path = `/plugins/pages/pages/${page.id}/compose`, key = `path:${path}`;
-    const root = `[data-float-window=${JSON.stringify(key)}]`, prompt = `${root} [data-promptbox] [contenteditable=true]`;
+    const path = `/plugins/pages/pages/${page.id}/compose`;
+    const root = '[data-capture-root="page"]', prompt = `${root} [data-promptbox] [contenteditable=true]`;
+    const draftText = "Keep this page conversation draft.";
+    const waitForPath = async (expected, timeoutMs = 15000) => {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const current = await client.poll("decodeURIComponent(location.pathname)");
+        if (current?.endsWith(expected)) return;
+        await sleep(200);
+      }
+      throw new Error(`The main view did not open ${expected}`);
+    };
+    // The composer route opens in the main view; mark its live section so later checks find the same one.
+    const markRoot = async name => {
+      const deadline = Date.now() + 15000;
+      while (!(await client.poll(`(() => {
+        const section = [...document.querySelectorAll('section[data-studio-conversation]')].find(node => node.checkVisibility() && node.querySelector('[data-promptbox] [contenteditable=true]'));
+        if (!section) return false; section.dataset.captureRoot = ${JSON.stringify(name)}; return true; })()`))) {
+        if (Date.now() > deadline) throw new Error(`No visible ${name} composer in the main view`);
+        await sleep(200);
+      }
+    };
     const retained = async visible => {
       const state = await client.evaluate(`(() => { const draft = document.querySelector(${JSON.stringify(prompt)}); return {
         same: draft === window.bbPageDraft, visible: !!draft?.checkVisibility(), text: draft?.textContent,
-        file: draft?.closest('[data-float-window]')?.textContent.includes('release-review.txt'),
-        tabs: document.querySelectorAll(${JSON.stringify(`[data-float-tab=${JSON.stringify(key)}]`)}).length }; })()`);
-      if (!state.same || state.visible !== visible || !state.text?.includes("Keep this page conversation draft.") || !state.file || state.tabs !== 1) throw new Error(`Pages lost its retained composer: ${JSON.stringify(state)}`);
+        file: !!draft?.closest('[data-studio-conversation]')?.textContent.includes('release-review.txt'),
+        copies: [...document.querySelectorAll('section[data-studio-conversation] [data-promptbox] [contenteditable=true]')].filter(node => node.textContent.includes(${JSON.stringify(draftText)})).length }; })()`);
+      if (!state.same || state.visible !== visible || !state.text?.includes(draftText) || !state.file || state.copies !== 1) throw new Error(`Pages lost its retained composer: ${JSON.stringify(state)}`);
+    };
+    const backToPage = async () => {
+      await client.evaluate("history.back()");
+      await client.waitForText("Launch checklist");
+      await client.waitForSelector('[data-studio-item-header]');
     };
     try {
       await bbCli(["plugin", "disable", "studio", "--json"]); disabled = true;
@@ -72,29 +97,32 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
         })()`);
         if (sidebarToggle) await client.clickAriaButtonWithPointer(sidebarToggle);
       }
+      // Chat continues the page's conversation in BB's main thread view.
       await client.clickElementWithTextAndPointer('[data-studio-item-header] button', "Chat");
-      await client.waitForSelector(`[data-float-window="thread:${threadId}"] [data-promptbox]`);
+      await waitForPath(`/threads/${threadId}`);
+      await client.waitForSelector("[data-promptbox]");
       const chats = await pluginRpc("pages", "chats", { pageId: page.id });
       if (chats.chats.length !== 1 || chats.chats[0].threadId !== threadId) throw new Error("Continuing a page conversation created a duplicate");
       if (await client.evaluate("!!document.querySelector('.pages-chat')")) throw new Error("Pages still renders its separate chat card");
-      await newConversation(); await client.waitForSelector(prompt);
+      // New conversation opens the page's composer route in the main view.
+      await backToPage();
+      await newConversation(); await waitForPath(path); await markRoot("page");
       await client.dragBy(prompt, 0, 0);
-      await client.command("Input.insertText", { text: "Keep this page conversation draft." });
+      await client.command("Input.insertText", { text: draftText });
       await attach(root);
       await client.waitForText("release-review.txt");
       await client.evaluate(`(() => { window.bbPageDraft = document.querySelector(${JSON.stringify(prompt)}); return true; })()`);
       await retained(true);
-      await newConversation(); await retained(true);
-      await client.clickAriaButtonWithPointer("Fold floating tabs"); await retained(false);
-      await newConversation(); await retained(true);
+      await backToPage(); await retained(false);
+      await newConversation(); await waitForPath(path); await retained(true);
       if (!mobile) {
         await client.dragBy(`[data-studio-tab="pages:${notes.id}"] a`, 0, 0);
         await client.waitForText("Offline sync for every team");
-        await retained(true);
+        await retained(false);
         await newConversation();
-        const notesKey = `path:/plugins/pages/pages/${notes.id}/compose`, notesRoot = `[data-float-window=${JSON.stringify(notesKey)}]`;
-        const notesPrompt = `${notesRoot} [data-promptbox] [contenteditable=true]`;
-        await client.waitForSelector(notesPrompt); await retained(false);
+        await waitForPath(`/plugins/pages/pages/${notes.id}/compose`); await markRoot("notes");
+        const notesRoot = '[data-capture-root="notes"]', notesPrompt = `${notesRoot} [data-promptbox] [contenteditable=true]`;
+        await retained(false);
         await client.dragBy(notesPrompt, 0, 0);
         await client.command("Input.insertText", { text: "Schedule this release review." });
         await attach(notesRoot);
@@ -110,21 +138,28 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
           if (!created) await sleep(200);
         }
         threads.push(created);
-        await client.waitForSelector(`[data-float-window="thread:${created}"] [data-promptbox]`);
-        if (await client.evaluate(`!!document.querySelector('[data-float-tab=${JSON.stringify(notesKey)}]')`)) throw new Error("Scheduled send did not replace its originating tab");
+        // Submitting opens the new thread in the main view.
+        await waitForPath(`/threads/${created}`);
+        await client.waitForSelector("[data-promptbox]");
         const queued = await bbCli(["thread", "queue", "list", created, "--json"]);
         if (!queued.includes(notes.id) || !queued.includes("Schedule this release review.") || !queued.includes("release-review.txt")) throw new Error("Pages lost its context, draft or attachment when scheduling");
+        await client.dragBy(`[data-studio-tab="pages:${notes.id}"] a`, 0, 0);
+        await client.waitForText("Offline sync for every team");
         await client.clickElementWithTextAndPointer('[data-studio-item-header] button', "Chat");
-        if (await client.evaluate(`document.querySelectorAll('[data-float-tab="thread:${created}"]').length`) !== 1) throw new Error("The header duplicated its new page conversation");
-        await client.dragBy(`[data-float-tab=${JSON.stringify(key)}]`, 0, 0); await retained(true);
-        await client.dragBy(`[data-studio-tab="pages:${page.id}"] a`, 0, 0); await retained(true);
+        await waitForPath(`/threads/${created}`);
+        if ((await pluginRpc("pages", "chats", { pageId: notes.id })).chats.length !== 1) throw new Error("The header duplicated its new page conversation");
+        await client.dragBy(`[data-studio-tab="pages:${page.id}"] a`, 0, 0);
+        await client.waitForText("Launch checklist");
+        await newConversation(); await waitForPath(path); await retained(true);
       }
       await sleep(1500);
-      await client.navigate(`/plugins/pages/pages/${page.id}`);
+      // A reload keeps the draft and attachment under the page's draft key.
+      await client.navigate(path);
+      await markRoot("page");
       await client.waitForSelector(prompt); await client.waitForText("release-review.txt");
       await client.evaluate(`(() => { window.bbPageDraft = document.querySelector(${JSON.stringify(prompt)}); return true; })()`);
       await retained(true);
-      const clipped = await client.evaluate(`(() => [...document.querySelectorAll(${JSON.stringify(`${root} [data-studio-conversation] button`)})].filter(button => button.checkVisibility()).filter(button => {
+      const clipped = await client.evaluate(`(() => [...document.querySelectorAll(${JSON.stringify(`${root} button`)})].filter(button => button.checkVisibility()).filter(button => {
         const rect = button.getBoundingClientRect(); return rect.left < 0 || rect.right > innerWidth || rect.top < 0 || rect.bottom > innerHeight;
       }).map(button => button.getAttribute('aria-label') ?? button.innerText))()`);
       if (clipped.length) throw new Error(`Pages clips its composer controls: ${JSON.stringify(clipped)}`);

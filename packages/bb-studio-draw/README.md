@@ -23,8 +23,7 @@ Captured from a staged BB (`node scripts/staged-bb.mjs start`): the seeded "Chec
 editor, under Studio's shared item header. Cart, Payment and Confirmation boxes
 are joined by arrows, with a "Retry payment on failure" note. The header shows
 **No thread**, Studio Chat's chip for a drawing no thread has been started
-or picked for, and Studio Chat's New in Float and Open in Float sit in the
-corner.
+or picked for.
 
 ## What you get
 

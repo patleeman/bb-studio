@@ -7,7 +7,7 @@
 //     thread's storage files, to save; and what the thread already saved.
 //   - messageDirective `::artifact{id="art_…"}`: a card in a reply.
 //   - mention provider (server): `@artifact` works in every composer.
-import { FloatPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
+import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ArtifactCard } from "./components/artifact-card";
 import { ArtifactsPanel } from "./components/artifacts-panel";
@@ -26,8 +26,8 @@ export default definePluginApp((app) => {
     headerContent: StudioBarSlot,
   });
 
-  // Shows the panel in Float windows open on its paths.
-  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <ArtifactsPanel subPath={subPath} />} /> });
+  // Keeps the panel's views alive across route changes (with retainPanel).
+  app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path={PANEL_PATH} render={(subPath) => <ArtifactsPanel subPath={subPath} />} /> });
   app.slots.threadPanelAction({
     id: PICKER,
     title: "Artifacts",

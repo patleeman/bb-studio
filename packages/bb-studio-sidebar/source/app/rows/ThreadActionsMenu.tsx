@@ -49,7 +49,6 @@ import {
   type ThreadSectionMoveContextValue,
 } from "./ThreadSectionMoveProvider.js";
 import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
-import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
 import { HideThreadItem } from "../studio/HiddenThreads.js";
 import { SpaceLeadItem, useIsSpaceLead } from "../studio/SpaceLead.js";
 import { MoveToSpaceItem } from "../studio/MoveToSpace.js";
@@ -259,7 +258,6 @@ function ThreadActionsMenuItems({
   const isCompactViewport = useIsCompactViewport();
   const isDrawer = surface === "dropdown" && isCompactViewport;
   const showSeparators = !isDrawer;
-  const floatAvailable = useFloatAvailable();
 
   if (isDrawer && compactStep === "move") {
     return (
@@ -332,10 +330,7 @@ function ThreadActionsMenuItems({
           {id === "move" ? <MoveToSpaceItem thread={thread} surface={surface} /> : null}
           {id === "archive" ? <HideThreadItem threadId={thread.id} surface={surface} /> : null}
           {id === "archive" ? <SpaceLeadItem thread={thread} surface={surface} /> : null}
-          {id === "split" && floatAvailable ? (
-            <FloatItem threadId={thread.id} surface={surface} />
-          ) : null}
-          {id === "split" && (onOpenInSplit || floatAvailable) ? separator : null}
+          {id === "split" && onOpenInSplit ? separator : null}
         </Fragment>
       ))}
       <ActionMenuItem

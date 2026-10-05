@@ -6,7 +6,7 @@
 import {
   CollectionPage,
   createStudioItem,
-  ViewMoveMenu,
+  OpenInSplitButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -411,7 +411,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   const headerActions = (
     <>
-    <ViewMoveMenu item={{ href: panelHref("studio", "studio", subPath), title: "Studio" }} />
+    <OpenInSplitButton item={{ href: panelHref("studio", "studio", subPath), title: "Studio" }} />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button

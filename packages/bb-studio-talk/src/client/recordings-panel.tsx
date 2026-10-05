@@ -24,8 +24,7 @@ import {
   openAppPath,
   studioPath,
   useStudioPresent,
-  useOpenCompanion,
-  useCompanionNavigate,
+  useOpenMain,
   type ProviderCall,
 } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
@@ -92,7 +91,7 @@ function RecordingList() {
 /** Points at audio this device kept because the server refused it. */
 function UnsentNotice({ recordingId, className }: { recordingId?: string; className?: string }) {
   const setAside = useTalkState().setAside ?? [];
-  const open = useOpenCompanion();
+  const open = useOpenMain();
   const count = setAside.filter((segment) => !recordingId || segment.recordingId === recordingId).length;
   if (count === 0) return null;
   const what = count === 1 ? "A piece of audio" : `${count} pieces of audio`;
@@ -113,8 +112,7 @@ function UnsentNotice({ recordingId, className }: { recordingId?: string; classN
 function UnsentAudio() {
   const setAside = useTalkState().setAside ?? [];
   const navigate = useBbNavigate();
-  const open = useOpenCompanion();
-  const within = useCompanionNavigate();
+  const open = useOpenMain();
   const studio = useStudioPresent();
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState<readonly SetAsideSegment[] | null>(null);
@@ -126,10 +124,8 @@ function UnsentAudio() {
   };
   const toCollection = () => {
     const path = studio ? studioPath("recording") : `/plugins/talk/${PANEL_PATH}`;
-    if (!within({ kind: "path", path })) {
-      if (studio) openAppPath(path);
-      else navigate.toPluginPanel(PANEL_PATH);
-    }
+    if (studio) openAppPath(path);
+    else navigate.toPluginPanel(PANEL_PATH);
   };
   return (
     <div className="relative h-full">
@@ -262,7 +258,6 @@ function usePlayer(recordingId: string, segments: readonly Segment[]) {
 function RecordingDetail({ id }: { id: string }) {
   const { rpc, data, error, refetch } = useRecording(id);
   const navigate = useBbNavigate();
-  const within = useCompanionNavigate();
   const studio = useStudioPresent();
   const state = useTalkState();
   const segments = data?.segments ?? [];
@@ -310,12 +305,10 @@ function RecordingDetail({ id }: { id: string }) {
   const toCollection = useCallback(
     (replace = false) => {
       const path = studio ? studioPath("recording") : `/plugins/talk/${PANEL_PATH}`;
-      if (!within({ kind: "path", path })) {
-        if (studio) openAppPath(path, { replace });
-        else navigate.toPluginPanel(PANEL_PATH, { replace });
-      }
+      if (studio) openAppPath(path, { replace });
+      else navigate.toPluginPanel(PANEL_PATH, { replace });
     },
-    [navigate, studio, within],
+    [navigate, studio],
   );
   // The recording went away while open: deleted elsewhere, or discarded
   // because it finished without a word.

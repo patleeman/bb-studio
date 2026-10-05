@@ -3,7 +3,7 @@ import { useState, type ComponentProps } from "react";
 import { errorMessage, quoteMessage, type ItemQuote } from "../format";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
-import { ViewMoveMenu, type ItemThread } from "./item-header";
+import { OpenInSplitButton, type ItemThread } from "./item-header";
 
 export type ConversationSubmit = NonNullable<ComponentProps<typeof NewThreadComposer>["onSubmit"]>;
 
@@ -30,7 +30,7 @@ export function NewConversationComposer({ title, icon = "MessageSquare", ariaLab
     <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
       <Icon name={icon} className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate">{title}</span>
-      {moveTarget ? <ViewMoveMenu item={moveTarget} /> : null}
+      {moveTarget ? <OpenInSplitButton item={moveTarget} /> : null}
       {onClose ? <button type="button" aria-label="Close composer" onClick={onClose} className="rounded p-1 hover:bg-state-hover"><Icon name="X" className="size-4" /></button> : null}
     </header>
     {quote?.image ? <div className="flex shrink-0 items-center gap-3 px-3 pt-2"><img src={quote.image} alt="Selected image area" className="max-h-24 max-w-40 rounded border border-border object-contain" /></div> : null}

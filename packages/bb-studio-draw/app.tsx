@@ -21,7 +21,7 @@ import { ExcalidrawPicker } from "./components/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./lib/composer-registration";
 import { blobToBase64, parseScene, renderSceneToPng } from "./lib/scene";
 import { callRpc } from "./lib/rpc";
-import { FloatPanels, retainPanel, StudioBarSlot, ThreadItemsPanel } from "@bb-studio/kit/app";
+import { RetainedPanels, retainPanel, StudioBarSlot, ThreadItemsPanel } from "@bb-studio/kit/app";
 import { DRAW_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL } from "./src/shared";
 
 function DrawingsSurface({ threadId }: { threadId: string }) {
@@ -69,8 +69,8 @@ export default definePluginApp((app) => {
     headerContent: StudioBarSlot,
   });
 
-  // Shows the panel in Float windows open on its paths.
-  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <DrawingsPanel subPath={subPath} />} /> });
+  // Keeps the panel's views alive across route changes (with retainPanel).
+  app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path={PANEL_PATH} render={(subPath) => <DrawingsPanel subPath={subPath} />} /> });
   app.slots.threadPanelAction({
     id: "excalidraw",
     title: "Drawings",

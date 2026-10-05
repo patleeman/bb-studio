@@ -109,9 +109,8 @@ GraphQL, and XML.
 
 The page header's Chat action continues its conversation or opens BB's
 new-thread composer. New conversation starts another. Sending starts a
-normal agent thread in the page's project, shown through the shared
-workbench/Float companion system or ordinary thread navigation when Float
-is absent. Existing page chat links still work. The thread also appears in
+normal agent thread in the page's project and opens it in BB's main view.
+Existing page chat links still work. The thread also appears in
 the sidebar, and its header links back to the page. Its first message carries the page id and
 its Markdown with block ids as hidden context. The copy can go stale as the
 user types, so read the page again right before you edit it with

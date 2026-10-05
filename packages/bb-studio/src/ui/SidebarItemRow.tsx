@@ -1,7 +1,7 @@
 // A Studio item's row in the sidebar, drawn as BB draws a thread's: the whole
 // row highlights on hover, and its buttons show at the right end, × to close
 // (open tabs only) and ⋯ for the same menu right-click opens.
-import { Icon, SIDEBAR_ROW, cn, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
+import { Icon, SIDEBAR_ROW, cn, openPathInSplit } from "@bb-studio/kit/app";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { useId, useRef, useState, type MouseEvent } from "react";
 import { toast } from "sonner";
@@ -46,8 +46,6 @@ export function SidebarItemRow({
   onClose?(): void;
   rowProps?: Record<`data-${string}`, string>;
 }) {
-  const target = { kind: "path" as const, path: href, title, icon: kindIcon };
-  const canFloat = useCanFloat(target);
   const link = useRef<HTMLAnchorElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
@@ -79,7 +77,7 @@ export function SidebarItemRow({
                 : "group-hover/item:pr-9 group-focus-within/item:pr-9 group-data-[state=open]/item:pr-9 pointer-coarse:pr-11",
             )}
             onClick={(event: MouseEvent) => {
-              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey) return;
               event.preventDefault();
               onOpen();
             }}
@@ -121,12 +119,6 @@ export function SidebarItemRow({
           <Icon name="Columns2" />
           Open in split
         </ContextMenuItem>
-        {canFloat ? (
-          <ContextMenuItem onSelect={() => openFloat(target)}>
-            <Icon name="AppWindow" />
-            Float
-          </ContextMenuItem>
-        ) : null}
         <ContextMenuItem onSelect={() => copyId(id)}>
           <Icon name="Copy" />
           Copy ID

@@ -3,7 +3,6 @@ import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { Icon } from "../ui/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { useCompanionNavigate } from "./float";
 import { ICON_BUTTON } from "./pieces";
 import { ItemLinkText, ItemLinkTextarea } from "./item-links";
 import { useStudioPresent } from "./presence";
@@ -22,7 +21,6 @@ const versionsSchema = z.object({ versions: z.array(z.object({ id: z.string(), l
 export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
   const sdk = useSdk();
   const studio = useStudioPresent();
-  const companionNavigate = useCompanionNavigate();
   const [open, setOpen] = useState(false);
   const [links, setLinks] = useState<{ title: string; href: string; detail: string }[]>([]);
   const [threads, setThreads] = useState<{ threadId: string; role: string; state: string }[]>([]);
@@ -83,9 +81,9 @@ export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
     </button></PopoverTrigger>
     <PopoverContent data-studio-related-panel="" aria-label="Related items" align="end" sideOffset={8} hideWhenDetached className="max-h-[min(70vh,var(--radix-popover-content-available-height))] w-72 max-w-[calc(100vw-1rem)] rounded-lg bg-background p-3 shadow-xl">
       <div className="mb-2 text-xs font-semibold text-muted-foreground">Related items</div>
-      {links.length ? links.map((link, index) => <a key={`${link.href}:${index}`} href={link.href} {...studioItemProps(link)} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && companionNavigate({ kind: "path", path: link.href })) event.preventDefault(); }} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{link.title}<span className="block text-xs text-muted-foreground">{link.detail}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No related items.</p>}
+      {links.length ? links.map((link, index) => <a key={`${link.href}:${index}`} href={link.href} {...studioItemProps(link)} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{link.title}<span className="block text-xs text-muted-foreground">{link.detail}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No related items.</p>}
       <div className="mt-3 mb-2 text-xs font-semibold text-muted-foreground">Threads about this</div>
-      {threads.length ? threads.map((thread) => <a key={thread.threadId} href={`/threads/${thread.threadId}`} {...studioThreadProps(thread.threadId, thread.role)} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && companionNavigate({ kind: "thread", threadId: thread.threadId })) event.preventDefault(); }} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{thread.role}<span className="block text-xs text-muted-foreground">{thread.state}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No threads yet.</p>}
+      {threads.length ? threads.map((thread) => <a key={thread.threadId} href={`/threads/${thread.threadId}`} {...studioThreadProps(thread.threadId, thread.role)} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{thread.role}<span className="block text-xs text-muted-foreground">{thread.state}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No threads yet.</p>}
       <div className="mt-3 mb-2 text-xs font-semibold text-muted-foreground">Comments</div>
       {rootComments.length ? rootComments.map((comment) => <div key={comment.id} className="border-b border-border/70 px-2 py-2 last:border-b-0">
         <p className="whitespace-pre-wrap break-words text-sm"><ItemLinkText text={comment.body} /></p>

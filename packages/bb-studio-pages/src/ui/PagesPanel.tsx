@@ -1,4 +1,4 @@
-import { AddOnCollection, navigateFromFloat, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
+import { AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,7 +24,6 @@ export function usePagesData(rpc: Rpc) {
 /** What the page's blocks and mentions need to open things, shared by every view of a page. */
 export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: BotsState): PagesUi {
   const navigate = useBbNavigate();
-  // Through openAppPath, so a page opened from a floating tab opens in that tab.
   const openPage = useCallback((id: string) => openAppPath(`/plugins/${PLUGIN_ID}/pages/${id}`), []);
   const studioItems = useRef<{ at: number; items: Promise<StudioEmbedItem[]> } | null>(null);
   return useMemo<PagesUi>(
@@ -32,9 +31,7 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
       pages: pages ?? [],
       bots: bots.bots,
       openPage,
-      openThread: (threadId) => {
-        if (!navigateFromFloat({ kind: "thread", threadId })) navigate.toThread(threadId);
-      },
+      openThread: (threadId) => navigate.toThread(threadId),
       openProject: (projectId) => navigate.toProject(projectId),
       openUrl: (url) => {
         if (!navigate.openUrl(url)) window.open(url, "_blank", "noopener");

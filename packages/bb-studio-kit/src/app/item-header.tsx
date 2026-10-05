@@ -2,8 +2,8 @@
 // A nav panel lends Studio its title bar through StudioBarSlot; ItemHeader
 // fills it with a breadcrumb (the way back, then the item) on the left and
 // the item's tools on the right: icon buttons, one labelled action (Chat),
-// and a menu. Where there is no title bar (Float, workbench tabs) the same
-// bar sits at the top of the view.
+// and a menu. Where there is no title bar the same bar sits at the top of
+// the view.
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
@@ -11,7 +11,6 @@ import { mentionPrompt } from "../contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
-import { openFloat, useCanFloat, useInFloat } from "./float";
 import { useOpenTarget } from "./move";
 import { useHomeThread, useItemChat, type ItemChatRef } from "./item-chat";
 import { BAR_BUTTON, ICON_BUTTON } from "./pieces";
@@ -32,41 +31,15 @@ function useNewItemThread(item: ItemThread | undefined) {
   };
 }
 
-/**
- * Moves the view on screen: Float adopts it, optionally returning through
- * the header's back action; a split opens it beside. Not shown
- * inside a floating tab, whose own menu moves it.
- */
-export function ViewMoveMenu({ item, onBack }: { item: ItemThread; onBack?(): void }) {
-  const target = { kind: "path" as const, path: item.href, title: item.title };
-  const canFloat = useCanFloat(target);
-  const inFloat = useInFloat();
+/** Opens the view on screen again in a split beside it. */
+export function OpenInSplitButton({ item }: { item: ItemThread }) {
   const { open, anchor } = useOpenTarget();
-  if (inFloat) return null;
   return (
     <>
       {anchor}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Move" title="Float or split" className={ICON_BUTTON}>
-            <Icon name="AppWindow" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          {canFloat ? (
-            <DropdownMenuItem
-              onSelect={() => {
-                if (openFloat(target)) onBack?.();
-              }}
-            >
-              <Icon name="AppWindow" className="size-4" /> Float this
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuItem onSelect={() => open(target, "split")}>
-            <Icon name="Columns2" className="size-4" /> Open in split
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <button type="button" aria-label="Open in split" title="Open in split" className={ICON_BUTTON} onClick={() => open({ kind: "path", path: item.href, title: item.title }, "split")}>
+        <Icon name="Columns2" />
+      </button>
     </>
   );
 }
@@ -144,10 +117,9 @@ function paneSlot(from: HTMLElement): HTMLElement | null {
   return null;
 }
 
-function useBarSlot(anchor: React.RefObject<HTMLElement | null>, enabled: boolean): HTMLElement | null {
+function useBarSlot(anchor: React.RefObject<HTMLElement | null>): HTMLElement | null {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => {
-    if (!enabled) { setSlot(null); return; }
     // The title bar and the view mount together; give the slot a few frames.
     let frame = 0, tries = 0, current: HTMLElement | null = null;
     const find = () => (anchor.current ? paneSlot(anchor.current) : null);
@@ -171,7 +143,7 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>, enabled: boolea
     });
     observer.observe(document.body, { childList: true, subtree: true });
     return () => { cancelAnimationFrame(frame); observer.disconnect(); };
-  }, [anchor, enabled]);
+  }, [anchor]);
   return slot;
 }
 
@@ -181,8 +153,7 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>, enabled: boolea
  */
 export function StudioBar({ children, className }: { children: ReactNode; className?: string }) {
   const anchor = useRef<HTMLDivElement>(null);
-  const inFloat = useInFloat();
-  const slot = useBarSlot(anchor, !inFloat);
+  const slot = useBarSlot(anchor);
   useLayoutEffect(() => slot ? markTitleBar(slot) : undefined, [slot]);
   const bar = <div data-studio-bar="" className="flex h-full min-w-0 flex-1 items-center gap-2">{children}</div>;
   if (slot) return <>
@@ -255,15 +226,14 @@ export function ItemHeader({
   trailing?: ReactNode;
   /** Adds the shared Chat action for this item. */
   thread?: ItemThread;
-  /** The item shown, for the Float and split menu; `thread` serves when given. */
+  /** The item shown, for Open in split; `thread` serves when given. */
   item?: ItemThread;
   /** Replaces the shared item chat when a view owns its conversation. Null hides it. */
   chatAction?: ReactNode;
   className?: string;
 }) {
   const anchor = useRef<HTMLDivElement>(null);
-  const inFloat = useInFloat();
-  const slot = useBarSlot(anchor, !inFloat);
+  const slot = useBarSlot(anchor);
   useLayoutEffect(() => slot ? markTitleBar(slot) : undefined, [slot]);
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
   useLayoutEffect(() => {
@@ -285,14 +255,12 @@ export function ItemHeader({
   const relatedRef = chatItem?.ref ?? (path[1] === "plugins" && path[2] && path[4]
     ? { pluginId: path[2], id: decodeURIComponent(path[4]) }
     : null);
-  const tools = relatedRef && studio || (moved && !inFloat) || trailing;
+  const tools = relatedRef && studio || moved || trailing;
   const bar = (
     <div data-studio-bar="" data-studio-item-header="" className="flex h-full min-w-0 flex-1 items-center gap-2">
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
-        {!inFloat ? <>
-          <BarCrumb onClick={onBack} title={`Back to ${backLabel}`}>{backLabel}</BarCrumb>
-          {leading ? <BarSeparator /> : null}
-        </> : null}
+        <BarCrumb onClick={onBack} title={`Back to ${backLabel}`}>{backLabel}</BarCrumb>
+        {leading ? <BarSeparator /> : null}
         {leading}
       </nav>
       {chatAction !== null && (chatAction || thread || relatedRef) || tools ? <div className="flex shrink-0 items-center gap-0.5">
@@ -303,8 +271,8 @@ export function ItemHeader({
         {chatAction === undefined && relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
         {tools ? <ItemActions compact={compact}>
           {relatedRef && studio ? <RelatedPanel ref={relatedRef} /> : null}
-          {moved && !inFloat ? <ViewMoveMenu item={moved} onBack={onBack} /> : null}
-          {trailing && ((relatedRef && studio) || (moved && !inFloat)) && !compact ? <span aria-hidden className="mx-1 h-4 w-px bg-border" /> : null}
+          {moved ? <OpenInSplitButton item={moved} /> : null}
+          {trailing && ((relatedRef && studio) || moved) && !compact ? <span aria-hidden className="mx-1 h-4 w-px bg-border" /> : null}
           {trailing}
         </ItemActions> : null}
       </div> : null}
@@ -325,8 +293,8 @@ export interface ChatMenuItem { label: ReactNode; icon: string; onSelect(): void
 
 /**
  * An item's Chat: open its conversation, or pick from the menu. Menu
- * actions run once the menu has closed, so one that opens a dialog or a
- * companion takes focus cleanly.
+ * actions run once the menu has closed, so one that opens a dialog takes
+ * focus cleanly.
  */
 export function ChatButton({ title, disabled = false, onOpen, items, ...rest }: {
   title: string;

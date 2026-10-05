@@ -78,7 +78,7 @@ function ProblemRow({ problem, health, onFix }: { problem: Problem; health: Heal
           </>
         ) : (
           <>
-            <Button size="sm" variant="outline" onClick={() => { onFix?.(); openAppPath(problem.fix.path, { main: true }); }}>{problem.fix.label}</Button>
+            <Button size="sm" variant="outline" onClick={() => { onFix?.(); openAppPath(problem.fix.path); }}>{problem.fix.label}</Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>Turn off plugin</Button>
             <Button size="sm" variant="ghost" disabled={health.busy} onClick={() => void health.hide(problem.key, !problem.hidden)}>
               {problem.hidden ? "Show" : "Hide"}
@@ -96,7 +96,7 @@ export function HealthFooter({ dismiss }: { dismiss(): void }) {
   const { summary, error } = health;
   const visible = summary?.problems.filter((problem) => !problem.hidden) ?? [];
   const hidden = (summary?.problems.length ?? 0) - visible.length;
-  const openSetup = () => { dismiss(); openAppPath(studioPath(SETUP_SUBPATH), { main: true }); };
+  const openSetup = () => { dismiss(); openAppPath(studioPath(SETUP_SUBPATH)); };
   return (
     <div className="flex max-h-[60vh] w-full flex-col gap-2 overflow-y-auto p-2">
       <div className="flex items-center gap-2 px-0.5">

@@ -56,9 +56,7 @@ import {
   type SortKey,
 } from "./selection";
 import { TagChips, TagDot, TagMenuItems, TagNameInput, type CollectionTag } from "./tags";
-import { openFloat, useFloatAvailable } from "./float";
 import { CopyReferenceMenuItem } from "./item-menu";
-import { floatPanelFor } from "./float-registry";
 import { useOpenTarget } from "./move";
 import { MoveToItems, MoveToSubmenu } from "./move-to";
 import { STUDIO_ITEM_CLICKS_OFF, studioItemProps } from "./studio-item";
@@ -224,7 +222,6 @@ export function CollectionPage({
   const anchor = useRef<string | null>(null);
   // A right-clicked row's menu, at the pointer.
   const [rowContext, setRowContext] = useState<{ item: CollectionItem; x: number; y: number } | null>(null);
-  const floatAvailable = useFloatAvailable();
   const { open: openTarget, anchor: splitAnchor } = useOpenTarget();
 
   const kindById = useMemo(() => new Map(kinds.map((kind) => [`${kind.pluginId}:${kind.id}`, kind])), [kinds]);
@@ -445,7 +442,6 @@ export function CollectionPage({
   );
 
   const itemTarget = (item: CollectionItem) => ({ kind: "path" as const, path: item.href, title: untitled(item.title), icon: kindOf(item)?.icon });
-  const floatable = (item: CollectionItem) => floatAvailable && floatPanelFor(item.href.split(/[?#]/)[0]!) !== null;
   // The row's whole menu, shown from its ⋯ button or a right-click.
   const rowMenuItems = (item: CollectionItem) => {
     const kind = kindOf(item);
@@ -454,11 +450,6 @@ export function CollectionPage({
           <DropdownMenuItem onSelect={() => handlers.onOpen(item)}>
             <Icon name="ArrowUpRight" className="size-4" /> Open
           </DropdownMenuItem>
-          {floatable(item) ? (
-            <DropdownMenuItem onSelect={() => openFloat(itemTarget(item))}>
-              <Icon name="AppWindow" className="size-4" /> Float
-            </DropdownMenuItem>
-          ) : null}
           <DropdownMenuItem onSelect={() => openTarget(itemTarget(item), "split")}>
             <Icon name="Columns2" className="size-4" /> Open in split
           </DropdownMenuItem>
@@ -808,11 +799,6 @@ export function CollectionPage({
                 <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => handlers.onNewThread(chosen)}>
                   <Icon name="MessageSquarePlus" /> New thread
                 </button>
-                {chosen.some(floatable) ? (
-                  <button type="button" className={OUTLINE_BUTTON} onClick={() => chosen.filter(floatable).forEach((item) => openFloat(itemTarget(item)))}>
-                    <Icon name="AppWindow" /> Float {chosen.filter(floatable).length}
-                  </button>
-                ) : null}
                 {chosenKind?.actions.map((action) => (
                   <button key={action.id} type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => act(chosenKind, action, chosen)}>
                     <Icon name={action.icon} /> {action.label.replace("{count}", String(chosen.length))}

@@ -1,6 +1,6 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { createStudioItem, openAppPath, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
+import { createStudioItem, openAppPath, openPathInSplit } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
@@ -48,7 +48,7 @@ export function openStudioItem(anchor: HTMLAnchorElement | null, href: string, s
       splitting = false;
     }
   }
-  openAppPath(href, { main: true });
+  openAppPath(href);
 }
 
 export type SpaceSubheadingCollapse = { isCollapsed: boolean; onToggleCollapsed(): void };
@@ -185,7 +185,6 @@ function openMenu(button: HTMLElement) {
 function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
   const sdk = useSdk();
   const link = useRef<HTMLAnchorElement>(null);
-  const canFloat = useCanFloat({ kind: "path", path: item.href, title: item.title });
   const [renaming, setRenaming] = useState(false);
   const call = (method: "archive" | "remove" | "rename", input: Record<string, unknown>) =>
     sdk.plugins.callRpc({ pluginId: "studio", method, input: input as never, outputSchema: resultsSchema, signal: AbortSignal.timeout(15_000) });
@@ -221,7 +220,7 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
             title={item.title}
             onClick={(event) => {
               // The split's own Mod-click goes on to BB.
-              if (splitting || event.button !== 0 || event.shiftKey || event.altKey) return;
+              if (splitting || event.button !== 0 || event.altKey) return;
               event.preventDefault();
               openStudioItem(link.current, item.href, event.metaKey || event.ctrlKey);
             }}
@@ -281,7 +280,8 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52" aria-label={`${item.title} actions`}>
-        {canFloat ? <><ContextMenuItem onSelect={() => openFloat({ kind: "path", path: item.href, title: item.title })}><Icon name="AppWindow" className="size-4" />Float</ContextMenuItem><ContextMenuSeparator /></> : null}
+        <ContextMenuItem onSelect={() => openStudioItem(link.current, item.href, true)}><Icon name="Columns2" className="size-4" />Open in split</ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => copyText(`[${item.title}](${item.href})`, "Link copied")}><Icon name="studio/link" fallback="Copy" className="size-4" />Copy link</ContextMenuItem>
         <ContextMenuItem onSelect={() => copyText(item.id, "ID copied")}><Icon name="Copy" className="size-4" />Copy ID</ContextMenuItem>
         <ContextMenuSeparator />

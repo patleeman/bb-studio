@@ -15,7 +15,7 @@ export {
 export { AddOnCollection, type ProviderCall } from "./add-on";
 export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
 export { ThreadItemsPanel } from "./thread-items";
-export { BarCrumb, BarSeparator, BarTitle, ChatButton, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, ViewMoveMenu, openNewItemThread, type ChatMenuItem, type ItemThread } from "./item-header";
+export { BarCrumb, BarSeparator, BarTitle, ChatButton, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, OpenInSplitButton, openNewItemThread, type ChatMenuItem, type ItemThread } from "./item-header";
 export { type RelatedRef } from "./related-panel";
 export { CopyReferenceMenuItem, ItemDeleteConfirm, ItemMenu } from "./item-menu";
 export { ITEM_LINK_PILLS, ItemLinkText, ItemLinkTextarea } from "./item-links";
@@ -47,34 +47,10 @@ export {
   type Project,
 } from "./pieces";
 export { TagDot } from "./tags";
+export { RetainedPanels, retainPanel } from "./retained";
 export {
-  FloatDockPortal,
-  FloatPanels,
-  retainPanel,
-  FloatThreadLeading,
-  openFloat,
-  useCanFloat,
-  useFloatAvailable,
-  useInFloat,
-  useCompanionNavigate,
-} from "./float";
-export {
-  floatPanelFor,
-  floatWindowKey,
-  navigateFromFloat,
-  publishFloatBody,
-  publishFloatDock,
-  publishFloatLeading,
-  setFloatHost,
-  type FloatOpenOptions,
-  type FloatTarget,
-} from "./float-registry";
-export {
-  dropTarget,
   openPathInSplit,
-  setDragTarget,
   STUDIO_ITEM_CLICKS_OFF,
-  STUDIO_TARGET_TYPE,
   studioItemProps,
   studioTargetAt,
   studioThreadProps,
@@ -82,9 +58,8 @@ export {
   threadLinkId,
   type StudioItemLink,
 } from "./studio-item";
-export { useOpenTarget, type OpenPlace } from "./move";
+export { useOpenMain, useOpenTarget, type OpenPlace, type OpenTarget } from "./move";
 export { MoveToItems, MoveToSubmenu, moveToSpace, spaceOfProject, useMoveSpaces, type MoveSpace } from "./move-to";
-export { CompanionView, CompanionOutlet, companionWorkbenchAvailable, openCompanion, useOpenCompanion, type CompanionPlacement, type CompanionViewProps } from "./companion";
 export { useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";
 export { NewConversationComposer, type NewConversationProps, type ConversationSubmit } from "./new-conversation";

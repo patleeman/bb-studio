@@ -1,12 +1,12 @@
 import { untitled } from "@bb-studio/kit/format";
-import { ChatButton, NewConversationComposer, useOpenCompanion } from "@bb-studio/kit/app";
+import { ChatButton, NewConversationComposer, useOpenMain } from "@bb-studio/kit/app";
 import type { PageMetaView } from "../contract";
 import type { Rpc } from "./shared";
 
 export const pageConversationPath = (pageId: string) => `/plugins/pages/pages/${encodeURIComponent(pageId)}/compose`;
 
 export function PageChat({ page, threadId }: { page: PageMetaView; threadId: string | null }) {
-  const open = useOpenCompanion();
+  const open = useOpenMain();
   const compose = () => open({ kind: "path", path: pageConversationPath(page.id), title: `Chat: ${untitled(page.title)}`, icon: "MessageSquare" });
   return <ChatButton
     title={threadId ? "Continue this page's conversation" : "Start a conversation about this page"}
@@ -16,7 +16,7 @@ export function PageChat({ page, threadId }: { page: PageMetaView; threadId: str
 }
 
 export function PageConversation({ page, rpc }: { page: PageMetaView; rpc: Rpc }) {
-  const open = useOpenCompanion();
+  const open = useOpenMain();
   return <NewConversationComposer title={`Chat about "${untitled(page.title)}"`} placeholder="Work with this page…"
     composerClassName="pages-composer" draftKey={`pages:${page.id}`} focusRequest={1}
     {...(page.projectId ? { defaultProjectId: page.projectId } : {})}

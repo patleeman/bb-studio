@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate, useSdk, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, PageColumn, StudioBar, Tooltip, openCompanion } from "@bb-studio/kit/app";
+import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, PageColumn, StudioBar, Tooltip } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { errorMessage as message } from "@bb-studio/kit/format";
 import "./styles.css";
@@ -102,7 +102,7 @@ function useStored<T extends string | null>(key: string, read: (value: string | 
 
 function CommandView({ spaceId }: { spaceId: string }) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
-  const openThread = (threadId: string) => { if (!openCompanion({ kind: "thread", threadId })) navigate.toThread(threadId); };
+  const openThread = (threadId: string) => navigate.toThread(threadId);
   const [space, setSpace] = useState<Space | null>(() => lastSpace.get(spaceId) ?? null), [error, setError] = useState<string | null>(null);
   const [permission, setPermission] = useStored<CommandPermissionMode | null>(`studio:command-permission:${spaceId}`, value => MODE_CHOICES.find(choice => choice.id === value)?.id ?? null);
   // The thread picked to reply to.

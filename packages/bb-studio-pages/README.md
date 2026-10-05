@@ -15,7 +15,7 @@ the cursor, then review it and post when ready. The page body stays separate.
 ![The compact Pages header](assets/compact-header.png)
 
 The live 390-pixel page keeps **Chat** visible while **Item actions** opens the
-space, related items, placement, and page controls. The standalone phone capture
+space, related items, Open in split, and page controls. The standalone phone capture
 also checks that Version history remains reachable through Page actions.
 These compact captures run on stable BB 0.45.0 with the full suite installed
 from pushed commit 786fd2f. They check viewport bounds, button hit targets,
@@ -43,11 +43,12 @@ buttons. **Dictate** appears because Talk is installed in the staged app.
 
 The standalone Chat check temporarily disables Studio in the isolated
 staged app. It resumes a legacy page conversation without creating another
-thread, then opens **New conversation** as a companion tab. Its draft and
-file survive tab reuse, folding, navigation to another page, and a browser
-reload. The desktop check also schedules a second page's conversation and
-verifies its page context, edited prompt, attachment, and updated Chat action.
-The [phone companion](assets/standalone-chat-mobile.png) keeps every composer
+thread, then opens **New conversation** in the main view. Its draft and
+file survive navigation to another page and back, and a browser reload. The
+desktop check also schedules a second page's conversation, opens the new
+thread in the main view, and verifies its page context, edited prompt,
+attachment, and updated Chat action. The
+[phone capture](assets/standalone-chat-mobile.png) keeps every composer
 control inside the viewport. All fixture sends are scheduled and their threads
 are deleted before any agent runs. The capture restores Studio and
 removes its pages and files.
@@ -138,14 +139,13 @@ afterwards.
 - **Chat about a page.** **Chat** continues the page's conversation or opens
   BB's new-thread composer. **New conversation** starts another. Sending
   starts an agent thread in the page's project with the page as context.
-  Conversations use the shared companion system: workbench on a capable BB
-  host, Float on stable hosts without that capability, or ordinary thread
-  navigation without Float. Existing page chats and links still work.
+  Conversations open in BB's main view. Existing page chats and links still
+  work.
   [Studio chat](../bb-studio) provides the suite-wide item links and
-  conversation picker when installed. Standalone Pages uses the same
-  retained companion tabs and preserves its existing composer draft keys.
-  New conversation focuses `/plugins/pages/pages/<id>/compose`; it keeps
-  drafts and attachments while you navigate other pages. The page's Chat
+  conversation picker when installed. Standalone Pages keeps its existing
+  composer draft keys. New conversation opens
+  `/plugins/pages/pages/<id>/compose` in the main view; it keeps drafts and
+  attachments while you navigate other pages. The page's Chat
   action updates when that draft becomes a thread.
 - **Version history.** Pages saves a version before an agent's first
   edit in a while. You can save one yourself and restore any version, and the
@@ -234,7 +234,7 @@ told not to.
 
 ## Explore
 
-Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page, opened in the thread's **Explore** tab. Agents can write an explainer themselves with the `explore_explain` tool. Explore keeps its explainers in its own `explore.db` next to Pages' database. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate|stats`.
+Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page, opened in the thread's panel (its **Explore** tab), or on its own page when the thread panel isn't available. Agents can write an explainer themselves with the `explore_explain` tool. Explore keeps its explainers in its own `explore.db` next to Pages' database. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate|stats`.
 
 ### Next row
 

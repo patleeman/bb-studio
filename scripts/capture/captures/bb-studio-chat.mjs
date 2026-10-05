@@ -2,8 +2,6 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const composerKey = ref => `path:/plugins/studio/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: ref.pluginId, id: ref.id }))}`;
-
 export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
   {
     id: "studio-item-chat",
@@ -14,30 +12,21 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
       const { drawing, cleanup: cleanupDrawing } = await seedDrawing();
       const { page, notes, cleanup: cleanupPages } = await seedPages();
       const drawingRef = { pluginId: "excalidraw", id: drawing.id };
-      const pageRef = { pluginId: "pages", id: page.id };
       const directory = await mkdtemp(join(tmpdir(), "bb-chat-draft-capture-"));
       const attachment = join(directory, "release-review.txt");
       await writeFile(attachment, "A deterministic attachment for the new-conversation draft.\n");
       let artifactId;
-      let quoteId;
       const drawingChat = `[data-studio-chat-item="excalidraw:${drawing.id}"]`;
-      const pageChat = `[data-float-window="path:/plugins/pages/pages/${page.id}"] [data-studio-chat-item="pages:${page.id}"]`;
+      const pageChat = `[data-studio-chat-item="pages:${page.id}"]`;
+      // Without a linked thread, Chat opens a compact composer in the bottom-right corner.
+      const corner = ".studio-chat section[data-studio-conversation]";
+      const prompt = `${corner} [data-promptbox] [contenteditable="true"]`;
+      const draftText = "Keep the release review draft beside my work.";
       const forget = async () => {
-        await client.evaluate('sessionStorage.removeItem("bb-studio-float:windows")').catch(() => {});
         await pluginRpc("studio", "chat.unlink", drawingRef).catch(() => {});
         await cleanupDrawing();
         await cleanupPages();
         if (artifactId) await pluginRpc("artifacts", "delete", { id: artifactId });
-        if (quoteId) await client.evaluate(`new Promise((resolve, reject) => {
-          const request = indexedDB.open('bb-studio-chat:drafts', 1);
-          request.onerror = () => reject(request.error);
-          request.onsuccess = () => {
-            const transaction = request.result.transaction('quotes', 'readwrite');
-            transaction.objectStore('quotes').delete(${JSON.stringify(quoteId)});
-            transaction.oncomplete = () => { request.result.close(); resolve(true); };
-            transaction.onerror = () => reject(transaction.error);
-          };
-        })`).catch(() => {});
         await rm(directory, { recursive: true, force: true });
         await client.evaluate("delete window.bbChatDraft").catch(() => {});
         await client.evaluate("delete window.bbChatQuoteDraft").catch(() => {});
@@ -52,15 +41,44 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         await client.waitForSelector('[role="menuitem"]');
         await client.clickElementWithTextAndPointer('[role="menuitem"]', label);
       };
-      const expectComposer = async (title, ref = drawingRef) => {
-        const root = `[data-float-window=${JSON.stringify(composerKey(ref))}]`;
-        await client.waitForSelector(`${root} .studio-chat-composer [data-promptbox]`);
-        const text = await client.evaluate(`document.querySelector(${JSON.stringify(`${root} .studio-chat-composer`)}).closest("section").innerText`);
+      const expectComposer = async (title) => {
+        await client.waitForSelector(`${corner} .studio-chat-composer [data-promptbox]`);
+        const text = await client.evaluate(`document.querySelector(${JSON.stringify(corner)}).innerText`);
         if (text.includes("@mention a bot")) throw new Error("Retired bot handoff prompt is visible");
         if (!text.includes(`Chat about "${title}"`)) throw new Error(`Composer targets the wrong item: ${text}`);
-        return root;
       };
-      const closeComposer = () => client.dragBy('[data-float-tab][aria-selected="true"] [aria-label="Close tab"]', 0, 0);
+      const closeComposer = async () => {
+        await client.dragBy(`${corner} [aria-label="Close composer"]`, 0, 0);
+        const deadline = Date.now() + 5000;
+        while (await client.evaluate(`!!document.querySelector(${JSON.stringify(corner)})`)) {
+          if (Date.now() > deadline) throw new Error("The corner composer did not close");
+          await sleep(100);
+        }
+      };
+      const waitForPath = async (expected) => {
+        const deadline = Date.now() + 15000;
+        while (!(await client.poll("location.pathname"))?.endsWith(expected)) {
+          if (Date.now() > deadline) throw new Error(`The main view did not open ${expected}`);
+          await sleep(200);
+        }
+      };
+      const openTab = async (ref, ready) => {
+        await client.waitForSelector(`[data-studio-tab="${ref}"] a`);
+        await client.dragBy(`[data-studio-tab="${ref}"] a`, 0, 0);
+        await ready();
+      };
+      const toDrawing = () => openTab(`excalidraw:${drawing.id}`, () => client.waitForSelector("canvas.excalidraw__canvas"));
+      const toPage = () => openTab(`pages:${page.id}`, () => client.waitForText("Offline mode launch"));
+      const draft = async ({ same, visible = true }) => {
+        const state = await client.evaluate(`(() => {
+          const prompt = document.querySelector(${JSON.stringify(prompt)});
+          return { same: prompt === window.bbChatDraft, visible: !!prompt?.checkVisibility(),
+            text: prompt?.textContent, file: !!prompt?.closest('section')?.textContent.includes('release-review.txt'),
+            title: document.querySelector(${JSON.stringify(corner)})?.innerText.includes('Chat about "Checkout flow"'),
+            count: document.querySelectorAll(${JSON.stringify(corner)}).length };
+        })()`);
+        if ((same && !state.same) || state.visible !== visible || !state.text?.includes(draftText) || !state.file || !state.title || state.count !== 1) throw new Error(`New conversation lost its draft: ${JSON.stringify(state)}`);
+      };
       try {
         await client.navigate(`/plugins/pages/pages/${notes.id}`);
         await client.waitForText("Release notes: October");
@@ -72,72 +90,56 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         await expectComposer("Checkout flow");
         await closeComposer();
         const oldBar = await client.evaluate('!!document.querySelector(".studio-chat-bar")');
-        if (oldBar) throw new Error("The duplicate Float-specific corner bar is still present");
+        if (oldBar) throw new Error("The retired Studio Chat corner bar is still present");
 
+        // Choosing a conversation links it and opens it in the main thread view.
         await option(drawingChat, "Choose conversation…");
         await client.waitForSelector(`.studio-chat-picker [data-thread-id="${threadId}"]`);
         await client.dragBy(`.studio-chat-picker [data-thread-id="${threadId}"]`, 0, 0);
-        await client.waitForSelector(`[data-float-tab="thread:${threadId}"][aria-selected="true"]`);
+        await waitForPath(`/threads/${threadId}`);
         const home = (await pluginRpc("studio", "chat.home", drawingRef)).thread;
         if (home?.threadId !== threadId) throw new Error("Choose conversation did not link the drawing");
+        await toDrawing();
         await chat(drawingChat);
-        const duplicates = await client.evaluate(`document.querySelectorAll('[data-float-tab="thread:${threadId}"]').length`);
-        if (duplicates !== 1) throw new Error(`Chat duplicated the linked thread ${duplicates} times`);
+        await waitForPath(`/threads/${threadId}`);
+        if (await client.evaluate(`!!document.querySelector(${JSON.stringify(corner)})`)) throw new Error("Chat opened a composer for a linked drawing");
+        await toDrawing();
+
         await option(drawingChat, "New conversation");
-        const root = await expectComposer("Checkout flow");
-        const prompt = `${root} [data-promptbox] [contenteditable="true"]`;
+        await expectComposer("Checkout flow");
         await client.dragBy(prompt, 0, 0);
-        await client.command("Input.insertText", { text: "Keep the release review draft beside my work." });
+        await client.command("Input.insertText", { text: draftText });
         const document = await client.command("DOM.getDocument");
-        const input = await client.command("DOM.querySelector", { nodeId: document.root.nodeId, selector: `${root} input[type="file"]` });
+        const input = await client.command("DOM.querySelector", { nodeId: document.root.nodeId, selector: `${corner} input[type="file"]` });
         if (!input.nodeId) throw new Error("New conversation has no native attachment input");
         await client.command("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [attachment] });
         await client.waitForText("release-review.txt");
         await client.evaluate(`(() => { window.bbChatDraft = document.querySelector(${JSON.stringify(prompt)}); return true; })()`);
-        const retained = async visible => {
-          const state = await client.evaluate(`(() => {
-            const prompt = document.querySelector(${JSON.stringify(prompt)});
-            return { same: prompt === window.bbChatDraft, visible: !!prompt?.checkVisibility(),
-              text: prompt?.textContent, file: prompt?.closest('[data-float-window]')?.textContent.includes('release-review.txt'),
-              tabs: document.querySelectorAll(${JSON.stringify(`[data-float-tab=${JSON.stringify(composerKey(drawingRef))}]`)}).length };
-          })()`);
-          if (!state.same || state.visible !== visible || !state.text?.includes("Keep the release review draft") || !state.file || state.tabs !== 1) throw new Error(`New conversation lost its draft: ${JSON.stringify(state)}`);
-        };
         await option(drawingChat, "New conversation");
-        await retained(true);
-        await client.clickAriaButtonWithPointer("Fold floating tabs");
-        await retained(false);
-        await client.clickAriaButtonWithPointer("Open floating tabs");
-        await retained(true);
+        await draft({ same: true });
         if ((await pluginRpc("studio", "chat.home", drawingRef)).thread?.threadId !== threadId)
           throw new Error("Opening a new composer changed the existing item link");
 
-        // A page in Float owns its Chat action while the main pane shows the drawing.
-        await client.dragBy(`[data-studio-tab="pages:${page.id}"] a`, 0, 0);
-        await client.waitForText("Offline mode launch");
-        await client.clickAriaButtonWithPointer("Move");
-        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Float this");
-        await client.waitForSelector(pageChat);
-        await client.dragBy(`[data-studio-tab="excalidraw:${drawing.id}"] a`, 0, 0);
-        await client.waitForSelector(pageChat);
+        // The composer stays bound to its item while the main view moves on.
+        await toPage();
+        await draft({ same: true });
         await chat(pageChat);
-        await expectComposer("Offline mode launch", pageRef);
-        await retained(false);
-        await client.waitForSelector(`[data-studio-tab="pages:${notes.id}"] a`);
-        await client.dragBy(`[data-studio-tab="pages:${notes.id}"] a`, 0, 0);
-        await client.waitForSelector(`[data-studio-chat-item="pages:${notes.id}"]`);
+        await expectComposer("Offline mode launch");
+        await openTab(`pages:${notes.id}`, () => client.waitForSelector(`[data-studio-chat-item="pages:${notes.id}"]`));
         const route = await client.evaluate("location.pathname");
         if (route !== `/plugins/pages/pages/${notes.id}`) throw new Error(`The main pane did not navigate: ${route}`);
-        await expectComposer("Offline mode launch", pageRef);
+        await expectComposer("Offline mode launch");
         await closeComposer();
-        await client.dragBy(`[data-studio-tab="excalidraw:${drawing.id}"] a`, 0, 0);
-        await client.waitForSelector("canvas.excalidraw__canvas");
+        await toDrawing();
         await chat(drawingChat);
-        await client.waitForSelector(`[data-float-window="thread:${threadId}"] .studio-chat-viewing`);
-        await client.waitForText("Viewing: Checkout flow");
-        await client.dragBy(`[data-float-tab=${JSON.stringify(composerKey(drawingRef))}]`, 0, 0);
-        await retained(true);
-        await client.dragBy('[data-float-resize="nw"]', -220, 0);
+        await waitForPath(`/threads/${threadId}`);
+        await toDrawing();
+        // The drawing's draft and attachment come back under its draft key.
+        await option(drawingChat, "New conversation");
+        await expectComposer("Checkout flow");
+        await client.waitForText("release-review.txt");
+        await draft({ same: false });
+        await closeComposer();
 
         const bytes = await client.evaluate(`(() => {
           const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 320;
@@ -175,12 +177,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         await client.dragBy('textarea[aria-label="Note"]', 0, 0);
         await client.command("Input.insertText", { text: "Clarify this retry arrow before release." });
         await client.clickElementWithTextAndPointer('section[aria-label="Send to thread"] button', "Send");
-        await client.waitForSelector('img[alt="Selected image area"]');
-        const quotePath = await client.evaluate(`JSON.parse(sessionStorage.getItem('bb-studio-float:windows')).tabs.find(tab => tab.target.kind === 'path' && tab.target.path.startsWith('/plugins/studio/chats/quote/'))?.target.path`);
-        if (!quotePath) throw new Error("The image selection did not open a retained quote composer");
-        quoteId = quotePath.split('/').at(-1);
-        const quoteRoot = `[data-float-window=${JSON.stringify(`path:${quotePath}`)}]`;
-        const quotePrompt = `${quoteRoot} [data-promptbox] [contenteditable="true"]`;
+        // The artifact has no linked thread, so the quote opens the corner composer.
+        await client.waitForSelector(`${corner} img[alt="Selected image area"]`);
+        const quoteRoot = corner;
+        const quotePrompt = prompt;
         await client.waitForSelector(quotePrompt);
         await client.dragBy(quotePrompt, 0, 0);
         for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "ArrowDown", code: "ArrowDown", modifiers: 4 });
@@ -198,15 +198,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
           })()`);
           if (!state.visible || state.count !== 1 || !state.text.includes('Chat about "Release diagram"') || !state.text.includes('Clarify this retry arrow before release.') || !state.text.includes('Also align the arrowhead.') || !state.text.includes('release-review.txt') || !state.image?.startsWith('data:image/png;base64,')) throw new Error(`Image quote context lost: ${JSON.stringify(state)}`);
         };
-        await expectQuote();
-        await client.evaluate("window.bbChatReloadPending = true");
-        await client.command("Page.reload", {});
-        const reloadDeadline = Date.now() + 90000;
-        while (!(await client.evaluate(`!window.bbChatReloadPending && !!document.querySelector(${JSON.stringify(quotePrompt)})`).catch(() => false))) {
-          if (Date.now() > reloadDeadline) throw new Error("The quote composer did not return after reload");
-          await sleep(100);
-        }
-        await client.waitForSelector(quotePrompt, 90000);
         await expectQuote();
         if (process.env.BB_CAPTURE_CHAT_COMPACT === "1") {
           await client.evaluate(`(() => { window.bbChatQuoteDraft = document.querySelector(${JSON.stringify(quotePrompt)}); return true; })()`);
@@ -227,8 +218,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
           await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
           await sleep(500); await expectQuote();
         }
-        await client.clickAriaButtonWithPointer("Floating tab actions");
-        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Pin tab");
         await sleep(1000);
       } catch (error) {
         await forget();

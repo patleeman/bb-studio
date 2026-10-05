@@ -26,7 +26,7 @@ import type { Recording, RecordingKind, TalkRpcContract } from "../shared/contra
 import { PANEL_PATH, UNSENT_PATH, isEmptyRecording, isLongDictation, joinTranscript, transcriptionError } from "../shared/format";
 import { insertDictationIntoComposer, type MicState } from "./composer-dom";
 import { COMPOSE_PENDING_PREFIX, composerPendingKey, composerSource, visibleComposers } from "./composer-source";
-import type { FloatTarget } from "@bb-studio/kit/app";
+import type { OpenTarget } from "@bb-studio/kit/app";
 import { textWithRecordings, type RecordingReference } from "./recording-reference";
 import {
   Outbox,
@@ -250,7 +250,7 @@ export class TalkController {
   private navigate: BbNavigate | null = null;
   private pendingTimer: number | null = null;
   private pendingComposers = new Map<HTMLElement, string>();
-  private openTarget: ((target: FloatTarget) => void) | null = null;
+  private openTarget: ((target: OpenTarget) => void) | null = null;
   private fieldsOnScreen = new Set<string>();
   /** Finished captures still transcribing, to report ones discarded as empty. */
   private readonly settling = new Map<string, RecordingKind>();
@@ -334,7 +334,7 @@ export class TalkController {
     this.onPendingChanged();
   }
 
-  setNavigator(navigate: BbNavigate, openTarget?: (target: FloatTarget) => void): void {
+  setNavigator(navigate: BbNavigate, openTarget?: (target: OpenTarget) => void): void {
     this.navigate = navigate;
     this.openTarget = openTarget ?? null;
   }

@@ -508,8 +508,8 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
       )}
       data-kind={kind}
       {...(kind === "thread"
-        ? studioThreadProps(target, text, { drag: false })
-        : studioItemProps(href ? { href, title: text, icon: kind === "page" ? MENTION_ICONS.page : item?.kindIcon } : null, { drag: false }))}
+        ? studioThreadProps(target, text)
+        : studioItemProps(href ? { href, title: text, icon: kind === "page" ? MENTION_ICONS.page : item?.kindIcon } : null))}
       onClick={() => {
         if (kind === "page") ui.openPage(target);
         else if (kind === "thread") ui.openThread(target);

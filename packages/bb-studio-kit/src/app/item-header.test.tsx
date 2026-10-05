@@ -2,9 +2,9 @@
 import { act, useEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ItemHeader, StudioBar, StudioBarSlot, ViewMoveMenu } from "./item-header";
+import { ItemHeader, OpenInSplitButton, StudioBar, StudioBarSlot } from "./item-header";
 
-const state = vi.hoisted(() => ({ launch: null as ((mode: string) => void) | null, inFloat: true, float: vi.fn(() => true), split: vi.fn() }));
+const state = vi.hoisted(() => ({ launch: null as ((mode: string) => void) | null, split: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toCompose: () => {} }) }));
 vi.mock("./item-chat", () => ({
   useHomeThread: () => null,
@@ -15,7 +15,6 @@ vi.mock("./item-chat", () => ({
   }),
 }));
 vi.mock("./presence", () => ({ useStudioChatPresent: () => true, useStudioPresent: () => true }));
-vi.mock("./float", () => ({ useInFloat: () => state.inFloat, useCanFloat: () => true, openFloat: state.float }));
 vi.mock("./move", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
 vi.mock("./related-panel", () => ({ RelatedPanel: () => null }));
 vi.mock("../ui/icon", () => ({ Icon: () => null }));
@@ -46,7 +45,7 @@ const menu = async () => {
 };
 
 beforeEach(async () => {
-  state.inFloat = true; state.float.mockClear(); state.split.mockClear();
+  state.split.mockClear();
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div");
   document.body.append(container);
@@ -55,38 +54,12 @@ beforeEach(async () => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); state.launch = null; });
 
-describe("View placement menu", () => {
-  const target = { href: "/plugins/feed/feed/post/discussion", title: "Discussion draft" };
-  const choose = async (label: string) => {
-    await act(async () => {
-      container.querySelector('[aria-label="Move"]')!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
-      await settle();
-    });
-    const entry = [...document.querySelectorAll('[role="menuitem"]')].find(element => element.textContent?.trim() === label) as HTMLElement;
-    expect(entry).toBeDefined();
-    await act(async () => { entry.click(); await settle(); });
-  };
-  it("moves a draft's exact route without requiring a back action", async () => {
-    state.inFloat = false;
-    await act(async () => root.render(<ViewMoveMenu item={target} />));
-    await choose("Float this");
-    expect(state.float).toHaveBeenCalledWith({ kind: "path", path: target.href, title: target.title });
-    await choose("Open in split");
+describe("Open in split", () => {
+  const target = { title: "Draft", href: "/plugins/studio/chats/draft/one" };
+  it("opens the view's exact route in a split", async () => {
+    await act(async () => root.render(<OpenInSplitButton item={target} />));
+    await act(async () => { (container.querySelector('[aria-label="Open in split"]') as HTMLElement).click(); });
     expect(state.split).toHaveBeenCalledWith({ kind: "path", path: target.href, title: target.title }, "split");
-  });
-  it("uses the header's back action only after Float accepts the transfer", async () => {
-    state.inFloat = false;
-    const back = vi.fn();
-    await act(async () => root.render(<ViewMoveMenu item={target} onBack={back} />));
-    state.float.mockReturnValueOnce(false);
-    await choose("Float this");
-    expect(back).not.toHaveBeenCalled();
-    await choose("Float this");
-    expect(back).toHaveBeenCalledOnce();
-  });
-  it("uses the companion chrome when already moved", async () => {
-    await act(async () => root.render(<ViewMoveMenu item={target} />));
-    expect(container.querySelector('[aria-label="Move"]')).toBeNull();
   });
 });
 
@@ -119,14 +92,16 @@ describe("Chat menu focus", () => {
   it("lets a conversation-owning view supply one Chat action or opt out", async () => {
     const item = { title: "Atlas", href: "/plugins/bot-teams/bots/atlas" };
     await act(async () => root.render(<ItemHeader backLabel="Studio" onBack={() => {}} item={item} chatAction={<button>Chat with Atlas</button>} />));
-    expect(container.textContent).toBe("Chat with Atlas");
+    const labels = () => [...container.querySelectorAll("button")].map((button) => button.textContent?.trim() || button.getAttribute("aria-label"));
+    expect(labels()).toEqual(["Studio", "Chat with Atlas", "Open in split"]);
     expect(container.querySelector('[data-studio-chat-item]')).toBeNull();
     await act(async () => root.render(<ItemHeader backLabel="Studio" onBack={() => {}} item={item} chatAction={null} />));
-    expect(container.querySelector("button")).toBeNull();
+    expect(labels()).toEqual(["Studio", "Open in split"]);
   });
-  it("uses the companion's navigation chrome inside Float", () => {
-    expect([...container.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Studio")).toBe(false);
+  it("shows the way back, the item's Chat and Open in split", () => {
+    expect([...container.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Studio")).toBe(true);
     expect(container.querySelector('[data-studio-chat-item="pages:launch"] > button')?.textContent?.trim()).toBe("Chat");
+    expect(container.querySelector('[aria-label="Open in split"]')).not.toBeNull();
   });
   it.each([["New conversation", "compose"], ["Choose conversation…", "choose"]])("keeps %s focused after the menu closes", async (label, mode) => {
     await menu();
@@ -149,7 +124,6 @@ describe("Chat menu focus", () => {
 
 describe("Studio bar in BB's title bar", () => {
   it("marks the title bar it fills, without :has(), and unmarks it when it goes", async () => {
-    state.inFloat = false;
     // BB's pane: a header row whose last div holds the plugin's slot, then the view.
     const pane = document.createElement("div");
     pane.innerHTML = '<header><div data-testid="app-page-header-content-row"><div>Label</div><div class="[app-region:no-drag]"><div data-bb-plugin-root></div></div></div></header><main></main>';

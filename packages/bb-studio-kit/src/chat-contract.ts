@@ -42,7 +42,7 @@ export const legacyChatContract = defineRpcContract({
     input: z.object({ path: z.string().min(1).max(2000) }),
     output: z.object({ item: viewed.nullable() }),
   },
-  /** Resolves the item a Chat action targets, including items in companion tabs. */
+  /** Resolves the item a Chat action targets. */
   subject: {
     input: ref,
     output: z.object({ item: viewed.nullable() }),

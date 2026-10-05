@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { panelHref } from "./nav";
 
-it("gives encoded host routes and decoded companion routes the same identity", () => {
+it("gives encoded and decoded routes the same identity", () => {
   const ref = JSON.stringify({ pluginId: "pages", id: "pg_release" });
   const expected = `/plugins/studio-chat/chats/item/${encodeURIComponent(ref)}`;
   expect(panelHref("studio-chat", "chats", `item/${ref}`)).toBe(expected);

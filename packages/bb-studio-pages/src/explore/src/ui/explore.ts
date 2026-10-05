@@ -1,7 +1,7 @@
 // Explore in the app: an explainer's state, realtime events about it, and
 // opening it in Explore's side-panel tab.
 import type { BbNavigate } from "@get-bb/plugin-sdk/app";
-import { openAppPath, openCompanion } from "@bb-studio/kit/app";
+import { openAppPath } from "@bb-studio/kit/app";
 import { useEffect, useState } from "react";
 import type { RealtimeEvent } from "../constants";
 import type { ExplainerView } from "../contract";
@@ -42,18 +42,17 @@ export function explainerIdFrom(params: unknown): string | null {
   return typeof explainerId === "string" && explainerId ? explainerId : null;
 }
 
-/** Opens one shared companion for an explainer; older installations retain their thread panel. */
+/** Opens an explainer in its thread's panel, or on its own page where there is none. */
 export function openExplainer(navigate: BbNavigate, explainer: Pick<ExplainerView, "id" | "label">): boolean {
-  if (openCompanion({ kind: "path", path: explainerPath(explainer.id), title: explainer.label })) return true;
   if (navigate.openThreadPanel({ actionId: PANEL_ACTION, title: explainer.label, params: { explainerId: explainer.id } })) return true;
-  openAppPath(explainerPath(explainer.id), { main: true });
+  openAppPath(explainerPath(explainer.id));
   return true;
 }
 
 /** Pages belongs to another plugin, so use its shared destination rather than an owner-only SDK route. */
 export function openExplainerPage(pageId: string): void {
   const path = `/plugins/${PAGES_PLUGIN_ID}/pages/${encodeURIComponent(pageId)}`;
-  if (!openCompanion({ kind: "path", path })) openAppPath(path, { main: true });
+  openAppPath(path);
 }
 
 /** Re-renders every minute so "2m ago" stays true. */

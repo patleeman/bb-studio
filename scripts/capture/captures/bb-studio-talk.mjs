@@ -1,6 +1,4 @@
 import { resolve } from "node:path";
-import companionReturn from "./talk-companion-return.mjs";
-import playbackTransfer from "./talk-playback-transfer.mjs";
 
 const scrollToTop = `(() => {
   for (let node = document.querySelector('input[aria-label="Title"]'); node; node = node.parentElement) {
@@ -10,8 +8,6 @@ const scrollToTop = `(() => {
 })()`;
 
 export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, pluginRpc, talkRpc, sleep }) => [
-  ...(process.env.BB_CAPTURE_TALK_PLAYBACK === "1" ? [playbackTransfer({ projectId, seedTalkRecording, seedPages, talkRpc, sleep })] : []),
-  ...(process.env.BB_CAPTURE_TALK_COMPANION === "1" ? [companionReturn({ projectId, seedPages, pluginRpc, bbCli, sleep })] : []),
   {
     id: "talk-settings",
     packageDir: "bb-studio-talk",

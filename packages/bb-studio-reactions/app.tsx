@@ -116,7 +116,7 @@ function SmartReactions({ attributes, message }: PluginMessageDirectiveProps) {
             const composer = composerFor(message.threadId);
             if (composer === null) {
               toast.error(
-                "Open this thread's composer to react, in the main view or Float.",
+                "Open this thread's composer to react, in the main view or a split.",
               );
               return;
             }
@@ -186,7 +186,7 @@ export default definePluginApp((app) => {
           const composer = composerFor(context.threadId);
           if (composer === null) {
             toast.error(
-              "Open this thread's composer to react, in the main view or Float.",
+              "Open this thread's composer to react, in the main view or a split.",
             );
             return;
           }

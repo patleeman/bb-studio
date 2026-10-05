@@ -2,7 +2,7 @@
 // Chat keeps the links and registers as the host; item views use it from
 // here, as the header's thread chip and a viewer's "Send to thread" do.
 // Every plugin bundles its own copy of the kit, so the host lives on
-// `window` under a versioned key, as Float's does.
+// `window` under a versioned key.
 import { useEffect, useSyncExternalStore } from "react";
 import type { ItemQuote } from "../format";
 

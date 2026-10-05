@@ -4,7 +4,7 @@
 // (when it was written, Regenerate, Open in Pages) with its follow-up
 // findings below. A Markdown explainer opens in Pages instead.
 import { errorMessage, shortDateTime } from "@bb-studio/kit/format";
-import { OUTLINE_BUTTON, ViewMoveMenu } from "@bb-studio/kit/app";
+import { OUTLINE_BUTTON, OpenInSplitButton } from "@bb-studio/kit/app";
 import { useBbNavigate, useRealtime, type PluginNavPanelProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
@@ -57,7 +57,7 @@ function ThreadExplainers({ threadId }: { threadId?: string }) {
   return <>
     <header className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
       <span className="text-sm font-medium">Explore</span>
-      <ViewMoveMenu item={{ href: `/plugins/pages/explainers${threadId ? `/thread/${encodeURIComponent(threadId)}` : ""}`, title: "Explore" }} />
+      <OpenInSplitButton item={{ href: `/plugins/pages/explainers${threadId ? `/thread/${encodeURIComponent(threadId)}` : ""}`, title: "Explore" }} />
     </header>
     <ThreadExplainerRows {...(threadId ? { threadId } : {})} />
   </>;
@@ -266,7 +266,7 @@ function ExplainerHeader({
           {writtenLine(explainer, state)}
         </div>
       </div>
-      <ViewMoveMenu item={{ href: `/plugins/pages/explainers/${encodeURIComponent(explainer.id)}`, title }} />
+      <OpenInSplitButton item={{ href: `/plugins/pages/explainers/${encodeURIComponent(explainer.id)}`, title }} />
       {state === "running" ? (
         <button type="button" className={button} disabled={acting} onClick={onStop} title="Stop writing this explainer">
           <Icon name="Square" className="size-3.5" /> Stop

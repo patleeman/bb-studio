@@ -4,10 +4,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RelatedPanel } from "./related-panel";
 
-const state = vi.hoisted(() => ({ sdk: { plugins: { callRpc: vi.fn() } }, navigate: vi.fn() }));
+const state = vi.hoisted(() => ({ sdk: { plugins: { callRpc: vi.fn() } } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useSdk: () => state.sdk }));
 vi.mock("./presence", () => ({ useStudioPresent: () => true }));
-vi.mock("./float", () => ({ useCompanionNavigate: () => state.navigate }));
 vi.mock("../ui/icon", () => ({ Icon: () => null }));
 vi.mock("./item-links", () => ({ ItemLinkText: ({ text }: any) => text, ItemLinkTextarea: ({ onValueChange, wrapperClassName, ...props }: any) => <textarea {...props} onChange={event => onValueChange(event.target.value)} /> }));
 
@@ -16,7 +15,6 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 40));
 const open = async () => { await act(async () => { container.querySelector("button")!.click(); await settle(); }); };
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  state.navigate.mockReturnValue(true);
   state.sdk.plugins.callRpc.mockImplementation(async ({ method }) => {
     if (method === "links") return { outgoing: [{ to: { pluginId: "pages", id: "release" }, kind: "reference", source: "manual" }], backlinks: [] };
     if (method === "itemThreads") return { threads: [{ threadId: "review", role: "Review", state: "idle" }] };
@@ -31,16 +29,12 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 
 describe("Related popover", () => {
-  it("keeps portaled item and thread links bound to their originating companion", async () => {
+  it("links related items and threads to where they open", async () => {
     await open();
     const popover = document.querySelector('[data-studio-related-panel]')!;
     expect(container.contains(popover)).toBe(false);
-    for (const [href, target] of [["/plugins/pages/pages/release", { kind: "path", path: "/plugins/pages/pages/release" }], ["/threads/review", { kind: "thread", threadId: "review" }]] as const) {
-      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
-      await act(async () => popover.querySelector(`a[href="${href}"]`)!.dispatchEvent(event));
-      expect(event.defaultPrevented).toBe(true);
-      expect(state.navigate).toHaveBeenLastCalledWith(target);
-    }
+    expect(popover.querySelector('a[href="/plugins/pages/pages/release"]')).not.toBeNull();
+    expect(popover.querySelector('a[href="/threads/review"]')).not.toBeNull();
   });
 
   it("retains a comment draft when the collision-aware popover closes and reopens", async () => {

@@ -3,7 +3,6 @@
 // goes through the app's router directly: BB uses a browser router, which
 // follows history changes announced with `popstate`.
 import { STUDIO_PANEL_PATH, STUDIO_PLUGIN_ID } from "../contract";
-import { navigateFromFloat } from "./float-registry";
 
 interface RouterState {
   usr?: unknown;
@@ -11,7 +10,7 @@ interface RouterState {
   idx?: number;
 }
 
-/** Canonical panel path for encoded host subpaths and decoded companion subpaths. */
+/** Canonical panel path for encoded and decoded subpaths alike. */
 export function panelHref(pluginId: string, path: string, subPath = ""): string {
   const root = `/plugins/${pluginId}/${path}`;
   if (!subPath) return root;
@@ -21,14 +20,9 @@ export function panelHref(pluginId: string, path: string, subPath = ""): string 
   }).join("/")}`;
 }
 
-/**
- * Opens an in-app path such as /plugins/pages/pages/pg_x. Clicked from inside
- * a floating tab, the tab goes there instead, as a browser tab would; `main`
- * opens it in the main view regardless.
- */
-export function openAppPath(path: string, options: { replace?: boolean; main?: boolean } = {}): void {
+/** Opens an in-app path such as /plugins/pages/pages/pg_x in the main view. */
+export function openAppPath(path: string, options: { replace?: boolean } = {}): void {
   if (!path.startsWith("/")) return;
-  if (!options.main && navigateFromFloat({ kind: "path", path })) return;
   const current = (window.history.state ?? {}) as RouterState;
   const idx = typeof current.idx === "number" ? current.idx : 0;
   const state: RouterState = {

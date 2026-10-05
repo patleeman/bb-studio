@@ -3,11 +3,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
 import { DropdownMenu, DropdownMenuContent } from "@/components/ui/dropdown-menu";
-import { ContextMenu, ContextMenuContent } from "@/components/ui/context-menu";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { publishThreadBadges, setFloatHost } from "@bb-studio/kit/app";
+import { publishThreadBadges } from "@bb-studio/kit/app";
 import { StudioNewProjectItem } from "./StudioHeaderMenuItems.js";
-import { FloatItem } from "./FloatItem.js";
 import { StudioThreadBadge } from "./StudioThreadBadge.js";
 
 installTestPluginRuntime();
@@ -19,18 +17,6 @@ describe("Studio sidebar additions", () => {
     render(<DropdownMenu open><DropdownMenuContent><StudioNewProjectItem onSelect={onSelect} /></DropdownMenuContent></DropdownMenu>);
     fireEvent.click(screen.getByRole("menuitem", { name: "New project" }));
     expect(onSelect).toHaveBeenCalledOnce();
-  });
-
-  it("floats the selected thread", () => {
-    const open = vi.fn();
-    setFloatHost({ open, navigate: vi.fn() });
-    try {
-      render(<ContextMenu open><ContextMenuContent><FloatItem surface="context" threadId="thr_studio" /></ContextMenuContent></ContextMenu>);
-      fireEvent.click(screen.getByRole("menuitem", { name: "Float" }));
-      expect(open).toHaveBeenCalledWith({ kind: "thread", threadId: "thr_studio" }, undefined);
-    } finally {
-      setFloatHost(null);
-    }
   });
 
   it("shows a published badge only on its thread", () => {

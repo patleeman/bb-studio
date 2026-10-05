@@ -3,7 +3,6 @@ import bb_studio_sidebar from "./captures/bb-studio-sidebar.mjs";
 import studioCommand from "./captures/studio-command.mjs";
 import bb_studio_draw from "./captures/bb-studio-draw.mjs";
 import bb_studio_chat from "./captures/bb-studio-chat.mjs";
-import bb_studio_float from "./captures/bb-studio-float.mjs";
 import bb_studio_talk from "./captures/bb-studio-talk.mjs";
 import bb_studio_pages from "./captures/bb-studio-pages.mjs";
 import bb_studio from "./captures/bb-studio.mjs";
@@ -22,7 +21,6 @@ export function loadCaptures(context) {
     ...studioCommand(context),
     ...bb_studio_draw(context),
     ...bb_studio_chat(context),
-    ...bb_studio_float(context),
     ...bb_studio_talk(context),
     ...bb_studio_pages(context),
     ...bb_studio(context),

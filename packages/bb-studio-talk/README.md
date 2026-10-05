@@ -37,35 +37,6 @@ the same dictation. Expanding and collapsing also retains keyboard focus.
 At a 390-pixel viewport, the controls use a second toolbar row and fit inside the
 input, including a tappable transcript expansion button.
 
-![Dictation returning to its companion conversation](assets/companion-dictation.png)
-
-The stable BB 0.45.0 capture starts the real composer microphone in a thread
-companion and a page's new-conversation companion. **Go back** focuses the
-original tab with the exact draft and attachment still mounted. The recording
-stores that composer's thread or page route and selected project, even when
-the main pane shows another item.
-
-![Companion dictation on a phone](assets/companion-dictation-mobile.png)
-
-The same draft and attachment stay in place at 390 by 844 pixels. If BB's
-compact input clips the inline toolbar, Talk uses its floating controls so
-Pause and Stop stay reachable. Run this capture in staged BB with
-`BB_CAPTURE_TALK_COMPANION=1 BB_CAPTURE_ONLY=talk-companion-return node scripts/capture-plugin-screenshots.mjs --plugin talk`.
-
-![Talk playback returned to its original main view](assets/companion-playback.png)
-
-The playback transfer capture starts real seeded audio in the main recording,
-then checks the exact original audio object and playback controls through
-Float, native workbench/main placement, navigation away, and closing back to
-the recording. Playback advances throughout and keeps its speed and volume.
-The returned player pauses at its retained position. This runs in the isolated
-optimized host; no Talk source change was needed.
-
-```sh
-BB_CAPTURE_TALK_PLAYBACK=1 BB_CAPTURE_ONLY=talk-playback-transfer \
-  node scripts/capture-plugin-screenshots.mjs --plugin talk
-```
-
 ![Talk recording page with cleanup and audio playback](assets/staged-preview.png)
 
 This is the real BB Recordings page in a staged BB (`node scripts/staged-bb.mjs start`), opened from the nav panel. It shows a
@@ -114,8 +85,9 @@ The same message at a 390-pixel viewport, with the source pill in view.
 - **Finish from anywhere.** Press ✓ from another thread and Talk holds the
   text. It types the text into the dictation's thread when you go back. BB
   keeps unsent composer text on the device, so Talk can't safely write into a
-  thread that isn't open. A Studio companion's new-conversation draft also
-  holds its dictation until you return to that same tab.
+  thread that isn't open. A Studio or page new-conversation composer also
+  holds its dictation until you go back to it. **Go back** returns to the
+  thread or composer the dictation came from, in the main view or a split.
 - **Hold to talk.** Hold Right Option (or the key set in settings) by itself
   to dictate into the focused composer or field, and let go to insert. A
   quick tap does nothing, and Option+key shortcuts and AltGr characters still
@@ -173,7 +145,7 @@ The same message at a 390-pixel viewport, with the source pill in view.
   put as you move between threads and pages. Everything else stays clickable.
   Drag it anywhere in the window and it stays there, even after a reload.
   Away from where you started, a back arrow returns you to that thread or
-  recording. Expand the pill to read the transcript as it arrives; the pill
+  recording. Click a recording's pill to open its page in the main view. Expand the pill to read the transcript as it arrives; the pill
   remembers whether you left it expanded or collapsed.
 - **Streaming transcript.** Audio is cut into pieces of about 25 seconds at
   natural pauses. Each piece is transcribed as soon as it is uploaded, so text
@@ -327,7 +299,7 @@ DOM, defined in [src/client/fields.ts](src/client/fields.ts):
   If BB changes that markup, the mic falls back to built-in dictation. Talk
   stays reachable from its commands and the Recordings page.
 - **Held text stays on the device.** A dictation finished away from its
-  thread or Studio companion waits on the device you dictated on. A main
+  thread or Studio composer waits on the device you dictated on. A main
   new-thread dictation without a Studio route is copied to the clipboard
   after you leave that page. Either way, the dictation is also in Recordings.
 - **Mobile backgrounding.** On mobile, the microphone stops when the BB app

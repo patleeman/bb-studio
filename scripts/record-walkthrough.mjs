@@ -54,7 +54,6 @@ const SCENES = [
   ["artifacts", "Keep what they *make*.", "Reports, images and files, all saved.", 3],
   ["bots", "Bots that work as a *team*.", "A Command view, delegation and memory.", 4, 900],
   ["reactions-smart", "Answer in *one tap*.", "Replies come with suggested answers.", 3.5],
-  ["float", "Keep it all *open*.", "Threads and items as floating tabs.", 3.5, 960],
   ["studio-item-chat", "Chat about *what you see*.", "The agent knows what's on screen.", 3.5],
 ];
 const INTRO = ["Your agents make *a lot*.", "BB Studio keeps it all in one place.", 2.5];
@@ -74,12 +73,6 @@ const ownScenes = {
       throw error;
     }
     return cleanup;
-  },
-  float: async (client) => {
-    // Earlier scenes leave a filter on the collection that shows behind the panel.
-    await client.navigate("/plugins/studio/studio");
-    await client.evaluate(`Object.keys(localStorage).filter((key) => key.startsWith("studio:query")).forEach((key) => localStorage.removeItem(key))`);
-    return captures.find((capture) => capture.id === "float").setup(client);
   },
 };
 
@@ -173,10 +166,8 @@ try {
     if (!capture) throw new Error(`No capture named ${id}`);
     process.stdout.write(`Recording ${id}...\n`);
     // The card is too narrow for the sidebar, so the surface gets the room.
-    // Float's setup floats a thread from its sidebar row, so it collapses after.
-    const sidebarDuringSetup = id === "float";
     await setView(scene[4] ?? VIEW_W);
-    await setSidebar(sidebarDuringSetup);
+    await setSidebar(false);
     let cleanup;
     try {
       cleanup = await capture.setup(client);

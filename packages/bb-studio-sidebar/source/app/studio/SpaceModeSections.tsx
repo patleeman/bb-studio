@@ -509,7 +509,7 @@ function SpaceSidebarSection({
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const command = useCommandInstalled();
-  const openCommand = () => openAppPath(`/plugins/${COMMAND_PLUGIN_ID}/studio/command/${encodeURIComponent(space.id)}`, { main: true });
+  const openCommand = () => openAppPath(`/plugins/${COMMAND_PLUGIN_ID}/studio/command/${encodeURIComponent(space.id)}`);
   return (
     <SortableSidebarSection
       id={sectionId}

@@ -15,7 +15,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 }));
 vi.mock("@bb-studio/kit/app", () => ({
   AddOnCollection: () => null,
-  navigateFromFloat: vi.fn(), openAppPath: vi.fn(), studioPath: vi.fn(), useStudioPresent: () => false,
+  openAppPath: vi.fn(), studioPath: vi.fn(), useStudioPresent: () => false,
 }));
 vi.mock("./shared", () => ({ useProjects: () => [] }));
 vi.mock("./PageView", () => ({ PageView: () => <div>Live editor</div> }));
