@@ -9,10 +9,12 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const option = (flag) => { const index = args.indexOf(flag); return index < 0 ? null : args[index + 1]; };
-if (!option("--upstream")) throw new Error("Usage: node upstream/sync.mjs --upstream <bb checkout> [--commit <sha>] [--check]");
+if (!option("--upstream")) throw new Error("Usage: node upstream/sync.mjs --upstream <bb checkout> [--commit <sha>] [--check | --write-patches]");
 const upstream = resolve(option("--upstream"));
 const commit = option("--commit") ?? "HEAD";
 const check = args.includes("--check");
+// Rewrite studio-hooks.patch and tests.patch from the local source/ against the selected commit.
+const writePatches = args.includes("--write-patches");
 const prefix = "plugins/thread-list/";
 const destination = join(here, "../source");
 const staging = mkdtempSync(join(tmpdir(), "bb-sidebar-sync-"));
@@ -29,7 +31,26 @@ try {
     mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, execFileSync("git", ["show", `${sha}:${name}`], { cwd: upstream }));
   }
-  for (const patch of ["studio-hooks.patch", "tests.patch"]) {
+  if (writePatches) {
+    const root = join(staging, "source");
+    run("git", ["init", "-q"], staging);
+    run("git", ["add", "-A"], staging);
+    for (const name of names) {
+      const relative = name.slice(prefix.length);
+      const pristine = join(root, relative);
+      if (!existsSync(pristine) || relative === "app/model/fixtures.ts") continue;
+      const local = join(destination, relative);
+      if (existsSync(local)) cpSync(local, pristine);
+      else rmSync(pristine);
+    }
+    const changed = run("git", ["diff", "--name-only"], staging).trim().split("\n").filter(Boolean);
+    const isTest = (path) => /\.test\.tsx?$/u.test(path);
+    for (const [patch, paths] of [["studio-hooks.patch", changed.filter((path) => !isTest(path))], ["tests.patch", changed.filter(isTest)]]) {
+      writeFileSync(join(here, patch), paths.length ? run("git", ["diff", "-U0", "--", ...paths], staging) : "");
+      console.log(`Wrote ${patch}: ${paths.length} files.`);
+    }
+  }
+  for (const patch of writePatches ? [] : ["studio-hooks.patch", "tests.patch"]) {
     const file = join(here, patch);
     if (!readFileSync(file, "utf8").trim()) continue;
     try {
@@ -42,7 +63,7 @@ try {
       break;
     }
   }
-  if (!process.exitCode) {
+  if (!process.exitCode && !writePatches) {
     const fixture = join(staging, "source/app/model/fixtures.ts");
     const relocated = join(staging, "source/app/testing/fixtures.ts");
     mkdirSync(dirname(relocated), { recursive: true });
@@ -66,6 +87,11 @@ try {
       return !existsSync(target) || !readFileSync(file).equals(readFileSync(target));
     });
     console.log(`BB ${sha}: ${generated.length} source files, ${differences.length} changed after Studio patches.`);
+    if (check && differences.length) {
+      console.error(`Patches out of date for: ${differences.map((file) => file.slice(join(staging, "source").length + 1)).join(", ")}`);
+      console.error("Run with --write-patches to regenerate them from source/.");
+      process.exitCode = 1;
+    }
     if (!check && !process.exitCode) {
       for (const file of generated) {
         const target = join(destination, file.slice(join(staging, "source").length + 1));

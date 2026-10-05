@@ -7,12 +7,17 @@ Run this from this package directory to check or refresh it:
 ```sh
 node upstream/sync.mjs --upstream /path/to/bb --commit 8595b6ea4b8bfa771f84d57e69124e76bacf9eef --check
 node upstream/sync.mjs --upstream /path/to/bb --commit <new-commit>
+node upstream/sync.mjs --upstream /path/to/bb --commit 8595b6ea4b8bfa771f84d57e69124e76bacf9eef --write-patches
 ```
 
 The script reads tracked files from the selected commit, applies
 `upstream/studio-hooks.patch` and `tests.patch` in a temporary
 directory, and stops before writing if either patch conflicts. Review and
 update the patches, tests, and this commit before accepting a newer BB commit.
+`--check` exits non-zero when any vendored file differs from the patched BB
+source. After editing an upstream file under `source/`, run `--write-patches`
+to rebuild both patches from `source/` (test files go to `tests.patch`), then
+`--check` to confirm 0 files changed, and add the file to the table below.
 Studio-only files live in `source/app/studio/`. Test fixtures live in
 `source/app/testing/` instead of runtime model code.
 
@@ -24,9 +29,11 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, filter empty project rows, apply each section's Automated threads choice, render By space with each Space's Studio items, export the grouped-mode helpers By space reuses, and pass By space's group move to the grouped drag and drop. |
 | `source/app/list/useSidebarThreadReveal.ts` | Keep ancestor reveal while new automated results leave their collapsed group alone; By space reveals its own sections. |
 | `source/app/list/SidebarHeaderControls.tsx` | Add the project action to the creation context, and let a section put its own button, such as Command view, in place of New thread. |
-| `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, empty project, By space, and per-section Automated threads menu items. |
+| `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, empty project, By space, per-section Automated threads, and Needs me sort menu items. |
 | `source/app/preferences/atoms.ts` | Expose synced empty project, Automated threads, and collapsed Space preferences. |
-| `source/shared/preferences.ts` | Add the `space` organization and `space:` groups, and define synced empty project, Automated threads, and collapsed Space preferences. |
+| `source/app/model/project-thread-groups.ts`, `thread-activity.ts`, and the `attention` branch of `getSidebarThreadComparator` in `ProjectList.tsx` | Add the Needs me sort: threads waiting on the user first, then working ones, then the rest. |
+| `source/app/list/sortComparator.test.ts` | Check the Needs me tiers and direction. |
+| `source/shared/preferences.ts` | Add the `attention` sort, the `space` organization and `space:` groups, and define synced empty project, Automated threads, and collapsed Space preferences. |
 | `source/app/list/SidebarHeaderControls.test.tsx` | Check the empty project menu toggle. |
 | `source/app/list/ProjectList.modes.test.tsx`, `ProjectList.sectionCreate.test.tsx`, and `useSidebarThreadReveal.test.tsx` | Leave By space out of the stored-order probe, count the Automated threads divider, and check that an automated thread's group expands only when opened. |
 | `source/server.test.ts` | Check the new preference default and parsing. |

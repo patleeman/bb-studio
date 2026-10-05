@@ -312,12 +312,38 @@ index 738d0ad..7c4b9c3 100644
 -    ).toEqual(["New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
 +    ).toEqual(["New project", "New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
 diff --git a/source/app/list/sortComparator.test.ts b/source/app/list/sortComparator.test.ts
-index 411fa38..312b1cc 100644
+index 411fa38..8ecac74 100644
 --- a/source/app/list/sortComparator.test.ts
 +++ b/source/app/list/sortComparator.test.ts
 @@ -15 +15 @@ import {
 -} from "../model/fixtures.js";
 +} from "../testing/fixtures.js";
+@@ -201,0 +202,25 @@ describe("getSidebarThreadComparator", () => {
++  it("needs me lists waiting threads first, then working, then the rest", () => {
++    const readOld = thread({ id: "thr_read", lastReadAt: 9, latestAttentionAt: 9 });
++    const working = thread({ id: "thr_working", status: "active", lastReadAt: 8, latestAttentionAt: 8 });
++    const unreadOld = thread({ id: "thr_unread_old", lastReadAt: 0, latestAttentionAt: 3 });
++    const unreadNew = thread({ id: "thr_unread_new", lastReadAt: 0, latestAttentionAt: 5 });
++    const asking = thread({ id: "thr_asking", hasPendingInteraction: true, lastReadAt: 4, latestAttentionAt: 4 });
++    const entries = [readOld, working, unreadOld, asking, unreadNew];
++    expect(order(getSidebarThreadComparator("attention"), entries)).toEqual([
++      "thr_unread_new",
++      "thr_asking",
++      "thr_unread_old",
++      "thr_working",
++      "thr_read",
++    ]);
++    expect(
++      order(getSidebarThreadComparator("attention", "ascending"), entries),
++    ).toEqual([
++      "thr_unread_old",
++      "thr_asking",
++      "thr_unread_new",
++      "thr_working",
++      "thr_read",
++    ]);
++  });
++
 diff --git a/source/app/list/useSidebarThreadReveal.test.tsx b/source/app/list/useSidebarThreadReveal.test.tsx
 index 23ad9d0..2affbf1 100644
 --- a/source/app/list/useSidebarThreadReveal.test.tsx
