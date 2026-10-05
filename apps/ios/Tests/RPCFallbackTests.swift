@@ -53,4 +53,30 @@ final class RPCFallbackTests: XCTestCase {
         let paths = await calls.paths
         XCTAssertEqual(paths.count, 1)
     }
+
+    func testItemChatFallsBackToStudioChatWhenStudioPredatesTheMerge() async throws {
+        let (old, calls) = client { path in
+            switch path {
+            case "/api/v1/plugins/studio/rpc/chat.home": (404, Self.missingMethod)
+            case "/api/v1/plugins/studio-chat/rpc/home": (200, Data(#"{"ok":true,"result":{"thread":{"threadId":"thr_1"}}}"#.utf8))
+            default: (500, Data())
+            }
+        }
+        let thread = try await old.lastStudioChat(pluginId: "artifacts", itemId: "a1")
+        XCTAssertEqual(thread, "thr_1")
+        let paths = await calls.paths
+        XCTAssertEqual(paths, ["/api/v1/plugins/studio/rpc/chat.home", "/api/v1/plugins/studio-chat/rpc/home"])
+    }
+
+    func testItemChatFailureDoesNotFallBack() async throws {
+        let (failing, calls) = client { _ in (500, Data(#"{"ok":false,"error":{"message":"boom"}}"#.utf8)) }
+        do {
+            _ = try await failing.lastStudioChat(pluginId: "artifacts", itemId: "a1")
+            XCTFail("A failing Studio must not fall back")
+        } catch {
+            XCTAssertEqual((error as? BBError)?.message, "boom")
+        }
+        let paths = await calls.paths
+        XCTAssertEqual(paths.count, 1)
+    }
 }

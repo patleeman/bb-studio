@@ -609,9 +609,21 @@
     },
     {
       "file": "apps/ios/Shared/StudioChat.swift",
+      "plugin": "studio-chat",
+      "method": "start",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/StudioChat.swift",
       "plugin": "studio",
       "method": "chat.home",
       "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/StudioChat.swift",
+      "plugin": "studio-chat",
+      "method": "home",
+      "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
       "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
