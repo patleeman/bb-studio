@@ -11,7 +11,8 @@ const args = process.argv.slice(2);
 const option = (flag) => { const index = args.indexOf(flag); return index < 0 ? null : args[index + 1]; };
 if (!option("--upstream")) throw new Error("Usage: node upstream/sync.mjs --upstream <bb checkout> [--commit <sha>] [--check | --write-patches]");
 const upstream = resolve(option("--upstream"));
-const commit = option("--commit") ?? "HEAD";
+// The BB commit source/ was taken from; patches are written and checked against it.
+const commit = option("--commit") ?? readFileSync(join(here, "BB_COMMIT"), "utf8").trim();
 const check = args.includes("--check");
 // Rewrite studio-hooks.patch and tests.patch from the local source/ against the selected commit.
 const writePatches = args.includes("--write-patches");

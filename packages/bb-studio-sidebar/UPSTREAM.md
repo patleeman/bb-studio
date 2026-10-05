@@ -1,19 +1,24 @@
 # Thread List upstream
 
-Compared with BB commit `8595b6ea4b8bfa771f84d57e69124e76bacf9eef`
+Compared with the BB commit in `upstream/BB_COMMIT`
 (`plugins/thread-list`). The runtime source is vendored under `source/`.
-Run this from this package directory to check or refresh it:
+Run this from this package directory to check or refresh it; `--commit`
+defaults to `upstream/BB_COMMIT`:
 
 ```sh
-node upstream/sync.mjs --upstream /path/to/bb --commit 8595b6ea4b8bfa771f84d57e69124e76bacf9eef --check
+node upstream/sync.mjs --upstream /path/to/bb --check
 node upstream/sync.mjs --upstream /path/to/bb --commit <new-commit>
-node upstream/sync.mjs --upstream /path/to/bb --commit 8595b6ea4b8bfa771f84d57e69124e76bacf9eef --write-patches
+node upstream/sync.mjs --upstream /path/to/bb --write-patches
 ```
+
+`source/app/studio/upstream-patches.test.ts` runs `--check` with the package tests
+whenever a BB checkout is found (`BB_UPSTREAM`, or `bb` beside this
+repository), so editing a vendored file without `--write-patches` fails them.
 
 The script reads tracked files from the selected commit, applies
 `upstream/studio-hooks.patch` and `tests.patch` in a temporary
 directory, and stops before writing if either patch conflicts. Review and
-update the patches, tests, and this commit before accepting a newer BB commit.
+update the patches, tests, and `upstream/BB_COMMIT` before accepting a newer BB commit.
 `--check` exits non-zero when any vendored file differs from the patched BB
 source. After editing an upstream file under `source/`, run `--write-patches`
 to rebuild both patches from `source/` (test files go to `tests.patch`), then
