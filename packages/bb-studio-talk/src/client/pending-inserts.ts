@@ -106,3 +106,30 @@ export function writeTimes(times: PendingTimes): void {
     // Private mode: nothing is waiting in storage either.
   }
 }
+
+// Every window polls the same waiting insertions. Each read-modify-write runs
+// under a Web Lock, so two windows showing the same thread can't both take
+// one dictation, and a new one isn't lost to another window's write.
+const PENDING_LOCK = "bb-plugin-talk:pending-inserts";
+
+export function withPendingLock<T>(run: () => T): Promise<T> {
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+  // Without Web Locks there is no cross-window exclusion to be had.
+  if (!locks) return Promise.resolve().then(run);
+  return locks.request(PENDING_LOCK, () => run()) as Promise<T>;
+}
+
+/** Takes the waiting insertion for `key`, if any; at most one window gets it. */
+export function claimPending(key: string): Promise<PendingInsert | null> {
+  return withPendingLock(() => {
+    const pending = readPending();
+    const value = pending[key] ?? null;
+    if (value !== null) writePending(withoutPending(pending, key));
+    return value;
+  });
+}
+
+/** Adds text waiting for `key` (see `addPending`). */
+export function holdPending(key: string, text: string, recordings: readonly RecordingReference[] = []): Promise<void> {
+  return withPendingLock(() => writePending(addPending(readPending(), key, text, recordings)));
+}

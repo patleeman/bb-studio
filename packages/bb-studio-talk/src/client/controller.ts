@@ -50,12 +50,14 @@ import {
 } from "./fields";
 import {
   PENDING_STORAGE_KEY,
-  addPending,
+  claimPending,
+  holdPending,
   readPending,
   pendingText,
   pendingRecordings,
   readTimes,
   staleFields,
+  withPendingLock,
   withoutPending,
   writePending,
   writeTimes,
@@ -1111,23 +1113,23 @@ export class TalkController {
       this.announceEmpty(this.state.kind);
     } else if (field) {
       if (!insertIntoField(field.key, text)) {
-        writePending(addPending(readPending(), `${FIELD_PENDING_PREFIX}${field.key}`, text));
+        await holdPending(`${FIELD_PENDING_PREFIX}${field.key}`, text);
         toast.success(`Dictation ready. It goes into ${field.label} when you go back.`, {
-          action: { label: "Go back", onClick: () => this.openField(field) },
+          action: { label: "Go back", onClick: () => void this.openField(field) },
         });
         this.onPendingChanged();
       }
     } else if (await insertDictationIntoComposer(this.sourceComposer(), text, references)) {
       // Typed where it started.
     } else if (threadId !== null) {
-      writePending(addPending(readPending(), threadId, text, references));
+      await holdPending(threadId, text, references);
       toast.success("Dictation ready. It goes into the thread's composer when you go back.", {
         action: this.navigate ? { label: "Go back", onClick: () => this.openThread(threadId) } : undefined,
       });
       this.onPendingChanged();
     } else if (this.composePath?.startsWith("/plugins/") && this.openTarget) {
       const path = this.composePath;
-      writePending(addPending(readPending(), `${COMPOSE_PENDING_PREFIX}${path}`, text, references));
+      await holdPending(`${COMPOSE_PENDING_PREFIX}${path}`, text, references);
       toast.success("Dictation ready. It goes into its conversation draft when you go back.", {
         action: { label: "Go back", onClick: () => this.openTarget?.({ kind: "path", path }) },
       });
@@ -1167,13 +1169,11 @@ export class TalkController {
    * "Go back" to a field. If its owner is gone, say because the plugin was
    * disabled, the waiting text is copied instead of stranded.
    */
-  private openField(field: FieldRef): void {
+  private async openField(field: FieldRef): Promise<void> {
     if (requestOpenField(field.key)) return;
-    const pendingKey = `${FIELD_PENDING_PREFIX}${field.key}`;
-    const pending = readPending()[pendingKey];
+    const pending = await claimPending(`${FIELD_PENDING_PREFIX}${field.key}`);
     if (!pending) return;
     const text = pendingText(pending);
-    writePending(withoutPending(readPending(), pendingKey));
     this.onPendingChanged();
     void navigator.clipboard?.writeText(text).then(
       () => toast.info(`Talk couldn't open ${field.label}, so it copied your dictation. Paste it where you need it.`),
@@ -1221,7 +1221,7 @@ export class TalkController {
    * own unsent text before Talk adds to it.
    */
   private async flushPending(): Promise<void> {
-    this.flushPendingFields();
+    await this.flushPendingFields();
     const candidates = new Map<HTMLElement, string>();
     if (document.visibilityState === "visible") for (const composer of visibleComposers()) {
       const key = composerPendingKey(composerSource(composer, this.context));
@@ -1231,16 +1231,14 @@ export class TalkController {
     this.pendingComposers = candidates;
     for (const [composer, key] of candidates) {
       if (previous.get(composer) !== key) continue;
-      const pending = readPending();
-      const insertion = pending[key];
+      const insertion = await claimPending(key);
       if (!insertion) continue;
       const text = pendingText(insertion);
       const references = pendingRecordings(insertion);
-      writePending(withoutPending(pending, key));
       if (await insertDictationIntoComposer(composer, text, references)) {
         toast.success("Added your dictation to the composer.");
       } else {
-        writePending(addPending(readPending(), key, text, references));
+        await holdPending(key, text, references);
       }
     }
     this.onPendingChanged();
@@ -1250,35 +1248,39 @@ export class TalkController {
    * Hands waiting dictations to their fields. Like composers, a field must be
    * on screen for a full poll first, so its owner has loaded its content.
    */
-  private flushPendingFields(): void {
-    this.expirePendingFields();
+  private async flushPendingFields(): Promise<void> {
+    await this.expirePendingFields();
     const visible = document.visibilityState === "visible";
     const seen = new Set<string>();
-    for (const [pendingKey, insertion] of Object.entries(readPending())) {
+    for (const pendingKey of Object.keys(readPending())) {
       if (!pendingKey.startsWith(FIELD_PENDING_PREFIX)) continue;
       const key = pendingKey.slice(FIELD_PENDING_PREFIX.length);
-      const text = pendingText(insertion);
       if (!visible || !findField(key)) continue;
       seen.add(key);
       if (!this.fieldsOnScreen.has(key)) continue;
       // Claim it before inserting, so a second window skips it.
-      writePending(withoutPending(readPending(), pendingKey));
+      const claimed = await claimPending(pendingKey);
+      if (!claimed) continue;
+      const text = pendingText(claimed);
       if (insertIntoField(key, text)) toast.success("Added your dictation.");
-      else writePending(addPending(readPending(), pendingKey, text));
+      else await holdPending(pendingKey, text);
       this.onPendingChanged();
     }
     this.fieldsOnScreen = seen;
   }
 
   /** Drops field dictations whose owner hasn't shown the field for days. */
-  private expirePendingFields(): void {
-    const pending = readPending();
-    const keys = Object.keys(pending).filter((key) => key.startsWith(FIELD_PENDING_PREFIX));
-    const before = readTimes();
-    const { stale, times } = staleFields(keys, before, Date.now());
-    if (JSON.stringify(times) !== JSON.stringify(before)) writeTimes(times);
+  private async expirePendingFields(): Promise<void> {
+    const stale = await withPendingLock(() => {
+      const pending = readPending();
+      const keys = Object.keys(pending).filter((key) => key.startsWith(FIELD_PENDING_PREFIX));
+      const before = readTimes();
+      const result = staleFields(keys, before, Date.now());
+      if (JSON.stringify(result.times) !== JSON.stringify(before)) writeTimes(result.times);
+      if (result.stale.length) writePending(result.stale.reduce(withoutPending, pending));
+      return result.stale;
+    });
     if (stale.length === 0) return;
-    writePending(stale.reduce(withoutPending, pending));
     toast.info(
       stale.length === 1
         ? "A dictation waited days for a field that never came back, so Talk stopped holding it. It's still in Talk recordings."

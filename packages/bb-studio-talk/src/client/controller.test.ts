@@ -308,3 +308,35 @@ it("treats an older live-capture record without its marker as interrupted, not r
   expect(Recorder.instances).toHaveLength(0);
   expect(insertDictationIntoComposer).not.toHaveBeenCalled();
 });
+
+it("lets only one window take a waiting dictation", async () => {
+  const tails = new Map<string, Promise<unknown>>();
+  const locks = { request: (name: string, ...rest: unknown[]) => {
+    const callback = rest.at(-1) as (lock: unknown) => unknown;
+    if (rest.length > 1) return Promise.resolve(callback({ name }));
+    const run = (tails.get(name) ?? Promise.resolve()).then(() => callback({ name }));
+    tails.set(name, run.catch(() => {}));
+    return run;
+  } };
+  Object.defineProperty(navigator, "locks", { configurable: true, value: locks });
+  try {
+    const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "thread:thr_side";
+    const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
+    Object.defineProperty(prompt, "offsetParent", { value: document.body });
+    wrapper.append(prompt); document.body.append(wrapper);
+    writePending(addPending({}, "thr_side", "Only once."));
+    // Another window is mid-claim: it holds the lock and takes the dictation.
+    let release!: () => void;
+    void locks.request("bb-plugin-talk:pending-inserts", () => new Promise<void>((resolve) => (release = resolve)));
+    const controller = new TalkController();
+    controller.attach({ call: vi.fn() } as never);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+    writePending({});
+    release();
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+  } finally {
+    Reflect.deleteProperty(navigator, "locks");
+  }
+});
