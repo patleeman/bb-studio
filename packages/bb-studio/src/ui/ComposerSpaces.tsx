@@ -17,6 +17,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
 import { openSpaceItems } from "./StudioPanel";
+import { CommandDraftWatch, commandComposerSpace } from "../command/draft-recipients";
 
 const REFETCH_DEBOUNCE_MS = 300;
 const pendingKey = (projectId: string) => `studio:new-thread-spaces:${projectId}`;
@@ -125,9 +126,11 @@ export function SpacesMenuContent({ heading, othersHeading = "Add to space", hol
  */
 export function ComposerSpaces() {
   const probe = useRef<HTMLSpanElement>(null);
-  const [inCommand, setInCommand] = useState<boolean | null>(null);
-  useLayoutEffect(() => setInCommand(!!probe.current?.closest("[data-command-composer], [data-command-new-thread]")), []);
-  return inCommand === false ? <SpacePicker /> : inCommand === null ? <span ref={probe} hidden /> : null;
+  // null until placed; "" in a Command new-thread pane; the Space's ID in its Command composer.
+  const [inCommand, setInCommand] = useState<string | false | null>(null);
+  useLayoutEffect(() => setInCommand(probe.current?.closest("[data-command-composer], [data-command-new-thread]") ? commandComposerSpace(probe.current) ?? "" : false), []);
+  // Command's own composer reports its draft so "To" follows it, focused or not.
+  return inCommand === false ? <SpacePicker /> : inCommand === null ? <span ref={probe} hidden /> : inCommand ? <CommandDraftWatch spaceId={inCommand} /> : null;
 }
 
 function SpacePicker() {

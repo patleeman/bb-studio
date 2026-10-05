@@ -3,12 +3,14 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ComposerSpaces, handOffNewThreadSpace } from "./ComposerSpaces";
+import { draftRecipients, useCommandDraft } from "../command/draft-recipients";
 
+const view = vi.hoisted(() => ({ text: "" }));
 const rpc = vi.hoisted(() => ({ call: vi.fn(async (method: string) => method === "spaces" ? { spaces: [{ id: "spc_launch", name: "Launch", icon: null }] } : { ok: true }) }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => ({}),
   useComposer: () => ({ experimental_onSubmitted: () => () => {} }),
-  useComposerView: () => ({ scope: { kind: "new-thread", projectId: "proj_1" } }),
+  useComposerView: () => ({ scope: { kind: "new-thread", projectId: "proj_1" }, draft: { text: view.text, isEmpty: !view.text, attachmentCount: 0 } }),
   useRealtime: () => {},
   useRpc: () => rpc,
 }));
@@ -44,4 +46,25 @@ test("a thread started from Command's new-thread pane gets no picker either", as
   await mount("data-command-new-thread");
   expect(container.querySelector("button")).toBeNull();
   expect(rpc.call).not.toHaveBeenCalled();
+});
+test("a draft restored in Command's composer addresses its threads before anyone focuses it", async () => {
+  view.text = "@b fix tests";
+  container.setAttribute("data-command-space", "sp_restored");
+  await mount(true);
+  const threads = [
+    { id: "thr_lead", title: "Lead", parentThreadId: null, status: "idle", updatedAt: 1, error: null, alias: "a" },
+    { id: "thr_b", title: "Tests", parentThreadId: null, status: "idle", updatedAt: 1, error: null, alias: "b" },
+  ];
+  let seen: unknown = null;
+  function To() { seen = draftRecipients(useCommandDraft("sp_restored"), threads); return null; }
+  const other = document.createElement("div");
+  const toRoot = createRoot(other);
+  await act(async () => { toRoot.render(React.createElement(To)); });
+  expect(document.activeElement).toBe(document.body);
+  expect(seen).toEqual(["thr_b"]);
+  // Another Space's view doesn't see it.
+  await act(async () => { toRoot.render(React.createElement(function Elsewhere() { seen = draftRecipients(useCommandDraft("sp_other"), threads); return null; })); });
+  expect(seen).toEqual([]);
+  act(() => toRoot.unmount());
+  view.text = "";
 });

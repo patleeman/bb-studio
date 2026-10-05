@@ -1,27 +1,60 @@
 // Command's composer is BB's own, so the view can't read its draft. Studio
-// watches every new-thread composer's draft (app.tsx) and passes the Command
-// composer's on, so "To" can name whoever the draft addresses before it's sent.
-import { useEffect, useState } from "react";
-import type { ComposerStructuredDraft } from "@get-bb/plugin-sdk/app";
+// keeps the latest draft of each Space's Command composer here, so "To" can
+// name whoever the draft addresses before it's sent, including a draft BB
+// restored before anyone focused the composer.
+import { createElement, useEffect, useState } from "react";
+import { useComposerView, type ComposerStructuredDraft } from "@get-bb/plugin-sdk/app";
 import type { CommandThread } from "./command-contract";
 import { typedAliases } from "./mentions";
 
 const EVENT = "studio:command-draft";
+const drafts = new Map<string, ComposerStructuredDraft>();
 
-/** For app.tsx's composer customization: only the draft being typed in Command's composer. */
-export function publishCommandDraft(draft: ComposerStructuredDraft) {
-  if (typeof document === "undefined" || !document.activeElement?.closest("[data-command-composer]")) return;
-  window.dispatchEvent(new CustomEvent(EVENT, { detail: draft }));
+/** The Space of the Command composer an element is in, if any. */
+export const commandComposerSpace = (element: Element | null | undefined) =>
+  element?.closest("[data-command-composer]")?.getAttribute("data-command-space") || null;
+
+function store(spaceId: string, draft: ComposerStructuredDraft) {
+  drafts.set(spaceId, draft);
+  window.dispatchEvent(new CustomEvent(EVENT, { detail: spaceId }));
 }
 
-/** The latest Command composer draft. */
-export function useCommandDraft(): ComposerStructuredDraft | null {
-  const [draft, setDraft] = useState<ComposerStructuredDraft | null>(null);
+/**
+ * For app.tsx's composer customization: BB's structured draft, with its
+ * mentions. BB doesn't say which composer it came from, so only a draft typed
+ * in a Command composer (it has focus) counts.
+ */
+export function publishCommandDraft(draft: ComposerStructuredDraft) {
+  if (typeof document === "undefined") return;
+  const spaceId = commandComposerSpace(document.activeElement);
+  if (spaceId) store(spaceId, draft);
+}
+
+/**
+ * Rendered inside a Space's Command composer (ComposerSpaces): follows the
+ * draft's text whether or not the composer has focus, so a restored draft
+ * addresses its threads as soon as the view opens. Pills keep the mentions
+ * BB last reported while their labels are still in the text.
+ */
+export function CommandDraftWatch({ spaceId }: { spaceId: string }) {
+  const text = useComposerView().draft?.text ?? "";
   useEffect(() => {
-    const onDraft = (event: Event) => setDraft((event as CustomEvent<ComposerStructuredDraft>).detail);
+    const previous = drafts.get(spaceId);
+    if (previous?.text === text) return;
+    store(spaceId, { text, mentions: (previous?.mentions ?? []).filter(mention => text.includes(mention.label)) });
+  }, [spaceId, text]);
+  return createElement("span", { hidden: true });
+}
+
+/** The latest draft of a Space's Command composer. */
+export function useCommandDraft(spaceId: string): ComposerStructuredDraft | null {
+  const [draft, setDraft] = useState<ComposerStructuredDraft | null>(() => drafts.get(spaceId) ?? null);
+  useEffect(() => {
+    setDraft(drafts.get(spaceId) ?? null);
+    const onDraft = (event: Event) => { if ((event as CustomEvent<string>).detail === spaceId) setDraft(drafts.get(spaceId) ?? null); };
     window.addEventListener(EVENT, onDraft);
     return () => window.removeEventListener(EVENT, onDraft);
-  }, []);
+  }, [spaceId]);
   return draft;
 }
 

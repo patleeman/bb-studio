@@ -107,7 +107,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const [permission, setPermission] = useStored<CommandPermissionMode | null>(`studio:command-permission:${spaceId}`, value => MODE_CHOICES.find(choice => choice.id === value)?.id ?? null);
   // The thread picked to reply to.
   const [reply, setReply] = useState<string | null>(null);
-  const draft = useCommandDraft();
+  const draft = useCommandDraft(spaceId);
   const [focus, setFocus] = useState(0);
   const generation = useRef(0);
   const load = useCallback(() => {
@@ -203,7 +203,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
     <div className="command-dock">
     <div className="min-w-0">
       {/* Keep the existing draft key so moving Command preserves unsent messages. */}
-      <div data-command-composer onFocusCapture={markFocus} onKeyDownCapture={event => { if (event.key === "@") markFocus(); }}><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
+      <div data-command-composer data-command-space={spaceId} onFocusCapture={markFocus} onKeyDownCapture={event => { if (event.key === "@") markFocus(); }}><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
       <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           {addressed === "everyone" ? <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">everyone</span></span></span>
