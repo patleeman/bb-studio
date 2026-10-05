@@ -23,7 +23,8 @@ export const SPACE_THREAD_DOT: Record<SpaceThreadState, { className: string; lab
   working: { className: "bg-success ring-[3px] ring-success/20", label: "Working" },
   error: { className: "size-2 bg-destructive ring-[3px] ring-destructive/30", label: "Unread error" },
   unread: { className: "size-2 bg-blue-500 ring-[3px] ring-blue-500/30", label: "Unread result" },
-  idle: { className: "bg-subtle-foreground/50", label: null },
+  // A read, idle thread has no mark, so a thread that wants you is the only one with a dot.
+  idle: { className: "invisible", label: null },
 };
 
 /**
@@ -80,14 +81,14 @@ export interface SpaceThreadRow {
   style: CSSProperties | undefined;
   /** The status dot before the title; it replaces BB's status glyph. */
   dot: ReactNode;
-  /** The relative time where BB shows the status glyph. */
+  /** The relative time where BB shows the status glyph, or a Done pill on an unread result. */
   time: ReactNode;
   /** The latest line under the title, or a blank one until it loads. */
   line: ReactNode;
 }
 
 /**
- * By space's two-line row: a status dot, the title and its age on line one,
+ * By space's two-line row: a status dot, the title and its age (or Done) on line one,
  * the thread's latest line, muted, on line two. The line wraps onto its own
  * row of the flex container and ignores the pointer, so a click on it opens
  * the thread like the rest of the row. A thread with no line yet, such as one
@@ -103,7 +104,16 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
     className: cn("h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto", SPACE_THREAD_TITLE[state]),
     style: { rowGap: 0 },
     dot: <SpaceThreadDot state={state} />,
-    time: (
+    time: state === "unread" ? (
+      <span
+        data-space-thread-done=""
+        className="absolute inset-y-0 right-1 flex items-center"
+      >
+        <span className="rounded-full bg-blue-500 px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide text-white">
+          Done
+        </span>
+      </span>
+    ) : (
       <time
         data-space-thread-time=""
         dateTime={new Date(at).toISOString()}

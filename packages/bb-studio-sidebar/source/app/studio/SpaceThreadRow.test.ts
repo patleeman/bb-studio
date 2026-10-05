@@ -22,6 +22,7 @@ describe("By space rows", () => {
       expect(SPACE_THREAD_DOT[state].className).toContain("ring-");
     }
     expect(SPACE_THREAD_TITLE.idle).toContain("text-muted-foreground");
+    expect(SPACE_THREAD_DOT.idle.className).toBe("invisible");
   });
 
   it("writes a compact age", () => {

@@ -1,5 +1,5 @@
 diff --git a/source/app.test.tsx b/source/app.test.tsx
-index 4d15df5..3f9eb20 100644
+index 4d15df5..88c9213 100644
 --- a/source/app.test.tsx
 +++ b/source/app.test.tsx
 @@ -4,0 +5 @@ import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,7 @@ index 4d15df5..3f9eb20 100644
 @@ -145,0 +151,2 @@ afterEach(() => {
 +  getDefaultStore().set(studioSpacesAtom, { status: "loading" });
 +  resetCommandInstalledForTest();
-@@ -150,0 +158,229 @@ describe("thread-list plugin", () => {
+@@ -150,0 +158,232 @@ describe("thread-list plugin", () => {
 +  it("hides a thread from its row's menu; the section's ⋯ shows and hides them", async () => {
 +    const { rpcCalls } = renderList({ organizationMode: "project" });
 +    await screen.findByText("Later thread");
@@ -130,7 +130,10 @@ index 4d15df5..3f9eb20 100644
 +    expect(row("thr_busy").querySelector("[data-space-thread-dot]")?.getAttribute("data-space-thread-dot")).toBe("working");
 +    expect(row("thr_parent").querySelector("[data-space-thread-dot]")?.getAttribute("data-space-thread-dot")).toBe("unread");
 +    expect(row("thr_parent").querySelector("[data-space-thread-line]")).toBeNull();
-+    expect(row("thr_parent").querySelector("[data-space-thread-time]")?.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
++    // An unread result swaps its age for a Done pill; a read thread keeps its age.
++    expect(row("thr_parent").querySelector("[data-space-thread-time]")).toBeNull();
++    expect(row("thr_parent").querySelector("[data-space-thread-done]")?.textContent).toBe("Done");
++    expect(row("thr_busy").querySelector("[data-space-thread-time]")?.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
 +    expect(row("thr_parent").querySelector("[data-sidebar-thread-trailing-indicator]")).toBeNull();
 +    // The heading is plain: ⋯ has the Space's actions.
 +    expect(screen.queryByRole("button", { name: "Open Alpha" })).toBeNull();
@@ -246,7 +249,7 @@ index 4d15df5..3f9eb20 100644
 +      unregister();
 +    }
 +  });
-@@ -303,0 +540,15 @@ describe("thread-list plugin", () => {
+@@ -303,0 +543,15 @@ describe("thread-list plugin", () => {
 +  it("opens the New project dialog from Threads", async () => {
 +    setPreferencesMirrorStorageForTest(null);
 +    renderList({ organizationMode: "project" }, {

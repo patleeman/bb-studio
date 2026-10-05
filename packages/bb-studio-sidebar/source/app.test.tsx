@@ -268,7 +268,10 @@ describe("thread-list plugin", () => {
     expect(row("thr_busy").querySelector("[data-space-thread-dot]")?.getAttribute("data-space-thread-dot")).toBe("working");
     expect(row("thr_parent").querySelector("[data-space-thread-dot]")?.getAttribute("data-space-thread-dot")).toBe("unread");
     expect(row("thr_parent").querySelector("[data-space-thread-line]")).toBeNull();
-    expect(row("thr_parent").querySelector("[data-space-thread-time]")?.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
+    // An unread result swaps its age for a Done pill; a read thread keeps its age.
+    expect(row("thr_parent").querySelector("[data-space-thread-time]")).toBeNull();
+    expect(row("thr_parent").querySelector("[data-space-thread-done]")?.textContent).toBe("Done");
+    expect(row("thr_busy").querySelector("[data-space-thread-time]")?.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
     expect(row("thr_parent").querySelector("[data-sidebar-thread-trailing-indicator]")).toBeNull();
     // The heading is plain: ⋯ has the Space's actions.
     expect(screen.queryByRole("button", { name: "Open Alpha" })).toBeNull();
