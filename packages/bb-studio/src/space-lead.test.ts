@@ -222,6 +222,20 @@ it("turns the heartbeat on and off through Automations", async () => {
   expect(x.automations).toHaveLength(0);
 });
 
+it("makes a new heartbeat automation when the stored one was deleted in Automations", async () => {
+  const x = await setup();
+  await lead(x);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
+  x.automations.splice(0);
+  x.callRpc.mockRejectedValueOnce(Object.assign(new Error("Automation not found"), { status: 404 }));
+  expect(await x.leads.setRun(x.garden.id, { enabled: true, cadence: "hourly" })).toMatchObject({ run: { enabled: true, cadence: "hourly" } });
+  expect(x.automations).toHaveLength(1);
+  const update = x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_update").at(-1)![0] as unknown as { input: { automationId: string } };
+  expect(update.input.automationId).toBe(x.automations[0]!.id);
+  x.callRpc.mockRejectedValueOnce(Object.assign(new Error("Automations is down"), { status: 503 }));
+  await expect(x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" })).rejects.toThrow("Automations is down");
+});
+
 it("keeps a space's heartbeat row when Automations can't turn it off", async () => {
   const x = await setup();
   await lead(x);

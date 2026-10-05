@@ -296,15 +296,28 @@ export class SpaceRuns {
       automationId = null;
       this.db.prepare("UPDATE space_runs SET automation_id = NULL, automation_project_id = NULL WHERE space_id = ?").run(spaceId);
     }
-    if (!automationId) {
+    const ensure = async () => {
       // Found by its stable name, so a lost create response doesn't make a second one.
       const existing = (await this.call("automations_list", { projectId: thread.projectId }, z.array(automation))).filter((each) => each.name === name);
       if (existing.length > 1) throw new Error("This space has more than one heartbeat automation.");
-      automationId = existing[0]?.id ?? (await this.call("automations_create", { projectId: thread.projectId, name, enabled: false, origin: "app", trigger, execution }, automation)).id;
+      const id = existing[0]?.id ?? (await this.call("automations_create", { projectId: thread.projectId, name, enabled: false, origin: "app", trigger, execution }, automation)).id;
       this.db.prepare("INSERT OR IGNORE INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 0, ?, ?, ?, NULL, NULL)").run(spaceId, run.cadence, run.time, run.cron ?? null);
-      this.db.prepare("UPDATE space_runs SET automation_id = ?, automation_project_id = ? WHERE space_id = ?").run(automationId, thread.projectId, spaceId);
+      this.db.prepare("UPDATE space_runs SET automation_id = ?, automation_project_id = ? WHERE space_id = ?").run(id, thread.projectId, spaceId);
+      return id;
+    };
+    const update = (id: string) => this.call("automations_update", { projectId: thread.projectId, automationId: id, trigger, execution }, z.unknown());
+    if (!automationId) {
+      automationId = await ensure();
+      await update(automationId);
+    } else {
+      // The stored automation may have been deleted in Automations: forget it and make another.
+      await update(automationId).catch(async (error: unknown) => {
+        if (!missing(error)) throw error;
+        this.db.prepare("UPDATE space_runs SET automation_id = NULL, automation_project_id = NULL WHERE space_id = ?").run(spaceId);
+        automationId = await ensure();
+        await update(automationId);
+      });
     }
-    await this.call("automations_update", { projectId: thread.projectId, automationId, trigger, execution }, z.unknown());
     await this.call("automations_resume", { projectId: thread.projectId, automationId }, z.unknown());
     this.db.prepare("UPDATE space_runs SET enabled = 1, cadence = ?, time = ?, cron = ? WHERE space_id = ?").run(run.cadence, run.time, run.cron ?? null, spaceId);
     this.changed();
