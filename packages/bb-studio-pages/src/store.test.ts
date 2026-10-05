@@ -63,3 +63,15 @@ it("settles retired bot workers while preserving request history and completed r
     expect(requests.find(request => request.id === "done")).toMatchObject({ status: "done", result: "done result", error: null, updated_at: 2 });
   } finally { db.close(); }
 });
+
+it("keeps the retired refresh columns in the table but out of page metadata", () => {
+  const db = new Database(":memory:");
+  try {
+    for (const sql of MIGRATIONS) db.exec(sql);
+    const store = new PageStore(db);
+    const page = store.create({ title: "Report", projectId: null, parentId: null, actor: "user" });
+    db.prepare("UPDATE pages SET refresh_cron = '0 9 * * *' WHERE id = ?").run(page.id);
+    expect(Object.keys(store.meta(page.id)!).filter((key) => key.startsWith("refresh_"))).toEqual([]);
+    expect(db.prepare("SELECT refresh_cron FROM pages WHERE id = ?").get(page.id)).toEqual({ refresh_cron: "0 9 * * *" });
+  } finally { db.close(); }
+});

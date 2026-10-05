@@ -101,10 +101,6 @@ export interface PageRow {
   updated_at: number;
   updated_by: string;
   archived_at: number | null;
-  refresh_bot_id: string | null;
-  refresh_cron: string | null;
-  refresh_instructions: string;
-  refresh_last_at: number | null;
   template?: number;
 }
 
@@ -137,7 +133,7 @@ export interface SnapshotMeta {
 }
 
 const META_COLUMNS =
-  "id, project_id, parent_id, title, icon, position, created_at, updated_at, updated_by, archived_at, refresh_bot_id, refresh_cron, refresh_instructions, refresh_last_at, template";
+  "id, project_id, parent_id, title, icon, position, created_at, updated_at, updated_by, archived_at, template";
 const SNAPSHOTS_PER_PAGE = 50;
 
 export class PageStore {

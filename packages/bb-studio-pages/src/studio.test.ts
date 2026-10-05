@@ -13,10 +13,6 @@ const meta = (overrides: Partial<PageMeta> = {}): PageMeta => ({
   updated_at: 2,
   updated_by: "user",
   archived_at: null,
-  refresh_bot_id: null,
-  refresh_cron: null,
-  refresh_instructions: "",
-  refresh_last_at: null,
   ...overrides,
 });
 
@@ -51,8 +47,8 @@ describe("toStudioItem", () => {
     });
   });
 
-  it("tells agents from people and keeps retired refresh settings out of the collection", () => {
-    const item = toStudioItem(meta({ icon: "", updated_by: "agent:thr_x", refresh_bot_id: "bot", refresh_cron: "0 9 * * *", archived_at: 5 }), null);
+  it("tells agents from people", () => {
+    const item = toStudioItem(meta({ icon: "", updated_by: "agent:thr_x", archived_at: 5 }), null);
     expect(item).toMatchObject({ icon: null, updatedBy: "agent", preview: null, archived: true, badge: null });
   });
 });
