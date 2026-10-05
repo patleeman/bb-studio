@@ -64,7 +64,8 @@ Two entry points, both backed by the same element-level merge:
   next provider session start).
 - **`bb excalidraw` CLI** — works in *every* agent session (plain bash):
   `show <id>` returns the current scene JSON; `merge <id> <file>` upserts
-  elements from a JSON file (an array of element objects or a full scene);
+  elements from a JSON file (an array of element objects or a full scene,
+  whose image `files` come along; elements marked `isDeleted` are deleted);
   `remove-elements <id> <el-id…>` deletes elements. This is the fallback path
   for custom ACP providers such as prime-agent.
 
@@ -159,7 +160,8 @@ Notes:
   bundler has no `.woff2` loader).
 - The frontend bundle is large (~13 MB) because it embeds the full Excalidraw
   editor; it only loads when the plugin surfaces are mounted.
-- `@bb-studio/kit` is a `file:../bb-studio-kit` dependency. Keep
+- `@bb-studio/kit` is a `file:../bb-studio-kit.tgz` dependency (the packed
+  kit; the pnpm workspace links the live sources instead). Keep
   `package-lock.json` current (regenerate it in a clean clone, not the pnpm
   workspace), because BB's Git install runs `npm install` from it.
 
