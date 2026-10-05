@@ -93,8 +93,13 @@ export interface SpaceThreadRow {
   style: CSSProperties | undefined;
   /** The status dot before the title; it replaces BB's status glyph. */
   dot: ReactNode;
-  /** The relative time where BB shows the status glyph, or a pill when the thread waits on you. */
+  /** The relative time where BB shows the status glyph; null when a pill shows instead. */
   time: ReactNode;
+  /**
+   * What a thread that waits on you shows in place of its time. Unlike the
+   * time it sits in the row's flow, so the slot widens and the title gives way.
+   */
+  pill: ReactNode;
   /** The latest line under the title, or a blank one until it loads. */
   line: ReactNode;
 }
@@ -116,16 +121,15 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
     className: cn("h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto", SPACE_THREAD_TITLE[state]),
     style: { rowGap: 0 },
     dot: <SpaceThreadDot state={state} />,
-    time: SPACE_THREAD_PILL[state] ? (
+    pill: SPACE_THREAD_PILL[state] ? (
       <span
         data-space-thread-pill={state}
-        className="absolute inset-y-0 right-1 flex items-center"
+        className={cn("whitespace-nowrap rounded-full px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide", SPACE_THREAD_PILL[state].className)}
       >
-        <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide", SPACE_THREAD_PILL[state].className)}>
-          {SPACE_THREAD_PILL[state].label}
-        </span>
+        {SPACE_THREAD_PILL[state].label}
       </span>
-    ) : (
+    ) : null,
+    time: SPACE_THREAD_PILL[state] ? null : (
       <time
         data-space-thread-time=""
         dateTime={new Date(at).toISOString()}

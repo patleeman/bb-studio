@@ -696,8 +696,22 @@ function ThreadRowComponent({
               className={cn(
                 "relative shrink-0",
                 COARSE_POINTER_ROW_ACTION_SIZE_CLASS,
+                spaceRow?.pill && "w-auto min-w-7 max-md:pointer-coarse:w-auto",
               )}
             >
+              {spaceRow?.pill && !miniMap ? (
+                <span
+                  data-sidebar-hover-actions-open={
+                    isActionsOpen ? "true" : undefined
+                  }
+                  className={cn(
+                    SIDEBAR_HOVER_ACTIONS_FADE_CLASS,
+                    "flex h-full items-center pr-1",
+                  )}
+                >
+                  {spaceRow.pill}
+                </span>
+              ) : null}
               <span
                 data-sidebar-hover-actions-open={
                   isActionsOpen ? "true" : undefined

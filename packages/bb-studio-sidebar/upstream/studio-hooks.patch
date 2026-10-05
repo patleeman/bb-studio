@@ -672,7 +672,7 @@ index c9f9497..5cb8c93 100644
 +      (id !== "move" || available.move) &&
 +      (id !== "archive" || available.archive !== false),
 diff --git a/source/app/rows/ThreadRow.tsx b/source/app/rows/ThreadRow.tsx
-index 13d58a8..536da90 100644
+index 13d58a8..1031cca 100644
 --- a/source/app/rows/ThreadRow.tsx
 +++ b/source/app/rows/ThreadRow.tsx
 @@ -97,0 +98,3 @@ import {
@@ -694,10 +694,26 @@ index 13d58a8..536da90 100644
 +              {spaceRow?.dot}
 @@ -595,0 +604 @@ function ThreadRowComponent({
 +              <StudioThreadBadge threadId={thread.id} needsYou={!spaceRow && thread.hasPendingInteraction} />
-@@ -714,0 +724,2 @@ function ThreadRowComponent({
+@@ -689,0 +699 @@ function ThreadRowComponent({
++                spaceRow?.pill && "w-auto min-w-7 max-md:pointer-coarse:w-auto",
+@@ -691,0 +702,13 @@ function ThreadRowComponent({
++              {spaceRow?.pill && !miniMap ? (
++                <span
++                  data-sidebar-hover-actions-open={
++                    isActionsOpen ? "true" : undefined
++                  }
++                  className={cn(
++                    SIDEBAR_HOVER_ACTIONS_FADE_CLASS,
++                    "flex h-full items-center pr-1",
++                  )}
++                >
++                  {spaceRow.pill}
++                </span>
++              ) : null}
+@@ -714,0 +738,2 @@ function ThreadRowComponent({
 +                ) : spaceRow ? (
 +                  spaceRow.time
-@@ -761,0 +773 @@ function ThreadRowComponent({
+@@ -761,0 +787 @@ function ThreadRowComponent({
 +      {spaceRow?.line}
 diff --git a/source/shared/preferences.ts b/source/shared/preferences.ts
 index 98a5200..fb842be 100644
