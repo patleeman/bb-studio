@@ -246,6 +246,11 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: spaceId, add: z.array(spaceMember).max(500).default([]), remove: z.array(spaceMember).max(500).default([]) }),
     output: z.object({ space }),
   },
+  /** Adds a folder on the primary host to a space as a project, made if it isn't one yet. */
+  addSpaceFolder: {
+    input: z.object({ id: spaceId, path: z.string().trim().min(1).max(4096) }),
+    output: z.object({ space, project: z.object({ id: z.string(), name: z.string() }) }),
+  },
   /** The spaces a thread is in; `inherited` ones hold it through a project. */
   spacesForThread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ spaces: z.array(space), inherited: z.array(z.string()) }) },
   /** Spaces picked in a project's new-thread composer; the next thread started there moves to the last one. */

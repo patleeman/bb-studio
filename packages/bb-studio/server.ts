@@ -531,6 +531,15 @@ export default async function plugin(bb: BbPluginApi) {
       if (!space) throw new Error("That space no longer exists.");
       return { space };
     },
+    addSpaceFolder: async ({ id, path }) => {
+      if (!spaces.get(id)) throw new Error("That space no longer exists.");
+      const project = await folders.projectAt(path);
+      spaces.add(id, [{ pluginId: "bb-project", id: project.id }]);
+      tagsChanged();
+      const space = spaces.get(id);
+      if (!space) throw new Error("That space no longer exists.");
+      return { space, project: { id: project.id, name: project.name } };
+    },
     space_lead: ({ spaceId }) => spaceLeads.get(spaceId),
     space_set_lead: ({ spaceId, threadId }) => spaceLeads.setLead(spaceId, threadId),
     thread_lines: async ({ threadIds }) => ({ lines: await threadLines.read(threadIds) }),

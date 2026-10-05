@@ -33,6 +33,33 @@ function folderName(path: string) {
   return path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || path;
 }
 
+/**
+ * Opens BB's folder picker on the primary host: the chosen path, null if the
+ * user cancels, or why it couldn't open, as in a browser on another machine.
+ */
+function useFolderPicker() {
+  const sdk = useSdk();
+  return async (): Promise<{ path: string | null } | { error: string }> => {
+    try {
+      const hostId = (await sdk.system.config()).primaryHostId;
+      if (!hostId) throw new Error("BB has no primary host connected");
+      return await sdk.hosts.pickFolder({ hostId, clientHostId: hostId });
+    } catch (cause) {
+      return { error: errorMessage(cause) };
+    }
+  };
+}
+
+/** Asks for a folder's path when the picker couldn't open, saying why. */
+function FolderPathInput({ reason, value, onChange }: { reason: string; value: string; onChange(value: string): void }) {
+  return (
+    <>
+      <span className="text-xs text-muted-foreground">Couldn't open the folder picker ({reason.replace(/\.$/, "")}). Type the folder's path instead.</span>
+      <Input autoFocus value={value} placeholder="/Users/you/code/site" onChange={(event) => onChange(event.target.value)} />
+    </>
+  );
+}
+
 function threadIcon(thread: SpaceThreadView) {
   return thread.status === "active" || thread.status === "starting" ? "Loading" : "MessageSquare";
 }
@@ -87,7 +114,7 @@ export function SpaceDialog({
   const [folder, setFolder] = useState("");
   const [pickerError, setPickerError] = useState<string | null>(null);
   const typing = pickerError !== null;
-  const sdk = useSdk();
+  const chooseFolder = useFolderPicker();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,18 +141,13 @@ export function SpaceDialog({
 
   const pickFolder = async () => {
     setError(null);
-    try {
-      const hostId = (await sdk.system.config()).primaryHostId;
-      if (!hostId) throw new Error("BB has no primary host connected");
-      const { path } = await sdk.hosts.pickFolder({ hostId, clientHostId: hostId });
-      if (!path) return;
-      setFolder(path);
+    const picked = await chooseFolder();
+    if ("error" in picked) setPickerError(picked.error);
+    else if (picked.path) {
+      setFolder(picked.path);
       setPickerError(null);
-      setProject(PICKED_FOLDER);
-    } catch (cause) {
-      setPickerError(errorMessage(cause));
-      setProject(PICKED_FOLDER);
-    }
+    } else return;
+    setProject(PICKED_FOLDER);
   };
 
   return (
@@ -181,10 +203,7 @@ export function SpaceDialog({
               <option value={PICK_FOLDER}>Choose a folder…</option>
             </select>
             {typing && project === PICKED_FOLDER ? (
-              <>
-                <span className="text-xs text-muted-foreground">Couldn't open the folder picker ({pickerError.replace(/\.$/, "")}). Type the folder's path instead.</span>
-                <Input autoFocus value={folder} placeholder="/Users/you/code/site" onChange={(event) => setFolder(event.target.value)} />
-              </>
+              <FolderPathInput reason={pickerError} value={folder} onChange={setFolder} />
             ) : null}
             <span className="text-xs text-muted-foreground">
               {project === PICKED_FOLDER && folder && !typing ? `${folder} becomes a project in this space. ` : null}
@@ -301,11 +320,36 @@ export function AddThreadsDialog({
 export function SpaceProjectsDialog({ rpc, space, projects, onClose, onChanged }: { rpc: Rpc; space: SpaceView; projects: readonly Project[]; onClose(): void; onChanged(): void }) {
   const members = useMembers(rpc, space, onChanged);
   const [busy, setBusy] = useState<string | null>(null);
+  // Projects made from a folder here, which `projects` was loaded too early to have.
+  const [made, setMade] = useState<Project[]>([]);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [folder, setFolder] = useState("");
+  const chooseFolder = useFolderPicker();
+  const listed = [...projects, ...made.filter((each) => !projects.some((project) => project.id === each.id))];
   const toggle = async (id: string, add: boolean) => {
     setBusy(id);
     const ref = [{ pluginId: PROJECT_REF, id }];
     await members(add ? ref : [], add ? [] : ref);
     setBusy(null);
+  };
+  const addFolder = async (path: string) => {
+    setBusy(PICK_FOLDER);
+    try {
+      const { project } = await rpc.call("addSpaceFolder", { id: space.id, path });
+      setMade((list) => [...list.filter((each) => each.id !== project.id), project]);
+      setPickerError(null);
+      setFolder("");
+      onChanged();
+    } catch (cause) {
+      toast.error(`Couldn't add the folder: ${errorMessage(cause)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const pickFolder = async () => {
+    const picked = await chooseFolder();
+    if ("error" in picked) setPickerError(picked.error);
+    else if (picked.path) await addFolder(picked.path);
   };
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
@@ -315,7 +359,7 @@ export function SpaceProjectsDialog({ rpc, space, projects, onClose, onChanged }
           <DialogDescription>A project's items and threads, now and later, belong to the space too. They stay in the project.</DialogDescription>
         </DialogHeader>
         <div className="-mx-2 flex max-h-96 flex-col overflow-y-auto">
-          {projects.map((project) => {
+          {listed.map((project) => {
             const added = space.projectIds.includes(project.id);
             return (
               <div key={project.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-state-hover">
@@ -328,9 +372,26 @@ export function SpaceProjectsDialog({ rpc, space, projects, onClose, onChanged }
               </div>
             );
           })}
-          {!projects.length ? <p className="px-2 py-6 text-center text-sm text-muted-foreground">No projects.</p> : null}
+          {!listed.length ? <p className="px-2 py-6 text-center text-sm text-muted-foreground">No projects.</p> : null}
         </div>
+        {pickerError !== null ? (
+          <form
+            className="flex flex-col gap-1.5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (folder.trim() && !busy) void addFolder(folder.trim());
+            }}
+          >
+            <FolderPathInput reason={pickerError} value={folder} onChange={setFolder} />
+            <Button type="submit" variant="outline" className="self-end" disabled={!folder.trim() || busy !== null}>
+              Add folder
+            </Button>
+          </form>
+        ) : null}
         <DialogFooter>
+          <Button variant="ghost" className="sm:mr-auto" disabled={busy !== null} onClick={() => void pickFolder()}>
+            Add a folder…
+          </Button>
           <Button onClick={onClose}>Done</Button>
         </DialogFooter>
       </DialogContent>
