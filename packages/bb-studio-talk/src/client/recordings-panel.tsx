@@ -399,15 +399,15 @@ function RecordingDetail({ id }: { id: string }) {
                 ) : null}
                 {recording.kind === "recording" && recording.status === "done" ? (
                   <DropdownMenuItem onSelect={() => run(() => rpc.call("meeting_regenerate", { id }))}>
-                    <Icon name="ListView" className="size-4" /> {recording.meetingNotes ? "Regenerate summary" : "Generate summary"}
+                    <Icon name="AiContentGenerator01" className="size-4" /> {recording.meetingNotes ? "Regenerate summary" : "Generate summary"}
                   </DropdownMenuItem>
                 ) : null}
                 {recording.status === "done" ? (
                   <>
-                    <DropdownMenuItem onSelect={() => downloadTranscript("markdown")}>Download Markdown</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => downloadTranscript("text")}>Download text</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => downloadTranscript("markdown")}><Icon name="Download" className="size-4" /> Download Markdown</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => downloadTranscript("text")}><Icon name="Download" className="size-4" /> Download text</DropdownMenuItem>
                     {recording.audioRemoved ? null : (
-                      <DropdownMenuItem onSelect={() => window.open(`/api/v1/plugins/talk/http/audio-export?recording=${encodeURIComponent(id)}`, "_blank", "noopener")}>Download audio</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => window.open(`/api/v1/plugins/talk/http/audio-export?recording=${encodeURIComponent(id)}`, "_blank", "noopener")}><Icon name="Download" className="size-4" /> Download audio</DropdownMenuItem>
                     )}
                   </>
                 ) : null}
@@ -450,7 +450,7 @@ function RecordingDetail({ id }: { id: string }) {
             <summary className="cursor-pointer font-semibold">Summary</summary>
             <div className="mt-3 flex items-center justify-end gap-3">
               <button type="button" className={OUTLINE_BUTTON} onClick={() => run(() => rpc.call("meeting_regenerate", { id }))}>
-                <Icon name="RotateCcw" /> {recording.meetingNotes ? "Regenerate" : "Generate"}
+                <Icon name="AiContentGenerator01" /> {recording.meetingNotes ? "Regenerate" : "Generate"}
               </button>
             </div>
             <p className="mt-3 whitespace-pre-wrap text-sm">{recording.meetingNotes.summary}</p>

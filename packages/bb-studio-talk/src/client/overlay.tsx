@@ -310,7 +310,7 @@ export function TalkOverlay() {
         {canStop && dictation ? (
           <>
             <PillButton icon="CircleX" label="Stop without inserting" onClick={() => void talk.stop(false)} />
-            <PillButton icon="Check" label="Stop and insert" tone="danger" onClick={() => void talk.stop(true)} />
+            <PillButton icon="Check" label="Stop and insert" tone="primary" onClick={() => void talk.stop(true)} />
           </>
         ) : null}
         {canStop && !dictation ? (
