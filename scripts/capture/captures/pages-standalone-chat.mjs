@@ -65,6 +65,10 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
         copies: [...document.querySelectorAll('section[data-studio-conversation] [data-promptbox] [contenteditable=true]')].filter(node => node.textContent.includes(${JSON.stringify(draftText)})).length }; })()`);
       if (!state.same || state.visible !== visible || !state.text?.includes(draftText) || !state.file || state.copies !== 1) throw new Error(`Pages lost its retained composer: ${JSON.stringify(state)}`);
     };
+    // Studio is off here, so pages switch through the app's router, as a link click would, keeping retained views.
+    const openPage = async id => {
+      await client.evaluate(`(() => { history.pushState({ usr: null, key: "capture", idx: (history.state?.idx ?? 0) + 1 }, "", ${JSON.stringify(`/plugins/pages/pages/${id}`)}); dispatchEvent(new PopStateEvent("popstate", { state: history.state })); return true; })()`);
+    };
     const backToPage = async () => {
       await client.evaluate("history.back()");
       await client.waitForText("Launch checklist");
@@ -77,14 +81,9 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
         executionInputSources: {}, environment: { type: "project-default" },
         input: [{ type: "text", text: "Review the offline launch checklist.", mentions: [] }], sendAt: Date.now() + 30 * 86400000,
       }}); threads.push(threadId);
-      await client.navigate(`/plugins/pages/pages/${page.id}`);
-      await client.waitForText("Launch checklist");
-      await client.waitForSelector(`[data-studio-tab="pages:${page.id}"] a[aria-current="page"]`);
       await client.navigate(`/plugins/pages/pages/${notes.id}`);
       await client.waitForText("Offline sync for every team");
-      await client.waitForSelector(`[data-studio-tab="pages:${notes.id}"] a[aria-current="page"]`);
-      await client.waitForSelector(`[data-studio-tab="pages:${page.id}"] a`);
-      await client.dragBy(`[data-studio-tab="pages:${page.id}"] a`, 0, 0);
+      await openPage(page.id);
       await client.waitForText("Launch checklist");
       if (mobile) await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
       if (mobile) {
@@ -97,7 +96,8 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
         })()`);
         if (sidebarToggle) await client.clickAriaButtonWithPointer(sidebarToggle);
       }
-      // Chat continues the page's conversation in BB's main thread view.
+      // Chat continues the page's conversation in BB's main thread view, once the page knows it.
+      await client.waitForSelector(`[data-studio-item-header] button[title="Continue this page's conversation"]`);
       await client.clickElementWithTextAndPointer('[data-studio-item-header] button', "Chat");
       await waitForPath(`/threads/${threadId}`);
       await client.waitForSelector("[data-promptbox]");
@@ -116,7 +116,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
       await backToPage(); await retained(false);
       await newConversation(); await waitForPath(path); await retained(true);
       if (!mobile) {
-        await client.dragBy(`[data-studio-tab="pages:${notes.id}"] a`, 0, 0);
+        await openPage(notes.id);
         await client.waitForText("Offline sync for every team");
         await retained(false);
         await newConversation();
@@ -143,12 +143,12 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
         await client.waitForSelector("[data-promptbox]");
         const queued = await bbCli(["thread", "queue", "list", created, "--json"]);
         if (!queued.includes(notes.id) || !queued.includes("Schedule this release review.") || !queued.includes("release-review.txt")) throw new Error("Pages lost its context, draft or attachment when scheduling");
-        await client.dragBy(`[data-studio-tab="pages:${notes.id}"] a`, 0, 0);
+        await openPage(notes.id);
         await client.waitForText("Offline sync for every team");
         await client.clickElementWithTextAndPointer('[data-studio-item-header] button', "Chat");
         await waitForPath(`/threads/${created}`);
         if ((await pluginRpc("pages", "chats", { pageId: notes.id })).chats.length !== 1) throw new Error("The header duplicated its new page conversation");
-        await client.dragBy(`[data-studio-tab="pages:${page.id}"] a`, 0, 0);
+        await openPage(page.id);
         await client.waitForText("Launch checklist");
         await newConversation(); await waitForPath(path); await retained(true);
       }

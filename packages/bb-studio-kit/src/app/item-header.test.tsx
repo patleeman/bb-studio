@@ -141,4 +141,23 @@ describe("Studio bar in BB's title bar", () => {
     await act(async () => slotRoot.unmount());
     pane.remove();
   });
+
+  it("leaves the title bar while its retained view is set aside, and returns with it", async () => {
+    const pane = document.createElement("div");
+    pane.innerHTML = '<header><div data-testid="app-page-header-content-row"><div>Label</div><div><div data-bb-plugin-root></div></div></div></header><main></main>';
+    const parking = document.createElement("div");
+    document.body.append(pane, parking);
+    const view = document.createElement("div");
+    pane.querySelector("main")!.append(view);
+    const slotRoot = createRoot(pane.querySelector("[data-bb-plugin-root]")!), viewRoot = createRoot(view);
+    await act(async () => { slotRoot.render(<StudioBarSlot />); viewRoot.render(<StudioBar>Release notes</StudioBar>); await settle(); });
+    const inTitleBar = () => pane.querySelector("[data-studio-bar-slot] [data-studio-bar]")?.textContent ?? null;
+    expect(inTitleBar()).toBe("Release notes");
+    await act(async () => { parking.append(view); await settle(); });
+    expect(inTitleBar()).toBeNull();
+    await act(async () => { pane.querySelector("main")!.append(view); await settle(); });
+    expect(inTitleBar()).toBe("Release notes");
+    await act(async () => { viewRoot.unmount(); slotRoot.unmount(); });
+    pane.remove(); parking.remove();
+  });
 });

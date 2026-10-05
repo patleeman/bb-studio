@@ -2,8 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
-  {
+export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep }) => {
+  const itemChat = {
     id: "studio-item-chat",
     packageDir: "bb-studio",
     fileName: "chat-preview.png",
@@ -225,5 +225,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
       }
       return forget;
     },
-  },
-];
+  };
+  return [
+    itemChat,
+    // The retired Chat plugin's bridge shows the same item chat it hands over to Studio.
+    { ...itemChat, id: "chat-bridge", packageDir: "bb-studio-chat", fileName: "staged-preview.png" },
+  ];
+};

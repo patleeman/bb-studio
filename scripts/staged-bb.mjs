@@ -129,7 +129,8 @@ async function seedSmartReactionsThread(project, machine, orbitDir) {
   await bb("thread", "wait", thread.id, "--timeout", "5m");
   const events = await bb("thread", "messages", thread.id);
   const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
-  if (!/::reactions\{[^}]*SQLite[^}]*Postgres/.test(reply)) throw new Error(`The SQLite or Postgres reply has no smart reactions: ${reply}`);
+  // Smart reactions arrive as ::reactions, or as the Next row's quick replies when Pages is installed.
+  if (!/::(?:reactions|next)\{[^}]*SQLite[^}]*Postgres/.test(reply)) throw new Error(`The SQLite or Postgres reply has no smart reactions: ${reply}`);
   await bb("thread", "read", thread.id);
   return thread;
 }

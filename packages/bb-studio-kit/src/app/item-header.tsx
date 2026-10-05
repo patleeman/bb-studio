@@ -123,6 +123,11 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>): HTMLElement | 
     // The title bar and the view mount together; give the slot a few frames.
     let frame = 0, tries = 0, current: HTMLElement | null = null;
     const find = () => (anchor.current ? paneSlot(anchor.current) : null);
+    // A retained view set aside leaves its pane; its bar must leave that title bar too.
+    const owns = (slot: HTMLElement) => {
+      const pane = slot.closest("header")?.parentElement;
+      return !!pane && !!anchor.current && pane.contains(anchor.current);
+    };
     const look = () => {
       frame = 0;
       const found = find();
@@ -133,8 +138,8 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>): HTMLElement | 
     // BB swaps its title bar at the compact breakpoint, and may lend one
     // late: follow the slot to the new one, or keep looking, once a frame.
     const observer = new MutationObserver(() => {
-      if (frame || current?.isConnected) return;
-      if (current) { current = null; tries = 0; look(); return; }
+      if (frame || (current?.isConnected && owns(current))) return;
+      if (current) { current = null; setSlot(null); tries = 0; look(); return; }
       frame = requestAnimationFrame(() => {
         frame = 0;
         current = find();
