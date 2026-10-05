@@ -1,15 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import plugin from "../server";
 import { rpcContract } from "@bb-studio/kit/chat-contract";
 
-async function setup(values: Map<string, unknown>, fail = false) {
+async function setup(values: Map<string, unknown>, fail: boolean | { failures: number } = false) {
   const callRpc = vi.fn(async ({ method, input }: { method: keyof typeof rpcContract; input: any }) => {
     rpcContract[method].input.parse(input);
-    if (fail) throw new Error("Studio is unavailable");
+    if (fail === true || (typeof fail === "object" && fail.failures-- > 0)) throw new Error("Studio is unavailable");
     return method === "chat.importLinks" ? { imported: input.links.length } : { thread: { threadId: "thread", title: "Linked", origin: "chosen" } };
   });
   let handlers: any, cli: any;
   const warn = vi.fn();
+  const disposers: (() => void)[] = [];
   await plugin({
     storage: { kv: {
       list: async (prefix: string) => [...values.keys()].filter(key => key.startsWith(prefix)),
@@ -21,11 +22,34 @@ async function setup(values: Map<string, unknown>, fail = false) {
     rpc: { register: (_contract: unknown, value: unknown) => { handlers = value; } },
     cli: { register: (value: unknown) => { cli = value; } },
     log: { warn },
+    onDispose: (dispose: () => void) => { disposers.push(dispose); },
   } as any);
-  return { callRpc, handlers, cli, warn };
+  return { callRpc, handlers, cli, warn, dispose: () => disposers.forEach(each => each()) };
 }
 
 describe("Chat upgrade bridge", () => {
+  afterEach(() => { vi.useRealTimers(); });
+  it("retries a failed startup migration with backoff until Studio answers", async () => {
+    vi.useFakeTimers();
+    const values = new Map<string, unknown>([["link:pages:page", { threadId: "old", at: 1 }]]);
+    const { callRpc, warn } = await setup(values, { failures: 2 });
+    expect(warn.mock.calls[0]![0]).toContain("retry in 5s");
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(warn.mock.calls[1]![0]).toContain("retry in 10s");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(callRpc).toHaveBeenCalledTimes(3);
+    expect(values.get("migrated:link:pages:page")).toEqual({ threadId: "old", at: 1 });
+    await vi.advanceTimersByTimeAsync(60 * 60_000);
+    expect(callRpc).toHaveBeenCalledTimes(3);
+  });
+  it("stops retrying once disposed", async () => {
+    vi.useFakeTimers();
+    const { callRpc, dispose } = await setup(new Map([["link:pages:page", { threadId: "old", at: 1 }]]), true);
+    dispose();
+    await vi.advanceTimersByTimeAsync(60 * 60_000);
+    expect(callRpc).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it("migrates chosen links and explicit unlinks in bounded batches without changing source storage", async () => {
     const values = new Map<string, unknown>(Array.from({ length: 251 }, (_, i) => [`link:artifacts:id:${i}`, { threadId: i ? `thread_${i}` : null, at: i }]));
     const { callRpc, cli } = await setup(values);
@@ -43,7 +67,8 @@ describe("Chat upgrade bridge", () => {
   });
   it("reports a failed migration without claiming completion or deleting originals", async () => {
     const values = new Map<string, unknown>([["link:pages:page", { threadId: "old", at: 1 }]]);
-    const { cli, warn } = await setup(values, true);
+    const { cli, warn, dispose } = await setup(values, true);
+    dispose();
     expect(warn).toHaveBeenCalled();
     const result = await cli.run(["migrate"]);
     expect(result.exitCode).toBe(1);

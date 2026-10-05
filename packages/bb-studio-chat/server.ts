@@ -8,6 +8,8 @@ const linkSchema = z.object({ threadId: z.string().min(1).max(200).nullable(), a
 const importedLink = linkSchema.extend({ item: ref });
 /** Prefix of the per-link record of what was copied to Studio; never under `link:`. */
 const MIGRATED = "migrated:";
+const FIRST_RETRY_MS = 5_000;
+const MAX_RETRY_MS = 10 * 60_000;
 
 /** Upgrade-only bridge. Studio owns the UI, new links, and all chat behavior. */
 export default async function plugin(bb: BbPluginApi) {
@@ -80,5 +82,19 @@ export default async function plugin(bb: BbPluginApi) {
       } catch (error) { return { exitCode: 1, stderr: `Update and enable Studio, then retry: ${String(error)}\n` }; }
     },
   });
-  await runMigration().catch(error => bb.log.warn(`Chat link migration will retry: ${String(error)}`));
+
+  // Studio may be missing, disabled, or still starting: retry with backoff
+  // until one pass completes (a legacy call or the CLI may finish it first).
+  let disposed = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const attempt = async (delay: number): Promise<void> => {
+    if (disposed || migrated) return;
+    await runMigration().catch(error => {
+      if (disposed || migrated) return;
+      bb.log.warn(`Chat link migration will retry in ${Math.round(delay / 1000)}s: ${String(error)}`);
+      timer = setTimeout(() => { void attempt(Math.min(delay * 2, MAX_RETRY_MS)); }, delay);
+    });
+  };
+  bb.onDispose(() => { disposed = true; clearTimeout(timer); });
+  await attempt(FIRST_RETRY_MS);
 }
