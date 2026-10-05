@@ -145,6 +145,8 @@ final class InboxModel: ObservableObject {
     /// Hidden threads are Studio Sidebar's; BB's own Thread List has none.
     var supportsHiding: Bool { preferences?.hiddenThreads != nil }
     var hidden: Set<String> { Set(preferences?.hiddenThreads ?? []) }
+    /// Threads whose sub-threads are folded away, shared with the web sidebar.
+    var collapsed: Set<String> { Set(preferences?.collapsedThreads ?? []) }
 
     /// Spaces, leads and open items change rarely and cost several calls: at
     /// most every 10 seconds unless asked (pull to refresh, reconnect, an action).
@@ -286,6 +288,21 @@ final class InboxModel: ObservableObject {
         actions += 1
         do {
             try await client.setSidebarPreference("hiddenThreads", .array(ids.map(JSONValue.string)))
+        } catch where BBClient.isCancellation(error) {
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+            await load(client, refreshPreferences: true)
+        }
+    }
+
+    /// Folds a thread's sub-threads away, or shows them again, through Studio Sidebar's synced preference.
+    func setCollapsed(_ client: BBClient, _ threadId: String, _ collapse: Bool) async {
+        var ids = preferences?.collapsedThreads ?? []
+        ids.removeAll { $0 == threadId }
+        if collapse { ids.append(threadId) }
+        preferences?.collapsedThreads = ids
+        do {
+            try await client.setSidebarPreference("collapsedThreads", .array(ids.map(JSONValue.string)))
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
@@ -562,7 +579,7 @@ struct InboxView: View {
             collapsible(group.id, group.title) {
                 ForEach(filtered) { thread in
                     threadLink(thread, showsProject: group.showsProject, depth: 0)
-                    ForEach(query.isEmpty ? model.children[thread.id] ?? [] : []) { child in
+                    ForEach(query.isEmpty ? shownChildren(of: thread) : []) { child in
                         threadLink(child, showsProject: false, depth: 1)
                     }
                 }
@@ -719,7 +736,7 @@ struct InboxView: View {
     @ViewBuilder
     private func spaceThreadLinks(_ thread: ThreadEntry, lead: Bool, heartbeat: String? = nil) -> some View {
         spaceThreadLink(thread, lead: lead, heartbeat: heartbeat, depth: 0)
-        ForEach(model.children[thread.id] ?? []) { child in
+        ForEach(shownChildren(of: thread)) { child in
             spaceThreadLink(child, lead: false, heartbeat: nil, depth: 1)
         }
     }
@@ -729,7 +746,7 @@ struct InboxView: View {
             SpaceThreadRow(
                 thread: thread, line: model.lines[thread.id],
                 badge: lead ? (heartbeat.map { "Lead · heartbeat \(SpaceLead.cadenceLabel($0))" } ?? "Lead") : nil,
-                hidden: model.hidden.contains(thread.id))
+                hidden: model.hidden.contains(thread.id), collapsedChildren: collapsedChildren(of: thread))
                 .padding(.leading, CGFloat(depth) * 18)
         }
         .swipeActions(edge: .leading) { leadingActions(thread) }
@@ -791,10 +808,21 @@ struct InboxView: View {
         }
     }
 
+    /// A thread's sub-threads, unless it's collapsed.
+    private func shownChildren(of thread: ThreadEntry) -> [ThreadEntry] {
+        model.collapsed.contains(thread.id) ? [] : model.children[thread.id] ?? []
+    }
+
+    /// How many sub-threads a collapsed thread folds away; 0 when it's open.
+    private func collapsedChildren(of thread: ThreadEntry) -> Int {
+        model.collapsed.contains(thread.id) ? model.children[thread.id]?.count ?? 0 : 0
+    }
+
     private func threadLink(_ thread: ThreadEntry, showsProject: Bool, depth: Int) -> some View {
         NavigationLink(value: Route.thread(id: thread.id)) {
             ThreadRow(
-                thread: thread, project: showsProject ? model.projectNames[thread.projectId] : nil)
+                thread: thread, project: showsProject ? model.projectNames[thread.projectId] : nil,
+                collapsedChildren: collapsedChildren(of: thread))
                 .padding(.leading, CGFloat(depth) * 18)
         }
         .swipeActions(edge: .leading) { leadingActions(thread) }
@@ -855,6 +883,16 @@ struct InboxView: View {
             Label(
                 thread.isUnread ? "Mark as read" : "Mark as unread",
                 systemImage: thread.isUnread ? "envelope.open" : "envelope.badge")
+        }
+        if let children = model.children[thread.id], !children.isEmpty {
+            let isCollapsed = model.collapsed.contains(thread.id)
+            Button {
+                Task { await model.setCollapsed(app.client, thread.id, !isCollapsed) }
+            } label: {
+                Label(
+                    isCollapsed ? "Expand Sub-threads" : "Collapse \(children.count) Sub-thread\(children.count == 1 ? "" : "s")",
+                    systemImage: isCollapsed ? "chevron.down" : "chevron.up")
+            }
         }
         Button { app.startVoiceChat(threadId: thread.id) } label: { Label("Voice chat", systemImage: Symbols.voiceChat) }
         Button { UIPasteboard.general.string = thread.id } label: { Label("Copy Thread ID", systemImage: "number") }
@@ -966,13 +1004,16 @@ struct ConnectionBanner: View {
 struct ThreadRow: View {
     let thread: ThreadEntry
     var project: String?
+    /// Sub-threads folded away under this one.
+    var collapsedChildren = 0
     @ObservedObject private var muted = MutedThreads.shared
     /// Written by the thread screen as the reader types; see `Drafts`.
     @AppStorage private var draft: Data?
 
-    init(thread: ThreadEntry, project: String? = nil) {
+    init(thread: ThreadEntry, project: String? = nil, collapsedChildren: Int = 0) {
         self.thread = thread
         self.project = project
+        self.collapsedChildren = collapsedChildren
         _draft = AppStorage(ServerScope.key("draft.\(thread.id)"))
     }
 
@@ -1000,6 +1041,7 @@ struct ThreadRow: View {
                     if muted.ids.contains(thread.id) {
                         Image(systemName: "bell.slash").accessibilityLabel("Muted")
                     }
+                    if collapsedChildren > 0 { CollapsedChildrenMark(count: collapsedChildren) }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

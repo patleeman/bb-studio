@@ -409,16 +409,19 @@ public struct SidebarPreferences: Codable, Hashable, Sendable {
     public var currentSpace: String?
     /// Studio Sidebar: threads hidden from every section unless pinned, open, or a Space's lead.
     public var hiddenThreads: [String]?
+    /// Studio Sidebar: threads whose sub-threads are folded away.
+    public var collapsedThreads: [String]?
 
     public init(
         organizationMode: String? = nil, sectionOrder: [String]? = nil, collapsedProjects: [String]? = nil,
-        currentSpace: String? = nil, hiddenThreads: [String]? = nil
+        currentSpace: String? = nil, hiddenThreads: [String]? = nil, collapsedThreads: [String]? = nil
     ) {
         self.organizationMode = organizationMode
         self.sectionOrder = sectionOrder
         self.collapsedProjects = collapsedProjects
         self.currentSpace = currentSpace
         self.hiddenThreads = hiddenThreads
+        self.collapsedThreads = collapsedThreads
     }
 }
 

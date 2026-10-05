@@ -121,6 +121,20 @@ struct YieldsRowSwipesToPager: UIViewRepresentable {
 
 // MARK: Rows
 
+/// On a collapsed thread's row: how many sub-threads it folds away.
+struct CollapsedChildrenMark: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "arrow.turn.down.right")
+            Text("\(count)").monospacedDigit()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(count) sub-thread\(count == 1 ? "" : "s") collapsed")
+    }
+}
+
 /// By space's two-line row: a status dot, the title with its age, and the
 /// thread's latest line from Studio, red when it failed and amber when blocked.
 struct SpaceThreadRow: View {
@@ -129,15 +143,18 @@ struct SpaceThreadRow: View {
     /// "Lead", with the heartbeat when one runs.
     var badge: String?
     var hidden = false
+    /// Sub-threads folded away under this one.
+    var collapsedChildren = 0
     @ObservedObject private var muted = MutedThreads.shared
     /// Written by the thread screen as the reader types; see `Drafts`.
     @AppStorage private var draft: Data?
 
-    init(thread: ThreadEntry, line: ThreadLine?, badge: String? = nil, hidden: Bool = false) {
+    init(thread: ThreadEntry, line: ThreadLine?, badge: String? = nil, hidden: Bool = false, collapsedChildren: Int = 0) {
         self.thread = thread
         self.line = line
         self.badge = badge
         self.hidden = hidden
+        self.collapsedChildren = collapsedChildren
         _draft = AppStorage(ServerScope.key("draft.\(thread.id)"))
     }
 
@@ -156,6 +173,7 @@ struct SpaceThreadRow: View {
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     Group {
+                        if collapsedChildren > 0 { CollapsedChildrenMark(count: collapsedChildren) }
                         if hidden { Image(systemName: "eye.slash").accessibilityLabel("Hidden") }
                         if muted.ids.contains(thread.id) { Image(systemName: "bell.slash").accessibilityLabel("Muted") }
                         Text(Self.age(Date(timeIntervalSince1970: at / 1000))).monospacedDigit()
