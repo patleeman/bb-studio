@@ -51,7 +51,7 @@ export function firstThreadItemRefs(events: readonly InputEvent[], options: Refe
 export function firstThreadMentionPlugins(events: readonly InputEvent[]): string[] {
   return [...new Set((firstInput(events) ?? []).flatMap((part) => part.type === "text" && Array.isArray(part.mentions) ? part.mentions.flatMap((mention) => {
     const resource = mention?.resource;
-    return resource?.kind === "plugin" && typeof resource.pluginId === "string" && resource.pluginId !== "studio-chat" && typeof resource.itemId === "string" && resource.itemId.includes(":") && parseStudioMentionReference(resource.pluginId, resource.itemId)?.id === resource.itemId ? [resource.pluginId] : [];
+    return resource?.kind === "plugin" && typeof resource.pluginId === "string" && typeof resource.itemId === "string" && resource.itemId.includes(":") && parseStudioMentionReference(resource.pluginId, resource.itemId)?.id === resource.itemId ? [resource.pluginId] : [];
   }) : []))];
 }
 
