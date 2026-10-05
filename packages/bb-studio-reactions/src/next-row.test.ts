@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pagesNextRowOn } from "./next-row";
+import { pagesNextRowOn, trackPagesNextRow } from "./next-row";
 
 const NEXT_SCHEMA = { explore_next: { type: "boolean", label: "Next row", default: true } };
 
@@ -47,5 +47,54 @@ describe("Pages' Next row", () => {
   it("is off when BB doesn't answer in time", async () => {
     const hung = { plugins: { list: () => new Promise<never>(() => {}), getSettings: async () => ({ schema: NEXT_SCHEMA, values: {} }) } };
     expect(await pagesNextRowOn(hung, 20)).toBe(false);
+  });
+});
+
+describe("tracking Pages' Next row", () => {
+  it("rechecks as soon as BB reports a system change, not a minute later", async () => {
+    let values: Record<string, unknown> = { explore_next: true };
+    let emit: (event: unknown) => void = () => {};
+    const live = {
+      plugins: {
+        list: async () => ({ plugins: [{ id: "pages", enabled: true, status: "running" }] }),
+        getSettings: async () => ({ schema: NEXT_SCHEMA, values }),
+      },
+      subscribe: ({ callback }: { event: "system:changed"; callback: (event: unknown) => void }) => {
+        emit = callback;
+        return () => { emit = () => {}; };
+      },
+    };
+    const tracker = await trackPagesNextRow(live, 50);
+    expect(tracker.on()).toBe(true);
+    values = { explore_next: false };
+    emit({ entity: "system", type: "changed", changes: ["plugins-changed"] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(tracker.on()).toBe(false);
+    values = { explore_next: true };
+    expect(await tracker.refresh()).toBe(true);
+    tracker.dispose();
+  });
+
+  it("keeps the newest answer when checks finish out of order", async () => {
+    const answers: ((value: { schema: typeof NEXT_SCHEMA; values: Record<string, unknown> }) => void)[] = [];
+    let first = true;
+    const slow = {
+      plugins: {
+        list: async () => ({ plugins: [{ id: "pages", enabled: true }] }),
+        getSettings: () => first
+          ? (first = false, Promise.resolve({ schema: NEXT_SCHEMA, values: { explore_next: true } }))
+          : new Promise<{ schema: typeof NEXT_SCHEMA; values: Record<string, unknown> }>((resolve) => answers.push(resolve)),
+      },
+    };
+    const tracker = await trackPagesNextRow(slow, 1_000);
+    const older = tracker.refresh();
+    const newer = tracker.refresh();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    answers[1]({ schema: NEXT_SCHEMA, values: { explore_next: false } });
+    await newer;
+    answers[0]({ schema: NEXT_SCHEMA, values: { explore_next: true } });
+    await older;
+    expect(tracker.on()).toBe(false);
+    tracker.dispose();
   });
 });

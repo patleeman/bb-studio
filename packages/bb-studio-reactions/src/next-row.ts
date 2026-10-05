@@ -6,8 +6,8 @@ export const PAGES_PLUGIN_ID = "pages";
 /** Pages' setting for the Next row. Pages versions without it have no Next row. */
 export const NEXT_ROW_SETTING = "explore_next";
 
-/** How often to recheck Pages' setting; `configure` is synchronous, so the answer is cached. */
-export const NEXT_ROW_REFRESH_MS = 60_000;
+/** Backstop recheck of Pages' setting; BB's system events and session starts recheck sooner. */
+export const NEXT_ROW_REFRESH_MS = 15_000;
 /** How long one check may take before smart reactions apply as usual. */
 export const NEXT_ROW_TIMEOUT_MS = 10_000;
 
@@ -51,4 +51,49 @@ export async function pagesNextRowOn(sdk: NextRowSdk, timeoutMs: number = NEXT_R
   } catch {
     return false;
   }
+}
+
+interface TrackerSdk extends NextRowSdk {
+  subscribe?(args: { event: "system:changed"; callback: (event: unknown) => void }): () => void;
+}
+
+export interface NextRowTracker {
+  /** The latest answer; `configure` is synchronous. */
+  on(): boolean;
+  /** Rechecks now; the newest check wins. */
+  refresh(): Promise<boolean>;
+  dispose(): void;
+}
+
+/**
+ * Keeps `pagesNextRowOn` current: rechecks when BB reports a system change
+ * (plugins enabled, disabled, reloaded or reconfigured), when asked (each
+ * session start), and every `NEXT_ROW_REFRESH_MS` as a backstop.
+ */
+export async function trackPagesNextRow(sdk: TrackerSdk, timeoutMs: number = NEXT_ROW_TIMEOUT_MS): Promise<NextRowTracker> {
+  let current = false;
+  let latest = 0;
+  const refresh = async () => {
+    const id = ++latest;
+    const on = await pagesNextRowOn(sdk, timeoutMs);
+    if (id === latest) current = on;
+    return current;
+  };
+  await refresh();
+  const timer = setInterval(() => void refresh(), NEXT_ROW_REFRESH_MS);
+  (timer as { unref?: () => void }).unref?.();
+  let unsubscribe: (() => void) | undefined;
+  try {
+    unsubscribe = sdk.subscribe?.({ event: "system:changed", callback: () => void refresh() });
+  } catch {
+    // No realtime events: the session-start check and the timer still apply.
+  }
+  return {
+    on: () => current,
+    refresh,
+    dispose() {
+      clearInterval(timer);
+      unsubscribe?.();
+    },
+  };
 }

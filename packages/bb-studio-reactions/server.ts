@@ -18,7 +18,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { DEFAULT_EMOJI_ITEMS, parseEmojiItems } from "./src/emoji-items";
 import { smartReactionInstructions } from "./src/smart-reactions";
-import { NEXT_ROW_REFRESH_MS, pagesNextRowOn } from "./src/next-row";
+import { trackPagesNextRow } from "./src/next-row";
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
@@ -85,26 +85,26 @@ export default async function plugin(bb: BbPluginApi) {
     );
   });
 
-  let nextRowOn = await pagesNextRowOn(bb.sdk);
-  const timer = setInterval(() => {
-    void pagesNextRowOn(bb.sdk).then((on) => { nextRowOn = on; });
-  }, NEXT_ROW_REFRESH_MS);
-  timer.unref?.();
-  bb.onDispose(() => clearInterval(timer));
+  const nextRow = await trackPagesNextRow(bb.sdk);
+  bb.onDispose(() => nextRow.dispose());
 
-  bb.agents.configure(() => ({
-    tools: [],
-    skills: [],
-    ...(current.smartReactions === true && !nextRowOn
-      ? {
-          instructions: smartReactionInstructions(
-            parseEmojiItems(
-              typeof current.emojiItems === "string"
-                ? current.emojiItems
-                : DEFAULT_EMOJI_ITEMS,
+  bb.agents.configure(() => {
+    // Recheck for the next session; this one uses the latest answer.
+    void nextRow.refresh();
+    return {
+      tools: [],
+      skills: [],
+      ...(current.smartReactions === true && !nextRow.on()
+        ? {
+            instructions: smartReactionInstructions(
+              parseEmojiItems(
+                typeof current.emojiItems === "string"
+                  ? current.emojiItems
+                  : DEFAULT_EMOJI_ITEMS,
+              ),
             ),
-          ),
-        }
-      : {}),
-  }));
+          }
+        : {}),
+    };
+  });
 }
