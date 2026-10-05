@@ -8,10 +8,6 @@
       "source": "./packages/bb-studio"
     },
     {
-      "name": "studio-chat",
-      "source": "./packages/bb-studio-chat"
-    },
-    {
       "name": "float",
       "source": "./packages/bb-studio-float"
     },
@@ -34,10 +30,6 @@
     {
       "name": "thread-list-plus",
       "source": "./packages/bb-studio-sidebar"
-    },
-    {
-      "name": "studio-navigation",
-      "source": "./packages/bb-studio-navigation"
     },
     {
       "name": "mobile",

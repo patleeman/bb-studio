@@ -1,7 +1,7 @@
 # BB Studio
 
-A suite of [BB](https://getbb.app) plugins for writing, talking, drawing,
-running bot teams, and keeping what your agents make. Every
+A suite of [BB](https://getbb.app) plugins for writing, talking, drawing, and
+keeping what your agents make. Every
 item lives in one Studio collection that you can search, tag, and hand to an
 agent.
 
@@ -9,16 +9,14 @@ agent.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, artifacts and tables, with search, tags, project filters and templates, and Spaces: areas of work, each with a lead thread and a brief. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, artifacts and tables, with search, tags, project filters, templates, item chats and quotes, and Spaces: areas of work, each with a lead thread and a brief. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents, with checklists you hand to agents, inline whiteboards, and Explore: pages explaining what an agent noticed along the way. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
 | [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
-| [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | One Chat action opens an item's linked conversation or a new composer. Choose or start another from its menu. |
 | [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
-| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that adds Studio apps' sections above your threads and can organize threads by Space. |
-| [Studio Navigation](packages/bb-studio-navigation/) | `studio-navigation` | Replaces BB's sidebar navigation with one that leaves out the add-on rows Studio already opens. Rows from BB and other plugins stay. |
+| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Thread lists organized by Space, project, section or machine, plus navigation without duplicate Studio rows. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
@@ -54,12 +52,9 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
    - studio-tables: structured tables with views and CSV import and export
-   - studio-chat: Chat on Studio items, with New conversation and Choose conversation in its menu
    - float: a panel of tabs for threads, views and Studio items, docked
      or dragged anywhere
-   - thread-list-plus: Studio Sidebar; it replaces BB's thread list
-   - studio-navigation: Studio Navigation; it replaces BB's sidebar navigation
-     without the add-on rows that Studio already opens
+   - thread-list-plus: Studio Sidebar; thread organization and sidebar navigation
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
    - mobile: push notifications for the BB Studio iOS app; only if I use it
@@ -87,8 +82,21 @@ bb plugin remove talk
 bb plugin install talk@bb-studio --yes
 ```
 
-Your items (pages, recordings, drawings, bots) are kept, but removing a
+Your items (pages, recordings, drawings, artifacts and tables) are kept, but removing a
 plugin deletes its settings and secrets, so note them first.
+
+## Consolidation upgrades
+
+Chat now ships in Studio, and Navigation ships in Studio Sidebar. New installs
+need 11 plugins. For an existing install, update Studio and the old Chat plugin,
+then run `bb studio-chat migrate`. Wait for **Migration complete** before
+removing the bridge. Keep it for older native clients or chat bookmarks that
+still address `studio-chat`.
+
+Update Studio Sidebar and select its **Studio Navigation** provider in
+Appearance before removing `studio-navigation`. Navigation visibility and order
+remain in BB's existing preferences. Saved drafts, quotes, page history and
+historical bot authors remain readable.
 
 ## Development
 
@@ -114,7 +122,7 @@ bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
 scripts/refresh-locks.sh bb-studio-pages  # refresh a plugin npm lock in a clean clone
 node scripts/staged-bb.mjs start         # stage the suite; stop removes it
-node scripts/staged-bb.mjs start --plugin studio-chat # all plugins, only this capture's fixtures
+node scripts/staged-bb.mjs start --plugin studio # all plugins, only this capture's fixtures
 ```
 
 The iOS app builds with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen)

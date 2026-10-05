@@ -40,7 +40,7 @@ export const STUDIO_REALTIME_CHANNEL = "studio-changed";
 export const STUDIO_ITEM_AT_METHOD = "itemAt";
 
 /** Studio Chat: "Work with this…" on Studio items. */
-export const STUDIO_CHAT_PLUGIN_ID = "studio-chat";
+export const STUDIO_CHAT_PLUGIN_ID = "studio";
 /** CSS variable on the root element that moves the windows left, e.g. past a comments card. */
 export const FLOAT_RIGHT_VAR = "--studio-float-right";
 

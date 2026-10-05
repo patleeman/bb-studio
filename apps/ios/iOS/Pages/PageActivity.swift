@@ -4,31 +4,12 @@ struct PageActivity: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     let pageId: String
-    let refresh: PageRefresh?
     @State private var requests: [PageRequest] = []
     @State private var error: String?
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Keep updated") {
-                    if let refresh {
-                        LabeledContent("Schedule", value: refresh.cron)
-                        if !refresh.instructions.isEmpty { Text(refresh.instructions) }
-                        if let lastAt = refresh.lastAt {
-                            LabeledContent("Last run") {
-                                Text(Date(timeIntervalSince1970: lastAt / 1000), format: .dateTime)
-                            }
-                        }
-                        if let nextAt = refresh.nextAt {
-                            LabeledContent("Next run") {
-                                Text(Date(timeIntervalSince1970: nextAt / 1000), format: .dateTime)
-                            }
-                        }
-                    } else {
-                        Text("Off").foregroundStyle(.secondary)
-                    }
-                }
                 Section("Activity") {
                     if let error { Text(error).foregroundStyle(.red) }
                     if requests.isEmpty && error == nil { Text("No activity yet").foregroundStyle(.secondary) }

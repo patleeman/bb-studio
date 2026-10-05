@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// "Work with this page": starts an agent thread that knows the page, or hands it
-/// to a bot the message @mentions, then opens that thread.
+/// "Work with this page": starts an agent thread that knows the page, then opens it.
 struct PageWorkBar: View {
     let page: PageMeta?
     let pageId: String

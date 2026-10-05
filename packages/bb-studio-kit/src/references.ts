@@ -39,7 +39,7 @@ export function parseStudioItemReference(value: string): StudioReference | null 
 
 export function parseStudioMentionReference(pluginId: string, itemId: string, providers: readonly ReferenceProvider[] = []): StudioReference | null {
   if (!validPlugin(pluginId) || !itemId) return null;
-  if (pluginId === "studio-chat") return parseStudioItemReference(itemId);
+  if (pluginId === "studio-chat" || (pluginId === "studio" && itemId.startsWith("item:"))) return parseStudioItemReference(itemId);
   const namespaces = [...(LEGACY_NAMESPACES[pluginId] ?? []), ...providers.filter((provider) => provider.pluginId === pluginId).flatMap((provider) => provider.kinds.flatMap((kind) => kind.mentionProviderId ? [kind.mentionProviderId] : []))];
   const prefix = namespaces.sort((a, b) => b.length - a.length).find((namespace) => itemId.startsWith(`${namespace}:`));
   const id = prefix ? itemId.slice(prefix.length + 1) : itemId;

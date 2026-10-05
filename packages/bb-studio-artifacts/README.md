@@ -1,6 +1,6 @@
 # Studio Artifacts
 
-> **Studio Artifacts** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
+> **Studio Artifacts** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make. See the [suite overview](../../README.md).
 
 Keep the images, reports, pages and files your agents make. Save a file from
 a thread and it becomes an artifact in Studio's collection. You can view it,
@@ -50,7 +50,7 @@ Studio Chat's New in Float and Open in Float.
   - Other files offer a download.
 
   The header has an editable title, the artifact's thread (with
-  [Studio Chat](../bb-studio-chat); otherwise **New thread**, which starts a
+  [Studio chat](../bb-studio); otherwise **New thread**, which starts a
   thread that mentions the artifact), Copy (text, or the image), Download,
   and a menu.
   The menu has Open source thread, Save as page (for Markdown, text and code),
@@ -59,7 +59,7 @@ Studio Chat's New in Float and Open in Float.
   artifact, or drag over an image, and **Send to thread** appears. Add a
   note and send: the passage (or the area, cropped, with its pixel
   coordinates) goes to the artifact's thread, which is the thread that made
-  it unless you've picked another. Without Studio Chat, BB's composer opens
+  it unless you've picked another. Without Studio, BB's composer opens
   with the quote. PDFs aren't supported yet.
 - **Save from a thread.** **Artifacts** in the thread panel launcher opens a
   side panel with the files the latest reply created, changed, or generated,

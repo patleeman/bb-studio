@@ -265,25 +265,21 @@ const STATUS_VERB: Record<RequestView["status"], string> = {
   failed: "couldn't finish",
 };
 
-/** Previous requests, the keep-updated schedule and page chats, behind one pill. */
+/** Historical requests and page chats, behind one pill. */
 function ActivityPill({
-  page,
   requests,
   chats,
   onOpenThread,
 }: {
-  page: PageMetaView;
   requests: RequestView[];
   chats: Chat[];
   onOpenThread(threadId: string): void;
 }) {
-  if (!page.refresh && !requests.length && !chats.length) return null;
+  if (!requests.length && !chats.length) return null;
   const active = requests.filter((request) => request.status === "queued" || request.status === "working");
   const label = active.length
     ? `${active[0]!.botName} is working${active.length > 1 ? ` +${active.length - 1}` : ""}`
-    : page.refresh
-      ? "Kept updated"
-      : "Activity";
+    : "Activity";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -293,7 +289,7 @@ function ActivityPill({
           className={cn(BAR_BUTTON, "max-w-56")}
         >
           <Icon
-            name={active.length ? "Spinner" : page.refresh ? "Repeat" : "Clock"}
+            name={active.length ? "Spinner" : "Clock"}
             className={cn("size-3.5 shrink-0", active.length && "text-violet-500")}
           />
           <span className="truncate max-md:sr-only">{label}</span>
@@ -302,7 +298,6 @@ function ActivityPill({
       <DropdownMenuContent align="end" className="max-h-[70vh] w-80 overflow-auto">
         {requests.length ? (
           <>
-            {page.refresh ? <DropdownMenuSeparator /> : null}
             <DropdownMenuLabel className="text-xs text-muted-foreground">Previous requests</DropdownMenuLabel>
             {requests.slice(0, 8).map((request) => (
               <DropdownMenuItem
@@ -327,7 +322,7 @@ function ActivityPill({
         ) : null}
         {chats.length ? (
           <>
-            {page.refresh || requests.length ? <DropdownMenuSeparator /> : null}
+            {requests.length ? <DropdownMenuSeparator /> : null}
             <DropdownMenuLabel className="text-xs text-muted-foreground">Chats</DropdownMenuLabel>
             {chats.map((chat) => (
               <DropdownMenuItem key={chat.threadId} onSelect={() => onOpenThread(chat.threadId)}>
@@ -376,7 +371,7 @@ export function PageView({
   const presence = usePresence(connection);
   const talk = useTalk(pageFieldKey(page.id));
   const [sidePanel, setSidePanel] = useState<SidePanel>(null);
-  const [dialog, setDialog] = useState<"refresh" | "history" | null>(null);
+  const [dialog, setDialog] = useState<"history" | null>(null);
   const [requests, setRequests] = useState<RequestView[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [chatThread, setChatThread] = useState<string | null>(chatThreadId);
@@ -542,7 +537,6 @@ export function PageView({
         trailing={
           <>
           <ActivityPill
-            page={page}
             requests={requests}
             chats={chats}
             onOpenThread={openThread}

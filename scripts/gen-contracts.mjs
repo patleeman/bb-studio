@@ -11,12 +11,11 @@ if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check")) {
 }
 
 const plugins = [
-  ["studio", "Studio", "../packages/bb-studio/src/contract.ts", "rpcContract"],
+  ["studio", "Studio", "../packages/bb-studio/src/public-contract.ts", "rpcContract"],
   ["talk", "Talk", "../packages/bb-studio-talk/src/shared/contract.ts", "rpcContract"],
   ["pages", "Pages", "../packages/bb-studio-pages/src/contract.ts", "rpcContract"],
   ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "rpcContract"],
   ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "rpcContract"],
-  ["studio-chat", "Chat", "../packages/bb-studio-chat/src/contract.ts", "rpcContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
   ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],
   ["studio-tables", "Tables", "../packages/bb-studio-kit/src/tables/contract.ts", "tablesContract"],

@@ -1,6 +1,6 @@
 # Studio
 
-> **Studio** is the core of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
+> **Studio** is the core of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make. See the [suite overview](../../README.md).
 
 Studio opens on the collection: everything the Studio add-ons make, including pages, Talk
 recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
@@ -187,3 +187,16 @@ Captured in staged stable BB 0.45.0 with the Launch work Space, ordinary Atlas a
 ![Focus on one thread on a phone](assets/command-focus-mobile.png)
 
 The same run checks [Grid arrangement](assets/command-grid-arrange.png), [Focus](assets/command-focus.png), [compact Focus](assets/command-focus-compact.png), [Active](assets/command-active.png), and [phone Grid](assets/command-grid-mobile.png).
+
+## Item chat
+
+Studio owns each item's **Chat** action, conversation picker, linked thread and
+quotes. A new conversation keeps the item's context, project and draft; a quote
+returns to its linked thread or stays in a retained composer until sent.
+Pages keeps its page-chat history; standalone Pages still provides its own chat
+when Studio is absent. Float remains an optional companion host.
+
+Existing Studio Chat installs must [migrate their links](../bb-studio-chat/README.md)
+before removing the old plugin. Old draft keys and quote storage are retained.
+
+![Studio item chat with a staged drawing and retained draft](assets/chat-preview.png)

@@ -5,8 +5,9 @@ linked conversation, or a new-conversation composer when there is no link.
 The menu offers **New conversation**, **Choose conversation…**, and **Unlink**.
 Chat keeps the same label whether Float is installed or absent.
 
-Plugin id `studio-chat`, display name "Studio Chat", in
-`packages/bb-studio-chat`.
+Item chat ships in plugin `studio`, in `packages/bb-studio/src/chat`.
+RPC methods use the `chat.` prefix. The retired `studio-chat` package is an
+upgrade bridge for saved links, older clients and bookmarks.
 
 ## Item identity and context
 
@@ -73,7 +74,7 @@ Chat reports that failure and keeps the quote in the overlay for submission.
 
 ## Pages and host work still pending
 
-Pages renders its separate `PageChat` only when Studio Chat is absent.
+Pages renders its separate `PageChat` only when Studio is absent.
 Its `work`, `chats`, and `chatPage` contracts remain unchanged. Existing
 page chats and linked conversations carry over. Standalone Pages chat and
 its comment-related chat controller still need migration to the shared

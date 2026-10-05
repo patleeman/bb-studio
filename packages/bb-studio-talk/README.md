@@ -1,6 +1,6 @@
 # Studio Talk
 
-> **Studio Talk** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
+> **Studio Talk** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make. See the [suite overview](../../README.md).
 
 Long-form, durable dictation and recording for BB. Talk saves audio as you
 speak and transcribes it with the voice service configured in **Settings → AI
@@ -179,7 +179,7 @@ The same message at a 390-pixel viewport, with the source pill in view.
 - **Linkable and mentionable.** Each recording has its own page at
   `/plugins/talk/recordings/<id>`. It shows up in the composer's @ menu, and
   mentioning it gives the agent its transcript. Its header names its thread
-  with [Studio Chat](../bb-studio-chat), or has **New thread**, which starts
+  with [Studio chat](../bb-studio), or has **New thread**, which starts
   a thread that links to it, without.
 - **Auto titles.** Studio Decisions uses its configured fallback model to
   title each recording from its transcript. If Decisions is missing or reports

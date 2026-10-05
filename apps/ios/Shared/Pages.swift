@@ -14,7 +14,6 @@ public struct PageMeta: Codable, Identifiable, Hashable, Sendable {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
-    public var refresh: PageRefresh?
 
     public var displayTitle: String {
         let title = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -24,13 +23,6 @@ public struct PageMeta: Codable, Identifiable, Hashable, Sendable {
     public var emoji: String? { icon.flatMap { $0.isEmpty ? nil : $0 } }
 }
 
-public struct PageRefresh: Codable, Hashable, Sendable {
-    public var botId: String
-    public var cron: String
-    public var instructions: String
-    public var lastAt: Double?
-    public var nextAt: Double?
-}
 
 public struct PageRequest: Decodable, Identifiable, Sendable {
     public var id: String
@@ -119,7 +111,7 @@ extension BBClient {
         return envelope.pages.filter { $0.archived != true }
     }
 
-    /// Starts an agent thread about the page, or hands it to a bot the message @mentions.
+    /// Starts an agent thread about the page.
     public func workWithPage(_ id: String, projectId: String, text: String, mentions: [Mention] = [], choice: ExecutionChoice)
         async throws -> (threadId: String, botName: String?)
     {
@@ -193,7 +185,7 @@ extension BBClient {
         return result.blocks
     }
 
-    /// Starts a thread as you. An @bot in the text reaches that bot, as in the editor.
+    /// Starts a page comment thread as you.
     public func commentOnPage(_ id: String, block: String, text: String) async throws {
         let _: JSONValue = try await rpc(
             "pages", "commentCreate", ["id": .string(id), "block": .string(block), "text": .string(String(text.prefix(8000)))])

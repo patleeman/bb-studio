@@ -73,6 +73,14 @@ public enum Studio {
     public static let versions = "versions"
     public static let versionCreate = "versionCreate"
     public static let versionRead = "versionRead"
+    public static let chat_viewing = "chat.viewing"
+    public static let chat_subject = "chat.subject"
+    public static let chat_start = "chat.start"
+    public static let chat_home = "chat.home"
+    public static let chat_link = "chat.link"
+    public static let chat_unlink = "chat.unlink"
+    public static let chat_send = "chat.send"
+    public static let chat_importLinks = "chat.importLinks"
   }
 
   public typealias Command = CommandOutput
@@ -234,6 +242,22 @@ public enum Studio {
   public typealias VersionCreate = VersionCreateOutput
 
   public typealias VersionRead = VersionReadOutput
+
+  public typealias ChatViewing = ChatViewingOutput
+
+  public typealias ChatSubject = ChatSubjectOutput
+
+  public typealias ChatStart = ChatStartOutput
+
+  public typealias ChatHome = ChatHomeOutput
+
+  public typealias ChatLink = ChatLinkOutput
+
+  public typealias ChatUnlink = ChatUnlinkOutput
+
+  public typealias ChatSend = ChatSendOutput
+
+  public typealias ChatImportLinks = ChatImportLinksOutput
 
   public struct CommandInput: Sendable, Hashable, Codable {
     public var spaceId: String?
@@ -5313,6 +5337,579 @@ public enum Studio {
 
     public init(bytes: String? = nil) {
       self.bytes = bytes
+    }
+  }
+
+  public struct ChatViewingInput: Sendable, Hashable, Codable {
+    public var path: String?
+
+    public init(path: String? = nil) {
+      self.path = path
+    }
+  }
+
+  public struct ChatViewingOutputItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var kindLabel: String?
+    public var title: String?
+    public var icon: String?
+    public var kindIcon: String?
+    public var projectId: String?
+    public var href: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, kindLabel: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, projectId: String? = nil, href: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.kindLabel = kindLabel
+      self.title = title
+      self.icon = icon
+      self.kindIcon = kindIcon
+      self.projectId = projectId
+      self.href = href
+    }
+  }
+
+  public struct ChatViewingOutput: Sendable, Hashable, Codable {
+    public var item: ChatViewingOutputItem?
+
+    public init(item: ChatViewingOutputItem? = nil) {
+      self.item = item
+    }
+  }
+
+  public struct ChatSubjectInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ChatSubjectOutputItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var kindLabel: String?
+    public var title: String?
+    public var icon: String?
+    public var kindIcon: String?
+    public var projectId: String?
+    public var href: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, kindLabel: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, projectId: String? = nil, href: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.kindLabel = kindLabel
+      self.title = title
+      self.icon = icon
+      self.kindIcon = kindIcon
+      self.projectId = projectId
+      self.href = href
+    }
+  }
+
+  public struct ChatSubjectOutput: Sendable, Hashable, Codable {
+    public var item: ChatSubjectOutputItem?
+
+    public init(item: ChatSubjectOutputItem? = nil) {
+      self.item = item
+    }
+  }
+
+  public struct ChatStartInputItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum ChatStartInputRequestReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ChatStartInputRequestPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ChatStartInputRequestServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ChatStartInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ChatStartInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ChatStartInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ChatStartInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ChatStartInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ChatStartInputRequestExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: ChatStartInputRequestExecutionInputSourcesModel?
+    public var permissionMode: ChatStartInputRequestExecutionInputSourcesPermissionMode?
+    public var providerId: ChatStartInputRequestExecutionInputSourcesProviderId?
+    public var reasoningLevel: ChatStartInputRequestExecutionInputSourcesReasoningLevel?
+    public var serviceTier: ChatStartInputRequestExecutionInputSourcesServiceTier?
+
+    public init(model: ChatStartInputRequestExecutionInputSourcesModel? = nil, permissionMode: ChatStartInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: ChatStartInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: ChatStartInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: ChatStartInputRequestExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct ChatStartInputRequest: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: ChatStartInputRequestReasoningLevel?
+    public var permissionMode: ChatStartInputRequestPermissionMode?
+    public var serviceTier: ChatStartInputRequestServiceTier?
+    public var executionInputSources: ChatStartInputRequestExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: ChatStartInputRequestReasoningLevel? = nil, permissionMode: ChatStartInputRequestPermissionMode? = nil, serviceTier: ChatStartInputRequestServiceTier? = nil, executionInputSources: ChatStartInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct ChatStartInput: Sendable, Hashable, Codable {
+    public var item: ChatStartInputItem?
+    public var request: ChatStartInputRequest?
+
+    public init(item: ChatStartInputItem? = nil, request: ChatStartInputRequest? = nil) {
+      self.item = item
+      self.request = request
+    }
+  }
+
+  public struct ChatStartOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct ChatHomeInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum ChatHomeOutputThreadOrigin: Sendable, Hashable, Codable {
+    case chosen
+    case created
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "chosen": self = .chosen
+      case "created": self = .created
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .chosen: try container.encode("chosen")
+      case .created: try container.encode("created")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ChatHomeOutputThread: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var origin: ChatHomeOutputThreadOrigin?
+
+    public init(threadId: String? = nil, title: String? = nil, origin: ChatHomeOutputThreadOrigin? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.origin = origin
+    }
+  }
+
+  public struct ChatHomeOutput: Sendable, Hashable, Codable {
+    public var thread: ChatHomeOutputThread?
+
+    public init(thread: ChatHomeOutputThread? = nil) {
+      self.thread = thread
+    }
+  }
+
+  public struct ChatLinkInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var threadId: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, threadId: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.threadId = threadId
+    }
+  }
+
+  public enum ChatLinkOutputThreadOrigin: Sendable, Hashable, Codable {
+    case chosen
+    case created
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "chosen": self = .chosen
+      case "created": self = .created
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .chosen: try container.encode("chosen")
+      case .created: try container.encode("created")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ChatLinkOutputThread: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var origin: ChatLinkOutputThreadOrigin?
+
+    public init(threadId: String? = nil, title: String? = nil, origin: ChatLinkOutputThreadOrigin? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.origin = origin
+    }
+  }
+
+  public struct ChatLinkOutput: Sendable, Hashable, Codable {
+    public var thread: ChatLinkOutputThread?
+
+    public init(thread: ChatLinkOutputThread? = nil) {
+      self.thread = thread
+    }
+  }
+
+  public struct ChatUnlinkInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ChatUnlinkOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ChatSendInputItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ChatSendInputQuote: Sendable, Hashable, Codable {
+    public var text: String?
+    public var note: String?
+    public var `where`: String?
+    public var image: String?
+
+    public init(text: String? = nil, note: String? = nil, `where`: String? = nil, image: String? = nil) {
+      self.text = text
+      self.note = note
+      self.`where` = `where`
+      self.image = image
+    }
+  }
+
+  public struct ChatSendInput: Sendable, Hashable, Codable {
+    public var item: ChatSendInputItem?
+    public var quote: ChatSendInputQuote?
+
+    public init(item: ChatSendInputItem? = nil, quote: ChatSendInputQuote? = nil) {
+      self.item = item
+      self.quote = quote
+    }
+  }
+
+  public struct ChatSendOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct ChatImportLinksInputLinksItemItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ChatImportLinksInputLinksItem: Sendable, Hashable, Codable {
+    public var item: ChatImportLinksInputLinksItemItem?
+    public var threadId: String?
+    public var at: Double?
+
+    public init(item: ChatImportLinksInputLinksItemItem? = nil, threadId: String? = nil, at: Double? = nil) {
+      self.item = item
+      self.threadId = threadId
+      self.at = at
+    }
+  }
+
+  public struct ChatImportLinksInput: Sendable, Hashable, Codable {
+    public var links: [ChatImportLinksInputLinksItem]?
+
+    public init(links: [ChatImportLinksInputLinksItem]? = nil) {
+      self.links = links
+    }
+  }
+
+  public struct ChatImportLinksOutput: Sendable, Hashable, Codable {
+    public var imported: Int?
+
+    public init(imported: Int? = nil) {
+      self.imported = imported
     }
   }
 

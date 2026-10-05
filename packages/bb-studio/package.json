@@ -14,7 +14,7 @@
   },
   "bb": {
     "name": "Studio",
-    "description": "The home of BB Studio. One collection for your pages, recordings, drawings, artifacts and tables: search, group with tags, filter by project, and hand anything to an agent. Add-ons plug in.",
+    "description": "The home of BB Studio: one collection for pages, recordings, drawings, artifacts and tables, with search, tags, Spaces, item conversations and quotes.",
     "branding": {
       "icon": "./icons/studio.svg",
       "experimental_icons": {
@@ -55,6 +55,7 @@
     "react-dom": "19.2.4",
     "sonner": "^1.7.4",
     "typescript": "^5.7.0",
-    "vitest": "4.1.1"
+    "vitest": "4.1.1",
+    "fake-indexeddb": "6.2.4"
   }
 }

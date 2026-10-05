@@ -1,72 +1,50 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import plugin from "../server";
+import { rpcContract } from "@bb-studio/kit/chat-contract";
 
-const item = {
-  pluginId: "excalidraw", id: "drawing_1", kind: "drawing", title: "Companion flow", icon: null,
-  projectId: "project_companion", parentId: null, createdAt: 1, updatedAt: 2, updatedBy: null,
-  preview: null, facts: [], badge: null, thumbnailUrl: null,
-  href: "/plugins/excalidraw/drawings/drawing_1", archived: false,
-};
-const ref = { pluginId: item.pluginId, id: item.id };
-const request = { input: [{ type: "text", text: "Fix the arrow", mentions: [] }] };
-let handlers: any;
-const rpc = vi.fn();
-const spawn = vi.fn();
-const set = vi.fn();
-
-beforeEach(async () => {
-  vi.clearAllMocks();
-  rpc.mockResolvedValue({ item, kind: null });
-  spawn.mockResolvedValue({ id: "thread_new" });
+async function setup(values: Map<string, unknown>, fail = false) {
+  const callRpc = vi.fn(async ({ method, input }: { method: keyof typeof rpcContract; input: any }) => {
+    rpcContract[method].input.parse(input);
+    if (fail) throw new Error("Studio is unavailable");
+    return method === "chat.importLinks" ? { imported: input.links.length } : { thread: { threadId: "thread", title: "Linked", origin: "chosen" } };
+  });
+  let handlers: any, cli: any;
+  const warn = vi.fn();
   await plugin({
-    storage: { kv: { list: async () => [], get: async () => null, set } },
-    sdk: { plugins: { callRpc: rpc }, threads: { spawn } },
-    ui: { registerMentionProvider: () => {} },
-    rpc: { register: (_contract: unknown, registered: unknown) => { handlers = registered; } },
+    storage: { kv: { list: async () => [...values.keys()], get: async (key: string) => values.get(key) } },
+    sdk: { plugins: { callRpc } },
+    ui: { registerMentionProvider: vi.fn() },
+    rpc: { register: (_contract: unknown, value: unknown) => { handlers = value; } },
+    cli: { register: (value: unknown) => { cli = value; } },
+    log: { warn },
   } as any);
-});
+  return { callRpc, handlers, cli, warn };
+}
 
-describe("Chat item resolution and submission", () => {
-  it("leaves views with their own chat UI out of the automatic overlay while keeping their explicit context available", async () => {
-    rpc.mockResolvedValue({ item, kind: { hasOwnChat: true } });
-    expect(await handlers.viewing({ path: item.href })).toEqual({ item: null });
-    expect((await handlers.subject(ref)).item).toMatchObject(ref);
-    rpc.mockResolvedValue({ item, kind: null });
-    expect((await handlers.viewing({ path: item.href })).item).toMatchObject(ref);
+describe("Chat upgrade bridge", () => {
+  it("migrates chosen links and explicit unlinks in bounded batches without changing source storage", async () => {
+    const values = new Map<string, unknown>(Array.from({ length: 251 }, (_, i) => [`link:artifacts:id:${i}`, { threadId: i ? `thread_${i}` : null, at: i }]));
+    const { callRpc, cli } = await setup(values);
+    expect(callRpc.mock.calls.map(([call]) => call.input.links.length)).toEqual([250, 1]);
+    expect(callRpc.mock.calls[0]![0].input.links[0]).toEqual({ item: { pluginId: "artifacts", id: "id:0" }, threadId: null, at: 0 });
+    expect(values.size).toBe(251);
+    expect((await cli.run(["migrate"])).stdout).toContain("Migration complete");
   });
-  it("resolves the explicit companion ref through Studio", async () => {
-    expect((await handlers.subject(ref)).item).toMatchObject({ ...ref, title: item.title, projectId: item.projectId });
-    expect(rpc).toHaveBeenCalledWith(expect.objectContaining({ pluginId: "studio", method: "itemAt", input: ref }));
+  it("forwards an older client's home request after retrying migration", async () => {
+    const { callRpc, handlers } = await setup(new Map([["link:pages:page", { threadId: "old", at: 1 }]]));
+    callRpc.mockClear();
+    expect((await handlers.home({ pluginId: "pages", id: "page" })).thread.threadId).toBe("thread");
+    expect(callRpc.mock.calls.map(([call]) => call.method)).toEqual(["chat.importLinks", "chat.home"]);
   });
-
-  it("keeps missing and archived items out of composers", async () => {
-    rpc.mockResolvedValueOnce({ item: null, kind: null });
-    expect(await handlers.subject(ref)).toEqual({ item: null });
-    rpc.mockResolvedValueOnce({ item: { ...item, archived: true }, kind: null });
-    expect(await handlers.subject(ref)).toEqual({ item: null });
-  });
-
-  it("adds the explicit item pill when spawning the conversation", async () => {
-    expect(await handlers.start({ item: ref, request })).toEqual({ threadId: "thread_new" });
-    expect(spawn.mock.calls[0]![0].input[0]).toMatchObject({
-      text: "@Companion flow Fix the arrow",
-      mentions: [{ resource: { pluginId: "studio-chat", itemId: "item:excalidraw:drawing_1" } }],
-    });
-    expect(set).toHaveBeenCalledWith("link:excalidraw:drawing_1", expect.objectContaining({ threadId: "thread_new" }));
-  });
-
-  it("rejects an item deleted or archived after the composer opened", async () => {
-    for (const found of [null, { ...item, archived: true }]) {
-      rpc.mockResolvedValue({ item: found, kind: null });
-      await expect(handlers.start({ item: ref, request })).rejects.toThrow("That Studio item is archived or gone.");
+  it("reports failed and malformed migrations without claiming completion or deleting originals", async () => {
+    for (const [value, fail] of [[{ threadId: "old", at: 1 }, true], [{ threadId: "old" }, false]] as const) {
+      const values = new Map([["link:pages:page", value]]);
+      const { cli, warn } = await setup(values, fail);
+      expect(warn).toHaveBeenCalled();
+      const result = await cli.run(["migrate"]);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBeUndefined();
+      expect(values.get("link:pages:page")).toEqual(value);
     }
-    expect(spawn).not.toHaveBeenCalled();
-    expect(set).not.toHaveBeenCalled();
-  });
-
-  it("preserves a plain composer request without resolving an item", async () => {
-    await handlers.start({ item: null, request });
-    expect(spawn).toHaveBeenCalledWith(request);
-    expect(rpc).not.toHaveBeenCalled();
   });
 });

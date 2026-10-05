@@ -43,3 +43,12 @@ tests are in `source/app/studio/StudioAdditions.test.tsx` and `source/app.test.t
 The top-level `components/ui`, `hooks`, and `lib` copies mirror BB's
 `packages/shared-ui`. They remain vendored upstream code; the kit's UI cleanup
 does not include this package.
+
+## Navigation
+
+Navigation now ships in this package under `source/app/navigation/`. It was
+vendored from BB `0baa605b32a00619c1d7e3f32be6553ebcf8244a`
+(`desktop-v0.44.0`, `plugins/navigation`) with Studio filtering and Space-aware
+new-thread handling. Its host behavior tests moved to `source/navigation.test.tsx`;
+Studio filtering tests live beside `navigation/studio/studio-items.ts`.
+Review this subtree separately when updating the thread-list upstream source.

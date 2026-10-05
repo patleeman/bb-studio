@@ -120,22 +120,6 @@ public enum Pages {
     }
   }
 
-  public struct TreeOutputPagesItemRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-    public var lastAt: Double?
-    public var nextAt: Double?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil, lastAt: Double? = nil, nextAt: Double? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-      self.lastAt = lastAt
-      self.nextAt = nextAt
-    }
-  }
-
   public struct TreeOutputPagesItem: Sendable, Hashable, Codable {
     public var id: String?
     public var projectId: String?
@@ -147,9 +131,8 @@ public enum Pages {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
-    public var refresh: TreeOutputPagesItemRefresh?
 
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil, refresh: TreeOutputPagesItemRefresh? = nil) {
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
       self.id = id
       self.projectId = projectId
       self.parentId = parentId
@@ -160,7 +143,6 @@ public enum Pages {
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
       self.archived = archived
-      self.refresh = refresh
     }
   }
 
@@ -188,22 +170,6 @@ public enum Pages {
     }
   }
 
-  public struct CreateOutputPageRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-    public var lastAt: Double?
-    public var nextAt: Double?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil, lastAt: Double? = nil, nextAt: Double? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-      self.lastAt = lastAt
-      self.nextAt = nextAt
-    }
-  }
-
   public struct CreateOutputPage: Sendable, Hashable, Codable {
     public var id: String?
     public var projectId: String?
@@ -215,9 +181,8 @@ public enum Pages {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
-    public var refresh: CreateOutputPageRefresh?
 
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil, refresh: CreateOutputPageRefresh? = nil) {
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
       self.id = id
       self.projectId = projectId
       self.parentId = parentId
@@ -228,7 +193,6 @@ public enum Pages {
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
       self.archived = archived
-      self.refresh = refresh
     }
   }
 
@@ -262,22 +226,6 @@ public enum Pages {
     }
   }
 
-  public struct UpdateOutputPageRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-    public var lastAt: Double?
-    public var nextAt: Double?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil, lastAt: Double? = nil, nextAt: Double? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-      self.lastAt = lastAt
-      self.nextAt = nextAt
-    }
-  }
-
   public struct UpdateOutputPage: Sendable, Hashable, Codable {
     public var id: String?
     public var projectId: String?
@@ -289,9 +237,8 @@ public enum Pages {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
-    public var refresh: UpdateOutputPageRefresh?
 
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil, refresh: UpdateOutputPageRefresh? = nil) {
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
       self.id = id
       self.projectId = projectId
       self.parentId = parentId
@@ -302,7 +249,6 @@ public enum Pages {
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
       self.archived = archived
-      self.refresh = refresh
     }
   }
 
@@ -338,22 +284,6 @@ public enum Pages {
     }
   }
 
-  public struct GetOutputPageRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-    public var lastAt: Double?
-    public var nextAt: Double?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil, lastAt: Double? = nil, nextAt: Double? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-      self.lastAt = lastAt
-      self.nextAt = nextAt
-    }
-  }
-
   public struct GetOutputPage: Sendable, Hashable, Codable {
     public var id: String?
     public var projectId: String?
@@ -365,9 +295,8 @@ public enum Pages {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
-    public var refresh: GetOutputPageRefresh?
 
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil, refresh: GetOutputPageRefresh? = nil) {
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
       self.id = id
       self.projectId = projectId
       self.parentId = parentId
@@ -378,7 +307,6 @@ public enum Pages {
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
       self.archived = archived
-      self.refresh = refresh
     }
   }
 
@@ -2136,22 +2064,6 @@ public enum Pages {
     }
   }
 
-  public struct ReplaceMarkdownOutputPageRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-    public var lastAt: Double?
-    public var nextAt: Double?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil, lastAt: Double? = nil, nextAt: Double? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-      self.lastAt = lastAt
-      self.nextAt = nextAt
-    }
-  }
-
   public struct ReplaceMarkdownOutputPage: Sendable, Hashable, Codable {
     public var id: String?
     public var projectId: String?
@@ -2163,9 +2075,8 @@ public enum Pages {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
-    public var refresh: ReplaceMarkdownOutputPageRefresh?
 
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil, refresh: ReplaceMarkdownOutputPageRefresh? = nil) {
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
       self.id = id
       self.projectId = projectId
       self.parentId = parentId
@@ -2176,7 +2087,6 @@ public enum Pages {
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
       self.archived = archived
-      self.refresh = refresh
     }
   }
 
@@ -2198,22 +2108,6 @@ public enum Pages {
     }
   }
 
-  public struct SearchOutputPagesItemRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-    public var lastAt: Double?
-    public var nextAt: Double?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil, lastAt: Double? = nil, nextAt: Double? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-      self.lastAt = lastAt
-      self.nextAt = nextAt
-    }
-  }
-
   public struct SearchOutputPagesItem: Sendable, Hashable, Codable {
     public var id: String?
     public var projectId: String?
@@ -2225,9 +2119,8 @@ public enum Pages {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
-    public var refresh: SearchOutputPagesItemRefresh?
 
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil, refresh: SearchOutputPagesItemRefresh? = nil) {
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
       self.id = id
       self.projectId = projectId
       self.parentId = parentId
@@ -2238,7 +2131,6 @@ public enum Pages {
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
       self.archived = archived
-      self.refresh = refresh
     }
   }
 
@@ -2664,22 +2556,6 @@ public enum Pages {
     }
   }
 
-  public struct ChatPageOutputPageRefresh: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var cron: String?
-    public var instructions: String?
-    public var lastAt: Double?
-    public var nextAt: Double?
-
-    public init(botId: String? = nil, cron: String? = nil, instructions: String? = nil, lastAt: Double? = nil, nextAt: Double? = nil) {
-      self.botId = botId
-      self.cron = cron
-      self.instructions = instructions
-      self.lastAt = lastAt
-      self.nextAt = nextAt
-    }
-  }
-
   public struct ChatPageOutputPage: Sendable, Hashable, Codable {
     public var id: String?
     public var projectId: String?
@@ -2691,9 +2567,8 @@ public enum Pages {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
-    public var refresh: ChatPageOutputPageRefresh?
 
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil, refresh: ChatPageOutputPageRefresh? = nil) {
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
       self.id = id
       self.projectId = projectId
       self.parentId = parentId
@@ -2704,7 +2579,6 @@ public enum Pages {
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
       self.archived = archived
-      self.refresh = refresh
     }
   }
 

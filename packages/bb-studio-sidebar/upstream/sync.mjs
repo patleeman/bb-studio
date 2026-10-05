@@ -56,7 +56,7 @@ try {
     const protectedPaths = new Set(["app/testing/fixtures.ts"]);
     const local = walk(destination).map((file) => file.slice(destination.length + 1));
     const generatedPaths = new Set(generated.map((file) => file.slice(join(staging, "source").length + 1)));
-    const extra = local.filter((path) => !path.startsWith("app/studio/") && !protectedPaths.has(path) && !generatedPaths.has(path));
+    const extra = local.filter((path) => !path.startsWith("app/studio/") && !path.startsWith("app/navigation/") && path !== "navigation.test.tsx" && !protectedPaths.has(path) && !generatedPaths.has(path));
     if (extra.length) {
       console.error(`Conflict: local source files absent from BB ${sha}: ${extra.join(", ")}`);
       process.exitCode = 1;

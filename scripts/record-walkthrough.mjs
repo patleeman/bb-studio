@@ -55,7 +55,7 @@ const SCENES = [
   ["bots", "Bots that work as a *team*.", "A Command view, delegation and memory.", 4, 900],
   ["reactions-smart", "Answer in *one tap*.", "Replies come with suggested answers.", 3.5],
   ["float", "Keep it all *open*.", "Threads and items as floating tabs.", 3.5, 960],
-  ["studio-chat", "Chat about *what you see*.", "The agent knows what's on screen.", 3.5],
+  ["studio-item-chat", "Chat about *what you see*.", "The agent knows what's on screen.", 3.5],
 ];
 const INTRO = ["Your agents make *a lot*.", "BB Studio keeps it all in one place.", 2.5];
 const OUTRO = ["BB *Studio*", "Plugins for BB · github.com/patleeman/bb-studio", 3.5];

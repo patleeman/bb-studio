@@ -45,14 +45,6 @@ export const recordingCardSchema = z.object({
 });
 export type RecordingCard = z.infer<typeof recordingCardSchema>;
 
-export const refreshSchema = z.object({
-  botId: z.string(),
-  cron: z.string().min(1).max(120),
-  instructions: z.string().max(4000),
-  lastAt: z.number().nullable(),
-  nextAt: z.number().nullable(),
-});
-
 export const pageMetaSchema = z.object({
   id: z.string(),
   projectId: z.string().nullable(),
@@ -64,7 +56,6 @@ export const pageMetaSchema = z.object({
   updatedAt: z.number(),
   updatedBy: z.string(),
   archived: z.boolean(),
-  refresh: refreshSchema.nullable(),
 });
 export type PageMetaView = z.infer<typeof pageMetaSchema>;
 
@@ -289,7 +280,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId }),
     output: z.object({ blocks: z.array(z.object({ id: z.string(), text: z.string() })) }),
   },
-  /** Starts a thread as the user. An @bot in the text reaches that bot, as in the editor. */
+  /** Starts a page comment thread as the user. */
   commentCreate: {
     input: z.object({ id: pageId, block: z.string().min(1).max(100), quote: z.string().max(500).optional(), text: commentText }),
     output: z.object({ threadId: z.string() }),

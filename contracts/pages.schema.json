@@ -64,50 +64,6 @@
                 },
                 "archived": {
                   "type": "boolean"
-                },
-                "refresh": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "botId": {
-                          "type": "string"
-                        },
-                        "cron": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 120
-                        },
-                        "instructions": {
-                          "type": "string",
-                          "maxLength": 4000
-                        },
-                        "lastAt": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        },
-                        "nextAt": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "botId",
-                        "cron",
-                        "instructions",
-                        "lastAt",
-                        "nextAt"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
                 }
               },
               "required": [
@@ -120,8 +76,7 @@
                 "createdAt",
                 "updatedAt",
                 "updatedBy",
-                "archived",
-                "refresh"
+                "archived"
               ],
               "additionalProperties": false
             }
@@ -222,50 +177,6 @@
               },
               "archived": {
                 "type": "boolean"
-              },
-              "refresh": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "botId": {
-                        "type": "string"
-                      },
-                      "cron": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 120
-                      },
-                      "instructions": {
-                        "type": "string",
-                        "maxLength": 4000
-                      },
-                      "lastAt": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      },
-                      "nextAt": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "botId",
-                      "cron",
-                      "instructions",
-                      "lastAt",
-                      "nextAt"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
               }
             },
             "required": [
@@ -278,8 +189,7 @@
               "createdAt",
               "updatedAt",
               "updatedBy",
-              "archived",
-              "refresh"
+              "archived"
             ],
             "additionalProperties": false
           }
@@ -387,50 +297,6 @@
               },
               "archived": {
                 "type": "boolean"
-              },
-              "refresh": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "botId": {
-                        "type": "string"
-                      },
-                      "cron": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 120
-                      },
-                      "instructions": {
-                        "type": "string",
-                        "maxLength": 4000
-                      },
-                      "lastAt": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      },
-                      "nextAt": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "botId",
-                      "cron",
-                      "instructions",
-                      "lastAt",
-                      "nextAt"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
               }
             },
             "required": [
@@ -443,8 +309,7 @@
               "createdAt",
               "updatedAt",
               "updatedBy",
-              "archived",
-              "refresh"
+              "archived"
             ],
             "additionalProperties": false
           }
@@ -544,50 +409,6 @@
                   },
                   "archived": {
                     "type": "boolean"
-                  },
-                  "refresh": {
-                    "anyOf": [
-                      {
-                        "type": "object",
-                        "properties": {
-                          "botId": {
-                            "type": "string"
-                          },
-                          "cron": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 120
-                          },
-                          "instructions": {
-                            "type": "string",
-                            "maxLength": 4000
-                          },
-                          "lastAt": {
-                            "type": [
-                              "number",
-                              "null"
-                            ]
-                          },
-                          "nextAt": {
-                            "type": [
-                              "number",
-                              "null"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "botId",
-                          "cron",
-                          "instructions",
-                          "lastAt",
-                          "nextAt"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
                   }
                 },
                 "required": [
@@ -600,8 +421,7 @@
                   "createdAt",
                   "updatedAt",
                   "updatedBy",
-                  "archived",
-                  "refresh"
+                  "archived"
                 ],
                 "additionalProperties": false
               },
@@ -3360,50 +3180,6 @@
               },
               "archived": {
                 "type": "boolean"
-              },
-              "refresh": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "botId": {
-                        "type": "string"
-                      },
-                      "cron": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 120
-                      },
-                      "instructions": {
-                        "type": "string",
-                        "maxLength": 4000
-                      },
-                      "lastAt": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      },
-                      "nextAt": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "botId",
-                      "cron",
-                      "instructions",
-                      "lastAt",
-                      "nextAt"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
               }
             },
             "required": [
@@ -3416,8 +3192,7 @@
               "createdAt",
               "updatedAt",
               "updatedBy",
-              "archived",
-              "refresh"
+              "archived"
             ],
             "additionalProperties": false
           }
@@ -3498,50 +3273,6 @@
                 },
                 "archived": {
                   "type": "boolean"
-                },
-                "refresh": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "botId": {
-                          "type": "string"
-                        },
-                        "cron": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 120
-                        },
-                        "instructions": {
-                          "type": "string",
-                          "maxLength": 4000
-                        },
-                        "lastAt": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        },
-                        "nextAt": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "botId",
-                        "cron",
-                        "instructions",
-                        "lastAt",
-                        "nextAt"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
                 }
               },
               "required": [
@@ -3554,8 +3285,7 @@
                 "createdAt",
                 "updatedAt",
                 "updatedBy",
-                "archived",
-                "refresh"
+                "archived"
               ],
               "additionalProperties": false
             }
@@ -4005,50 +3735,6 @@
                   },
                   "archived": {
                     "type": "boolean"
-                  },
-                  "refresh": {
-                    "anyOf": [
-                      {
-                        "type": "object",
-                        "properties": {
-                          "botId": {
-                            "type": "string"
-                          },
-                          "cron": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 120
-                          },
-                          "instructions": {
-                            "type": "string",
-                            "maxLength": 4000
-                          },
-                          "lastAt": {
-                            "type": [
-                              "number",
-                              "null"
-                            ]
-                          },
-                          "nextAt": {
-                            "type": [
-                              "number",
-                              "null"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "botId",
-                          "cron",
-                          "instructions",
-                          "lastAt",
-                          "nextAt"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
                   }
                 },
                 "required": [
@@ -4061,8 +3747,7 @@
                   "createdAt",
                   "updatedAt",
                   "updatedBy",
-                  "archived",
-                  "refresh"
+                  "archived"
                 ],
                 "additionalProperties": false
               },

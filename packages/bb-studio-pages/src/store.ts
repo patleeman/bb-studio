@@ -208,22 +208,6 @@ export class PageStore {
     }
   }
 
-  setRefresh(id: string, config: { botId: string; cron: string; instructions: string } | null): void {
-    this.db
-      .prepare("UPDATE pages SET refresh_bot_id = ?, refresh_cron = ?, refresh_instructions = ? WHERE id = ?")
-      .run(config?.botId ?? null, config?.cron ?? null, config?.instructions ?? "", id);
-  }
-
-  markRefreshed(id: string, at: number): void {
-    this.db.prepare("UPDATE pages SET refresh_last_at = ? WHERE id = ?").run(at, id);
-  }
-
-  refreshable(): PageMeta[] {
-    return this.db
-      .prepare(`SELECT ${META_COLUMNS} FROM pages WHERE refresh_bot_id IS NOT NULL AND refresh_cron IS NOT NULL AND archived_at IS NULL`)
-      .all() as PageMeta[];
-  }
-
   descendants(id: string): string[] {
     const rows = this.db
       .prepare(
@@ -389,11 +373,5 @@ export class PageStore {
     return this.db
       .prepare("SELECT * FROM requests WHERE thread_id = ? AND status IN ('queued', 'working') ORDER BY created_at")
       .all(threadId) as RequestRow[];
-  }
-
-  openRequestsForPage(pageId: string, botId: string): RequestRow[] {
-    return this.db
-      .prepare("SELECT * FROM requests WHERE page_id = ? AND bot_id = ? AND status IN ('queued', 'working')")
-      .all(pageId, botId) as RequestRow[];
   }
 }

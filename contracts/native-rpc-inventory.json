@@ -543,14 +543,14 @@
     },
     {
       "file": "apps/ios/Shared/StudioChat.swift",
-      "plugin": "studio-chat",
-      "method": "start",
+      "plugin": "studio",
+      "method": "chat.start",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/StudioChat.swift",
-      "plugin": "studio-chat",
-      "method": "home",
+      "plugin": "studio",
+      "method": "chat.home",
       "coverage": "generated method"
     },
     {

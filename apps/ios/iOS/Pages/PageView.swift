@@ -276,7 +276,7 @@ struct PageView: View {
         .sheet(isPresented: $showingEditor) {
             PageEditor(pageId: model.pageId) { await model.load(app.client) }
         }
-        .sheet(isPresented: $showingActivity) { PageActivity(pageId: model.pageId, refresh: meta?.refresh) }
+        .sheet(isPresented: $showingActivity) { PageActivity(pageId: model.pageId) }
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "pages", itemId: model.pageId) }
         .sheet(isPresented: $showingComments) { PageCommentsSheet(model: model) }
         .sheet(isPresented: $showingWeb) {
@@ -367,10 +367,7 @@ struct PageView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            if let refresh = meta?.refresh {
-                Label("Keep updated · \(refresh.cron)", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+
         }
     }
 

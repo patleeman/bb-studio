@@ -1,4 +1,5 @@
 import { definePluginApp, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { Navigation } from "./app/navigation/Navigation.js";
 import { SidebarAnchors } from "@bb-studio/kit/app";
 import { CompactViewportOverrideProvider } from "@/components/ui/hooks/use-compact-viewport";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,6 +26,11 @@ function ThreadList({
 }
 
 export default definePluginApp((app) => {
+  app.slots.experimental_sidebarNavigation({
+    id: "navigation", title: "Studio Navigation",
+    description: "BB navigation without the add-on rows Studio already opens.",
+    component: Navigation,
+  });
   app.slots.experimental_threadList({
     id: "thread-list",
     title: "Studio Sidebar",

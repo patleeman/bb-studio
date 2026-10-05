@@ -1,6 +1,6 @@
 # Studio Sidebar
 
-> **Studio Sidebar** is part of **BB Studio**, a suite of plugins for writing, talking, drawing and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tables](../bb-studio-tables), [Studio Chat](../bb-studio-chat) and [Float](../bb-studio-float).
+> **Studio Sidebar** is part of **BB Studio**, a suite of plugins for writing, talking, drawing and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tables](../bb-studio-tables), [Studio chat](../bb-studio) and [Float](../bb-studio-float).
 
 Studio Sidebar replaces BB's Thread List sidebar provider. It keeps the thread
 list and its organization controls, and adds:
@@ -127,3 +127,14 @@ bb plugin build .
 `@bb-studio/kit` is a `file:../bb-studio-kit` dependency. Keep
 `package-lock.json` current (regenerate it in a clean clone, not the pnpm
 workspace), because BB's Git install runs `npm install` from it.
+
+## Navigation
+
+Studio Sidebar also provides **Studio Navigation**, selectable in BB Appearance.
+It keeps BB and other plugins' navigation rows, hides duplicate Studio add-on
+rows when the Studio hub is available, and starts new threads in the selected
+Space. Customize sidebar controls keep their existing visibility and order.
+The separate `studio-navigation` package is retired; update Studio Sidebar,
+select its navigation provider in Appearance, then remove the old plugin.
+
+![Studio Sidebar navigation with Studio and the staged Forecast plugin](assets/navigation-preview.png)

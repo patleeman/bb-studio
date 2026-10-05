@@ -24,7 +24,6 @@ export function toView(meta: PageMeta): PageMetaView {
     updatedAt: meta.updated_at,
     updatedBy: meta.updated_by,
     archived: meta.archived_at !== null,
-    refresh: null,
   };
 }
 

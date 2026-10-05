@@ -173,7 +173,7 @@ struct DrawingView: View {
             } label: { Image(systemName: "pencil") }
             .accessibilityLabel("Rename")
             .disabled(scene == nil)
-            if StudioStore.shared.plugins.contains("studio-chat") {
+            if StudioStore.shared.plugins.contains("studio") {
                 Button { chatting = true } label: { Image(systemName: "bubble.left.and.text.bubble.right") }
                     .accessibilityLabel("Chat About This")
                     .disabled(scene == nil)

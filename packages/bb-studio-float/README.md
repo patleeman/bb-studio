@@ -1,6 +1,6 @@
 # Float
 
-> **Float** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
+> **Float** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make. See the [suite overview](../../README.md).
 
 Float any thread, Studio item or Studio view into a panel of tabs
 that stays on screen while you work somewhere else. It docks at the bottom
@@ -213,7 +213,7 @@ main route. The shared kit's `FloatPanels` does this
 Talk, Artifacts and Studio render it, so their items and views can float.
 Other plugins open tabs with the kit's `openFloat`.
 
-[Studio Chat](../bb-studio-chat) provides the shared item-header Chat action
+[Studio chat](../bb-studio) provides the shared item-header Chat action
 and adds a "Viewing" chip to conversation tabs. Chat prefers the native
 workbench when available and otherwise opens Float.
 

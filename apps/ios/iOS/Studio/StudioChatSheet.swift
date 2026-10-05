@@ -6,7 +6,7 @@ struct StudioChatMenuButton: View {
     @Binding var isPresented: Bool
 
     var body: some View {
-        if store.plugins.contains("studio-chat") {
+        if store.plugins.contains("studio") {
             Button { isPresented = true } label: { Label("Chat About This", systemImage: "bubble.left.and.text.bubble.right") }
         }
     }

@@ -8,7 +8,7 @@
  *
  *   node scripts/staged-bb.mjs start [--ref <pushed commit>] [--plugin <id>]
  *   . "$TMPDIR/bb-studio-staged/capture.env"
- *   node scripts/capture-plugin-screenshots.mjs --plugin studio-navigation
+ *   node scripts/capture-plugin-screenshots.mjs --plugin thread-list-plus
  *   node scripts/staged-bb.mjs stop
  *
  * BB_STAGED_DIR moves the instance (default $TMPDIR/bb-studio-staged) and
@@ -251,7 +251,7 @@ async function start() {
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
   const smartReactionsThread = !capturePlugin || ["emoji-react", "artifacts"].includes(capturePlugin)
     ? await seedSmartReactionsThread(project, machine, orbitDir) : null;
-  if (!capturePlugin || capturePlugin === "studio" || capturePlugin === "studio-navigation") await seedCommand(machine, project);
+  if (!capturePlugin || capturePlugin === "studio" || capturePlugin === "thread-list-plus") await seedCommand(machine, project);
 
   const envFile = join(stagedDir, "capture.env");
   await writeFile(

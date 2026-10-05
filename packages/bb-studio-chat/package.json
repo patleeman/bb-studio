@@ -1,24 +1,21 @@
 {
   "name": "@bb-studio/studio-chat",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
-  "description": "Part of BB Studio. One Chat action on Studio items opens their linked conversation or a new composer. Choose or start another conversation from its menu; item quotes keep their own context across main and Float views.",
+  "description": "Upgrade bridge for retired Studio Chat: transfers saved conversation links to Studio and forwards old clients and mentions.",
   "engines": {
     "bb": ">=0.44",
     "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
     "name": "Studio Chat",
-    "description": "Part of BB Studio. One Chat action on Studio items opens their linked conversation or a new composer. Choose or start another conversation from its menu; item quotes keep their own context across main and Float views.",
+    "description": "Upgrade bridge for retired Studio Chat: transfers saved conversation links to Studio and forwards old clients and mentions.",
     "branding": {
       "icon": "./assets/icon.svg"
     },
     "server": "./server.ts",
-    "app": "./app.tsx",
-    "skills": [
-      "skills"
-    ]
+    "app": "./app.tsx"
   },
   "scripts": {
     "test": "vitest run --config vitest.config.mts",

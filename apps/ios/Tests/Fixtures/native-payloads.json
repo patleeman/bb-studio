@@ -144,8 +144,8 @@
   },
   {
     "id": "chat-start",
-    "plugin": "studio-chat",
-    "method": "start",
+    "plugin": "studio",
+    "method": "chat.start",
     "input": {
       "item": {
         "pluginId": "pages",

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A page's comment threads: read, reply, resolve, and start one on a block.
-/// Writes go in as you, so an @bot in a comment reaches that bot like in the editor.
+/// Comments are written as you.
 struct PageCommentsSheet: View {
     @ObservedObject var model: PageModel
     @EnvironmentObject private var app: AppModel
@@ -155,7 +155,7 @@ private struct NewPageCommentSheet: View {
             List {
                 if let error { Text(error).font(.footnote).foregroundStyle(.red) }
                 Section {
-                    TextField("Comment, or @ a bot", text: $text, axis: .vertical)
+                    TextField("Write a comment", text: $text, axis: .vertical)
                         .lineLimit(2...8)
                         .focused($focused)
                         .accessibilityIdentifier("newCommentField")

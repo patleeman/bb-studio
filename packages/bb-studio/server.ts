@@ -1,3 +1,4 @@
+import { registerChat } from "./src/chat/server";
 import { Command } from "./src/command/command";
 import { registerMentionProviders } from "./src/command/mention-providers";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
@@ -59,6 +60,7 @@ function queryArg(arg: string): string {
 }
 
 export default async function plugin(bb: BbPluginApi) {
+  await registerChat(bb);
   const hub = new StudioHub(bb.sdk);
   const changes = new ChangeLog();
   const db = bb.storage.database();

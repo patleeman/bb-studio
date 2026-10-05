@@ -33,7 +33,6 @@ export function NewConversationComposer({ title, icon = "MessageSquare", ariaLab
       {moveTarget ? <ViewMoveMenu item={moveTarget} /> : null}
       {onClose ? <button type="button" aria-label="Close composer" onClick={onClose} className="rounded p-1 hover:bg-state-hover"><Icon name="X" className="size-4" /></button> : null}
     </header>
-    <p className="shrink-0 px-3 pt-2 text-xs text-muted-foreground">@mention a bot to hand it off.</p>
     {quote?.image ? <div className="flex shrink-0 items-center gap-3 px-3 pt-2"><img src={quote.image} alt="Selected image area" className="max-h-24 max-w-40 rounded border border-border object-contain" /></div> : null}
     {error ? <p role="alert" className="shrink-0 px-3 pt-2 text-xs text-destructive">{error}</p> : null}
     <NewThreadComposer

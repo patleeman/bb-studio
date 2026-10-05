@@ -1,3 +1,5 @@
+import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
+import { ConversationPage } from "./src/chat/ui/ConversationComposer";
 import { CommandPage } from "./src/command/command-view";
 // bb-studio frontend: the Studio collection, one nav panel whose
 // sub-path filters it to a kind, the sidebar's Studio tabs and Spaces, the
@@ -23,6 +25,9 @@ function StudioRoot({ subPath }: { subPath: string }) {
 }
 
 export default definePluginApp((app) => {
+  app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
+  app.slots.navPanel({ id: "chats", path: "chats", title: "Chat", icon: "MessageSquare", component: retainPanel("chats", ConversationPage) });
+  app.slots.experimental_appOverlay({ id: "conversation-companions", component: () => <FloatPanels path="chats" render={subPath => <ConversationPage subPath={subPath} />} /> });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // Shows the panel in Float windows open on its paths.
   app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });

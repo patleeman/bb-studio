@@ -15,7 +15,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
     const threads = [];
     let disabled = false, sidebarToggle = null;
     const forget = async () => {
-      if (disabled) await bbCli(["plugin", "enable", "studio-chat", "--json"]);
+      if (disabled) await bbCli(["plugin", "enable", "studio", "--json"]);
       for (const id of threads) await bbCli(["thread", "delete", id, "--yes", "--json"]);
       await cleanup();
       await client.evaluate("sessionStorage.removeItem('bb-studio-float:windows'); delete window.bbPageDraft").catch(() => {});
@@ -46,7 +46,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
       if (!state.same || state.visible !== visible || !state.text?.includes("Keep this page conversation draft.") || !state.file || state.tabs !== 1) throw new Error(`Pages lost its retained composer: ${JSON.stringify(state)}`);
     };
     try {
-      await bbCli(["plugin", "disable", "studio-chat", "--json"]); disabled = true;
+      await bbCli(["plugin", "disable", "studio", "--json"]); disabled = true;
       const { threadId } = await pluginRpc("pages", "work", { id: page.id, request: {
         projectId, providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "medium", permissionMode: "full",
         executionInputSources: {}, environment: { type: "project-default" },

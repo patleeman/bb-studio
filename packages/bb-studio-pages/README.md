@@ -41,7 +41,7 @@ buttons. **Dictate** appears because Talk is installed in the staged app.
 
 ![Standalone Pages Chat with its retained draft](assets/standalone-chat.png)
 
-The standalone Chat check temporarily disables Studio Chat in the isolated
+The standalone Chat check temporarily disables Studio in the isolated
 staged app. It resumes a legacy page conversation without creating another
 thread, then opens **New conversation** as a companion tab. Its draft and
 file survive tab reuse, folding, navigation to another page, and a browser
@@ -49,7 +49,7 @@ reload. The desktop check also schedules a second page's conversation and
 verifies its page context, edited prompt, attachment, and updated Chat action.
 The [phone companion](assets/standalone-chat-mobile.png) keeps every composer
 control inside the viewport. All fixture sends are scheduled and their threads
-are deleted before any agent runs. The capture restores Studio Chat and
+are deleted before any agent runs. The capture restores Studio and
 removes its pages and files.
 
 ```sh
@@ -83,7 +83,7 @@ afterwards.
   video, audio, files, and the custom blocks below. Blocks can be dragged,
   nested, and turned into other types. Markdown shortcuts work as you type.
 - **Live collaboration.** Every page is a Yjs document synced over a
-  WebSocket. Agents and bots edit the same document from the server, so their
+  WebSocket. Agents edit the same document from the server, so their
   changes stream into your editor, with cursors, while you keep typing.
 - **Code and diagrams.** Code blocks are syntax-highlighted for about
   twenty languages, in light and dark. A `mermaid` block renders its
@@ -122,14 +122,13 @@ afterwards.
   as column names, and embeds it in its place.
   Charts and stats are edited as JSON, which makes them easy for agents to
   write.
-- **Mentions.** Type `@` to mention a bot, another page, a BB thread, a
+- **Mentions.** Type `@` to mention another page, a BB thread, a
   Studio item, or a date. Page and thread mentions open where they point.
 - **Comments.** Select text to comment on it. Threads show in a floating
   card where you can reply, react, edit, and resolve. Agents can read, start,
   reply to, and resolve threads. Clients without the editor, like the BB
   Studio phone app, use the `comments`, `commentBlocks`, `commentCreate`,
-  `commentReply` and `commentResolve` RPCs, which write as you, so an @bot in
-  a comment reaches the bot the same way.
+  `commentReply` and `commentResolve` RPCs, which write as you.
 - **A collection of pages.** The **Pages** nav item lists every page, with
   search over titles and content, filters, a project filter, and sorting and
   grouping from **Display**. **New page** opens a blank full-page document.
@@ -142,7 +141,7 @@ afterwards.
   Conversations use the shared companion system: workbench on a capable BB
   host, Float on stable hosts without that capability, or ordinary thread
   navigation without Float. Existing page chats and links still work.
-  [Studio Chat](../bb-studio-chat) provides the suite-wide item links and
+  [Studio chat](../bb-studio) provides the suite-wide item links and
   conversation picker when installed. Standalone Pages uses the same
   retained companion tabs and preserves its existing composer draft keys.
   New conversation focuses `/plugins/pages/pages/<id>/compose`; it keeps
@@ -189,7 +188,7 @@ bb pages append <page-id|title> <markdown…>
 ```
 
 [skills/pages/SKILL.md](skills/pages/SKILL.md) documents the tools, the
-Markdown extensions (charts, stats, HTML, embeds, callouts, mentions), and the bot
+Markdown extensions (charts, stats, HTML, embeds, callouts, mentions), and the agent
 workflows.
 
 ## Storage
@@ -199,7 +198,7 @@ retention. The default is 50. Set 1 to 1000 to keep that many versions, or 0
 to keep all. Lowering the limit removes older versions when that page next
 saves a version. Existing pages use the new limit without a restart.
 
-Pages, versions, uploads, and bot requests live in the plugin's SQLite
+Pages, versions, uploads, and historical requests live in the plugin's SQLite
 database in the BB data directory. Uploads are limited to 15 MB each and are
 served back through the plugin's HTTP route.
 

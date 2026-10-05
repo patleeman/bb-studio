@@ -15,7 +15,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
       if (stop) await client.clickAriaButtonWithPointer("Stop without inserting").catch(() => {});
       for (const id of records) await pluginRpc("talk", "recording_delete", { id }).catch(() => {});
       if (threadId) await bbCli(["thread", "delete", threadId, "--yes", "--json"]);
-      if (disabled) await bbCli(["plugin", "enable", "studio-chat", "--json"]);
+      if (disabled) await bbCli(["plugin", "enable", "studio", "--json"]);
       await cleanup(); await rm(directory, { recursive: true, force: true });
       await client.evaluate("sessionStorage.removeItem('bb-studio-float:windows'); delete window.bbTalkSource").catch(() => {});
       await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
@@ -60,7 +60,7 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
       if (await client.evaluate("location.pathname") !== `/plugins/pages/pages/${page.id}`) throw new Error("Talk replaced the main page instead of focusing its companion");
     };
     try {
-      await bbCli(["plugin", "disable", "studio-chat", "--json"]); disabled = true;
+      await bbCli(["plugin", "disable", "studio", "--json"]); disabled = true;
       ({ threadId } = await pluginRpc("pages", "work", { id: page.id, request: {
         projectId, providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "medium", permissionMode: "full",
         executionInputSources: {}, environment: { type: "project-default" },
