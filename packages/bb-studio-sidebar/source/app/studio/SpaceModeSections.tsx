@@ -58,6 +58,9 @@ import {
 } from "./SpaceSwitcher.js";
 import type { SpaceItems } from "./studioSpaces.js";
 
+/** Read by Studio Navigation's New thread row. */
+const SPACE_NEW_THREAD_PROJECT_KEY = "bb-studio:space-new-thread-project";
+
 export interface SpaceModeSectionsProps
   extends BuiltInSectionRenderState, GroupedModePinnedProps {
   collapsedEnvironmentIds: Set<string>;
@@ -164,6 +167,18 @@ export function SpaceModeSections({
 
   // Opening a thread from elsewhere shows its Space; All expands it.
   const revealedFor = useRef<string | undefined>(undefined);
+  // BB's New thread starts in the Space shown, as the Space's + does (Studio
+  // Navigation reads this). All, or no Space, leaves New thread to bb.
+  const newThreadProjectId = currentSpace?.defaultProjectId ?? null;
+  useEffect(() => {
+    try {
+      if (newThreadProjectId) localStorage.setItem(SPACE_NEW_THREAD_PROJECT_KEY, newThreadProjectId);
+      else localStorage.removeItem(SPACE_NEW_THREAD_PROJECT_KEY);
+    } catch { /* storage unavailable */ }
+  }, [newThreadProjectId]);
+  useEffect(() => () => {
+    try { localStorage.removeItem(SPACE_NEW_THREAD_PROJECT_KEY); } catch { /* storage unavailable */ }
+  }, []);
   useEffect(() => {
     if (!selectedThreadId || revealedFor.current === selectedThreadId) return;
     const thread = threads.find((candidate) => candidate.id === selectedThreadId);

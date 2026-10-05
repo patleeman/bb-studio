@@ -1,7 +1,7 @@
 // Which navigation rows Studio Navigation leaves out. A Studio panel goes
 // when another surface already reaches it or Studio retired it; bb's own rows
 // and every other plugin's panels stay.
-import type { ExperimentalSidebarNavigationItem } from "@get-bb/plugin-sdk/app";
+import { experimental_useSidebarThreadActions, type ExperimentalSidebarNavigationItem } from "@get-bb/plugin-sdk/app";
 
 export const STUDIO_HUB = "studio/studio";
 
@@ -45,4 +45,23 @@ export function useStudioNavigationItems(
   items: readonly ExperimentalSidebarNavigationItem[],
 ): ExperimentalSidebarNavigationItem[] {
   return studioNavigationItems(items);
+}
+
+/** Studio Sidebar keeps the selected Space's default project here (By space, one Space shown). */
+export const SPACE_NEW_THREAD_PROJECT_KEY = "bb-studio:space-new-thread-project";
+
+/**
+ * New thread starts in the Space the sidebar shows, as the Space's own + does.
+ * Returns whether it handled the click; ⌘-click (split) and no Space fall back to bb.
+ */
+export function useSpaceNewThread(): (item: ExperimentalSidebarNavigationItem, openInSplit: boolean) => boolean {
+  const threads = experimental_useSidebarThreadActions();
+  return (item, openInSplit) => {
+    if (item.action.kind !== "new-thread" || openInSplit) return false;
+    let projectId: string | null = null;
+    try { projectId = localStorage.getItem(SPACE_NEW_THREAD_PROJECT_KEY); } catch { /* storage unavailable */ }
+    if (!projectId) return false;
+    threads.openNewThread({ projectId, focusPrompt: true });
+    return true;
+  };
 }

@@ -61,3 +61,5 @@ bb plugin build .
 `@bb-studio/kit` is the packed `file:../bb-studio-kit.tgz` dependency. Keep
 `package-lock.json` current with `scripts/refresh-locks.sh bb-studio-navigation`,
 because BB's Git install runs `npm install` from it.
+
+With Studio Sidebar showing one Space, **New thread** starts the thread in that Space's project, as the Space's own **+** does; ⌘-click and the All view keep bb's usual behavior.

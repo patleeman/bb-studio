@@ -60,7 +60,7 @@ import {
   type SidebarSortableDragBindings,
 } from "./ui/sortableMotion.js";
 import { useSidebarReorderDnd } from "./ui/useSidebarReorderDnd.js";
-import { useStudioNavigationItems } from "./studio/studio-items.js";
+import { useSpaceNewThread, useStudioNavigationItems } from "./studio/studio-items.js";
 
 type MenuSurface = "context" | "dropdown";
 
@@ -160,6 +160,7 @@ function NavigationRowChrome({
 }) {
   const { activeItemId, actions, isShortcutModifierHeld } =
     experimental_useSidebarNavigation();
+  const newThreadInSpace = useSpaceNewThread();
   const split = experimental_useSidebarNavigationSplit(item.id);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
@@ -234,6 +235,7 @@ function NavigationRowChrome({
             {...pointerDragListeners}
             {...split.splitProps}
             onClick={(event) =>
+              newThreadInSpace(item, event.metaKey || event.ctrlKey) ||
               actions.activate(item.id, {
                 openInSplit: event.metaKey || event.ctrlKey,
               })
