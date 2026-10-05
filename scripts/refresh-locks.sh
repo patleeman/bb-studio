@@ -8,7 +8,7 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 sh "$repo_dir/scripts/pack-kit.sh"
-scratch_dir="$(mktemp -d)"
+scratch_dir="$(mktemp -d "${TMPDIR:-/tmp}/bb-studio.XXXXXX")"
 trap 'rm -rf "$scratch_dir"' EXIT HUP INT TERM
 git clone --quiet --shared --no-checkout "$repo_dir" "$scratch_dir/repo"
 git -C "$scratch_dir/repo" checkout --quiet HEAD
