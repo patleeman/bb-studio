@@ -2,7 +2,7 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { ComposerSpaces, handOffNewThreadSpace } from "./ComposerSpaces";
+import { ComposerSpaces } from "./ComposerSpaces";
 import { draftRecipients, useCommandDraft } from "../command/draft-recipients";
 
 const view = vi.hoisted(() => ({ text: "" }));
@@ -21,6 +21,8 @@ vi.mock("@bb-studio/kit/app", () => {
 vi.mock("./StudioPanel", () => ({ openSpaceItems: () => {} }));
 vi.mock("sonner", () => ({ toast: { error: () => {} } }));
 
+/** What Studio Sidebar's handOffNewThreadSpace writes when New thread is opened from a Space. */
+const handOffNewThreadSpace = (spaceId: string, projectId: string | null) => sessionStorage.setItem("studio:new-thread-space", JSON.stringify({ spaceId, projectId, at: Date.now() }));
 let root: Root, container: HTMLDivElement;
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); sessionStorage.clear(); rpc.call.mockClear(); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
