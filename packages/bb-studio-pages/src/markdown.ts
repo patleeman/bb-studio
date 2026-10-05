@@ -168,7 +168,7 @@ function convertBlock(node: RootContent): PageBlock[] {
     case "list":
       return convertList(node);
     case "blockquote":
-      return [convertQuote(node)];
+      return convertQuote(node);
     case "code": {
       const lang = (node.lang ?? "").toLowerCase();
       const fence = DATA_FENCES[lang];
@@ -217,7 +217,13 @@ function convertList(list: List): PageBlock[] {
   });
 }
 
-function convertQuote(node: Blockquote): PageBlock {
+/**
+ * A callout keeps its paragraphs in one block, joined by line breaks. A plain
+ * quote becomes one quote block per paragraph, which write back as separate
+ * quotes. Lists, code and other blocks inside a quote follow it unquoted, since
+ * a quote block holds only text.
+ */
+function convertQuote(node: Blockquote): PageBlock[] {
   const paragraphs = node.children.filter((child) => child.type === "paragraph");
   const content: InlineContent[] = [];
   paragraphs.forEach((paragraph, index) => {
@@ -231,10 +237,14 @@ function convertQuote(node: Blockquote): PageBlock {
     if (match && tone) {
       const rest = first.text.slice(match[0].length);
       const body = rest ? [{ ...first, text: rest }, ...content.slice(1)] : content.slice(1);
-      return { type: "callout", props: { tone }, content: trimLeadingBreak(body) };
+      const others = node.children.filter((child) => child.type !== "paragraph");
+      return [{ type: "callout", props: { tone }, content: trimLeadingBreak(body) }, ...convertBlocks(others as RootContent[])];
     }
   }
-  return { type: "quote", content };
+  if (!node.children.length) return [{ type: "quote", content: [] }];
+  return node.children.flatMap((child): PageBlock[] =>
+    child.type === "paragraph" ? [{ type: "quote", content: inline(child.children) }] : convertBlocks([child as RootContent]),
+  );
 }
 
 function trimLeadingBreak(content: InlineContent[]): InlineContent[] {

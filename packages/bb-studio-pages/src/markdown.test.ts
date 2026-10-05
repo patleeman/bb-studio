@@ -229,6 +229,21 @@ describe("ordered lists", () => {
   });
 });
 
+describe("quotes", () => {
+  it("keep each paragraph, and the blocks inside them", () => {
+    const blocks = throughYjs(markdownToBlocks("> First\n>\n> Second\n>\n> - item\n"));
+    expect(blocks).toMatchObject([
+      { type: "quote", content: [{ text: "First" }] },
+      { type: "quote", content: [{ text: "Second" }] },
+      { type: "bulletListItem", content: [{ text: "item" }] },
+    ]);
+    const markdown = blocksToMarkdown(blocks);
+    expect(markdown).toBe("> First\n\n> Second\n\n- item\n");
+    expect(blocksToMarkdown(throughYjs(markdownToBlocks(markdown)))).toBe(markdown);
+    expect(markdownToBlocks("> [!NOTE] One\n>\n> Two\n")).toMatchObject([{ type: "callout", content: [{ text: "One" }, { text: "\n" }, { text: "Two" }] }]);
+  });
+});
+
 describe("toggles", () => {
   const MARKDOWN = `<details>
 <summary>**More** details</summary>
