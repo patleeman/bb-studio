@@ -25,12 +25,24 @@ export function spaceThreadState(thread: SidebarThread): SpaceThreadState {
   return "idle";
 }
 
-const DOT: Record<SpaceThreadState, { className: string; label: string | null }> = {
-  "needs-you": { className: "bg-warning", label: "Needs you" },
+export const SPACE_THREAD_DOT: Record<SpaceThreadState, { className: string; label: string | null }> = {
+  "needs-you": { className: "size-2 bg-warning ring-[3px] ring-warning/30", label: "Needs you" },
   working: { className: "bg-success ring-[3px] ring-success/20", label: "Working" },
-  error: { className: "bg-destructive", label: "Unread error" },
-  unread: { className: "bg-blue-500", label: "Unread result" },
+  error: { className: "size-2 bg-destructive ring-[3px] ring-destructive/30", label: "Unread error" },
+  unread: { className: "size-2 bg-blue-500 ring-[3px] ring-blue-500/30", label: "Unread result" },
   idle: { className: "bg-subtle-foreground/50", label: null },
+};
+
+/**
+ * A thread that waits on the user (a question, an unread error or result)
+ * gets a bold, full-strength title; a read, idle thread's title steps back.
+ */
+export const SPACE_THREAD_TITLE: Record<SpaceThreadState, string | null> = {
+  "needs-you": "[&_.bb-thread-title]:font-semibold [&_.bb-thread-title]:text-sidebar-foreground",
+  error: "[&_.bb-thread-title]:font-semibold [&_.bb-thread-title]:text-sidebar-foreground",
+  unread: "[&_.bb-thread-title]:font-semibold [&_.bb-thread-title]:text-sidebar-foreground",
+  working: null,
+  idle: "[&_.bb-thread-title]:text-muted-foreground",
 };
 
 /** "now", "5m", "3h", "2d", "3w", "4mo" or "1y" since `at`. */
@@ -48,7 +60,7 @@ export function compactAge(at: number, now = Date.now()): string {
 }
 
 function SpaceThreadDot({ state }: { state: SpaceThreadState }) {
-  const { className, label } = DOT[state];
+  const { className, label } = SPACE_THREAD_DOT[state];
   return (
     <span
       data-space-thread-dot={state}
@@ -93,10 +105,11 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
   if (!rows) return null;
   const line = rows.lines[thread.id];
   const at = Math.max(thread.updatedAt, thread.latestAttentionAt, line?.at ?? 0);
+  const state = spaceThreadState(thread);
   return {
-    className: "h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto",
+    className: cn("h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto", SPACE_THREAD_TITLE[state]),
     style: { rowGap: 0 },
-    dot: <SpaceThreadDot state={spaceThreadState(thread)} />,
+    dot: <SpaceThreadDot state={state} />,
     time: (
       <time
         data-space-thread-time=""

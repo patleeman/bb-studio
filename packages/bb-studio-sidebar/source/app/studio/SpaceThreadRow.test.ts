@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeSidebarThread } from "../testing/fixtures.js";
-import { compactAge, spaceThreadState } from "./SpaceThreadRow.js";
+import { compactAge, SPACE_THREAD_DOT, SPACE_THREAD_TITLE, spaceThreadState } from "./SpaceThreadRow.js";
 import { threadLineIds, THREAD_LINES_LIMIT } from "./useThreadLines.js";
 
 describe("By space rows", () => {
@@ -14,6 +14,14 @@ describe("By space rows", () => {
     expect(state({ indicator: "unread-success" })).toBe("unread");
     expect(state({ isUnread: true })).toBe("unread");
     expect(state({})).toBe("idle");
+  });
+
+  it("makes threads that wait on you louder than read ones", () => {
+    for (const state of ["needs-you", "error", "unread"] as const) {
+      expect(SPACE_THREAD_TITLE[state]).toContain("font-semibold");
+      expect(SPACE_THREAD_DOT[state].className).toContain("ring-");
+    }
+    expect(SPACE_THREAD_TITLE.idle).toContain("text-muted-foreground");
   });
 
   it("writes a compact age", () => {
