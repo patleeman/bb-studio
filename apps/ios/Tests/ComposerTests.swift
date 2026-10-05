@@ -21,8 +21,8 @@ final class ComposerTests: XCTestCase {
         let next = Directive.next(in: "Done.\n::next{reply=\"👍 Ship it|🧪 Add tests first\" explore=\"🐛 Something\" do=\"📄 Write up the plan as a page\"}")
         XCTAssertEqual(next.reply, ["👍 Ship it", "🧪 Add tests first"])
         XCTAssertEqual(next.ask, ["📄 Write up the plan as a page"])
-        // Explore and btw notes need an explainer, so they're left out; a reply alone is fine.
-        XCTAssertEqual(Directive.next(in: "::next{btw=\"🐛 It breaks\" explore=\"🐛 Why\"}").isEmpty, true)
+        // The older explore attribute shows as notes when there's no btw.
+        XCTAssertEqual(next.notes, [.init(emoji: "🐛", text: "Something")])
         XCTAssertEqual(Directive.next(in: "::next{do=\"🧵 Start a thread\"}"), .init(reply: [], ask: ["🧵 Start a thread"]))
         // No emoji gets 🔎; emoji without a space, variation selectors, keycaps and flags split; dupes and empties drop.
         XCTAssertEqual(Directive.parseNextItems("Ship it|🐛Retry| 🏗️  How it  works |1️⃣ First|🇺🇸 Flag||👍 ship IT|3 tries|🐛", max: 9),
@@ -42,6 +42,22 @@ final class ComposerTests: XCTestCase {
         XCTAssertEqual(Directive.reactions(in: "::reactions{items=\"👍 Agree|❓ Why\"}"), ["👍 Agree", "❓ Why"])
         XCTAssertEqual(Directive.reactions(in: "::next{reply=\"👍 Agree\"}"), [])
         XCTAssertTrue(Directive.next(in: "::reactions{items=\"👍 Agree\"}").isEmpty)
+    }
+
+    func testNextRowNotes() {
+        let sentence = "I noticed retries don't wait. If the server is down, it gets hammered."
+        let next = Directive.next(in: "::next{btw=\"🐛 \(sentence)|🏗️ I noticed a thing.|🐛 \(sentence.uppercased())\" explore=\"🔗 Ignored\"}")
+        // btw wins over explore; whole sentences are kept; repeats drop.
+        XCTAssertEqual(next.notes, [.init(emoji: "🐛", text: sentence), .init(emoji: "🏗️", text: "I noticed a thing.")])
+        XCTAssertFalse(next.isEmpty)
+        XCTAssertEqual(Directive.parseNotes("No emoji here.", max: 3), [.init(emoji: "🔎", text: "No emoji here.")])
+        XCTAssertEqual(Directive.parseNotes("🐛 a|🐛 b|🐛 c|🐛 d", max: 3).count, 3)
+        let long = Directive.parseNotes("🔗 " + String(repeating: "word ", count: 80), max: 3)
+        XCTAssertLessThanOrEqual(long[0].text.count, 281)
+        XCTAssertTrue(long[0].text.hasSuffix("…"))
+        // 🐛 notes offer Fix this, drafted as on the web; every note offers Tell me more.
+        XCTAssertEqual(NextCard.actions(for: next.notes[0]).map(\.draft), ["📖 Tell me more: \(sentence)", "🐛 Fix this: \(sentence)"])
+        XCTAssertEqual(NextCard.actions(for: next.notes[1]).map(\.label), ["📖 Tell me more"])
     }
 
     func testCommandAndReactionParsing() {

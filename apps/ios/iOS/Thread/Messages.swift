@@ -44,10 +44,7 @@ struct MessageBubble: View {
                 }
                 let next = Directive.next(in: text)
                 if !next.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if !next.reply.isEmpty { ReactionChips(items: next.reply, react: react) }
-                        if !next.ask.isEmpty { ReactionChips(items: next.ask, request: true, react: react) }
-                    }
+                    NextCard(next: next, react: react)
                 }
             }
         }
@@ -224,13 +221,78 @@ struct ImageViewer: View {
     }
 }
 
+/// Pages' Next row as a "What next?" card, as in BB web: labeled rows of
+/// replies, requests, and notes on what the agent noticed. Every tap drafts
+/// text. A note's Tell me more asks the agent, since the app can't write an
+/// explainer page itself; Fix this drafts the same request as on the web.
+struct NextCard: View {
+    let next: Directive.Next
+    let react: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("What next?")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            if !next.reply.isEmpty {
+                section("Reply") { ReactionChips(items: next.reply, react: react) }
+            }
+            if !next.ask.isEmpty {
+                section("Ask for") { ReactionChips(items: next.ask, request: true, react: react) }
+            }
+            if !next.notes.isEmpty {
+                section("By the way") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(next.notes, id: \.self) { note in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("\(note.emoji) \(note.text)")
+                                    .font(.subheadline)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                ReactionChips(items: Self.actions(for: note).map(\.label), request: true) { label in
+                                    if let action = Self.actions(for: note).first(where: { $0.label == label }) { react(action.draft) }
+                                }
+                            }
+                            .accessibilityElement(children: .contain)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
+        .accessibilityIdentifier("next-card")
+    }
+
+    /// A short label over each row, saying what its buttons are for.
+    private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    /// A note's buttons, and what each drafts.
+    static func actions(for note: Directive.Note) -> [(label: String, draft: String)] {
+        var actions = [(label: "📖 Tell me more", draft: "📖 Tell me more: \(note.text)")]
+        if note.isBug { actions.append((label: "🔧 Fix this", draft: "🐛 Fix this: \(note.text)")) }
+        return actions
+    }
+}
+
 /// Suggested replies under an assistant message. A tap drafts the reply.
 struct ReactionChips: View {
     let items: [String]
-    /// Requests for the agent (the Next row's `do`), drawn dashed as in BB web.
+    /// Things the agent does (the Next row's requests and note actions), drawn
+    /// as dashed rounded squares as in BB web; replies are capsules.
     var request = false
     let react: (String) -> Void
     @State private var taps = 0
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: request ? 8 : 100, style: .continuous) }
 
     var body: some View {
         FlowLayout(spacing: 8) {
@@ -243,8 +305,8 @@ struct ReactionChips: View {
                         .font(.subheadline)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(.fill.secondary, in: .capsule)
-                        .overlay(Capsule().strokeBorder(.separator, style: StrokeStyle(lineWidth: 1, dash: request ? [4, 3] : [])))
+                        .background(.fill.secondary, in: shape)
+                        .overlay(shape.strokeBorder(.separator, style: StrokeStyle(lineWidth: 1, dash: request ? [4, 3] : [])))
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint(request ? "Drafts this request" : "Drafts this reply")

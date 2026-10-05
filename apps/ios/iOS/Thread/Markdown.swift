@@ -334,20 +334,62 @@ struct Directive {
         return parseReactions(raw)
     }
 
-    /// Pages' Next row, `::next{reply="👍 Ship it|❓ Why" do="📄 Write up the plan as a page"}`:
-    /// quick replies and requests, each drafted as "emoji label". Notes (`btw`,
-    /// and the older `explore`) open explainers, which the app doesn't have, so
-    /// they're left out. Parsed as Pages' next.ts does.
+    /// Pages' Next row, `::next{reply="👍 Ship it" btw="🐛 I noticed …" do="📄 Write up the plan as a page"}`:
+    /// quick replies, requests, and notes on what the agent noticed. Replies and
+    /// requests draft as "emoji label". Notes (`btw`, or the older
+    /// `explore="🐛 Label — why"`) show as written. Parsed as Pages' next.ts does.
     struct Next: Equatable {
         var reply: [String]
         var ask: [String]
-        var isEmpty: Bool { reply.isEmpty && ask.isEmpty }
+        var notes: [Note] = []
+        var isEmpty: Bool { reply.isEmpty && ask.isEmpty && notes.isEmpty }
+    }
+
+    /// A note back to the user: one or two sentences, with their emoji.
+    struct Note: Equatable, Hashable {
+        var emoji: String
+        var text: String
+        /// 🐛 notes look broken or risky, so they offer Fix this.
+        var isBug: Bool { emoji == "🐛" }
     }
 
     static func next(in text: String) -> Next {
         guard let directive = last(in: text), directive.name == "next" else { return Next(reply: [], ask: []) }
+        let notes = parseNotes(directive.attributes["btw"], max: 3)
         return Next(reply: parseNextItems(directive.attributes["reply"], max: 5),
-            ask: parseNextItems(directive.attributes["do"], max: 3))
+            ask: parseNextItems(directive.attributes["do"], max: 3),
+            notes: notes.isEmpty ? parseNotes(directive.attributes["explore"], max: 4) : notes)
+    }
+
+    /// `|`-separated notes: an optional emoji (🔎 without one) and up to 280
+    /// characters of text, cut at a word. Repeats drop.
+    static func parseNotes(_ raw: String?, max: Int) -> [Note] {
+        guard let raw else { return [] }
+        var seen = Set<String>()
+        var notes: [Note] = []
+        for part in String(raw.prefix(4_000)).components(separatedBy: "|") {
+            guard let (emoji, rest) = splitEmoji(clean(part)) else { continue }
+            let text = cutLabel(rest, max: 280)
+            guard !text.isEmpty, seen.insert(text.lowercased()).inserted else { continue }
+            notes.append(Note(emoji: emoji, text: text))
+            if notes.count >= max { break }
+        }
+        return notes
+    }
+
+    /// Control characters, quotes and braces become spaces; runs of space collapse.
+    private static func clean(_ part: String) -> String {
+        let cleaned = String(String.UnicodeScalarView(part.unicodeScalars.map {
+            $0.value < 0x20 || "\"{}".unicodeScalars.contains($0) ? " " : $0
+        }))
+        return cleaned.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// The leading emoji (🔎 when there's none) and the rest, or nil for an empty item.
+    private static func splitEmoji(_ text: String) -> (String, String)? {
+        guard let first = text.first else { return nil }
+        guard isEmoji(first) else { return ("🔎", text) }
+        return (String(first), text.dropFirst().trimmingCharacters(in: .whitespaces))
     }
 
     /// `|`-separated "emoji label" items, cleaned, capped and deduped by label.
@@ -357,18 +399,8 @@ struct Directive {
         var seen = Set<String>()
         var items: [String] = []
         for part in String(raw.prefix(4_000)).components(separatedBy: "|") {
-            let cleaned = String(String.UnicodeScalarView(part.unicodeScalars.map {
-                $0.value < 0x20 || "\"{}".unicodeScalars.contains($0) ? " " : $0
-            }))
-            let text = cleaned.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-            guard let first = text.first else { continue }
-            var emoji = "🔎"
-            var label = text
-            if isEmoji(first) {
-                emoji = String(first)
-                label = text.dropFirst().trimmingCharacters(in: .whitespaces)
-            }
-            label = cutLabel(label)
+            guard let (emoji, rest) = splitEmoji(clean(part)) else { continue }
+            let label = cutLabel(rest)
             guard !label.isEmpty, seen.insert(label.lowercased()).inserted else { continue }
             items.append("\(emoji) \(label)")
             if items.count >= max { break }
