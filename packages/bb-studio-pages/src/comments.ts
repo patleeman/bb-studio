@@ -46,14 +46,20 @@ export function bodyText(body: unknown): string {
 
 /** Comment bodies use the comment editor's default schema: plain paragraphs. */
 export function textBody(text: string): unknown[] {
-  const blocks = markdownToBlocks(text);
+  // Nested blocks become paragraphs of their own, and code keeps its text.
+  const flat = (blocks: PageBlock[]): PageBlock[] => blocks.flatMap((block) => [block, ...flat(block.children ?? [])]);
+  const inline = (block: PageBlock): unknown[] =>
+    typeof block.content === "string"
+      ? block.content ? [{ type: "text", text: block.content, styles: { code: true } }] : []
+      : (Array.isArray(block.content) ? block.content : []).map((item) =>
+          item.type === "mention" ? { type: "text", text: `@${item.props.label}`, styles: {} } : item,
+        );
+  const blocks = flat(markdownToBlocks(text));
   const paragraphs = (blocks.length ? blocks : [{ type: "paragraph", content: [] }]).map((block) => ({
     id: randomUUID(),
     type: "paragraph",
     props: { backgroundColor: "default", textColor: "default", textAlignment: "left" },
-    content: (Array.isArray(block.content) ? block.content : []).map((item) =>
-      item.type === "mention" ? { type: "text", text: `@${item.props.label}`, styles: {} } : item,
-    ),
+    content: inline(block),
     children: [],
   }));
   return paragraphs;

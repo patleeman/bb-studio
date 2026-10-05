@@ -128,3 +128,10 @@ describe("comments", async () => {
     expect(origins.every((origin) => origin === client)).toBe(true);
   });
 });
+
+describe("comment bodies", async () => {
+  const { bodyText, textBody } = await import("./comments");
+  it("keep code blocks and nested list items", () => {
+    expect(bodyText(textBody("Look:\n\n```ts\nconst x = 1;\n```\n\n- a\n  - b\n"))).toBe("Look:\nconst x = 1;\na\nb");
+  });
+});
