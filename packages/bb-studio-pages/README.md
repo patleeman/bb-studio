@@ -173,8 +173,8 @@ Talk, the dictation controls are hidden.
 
 Agents get eight tools: `pages_list`, `pages_read`, `pages_create`,
 `pages_edit`, `pages_comments`, `pages_comment`, `pages_comment_reply`, and
-`pages_comment_resolve`. `pages_read` returns Markdown with a block id after
-each block, and `pages_edit` applies small operations against those ids. An
+`pages_comment_resolve`. `pages_read` returns Markdown with a block id on the
+line before each block, and `pages_edit` applies small operations against those ids. An
 agent can then change one checklist item or paragraph without overwriting
 what you are typing.
 
@@ -227,7 +227,8 @@ A checklist item is a unit of work. **Hand to agent** (in the item's ⋮⋮
 menu, or `/hand to agent` on the item) starts a thread in the page's project
 with the item as its prompt and a mention of the page. Pages puts a mention
 of that thread at the end of the item, labelled with the thread's state:
-**Agent · working**, **needs input**, **replied** or **failed**. Click it to
+**Agent · starting**, **working**, **needs input**, **replied**, **failed**,
+**archived** or **deleted**. Click it to
 open the thread. Check the item off yourself after reviewing; the agent is
 told not to.
 
