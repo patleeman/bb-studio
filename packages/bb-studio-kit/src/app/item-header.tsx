@@ -103,15 +103,29 @@ function ItemActions({ compact, children }: { compact: boolean; children: ReactN
 // BB's title bar, laid out for a Studio bar: the bar replaces the panel's
 // fixed label and takes the row's width, and, like the rest of the title bar
 // on macOS, drags the window everywhere but its controls. If BB's header
-// changes shape, the bar still shows, on the right.
+// changes shape, the bar still shows, on the right. StudioBar marks the
+// elements (markTitleBar): :has() here made every keystroke re-check the page.
 const BAR_CSS = `
-[data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:first-child { display: none; }
-[data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:last-child,
-[data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:last-child > div:first-child,
-[data-bb-plugin-root]:has(> [data-studio-bar-slot] [data-studio-bar]) { flex: 1 1 auto; min-width: 0; }
-[data-testid="app-page-header-content-row"] > div[class~="[app-region:no-drag]"]:has([data-studio-bar]) { app-region: drag; -webkit-app-region: drag; }
-[data-testid="app-page-header-content-row"] > div[class~="[app-region:no-drag]"]:has([data-studio-bar]) :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"]) { app-region: no-drag; -webkit-app-region: no-drag; }
+[data-studio-bar-row] > div:first-child { display: none; }
+[data-studio-bar-row] > div:last-child,
+[data-studio-bar-row] > div:last-child > div:first-child,
+[data-studio-bar-root] { flex: 1 1 auto; min-width: 0; }
+[data-studio-bar-drag] { app-region: drag; -webkit-app-region: drag; }
+[data-studio-bar-drag] :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"]) { app-region: no-drag; -webkit-app-region: no-drag; }
 `;
+
+/** Marks the title bar around a filled slot for BAR_CSS, until the returned cleanup. */
+function markTitleBar(slot: HTMLElement) {
+  const row = slot.closest<HTMLElement>('[data-testid="app-page-header-content-row"]');
+  const drag = row ? [...row.children].find((child): child is HTMLElement => child.matches('div[class~="[app-region:no-drag]"]') && child.contains(slot)) : undefined;
+  const root = slot.parentElement?.matches("[data-bb-plugin-root]") ? slot.parentElement : null;
+  const marks: [HTMLElement, string][] = [];
+  if (row) marks.push([row, "data-studio-bar-row"]);
+  if (drag) marks.push([drag, "data-studio-bar-drag"]);
+  if (root) marks.push([root, "data-studio-bar-root"]);
+  for (const [element, name] of marks) element.setAttribute(name, "");
+  return () => { for (const [element, name] of marks) element.removeAttribute(name); };
+}
 
 /** A nav panel's headerContent: where its views' Studio bar goes. */
 export function StudioBarSlot() {
@@ -169,6 +183,7 @@ export function StudioBar({ children, className }: { children: ReactNode; classN
   const anchor = useRef<HTMLDivElement>(null);
   const inFloat = useInFloat();
   const slot = useBarSlot(anchor, !inFloat);
+  useLayoutEffect(() => slot ? markTitleBar(slot) : undefined, [slot]);
   const bar = <div data-studio-bar="" className="flex h-full min-w-0 flex-1 items-center gap-2">{children}</div>;
   if (slot) return <>
     <span ref={anchor} hidden />
@@ -249,6 +264,7 @@ export function ItemHeader({
   const anchor = useRef<HTMLDivElement>(null);
   const inFloat = useInFloat();
   const slot = useBarSlot(anchor, !inFloat);
+  useLayoutEffect(() => slot ? markTitleBar(slot) : undefined, [slot]);
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
   useLayoutEffect(() => {
     const measured = slot ?? anchor.current;

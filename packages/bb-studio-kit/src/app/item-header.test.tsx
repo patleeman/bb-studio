@@ -2,7 +2,7 @@
 import { act, useEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ItemHeader, ViewMoveMenu } from "./item-header";
+import { ItemHeader, StudioBar, StudioBarSlot, ViewMoveMenu } from "./item-header";
 
 const state = vi.hoisted(() => ({ launch: null as ((mode: string) => void) | null, inFloat: true, float: vi.fn(() => true), split: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toCompose: () => {} }) }));
@@ -144,5 +144,27 @@ describe("Chat menu focus", () => {
       await settle();
     });
     expect(document.activeElement).toBe(document.querySelector('[aria-label="Chat options"]'));
+  });
+});
+
+describe("Studio bar in BB's title bar", () => {
+  it("marks the title bar it fills, without :has(), and unmarks it when it goes", async () => {
+    state.inFloat = false;
+    // BB's pane: a header row whose last div holds the plugin's slot, then the view.
+    const pane = document.createElement("div");
+    pane.innerHTML = '<header><div data-testid="app-page-header-content-row"><div>Label</div><div class="[app-region:no-drag]"><div data-bb-plugin-root></div></div></div></header><main></main>';
+    document.body.append(pane);
+    const slotRoot = createRoot(pane.querySelector("[data-bb-plugin-root]")!), viewRoot = createRoot(pane.querySelector("main")!);
+    await act(async () => { slotRoot.render(<StudioBarSlot />); viewRoot.render(<StudioBar>Crumbs</StudioBar>); await settle(); });
+    const row = pane.querySelector('[data-testid="app-page-header-content-row"]')!;
+    expect(pane.querySelector("[data-studio-bar-slot] [data-studio-bar]")?.textContent).toBe("Crumbs");
+    expect(row.hasAttribute("data-studio-bar-row")).toBe(true);
+    expect(row.children[1]!.hasAttribute("data-studio-bar-drag")).toBe(true);
+    expect(pane.querySelector("[data-bb-plugin-root]")!.hasAttribute("data-studio-bar-root")).toBe(true);
+    expect(pane.querySelector("style")!.textContent).not.toContain(":has(");
+    await act(async () => viewRoot.unmount());
+    expect(pane.querySelectorAll("[data-studio-bar-row], [data-studio-bar-drag], [data-studio-bar-root]")).toHaveLength(0);
+    await act(async () => slotRoot.unmount());
+    pane.remove();
   });
 });
