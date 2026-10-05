@@ -97,7 +97,7 @@ ids, so they follow across windows. Set it with
 shows is the synced `currentSpace` preference (a Space id, `all` for All, or
 null for the default Space); `collapsedSpaces` lists the Spaces collapsed in
 All, and `collapsedSpaceSections` the Lead, Studio and Threads sections folded
-inside a Space (`<space id>:lead`, `:studio` or `:threads`). Each row's second line comes from Studio's `thread_lines` RPC (leads
+inside a Space (`<space id>:lead`, `:studio` or `:threads`). An empty Studio or Threads section starts collapsed instead; opening it lasts until reload. Each row's second line comes from Studio's `thread_lines` RPC (leads
 first, then by recency, at most 60 threads), fetched when the shown threads or
 their status change, on focus, and every 30 seconds while the window is
 visible.

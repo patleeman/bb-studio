@@ -171,13 +171,25 @@ export function SpaceModeSections({
     [setCollapsedSpaceList],
   );
   const [collapsedSectionList, setCollapsedSectionList] = useAtom(sidebarCollapsedSpaceSectionsAtom);
-  const sectionCollapse = useCallback((spaceId: string, section: "lead" | "studio" | "threads") => {
+  // An empty section starts collapsed; opening it holds for this session.
+  const [openedEmptySections, setOpenedEmptySections] = useState<ReadonlySet<string>>(new Set());
+  const sectionCollapse = useCallback((spaceId: string, section: "lead" | "studio" | "threads", empty = false) => {
     const id = `${spaceId}:${section}`;
+    if (empty) {
+      return {
+        isCollapsed: !openedEmptySections.has(id),
+        onToggleCollapsed: () => setOpenedEmptySections((current) => {
+          const next = new Set(current);
+          if (!next.delete(id)) next.add(id);
+          return next;
+        }),
+      };
+    }
     return {
       isCollapsed: collapsedSectionList.includes(id),
       onToggleCollapsed: () => setCollapsedSectionList((current) => toggleCollapsedIdList({ current, id })),
     };
-  }, [collapsedSectionList, setCollapsedSectionList]);
+  }, [collapsedSectionList, openedEmptySections, setCollapsedSectionList]);
 
   const resolveSpace = useMemo(
     () => createSpaceResolver(threads, spaceOf, new Set(spaces.map((space) => space.id)), fallbackSpaceId, projectSpaces(spaces)),
@@ -369,7 +381,7 @@ export function SpaceModeSections({
               };
               const heartbeat = heartbeats[group.space.id] ?? null;
               const leadCollapse = sectionCollapse(group.space.id, "lead");
-              const threadsCollapse = sectionCollapse(group.space.id, "threads");
+              const threadsCollapse = sectionCollapse(group.space.id, "threads", !group.threads.length);
               return (
                 <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>
                   <SpaceDropArea spaceId={group.space.id}>
@@ -394,7 +406,7 @@ export function SpaceModeSections({
                       spaceName={group.space.name}
                       defaultProjectId={group.space.defaultProjectId}
                       items={items[group.space.id]}
-                      collapse={sectionCollapse(group.space.id, "studio")}
+                      collapse={sectionCollapse(group.space.id, "studio", !items[group.space.id]?.open.length)}
                     />
                     <SpaceSubheading
                       title="Threads"

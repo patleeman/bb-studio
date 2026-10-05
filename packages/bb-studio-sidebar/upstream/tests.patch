@@ -1,5 +1,5 @@
 diff --git a/source/app.test.tsx b/source/app.test.tsx
-index 4d15df5..7e6e081 100644
+index 4d15df5..482d7f5 100644
 --- a/source/app.test.tsx
 +++ b/source/app.test.tsx
 @@ -4,0 +5 @@ import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,7 @@ index 4d15df5..7e6e081 100644
 @@ -145,0 +151,2 @@ afterEach(() => {
 +  getDefaultStore().set(studioSpacesAtom, { status: "loading" });
 +  resetCommandInstalledForTest();
-@@ -150,0 +158,226 @@ describe("thread-list plugin", () => {
+@@ -150,0 +158,229 @@ describe("thread-list plugin", () => {
 +  it("hides a thread from its row's menu, with Show and Unhide", async () => {
 +    const { rpcCalls } = renderList({ organizationMode: "project" });
 +    await screen.findByText("Later thread");
@@ -168,6 +168,9 @@ index 4d15df5..7e6e081 100644
 +    expect(threadIds().filter((id) => id !== "thr_pinned")).toEqual(["thr_ask", "thr_later"]);
 +    expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.parentElement?.querySelector("[data-sidebar-needs-you]")).not.toBeNull();
 +    expect(document.querySelectorAll("[data-sidebar-needs-you]")).toHaveLength(1);
++    // Beta has no Studio items, so its Studio starts collapsed.
++    expect(screen.queryByText("No items")).toBeNull();
++    fireEvent.click(screen.getByRole("button", { name: "Expand Studio" }));
 +    expect(screen.getByText("No items")).not.toBeNull();
 +    const created: Event[] = [];
 +    const onNew = (event: Event) => created.push(event);
@@ -243,7 +246,7 @@ index 4d15df5..7e6e081 100644
 +      unregister();
 +    }
 +  });
-@@ -303,0 +537,15 @@ describe("thread-list plugin", () => {
+@@ -303,0 +540,15 @@ describe("thread-list plugin", () => {
 +  it("opens the New project dialog from Threads", async () => {
 +    setPreferencesMirrorStorageForTest(null);
 +    renderList({ organizationMode: "project" }, {
