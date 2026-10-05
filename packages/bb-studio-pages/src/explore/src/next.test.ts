@@ -63,6 +63,17 @@ describe("the Next instructions", () => {
     expect(text).toContain("Don't also write ::reactions or ::explore lines");
   });
 
+  it("tell the agent how to quote, since one straight double quote turns the whole line into raw text", () => {
+    const text = nextInstructions({ explore: true, replies: [] });
+    expect(text).toContain("one stray \" breaks the whole line");
+    expect(text).toContain("“curly” quotes");
+  });
+
+  it("keep curly quotes in notes", () => {
+    const items = parseNextItems({ btw: "🐛 I noticed the “retry” setting is ignored. Changing it does nothing." });
+    expect(items.btw[0].text).toBe("I noticed the “retry” setting is ignored. Changing it does nothing.");
+  });
+
   it("leave notes out when Explore is off", () => {
     const text = nextInstructions({ explore: false, replies: [] });
     expect(text).not.toContain("btw=");

@@ -33,7 +33,7 @@ export function nextInstructions({ explore, replies }: { explore: boolean; repli
   return [
     "The Next row is on. End a reply with one line that offers the user's likely next steps, when there are any:",
     `::${NEXT_DIRECTIVE}{${example}}`,
-    "Every attribute is optional; leave out the ones with nothing worth offering, and leave out the whole line when nothing is. Items are separated by |. Each is one emoji, a space, and its text. Don't use double quotes, braces or | inside an item.",
+    "Every attribute is optional; leave out the ones with nothing worth offering, and leave out the whole line when nothing is. Items are separated by |. Each is one emoji, a space, and its text. Never put a straight double quote (\") or | inside an item, not even to quote a word: one stray \" breaks the whole line and the user sees raw text instead of buttons. Quote with ‘single’ or “curly” quotes instead.",
     `- reply: only when your reply asks the user to decide, choose, approve or answer. 2 to ${NEXT_LIMITS.reply} quick answers of at most 5 words; each must make sense as the user's whole reply.${replies.length ? ` Prefer these when they fit: ${replies.join(" | ")}. Write specific ones when your reply offers distinct options.` : ""}`,
     ...(explore
       ? [
