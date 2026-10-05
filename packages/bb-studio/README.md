@@ -192,6 +192,10 @@ which includes hidden problems, plugins whose check didn't answer, and what
 passed. `bb studio health` prints the same list and exits 1 when a problem
 isn't hidden.
 
+![The Plugin health card open above the sidebar footer on staged stable BB, showing that Studio Decisions has no Jev provider set up, with Add a key, Turn off plugin and Hide](assets/plugin-health.png)
+
+![Studio's Plugin setup page on the same staged BB, listing the Studio Decisions problem and when Studio last checked](assets/plugin-setup.png)
+
 ## Development
 
 ```sh

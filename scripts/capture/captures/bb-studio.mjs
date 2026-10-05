@@ -268,5 +268,46 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       }
       return cleanup;
     },
-  }
+  },
+  {
+    // A fresh staged BB has no Jev key, so Studio Decisions reports a problem
+    // and the Plugin health footer item opens by itself.
+    id: "studio-health",
+    packageDir: "bb-studio",
+    fileName: "plugin-health.png",
+    showSidebar: true,
+    setup: async (client) => {
+      // Forget problems an earlier run already showed, so it opens again.
+      await client.navigate(`/projects/${projectId}`);
+      await client.evaluate(`localStorage.removeItem("studio:health-seen")`);
+      await client.navigate(`/projects/${projectId}`);
+      await client.waitForText("No Jev provider is set up", 30000);
+      await client.waitForText("Studio Decisions");
+      await client.waitForText("Add a key");
+      await client.waitForText("Turn off plugin");
+      await client.waitForText("Open plugin setup");
+      await sleep(400);
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      const anchor = [...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Open plugin setup");
+      const card = anchor?.closest("[data-bb-plugin-root], [role=dialog], [role=region]") ?? anchor?.parentElement;
+      const sidebar = document.querySelector("[data-sidebar=sidebar]") ?? card;
+      const box = sidebar.getBoundingClientRect();
+      const top = Math.max(0, card.getBoundingClientRect().top - 24);
+      return { x: box.left, y: top, width: box.width, height: box.bottom - top, scale: 2 };
+    })()`),
+  },
+  {
+    id: "studio-setup",
+    packageDir: "bb-studio",
+    fileName: "plugin-setup.png",
+    setup: async (client) => {
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Plugin setup", 30000);
+      await client.waitForText("Needs attention (1)");
+      await client.waitForText("No Jev provider is set up");
+      await client.waitForText("Last checked");
+      await sleep(400);
+    },
+  },
 ];
