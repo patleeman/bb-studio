@@ -24,6 +24,15 @@ const MODE_CHOICES: { id: CommandPermissionMode | null; label: string; detail: s
   { id: "full", label: "Full Access", detail: "No sandbox and no approvals. The agent can run anything on your machine." },
 ];
 
+/** The last data each Space showed, so reopening the view draws at once while it refreshes. */
+const lastSpace = new Map<string, Space>(), lastFeed = new Map<string, CommandEntry[]>();
+
+function Placeholder({ rows }: { rows: number }) {
+  return <div role="status" aria-label="Loading" className="flex flex-col gap-3 motion-safe:animate-pulse">
+    {Array.from({ length: rows }, (_, i) => <div key={i} className="flex flex-col gap-2 rounded-lg px-2"><div className="h-3.5 w-40 rounded bg-surface-recessed" /><div className="h-3 w-full rounded bg-surface-recessed" /><div className="h-3 w-2/3 rounded bg-surface-recessed" /></div>)}
+  </div>;
+}
+
 function useStored<T extends string | null>(key: string, read: (value: string | null) => T) {
   const [value, setValue] = useState<T>(() => { try { return read(localStorage.getItem(key)); } catch { return read(null); } });
   useEffect(() => { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch {} }, [key, value]);
@@ -33,8 +42,8 @@ function useStored<T extends string | null>(key: string, read: (value: string | 
 function CommandView({ spaceId }: { spaceId: string }) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
   const openThread = (threadId: string) => { if (!openCompanion({ kind: "thread", threadId })) navigate.toThread(threadId); };
-  const [space, setSpace] = useState<Space | null>(null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
-  const [entries, setEntries] = useState<CommandEntry[] | null>(null);
+  const [space, setSpace] = useState<Space | null>(() => lastSpace.get(spaceId) ?? null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
+  const [entries, setEntries] = useState<CommandEntry[] | null>(() => lastFeed.get(spaceId) ?? null);
   const [layout, setLayout] = useStored<CommandLayout>(`bot-teams:command-layout:${spaceId}`, commandLayout);
   const [permission, setPermission] = useStored<CommandPermissionMode | null>(`bot-teams:command-permission:${spaceId}`, value => MODE_CHOICES.find(choice => choice.id === value)?.id ?? null);
   // The thread picked to reply to; Focus picks the thread it shows.
@@ -44,11 +53,11 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const generation = useRef(0), feedGeneration = useRef(0);
   const load = useCallback(() => {
     const seq = ++generation.current;
-    void rpc.call("command", { spaceId }).then(next => { if (seq === generation.current) { setSpace(next); setError(null); } }, e => { if (seq === generation.current) setError(message(e)); });
+    void rpc.call("command", { spaceId }).then(next => { if (seq === generation.current) { lastSpace.set(spaceId, next); setSpace(next); setError(null); } }, e => { if (seq === generation.current) setError(message(e)); });
   }, [rpc, spaceId]);
   const loadFeed = useCallback(() => {
     const seq = ++feedGeneration.current;
-    void rpc.call("commandFeed", { spaceId }).then(next => { if (seq === feedGeneration.current) setEntries(next.entries); }, e => { if (seq === feedGeneration.current) setError(message(e)); });
+    void rpc.call("commandFeed", { spaceId }).then(next => { if (seq === feedGeneration.current) { lastFeed.set(spaceId, next.entries); setEntries(next.entries); } }, e => { if (seq === feedGeneration.current) setError(message(e)); });
   }, [rpc, spaceId]);
   useEffect(() => { void rpc.call("profiles", {}).then(setBots, e => setError(message(e))); }, [rpc]);
   useEffect(() => {
@@ -73,7 +82,8 @@ function CommandView({ spaceId }: { spaceId: string }) {
   const markFocus = () => { void rpc.call("commandFocus", { spaceId }).catch(() => {}); };
   /** BB's composer submits rich input: mentions pick recipients and files ride along. Throwing keeps the draft. */
   const send = async (request: NewThreadRequest) => {
-    if (!space) return;
+    // Throwing keeps the draft until the Space has loaded.
+    if (!space) throw new Error("This Space is still loading. Try again in a moment.");
     setError(null);
     const attachments = request.input.filter((part): part is CommandAttachment => part.type !== "text");
     const mentioned: string[] = [];
@@ -118,14 +128,14 @@ function CommandView({ spaceId }: { spaceId: string }) {
     if (failure) { setError(failure); throw new Error(failure); }
   };
 
-  if (!space) return <PageColumn><ErrorMessage error={error} />{!error && <p role="status" className="text-sm text-muted-foreground">Loading Command view…</p>}</PageColumn>;
-  const thread = (id: string | null) => space.threads.find(t => t.id === id);
+  const threads = space?.threads ?? [];
+  const thread = (id: string | null) => threads.find(t => t.id === id);
   const botFor = (threadId: string) => bots.find(b => b.id === thread(threadId)?.botId);
   const nameOf = (threadId: string) => botFor(threadId)?.name || thread(threadId)?.title || "Thread";
   const target = layout === "focus" ? reply ?? selected : reply;
-  const defaultTo = target && thread(target) ? target : space.leadThreadId;
+  const defaultTo = target && thread(target) ? target : space?.leadThreadId ?? null;
   const time = (at: number) => new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(at);
-  const working = space.threads.filter(t => !t.parentThreadId && ["starting", "active"].includes(t.status)).map(t => nameOf(t.id));
+  const working = threads.filter(t => !t.parentThreadId && ["starting", "active"].includes(t.status)).map(t => nameOf(t.id));
   const renderEntry = (entry: CommandEntry, previous?: CommandEntry) => {
     if (entry.role === "user") return <li key={entry.id} data-command-entry="user" className="ml-auto flex w-fit max-w-[70%] flex-col items-end gap-1">
       <time className="text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>
@@ -141,25 +151,26 @@ function CommandView({ spaceId }: { spaceId: string }) {
   return <div className="relative flex h-full min-h-0 flex-col" data-command-view>
     <StudioBar>
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
-        <BarCrumb><span className="truncate">{space.space.name}</span></BarCrumb>
+        <BarCrumb><span className="truncate">{space?.space.name ?? "Space"}</span></BarCrumb>
         <BarSeparator />
         <BarCrumb current>Command</BarCrumb>
       </nav>
       <div className="flex shrink-0 items-center gap-0.5"><CommandLayoutPicker value={layout} onChange={setLayout} /></div>
     </StudioBar>
     {layout === "merged" ? <div data-command-timeline ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col px-4 pt-6 pb-8">
-      {entries && !entries.length && <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
+      {(!space || !entries) && !error && <Placeholder rows={3} />}
+      {space && entries && !entries.length && <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
         <p className="text-sm font-medium">{space.space.name}</p>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">{space.threads.length ? "Message the lead, or @mention threads to message them together. Their replies land here." : "This Space has no threads yet."}</p>
       </div>}
       <ol className="flex flex-col gap-3">{(entries ?? []).map((entry, i, all) => renderEntry(entry, all[i - 1]))}</ol>
       {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
-    </div></div> : <CommandThreads spaceId={spaceId} threads={space.threads} leadThreadId={space.leadThreadId} bots={bots} layout={layout} selected={selected} onSelect={threadId => { setSelected(threadId); setReply(null); setLayout("focus"); }} onReply={(threadId, focusComposer) => { setReply(threadId); if (focusComposer) setFocus(value => value + 1); }} onOpen={openThread} />}
+    </div></div> : !space ? <div className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-[760px] px-4 pt-6">{!error && <Placeholder rows={2} />}</div></div> : <CommandThreads spaceId={spaceId} threads={space.threads} leadThreadId={space.leadThreadId} bots={bots} layout={layout} selected={selected} onSelect={threadId => { setSelected(threadId); setReply(null); setLayout("focus"); }} onReply={(threadId, focusComposer) => { setReply(threadId); if (focusComposer) setFocus(value => value + 1); }} onOpen={openThread} />}
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
       <div data-command-composer onFocusCapture={markFocus} onKeyDownCapture={event => { if (event.key === "@") markFocus(); }}><NewThreadComposer layout="contained" className="view-composer" placeholder={defaultTo ? `Message ${nameOf(defaultTo)}. @mention threads, or @all for everyone.` : "@mention threads to message them, or @all for everyone."} draftKey={`bot-teams:command:${spaceId}`} focusRequest={focus} onSubmit={send} /></div>
       <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          {defaultTo && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">{nameOf(defaultTo)}</span>{defaultTo === space.leadThreadId && !reply ? " · lead" : ""}</span>{reply && <button type="button" aria-label="Send to the lead instead" title="Send to the lead instead" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button>}</span>}
+          {defaultTo && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" data-command-target><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">To <span className="text-foreground">{nameOf(defaultTo)}</span>{defaultTo === space?.leadThreadId && !reply ? " · lead" : ""}</span>{reply && <button type="button" aria-label="Send to the lead instead" title="Send to the lead instead" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button>}</span>}
         </div>
         <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Approval mode" className={`inline-flex h-6 min-w-0 items-center gap-1 rounded-md px-1 text-xs font-medium leading-tight transition-colors hover:bg-state-hover data-[state=open]:bg-state-active ${permission === "full" ? "text-warning-text" : "text-muted-foreground hover:text-foreground"}`}><span className="truncate">{MODE_CHOICES.find(choice => choice.id === permission)!.label}</span><Icon name="ChevronDown" className="size-3 shrink-0" /></button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-72">
