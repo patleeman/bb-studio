@@ -32,6 +32,51 @@ export function publishSidebarOrganization(mode: string): void {
   window.dispatchEvent(new CustomEvent(SIDEBAR_ORGANIZATION_EVENT, { detail: mode }));
 }
 
+/**
+ * Moves sent to Studio but not yet seen in a fetched `space_of_threads`, by
+ * thread. A refetch that started before a move settled still carries the old
+ * Space, so each fetched map gets these laid over it until a load that began
+ * after the move settled.
+ */
+interface PendingSpaceMove {
+  spaceId: string;
+  /** The last load started before the move settled; null while in flight. */
+  settledAfterLoad: number | null;
+}
+const pendingSpaceMoves = new Map<string, PendingSpaceMove>();
+let spaceLoadSeq = 0;
+
+/** Records a move; call the returned function once Studio answers. */
+export function beginPendingSpaceMove(threadIds: readonly string[], spaceId: string): () => void {
+  const move: PendingSpaceMove = { spaceId, settledAfterLoad: null };
+  for (const id of threadIds) pendingSpaceMoves.set(id, move);
+  return () => { move.settledAfterLoad = spaceLoadSeq; };
+}
+
+/** Numbers a `space_of_threads` load as it starts. */
+export function startSpaceLoad(): number {
+  return ++spaceLoadSeq;
+}
+
+/**
+ * `spaceOf` with pending moves laid over it. Pass the load that fetched it to
+ * drop moves that load already reflects.
+ */
+export function withPendingSpaceMoves(
+  spaceOf: Readonly<Record<string, string>>,
+  load?: number,
+): Record<string, string> {
+  const next = { ...spaceOf };
+  for (const [threadId, move] of pendingSpaceMoves) {
+    if (load !== undefined && move.settledAfterLoad !== null && load > move.settledAfterLoad) {
+      pendingSpaceMoves.delete(threadId);
+      continue;
+    }
+    next[threadId] = move.spaceId;
+  }
+  return next;
+}
+
 const spacesSchema = z.object({
   spaces: z.array(z.object({
     id: z.string(),
@@ -153,6 +198,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
     const load = async () => {
       if (running) { again = true; return; }
       running = true;
+      const loadSeq = startSpaceLoad();
       try {
         const { spaces } = await call("spaces", null, spacesSchema);
         let spaceOf: Record<string, string> = {};
@@ -167,7 +213,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
             // Items are a nicety: a failure leaves the lists empty, not the sidebar.
             call("spaceTree", {}, treeSchema).catch(() => ({ spaces: [] })),
           ]);
-          spaceOf = of.threads;
+          spaceOf = withPendingSpaceMoves(of.threads, loadSeq);
           leads = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null]));
           heartbeats = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId && lead.run?.enabled ? lead.run.cadence : null]));
           items = Object.fromEntries(tree.spaces.map((space) => [space.id, {

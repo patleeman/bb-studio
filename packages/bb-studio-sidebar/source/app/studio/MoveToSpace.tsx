@@ -21,7 +21,14 @@ import type { SidebarThread } from "../model/sidebar-thread.js";
 import { SpaceLeadContext } from "./SpaceLead.js";
 import { SpaceMark } from "./SpaceSwitcher.js";
 import type { StudioSpace } from "./space-groups.js";
-import { SPACE_CHANGED_EVENT, STUDIO_CHANGED_EVENT, studioSpacesAtom, useStudioSpaces } from "./studioSpaces.js";
+import {
+  beginPendingSpaceMove,
+  SPACE_CHANGED_EVENT,
+  STUDIO_CHANGED_EVENT,
+  studioSpacesAtom,
+  useStudioSpaces,
+  withPendingSpaceMoves,
+} from "./studioSpaces.js";
 
 const THREAD_REF = "bb-thread";
 const spaceOfSchema = z.object({ threads: z.record(z.string(), z.string()) });
@@ -40,8 +47,10 @@ export function useMoveThreadsToSpace(): (threadIds: readonly string[], space: S
       window.dispatchEvent(new Event(STUDIO_CHANGED_EVENT));
       window.dispatchEvent(new CustomEvent(SPACE_CHANGED_EVENT, { detail: { spaceId: space.id } }));
     };
+    // Shown at once, and kept over refetches until Studio answers.
+    const settle = beginPendingSpaceMove(threadIds, space.id);
     setSpaces((current) => current.status === "ready" && current.threadsLoaded
-      ? { ...current, spaceOf: { ...current.spaceOf, ...Object.fromEntries(threadIds.map((id) => [id, space.id])) } }
+      ? { ...current, spaceOf: withPendingSpaceMoves(current.spaceOf) }
       : current);
     try {
       await sdk.plugins.callRpc({
@@ -56,6 +65,7 @@ export function useMoveThreadsToSpace(): (threadIds: readonly string[], space: S
       toast.error(`Couldn't move to ${space.name}: ${cause instanceof Error ? cause.message : String(cause)}`);
       throw cause;
     } finally {
+      settle();
       refresh();
     }
   }, [sdk, setSpaces]);
