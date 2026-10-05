@@ -992,12 +992,19 @@ export class TalkController {
     if (this.state.localSaveError || this.state.phase !== "finalizing" || !id || !this.rpc) return;
     const local = (await this.outbox.all()).filter((segment) => segment.recordingId === id);
     if (local.some((segment) => !segment.rejected)) return;
-    // A set-aside piece would leave a hole in the text: never insert it silently.
-    if (local.length && this.insertOnDone) {
-      this.insertOnDone = false;
-      toast.error("Part of this dictation couldn't be uploaded, so Talk didn't insert it. It's in Talk recordings, and the missing audio is kept on this device.");
-    }
     const { kind } = this.state;
+    if (local.length) {
+      // Set-aside audio is still on this device. Finishing could insert a
+      // dictation with a hole in it, or let the server discard the recording
+      // as empty, so leave it paused until that audio is resolved.
+      void this.rpc.call("recording_state", { id, status: "paused" }).catch(() => {});
+      toast.error(`Part of this ${kind} couldn't be uploaded and is kept on this device, so Talk left it paused${kind === "dictation" ? " and didn't insert it" : ""}. Retry or discard that audio, then finish it from its page.`, {
+        action: this.navigate ? { label: "Review", onClick: () => this.showSetAside() } : undefined,
+      });
+      this.insertOnDone = false;
+      if (this.state.recordingId === id) this.finishIdle();
+      return;
+    }
     let recording: Recording;
     try {
       recording = await this.rpc.call("recording_state", { id, status: "finishing" });

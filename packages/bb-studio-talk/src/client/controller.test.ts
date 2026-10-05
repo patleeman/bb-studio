@@ -248,7 +248,7 @@ it("holds a new draft's pending dictation until that exact companion is visible"
   expect(readPending()).toEqual({});
 });
 
-it("does not insert a dictation when one of its pieces was set aside", async () => {
+it("neither inserts nor finishes a dictation while one of its pieces is set aside", async () => {
   const recording = { id: "rec_partial", kind: "dictation", durationMs: 50_000, status: "done", wordCount: 4, failedCount: 0, pendingCount: 0 };
   const segments = [{ sessionId: "s", status: "done", text: "Only the first half.", error: null }];
   const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments } : recording);
@@ -259,7 +259,25 @@ it("does not insert a dictation when one of its pieces was set aside", async () 
   vi.mocked(Outbox.prototype.all).mockResolvedValue([setAside]);
   await controller.stop(true);
   await vi.advanceTimersByTimeAsync(10_000);
-  expect(call).toHaveBeenCalledWith("recording_state", { id: "rec_partial", status: "finishing" });
+  expect(call).not.toHaveBeenCalledWith("recording_state", { id: "rec_partial", status: "finishing" });
+  expect(call).toHaveBeenCalledWith("recording_state", { id: "rec_partial", status: "paused" });
   expect(controller.getState().phase).toBe("idle");
   expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+});
+
+it("does not let the server discard a recording as empty while its audio is set aside", async () => {
+  const recording = { id: "rec_setaside", kind: "recording", durationMs: 0, status: "recording", wordCount: 0, failedCount: 0, pendingCount: 0 };
+  const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
+  await controller.startRecording("recording");
+  const setAside = { recordingId: "rec_setaside", sessionId: "s", index: 0, startedAt: 1, mimeType: "audio/webm", lastPartAt: 1, durationMs: 25_000, complete: true, rejected: "Invalid input", parts: [new ArrayBuffer(1)] };
+  vi.mocked(Outbox.prototype.all).mockResolvedValue([setAside]);
+  const { toast } = await import("sonner");
+  await controller.stop(false);
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(call).not.toHaveBeenCalledWith("recording_state", { id: "rec_setaside", status: "finishing" });
+  expect(vi.mocked(toast.info).mock.calls.flat().join(" ")).not.toMatch(/heard nothing|no speech/);
+  expect(vi.mocked(toast.error).mock.calls.flat().join(" ")).toMatch(/kept on this device/);
+  expect(controller.getState().phase).toBe("idle");
 });
