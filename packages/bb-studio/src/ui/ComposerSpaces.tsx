@@ -13,7 +13,7 @@ import {
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useComposer, useComposerView, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
 import { openSpaceItems } from "./StudioPanel";
@@ -118,7 +118,18 @@ export function SpacesMenuContent({ heading, othersHeading = "Add to space", hol
   );
 }
 
+/**
+ * Studio's Command view embeds BB's new-thread composer to message existing
+ * threads, so the picker stays out of it, including its handoff.
+ */
 export function ComposerSpaces() {
+  const probe = useRef<HTMLSpanElement>(null);
+  const [inCommand, setInCommand] = useState<boolean | null>(null);
+  useLayoutEffect(() => setInCommand(!!probe.current?.closest("[data-command-composer]")), []);
+  return inCommand === false ? <SpacePicker /> : inCommand === null ? <span ref={probe} hidden /> : null;
+}
+
+function SpacePicker() {
   const view = useComposerView();
   const composer = useComposer();
   const rpc = useRpc<typeof rpcContract>();

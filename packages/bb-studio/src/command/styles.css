@@ -223,7 +223,7 @@
   align-items: center;
   border-radius: 6px;
 }
-.channel-switcher-row > button[aria-pressed] {
+.channel-switcher-row > .channel-switcher-pick {
   display: flex;
   height: 28px;
   min-width: 0;
@@ -237,9 +237,9 @@
 }
 .channel-switcher-row:hover,
 .channel-switcher-row[data-current] { background: var(--state-hover); }
-.channel-switcher-row[data-current] > button[aria-pressed] { font-weight: 500; }
-.channel-switcher-row:not([data-current]) > button[aria-pressed] { color: var(--muted-foreground); }
-.channel-switcher-row[data-fork] > button[aria-pressed] { padding-left: 20px; font-size: var(--text-xs); }
+.channel-switcher-row[data-current] > .channel-switcher-pick { font-weight: 500; }
+.channel-switcher-row:not([data-current]) > .channel-switcher-pick { color: var(--muted-foreground); }
+.channel-switcher-row[data-fork] > .channel-switcher-pick { padding-left: 20px; font-size: var(--text-xs); }
 .channel-switcher-check {
   display: inline-flex;
   width: 14px;
@@ -248,10 +248,17 @@
 }
 .channel-switcher-row[data-activity="Idle"] .channel-status-dot { display: none; }
 .channel-switcher-row > button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-.channel-switcher-close { width: 22px; height: 22px; margin-right: 2px; }
+.channel-switcher-send,
+.channel-switcher-close { width: 22px; height: 22px; flex: 0 0 auto; }
+.channel-switcher-close { margin-right: 2px; }
+/* The thread messages go to keeps its arrow, in the accent colour. */
+.channel-switcher-send[aria-pressed="true"] { color: var(--channel-working, #4f8ff7); opacity: 1; }
 @media (hover: hover) {
+  .channel-switcher-send:not([aria-pressed="true"]),
   .channel-switcher-close { opacity: 0; }
+  .channel-switcher-row:hover .channel-switcher-send,
   .channel-switcher-row:hover .channel-switcher-close,
+  .channel-switcher-send:focus-visible,
   .channel-switcher-close:focus-visible { opacity: 1; }
 }
 
@@ -268,9 +275,9 @@
     padding: 0;
     scrollbar-width: none;
   }
-  .channel-switcher-row > button[aria-pressed] { height: 30px; padding: 0 10px 0 4px; }
-  .channel-switcher-row > button[aria-pressed] > .channel-rail-name { max-width: 140px; }
-  .channel-switcher-row[data-fork] > button[aria-pressed] { padding: 0 10px 0 6px; }
+  .channel-switcher-row > .channel-switcher-pick { height: 30px; padding: 0 10px 0 4px; }
+  .channel-switcher-row > .channel-switcher-pick > .channel-rail-name { max-width: 140px; }
+  .channel-switcher-row[data-fork] > .channel-switcher-pick { padding: 0 10px 0 6px; }
 }
 
 .channel-stage-empty {

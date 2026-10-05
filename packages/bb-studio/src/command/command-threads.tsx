@@ -167,7 +167,6 @@ export function CommandThreads({ panes, threads, leadThreadId, onReply, onOpen }
         {following && <span className="shrink-0 text-xs text-subtle-foreground" title="This pane switches to whichever thread is working. Open another thread to keep this one." data-command-following>Following</span>}
         <Status thread={thread} withTime />
         <span className="channel-pane-actions">
-          <button type="button" aria-label={`Send to ${label(thread)}`} title="Send to this thread" onClick={() => choose(thread.id)} className="channel-pane-action"><Icon name="ArrowTurnBackward" className="size-3.5" /></button>
           {arrangeable && <button type="button" aria-label={`Show only ${label(thread)}`} title="Close the other panes" onClick={() => panes.only(thread.id)} className="channel-pane-action"><Icon name="Maximize2" className="size-3.5" /></button>}
           {!following && <button type="button" aria-label={`Close ${label(thread)}`} title={arrangeable ? "Close. Open it again from the thread list." : "Close and follow the work again"} onClick={() => panes.close(thread.id)} className="channel-pane-action"><Icon name="X" className="size-3.5" /></button>}
         </span>
@@ -186,8 +185,16 @@ export function CommandThreads({ panes, threads, leadThreadId, onReply, onOpen }
   </div>;
 }
 
-/** Every thread in the Space, beside the composer: a check marks the open ones. Click one to open it, or close it again. */
-export function CommandSwitcher({ panes, threads, leadThreadId }: { panes: CommandPanes; threads: CommandThread[]; leadThreadId: string | null }) {
+/**
+ * Every thread in the Space, beside the composer: a check marks the open
+ * ones and an arrow the one messages go to. Click a name to open it as a
+ * pane; click the arrow to send to it.
+ */
+export function CommandSwitcher({ panes, threads, leadThreadId, target, onReply }: {
+  panes: CommandPanes; threads: CommandThread[]; leadThreadId: string | null;
+  /** The thread the composer sends to. */
+  target: string | null; onReply(id: string, focusComposer?: boolean): void;
+}) {
   const roots = byAttention(threads.filter(thread => !thread.parentThreadId));
   const lead = roots.filter(thread => thread.id === leadThreadId);
   // Lead first, then attention order, with forks right after their parent.
@@ -198,12 +205,13 @@ export function CommandSwitcher({ panes, threads, leadThreadId }: { panes: Comma
       {rows.map(thread => {
         const open = shown.has(thread.id), activity = threadActivity(thread);
         return <div key={thread.id} className="channel-switcher-row" data-current={open || undefined} data-fork={thread.parentThreadId ? "" : undefined} data-activity={activity}>
-          <button type="button" aria-pressed={open} onClick={() => panes.open(thread.id)} aria-label={`${thread.title}, ${activity}${open ? ", open" : ""}`} title={open ? `${thread.title} · ${activity}` : `Open ${thread.title} · ${activity}`}>
+          <button type="button" className="channel-switcher-pick" aria-pressed={open} onClick={() => panes.open(thread.id)} aria-label={`${thread.title}, ${activity}${open ? ", open" : ""}`} title={open ? `${thread.title} · ${activity}` : `Open ${thread.title} · ${activity}`}>
             <span className="channel-switcher-check" aria-hidden>{open && <Icon name="Check" className="size-3.5" />}</span>
             <span className="channel-rail-name">{thread.title}</span>
             {thread.id === leadThreadId && <span className="shrink-0 text-xs text-subtle-foreground">Lead</span>}
             <span className="channel-status-dot" aria-hidden />
           </button>
+          <button type="button" className="channel-pane-action channel-switcher-send" aria-pressed={thread.id === target} aria-label={`Send to ${thread.title}`} title={thread.id === target ? `Messages go to ${thread.title}` : `Send to ${thread.title}`} onClick={() => onReply(thread.id, true)}><Icon name="ArrowTurnBackward" className="size-3.5" /></button>
           {open && !panes.following && <button type="button" className="channel-pane-action channel-switcher-close" aria-label={`Close ${thread.title}`} title="Close this pane" onClick={() => panes.close(thread.id)}><Icon name="X" className="size-3" /></button>}
         </div>;
       })}

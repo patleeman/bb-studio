@@ -178,7 +178,7 @@ function CommandView({ spaceId }: { spaceId: string }) {
       </div>
       {error && <div className="mt-2">{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</div>}
     </div>
-    {space && <CommandSwitcher panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} />}
+    {space && <CommandSwitcher panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} target={defaultTo} onReply={pickReply} />}
     </div>
   </div>;
 }

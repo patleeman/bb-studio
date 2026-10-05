@@ -13,13 +13,13 @@ function View({ threads, leadThreadId }: { threads: CommandThread[]; leadThreadI
   const panes = useCommandPanes("space", threads, leadThreadId);
   return React.createElement(React.Fragment, null,
     React.createElement(CommandThreads, { panes, threads, leadThreadId, onReply: state.reply, onOpen: state.open }),
-    React.createElement(CommandSwitcher, { panes, threads, leadThreadId }),
+    React.createElement(CommandSwitcher, { panes, threads, leadThreadId, target: leadThreadId, onReply: state.reply }),
     React.createElement("button", { "aria-label": "Follow work", onClick: panes.follow }));
 }
 const render = (threads = [row("idle", "idle"), row("active", "active")], leadThreadId: string | null = null) => act(() => root.render(React.createElement(View, { threads, leadThreadId })));
 const shown = () => [...container.querySelectorAll("[data-channel-thread]")].map(pane => pane.getAttribute("data-channel-thread"));
 const click = (label: string) => act(() => (container.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement).click());
-const switcher = (name: string) => act(() => ([...container.querySelectorAll('[aria-label="Space threads"] button[aria-pressed]')].find(button => button.textContent?.startsWith(name)) as HTMLButtonElement).click());
+const switcher = (name: string) => act(() => ([...container.querySelectorAll('[aria-label="Space threads"] .channel-switcher-pick')].find(button => button.textContent?.startsWith(name)) as HTMLButtonElement).click());
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} }); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 test("one pane follows the work until the owner opens another thread, which makes a grid", () => {
@@ -58,7 +58,7 @@ test("closing a pane hides it until the thread list opens it again, and closing 
 });
 test("the thread list puts the lead first and forks under their parent; fork links open a pane", () => {
   render([row("idle", "idle", { updatedAt: 9 }), row("ask", "idle", { hasPendingInteraction: true }), row("lead", "idle"), row("child", "active", { parentThreadId: "ask" })], "lead");
-  expect([...container.querySelectorAll('[aria-label="Space threads"] button[aria-pressed]')].map(button => button.textContent?.replace(/Lead$/, ""))).toEqual(["lead", "ask", "child", "idle"]);
+  expect([...container.querySelectorAll('[aria-label="Space threads"] .channel-switcher-pick')].map(button => button.textContent?.replace(/Lead$/, ""))).toEqual(["lead", "ask", "child", "idle"]);
   // Input requests come ahead of work.
   expect(shown()).toEqual(["ask"]);
   switcher("lead");
@@ -116,6 +116,15 @@ test("panes open on the newest message and follow new ones until the owner scrol
 });
 test("the thread list checks the open threads", () => {
   render([row("lead", "idle"), row("run", "active")], "lead");
-  const checked = () => [...container.querySelectorAll('[aria-label="Space threads"] button[aria-pressed="true"]')].map(button => button.textContent);
+  const checked = () => [...container.querySelectorAll('[aria-label="Space threads"] .channel-switcher-pick[aria-pressed="true"]')].map(button => button.textContent);
   expect(checked()).toEqual(["run"]);
+});
+test("each row in the thread list sends to its thread, and the recipient's arrow stays lit", () => {
+  render([row("lead", "idle"), row("run", "active")], "lead");
+  expect(container.querySelector('[aria-label="Send to lead"]')?.getAttribute("aria-pressed")).toBe("true");
+  expect(container.querySelector('[aria-label="Send to run"]')?.getAttribute("aria-pressed")).toBe("false");
+  click("Send to run");
+  expect(state.reply).toHaveBeenCalledWith("run", true);
+  // Panes no longer carry their own send button.
+  expect(container.querySelector('[data-channel-thread] [aria-label="Send to run"]')).toBeNull();
 });

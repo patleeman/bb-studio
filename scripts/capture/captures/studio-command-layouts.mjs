@@ -26,7 +26,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
  const wait = (client, expression) => client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+20000;const tick=()=>(${expression})?resolve():Date.now()>end?reject(new Error('Command view assertion failed: '+${JSON.stringify(expression)})):setTimeout(tick,200);tick();})`, true);
  const panes = "Array.from(document.querySelectorAll('[data-command-panes] [data-channel-thread]')).map(p=>p.getAttribute('data-channel-thread'))";
  // Opens a thread from the list beside the composer; one already open stays put.
- const show = (client, title) => client.evaluate(`(()=>{const row=Array.from(document.querySelectorAll('[aria-label="Space threads"] button[aria-pressed]')).find(b=>b.getAttribute('aria-label').startsWith(${JSON.stringify(title + ", ")}));if(!row)throw new Error('Missing thread row: '+${JSON.stringify(title)});if(row.getAttribute('aria-pressed')!=='true')row.click();})()`);
+ const show = (client, title) => client.evaluate(`(()=>{const row=Array.from(document.querySelectorAll('[aria-label="Space threads"] .channel-switcher-pick')).find(b=>b.getAttribute('aria-label').startsWith(${JSON.stringify(title + ", ")}));if(!row)throw new Error('Missing thread row: '+${JSON.stringify(title)});if(row.getAttribute('aria-pressed')!=='true')row.click();})()`);
  const follow = async client => {
   await client.evaluate("(()=>{const back=document.querySelector('[aria-label=\"Follow work\"]');if(back&&back.getAttribute('aria-pressed')!=='true')back.click();})()");
   await wait(client, `${panes}.length===1&&!!document.querySelector('[data-command-following]')`);
@@ -52,7 +52,7 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
  };
  // The thread list sits beside the composer, never over the panes.
  const docked = client => client.evaluate("(()=>{const list=document.querySelector('.channel-switcher')?.getBoundingClientRect();const composer=document.querySelector('[data-command-composer]')?.getBoundingClientRect();const stage=document.querySelector('.channel-thread-stage')?.getBoundingClientRect();if(!list||!composer||!stage)throw new Error('Missing thread list, composer or panes');if(list.top<stage.bottom-1)throw new Error('Thread list overlaps the panes');if(innerWidth>820&&list.left<composer.right)throw new Error('Thread list is not beside the composer');const box=document.querySelector('[data-command-composer] form')?.getBoundingClientRect(),rows=document.querySelector('.channel-switcher-list')?.getBoundingClientRect();if(innerWidth>820&&(!box||!rows||Math.abs(box.top-rows.top)>1||Math.abs(box.bottom-rows.bottom)>1))throw new Error('Thread list is not as tall as the composer box');})()");
- const rows = "document.querySelectorAll('[aria-label=\"Space threads\"] button[aria-pressed]').length";
+ const rows = "document.querySelectorAll('[aria-label=\"Space threads\"] .channel-switcher-pick').length";
  const clearDraft = async client => {
   await client.evaluate("document.querySelector('[data-command-composer] .ProseMirror').focus()");
   for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "a", code: "KeyA", windowsVirtualKeyCode: 65, modifiers: 4 });
@@ -88,6 +88,10 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    await client.clickElementWithTextAndPointer(reactionSelector, reactionText);
    await wait(client, "document.querySelector('[data-command-composer] .ProseMirror').textContent.includes('Approve')");
    await wait(client, "document.querySelector('[data-command-target]')?.textContent.includes('To Release checklist')");
+   await wait(client, "document.querySelector('.channel-switcher [aria-label=\"Send to Release checklist\"]')?.getAttribute('aria-pressed')==='true'");
+   // The thread list's arrow picks the recipient too.
+   await client.evaluate("document.querySelector('.channel-switcher [aria-label=\"Send to Scribe\"]').click()");
+   await wait(client, "document.querySelector('[data-command-target]')?.textContent.includes('To Scribe')");
    await clearDraft(client);
    await client.clickAriaButtonWithPointer("Send to the lead instead");
    await wait(client, "document.querySelector('[data-command-target]')?.textContent.includes('To Atlas · lead')");
