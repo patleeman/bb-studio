@@ -35,6 +35,7 @@ public enum Studio {
     public static let spaceMembers = "spaceMembers"
     public static let spacesForThread = "spacesForThread"
     public static let pendingThreadSpaces = "pendingThreadSpaces"
+    public static let moveToSpace = "moveToSpace"
     public static let createInSpace = "createInSpace"
     public static let recentThreads = "recentThreads"
     public static let space_lead = "space_lead"
@@ -145,6 +146,8 @@ public enum Studio {
   public typealias SpacesForThread = SpacesForThreadOutput
 
   public typealias PendingThreadSpaces = PendingThreadSpacesOutput
+
+  public typealias MoveToSpace = MoveToSpaceOutput
 
   public typealias CreateInSpace = CreateInSpaceOutput
 
@@ -2562,6 +2565,52 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public struct MoveToSpaceInputItemsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct MoveToSpaceInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var items: [MoveToSpaceInputItemsItem]?
+
+    public init(id: String? = nil, items: [MoveToSpaceInputItemsItem]? = nil) {
+      self.id = id
+      self.items = items
+    }
+  }
+
+  public struct MoveToSpaceOutputFailedItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var title: String?
+    public var error: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, error: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.title = title
+      self.error = error
+    }
+  }
+
+  public struct MoveToSpaceOutput: Sendable, Hashable, Codable {
+    public var moved: Double?
+    public var unchanged: Double?
+    public var failed: [MoveToSpaceOutputFailedItem]?
+
+    public init(moved: Double? = nil, unchanged: Double? = nil, failed: [MoveToSpaceOutputFailedItem]? = nil) {
+      self.moved = moved
+      self.unchanged = unchanged
+      self.failed = failed
     }
   }
 

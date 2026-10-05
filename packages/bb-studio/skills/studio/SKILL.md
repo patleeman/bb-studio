@@ -62,16 +62,22 @@ stuff". It doesn't delete spaces.
 
 ## Spaces
 
-A space gathers Studio items, whole BB projects and threads into one place,
-like a "Q4 launch" space with two repos, a few pages and a board. A BB
+A space gathers whole BB projects, with their Studio items, and threads into
+one place, like a "Q4 launch" space with two repos, a few pages and a board. A BB
 project is where code lives and threads run; a space is how the user groups
 work. A project in a space brings in all of its items and open threads, now
 and later. A thread is in a space when it was added to it or its project is.
 
 - `studio_list_spaces` lists the spaces and marks the ones this thread is in.
-- `studio_space_items` with `space` (a name), `threads` (thread ids) and
-  `thisThread` (`add` or `remove`) files threads in a space. Items follow
-  their project, so they can't be filed one by one.
+- `studio_space_items` with `space` (a name), `threads` (thread ids),
+  `items` (item links) and `thisThread` (`add` or `remove`) files threads and
+  items in a space. A thread is in one space at a time, so filing it moves
+  it. Items follow their project, so an item not in the space yet moves to
+  the space's own project; items already in it stay put.
+- `studio_move_items` with `items` and `project` (a name, an id, or
+  `global`) moves items to another project, and so to that project's space.
+- In a shell, `bb studio move <link|plugin:id|thread-id>… --space <name>` or
+  `--project <name|global>` does the same.
 - Only the user makes, renames or deletes spaces. Spaces aren't tags:
   `studio_tag_items` can't touch them. File things in a space when the user
   asks to.
@@ -87,8 +93,9 @@ Spaces show in the sidebar with their threads and Studio items; the user
 makes, edits and deletes them there, and picks a space's lead and Heartbeat
 from its ⋯ menu. Studio Teams bot conversations
 are threads, so they join a space as threads do. Each thread's
-header shows the spaces it's in, linking back to them, and adds it to
-another. The Studio panel
+header shows its space, links back to it, and moves the thread to another.
+Each Studio item's ⋯ menu, the collection's row menu and its bulk **Move**
+offer **Move to** a space or a project. The Studio panel
 is the collection. Search, space, kind, project and tag filters, list or
 grid, archive, move to project, delete, **New ▾** for any kind, and
 **New thread** to start a conversation that mentions the selected items. With

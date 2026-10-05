@@ -246,6 +246,14 @@ export const rpcContract = defineRpcContract({
   spacesForThread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ spaces: z.array(space), inherited: z.array(z.string()) }) },
   /** Spaces picked in a project's new-thread composer; the next thread started there moves to the last one. */
   pendingThreadSpaces: { input: z.object({ projectId: z.string().min(1).max(200), ids: z.array(spaceId).max(50) }), output: z.object({ ok: z.boolean() }) },
+  /**
+   * Moves items into a space: those not in it yet go to its catch-all
+   * project. Counts what moved and stayed, and names what failed.
+   */
+  moveToSpace: {
+    input: z.object({ id: spaceId, items: z.array(itemRef).min(1).max(500) }),
+    output: z.object({ moved: z.number(), unchanged: z.number(), failed: z.array(z.object({ pluginId, id: z.string(), title: z.string(), error: z.string() })) }),
+  },
   /** An item made in the space's catch-all project, so it's in the space. */
   createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string(), title: z.string().optional() }) },
   /** Open threads to pick from when adding one to a space. */

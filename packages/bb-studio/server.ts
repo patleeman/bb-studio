@@ -29,6 +29,7 @@ import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
 import { SpaceFolders } from "./src/space-folders";
+import { planMove } from "./src/move-items";
 import { createThreadLines } from "./src/thread-lines";
 import { spaceOpenItems, spaceTreeItems } from "./src/space-tree";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
@@ -245,6 +246,46 @@ export default async function plugin(bb: BbPluginApi) {
   const threadLines = createThreadLines(bb.sdk);
   /** A thread's space can change without a membership write; sidebars refetch space_of_threads. */
   const threadsMoved = () => { spaceLeads.threadsChanged(); tagsChanged(); };
+  /**
+   * Moves items to a project, or into a space through its catch-all project.
+   * Items already there stay; kinds that can't move are listed as failed.
+   */
+  const moveItems = async (refs: readonly ItemRef[], target: { spaceId: string } | { projectId: string | null }) => {
+    let projectId: string | null;
+    let space: Space | undefined;
+    if ("spaceId" in target) {
+      if (!spaces.get(target.spaceId)) throw new Error("That space no longer exists.");
+      await folders.ensureCatchAll(target.spaceId);
+      space = spaces.get(target.spaceId) ?? undefined;
+      projectId = space?.defaultProjectId ?? null;
+      if (!space || !projectId) throw new Error("This Space has no folder to move items into yet.");
+    } else projectId = target.projectId;
+    const { items, providers } = await hub.overview();
+    const movable = new Set(providers.flatMap((provider) => provider.kinds.filter((kind) => kind.capabilities?.move).map((kind) => `${provider.pluginId}:${kind.id}`)));
+    const byKey = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item]));
+    const known = refs.flatMap((ref) => {
+      const item = byKey.get(`${ref.pluginId}:${ref.id}`);
+      return item ? [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), projectId: item.projectId ?? null, kind: item.kind }] : [];
+    });
+    const plan = planMove(known, { projectId, space }, (item) => item.pluginId !== STUDIO_PLUGIN_ID && movable.has(`${item.pluginId}:${item.kind}`));
+    const titleOf = (pluginId: string, id: string) => byKey.get(`${pluginId}:${id}`)?.title || id;
+    const failed = [
+      ...refs.filter((ref) => !byKey.has(`${ref.pluginId}:${ref.id}`)).map((ref) => ({ ...ref, title: ref.id, error: "Not found" })),
+      ...plan.refused.map((item) => ({ pluginId: item.pluginId, id: item.id, title: item.title, error: "Can't be moved" })),
+    ];
+    const moved: { pluginId: string; id: string; title: string }[] = [];
+    for (const [pluginId, ids] of plan.byPlugin) {
+      try {
+        const result = await hub.call(pluginId, "studio_move", { ids, projectId });
+        moved.push(...result.done.map((id) => ({ pluginId, id, title: untitled(titleOf(pluginId, id)) })));
+        failed.push(...result.failed.map(({ id, error }) => ({ pluginId, id, title: untitled(titleOf(pluginId, id)), error })));
+      } catch (error) {
+        failed.push(...ids.map((id) => ({ pluginId, id, title: untitled(titleOf(pluginId, id)), error: errorText(error) })));
+      }
+    }
+    if (moved.length) tagsChanged();
+    return { moved, unchanged: plan.unchanged, failed, projectId };
+  };
   bb.events.on("thread.created", () => threadsMoved());
   bb.events.on("thread.archived", () => threadsMoved());
   bb.events.on("thread.unarchived", () => threadsMoved());
@@ -409,6 +450,10 @@ export default async function plugin(bb: BbPluginApi) {
       const { item } = await hub.call(pluginId, "studio_create", { kind, projectId });
       tagsChanged();
       return { href: item.href, title: item.title || "Untitled" };
+    },
+    moveToSpace: async ({ id, items }) => {
+      const { moved, unchanged, failed } = await moveItems(items, { spaceId: id });
+      return { moved: moved.length, unchanged: unchanged.length, failed };
     },
     spaceMembers: ({ id, add, remove }) => {
       if (add.length) spaces.add(id, add);
@@ -698,7 +743,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_list_spaces",
     description:
-      "List the user's Studio spaces. A space gathers Studio items, whole BB projects and threads into one place; a thread in a space sees its items by default in studio_list_items.",
+      "List the user's Studio spaces. A space gathers whole BB projects, with their Studio items, and threads into one place; a thread in a space sees its items by default in studio_list_items.",
     parameters: z.object({}),
     async execute(_params, ctx) {
       return formatSpaces(spaces.list(), threadSpaces(ctx.threadId, ctx.projectId ?? null));
@@ -717,6 +762,29 @@ export default async function plugin(bb: BbPluginApi) {
       else missing.push(ref);
     }
     return { found, missing };
+  };
+
+  /** A project by id or name; "global" is no project. */
+  const resolveProject = async (ref: string): Promise<string | null> => {
+    if (ref.trim().toLowerCase() === "global") return null;
+    const projects = (await bb.sdk.projects.list({ includePersonal: true })) as { id: string; name: string }[];
+    const found = projects.find((project) => project.id === ref) ?? projects.find((project) => project.name.toLowerCase() === ref.trim().toLowerCase());
+    if (!found) throw new Error(`No project called "${ref}".`);
+    return found.id;
+  };
+
+  /** Moves items by link and says what happened, a line each. */
+  const moveItemsReport = async (refs: readonly string[], target: Parameters<typeof moveItems>[1], label: string) => {
+    const { found, missing } = await resolveItems(refs);
+    const lines: string[] = [];
+    if (found.length) {
+      const { moved, unchanged, failed } = await moveItems(found, target);
+      lines.push(`${label}: moved ${moved.length} item${moved.length === 1 ? "" : "s"}${moved.length ? ` (${moved.map((item) => item.title).join(", ")})` : ""}.`);
+      if (unchanged.length) lines.push(`Already there: ${unchanged.map((item) => item.title).join(", ")}`);
+      if (failed.length) lines.push(`Failed: ${failed.map((item) => `${item.title} (${item.error})`).join(", ")}`);
+    }
+    if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
+    return lines;
   };
 
   bb.agents.registerTool({
@@ -788,15 +856,16 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_space_items",
     description:
-      "Move this thread or other threads into one of the user's spaces, or take them out. A thread is in one space at a time, so adding it moves it; taking it out returns it to its project's space. Studio items follow their project, so they can't be added one by one. Only the user makes, renames or deletes spaces, so name one that exists. Add when the user asks to file a thread in a space, or when a space's lead starts a worker thread.",
+      "Move threads or Studio items into one of the user's spaces, or take this thread out. A thread is in one space at a time, so adding it moves it; taking it out returns it to its project's space. An item moves into the space's own project, unless it is already in the space. Only the user makes, renames or deletes spaces, so name one that exists. Use when the user asks to file something in a space, or when a space's lead starts a worker thread.",
     parameters: z.object({
       space: z.string().min(1).max(100).describe("The space's name or id"),
       thisThread: z.enum(["add", "remove"]).optional().describe("Add this thread to the space, or take it out"),
       threads: z.array(z.string().min(1).max(200)).max(100).optional().describe("Ids of other threads to add to the space, e.g. workers you started"),
+      items: z.array(z.string().max(500)).max(100).optional().describe("Studio items to move into the space, as the links studio_list_items shows, e.g. /plugins/pages/pages/pg_x"),
     }),
-    async execute({ space: name, thisThread, threads = [] }, ctx) {
+    async execute({ space: name, thisThread, threads = [], items = [] }, ctx) {
       const space = requireSpace(name);
-      if (!thisThread && !threads.length) return "Pass threads or thisThread.";
+      if (!thisThread && !threads.length && !items.length) return "Pass threads, items or thisThread.";
       const thread = { pluginId: THREAD_REF, id: ctx.threadId };
       const others = (await Promise.all(threads.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null)))).flatMap((found, index) => (found && found.deletedAt == null ? [{ pluginId: THREAD_REF, id: threads[index]! }] : []));
       const missing = threads.filter((threadId) => !others.some((other) => other.id === threadId));
@@ -806,7 +875,22 @@ export default async function plugin(bb: BbPluginApi) {
       const lines = others.length ? [`Space ${space.name}: added ${others.length} thread${others.length === 1 ? "" : "s"}.`] : [];
       if (thisThread) lines.push(thisThread === "add" ? "This thread is in the space." : "This thread is out of the space.");
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
+      if (items.length) lines.push(...(await moveItemsReport(items, { spaceId: space.id }, `Space ${space.name}`)));
       return lines.join("\n");
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "studio_move_items",
+    description:
+      "Move the user's BB Studio items to another BB project, or to Global (no project). An item's space follows its project; to put items in a space, use studio_space_items instead. Pass items as the links studio_list_items shows.",
+    parameters: z.object({
+      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
+      project: z.string().min(1).max(200).describe('The project\'s id or name, or "global" for no project'),
+    }),
+    async execute({ items, project }) {
+      const projectId = await resolveProject(project);
+      return (await moveItemsReport(items, { projectId }, projectId ? `Project ${project}` : "Global")).join("\n");
     },
   });
 
@@ -817,6 +901,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "list", summary: "List items in the current space, or the current project and global ones", usage: "bb studio list [query…] [--all] [--json], e.g. bb studio list kind:page -tag:draft pricing" },
       { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
       { name: "spaces", summary: "List spaces, their projects and how many items each has", usage: "bb studio spaces" },
+      { name: "move", summary: "Move items or threads into a space, or items to a project", usage: "bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)" },
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
       { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
     ],
@@ -842,6 +927,33 @@ export default async function plugin(bb: BbPluginApi) {
           }
           case "spaces":
             return { exitCode: 0, stdout: `${await formatSpaces(spaces.list(), ctx.threadId ? threadSpaces(ctx.threadId, ctx.projectId ?? null) : [])}\n` };
+          case "move": {
+            const spaceName = option("--space");
+            const project = option("--project");
+            if (!rest.length || Boolean(spaceName) === Boolean(project)) return usage("bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)");
+            const threadIds = rest.filter((ref) => /^thr_[a-z0-9]+$/i.test(ref));
+            const itemRefs = rest.filter((ref) => !threadIds.includes(ref));
+            const lines: string[] = [];
+            if (spaceName) {
+              const space = requireSpace(spaceName);
+              if (threadIds.length) {
+                const found = (await Promise.all(threadIds.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null)))).flatMap((thread, index) => (thread && thread.deletedAt == null ? [threadIds[index]!] : []));
+                if (found.length) {
+                  spaces.add(space.id, found.map((id) => ({ pluginId: THREAD_REF, id })));
+                  threadsMoved();
+                  lines.push(`Space ${space.name}: moved ${found.length} thread${found.length === 1 ? "" : "s"}.`);
+                }
+                const missing = threadIds.filter((id) => !found.includes(id));
+                if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
+              }
+              if (itemRefs.length) lines.push(...(await moveItemsReport(itemRefs, { spaceId: space.id }, `Space ${space.name}`)));
+            } else {
+              if (threadIds.length) return { exitCode: 1, stderr: "Threads move between spaces; pass --space.\n" };
+              const projectId = await resolveProject(project!);
+              lines.push(...(await moveItemsReport(itemRefs, { projectId }, projectId ? `Project ${project}` : "Global")));
+            }
+            return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
+          }
           case "providers": {
             const providers = await hub.providers();
             if (!providers.length) return { exitCode: 0, stdout: "No Studio add-ons installed. Install Studio Pages, Studio Talk or Studio Draw.\n" };
@@ -856,7 +968,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|spaces|providers|reindex> …");
+            return usage("bb studio <list|tags|spaces|move|providers|reindex> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
