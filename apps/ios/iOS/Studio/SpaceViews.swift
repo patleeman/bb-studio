@@ -190,15 +190,30 @@ final class ThreadSpacesModel: ObservableObject {
         return spaces.first { $0.id == id }
     }
 
+    /// Shows the move at once; on failure puts the thread back and reloads, since the move may have landed.
     func move(_ threadId: String, to space: StudioSpace, client: BBClient) async throws {
+        let previous = spaceOf[threadId]
         spaceOf[threadId] = space.id
-        try await client.moveThreads([threadId], toSpace: space.id)
+        do {
+            try await client.moveThreads([threadId], toSpace: space.id)
+        } catch {
+            if spaceOf[threadId] == space.id { spaceOf[threadId] = previous }
+            await load(threadId, client: client)
+            throw error
+        }
         await load(threadId, client: client)
     }
 
     func setLead(_ threadId: String?, of space: StudioSpace, reload threadIdToReload: String, client: BBClient) async throws {
+        let previous = leadOfSpace[space.id]
         leadOfSpace[space.id] = threadId
-        try await client.setSpaceLead(space.id, threadId: threadId)
+        do {
+            try await client.setSpaceLead(space.id, threadId: threadId)
+        } catch {
+            if leadOfSpace[space.id] == threadId { leadOfSpace[space.id] = previous }
+            await load(threadIdToReload, client: client)
+            throw error
+        }
         await load(threadIdToReload, client: client)
     }
 }

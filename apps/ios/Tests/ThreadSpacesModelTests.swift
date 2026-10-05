@@ -1,7 +1,7 @@
 import XCTest
 @testable import BBStudio
 
-/// A thread's Space menu: hidden without Studio's thread lookup.
+/// A thread's Space menu: hidden without Studio's thread lookup, and honest after a failed change.
 @MainActor
 final class ThreadSpacesModelTests: XCTestCase {
     private static let spaces = #"{"ok":true,"result":{"spaces":[{"id":"personal","isDefault":true,"name":"Personal","description":"","projectIds":[],"threadIds":[]},{"id":"launch","isDefault":false,"name":"Launch","description":"","projectIds":[],"threadIds":[]}]}}"#
@@ -39,5 +39,40 @@ final class ThreadSpacesModelTests: XCTestCase {
         }
         await model.load("thr_1", client: failing)
         XCTAssertNil(model.space(of: "thr_1", projectId: nil))
+    }
+
+    func testFailedMoveRestoresTheThreadsSpace() async throws {
+        let model = ThreadSpacesModel()
+        await model.load("thr_1", client: client { Self.answer($0) })
+        XCTAssertEqual(model.space(of: "thr_1", projectId: nil)?.id, "launch")
+        let personal = try XCTUnwrap(model.spaces.first { $0.id == "personal" })
+
+        // The move fails and so does the reload: the menu shows where the thread was.
+        let offline = client { path in
+            if path.hasSuffix("spaceMembers") { return (500, #"{"ok":false,"error":{"message":"boom"}}"#) }
+            throw URLError(.notConnectedToInternet)
+        }
+        do {
+            try await model.move("thr_1", to: personal, client: offline)
+            XCTFail("The move should fail")
+        } catch {}
+        XCTAssertEqual(model.space(of: "thr_1", projectId: nil)?.id, "launch")
+    }
+
+    func testFailedLeadChangeRestoresTheLead() async throws {
+        let model = ThreadSpacesModel()
+        await model.load("thr_1", client: client { Self.answer($0) })
+        let launch = try XCTUnwrap(model.spaces.first { $0.id == "launch" })
+        XCTAssertNil(model.leadOfSpace["launch"])
+
+        let offline = client { path in
+            if path.hasSuffix("space_set_lead") { return (500, #"{"ok":false,"error":{"message":"boom"}}"#) }
+            throw URLError(.notConnectedToInternet)
+        }
+        do {
+            try await model.setLead("thr_1", of: launch, reload: "thr_1", client: offline)
+            XCTFail("Setting the lead should fail")
+        } catch {}
+        XCTAssertNil(model.leadOfSpace["launch"])
     }
 }
