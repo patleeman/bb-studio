@@ -66,6 +66,17 @@ describe("applyElementUpserts", () => {
     expect(scene.elements.map((el) => el.id)).toEqual(["r1"]);
   });
 
+  it("keys agent image files by the id the image element references", () => {
+    const dataURL = "data:image/png;base64,AAAA";
+    const scene = applyElementUpserts(stored([]), [{ id: "img", type: "image", fileId: "f1" }], {
+      files: { f1: { mimeType: "image/png", dataURL }, f2: { id: "other", mimeType: "image/png", dataURL }, bad: "nope" },
+    });
+    expect(scene.files).toEqual({
+      f1: { id: "f1", mimeType: "image/png", dataURL },
+      f2: { id: "f2", mimeType: "image/png", dataURL },
+    });
+  });
+
   it("deletes a live element sent as a tombstone", () => {
     const scene = applyElementUpserts(stored([rect]), [{ ...rect, isDeleted: true }]);
     expect(scene.elements[0]).toMatchObject({ id: "r1", isDeleted: true, version: 4 });

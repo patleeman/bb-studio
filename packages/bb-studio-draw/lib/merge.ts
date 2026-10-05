@@ -261,9 +261,24 @@ export function applyElementUpserts(
       ...cur.appState,
       ...(options.appState ?? {}),
     }),
-    files: { ...cur.files, ...(options.files ?? {}) },
+    files: { ...cur.files, ...binaryFiles(options.files) },
   };
   return pruneTombstones(scene);
+}
+
+/**
+ * Agent- or file-supplied image files, keyed the way Excalidraw keys them.
+ * The editor indexes files by their own `id`, not the record key, so a file
+ * without a matching `id` never reaches the image element that references it.
+ */
+function binaryFiles(files: Record<string, unknown> | undefined): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [id, file] of Object.entries(files ?? {})) {
+    if (file && typeof file === "object" && !Array.isArray(file) && typeof (file as { dataURL?: unknown }).dataURL === "string") {
+      out[id] = { ...file, id };
+    }
+  }
+  return out;
 }
 
 /**
