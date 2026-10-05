@@ -63,25 +63,28 @@ export function drawingText(data: string): string[] {
     .map((element) => (element.text as string).trim());
 }
 
-type Summary = { count: number; preview: string | null };
+type Summary = { count: number; preview: string | null; thumbnail: boolean };
 const summaries = new Map<string, { at: number; summary: Summary }>();
 
 /** Element count and text preview, cached per revision: scenes can be large. */
 function summarize(row: DrawingRow): Summary {
   const cached = summaries.get(row.id);
   if (cached?.at === row.updated_at) return cached.summary;
-  const count = getNonDeletedElements(parseSceneData(row.data)).length;
+  const scene = parseSceneData(row.data);
+  const count = getNonDeletedElements(scene).length;
   const text = drawingText(row.data).join(" · ").replace(/\s+/g, " ");
   const summary = {
     count,
     preview: text ? (text.length > PREVIEW_CHARS ? `${text.slice(0, PREVIEW_CHARS - 1).trimEnd()}…` : text) : null,
+    // Some elements (embeds, empty text) draw nothing; the route would 404.
+    thumbnail: count > 0 && sceneThumbnail(scene) !== null,
   };
   summaries.set(row.id, { at: row.updated_at, summary });
   return summary;
 }
 
 export function toStudioItem(row: DrawingRow): StudioItem {
-  const { count, preview } = summarize(row);
+  const { count, preview, thumbnail } = summarize(row);
   return {
     id: row.id,
     kind: DRAWING_KIND.id,
@@ -95,7 +98,7 @@ export function toStudioItem(row: DrawingRow): StudioItem {
     preview,
     facts: [{ id: "elements", value: count.toLocaleString("en-US"), sort: count }],
     badge: null,
-    thumbnailUrl: count ? thumbnailUrl(row.id, row.updated_at) : null,
+    thumbnailUrl: thumbnail ? thumbnailUrl(row.id, row.updated_at) : null,
     href: drawingHref(row.id),
     archived: row.archived_at !== null,
     template: Boolean(row.template),

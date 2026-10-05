@@ -97,6 +97,13 @@ describe("the Draw Studio provider", () => {
     expect(toStudioItem(row)).toMatchObject({ title: "", thumbnailUrl: null, preview: null });
   });
 
+  it("shows no thumbnail when none of the elements draw anything", () => {
+    const { store } = setup();
+    const row = store.create({ name: "", projectId: null, by: "app" });
+    store.write(row.id, scene([element("embeddable"), element("text", { text: "  " })]), "editor");
+    expect(toStudioItem(store.get(row.id)!)).toMatchObject({ thumbnailUrl: null, facts: [{ id: "elements", value: "2", sort: 2 }] });
+  });
+
   it("creates, moves, archives and deletes", async () => {
     const { store, call, changed } = setup();
     const { item } = await call("studio_create", { kind: "drawing", projectId: "proj_a" });
