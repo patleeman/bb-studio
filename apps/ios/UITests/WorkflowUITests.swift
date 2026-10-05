@@ -17,13 +17,18 @@ final class WorkflowUITests: XCTestCase {
 
         app.open(URL(string: "bbstudio://new")!)
         XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Workspace"].exists)
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Use'")).firstMatch.tap()
-        XCTAssertTrue(app.buttons["Project checkout"].exists)
+        XCTAssertTrue(app.buttons["newThreadProject"].exists)
+        XCTAssertTrue(app.buttons["newThreadAgent"].exists)
+        app.buttons["newThreadWorkspace"].tap()
+        XCTAssertTrue(app.buttons["Project checkout"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["New worktree"].waitForExistence(timeout: 5))
         app.buttons["New worktree"].tap()
         XCTAssertTrue(app.textFields["Base branch (project default)"].exists)
         screenshot("new-thread-workspace")
+        app.buttons["newThreadAgent"].tap()
+        XCTAssertTrue(app.buttons["Model"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Permissions"].exists)
+        screenshot("new-thread-agent")
     }
 
     func testAutomationEditor() {

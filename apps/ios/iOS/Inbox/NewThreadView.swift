@@ -13,6 +13,7 @@ struct NewThreadView: View {
     @State private var text: String
     @State private var attachments: [PendingAttachment] = []
     @State private var dictating = false
+    @State private var focused = false
     @State private var creating = false
     @State private var error: String?
     /// Studio's Spaces; empty without Studio.
@@ -35,79 +36,30 @@ struct NewThreadView: View {
 
     private var space: StudioSpace? { spaces.first { $0.id == spaceId } }
 
+    /// A chat, not a form: an empty conversation with the composer at the
+    /// bottom. Where it runs and which agent are chips above the field, set to
+    /// the project's defaults, so most threads need only a message.
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    if spaces.count > 1 {
-                        Picker("Space", selection: $spaceId) {
-                            Text("Project's Space").tag("")
-                            ForEach(spaces) { Text($0.label).tag($0.id) }
-                        }
-                    }
-                    Picker("Project", selection: $projectId) {
-                        ForEach(projects) { Text($0.name).tag($0.id) }
-                    }
-                }
-                Section("Workspace") {
-                    Picker("Use", selection: $workspace) {
-                        Text("Project default").tag("default")
-                        if checkoutHostId != nil { Text("Project checkout").tag("checkout") }
-                        if worktreeHostId != nil { Text("New worktree").tag("worktree") }
-                        ForEach(environments.filter { $0.status == "ready" }) { environment in
-                            Text(environment.label).tag(environment.id)
-                        }
-                    }
-                    if workspace == "worktree" {
-                        TextField("Base branch (project default)", text: $baseBranch)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    }
-                }
-                Section {
-                    TextField("What should the agent do?", text: $text, axis: .vertical)
-                        .lineLimit(4...12)
-                    AttachmentStrip(items: $attachments)
-                    HStack {
-                        Button { dictating = true } label: { Label("Dictate", systemImage: "mic") }
-                        Spacer()
-                        AttachmentMenu(items: $attachments)
-                    }
-                    .buttonStyle(.borderless)
-                }
-                Section("Agent") {
-                    Picker("Provider", selection: $providerId) {
-                        Text(defaultLabel(defaults?.providerId.flatMap(providerName))).tag("")
-                        ForEach(options?.providers.filter { $0.available != false } ?? []) {
-                            Text($0.displayName).tag($0.id)
-                        }
-                    }
-                    Picker("Model", selection: $modelId) {
-                        Text(defaultLabel(defaultModelName)).tag("")
-                        ForEach(options?.models ?? []) { Text($0.displayName).tag($0.id) }
-                    }
-                    Picker("Reasoning", selection: $reasoning) {
-                        Text(defaultLabel(defaults?.reasoningLevel)).tag("")
-                        ForEach(reasoningLevels, id: \.self) { Text($0).tag($0) }
-                    }
-                    Picker("Permissions", selection: $permissionMode) {
-                        Text(defaultLabel(defaults?.permissionMode.map(permissionLabel))).tag("")
-                        ForEach(permissionModes, id: \.self) { Text(permissionLabel($0)).tag($0) }
-                    }
-                }
-                if let error { Text(error).foregroundStyle(.red).font(.footnote) }
+            VStack {
+                Spacer()
+                Text(space.map { "What should we do in \($0.name)?" } ?? "What should we work on?")
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                Spacer()
             }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 32)
+            .contentShape(.rect)
+            .onTapGesture { focused = false }
+            .safeAreaInset(edge: .bottom) { composer }
             .navigationTitle("New thread")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Start") { Task { await create() } }
-                        .disabled(
-                            (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachments.isEmpty)
-                                || projectId.isEmpty || creating)
-                }
             }
+            .onAppear { focused = true }
             .sheet(isPresented: $dictating) {
                 DictationView(threadId: nil, autoStart: true) { text += (text.isEmpty ? "" : " ") + $0 }
             }
@@ -137,6 +89,158 @@ struct NewThreadView: View {
                 matchModelOption()
             }
         }
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    placeChip
+                    workspaceChip
+                    agentChip
+                }
+            }
+            .scrollClipDisabled()
+            if workspace == "worktree" {
+                TextField("Base branch (project default)", text: $baseBranch)
+                    .font(.subheadline)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(.fill.tertiary, in: .capsule)
+            }
+            AttachmentStrip(items: $attachments)
+            HStack(alignment: .bottom, spacing: 4) {
+                AttachmentMenu(items: $attachments)
+                Button { dictating = true } label: {
+                    Image(systemName: "mic.fill").font(.title3).frame(width: 36, height: 36)
+                }
+                .accessibilityLabel("Dictate")
+                ComposerField(text: $text, focused: $focused, placeholder: "What should the agent do?", maxLines: 10) { images in
+                    attachments += images.compactMap { PendingAttachment.image($0, name: "pasted.jpg") }
+                }
+                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
+                Button { Task { await create() } } label: {
+                    Group {
+                        if creating { ProgressView() } else { Image(systemName: "arrow.up.circle.fill").font(.title) }
+                    }
+                    .frame(width: 36, height: 36)
+                }
+                .disabled(!canStart)
+                .keyboardShortcut(.return, modifiers: .command)
+                .accessibilityLabel("Start")
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    private var canStart: Bool {
+        (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty) && !projectId.isEmpty && !creating
+    }
+
+    /// The Space and project the thread starts in.
+    private var placeChip: some View {
+        Menu {
+            if spaces.count > 1 {
+                Picker(selection: $spaceId) {
+                    Text("Project's Space").tag("")
+                    ForEach(spaces) { Text($0.label).tag($0.id) }
+                } label: {
+                    Label("Space: \(space?.label ?? "Project's")", systemImage: "square.grid.2x2")
+                }
+                .pickerStyle(.menu)
+            }
+            Section("Project") {
+                Picker("Project", selection: $projectId) {
+                    ForEach(projects) { Text($0.name).tag($0.id) }
+                }
+                .pickerStyle(.inline)
+            }
+        } label: {
+            chip(placeLabel, systemImage: "folder")
+        }
+        .accessibilityIdentifier("newThreadProject")
+    }
+
+    private var placeLabel: String {
+        let project = projects.first { $0.id == projectId }?.name ?? "Project"
+        return space.map { "\($0.label) · \(project)" } ?? project
+    }
+
+    private var workspaceChip: some View {
+        Menu {
+            Picker("Workspace", selection: $workspace) {
+                Text("Project default").tag("default")
+                if checkoutHostId != nil { Text("Project checkout").tag("checkout") }
+                if worktreeHostId != nil { Text("New worktree").tag("worktree") }
+                ForEach(environments.filter { $0.status == "ready" }) { environment in
+                    Text(environment.label).tag(environment.id)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            chip(workspaceLabel, systemImage: workspace == "worktree" ? "arrow.triangle.branch" : "desktopcomputer")
+        }
+        .accessibilityIdentifier("newThreadWorkspace")
+    }
+
+    private var workspaceLabel: String {
+        switch workspace {
+        case "default": "Default workspace"
+        case "checkout": "Project checkout"
+        case "worktree": "New worktree"
+        default: environments.first { $0.id == workspace }?.label ?? "Workspace"
+        }
+    }
+
+    /// Provider, model, reasoning and permissions, each defaulting to the project's.
+    private var agentChip: some View {
+        Menu {
+            Picker(selection: $providerId) {
+                Text(defaultLabel(defaults?.providerId.flatMap(providerName))).tag("")
+                ForEach(options?.providers.filter { $0.available != false } ?? []) {
+                    Text($0.displayName).tag($0.id)
+                }
+            } label: { Label("Provider", systemImage: "server.rack") }
+            .pickerStyle(.menu)
+            Picker(selection: $modelId) {
+                Text(defaultLabel(defaultModelName)).tag("")
+                ForEach(options?.models ?? []) { Text($0.displayName).tag($0.id) }
+            } label: { Label("Model", systemImage: "cpu") }
+            .pickerStyle(.menu)
+            if !reasoningLevels.isEmpty {
+                Picker(selection: $reasoning) {
+                    Text(defaultLabel(defaults?.reasoningLevel)).tag("")
+                    ForEach(reasoningLevels, id: \.self) { Text($0).tag($0) }
+                } label: { Label("Reasoning", systemImage: "brain") }
+                .pickerStyle(.menu)
+            }
+            Picker(selection: $permissionMode) {
+                Text(defaultLabel(defaults?.permissionMode.map(permissionLabel))).tag("")
+                ForEach(permissionModes, id: \.self) { Text(permissionLabel($0)).tag($0) }
+            } label: { Label("Permissions", systemImage: "lock.shield") }
+            .pickerStyle(.menu)
+        } label: {
+            chip(selectedModel?.displayName ?? defaultModelName ?? "Agent", systemImage: "sparkles")
+        }
+        .accessibilityIdentifier("newThreadAgent")
+    }
+
+    private func chip(_ title: String, systemImage: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemImage).font(.caption)
+            Text(title).lineLimit(1)
+            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+        }
+        .font(.subheadline)
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+        .background(.fill.tertiary, in: .capsule)
     }
 
     private func loadOptions() async {
