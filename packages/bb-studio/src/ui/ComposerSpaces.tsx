@@ -120,12 +120,13 @@ export function SpacesMenuContent({ heading, othersHeading = "Add to space", hol
 
 /**
  * Studio's Command view embeds BB's new-thread composer to message existing
- * threads, so the picker stays out of it, including its handoff.
+ * threads and to start them in its Space, so the picker stays out of both,
+ * including its handoff.
  */
 export function ComposerSpaces() {
   const probe = useRef<HTMLSpanElement>(null);
   const [inCommand, setInCommand] = useState<boolean | null>(null);
-  useLayoutEffect(() => setInCommand(!!probe.current?.closest("[data-command-composer]")), []);
+  useLayoutEffect(() => setInCommand(!!probe.current?.closest("[data-command-composer], [data-command-new-thread]")), []);
   return inCommand === false ? <SpacePicker /> : inCommand === null ? <span ref={probe} hidden /> : null;
 }
 

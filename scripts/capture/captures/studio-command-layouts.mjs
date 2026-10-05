@@ -128,6 +128,31 @@ export default ({ pluginRpc, launchSpace, getLaunchSpaceId, bbCli, projectId, sl
    await wait(client, `${rows}===3&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Release checklist')`);
    await docked(client);
   }) },
+  { id: "studio-command-new-thread", packageDir: "bb-studio", fileName: "command-new-thread.png", setup: guard(async client => {
+   const data = await open(client);
+   // The bar's +, not the sidebar's same-named button.
+   await client.evaluate("document.querySelector('[data-studio-bar] [aria-label=\"New thread in Launch work\"]').click()");
+   await client.waitForSelector('[data-command-new-thread] .ProseMirror');
+   await wait(client, "!!document.activeElement?.closest('[data-command-new-thread]')&&document.querySelector('.channel-thread-stage').getAttribute('data-thread-count')==='2'");
+   await client.evaluate("(()=>{const pane=document.querySelector('[data-command-new-thread]');if(pane.querySelector('[aria-label=\"Add to a space\"], [aria-label^=\"Spaces:\"]'))throw new Error('The new-thread pane offers a Space picker');if(!pane.innerText.includes('in Launch work'))throw new Error('The new-thread pane does not name its Space');})()");
+   await client.command("Input.insertText", { text: "This is a deterministic UI fixture. Do not use tools or change files. Reply exactly: Draft check ready." });
+   await client.evaluate("document.activeElement?.blur()");
+   return async () => {
+    const before = (await pluginRpc("studio", "command", { spaceId: data.id })).threads.map(thread => thread.id);
+    await client.evaluate("document.querySelector('[data-command-new-thread] .ProseMirror').focus()");
+    for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    // The thread starts in the Space and takes the draft's place.
+    let started = null;
+    for (let tries = 0; tries < 60 && !started; tries++) {
+     started = (await pluginRpc("studio", "command", { spaceId: data.id })).threads.find(thread => !before.includes(thread.id)) ?? null;
+     if (!started) await sleep(1000);
+    }
+    if (!started) throw new Error("The new thread did not join the Space");
+    await wait(client, `!document.querySelector('[data-command-new-thread]')&&${panes}.includes(${JSON.stringify(started.id)})`);
+    await bbCli(["thread", "stop", started.id]).catch(() => {});
+    await bbCli(["thread", "archive", started.id]).catch(() => {});
+   };
+  }) },
   { id: "studio-command-follow", packageDir: "bb-studio", fileName: "command-follow.png", setup: guard(async client => {
    const data = await open(client);
    const page = await pluginRpc("studio", "command", { spaceId: data.id });

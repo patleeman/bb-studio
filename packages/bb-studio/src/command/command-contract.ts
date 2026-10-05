@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { conversationRequestSchema } from "@bb-studio/kit/contract";
 
 /** One of a Space's threads, as the Command view shows it. */
 export const commandThreadSchema = z.object({
@@ -45,6 +46,8 @@ export const commandContract = {
   /** Owner messages and final replies across the Space's threads, oldest first. */
   commandFeed: { input: z.object({ spaceId }), output: z.object({ entries: z.array(commandEntrySchema) }) },
   commandSend: { input: commandSendInput, output: z.object({ deliveries: z.array(commandDeliverySchema) }) },
+  /** Starts a thread from BB's new-thread composer and adds it to the Space. */
+  commandSpawn: { input: z.object({ spaceId, request: conversationRequestSchema(z) }), output: z.object({ threadId: z.string() }) },
   /** The Command composer was focused: its Space's threads answer @ in the "This Space" mention provider. */
   commandFocus: { input: z.object({ spaceId }), output: z.object({ ok: z.literal(true) }) },
 };

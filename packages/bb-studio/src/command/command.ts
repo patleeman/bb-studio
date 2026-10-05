@@ -1,4 +1,4 @@
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
+import type { BbPluginApi, NewThreadRequest, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { commandContract, type CommandDelivery, type CommandEntry, type CommandSend, type CommandThread } from "./command-contract";
 import { errorMessage } from "@bb-studio/kit/format";
 const missingThread = (cause: unknown) => /(?:^|\b)(?:thread not found|thread does not exist|HTTP 404)(?:\b|$)/i.test(errorMessage(cause));
@@ -18,6 +18,8 @@ export type CommandSpaces = {
   list(): readonly { id: string; name: string; isDefault: boolean; defaultProjectId: string | null }[];
   spaceOfThreads(): Promise<Record<string, string>>;
   lead(spaceId: string): Promise<string | null>;
+  /** Adds a thread to the Space. */
+  join(spaceId: string, threadId: string): void;
 };
 
 const baseName = (path: string) => path.split(/[\\/]/).at(-1) || "Attachment";
@@ -208,11 +210,20 @@ export class Command {
     this.changed();
     return { deliveries };
   }
+  /** A thread started in the Command view: created, then filed in its Space. */
+  async spawn(spaceId: string, request: NewThreadRequest) {
+    if (!this.spaces.list().some(space => space.id === spaceId)) throw new Error("This Space no longer exists.");
+    const thread = await this.bb.sdk.threads.spawn(request);
+    this.spaces.join(spaceId, thread.id);
+    this.changed();
+    return { threadId: thread.id };
+  }
   handlers(): PluginRpcHandlers<typeof commandContract> {
     return {
       command: ({ spaceId }) => this.space(spaceId),
       commandFeed: ({ spaceId }) => this.feed(spaceId),
       commandSend: input => this.send(input),
+      commandSpawn: ({ spaceId, request }) => this.spawn(spaceId, request),
       commandFocus: ({ spaceId }) => { this.focus(spaceId); return { ok: true as const }; },
     };
   }

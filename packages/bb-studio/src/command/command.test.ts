@@ -12,8 +12,9 @@ function fixture(spaceOf: Record<string, string> = {}, lead: string | null = nul
   x.harness.inspection.sdk.stub("threads.interactions.list", async ({ threadId }) => threadId === "ask" ? [{}] as never : []);
   x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [], timelinePage: { olderCursor: null, hasOlderRows: false } }));
   x.harness.inspection.sdk.stub("threads.events.list", async () => []);
-  const spaces = { list: () => SPACES.spaces, spaceOfThreads: async () => spaceOf, lead: async () => lead };
-  return { ...x, command: new Command(x.bb, spaces) };
+  const joined: [string, string][] = [];
+  const spaces = { list: () => SPACES.spaces, spaceOfThreads: async () => spaceOf, lead: async () => lead, join: (spaceId: string, threadId: string) => { joined.push([spaceId, threadId]); } };
+  return { ...x, joined, command: new Command(x.bb, spaces) };
 }
 
 test("a Space's threads come from Studio, lead first, without archived ones", async () => {
@@ -122,5 +123,19 @@ test("the focused Command Space answers @ for a while, then stops", async () => 
     x.command.focus("sp_launch", 1_000);
     expect((await x.command.mentionable(2_000))?.threads.map(t => t.id)).toEqual(["lead", "ask"]);
     expect(await x.command.mentionable(1_000 + 11 * 60_000)).toBeNull();
+  } finally { await x.close(); }
+});
+
+test("a thread started in Command is created from the composer's request and joins the Space", async () => {
+  const x = fixture();
+  try {
+    const spawned: unknown[] = [];
+    x.harness.inspection.sdk.stub("threads.spawn", async (args: unknown) => { spawned.push(args); return makeThreadResponse({ id: "thr_new" }); });
+    const request = { projectId: "proj_launch", providerId: "codex", model: "gpt-6-luna", reasoningLevel: "low", permissionMode: "auto", executionInputSources: {}, environment: { type: "project-default" }, input: [{ type: "text", text: "Ship it", mentions: [] }] } as never;
+    expect(await x.command.spawn("sp_launch", request)).toEqual({ threadId: "thr_new" });
+    expect(spawned).toEqual([expect.objectContaining(request as object)]);
+    expect(x.joined).toEqual([["sp_launch", "thr_new"]]);
+    await expect(x.command.spawn("sp_gone", request)).rejects.toThrow("no longer exists");
+    expect(spawned).toHaveLength(1);
   } finally { await x.close(); }
 });

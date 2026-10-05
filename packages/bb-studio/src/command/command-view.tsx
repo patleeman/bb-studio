@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { experimental_NewThreadComposer as NewThreadComposer, experimental_useSidebarThreadActions, useBbNavigate, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate, useRealtime, useRpc, type NewThreadRequest, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { BarCrumb, BarSeparator, ICON_BUTTON, Icon, PageColumn, StudioBar, Tooltip, openCompanion } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { errorMessage as message } from "@bb-studio/kit/format";
@@ -8,9 +8,8 @@ const PLUGIN_ID = "studio";
 import type { rpcContract } from "../contract";
 import type { CommandAttachment, CommandPermissionMode, CommandSpace } from "./command-contract";
 import { broadcastMentionText, spaceThreadMentionId } from "./mentions";
-import { CommandSwitcher, CommandThreads, useCommandPanes } from "./command-threads";
+import { CommandSwitcher, CommandThreads, useCommandPanes, type CommandPanes } from "./command-threads";
 import { recipients } from "./command-layout";
-import { handOffNewThreadSpace } from "../ui/ComposerSpaces";
 
 type Contract = typeof rpcContract;
 type Space = CommandSpace;
@@ -40,32 +39,58 @@ function Placeholder({ rows }: { rows: number }) {
 /** A poll that changed nothing keeps the old object, so the panes and composer don't re-render. */
 const same = (a: Space | null, b: Space) => !!a && JSON.stringify(a) === JSON.stringify(b);
 
-/**
- * New thread in this Space. BB's thread actions hook re-renders on every
- * thread change, so it lives here rather than in the whole view.
- */
-function NewThreadButton({ space }: { space: Space["space"] | null }) {
-  const threadActions = experimental_useSidebarThreadActions();
-  const latest = useRef({ space, threadActions });
-  latest.current = { space, threadActions };
-  const open = useCallback(() => {
-    const { space, threadActions } = latest.current;
-    if (!space) return;
-    handOffNewThreadSpace(space.id, space.defaultProjectId);
-    threadActions.openNewThread({ projectId: space.defaultProjectId ?? undefined, focusPrompt: true });
-  }, []);
+/** New thread in this Space: a draft pane in the grid. ⌘N opens it too while Command is open. */
+function NewThreadButton({ space, onNew }: { space: Space["space"] | null; onNew(): void }) {
+  const latest = useRef({ space, onNew });
+  latest.current = { space, onNew };
   useEffect(() => {
-    // Capture runs before BB's own handler, so the key files the thread here instead.
+    // Capture runs before BB's own handler, so the key starts the thread here instead.
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || !latest.current.space || !isNewThreadKey(event) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
       event.preventDefault();
       event.stopPropagation();
-      open();
+      latest.current.onNew();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [open]);
-  return <Tooltip label="New thread in this Space (⌘N)"><button type="button" aria-label={`New thread in ${space?.name ?? "this Space"}`} aria-keyshortcuts="Meta+N" className={ICON_BUTTON} disabled={!space} onClick={open}><Icon name="Plus" className="size-4" aria-hidden /></button></Tooltip>;
+  }, []);
+  return <Tooltip label="New thread in this Space (⌘N)"><button type="button" aria-label={`New thread in ${space?.name ?? "this Space"}`} aria-keyshortcuts="Meta+N" className={ICON_BUTTON} disabled={!space} onClick={onNew}><Icon name="Plus" className="size-4" aria-hidden /></button></Tooltip>;
+}
+
+/**
+ * A pane for starting a thread in the Space: BB's new-thread composer with
+ * the Space's project picked. Once the thread starts it becomes its pane.
+ */
+function NewThreadPane({ space, panes, onStarted }: { space: Space["space"]; panes: CommandPanes; onStarted(): void }) {
+  const rpc = useRpc<Contract>();
+  const pane = useRef<HTMLElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const focus = panes.draft?.focus ?? 0;
+  useEffect(() => { if (focus) pane.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [focus]);
+  // Throwing keeps the draft in the composer.
+  const submit = async (request: NewThreadRequest) => {
+    setError(null);
+    try {
+      const { threadId } = await rpc.call("commandSpawn", { spaceId: space.id, request });
+      panes.started(threadId);
+      onStarted();
+    } catch (cause) { setError(message(cause)); throw cause; }
+  };
+  return <section ref={pane} className="channel-thread-pane" data-command-new-thread aria-label="New thread">
+    <header>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">New thread</span>
+      <span className="shrink-0 text-xs text-subtle-foreground">in {space.name}</span>
+      <span className="channel-pane-actions">
+        <Tooltip label="Discard the new thread"><button type="button" aria-label="Close new thread" onClick={panes.discard} className="channel-pane-action"><Icon name="X" className="size-3.5" /></button></Tooltip>
+      </span>
+    </header>
+    {panes.draft?.threadId
+      ? <div className="channel-stage-empty" role="status"><p className="text-muted-foreground">Starting…</p></div>
+      : <div className="command-new-thread-body">
+        <NewThreadComposer layout="contained" defaultProjectId={space.defaultProjectId ?? undefined} draftKey={`studio:command-new-thread:${space.id}`} focusRequest={focus} placeholder={`What should a new thread in ${space.name} do?`} onSubmit={submit} />
+        {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+      </div>}
+  </section>;
 }
 
 function useStored<T extends string | null>(key: string, read: (value: string | null) => T) {
@@ -158,10 +183,10 @@ function CommandView({ spaceId }: { spaceId: string }) {
       </nav>
       <div className="flex shrink-0 items-center gap-0.5">
         <Tooltip label={panes.following ? "Following work: one pane shows whichever thread is working" : "Follow work: close the panes and show whichever thread is working"}><button type="button" aria-label="Follow work" aria-pressed={panes.following} className={ICON_BUTTON} disabled={!space} onClick={panes.follow}><Icon name="Zap" className="size-4" aria-hidden /></button></Tooltip>
-        <NewThreadButton space={space?.space ?? null} />
+        <NewThreadButton space={space?.space ?? null} onNew={panes.newThread} />
       </div>
     </StudioBar>
-    {!space ? <div className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-[760px] px-4 pt-6">{!error && <Placeholder rows={2} />}</div></div> : <CommandThreads panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} onReply={pickReply} onOpen={openThread} />}
+    {!space ? <div className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-[760px] px-4 pt-6">{!error && <Placeholder rows={2} />}</div></div> : <CommandThreads panes={panes} threads={space.threads} leadThreadId={space.leadThreadId} draftPane={<NewThreadPane space={space.space} panes={panes} onStarted={load} />} onReply={pickReply} onOpen={openThread} />}
     <div className="command-dock">
     <div className="min-w-0">
       {/* Keep the existing draft key so moving Command preserves unsent messages. */}

@@ -22,8 +22,8 @@ vi.mock("sonner", () => ({ toast: { error: () => {} } }));
 let root: Root, container: HTMLDivElement;
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); sessionStorage.clear(); rpc.call.mockClear(); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
-const mount = async (inCommand: boolean) => {
-  if (inCommand) container.setAttribute("data-command-composer", "");
+const mount = async (inCommand: boolean | string) => {
+  if (inCommand) container.setAttribute(typeof inCommand === "string" ? inCommand : "data-command-composer", "");
   await act(async () => { root.render(React.createElement(ComposerSpaces)); await new Promise(resolve => setTimeout(resolve, 10)); });
 };
 
@@ -39,4 +39,9 @@ test("a new thread's composer takes the handoff and shows the Space", async () =
   await mount(false);
   expect(sessionStorage.getItem("studio:new-thread-space")).toBeNull();
   expect(container.querySelector("button")?.getAttribute("aria-label")).toBe("Spaces: Launch");
+});
+test("a thread started from Command's new-thread pane gets no picker either", async () => {
+  await mount("data-command-new-thread");
+  expect(container.querySelector("button")).toBeNull();
+  expect(rpc.call).not.toHaveBeenCalled();
 });

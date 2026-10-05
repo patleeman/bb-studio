@@ -13,7 +13,10 @@ const row = (id: string, status: string, extra: Partial<CommandThread> = {}): Co
 function View({ threads, leadThreadId }: { threads: CommandThread[]; leadThreadId: string | null }) {
   const panes = useCommandPanes("space", threads, leadThreadId);
   return React.createElement(React.Fragment, null,
-    React.createElement(CommandThreads, { panes, threads, leadThreadId, onReply: state.reply, onOpen: state.open }),
+    React.createElement(CommandThreads, { panes, threads, leadThreadId, draftPane: React.createElement("div", { "data-draft": panes.draft?.threadId ?? "composing" }), onReply: state.reply, onOpen: state.open }),
+    React.createElement("button", { "aria-label": "New thread", onClick: panes.newThread }),
+    React.createElement("button", { "aria-label": "Started", onClick: () => panes.started("fresh") }),
+    React.createElement("button", { "aria-label": "Discard", onClick: panes.discard }),
     React.createElement(CommandSwitcher, { panes, threads, leadThreadId, target: leadThreadId, onReply: state.reply }),
     React.createElement("button", { "aria-label": "Follow work", onClick: panes.follow }));
 }
@@ -135,4 +138,22 @@ test("controls explain themselves in tooltips, not title attributes", () => {
   switcher("lead");
   expect(container.querySelectorAll("[title]")).toHaveLength(0);
   expect(tooltips).toEqual(expect.arrayContaining(["Close the other panes", "Send to run", "Messages go to lead", "Open child", "Close this pane"]));
+});
+test("a new thread drafts in a pane beside the others and becomes its own pane once the Space lists it", () => {
+  const draft = () => container.querySelector("[data-draft]")?.getAttribute("data-draft") ?? null;
+  render([row("lead", "idle"), row("run", "active")], "lead");
+  click("New thread");
+  // The following pane stays, with the draft beside it.
+  expect(shown()).toEqual(["run"]);
+  expect(draft()).toBe("composing");
+  expect(container.querySelector(".channel-thread-stage")?.getAttribute("data-thread-count")).toBe("2");
+  click("Discard");
+  expect(draft()).toBeNull();
+  click("New thread");
+  click("Started");
+  expect(draft()).toBe("fresh");
+  expect(JSON.parse(localStorage.getItem("studio:command-open:space")!)).toEqual(["run", "fresh"]);
+  render([row("lead", "idle"), row("run", "active"), row("fresh", "starting")], "lead");
+  expect(draft()).toBeNull();
+  expect(shown()).toEqual(["run", "fresh"]);
 });

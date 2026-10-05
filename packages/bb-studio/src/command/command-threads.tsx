@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { ThreadChat } from "@get-bb/plugin-sdk/app";
 import { Icon, ItemTile, Tooltip } from "@bb-studio/kit/app";
 import type { CommandThread } from "./command-contract";
@@ -74,12 +74,16 @@ export type CommandPanes = ReturnType<typeof useCommandPanes>;
  * opening another thread keeps that one and adds a pane beside it, so the
  * view becomes a grid. Closing a pane only hides it; the thread list beside
  * the composer opens it again. Closing the last one goes back to following.
+ * A new thread starts in a draft pane at the end, which becomes the thread.
  */
 export function useCommandPanes(spaceId: string, threads: CommandThread[], leadThreadId: string | null) {
   const key = `studio:command-open:${spaceId}`;
   const [opened, setOpened] = useState(() => readOpen(key));
   useEffect(() => setOpened(readOpen(key)), [key]);
   const [announcement, setAnnouncement] = useState("");
+  // Composing (no thread yet), or started and waiting for the Space to list it.
+  const [draft, setDraft] = useState<{ threadId: string | null; focus: number } | null>(null);
+  useEffect(() => { if (draft?.threadId && threads.some(thread => thread.id === draft.threadId)) setDraft(null); }, [draft, threads]);
   const lastFollowed = useRef<string | null>(null);
   const pinned = opened.flatMap(id => threads.filter(thread => thread.id === id));
   const following = !pinned.length;
@@ -93,7 +97,16 @@ export function useCommandPanes(spaceId: string, threads: CommandThread[], leadT
     try { if (next.length) localStorage.setItem(key, JSON.stringify(next)); else localStorage.removeItem(key); } catch {}
   };
   return {
-    shown, following, announcement,
+    shown, following, announcement, draft,
+    /** Opens the draft pane, or focuses its composer if it's open. */
+    newThread() { setDraft(current => current ? { ...current, focus: current.focus + 1 } : { threadId: null, focus: 1 }); },
+    discard() { setDraft(null); },
+    /** The draft's thread started: it takes the draft's place once the Space lists it. */
+    started(threadId: string) {
+      save([...ids, threadId]);
+      setDraft({ threadId, focus: 0 });
+      setAnnouncement(`Started a thread.`);
+    },
     open(id: string) {
       // A thread already on screen just scrolls into view.
       if (ids.includes(id)) return paneOf(id)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -116,8 +129,10 @@ export function useCommandPanes(spaceId: string, threads: CommandThread[], leadT
 }
 
 /** A Space's open panes: one following the work, or the ones the owner opened, side by side. */
-export function CommandThreads({ panes, threads, leadThreadId, onReply, onOpen }: {
+export function CommandThreads({ panes, threads, leadThreadId, draftPane, onReply, onOpen }: {
   panes: CommandPanes; threads: CommandThread[]; leadThreadId: string | null;
+  /** The new-thread pane, shown at the end while panes.draft is set. */
+  draftPane?: ReactNode;
   onReply(id: string, focusComposer?: boolean): void; onOpen(id: string): void;
 }) {
   const label = (thread: CommandThread) => thread.title;
@@ -129,6 +144,7 @@ export function CommandThreads({ panes, threads, leadThreadId, onReply, onOpen }
   const [drop, setDrop] = useState<{ id: string; place: "before" | "after"; axis: "x" | "y" } | null>(null);
   const { shown, following } = panes;
   const arrangeable = shown.length > 1;
+  const count = shown.length + (panes.draft ? 1 : 0);
   const nudge = (event: KeyboardEvent, id: string) => {
     const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[event.key];
     if (!step) return;
@@ -177,9 +193,10 @@ export function CommandThreads({ panes, threads, leadThreadId, onReply, onOpen }
   };
 
   return <div className="channel-thread-layout" data-command-panes>
-    <div className="channel-thread-stage" data-thread-count={shown.length}>
-      {!shown.length && <div className="channel-stage-empty" role="status"><p className="font-medium">No threads in this Space</p><p className="text-muted-foreground">Add threads to the Space to command them here.</p></div>}
+    <div className="channel-thread-stage" data-thread-count={count}>
+      {!count && <div className="channel-stage-empty" role="status"><p className="font-medium">No threads in this Space</p><p className="text-muted-foreground">Start one with + or ⌘N, or add threads to the Space.</p></div>}
       {shown.map(pane)}
+      {panes.draft && draftPane}
     </div>
     <span className="sr-only" aria-live="polite">{panes.announcement}</span>
   </div>;

@@ -83,6 +83,7 @@ export default async function plugin(bb: BbPluginApi) {
     list: () => spaces.list(),
     spaceOfThreads: () => spaceLeads.spaceOfThreads(),
     lead: async (spaceId) => (await spaceLeads.get(spaceId)).leadThreadId,
+    join: (spaceId, threadId) => { spaces.add(spaceId, [{ pluginId: "bb-thread", id: threadId }]); tagsChanged(); },
   });
   registerMentionProviders(bb, command);
   for (const event of ["thread.created", "thread.active", "thread.idle", "thread.failed", "thread.archived", "thread.unarchived", "thread.deleted"] as const)
