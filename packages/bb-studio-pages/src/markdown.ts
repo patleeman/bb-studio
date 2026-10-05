@@ -414,7 +414,8 @@ function renderBlock(block: PageBlock, indent: string, number: number, options: 
   const idLine = options.ids && block.id ? `${indent}<!-- ^${shortId(block.id)} -->\n` : "";
   const props = block.props ?? {};
   const content = Array.isArray(block.content) ? block.content : [];
-  const text = renderInline(content);
+  // A heading's text follows its `#`s, so it can't start a block.
+  const text = block.type === "heading" ? renderInline(content) : escapeLineStarts(renderInline(content));
   // A list item's children line up with its text, past the `1. ` marker.
   const childIndent = indent + " ".repeat(block.type === "numberedListItem" ? String(number).length + 2 : 2);
   const children = block.children?.length ? renderBlocks(block.children, childIndent, options) : [];
@@ -541,6 +542,21 @@ function renderTable(content: PageBlock["content"], indent: string): string {
   const line = (cells: string[]) =>
     `${indent}| ${Array.from({ length: width }, (_, i) => cells[i] ?? "").join(" | ")} |`;
   return [line(rows[0]!), `${indent}|${" --- |".repeat(width)}`, ...rows.slice(1).map(line)].join("\n");
+}
+
+/**
+ * Escapes what would start a list, heading, quote, rule or fence at the start
+ * of a line of text, so a paragraph that reads "1. Draft" stays a paragraph.
+ */
+function escapeLineStarts(text: string): string {
+  return text
+    .split("\\\n")
+    .map((line) =>
+      line
+        .replace(/^([ \t]*)([-+](?=[ \t]|$)|[-=](?=[-= \t]*$)|#(?=#{0,5}(?:[ \t]|$))|>|~(?=~~))/, "$1\\$2")
+        .replace(/^([ \t]*\d{1,9})([.)])(?=[ \t]|$)/, "$1\\$2"),
+    )
+    .join("\\\n");
 }
 
 export function renderInline(content: InlineContent[]): string {

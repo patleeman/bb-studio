@@ -207,6 +207,19 @@ describe("nested list items", () => {
   });
 });
 
+describe("text that looks like block syntax", () => {
+  it("stays text through a read and write", () => {
+    const texts = ["- not a list", "1. Draft", "2) Review", "# not a heading", "> not a quote", "+ plus", "~~~ tildes", "line\n---", "line\n===", "a\n- b", "-5 degrees", "#hashtag"];
+    for (const text of texts) {
+      for (const type of ["paragraph", "bulletListItem", "quote", "toggleListItem"]) {
+        const blocks: PageBlock[] = [{ type, content: [{ type: "text", text, styles: {} }] }];
+        expect(markdownToBlocks(blocksToMarkdown(throughYjs(blocks)))).toMatchObject([{ type, content: [{ text }] }]);
+      }
+    }
+    expect(blocksToMarkdown([{ type: "heading", props: { level: 2 }, content: [{ type: "text", text: "1. Intro", styles: {} }] }])).toBe("## 1. Intro\n");
+  });
+});
+
 describe("toggles", () => {
   const MARKDOWN = `<details>
 <summary>**More** details</summary>
