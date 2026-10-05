@@ -22,8 +22,8 @@ and the Related popover before capture.
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): the seeded "Checkout flow" drawing open in the Draw
 editor, under Studio's shared item header. Cart, Payment and Confirmation boxes
 are joined by arrows, with a "Retry payment on failure" note. The header shows
-**No thread**, Studio Chat's chip for a drawing no thread has been started
-or picked for.
+Studio Chat's **Chat** button, Related, **Open in split**, and the drawing's
+own tools.
 
 ## What you get
 
