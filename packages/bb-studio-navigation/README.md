@@ -16,13 +16,12 @@ the Studio rows that another surface already opens:
 
 Left-out rows are in neither the rows nor **More**; their plugins still run
 and their links still open. Everything else stays: BB's own rows (New thread,
-Search threads, Plugins, Skills, Automations), Feed
-([Studio Feed](../bb-studio-feed)), Studio, Teams, and every panel from a
+Search threads, Plugins, Skills, Automations), Studio, Teams, and every panel from a
 plugin outside BB Studio. Hide, reorder, **More**, and **Customize sidebar** work as in BB's
 Navigation. A row Studio Navigation leaves out keeps its place in BB's saved
 order, so it comes back where it was if you switch back. Row order is always
 BB's saved order: BB passes it without saying whether you saved it, so Studio
-Navigation can't set a default order without overriding yours. Drag Feed
+Navigation can't set a default order without overriding yours. Drag a row
 under Search threads to put it there.
 
 Installing it makes it the sidebar navigation, unless you picked a provider

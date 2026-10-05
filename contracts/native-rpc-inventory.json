@@ -326,60 +326,6 @@
       "coverage": "literal method checked against contract"
     },
     {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "list",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "post",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "story",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "forDirective",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "topics",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "remove",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "read",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "seen",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "unread",
-      "coverage": "generated method"
-    },
-    {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "tree",

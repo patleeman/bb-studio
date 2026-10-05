@@ -44,7 +44,7 @@ The Studio hub stores links, item threads, activity, comments, and content versi
 
 Studio keeps an SQLite FTS index of every provider's titles and `studio_read` text, updated from the change feed; `bb studio reindex` rebuilds it. `searchAll { query, kinds?, limit }` merges that index with live BB thread search and returns ranked hits with highlighted snippets. Cmd/Ctrl+Shift+K opens it as a quick-open palette; Cmd/Ctrl+K stays BB's thread search.
 
-`home { projectId?, periodDays }` feeds Studio's Activity view and the iOS app's Today view. **Needs you** gathers BB approvals and questions and open comment replies and mentions, ranked by urgency. `homeRespond` answers a BB approval or question. The other sections list running threads and bots, recent items, upcoming automations, and the activity feed. Reports land in [Studio Feed](../packages/bb-studio-feed).
+`home { projectId?, periodDays }` feeds Studio's Activity view and the iOS app's Today view. **Needs you** gathers BB approvals and questions and open comment replies and mentions, ranked by urgency. `homeRespond` answers a BB approval or question. The other sections list running threads and bots, recent items, upcoming automations, and the activity feed.
 
 Templates and bulk export are described in the [Studio README](../packages/bb-studio/README.md#templates-and-export).
 

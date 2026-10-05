@@ -52,7 +52,6 @@ const SCENES = [
   ["excalidraw", "*Sketch* it together.", "Excalidraw, shared with your agents.", 3],
   ["studio-tables", "Real *tables*.", "Typed columns, views, CSV and agent tools.", 3],
   ["artifacts", "Keep what they *make*.", "Reports, images and files, all saved.", 3],
-  ["feed", "One *feed* of reports.", "From every thread and automation.", 4],
   ["bots", "Bots that work as a *team*.", "A Command view, delegation and memory.", 4, 900],
   ["reactions-smart", "Answer in *one tap*.", "Replies come with suggested answers.", 3.5],
   ["float", "Keep it all *open*.", "Threads and items as floating tabs.", 3.5, 960],
@@ -81,13 +80,6 @@ const ownScenes = {
     await client.navigate("/plugins/studio/studio");
     await client.evaluate(`Object.keys(localStorage).filter((key) => key.startsWith("studio:query")).forEach((key) => localStorage.removeItem(key))`);
     return captures.find((capture) => capture.id === "float").setup(client);
-  },
-  feed: async (client) => {
-    // Seeded agent threads may already have posted; the capture counts unread posts.
-    for (const line of (await bbCli(["feed", "list", "--all"])).split("\n").filter(Boolean)) {
-      await pluginRpc("feed", "read", { postId: line.split("\t")[0], read: true });
-    }
-    return captures.find((capture) => capture.id === "feed").setup(client);
   },
 };
 

@@ -14,9 +14,7 @@
       "icon": "./icons/pages.svg",
       "experimental_icons": {
         "pages": "./icons/pages.svg",
-        "explore": "./src/explore/icons/explore.svg",
-        "bookmark-add": "./src/explore/icons/bookmark-add.svg",
-        "bookmark-check": "./src/explore/icons/bookmark-check.svg"
+        "explore": "./src/explore/icons/explore.svg"
       }
     },
     "server": "./server.ts",

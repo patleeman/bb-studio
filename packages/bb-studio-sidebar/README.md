@@ -1,6 +1,6 @@
 # Studio Sidebar
 
-> **Studio Sidebar** is part of **BB Studio**, a suite of plugins for writing, talking, drawing and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Feed](../bb-studio-feed), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tables](../bb-studio-tables), [Studio Chat](../bb-studio-chat), [Studio Teams](../bb-studio-teams) and [Float](../bb-studio-float).
+> **Studio Sidebar** is part of **BB Studio**, a suite of plugins for writing, talking, drawing and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tables](../bb-studio-tables), [Studio Chat](../bb-studio-chat), [Studio Teams](../bb-studio-teams) and [Float](../bb-studio-float).
 
 Studio Sidebar replaces BB's Thread List sidebar provider. It keeps the thread
 list and its organization controls, and adds:

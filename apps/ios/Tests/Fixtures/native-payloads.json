@@ -158,49 +158,6 @@
     }
   },
   {
-    "id": "feed-list",
-    "plugin": "feed",
-    "method": "list",
-    "input": {
-      "limit": 40,
-      "cursor": "older",
-      "topic": "Review",
-      "query": "recovery"
-    },
-    "output": {
-      "posts": [
-        {
-          "id": "post_contract",
-          "title": "Contract post",
-          "body": "Post body",
-          "preview": "Post body",
-          "domains": [],
-          "image": null,
-          "avatar": null,
-          "link": null,
-          "embeds": [],
-          "explorable": false,
-          "threadTitle": null,
-          "read": false,
-          "topic": "Review",
-          "story": null,
-          "storyPosts": 1,
-          "priority": "urgent",
-          "author": "QA",
-          "botId": null,
-          "threadId": null,
-          "projectId": null,
-          "createdAt": 1,
-          "updatedAt": 2,
-          "editedBy": null,
-          "resolvedAt": null
-        }
-      ],
-      "nextCursor": "next",
-      "lastSeenAt": 0
-    }
-  },
-  {
     "id": "chat-start",
     "plugin": "studio-chat",
     "method": "start",

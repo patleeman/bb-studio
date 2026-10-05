@@ -17,19 +17,6 @@ export const EXPLORE_SETTINGS = {
         "Agents end answers that involved reading code with a few things they noticed along the way. Click one to get a page explaining it. Applies to agent sessions started after the change.",
       default: true,
     },
-    feedDigest: {
-      type: "boolean",
-      label: "Daily digest in Studio Feed",
-      description: "Each evening, post what agents noticed that day and nobody explored or saved: one post per project. Needs Studio Feed.",
-      default: true,
-    },
-    digestHour: {
-      type: "number",
-      label: "Daily digest hour",
-      description: "Hour from 0 to 23 in the BB server's local time. When the daily digest is on, Explore checks every 10 minutes after this hour.",
-      default: 18,
-      experimental_schema: z.number().int().min(0).max(23),
-    },
     workerTimeoutMinutes: {
       type: "number",
       label: "Explainer time limit (minutes)",
@@ -44,18 +31,12 @@ export default async function plugin(bb: BbPluginApi) {
   // `bb.agents.configure` is synchronous, so keep the latest values in memory.
   const initial = await settings.get();
   let enabled = initial.explore !== false;
-  let feedDigest = initial.feedDigest !== false;
-  let digestHour = initial.digestHour;
   let workerTimeoutMinutes = initial.workerTimeoutMinutes;
   settings.onChange((next) => {
     enabled = next.explore !== false;
-    feedDigest = next.feedDigest !== false;
-    digestHour = next.digestHour;
     workerTimeoutMinutes = next.workerTimeoutMinutes;
   });
   const explore = registerExplore(bb, {
-    feedDigest: () => feedDigest,
-    digestHour: () => digestHour,
     workerTimeoutMs: () => workerTimeoutMinutes * 60_000,
   });
 

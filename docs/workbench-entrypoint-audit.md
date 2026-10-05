@@ -11,8 +11,8 @@ Kit's `item-header.tsx` and `item-chat.ts` provide the item Chat action.
 Float's stack uses canonical thread/path keys, shared placement, explicit
 activation and persistent pins. Reopening a target focuses its existing tab.
 
-Eleven content plugins register `retainPanel` and matching `FloatPanels`:
-Studio, Studio Chat, Pages, Talk, Draw, Artifacts, Tasks, Tables, Feed, Explore
+Ten content plugins register `retainPanel` and matching `FloatPanels`:
+Studio, Studio Chat, Pages, Talk, Draw, Artifacts, Tasks, Tables, Explore
 and Teams. Teams covers `bots`.
 Their app overlays own the original views before the first companion move.
 Sidebar and Navigation supply entry points. Reactions and Decisions act on the
@@ -32,7 +32,6 @@ another desktop chat panel.
 | Artifacts | Retained viewer, text/image/HTML quotes through shared Chat | [Viewer/quote formats and compact controls](../packages/bb-studio-artifacts/README.md) |
 | Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio-tables/README.md) |
 | Teams | Bot Chat and profile-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Conversation reuse](../packages/bb-studio-teams/README.md) |
-| Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio-feed/README.md) |
 | Sidebar | Thread Float action uses `openFloat`; ordinary navigation/split stays host-owned | [Real sidebar first moves](../packages/bb-studio-float/README.md) |
 | Navigation | Host panel activation/split plus Studio's shared Quick Open placement | [Keyboard/focus checks](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/search-accessibility/README.md) |
 | Reactions | Composer bridge selects the displayed message's thread; drafts quotes/reactions into it | [Settings, selection and message actions](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/reactions-explore/README.md); native right-click remains open |
@@ -107,10 +106,10 @@ documentation, marketplace, contract, native-payload and packed-Kit gates.
 
 ## Remaining content-plugin entry points
 
-Studio, Studio Chat, Feed and Explore installed from pushed `c83c4fd` pass
+Studio, Studio Chat and Explore installed from pushed `c83c4fd` pass
 the same placement matrix on both isolated hosts. These supplement the
 seven content types above, giving representative original-view transfer
-proof for all eleven retained content plugins. Every first move uses the
+proof for all ten retained content plugins. Every first move uses the
 visible **Move → Float this** action; every later move uses companion chrome.
 Kit exports `ViewMoveMenu`, and conversation composers accept a `moveTarget`.
 
@@ -118,9 +117,6 @@ Kit exports `ViewMoveMenu`, and conversation composers accept a `moveTarget`.
 | --- | --- | --- | --- |
 | Studio collection | Search input, query and seeded release-note result | [Main](../packages/bb-studio/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/companion-transfers-native.png) |
 | Item-chat draft | Prompt, unsent wording, file input, selected attachment control and encoded item path | [Main](../packages/bb-studio-chat/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/companion-transfers-native.png) |
-| Feed reader | Search input, unapplied filter and seeded release post | [Main](../packages/bb-studio-feed/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/companion-transfers-native.png) |
-| Feed post | Original post heading | [Main](../packages/bb-studio-feed/assets/feed-post-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-post-companion-transfers-native.png) |
-| Feed discussion | Prompt, unsent wording, file input and selected attachment control | [Main](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-native.png) |
 
 The chat check reproduced double encoding: the host passes an already-encoded
 item subpath, but main-view ownership encoded it again. Kit's shared
@@ -136,7 +132,7 @@ Run the supplemental captures after sourcing the matching isolated env file:
 BB_CAPTURE_PLUGIN= BB_CAPTURE_STAGE_ENV=/path/to/isolated/capture.env \
 BB_CAPTURE_SUITE_TRANSFERS=1 BB_CAPTURE_TRANSFER_FRAME=1 \
 BB_CAPTURE_SUITE_HOST=native \
-BB_CAPTURE_ONLY=suite-native-studio,suite-native-chat,suite-native-feed,suite-native-feed-post,suite-native-feed-discussion \
+BB_CAPTURE_ONLY=suite-native-studio,suite-native-chat \
 node scripts/capture-plugin-screenshots.mjs
 ```
 

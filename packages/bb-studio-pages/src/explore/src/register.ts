@@ -9,13 +9,12 @@ import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 //     instructions for `bb.agents.configure`, and `bb pages explore …`.
 import type { BbPluginApi, PluginCliContext, PluginCliResult } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { exploreFeed, replyFindings } from "./feed";
 import { explainerHtml } from "./markdown";
 import { explorePages } from "./pages";
 import { exploreInstructions } from "./prompt";
 import { ExploreService } from "./service";
-import { PLUGIN_ID, REALTIME_CHANNEL, type RealtimeEvent } from "./constants";
-import { MAX_LABEL_LENGTH, STAGES, parseExploreItem } from "./shared";
+import { REALTIME_CHANNEL, type RealtimeEvent } from "./constants";
+import { MAX_LABEL_LENGTH, STAGES } from "./shared";
 import { ExploreStore, MIGRATIONS, type ExplainerRow } from "./store";
 import { walk } from "./timeline";
 import { exploreWorkers } from "./worker";
@@ -31,15 +30,9 @@ export const EXPLORE_USAGE = `bb pages explore <list|open|regenerate> …`;
 
 type CliResult = PluginCliResult;
 
-/** How often the daily digest checks whether it's time. */
-const DIGEST_CHECK_MS = 10 * 60_000;
-const RPC_TIMEOUT_MS = 15_000;
-
 export function registerExplore(bb: BbPluginApi, options: {
-  feedDigest: () => boolean;
-  digestHour?: () => number;
   workerTimeoutMs?: () => number;
-} = { feedDigest: () => true }) {
+} = {}) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new ExploreStore(db);
@@ -54,10 +47,6 @@ export function registerExplore(bb: BbPluginApi, options: {
       parentId: explainer.parent_id,
     };
     bb.realtime.publish(REALTIME_CHANNEL, event);
-    // A written explainer is linked from the Feed post its finding was saved as.
-    if (explainer.page_id && !explainer.parent_id) {
-      feed.explainerChanged(explainer.key).catch((error: unknown) => bb.log.warn(`Could not link the explainer from the Feed: ${String(error)}`));
-    }
   };
   const service = new ExploreService({
     store,
@@ -69,59 +58,6 @@ export function registerExplore(bb: BbPluginApi, options: {
     changed: publish,
     log: bb.log,
   });
-  const feed = exploreFeed({
-    store,
-    digestHour: options.digestHour,
-    callRpc: (pluginId, method, input, schema) =>
-      bb.sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema: schema, signal: AbortSignal.timeout(RPC_TIMEOUT_MS) }),
-    explainerPage: (finding) => {
-      const row = store.byKey(finding.key);
-      const href = row?.page_id ? service.view(row).href : null;
-      return row?.page_id && href ? { pageId: row.page_id, href } : null;
-    },
-    projectName: async (projectId) => {
-      const project = (await bb.sdk.projects.get({ projectId })) as { name?: unknown; project?: { name?: unknown } };
-      const name = project.name ?? project.project?.name;
-      return typeof name === "string" && name.trim() ? name.trim() : null;
-    },
-  });
-
-  // Every reply's findings are kept, for saving to the Feed and its daily digest.
-  bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
-    const items = replyFindings(lastAssistantText);
-    if (!items.length || thread.originPluginId === PLUGIN_ID || thread.visibility === "hidden") return;
-    try {
-      const message = await latestAssistantMessage(thread.id, AbortSignal.timeout(RPC_TIMEOUT_MS));
-      if (!message) return;
-      const threadTitle = thread.title?.trim() || thread.titleFallback?.trim() || "";
-      for (const item of items) {
-        store.addFinding({ threadId: thread.id, messageId: message.id, turnId: message.turnId, emoji: item.emoji, label: item.label, projectId: thread.projectId ?? null, threadTitle });
-      }
-    } catch (error) {
-      bb.log.warn(`Could not keep the findings from ${thread.id}: ${String(error)}`);
-    }
-  });
-  const digestTimer = setInterval(() => {
-    if (!options.feedDigest()) return;
-    feed.digest().catch((error: unknown) => bb.log.warn(`Could not post the Explore digest to the Feed: ${String(error)}`));
-  }, DIGEST_CHECK_MS);
-
-  /** A finding from a reply, kept now if the idle event missed it. */
-  async function finding(input: { threadId: string; messageId: string; turnId?: string | null; emoji?: string; label: string }) {
-    const parsed = parseExploreItem(`${input.emoji ?? ""} ${input.label}`);
-    if (!parsed) throw new Error("Nothing to save.");
-    const thread = await bb.sdk.threads.get({ threadId: input.threadId }).catch(() => null);
-    return store.addFinding({
-      threadId: input.threadId,
-      messageId: input.messageId,
-      turnId: input.turnId ?? null,
-      emoji: parsed.emoji,
-      label: parsed.label,
-      projectId: thread?.projectId ?? null,
-      threadTitle: thread?.title?.trim() || thread?.titleFallback?.trim() || "",
-    });
-  }
-
   const interrupted = service.recover();
   if (interrupted.length) bb.log.info(`Marked ${interrupted.length} Explore job(s) interrupted by the restart.`);
 
@@ -138,30 +74,6 @@ export function registerExplore(bb: BbPluginApi, options: {
     explore: ({ threadId, messageId, turnId, emoji, label, parentId }: { threadId: string; messageId: string; turnId?: string | null; emoji?: string; label: string; parentId?: string | null }) => {
       const result = service.explore({ threadId, messageId, turnId, emoji, label, parentId });
       return { explainer: service.view(result.explainer), started: result.started };
-    },
-    saveToFeed: async (input: { threadId: string; messageId: string; turnId?: string | null; emoji?: string; label: string }) => ({
-      postId: await feed.save(await finding(input)),
-    }),
-    savedForMessage: ({ threadId, messageId }: { threadId: string; messageId: string }) => ({
-      labels: store
-        .findingsForMessage(threadId, messageId)
-        .filter((row) => row.post_id)
-        .map((row) => row.label),
-    }),
-    exploreFeedPost: async ({ postId }: { postId: string }) => {
-      const saved = store.findingByPost(postId);
-      if (!saved) return { status: "unavailable" as const, href: null };
-      const { explainer } = service.explore({
-        threadId: saved.thread_id,
-        messageId: saved.message_id,
-        turnId: saved.turn_id,
-        emoji: saved.emoji,
-        label: saved.label,
-        projectId: saved.project_id,
-      });
-      if (!explainer.page_id) return { status: "started" as const, href: null };
-      await feed.linkExplainer(saved).catch(() => undefined);
-      return { status: "ready" as const, href: service.view(explainer).href };
     },
     exploreRegenerate: ({ explainerId }: { explainerId: string }) => ({ explainer: service.view(service.regenerate(explainerId)) }),
     exploreStop: ({ explainerId }: { explainerId: string }) => ({ explainer: view(service.stop(explainerId)) }),
@@ -266,7 +178,6 @@ export function registerExplore(bb: BbPluginApi, options: {
   }
 
   bb.onDispose(() => {
-    clearInterval(digestTimer);
     service.dispose();
     workers.dispose();
   });

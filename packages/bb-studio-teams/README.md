@@ -25,7 +25,7 @@ A bot can run on an outside agent from the External Agents plugin: Hermes, OpenC
 
 Mission and memory editors reject stale saves. A profile can configure a fallback model for managed mission work; a provider failure retries the mission once in a fresh thread. Ordinary threads keep BB's model and retry controls. Archiving a bot stops managed work and turns off its mission interval; its ordinary threads and history remain available.
 
-Use BB Automations to schedule work in a normal thread. Scheduled findings go to Studio Feed with stable story keys.
+Use BB Automations to schedule work in a normal thread. A scheduled run reports in its thread, and stays quiet when nothing changed.
 
 ## CLI and tools
 

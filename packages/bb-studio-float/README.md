@@ -135,7 +135,7 @@ BB_CAPTURE_MAIN_THREAD=1 BB_CAPTURE_ONLY=float-native-main-thread \
   [Studio Sidebar](../bb-studio-sidebar)).
 - **Move any item in one gesture.** This works on Studio items and threads
   anywhere: a collection row, a mention or embed on a page, a table's item
-  chip, a Space's rows, a Feed post's item, and any link
+  chip, a Space's rows, and any link
   into a plugin view or a thread.
   - **Shift-click** floats it, and **⌘-click** (Ctrl-click) opens it in a
     split.

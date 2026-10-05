@@ -11,7 +11,6 @@ agent.
 | --- | --- | --- |
 | [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, artifacts and tables, with search, tags, project filters and templates, and Spaces: areas of work, each with a lead thread and a brief. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents, with checklists you hand to agents, inline whiteboards, and Explore: pages explaining what an agent noticed along the way. |
-| [Studio Feed](packages/bb-studio-feed/) | `feed` | One feed of what your agents report. An agent ends a reply with a `::post` line, from any thread or automation; read it on desktop and phone and discuss any post. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
@@ -52,7 +51,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    a one-line description each:
    - studio: the Studio collection; recommended, since the others plug into it
    - pages: collaborative pages
-   - feed: Studio Feed; one feed of what agents and automations post
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make

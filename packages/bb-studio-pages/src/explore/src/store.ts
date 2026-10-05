@@ -42,25 +42,6 @@ export type JobRow = {
   updated_at: number;
 };
 
-/** A finding an agent ended a reply with, kept for the Feed: saved there, or listed in the daily digest. */
-export type FindingRow = {
-  id: string;
-  /** The explainer key it would have. */
-  key: string;
-  thread_id: string;
-  message_id: string;
-  turn_id: string | null;
-  emoji: string;
-  label: string;
-  project_id: string | null;
-  thread_title: string;
-  created_at: number;
-  /** The Feed post it was saved as. */
-  post_id: string | null;
-  /** The explainer page that post links to. */
-  linked_page_id: string | null;
-  digested_at: number | null;
-};
 
 export type JobPatch = Partial<Pick<JobRow, "status" | "label" | "detail" | "progress" | "worker_thread_id" | "error">>;
 
@@ -150,6 +131,8 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS explore_jobs_explainer ON explore_jobs (explainer_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS explore_findings_digest ON explore_findings (digested_at, created_at)`,
   `CREATE INDEX IF NOT EXISTS explore_findings_post ON explore_findings (post_id)`,
+  // Findings were kept for Studio Feed, which is gone.
+  `DROP TABLE IF EXISTS explore_findings`,
 ];
 
 export class ExploreStore {
@@ -322,55 +305,6 @@ export class ExploreStore {
   }
 
   // ----- the "Explore" parent page per project -----
-
-  // ----- findings, for the Feed -----
-
-  /** Keeps a finding; one already kept is returned as it is. */
-  addFinding(input: { threadId: string; messageId: string; turnId: string | null; emoji: string; label: string; projectId: string | null; threadTitle: string }): FindingRow {
-    const key = explainerKey({ threadId: input.threadId, messageId: input.messageId, label: input.label });
-    this.db
-      .prepare(
-        `INSERT INTO explore_findings (id, key, thread_id, message_id, turn_id, emoji, label, project_id, thread_title, created_at)
-         VALUES (@id, @key, @threadId, @messageId, @turnId, @emoji, @label, @projectId, @threadTitle, @now)
-         ON CONFLICT(key) DO NOTHING`,
-      )
-      .run({ ...input, id: newId("fnd"), key, now: this.now() });
-    return this.findingByKey(key)!;
-  }
-
-  findingByKey(key: string): FindingRow | undefined {
-    return this.db.prepare("SELECT * FROM explore_findings WHERE key = ?").get(key) as FindingRow | undefined;
-  }
-
-  findingByPost(postId: string): FindingRow | undefined {
-    return this.db.prepare("SELECT * FROM explore_findings WHERE post_id = ?").get(postId) as FindingRow | undefined;
-  }
-
-  findingsForMessage(threadId: string, messageId: string): FindingRow[] {
-    return this.db.prepare("SELECT * FROM explore_findings WHERE thread_id = ? AND message_id = ?").all(threadId, messageId) as FindingRow[];
-  }
-
-  setFindingPost(id: string, postId: string | null, linkedPageId: string | null): void {
-    this.db.prepare("UPDATE explore_findings SET post_id = ?, linked_page_id = ? WHERE id = ?").run(postId, linkedPageId, id);
-  }
-
-  /** Findings for the digest: not digested, not saved, not explored, since `since`; oldest first. */
-  undigested(since: number): FindingRow[] {
-    return this.db
-      .prepare(
-        `SELECT f.* FROM explore_findings f
-         WHERE f.digested_at IS NULL AND f.post_id IS NULL AND f.created_at >= ?
-           AND NOT EXISTS (SELECT 1 FROM explore_explainers e WHERE e.key = f.key)
-         ORDER BY f.created_at`,
-      )
-      .all(since) as FindingRow[];
-  }
-
-  markDigested(ids: readonly string[]): void {
-    const mark = this.db.prepare("UPDATE explore_findings SET digested_at = ? WHERE id = ?");
-    const at = this.now();
-    this.db.transaction(() => ids.forEach((id) => mark.run(at, id)))();
-  }
 
   meta(key: string): string | null {
     return (this.db.prepare("SELECT value FROM explore_meta WHERE key = ?").get(key) as { value: string } | undefined)?.value ?? null;

@@ -18,7 +18,7 @@ type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
 type Listed = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
 export const LEAD_ROLE = "space-lead";
-export const HEARTBEAT = "Heartbeat: check on this space's threads and items. Steer only the workers you started; for threads the user started, read and report but don't steer them. Post to the Feed only when something changed or needs the user.";
+export const HEARTBEAT = "Heartbeat: check on this space's threads and items. Steer only the workers you started; for threads the user started, read and report but don't steer them. Reply only when something changed or needs the user; otherwise finish without a final assistant message.";
 const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
 const SNAPSHOT_MS = 60_000;
@@ -200,7 +200,7 @@ export class SpaceLeads {
           `Continue the work from /threads/${encodeURIComponent(threadId)} (${threadTitle(old)}). Read that thread with bb thread if you need more context.`,
           `Latest response (excerpt):\n${(output ?? "No response yet.").slice(-12_000)}`,
           space ? `This thread is in the space ${space.name} (${space.id}).` : "",
-          ledSpace && space ? `You are now this space's lead. Steer the workers you start (read but don't steer threads the user started), and report through the Studio Feed.` : "",
+          ledSpace && space ? `You are now this space's lead. Steer the workers you start (read but don't steer threads the user started), and report in this thread.` : "",
         ].filter(Boolean).join("\n\n");
         const next = await this.deps.sdk.threads.spawn({
           ...request,

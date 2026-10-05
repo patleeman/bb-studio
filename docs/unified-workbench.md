@@ -39,7 +39,6 @@ can open in the main view. Placement does not create another conversation.
 | Artifacts | Text, image, file, and HTML viewers; selections and quotes |
 | Tables | Tables, views, cells that link Studio items, editing continuity |
 | Teams | Bot profiles, conversations, thread entry points |
-| Feed | Item and thread links from posts |
 | Explore | Explainer panels and links to pages |
 | Sidebar | Thread and Studio navigation, row menus, split actions |
 | Navigation | Quick Open and keyboard placement actions |
@@ -281,7 +280,7 @@ split/swap flows, and the full completion audit remain required.
 
 Main plugin panels now register with their own app overlay through Kit's
 `retainPanel(path, Component)` wrapper. Pages, Talk, Draw, Artifacts, Tasks,
-Tables, Feed, Explore, Studio Chat, Studio, and Teams use it for every content
+Tables, Explore, Studio Chat, Studio, and Teams use it for every content
 route. The overlay owns a stable portal container before Float opens. The
 first companion move carries that container rather than creating another
 editor. Separate main panes retain independent state; the most recently

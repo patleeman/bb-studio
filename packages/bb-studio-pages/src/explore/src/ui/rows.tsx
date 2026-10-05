@@ -3,7 +3,6 @@
 // under an explainer. A row shows its explainer's state (Explore →
 // Generating · 45% → Open · generated 2h ago, or Retry) from what's saved,
 // so it survives a reload. Clicking one opens it in Explore's side-panel tab.
-// A reply's findings can also be saved to Studio Feed, to read later.
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -48,10 +47,6 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
   /** Labels whose click is in flight, and clicks that failed before a job existed. */
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  /** Labels saved to the Feed (reply findings only), and saves in flight or failed. */
-  const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [saving, setSaving] = useState<Record<string, "busy" | string>>({});
-  const savable = parentId === null;
   const load = useCallback(() => {
     rpc.call("explainersForMessage", { threadId, messageId, parentId }).then(
       (result) => setExplainers(result.explainers),
@@ -59,13 +54,6 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
     );
   }, [rpc, threadId, messageId, parentId]);
   useEffect(load, [load]);
-  useEffect(() => {
-    if (!savable) return;
-    rpc.call("savedForMessage", { threadId, messageId }).then(
-      (result) => setSaved(new Set(result.labels.map(labelKey))),
-      () => undefined,
-    );
-  }, [rpc, threadId, messageId, savable]);
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = explainerEvent(payload);
     if (event && event.threadId === threadId && event.messageId === messageId && event.parentId === parentId) load();
@@ -107,19 +95,6 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
     }
   }
 
-  async function save(item: ExploreItem) {
-    const key = labelKey(item.label);
-    if (saving[key] === "busy") return;
-    setSaving((current) => ({ ...current, [key]: "busy" }));
-    try {
-      await rpc.call("saveToFeed", { threadId, messageId, turnId, emoji: item.emoji, label: item.label });
-      setSaved((current) => new Set(current).add(key));
-      setSaving(({ [key]: _, ...rest }) => rest);
-    } catch (error) {
-      setSaving((current) => ({ ...current, [key]: errorMessage(error) }));
-    }
-  }
-
   if (!items.length) return null;
   return (
     <section aria-label={title} className={cn("my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background", className)}>
@@ -149,7 +124,6 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
               clickError={errors[key] ?? null}
               onOpen={() => void act(item, explainer, false)}
               onRegenerate={() => void act(item, explainer, true)}
-              feed={savable ? { saved: saved.has(key), saving: saving[key] ?? null, onSave: () => void save(item) } : null}
             />
           );
         })}
@@ -165,7 +139,6 @@ function ExploreRow({
   clickError,
   onOpen,
   onRegenerate,
-  feed,
 }: {
   item: ExploreItem;
   explainer: ExplainerView | undefined;
@@ -173,8 +146,6 @@ function ExploreRow({
   clickError: string | null;
   onOpen(): void;
   onRegenerate(): void;
-  /** Saving to Studio Feed: reply findings only. `saving` is "busy" or the error. */
-  feed: { saved: boolean; saving: string | null; onSave(): void } | null;
 }) {
   const state = clickError ? "error" : rowState(explainer);
   const progress = Math.round(explainer?.job?.progress ?? 0);
@@ -232,25 +203,6 @@ function ExploreRow({
           className="flex w-9 shrink-0 items-center justify-center text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-40"
         >
           <Icon name="RotateCcw" className="size-3.5" />
-        </button>
-      ) : null}
-      {feed ? (
-        <button
-          type="button"
-          onClick={feed.onSave}
-          disabled={feed.saved || feed.saving === "busy"}
-          aria-label={feed.saved ? `"${item.label}" is saved to the feed` : `Save "${item.label}" to the feed`}
-          title={feed.saved ? "Saved to the feed" : feed.saving && feed.saving !== "busy" ? `Couldn't save: ${feed.saving}` : "Save to the feed, to read later"}
-          className={cn(
-            "flex w-9 shrink-0 items-center justify-center text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:hover:bg-transparent",
-            feed.saved && "text-foreground",
-            feed.saving && feed.saving !== "busy" && "text-destructive",
-          )}
-        >
-          <Icon
-            name={feed.saving === "busy" ? "Loading" : feed.saved ? "pages/bookmark-check" : "pages/bookmark-add"}
-            className={cn("size-3.5", feed.saving === "busy" && "animate-spin motion-reduce:animate-none")}
-          />
         </button>
       ) : null}
       {state === "running" ? (

@@ -1,8 +1,8 @@
 # Native plugin contract coverage
 
 `pnpm gen:contracts` generates JSON schemas and Swift models from each included
-plugin's actual RPC contract. Feed is included alongside Studio, Pages, Draw,
-Talk, Chat, Teams, Tables, Artifacts, Mobile and Decisions.
+plugin's actual RPC contract: Studio, Pages, Draw, Talk, Chat, Teams, Tables,
+Artifacts, Mobile and Decisions.
 
 `pnpm check:contracts` also checks the generated
 [native RPC inventory](../contracts/native-rpc-inventory.json). It scans the
@@ -15,8 +15,7 @@ the inventory as external APIs.
 The inventory separates generated method references, checked literal names,
 external host plugins and dynamic dispatch. It checks method parity; it does
 not prove handwritten request and response shapes. Native transport/decoder
-tests cover those behaviors. Feed preserves its older-server read-state
-default and tolerant priority decoding while using generated method names.
+tests cover those behaviors.
 
 The first inventory found a real drift: native Studio Chat called the removed
 `lastThread` method. It now calls `home` and reads `thread.threadId`, with a
@@ -31,9 +30,9 @@ compare them with those same fixtures, and check response decoding:
 - Talk recording creation, audio segment upload and transcript reads.
 - Bots document revision tokens.
 - Tables text, number, boolean, list, relation and null cell values.
-- Feed read state, priority and pagination; Studio Chat's start envelope.
+- Studio Chat's start envelope.
 
-Existing Feed and Studio Chat tests
+Existing Studio Chat tests
 also cover older responses and linked/unlinked items.
 
 These are transport fixtures, not live server integration or exhaustive method

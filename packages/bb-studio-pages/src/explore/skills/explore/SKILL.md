@@ -5,9 +5,7 @@ description: Use when the user asks about Explore findings ("Along the way" rows
 
 # Explore (experimental)
 
-In **Settings → Studio Pages** (the Explore settings), **Daily digest in Studio Feed** controls
-automatic posting. **Daily digest hour** accepts 0 to 23 in the BB server's
-local time (default 18); checks run every 10 minutes. **Explainer time limit
+In **Settings → Studio Pages** (the Explore settings), **Explainer time limit
 (minutes)** accepts 1 to 120 (default 20), applies to new runs, and stops and
 archives unfinished workers. Explainers use the source thread's model and
 reasoning level.

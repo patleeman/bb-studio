@@ -268,9 +268,6 @@ struct InboxView: View {
     @State private var newTitle = ""
     /// The server's running plugins, comma-separated; remembered so plugin rows show offline.
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
-    /// Feed stories with a post since you last read it.
-    @State private var feedUnread = 0
-    @State private var feedListener: UUID?
 
     var body: some View {
         List {
@@ -288,17 +285,9 @@ struct InboxView: View {
             } else {
                 // Plain rows under no header, like the sidebar's nav.
                 let plugins = runningPlugins.split(separator: ",")
-                if query.isEmpty, plugins.contains("automations") || plugins.contains("feed") {
+                if query.isEmpty, plugins.contains("automations") {
                     Section {
-                        if plugins.contains("feed") {
-                            NavigationLink(value: Route.feed) {
-                                Label("Feed", systemImage: "newspaper").badge(feedUnread)
-                            }
-                            .accessibilityIdentifier("feedRow")
-                        }
-                        if plugins.contains("automations") {
-                            NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
-                        }
+                        NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
                     }
                 }
                 ForEach(model.groups) { group in threadSection(group) }
@@ -358,24 +347,11 @@ struct InboxView: View {
             if let running = try? await app.client.runningPlugins() { runningPlugins = running.sorted().joined(separator: ",") }
             await MutedThreads.shared.refresh()
         }
-        .task(id: "\(app.serverURL)|\(app.path.isEmpty)|\(runningPlugins)") { await loadFeedUnread() }
-        .task {
-            feedListener = app.realtime.listen { event in
-                guard case .pluginSignal(let pluginId, _, _) = event, pluginId == "feed" else { return }
-                Task { await loadFeedUnread() }
-            }
-        }
-        .onDisappear { if let feedListener { app.realtime.removeListener(feedListener) } }
         .task(id: app.serverURL) {
             model.restore()
             model.attach(app)
             await model.load(app.client)
         }
-    }
-
-    private func loadFeedUnread() async {
-        guard runningPlugins.split(separator: ",").contains("feed") else { return }
-        if let count = try? await app.client.feedUnread() { feedUnread = count }
     }
 
     /// Section expansion survives relaunches, like the sidebar's collapsed groups.

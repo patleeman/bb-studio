@@ -64,12 +64,7 @@ final class NativePayloadContractTests: XCTestCase {
         XCTAssertTrue(values["empty"] is NSNull)
     }
 
-    func testFeedCurrentPayloadAndChatStartEnvelope() async throws {
-        let feedClient = try client("feed-list")
-        let feed = try await feedClient.feed(cursor: "older", topic: "Review", query: "recovery")
-        XCTAssertEqual(feed.posts.first?.read, false)
-        XCTAssertEqual(feed.posts.first?.priority, "urgent")
-        XCTAssertEqual(feed.nextCursor, "next")
+    func testChatStartEnvelope() async throws {
         let chatClient = try client("chat-start")
         let thread = try await chatClient.startStudioChat(pluginId: "pages", itemId: "pg_contract", projectId: "proj_contract", text: "Discuss")
         XCTAssertEqual(thread, "thr_chat")

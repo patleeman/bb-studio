@@ -9,7 +9,6 @@ import bb_studio_pages from "./captures/bb-studio-pages.mjs";
 import bb_studio from "./captures/bb-studio.mjs";
 import bb_studio_artifacts from "./captures/bb-studio-artifacts.mjs";
 import bb_studio_reactions from "./captures/bb-studio-reactions.mjs";
-import bb_studio_feed from "./captures/bb-studio-feed.mjs";
 import bb_studio_decisions from "./captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./captures/bb-studio-mobile.mjs";
 import bb_studio_tables from "./captures/bb-studio-tables.mjs";
@@ -29,7 +28,6 @@ export function loadCaptures(context) {
     ...bb_studio(context),
     ...bb_studio_artifacts(context),
     ...bb_studio_reactions(context),
-    ...bb_studio_feed(context),
     ...bb_studio_decisions(context),
     ...bb_studio_mobile(context),
     ...bb_studio_tables(context),

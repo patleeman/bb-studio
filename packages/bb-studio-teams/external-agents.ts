@@ -55,5 +55,5 @@ export function externalPermissionHint(providerId: string | null | undefined): s
 export function externalToolsNote(providerId: string | null | undefined): string | null {
   const agent = externalAgent(providerId);
   if (!agent) return null;
-  return `${agent.name} is an outside agent. It chats in its BB threads and does its work on its own side. It can't use BB tools such as the bots skill, Feed, or the bb CLI, and it keeps its own memory.`;
+  return `${agent.name} is an outside agent. It chats in its BB threads and does its work on its own side. It can't use BB tools such as the bots skill or the bb CLI, and it keeps its own memory.`;
 }

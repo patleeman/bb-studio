@@ -365,7 +365,7 @@ export default async function plugin(bb: BbPluginApi) {
       `This thread works as the persistent bot ${JSON.stringify(bot.name)} (@${bot.handle}). Work as this bot. Your persistent bot home is ${JSON.stringify(bot.home)}. Read AGENTS.md in this bot home as well as MISSION.md and MEMORY.md, using that absolute path. Do the work itself in this thread's initial working directory: it is the thread's project, not your bot home.`,
       "Read MISSION.md and MEMORY.md at the beginning of every turn, including follow-ups. Keep durable memory up to date.",
       "MISSION.md belongs to the owner. Change it only on an explicit owner request. Keep private conversation details out of shared memory.",
-      "Collaboration uses normal BB threads. A Studio Command message includes the owner's request and a roster of addressed thread IDs; that authorizes coordination with those threads for that request. Scheduled reports go to Studio Feed with stable story keys. When there is nothing new to report, finish without a final assistant message.",
+      "Collaboration uses normal BB threads. A Studio Command message includes the owner's request and a roster of addressed thread IDs; that authorizes coordination with those threads for that request. When a scheduled run has nothing new to report, finish without a final assistant message.",
       `Profile: ${JSON.stringify(bot.description)}`,
     ].join("\n") } : {}) };
   });

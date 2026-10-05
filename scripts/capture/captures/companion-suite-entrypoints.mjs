@@ -10,10 +10,6 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
     if (!manifest.includes(`export BB_DATA_DIR=${JSON.stringify(dataDir)}`) || !manifest.includes(`export BB_SERVER_URL=${process.env.BB_SERVER_URL}`)) throw new Error("Fixture does not match the staged capture.env");
     return dataDir;
   };
-  const seedPost = async () => {
-    const { post } = await pluginRpc("feed", "publish", { projectId, threadId, author: "Atlas", title: "Release notes ready for review", body: "The release checklist and notes are ready. Review the wording before sharing." });
-    return { post, cleanup: () => pluginRpc("feed", "remove", { postId: post.id }) };
-  };
   const fixtures = [
     { id: "studio", packageDir: "bb-studio", seed: async () => {
       const { cleanup } = await seedPages();
@@ -22,18 +18,6 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
     { id: "chat", packageDir: "bb-studio-chat", seed: async () => {
       const { page, cleanup } = await seedPages();
       return { path: `/plugins/studio-chat/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: "pages", id: page.id }))}`, ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent item conversation", attachment: true, cleanup };
-    } },
-    { id: "feed", packageDir: "bb-studio-feed", seed: async () => {
-      const { post, cleanup } = await seedPost();
-      return { path: "/plugins/feed/feed", ready: 'form[aria-label="Filter updates"] input[type="search"]', draft: "Unapplied feed filter", visibleText: post.title, cleanup };
-    } },
-    { id: "feed-post", packageDir: "bb-studio-feed", seed: async () => {
-      const { post, cleanup } = await seedPost();
-      return { path: `/plugins/feed/feed/${post.id}`, ready: 'article h1', cleanup };
-    } },
-    { id: "feed-discussion", packageDir: "bb-studio-feed", seed: async () => {
-      const { post, cleanup } = await seedPost();
-      return { path: `/plugins/feed/feed/${post.id}/discussion`, ready: '.feed-discussion-composer [contenteditable="true"]', draft: "Keep this unsent Feed discussion", attachment: true, cleanup };
     } },
   ];
   const studio = fixtures.find(fixture => fixture.id === "studio");

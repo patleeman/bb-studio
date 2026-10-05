@@ -1,6 +1,6 @@
 ---
 name: bots
-description: Manage persistent bot profiles that ordinary BB threads work as. Use owner-provided thread rosters to coordinate work and Studio Feed for scheduled reports.
+description: Manage persistent bot profiles that ordinary BB threads work as. Use owner-provided thread rosters to coordinate work.
 ---
 
 # Bots
@@ -19,4 +19,4 @@ A Command view message includes all addressed real thread IDs as agent-only cont
 
 Owner sends to busy threads follow global Smart Queue settings. `/steer`, `/followup` and `/fork` in the Command view composer override the mode for that send. Open the originating thread for tools, approvals, queued work, model choices and stopping a response.
 
-Schedule work through the Automations plugin targeting a normal thread. Scheduled reports belong in Studio Feed. Use a stable story key and update existing stories; when nothing changed, post nothing and finish without a final assistant message. Ask the owner in the ordinary thread when a decision is needed. Do not recursively create schedules from scheduled work.
+Schedule work through the Automations plugin targeting a normal thread. Report a scheduled run's result as the final reply in its thread; when nothing changed, finish without a final assistant message. Ask the owner in the ordinary thread when a decision is needed. Do not recursively create schedules from scheduled work.
