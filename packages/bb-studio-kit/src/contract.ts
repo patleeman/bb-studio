@@ -309,10 +309,15 @@ export async function eachId(
 export function itemAtPath<T extends { href: string }>(items: readonly T[], path: string): T | null {
   const clean = path.split(/[?#]/)[0]!.replace(/\/+$/, "");
   let best: T | null = null;
+  let bestLength = 0;
   for (const item of items) {
     const href = item.href.split(/[?#]/)[0]!.replace(/\/+$/, "");
     if (!href.startsWith("/")) continue;
-    if ((clean === href || clean.startsWith(`${href}/`)) && href.length > (best?.href.length ?? 0)) best = item;
+    // Compare the cleaned hrefs: a query on a parent's href mustn't outrank a deeper item.
+    if ((clean === href || clean.startsWith(`${href}/`)) && href.length > bestLength) {
+      best = item;
+      bestLength = href.length;
+    }
   }
   return best;
 }

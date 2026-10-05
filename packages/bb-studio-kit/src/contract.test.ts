@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { studioSchemas } from "./contract";
+import { itemAtPath, studioSchemas } from "./contract";
 
 const schemas = studioSchemas(z);
 const kind = {
@@ -25,5 +25,16 @@ describe("Studio provider contract", () => {
     expect(schemas.provider.studio_read.input.parse({ id: "pg_1", format: "markdown" })).toEqual({ id: "pg_1", format: "markdown" });
     expect(schemas.provider.studio_read.output.parse({ content: "# Page" })).toEqual({ content: "# Page" });
     expect(schemas.changed.input.parse({ pluginId: "pages", ids: ["pg_1"], removed: ["pg_2"] })).toEqual({ pluginId: "pages", ids: ["pg_1"], removed: ["pg_2"] });
+  });
+});
+
+describe("itemAtPath", () => {
+  it("prefers the deeper item when a parent's href has a query", () => {
+    const items = [
+      { id: "table", href: "/plugins/studio-tables/tables/t1?view=board-with-a-long-name" },
+      { id: "row", href: "/plugins/studio-tables/tables/t1/row/r1" },
+    ];
+    expect(itemAtPath(items, "/plugins/studio-tables/tables/t1/row/r1")?.id).toBe("row");
+    expect(itemAtPath(items, "/plugins/studio-tables/tables/t1")?.id).toBe("table");
   });
 });
