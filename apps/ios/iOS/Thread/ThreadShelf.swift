@@ -42,7 +42,7 @@ struct ThreadShelf: View {
                 }
             }
             if let first = shelf.background.first {
-                ShelfCard(icon: first.workflowName != nil ? "square.stack.3d.up" : "terminal", tint: .green) {
+                ShelfCard(icon: first.workflowName != nil ? "flowchart" : "terminal", tint: .green) {
                     HStack(spacing: 4) {
                         Text(first.workflowName ?? first.description ?? "Background work").lineLimit(1)
                         if shelf.background.count > 1 {

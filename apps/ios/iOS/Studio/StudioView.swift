@@ -376,7 +376,7 @@ struct StudioView: View {
                     ForEach(Array(externalMatches.enumerated()), id: \.offset) { _, match in
                         if let id = match.ref?.id {
                             NavigationLink(value: Route.thread(id: id)) {
-                                Label(match.title ?? "Thread", systemImage: "bubble.left")
+                                Label(match.title ?? "Thread", systemImage: Symbols.thread)
                             }
                         }
                     }

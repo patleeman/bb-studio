@@ -46,7 +46,7 @@ struct StudioHomeView: View {
                             Section {
                                 ForEach(Array((home.working?.threads ?? []).enumerated()), id: \.offset) { _, thread in
                                     if let id = thread.id {
-                                        NavigationLink(value: Route.thread(id: id)) { Label(thread.title ?? "Thread", systemImage: "bubble.left") }
+                                        NavigationLink(value: Route.thread(id: id)) { Label(thread.title ?? "Thread", systemImage: Symbols.thread) }
                                     }
                                 }
                             } header: {

@@ -267,7 +267,7 @@ struct ThreadView: View {
                 // One menu rather than a row of buttons, so the title has room.
                 Menu {
                     Button { app.startVoiceChat(threadId: model.threadId) } label: {
-                        Label("Voice chat", systemImage: "waveform")
+                        Label("Voice chat", systemImage: Symbols.voiceChat)
                     }
                     Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
                     Button {

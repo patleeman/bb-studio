@@ -110,7 +110,7 @@ struct StatusWidgetView: View {
                     Spacer(minLength: 0)
                     HStack(spacing: 16) {
                         Link(destination: AppLink.scoped(URL(string: "bbstudio://dictate")!, serverURL: entry.serverURL)) { Label("Dictate", systemImage: "mic.fill") }
-                        Link(destination: AppLink.scoped(URL(string: "bbstudio://voice")!, serverURL: entry.serverURL)) { Label("Voice", systemImage: "waveform") }
+                        Link(destination: AppLink.scoped(URL(string: "bbstudio://voice")!, serverURL: entry.serverURL)) { Label("Voice", systemImage: Symbols.voiceChat) }
                     }
                     .font(.caption.weight(.semibold))
                 }

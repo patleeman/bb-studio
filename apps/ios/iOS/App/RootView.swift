@@ -79,7 +79,7 @@ struct InboxTab: View {
                 InboxView().navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 480)
             } detail: {
                 NavigationStack(path: $model.path) {
-                    ContentUnavailableView("No thread selected", systemImage: "bubble.left.and.bubble.right")
+                    ContentUnavailableView("No thread selected", systemImage: Symbols.thread)
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }

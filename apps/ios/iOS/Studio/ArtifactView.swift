@@ -293,7 +293,7 @@ struct ArtifactView: View {
                 .pickerStyle(.menu)
             }
             if let thread = artifact.sourceThreadId {
-                Button { operation.complete(on: app) { app.push(.thread(id: thread)) } } label: { Label("Open Source Thread", systemImage: "bubble.left.and.bubble.right") }
+                Button { operation.complete(on: app) { app.push(.thread(id: thread)) } } label: { Label("Open Source Thread", systemImage: Symbols.thread) }
             }
             if ["markdown", "text"].contains(artifact.version.type) {
                 Button { Task { await saveAsPage() } } label: { Label("Save as Page", systemImage: "doc.badge.plus") }

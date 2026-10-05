@@ -427,7 +427,7 @@ struct ActivityStep: View {
         case "file-read": return "doc.text"
         case "file-change": return "pencil"
         case "tool": return "wrench.and.screwdriver"
-        case "workflow": return "square.stack.3d.up"
+        case "workflow": return "flowchart"
         default: return row.systemKind == "operation" ? "sparkle" : "circle.dotted"
         }
     }

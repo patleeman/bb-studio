@@ -71,7 +71,7 @@ struct MentionSuggestions: View {
         let threadSuggestions = matching.sorted { $0.updatedAt > $1.updatedAt }.prefix(4).map { thread in
             let title = ThreadTitles.resolve(thread.displayTitle)
             return Suggestion(
-                id: thread.id, icon: "bubble.left.and.text.bubble.right", title: title, subtitle: "Thread",
+                id: thread.id, icon: Symbols.thread, title: title, subtitle: "Thread",
                 mention: .thread(thread.id, projectId: thread.projectId, label: title))
         }
         let pluginSuggestions = groups.flatMap { group in
@@ -85,14 +85,10 @@ struct MentionSuggestions: View {
     }
 
     private static func icon(_ provider: String) -> String {
-        switch provider {
-        case "bots": "person.crop.circle"
-        case "recordings": "waveform"
-        case "pages": "doc.richtext"
-        case "drawings", "drawing": "scribble.variable"
-        case "artifacts", "artifact": "doc.zipper"
-        default: "at"
-        }
+        if provider == "bots" { return "person.crop.circle" }
+        // Providers are named for their Studio kind ("page", "table"), some in the plural ("recordings").
+        let kind = provider.hasSuffix("s") ? String(provider.dropLast()) : provider
+        return StudioKind.known.first { $0.id == provider || $0.id == kind }?.symbol ?? "at"
     }
 
     /// The last thread list, so suggestions show at once the next time.

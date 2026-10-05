@@ -220,7 +220,7 @@ struct PageView: View {
                                 }
                             }
                         } label: {
-                            Label("Chats (\(chats.count))", systemImage: "bubble.left.and.bubble.right")
+                            Label("Chats (\(chats.count))", systemImage: Symbols.thread)
                         }
                     }
                     Section {

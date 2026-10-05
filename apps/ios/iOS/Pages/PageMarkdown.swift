@@ -418,8 +418,8 @@ struct EmbedCard: View {
 
     private func symbol(_ kind: String) -> String {
         switch kind {
-        case "page": "doc.text"
-        case "thread": "bubble.left.and.bubble.right"
+        case "page": StudioKind.of("page").symbol
+        case "thread": Symbols.thread
         case "bookmark": "link"
         default: "square.dashed"
         }

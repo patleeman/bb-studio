@@ -26,7 +26,7 @@ struct RelatedSection: View {
             ForEach(Array((threads?.threads ?? []).enumerated()), id: \.offset) { _, thread in
                 if let id = thread.threadId {
                     NavigationLink(value: Route.thread(id: id)) {
-                        Label("Thread · \(thread.state ?? thread.role ?? "")", systemImage: "bubble.left")
+                        Label("Thread · \(thread.state ?? thread.role ?? "")", systemImage: Symbols.thread)
                     }
                 }
             }

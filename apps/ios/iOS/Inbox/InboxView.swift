@@ -856,7 +856,7 @@ struct InboxView: View {
                 thread.isUnread ? "Mark as read" : "Mark as unread",
                 systemImage: thread.isUnread ? "envelope.open" : "envelope.badge")
         }
-        Button { app.startVoiceChat(threadId: thread.id) } label: { Label("Voice chat", systemImage: "waveform") }
+        Button { app.startVoiceChat(threadId: thread.id) } label: { Label("Voice chat", systemImage: Symbols.voiceChat) }
         Button { UIPasteboard.general.string = thread.id } label: { Label("Copy Thread ID", systemImage: "number") }
         if model.spaces.count > 1, thread.parentThreadId == nil {
             let current = model.spaceId(of: thread)

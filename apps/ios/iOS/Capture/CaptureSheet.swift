@@ -21,7 +21,7 @@ enum CaptureOption: String, CaseIterable, Identifiable {
         case .dictate: "mic.fill"
         case .note: "note.text"
         case .file: "photo.on.rectangle.angled"
-        case .thread: "bubble.left.and.text.bubble.right"
+        case .thread: Symbols.newThread
         }
     }
 

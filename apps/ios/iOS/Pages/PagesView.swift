@@ -244,7 +244,7 @@ struct PageRow: View {
                 if let emoji = page.emoji {
                     Text(emoji)
                 } else {
-                    Image(systemName: "doc.text").foregroundStyle(.secondary)
+                    Image(systemName: StudioKind.of("page").symbol).foregroundStyle(.secondary)
                 }
             }
             .frame(width: 24)

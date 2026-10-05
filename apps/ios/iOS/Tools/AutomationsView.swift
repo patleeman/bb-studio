@@ -209,7 +209,7 @@ struct AutomationView: View {
                     LabeledContent("Agent", value: [automation.execution.model, automation.execution.reasoningLevel]
                         .compactMap { $0 }.joined(separator: " · "))
                     if let target = automation.execution.targetThreadId {
-                        NavigationLink(value: Route.thread(id: target)) { Label("Posts in its thread", systemImage: "bubble.left") }
+                        NavigationLink(value: Route.thread(id: target)) { Label("Posts in its thread", systemImage: Symbols.thread) }
                     }
                     if let prompt = automation.execution.prompt {
                         DisclosureGroup("Prompt") {

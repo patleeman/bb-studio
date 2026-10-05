@@ -134,7 +134,7 @@ final class SceneDelegate: NSObject, UIWindowSceneDelegate {
     static let shortcuts: [UIApplicationShortcutItem] = [
         .init(type: "bbstudio://dictate", localizedTitle: "Dictate", localizedSubtitle: nil, icon: .init(systemImageName: "mic.fill")),
         .init(type: "bbstudio://write", localizedTitle: "Write", localizedSubtitle: nil, icon: .init(systemImageName: "square.and.pencil")),
-        .init(type: "bbstudio://new", localizedTitle: "New Thread", localizedSubtitle: nil, icon: .init(systemImageName: "bubble.left.and.text.bubble.right")),
+        .init(type: "bbstudio://new", localizedTitle: "New Thread", localizedSubtitle: nil, icon: .init(systemImageName: Symbols.newThread)),
     ]
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {

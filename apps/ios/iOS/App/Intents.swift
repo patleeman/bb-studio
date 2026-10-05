@@ -173,9 +173,10 @@ struct WriteIntent: AppIntent {
 }
 
 struct BBShortcuts: AppShortcutsProvider {
+    // Symbol names must be literals here; they match StudioKind and Symbols.
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: CaptureIntent(), phrases: ["Capture in \(.applicationName)"], shortTitle: "Capture", systemImageName: "square.and.arrow.down")
-        AppShortcut(intent: OpenPageIntent(), phrases: ["Open a page in \(.applicationName)"], shortTitle: "Open page", systemImageName: "doc.text")
+        AppShortcut(intent: OpenPageIntent(), phrases: ["Open a page in \(.applicationName)"], shortTitle: "Open page", systemImageName: "doc.richtext")
         AppShortcut(intent: SendToThreadIntent(), phrases: ["Send to a thread in \(.applicationName)"], shortTitle: "Send to thread", systemImageName: "paperplane")
         AppShortcut(intent: StartRecordingIntent(), phrases: ["Start recording in \(.applicationName)"], shortTitle: "Record", systemImageName: "record.circle")
         AppShortcut(
@@ -186,10 +187,10 @@ struct BBShortcuts: AppShortcutsProvider {
             systemImageName: "mic.fill")
         AppShortcut(
             intent: VoiceChatIntent(), phrases: ["Voice chat with \(.applicationName)"], shortTitle: "Voice chat",
-            systemImageName: "waveform")
+            systemImageName: "waveform.and.person.filled")
         AppShortcut(
             intent: NewThreadIntent(), phrases: ["New \(.applicationName) thread"], shortTitle: "New thread",
-            systemImageName: "bubble.left.and.text.bubble.right")
+            systemImageName: "square.and.pencil")
         AppShortcut(
             intent: WriteIntent(), phrases: ["Write in \(.applicationName)", "Take a note in \(.applicationName)"],
             shortTitle: "Write", systemImageName: "square.and.pencil")
