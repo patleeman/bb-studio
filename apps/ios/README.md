@@ -14,7 +14,7 @@ are unchanged, and old `bbgo://` links still open.
 | Feature | Where |
 |---|---|
 | Home: the BB web sidebar on the phone, following its organization (Studio Sidebar's when it's installed). Automations, Pinned, your project groups in the sidebar's order, then Threads. Running threads first, then most recent activity; child threads nest under their parent; sections collapse | `iOS/Inbox/InboxView.swift` |
-| By space: when the web sidebar shows By space, Home does too. Chips at the top switch between All and each Space (an amber mark when a thread there needs you; + makes a Space); Home starts on the Space the web sidebar shows and then remembers yours. A Space shows its lead (with its heartbeat), its open Studio items (tap to open, swipe to close), and its other threads, those that need you first. Rows are two lines: a status dot, the title and its age, and the thread's latest line from Studio, red when it failed and amber when blocked. The Space's ⋯ has New Thread Here, New Item, Browse Items, Archived Threads, Command View, Lead and Heartbeat, and Edit Space. A thread's long-press has Move to Space, Make Space Lead, and Hide; a section with hidden threads ends with "N hidden · Show". New threads start in the Space shown, in its default project | `iOS/Inbox/InboxView.swift`, `iOS/Inbox/SpaceHome.swift`, `Shared/Spaces.swift` |
+| By space: when the web sidebar shows By space, Home does too. Chips at the top switch between All and each Space (an amber mark when a thread there needs you; + makes a Space), and so does a horizontal swipe: each Space is a page. A swipe that starts on a thread row still opens that row's actions; Home starts on the Space the web sidebar shows and then remembers yours. A Space shows its lead (with its heartbeat), its open Studio items (tap to open, swipe to close), and its other threads, those that need you first. Rows are two lines: a status dot, the title and its age, and the thread's latest line from Studio, red when it failed and amber when blocked. The Space's ⋯ has New Thread Here, New Item, Browse Items, Archived Threads, Command View, Lead and Heartbeat, and Edit Space. A thread's long-press has Move to Space, Make Space Lead, and Hide; a section with hidden threads ends with "N hidden · Show". New threads start in the Space shown, in its default project | `iOS/Inbox/InboxView.swift`, `iOS/Inbox/SpaceHome.swift`, `Shared/Spaces.swift` |
 | Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename | `iOS/Inbox/InboxView.swift` |
 | Search across thread titles and messages, active and archived | `iOS/Inbox/InboxView.swift` |
 | New thread with project, provider, model, reasoning, and permissions (the choice becomes the project default, as in the web app). | `iOS/Inbox/NewThreadView.swift` |
@@ -146,6 +146,10 @@ changing anything: `TEST_RUNNER_BBGO_PROBE_THREAD=thr_xxx`, plus optionally
 `TEST_RUNNER_BBGO_PROBE_SWIPES=<n>`, `TEST_RUNNER_BBGO_PROBE_FAST=1`, and
 `TEST_RUNNER_BBGO_PROBE_FIND=<text>` to stop once that text is on screen.
 Screenshots land in `/tmp/qa-ui-probe-*.png`.
+
+`SpacePagingUITests` swipes Home between Spaces and drags a thread row partway
+open (never far enough to run an action, then closes it). It needs the server in
+By space mode and skips otherwise. Screenshots land in `/tmp/qa-space-paging-*.png`.
 
 Unit tests use a private simulator clone:
 

@@ -441,42 +441,7 @@ struct InboxView: View {
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
 
     var body: some View {
-        List {
-            if let error = model.error {
-                Section {
-                    ConnectionBanner(message: error) { await model.load(app.client) }
-                }
-            }
-            if let results = model.searchResults, !query.isEmpty {
-                searchSection("Matches", results.active.results)
-                searchSection("Archived", results.archived.results)
-                if results.active.total + results.archived.total == 0 {
-                    ContentUnavailableView.search(text: query)
-                }
-            } else {
-                // Plain rows under no header, like the sidebar's nav.
-                let plugins = runningPlugins.split(separator: ",")
-                if query.isEmpty, model.spaceMode {
-                    Section {
-                        SpaceSwitcher(spaces: model.spaceSections, shown: shownSpace) { app.homeSpace = $0 } add: {
-                            spaceSheet = SpaceSheet(space: nil)
-                        }
-                    }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                }
-                if query.isEmpty, plugins.contains("automations") {
-                    Section {
-                        NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
-                    }
-                }
-                if query.isEmpty, model.spaceMode {
-                    spaceHome
-                } else {
-                    ForEach(model.groups) { group in threadSection(group) }
-                }
-            }
-        }
+        home
         .listStyle(.sidebar)
         .overlay {
             if !model.loaded { ProgressView() }
@@ -625,6 +590,61 @@ struct InboxView: View {
         }
     }
 
+    /// By space pages through All and each Space, in the switcher's order, with
+    /// a horizontal swipe; a swipe that starts on a row still opens its actions.
+    @ViewBuilder
+    private var home: some View {
+        if query.isEmpty, model.spaceMode {
+            TabView(selection: Binding(get: { shownSpace }, set: { app.homeSpace = $0 })) {
+                ForEach(["all"] + model.spaces.map(\.id), id: \.self) { id in
+                    List {
+                        homeTop
+                        spaceHome(id)
+                    }
+                    .background(YieldsRowSwipesToPager())
+                    .tag(id)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .safeAreaBar(edge: .top) {
+                SpaceSwitcher(spaces: model.spaceSections, shown: shownSpace) { id in
+                    withAnimation { app.homeSpace = id }
+                } add: {
+                    spaceSheet = SpaceSheet(space: nil)
+                }
+            }
+            .sensoryFeedback(.selection, trigger: shownSpace)
+        } else {
+            List {
+                homeTop
+                if let results = model.searchResults, !query.isEmpty {
+                    searchSection("Matches", results.active.results)
+                    searchSection("Archived", results.archived.results)
+                    if results.active.total + results.archived.total == 0 {
+                        ContentUnavailableView.search(text: query)
+                    }
+                } else {
+                    ForEach(model.groups) { group in threadSection(group) }
+                }
+            }
+        }
+    }
+
+    /// The connection banner, then Automations as a plain row under no header, like the sidebar's nav.
+    @ViewBuilder
+    private var homeTop: some View {
+        if let error = model.error {
+            Section {
+                ConnectionBanner(message: error) { await model.load(app.client) }
+            }
+        }
+        if query.isEmpty, runningPlugins.split(separator: ",").contains("automations") {
+            Section {
+                NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
+            }
+        }
+    }
+
     // MARK: By space
 
     private var shownSpace: String { model.shownSpace(app.homeSpace) }
@@ -641,9 +661,9 @@ struct InboxView: View {
         return currentSpace?.label ?? "All Spaces"
     }
 
-    /// Pinned, then the Space shown (its lead, Studio items and threads), or every Space under All.
+    /// Pinned, then one Space's page (its lead, Studio items and threads), or every Space under All.
     @ViewBuilder
-    private var spaceHome: some View {
+    private func spaceHome(_ id: String) -> some View {
         let pinned = model.threads.filter { $0.pinnedAt != nil }
             .sorted { ($0.pinSortKey ?? "", $1.pinnedAt ?? 0) < ($1.pinSortKey ?? "", $0.pinnedAt ?? 0) }
         if !pinned.isEmpty {
@@ -652,7 +672,8 @@ struct InboxView: View {
             }
         }
         let sections = model.spaceSections
-        if let space = currentSpace, let section = sections.first(where: { $0.id == space.id }) {
+        if let section = sections.first(where: { $0.id == id }) {
+            let space = section.space
             if let lead = section.lead {
                 Section("Lead") { spaceThreadLinks(lead, lead: true, heartbeat: section.leadInfo?.heartbeat) }
             }
