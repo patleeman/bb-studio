@@ -990,8 +990,13 @@ export class TalkController {
   private async maybeFinish(): Promise<void> {
     const id = this.state.recordingId;
     if (this.state.localSaveError || this.state.phase !== "finalizing" || !id || !this.rpc) return;
-    const waiting = (await this.outbox.all()).some((segment) => segment.recordingId === id && !segment.rejected);
-    if (waiting) return;
+    const local = (await this.outbox.all()).filter((segment) => segment.recordingId === id);
+    if (local.some((segment) => !segment.rejected)) return;
+    // A set-aside piece would leave a hole in the text: never insert it silently.
+    if (local.length && this.insertOnDone) {
+      this.insertOnDone = false;
+      toast.error("Part of this dictation couldn't be uploaded, so Talk didn't insert it. It's in Talk recordings, and the missing audio is kept on this device.");
+    }
     const { kind } = this.state;
     let recording: Recording;
     try {

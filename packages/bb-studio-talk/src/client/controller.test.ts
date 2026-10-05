@@ -247,3 +247,19 @@ it("holds a new draft's pending dictation until that exact companion is visible"
   expect(insertDictationIntoComposer).toHaveBeenCalledWith(prompt, "Return to the original draft.", []);
   expect(readPending()).toEqual({});
 });
+
+it("does not insert a dictation when one of its pieces was set aside", async () => {
+  const recording = { id: "rec_partial", kind: "dictation", durationMs: 50_000, status: "done", wordCount: 4, failedCount: 0, pendingCount: 0 };
+  const segments = [{ sessionId: "s", status: "done", text: "Only the first half.", error: null }];
+  const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
+  await controller.startRecording("dictation");
+  const setAside = { recordingId: "rec_partial", sessionId: "s", index: 1, startedAt: 1, mimeType: "audio/webm", lastPartAt: 1, durationMs: 25_000, complete: true, rejected: "Invalid input", parts: [new ArrayBuffer(1)] };
+  vi.mocked(Outbox.prototype.all).mockResolvedValue([setAside]);
+  await controller.stop(true);
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(call).toHaveBeenCalledWith("recording_state", { id: "rec_partial", status: "finishing" });
+  expect(controller.getState().phase).toBe("idle");
+  expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+});

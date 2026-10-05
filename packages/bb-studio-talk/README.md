@@ -224,7 +224,8 @@ The same message at a 390-pixel viewport, with the source pill in view.
   unsaved audio alone, and upload it only once that window is gone.
 - **Refused pieces don't block the rest.** If the server rejects a piece as
   invalid, Talk keeps its audio on the device, says so, and uploads the
-  pieces after it. **Unsent audio** (the toast's *Review*, or the notice on
+  pieces after it. A dictation with a refused piece isn't inserted, since its
+  text would have a gap; it stays in Talk recordings. **Unsent audio** (the toast's *Review*, or the notice on
   the recording's page and the Recordings list) lists what the device kept:
   retry each piece or all of them (after a Talk update, say), download one
   as an audio file, or discard it. A laptop that sleeps mid-recording doesn't count the
