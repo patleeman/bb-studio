@@ -1,7 +1,7 @@
 // The Next row at the end of a reply (`::next{reply="…" btw="…" do="…"}`):
 // quick replies and actions as buttons that draft into the composer, then
-// notes about what the agent noticed, each with Tell me more (an explainer)
-// and, for 🐛 notes, Fix this. Each message logs its suggestions once
+// notes about what the agent noticed, each with Tell me more (asks this
+// agent), Visual explainer (an explainer page) and, for 🐛 notes, Fix this. Each message logs its suggestions once
 // as shown, and every click, so `bb pages explore stats` can tell which kinds
 // earn their place.
 import type { PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
@@ -20,7 +20,7 @@ import { useExplainers, type ExplainerTarget } from "./rows";
 const SETTINGS_HREF = `/settings/plugins/${PLUGIN_ID}`;
 
 const CHIP = "inline-flex h-6 items-center gap-1.5 border border-border bg-transparent px-2 text-xs text-foreground hover:bg-state-hover";
-/** Replies are round; things the agent does (Ask for, Tell me more, Fix this) are dashed squares. */
+/** Replies are round; things the agent does (Ask for and the notes' buttons) are dashed squares. */
 const REPLY_CHIP = `${CHIP} rounded-full`;
 const ACTION_CHIP = `${CHIP} rounded-md border-dashed`;
 
@@ -34,6 +34,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
       ...items.do.map((item) => ({ kind: "do" as const, emoji: item.emoji, label: item.label })),
       ...items.btw.map((note) => ({ kind: "explore" as const, emoji: note.emoji, label: note.label })),
       ...items.btw.filter(isBug).map((note) => ({ kind: "fix" as const, emoji: note.emoji, label: note.label })),
+      ...items.btw.map((note) => ({ kind: "more" as const, emoji: note.emoji, label: note.label })),
     ],
     [items],
   );
@@ -107,6 +108,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
             turnId={message.turnId}
             onExplore={(item) => logClick("explore", item)}
             onFix={(note) => draft("fix", note, `${BUG_EMOJI} Fix this: ${note.text}`)}
+          onMore={(note) => draft("more", note, `${MORE_EMOJI} Tell me more: ${note.text}`)}
           />
         </NextSection>
       ) : null}
@@ -128,8 +130,14 @@ function NextSection({ label, hint, children }: { label: string; hint: string; c
 
 const isBug = (note: BtwNote) => note.emoji === BUG_EMOJI;
 
-/** Notes back to the user, each with Tell me more (its explainer's state) and, for 🐛 notes, Fix this. */
-function BtwNotes({ notes, onFix, ...target }: ExplainerTarget & { notes: readonly BtwNote[]; onFix(note: BtwNote): void }) {
+/** Drafted by Tell me more; matches the iOS app. */
+const MORE_EMOJI = "💬";
+
+/**
+ * Notes back to the user, each with Tell me more (asks this agent), Fix this
+ * for 🐛 notes, and Visual explainer (shows its explainer page's state).
+ */
+function BtwNotes({ notes, onFix, onMore, ...target }: ExplainerTarget & { notes: readonly BtwNote[]; onFix(note: BtwNote): void; onMore(note: BtwNote): void }) {
   const { byLabel, busy, errors, act } = useExplainers(target);
   return (
     <ul className="space-y-1.5" aria-label="Things the agent noticed">
@@ -139,8 +147,8 @@ function BtwNotes({ notes, onFix, ...target }: ExplainerTarget & { notes: readon
         const error = errors[key] ?? null;
         const state = error ? "error" : rowState(explainer);
         const progress = Math.round(explainer?.job?.progress ?? 0);
-        const more =
-          state === "running" ? `Writing · ${progress}%` : state === "ready" ? "Open explanation" : state === "error" ? "Retry" : "Tell me more";
+        const explainerLabel =
+          state === "running" ? `Writing explainer · ${progress}%` : state === "ready" ? "Open explainer" : state === "error" ? "Retry explainer" : "Visual explainer";
         return (
           <li key={key} className="flex gap-2 pt-0.5 text-sm">
             <span aria-hidden className="w-4 shrink-0 text-center leading-5">
@@ -149,20 +157,9 @@ function BtwNotes({ notes, onFix, ...target }: ExplainerTarget & { notes: readon
             <div className="min-w-0 flex-1">
               <p className="leading-5 text-foreground">{note.text}</p>
               <div className="mt-1 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => void act(note, explainer, false, note.text)}
-                  disabled={Boolean(busy[key])}
-                  title={error ?? explainer?.job?.detail ?? "Write a page explaining this"}
-                  className={cn(
-                    ACTION_CHIP,
-                    "disabled:cursor-progress",
-                    state === "error" && "border-destructive/60 text-destructive",
-                    state === "running" && "animate-pulse motion-reduce:animate-none",
-                  )}
-                >
-                  <span aria-hidden="true">{state === "ready" ? "↗" : state === "running" ? "⏳" : state === "error" ? "↻" : "📖"}</span>
-                  <span>{more}</span>
+                <button type="button" onClick={() => onMore(note)} title="Ask the agent to explain this here, in the thread" className={ACTION_CHIP}>
+                  <span aria-hidden="true">{MORE_EMOJI}</span>
+                  <span>Tell me more</span>
                 </button>
                 {isBug(note) ? (
                   <button type="button" onClick={() => onFix(note)} title="Draft a request to fix this in your message box" className={ACTION_CHIP}>
@@ -170,6 +167,21 @@ function BtwNotes({ notes, onFix, ...target }: ExplainerTarget & { notes: readon
                     <span>Fix this</span>
                   </button>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={() => void act(note, explainer, false, note.text)}
+                  disabled={Boolean(busy[key])}
+                  title={error ?? explainer?.job?.detail ?? "Write a page that explains this with diagrams, in the background"}
+                  className={cn(
+                    ACTION_CHIP,
+                    "disabled:cursor-progress",
+                    state === "error" && "border-destructive/60 text-destructive",
+                    state === "running" && "animate-pulse motion-reduce:animate-none",
+                  )}
+                >
+                  <span aria-hidden="true">{state === "ready" ? "↗" : state === "running" ? "⏳" : state === "error" ? "↻" : "🖼️"}</span>
+                  <span>{explainerLabel}</span>
+                </button>
               </div>
             </div>
           </li>

@@ -223,8 +223,9 @@ struct ImageViewer: View {
 
 /// Pages' Next row as a "What next?" card, as in BB web: labeled rows of
 /// replies, requests, and notes on what the agent noticed. Every tap drafts
-/// text. A note's Tell me more asks the agent, since the app can't write an
-/// explainer page itself; Fix this drafts the same request as on the web.
+/// text. A note's Tell me more and Fix this draft the same requests as on the
+/// web; the web's Visual explainer is left out, since the app doesn't show
+/// explainer pages.
 struct NextCard: View {
     let next: Directive.Next
     let react: (String) -> Void
@@ -277,7 +278,7 @@ struct NextCard: View {
 
     /// A note's buttons, and what each drafts.
     static func actions(for note: Directive.Note) -> [(label: String, draft: String)] {
-        var actions = [(label: "📖 Tell me more", draft: "📖 Tell me more: \(note.text)")]
+        var actions = [(label: "💬 Tell me more", draft: "💬 Tell me more: \(note.text)")]
         if note.isBug { actions.append((label: "🔧 Fix this", draft: "🐛 Fix this: \(note.text)")) }
         return actions
     }

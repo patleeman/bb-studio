@@ -5,16 +5,16 @@
 //
 // `reply` items draft a quick answer, and `do` items draft an instruction for
 // the agent to carry out. `btw` items are notes back to the user about
-// something the agent noticed, in plain sentences, with Tell me more (an
-// explainer) and, for 🐛 notes, Fix this. Replies from before `btw` carry
+// something the agent noticed, in plain sentences, with Tell me more (asks
+// this agent), Visual explainer (an explainer page) and, for 🐛 notes, Fix this. Replies from before `btw` carry
 // `explore="🐛 Label — why"` instead; those show as notes too. Attributes come
 // from the model, so parsing caps and dedupes them.
 import { labelKey, MAX_ITEMS, MAX_LABEL_LENGTH, parseExploreItem, parseExploreItems, type ExploreItem } from "./shared";
 
 export const NEXT_DIRECTIVE = "next";
 
-/** What the click log counts: quick replies, Tell me more, actions, and Fix this. */
-export const NEXT_KINDS = ["reply", "explore", "do", "fix"] as const;
+/** What the click log counts: quick replies, Visual explainer, actions, Fix this, and Tell me more. */
+export const NEXT_KINDS = ["reply", "explore", "do", "fix", "more"] as const;
 export type NextKind = (typeof NEXT_KINDS)[number];
 
 /** Each group's cap. */

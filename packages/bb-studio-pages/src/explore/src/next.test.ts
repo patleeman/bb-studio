@@ -130,6 +130,7 @@ describe("the click log", () => {
       { kind: "explore", shown: 1, clicked: 0 },
       { kind: "do", shown: 2, clicked: 2 },
       { kind: "fix", shown: 0, clicked: 0 },
+      { kind: "more", shown: 0, clicked: 0 },
     ]);
     expect(stats.top).toEqual([{ kind: "do", emoji: "📄", label: "Write it up", shown: 2, clicked: 2 }]);
   });

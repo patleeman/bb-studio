@@ -56,8 +56,8 @@ final class ComposerTests: XCTestCase {
         XCTAssertLessThanOrEqual(long[0].text.count, 281)
         XCTAssertTrue(long[0].text.hasSuffix("…"))
         // 🐛 notes offer Fix this, drafted as on the web; every note offers Tell me more.
-        XCTAssertEqual(NextCard.actions(for: next.notes[0]).map(\.draft), ["📖 Tell me more: \(sentence)", "🐛 Fix this: \(sentence)"])
-        XCTAssertEqual(NextCard.actions(for: next.notes[1]).map(\.label), ["📖 Tell me more"])
+        XCTAssertEqual(NextCard.actions(for: next.notes[0]).map(\.draft), ["💬 Tell me more: \(sentence)", "🐛 Fix this: \(sentence)"])
+        XCTAssertEqual(NextCard.actions(for: next.notes[1]).map(\.label), ["💬 Tell me more"])
     }
 
     func testCommandAndReactionParsing() {

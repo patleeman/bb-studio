@@ -23,7 +23,8 @@ to the user in plain sentences, next to `reply` (quick answers) and `do`
 `::next{reply="👍 Ship it" btw="🐛 I noticed the new endpoint retries without waiting. If the server is down, it will get hammered." do="📄 Write up the plan as a page"}`.
 Start each note with "I noticed", avoid code names, and say what it means for
 the user. Never put a straight double quote inside an item; BB then shows the
-whole line as raw text. Quote with ‘single’ or “curly” quotes. Each note gets **Tell me more** (an explainer page); 🐛 notes also
+whole line as raw text. Quote with ‘single’ or “curly” quotes. Each note gets **Tell me more** (drafts "💬 Tell me more: <note>"; answer it
+in the thread) and **Visual explainer** (an explainer page); 🐛 notes also
 get **Fix this**, which drafts "🐛 Fix this: <note>". Clicking a `reply` or
 `do` item drafts its text in the composer; when the user sends a `do` item or
 a Fix this request, carry it out.
