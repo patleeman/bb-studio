@@ -24,3 +24,21 @@ it("merges a full scene file together with the image files its elements referenc
     await host.harness.lifecycle.dispose();
   }
 });
+
+it("tells the agent when an upsert of a deleted element was not applied", async () => {
+  const host = createFakePluginHost({ pluginId: "excalidraw", sdk: {
+    plugins: { callRpc: async () => { throw new Error("Studio is optional"); } },
+  } });
+  await plugin(host.bb);
+  try {
+    const { drawing } = await host.harness.behavior.callRpc("createDrawing", { name: "Boxes" }) as { drawing: { id: string } };
+    const call = (input: object) => host.harness.behavior.callAgentTool("excalidraw_update_drawing", { drawingId: drawing.id, ...input });
+    await call({ elements: [{ id: "box1", type: "rectangle" }] });
+    await call({ deletedElementIds: ["box1"] });
+    const result = await call({ elements: [{ id: "box1", type: "rectangle", x: 10 }, { id: "box2", type: "rectangle" }] });
+    expect(String(result)).toContain("upserted 1 element(s)");
+    expect(String(result)).toContain("NOT applied: box1");
+  } finally {
+    await host.harness.lifecycle.dispose();
+  }
+});

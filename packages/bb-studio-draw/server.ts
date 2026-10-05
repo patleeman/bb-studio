@@ -399,7 +399,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "excalidraw_update_drawing",
     description:
-      "Edit an Excalidraw drawing the user may have open right now: upsert elements and/or delete elements by id. The user's open editor updates live. Merge is element-level: only the elements you send change, and any element you send wins (its version is bumped), so concurrent user edits to other elements are preserved. Fetch the latest scene with excalidraw_get_drawing first. Element objects must match Excalidraw's shape (id, type, x, y, width, height, strokeColor, backgroundColor, fillStyle, strokeWidth, roughness, opacity, seed, groupIds, frameId, roundness, ...) — safest to copy an existing element from excalidraw_get_drawing and change id/type/position/text. Upserting an existing id merges into it, so {id, type, x, y} moves an element and keeps the rest. `index` (z-order) is assigned automatically when omitted. deletedElementIds removes elements for the user, not just hides them.",
+      "Edit an Excalidraw drawing the user may have open right now: upsert elements and/or delete elements by id. The user's open editor updates live. Merge is element-level: only the elements you send change, and any element you send wins (its version is bumped) unless it was already deleted (re-add it with a new id), so concurrent user edits to other elements are preserved. Fetch the latest scene with excalidraw_get_drawing first. Element objects must match Excalidraw's shape (id, type, x, y, width, height, strokeColor, backgroundColor, fillStyle, strokeWidth, roughness, opacity, seed, groupIds, frameId, roundness, ...) — safest to copy an existing element from excalidraw_get_drawing and change id/type/position/text. Upserting an existing id merges into it, so {id, type, x, y} moves an element and keeps the rest. `index` (z-order) is assigned automatically when omitted. deletedElementIds removes elements for the user, not just hides them.",
     parameters: z.object({
       drawingId: z.string().min(1),
       elements: z.array(excalidrawElementSchema).max(500).optional(),
@@ -429,16 +429,21 @@ export default async function plugin(bb: BbPluginApi) {
           isError: true,
         };
       }
+      const skipped: string[] = [];
       const merged = applyElementUpserts(row.data, (elements ?? []) as SceneElement[], {
         deletedElementIds,
         appState,
         files,
+        skipped,
       });
       const updatedAt = write(row, merged, "agent");
       const clean = getNonDeletedElements(merged);
       return [
         `Updated drawing "${displayName(row)}" (id ${row.id}) — now ${clean.length} element(s): ${sceneSummary(merged)}.`,
-        `- upserted ${elements?.length ?? 0} element(s), deleted ${deletedElementIds?.length ?? 0} element(s)`,
+        `- upserted ${(elements?.length ?? 0) - skipped.length} element(s), deleted ${deletedElementIds?.length ?? 0} element(s)`,
+        ...(skipped.length
+          ? [`- NOT applied: ${skipped.join(", ")} — already deleted in the drawing. Use new ids to add them again.`]
+          : []),
         `- saved at ${new Date(updatedAt).toISOString()}`,
         `The user's open editor has been notified and shows the change live.`,
       ].join("\n");

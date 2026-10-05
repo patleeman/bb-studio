@@ -195,6 +195,8 @@ export function applyElementUpserts(
     deletedElementIds?: string[];
     appState?: Record<string, unknown>;
     files?: Record<string, unknown>;
+    /** Receives the ids of upserts dropped because the element was deleted at a newer version. */
+    skipped?: string[];
   } = {},
 ): StoredScene {
   const cur = parseSceneData(currentData) ?? emptyScene();
@@ -219,6 +221,7 @@ export function applyElementUpserts(
       // Stale re-add of an element the other writer deleted: keep the
       // tombstone (the deletion happened at a higher version). Only an
       // explicitly newer version (undo/re-add intent) resurrects it.
+      options.skipped?.push(el.id);
       continue;
     }
     const version = existing
