@@ -79,6 +79,11 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS requests_thread ON requests (thread_id, status)`,
   `CREATE INDEX IF NOT EXISTS chats_page ON chats (page_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS checklist_handoffs_page ON checklist_handoffs (page_id, created_at)`,
+  // Bot workers were retired. Keep history, but never show old requests as live work.
+  `UPDATE requests SET status = 'failed',
+     error = COALESCE(NULLIF(error, ''), 'Bot profile automation was retired. Start a page chat to continue.'),
+     updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+   WHERE status IN ('queued', 'working')`,
 ];
 
 export { newId };
@@ -306,47 +311,7 @@ export class PageStore {
     return this.db.prepare("SELECT id, name, mime, data FROM files WHERE page_id = ? ORDER BY created_at, id").all(pageId) as { id: string; name: string; mime: string; data: Buffer }[];
   }
 
-  // Bot requests ------------------------------------------------------------
-
-  addRequest(input: Omit<RequestRow, "id" | "created_at" | "updated_at" | "status" | "error" | "result" | "thread_id">): RequestRow | null {
-    const id = newId("req");
-    const now = Date.now();
-    const result = this.db
-      .prepare(
-        `INSERT OR IGNORE INTO requests (id, page_id, bot_id, bot_name, kind, block_id, comment_thread_id, summary, status, dedupe_key, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
-      )
-      .run(
-        id,
-        input.page_id,
-        input.bot_id,
-        input.bot_name,
-        input.kind,
-        input.block_id,
-        input.comment_thread_id,
-        input.summary,
-        input.dedupe_key,
-        now,
-        now,
-      );
-    return result.changes ? this.request(id) : null;
-  }
-
-  hasRequest(dedupeKey: string): boolean {
-    return !!this.db.prepare("SELECT 1 FROM requests WHERE dedupe_key = ?").get(dedupeKey);
-  }
-
-  request(id: string): RequestRow | null {
-    return (this.db.prepare("SELECT * FROM requests WHERE id = ?").get(id) as RequestRow | undefined) ?? null;
-  }
-
-  updateRequest(id: string, patch: Partial<Pick<RequestRow, "status" | "thread_id" | "error" | "result">>): void {
-    const entries = Object.entries(patch).filter(([, value]) => value !== undefined);
-    if (!entries.length) return;
-    this.db
-      .prepare(`UPDATE requests SET ${entries.map(([key]) => `${key} = ?`).join(", ")}, updated_at = ? WHERE id = ?`)
-      .run(...entries.map(([, value]) => value), Date.now(), id);
-  }
+  // Historical bot requests are read-only.
 
   requests(pageId: string, limit = 20): RequestRow[] {
     return this.db
@@ -367,11 +332,5 @@ export class PageStore {
   chatPageId(threadId: string): string | null {
     const row = this.db.prepare("SELECT page_id FROM chats WHERE thread_id = ?").get(threadId) as { page_id: string } | undefined;
     return row?.page_id ?? null;
-  }
-
-  openRequestsForThread(threadId: string): RequestRow[] {
-    return this.db
-      .prepare("SELECT * FROM requests WHERE thread_id = ? AND status IN ('queued', 'working') ORDER BY created_at")
-      .all(threadId) as RequestRow[];
   }
 }

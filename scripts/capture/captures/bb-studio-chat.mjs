@@ -56,6 +56,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         const root = `[data-float-window=${JSON.stringify(composerKey(ref))}]`;
         await client.waitForSelector(`${root} .studio-chat-composer [data-promptbox]`);
         const text = await client.evaluate(`document.querySelector(${JSON.stringify(`${root} .studio-chat-composer`)}).closest("section").innerText`);
+        if (text.includes("@mention a bot")) throw new Error("Retired bot handoff prompt is visible");
         if (!text.includes(`Chat about "${title}"`)) throw new Error(`Composer targets the wrong item: ${text}`);
         return root;
       };

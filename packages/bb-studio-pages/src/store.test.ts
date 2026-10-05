@@ -45,3 +45,21 @@ it("retains the newest versions at the live limit and supports keeping all", () 
     db.close();
   }
 });
+
+it("settles retired bot workers while preserving request history and completed results", () => {
+  const db = new Database(":memory:");
+  try {
+    for (const sql of MIGRATIONS.slice(0, -1)) db.exec(sql);
+    const insert = db.prepare(`INSERT INTO requests
+      (id, page_id, bot_id, bot_name, kind, summary, status, result, dedupe_key, created_at, updated_at)
+      VALUES (?, 'page', 'former_bot', 'Scribe', 'refresh', 'Historical request', ?, ?, ?, 1, 2)`);
+    for (const status of ["queued", "working", "done"]) insert.run(status, status, `${status} result`, status);
+    db.exec(MIGRATIONS.at(-1)!);
+    const requests = new PageStore(db).requests("page");
+    expect(requests).toHaveLength(3);
+    for (const status of ["queued", "working"]) {
+      expect(requests.find(request => request.id === status)).toMatchObject({ status: "failed", bot_name: "Scribe", result: `${status} result`, error: expect.stringContaining("retired") });
+    }
+    expect(requests.find(request => request.id === "done")).toMatchObject({ status: "done", result: "done result", error: null, updated_at: 2 });
+  } finally { db.close(); }
+});

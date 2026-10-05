@@ -92,9 +92,12 @@ Pages reads and writes GitHub-flavoured Markdown plus:
   a recording its player and transcript, and the
   rest a card. To give a page a database, make it with `tables_create` and
   embed it as a `table`; to track work in it, use checklists.
-- **Mentions:** `@[Name](bot:bot_id)`, `@[Title](page:pg_id)`,
+- **Mentions:** `@[Title](page:pg_id)`,
   `@[Title](thread:thr_id)`, `@[Title](item:plugin:id)`,
   `@[2026-10-01](date:2026-10-01)`.
+
+Historical bot mentions remain readable. Use thread mentions and page chats for
+new agent work; bot profiles and their mention/refresh workers are retired.
 
 Tables, checklists (`- [ ]`), headings, quotes, and images work as in GFM.
 Code fences keep their language and are highlighted for TypeScript,

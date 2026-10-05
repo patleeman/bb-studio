@@ -1,11 +1,11 @@
 ---
 name: studio-chat
-description: Use when a message says the user has a Studio item open ("Context for @… resolved by plugin studio-chat"), when they say "this page", "this drawing" or "here" in a chat started from Studio Chat, or when they ask how Studio Chat works.
+description: Use when a message says the user has a Studio item open ("Context for @… resolved by plugin studio, or the legacy studio-chat bridge"), when they say "this page", "this drawing" or "here" in a chat started from Studio Chat, or when they ask how Studio Chat works.
 ---
 
 # Studio Chat
 
-Studio Chat is the Chat action on BB Studio items: pages,
+Item chat is part of Studio. It provides the Chat action on BB Studio items: pages,
 drawings, recordings, artifacts and tables. Starting a chat from it
 adds a pill for the item whose Chat action the user chose, including an item
 in a Float tab. The main pane can show another item. When the message is sent, the pill turns

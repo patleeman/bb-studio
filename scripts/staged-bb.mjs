@@ -251,7 +251,7 @@ async function start() {
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
   const smartReactionsThread = !capturePlugin || ["emoji-react", "artifacts"].includes(capturePlugin)
     ? await seedSmartReactionsThread(project, machine, orbitDir) : null;
-  if (!capturePlugin || capturePlugin === "studio" || capturePlugin === "thread-list-plus") await seedCommand(machine, project);
+  if (!capturePlugin || capturePlugin === "studio") await seedCommand(machine, project);
 
   const envFile = join(stagedDir, "capture.env");
   await writeFile(
