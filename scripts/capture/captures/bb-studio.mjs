@@ -199,8 +199,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.clickAriaButtonWithPointer("Orbit");
         await escape();
         await client.waitForAriaButton("Remove Project Orbit");
+        await sleep(350);
         await client.evaluate(`window.prompt = () => 'Launch pages'`);
         await client.clickAriaButtonWithPointer("Save view");
+        await client.waitForText("Views");
         const overview = await pluginRpc("studio", "overview", null);
         viewId = overview.views.find((view) => view.name === 'Launch pages')?.id;
         if (!viewId) throw new Error("Save view did not persist the filter query");
@@ -212,7 +214,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForText("Offline mode launch");
         const layout = await client.evaluate(`(() => { const field = document.querySelector('input[aria-label="Search and filter studio"]'); return { inside: !field.parentElement.querySelector('[aria-label^="Remove "]'), overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
         if (!layout.inside || layout.overflow) throw new Error(`Invalid filter layout: ${JSON.stringify(layout)}`);
-        await sleep(600);
+        // Let the saved-view toast clear so it cannot cover mobile search.
+        await sleep(5000);
       } catch (error) { await cleanup(); throw error; }
       return cleanup;
     },

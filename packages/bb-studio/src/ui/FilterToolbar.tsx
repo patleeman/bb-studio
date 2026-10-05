@@ -86,7 +86,7 @@ export function FilterToolbar({ query, vocabulary, counts, onChange, spaces, vie
   const tagColor = new Map(tags.map((tag) => [tag.name.toLowerCase(), tag.color]));
   const spaceByName = new Map(spaces.map((space) => [space.name.toLowerCase(), space]));
   return (
-    <>
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
       {spaces.length ? <FilterPicker {...shared} field="space" label="Space" countOf={(value) => counts.space.get(idOf(value) ?? "") ?? 0} glyph={(value) => {
         const space = spaceByName.get(value.value.toLowerCase());
         return space ? <SpaceGlyph space={space} className="w-3.5 shrink-0 text-center text-xs" /> : null;
@@ -108,7 +108,7 @@ export function FilterToolbar({ query, vocabulary, counts, onChange, spaces, vie
           </PopoverContent>
         </Popover>
       ) : null}
-      {current ? <button type="button" aria-label="Save view" title="Save this search as a view" className={cn(BUTTON, "px-2")} onClick={onSaveView}><Icon name="BookmarkPlus" className="size-3.5" /><span className="@max-3xl/page:sr-only">Save view</span></button> : null}
+      {current ? <button type="button" aria-label="Save view" title="Save this search as a view" className={cn(BUTTON, "px-2")} onClick={onSaveView}><Icon name="studio/bookmark" className="size-3.5" /><span className="@max-3xl/page:sr-only">Save view</span></button> : null}
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>More filters</DialogTitle></DialogHeader>
@@ -119,6 +119,6 @@ export function FilterToolbar({ query, vocabulary, counts, onChange, spaces, vie
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
