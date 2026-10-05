@@ -80,7 +80,6 @@ const LINK_ICONS: Record<string, string> = {
   "talk/recordings": "talk/talk",
   "studio-tables/tables": "Rows2",
   "bot-teams/bots": "Bot",
-  "feed/feed": "feed/feed",
   "studio/spaces": "Layers",
 };
 
