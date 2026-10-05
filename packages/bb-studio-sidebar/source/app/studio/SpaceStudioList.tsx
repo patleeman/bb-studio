@@ -192,11 +192,12 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
             <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}>
               {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
             </span>
-            {renaming ? null : <span className="min-w-0 flex-1 truncate">{item.title}</span>}
+            {/* Line one is as tall as the hover buttons, so they stay off the preview. */}
+            {renaming ? null : <span className="flex h-7 min-w-0 flex-1 items-center max-md:pointer-coarse:h-9"><span className="truncate">{item.title}</span></span>}
             <span className="pointer-events-none min-w-0 basis-full truncate pl-6 text-xs leading-4 text-subtle-foreground">{item.preview ?? item.kindLabel}</span>
           </a>
           {renaming ? null : (
-            <span className="pointer-events-none absolute top-1.5 right-1 flex items-center gap-1 text-xs tabular-nums text-subtle-foreground group-hover/item:hidden group-focus-within/item:hidden">
+            <span className="pointer-events-none absolute top-0 right-1 flex h-7 items-center gap-1 max-md:pointer-coarse:h-9 text-xs tabular-nums text-subtle-foreground group-hover/item:hidden group-focus-within/item:hidden">
               {item.pinned ? <Icon name="Pin" aria-label="Pinned" className="size-3" /> : null}
               {item.updatedAt ? compactAge(item.updatedAt) : null}
             </span>
@@ -216,7 +217,7 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
               className="absolute inset-y-0.5 right-1 left-8 rounded-sm border border-sidebar-ring bg-sidebar px-1.5 text-sm outline-none"
             />
           ) : null}
-          <span className="absolute top-0.5 right-0.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">
+          <span className="absolute top-0 right-0.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">
             <button
               type="button"
               aria-label={`Close ${item.title}`}
