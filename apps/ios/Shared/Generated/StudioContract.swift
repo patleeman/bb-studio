@@ -1116,6 +1116,7 @@ public enum Studio {
 
   public struct OverviewOutputSpacesItem: Sendable, Hashable, Codable {
     public var id: String?
+    public var isDefault: Bool?
     public var name: String?
     public var color: String?
     public var icon: String?
@@ -1125,8 +1126,9 @@ public enum Studio {
     public var threadIds: [String]?
     public var itemKeys: [String]?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
+      self.isDefault = isDefault
       self.name = name
       self.color = color
       self.icon = icon
@@ -2534,6 +2536,7 @@ public enum Studio {
 
   public struct SpacesOutputSpacesItem: Sendable, Hashable, Codable {
     public var id: String?
+    public var isDefault: Bool?
     public var name: String?
     public var color: String?
     public var icon: String?
@@ -2543,8 +2546,9 @@ public enum Studio {
     public var threadIds: [String]?
     public var itemKeys: [String]?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
+      self.isDefault = isDefault
       self.name = name
       self.color = color
       self.icon = icon
@@ -2580,6 +2584,7 @@ public enum Studio {
 
   public struct CreateSpaceOutputSpace: Sendable, Hashable, Codable {
     public var id: String?
+    public var isDefault: Bool?
     public var name: String?
     public var color: String?
     public var icon: String?
@@ -2589,8 +2594,9 @@ public enum Studio {
     public var threadIds: [String]?
     public var itemKeys: [String]?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
+      self.isDefault = isDefault
       self.name = name
       self.color = color
       self.icon = icon
@@ -2628,6 +2634,7 @@ public enum Studio {
 
   public struct UpdateSpaceOutputSpace: Sendable, Hashable, Codable {
     public var id: String?
+    public var isDefault: Bool?
     public var name: String?
     public var color: String?
     public var icon: String?
@@ -2637,8 +2644,9 @@ public enum Studio {
     public var threadIds: [String]?
     public var itemKeys: [String]?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
+      self.isDefault = isDefault
       self.name = name
       self.color = color
       self.icon = icon
@@ -2708,6 +2716,7 @@ public enum Studio {
 
   public struct SpaceMembersOutputSpace: Sendable, Hashable, Codable {
     public var id: String?
+    public var isDefault: Bool?
     public var name: String?
     public var color: String?
     public var icon: String?
@@ -2717,8 +2726,9 @@ public enum Studio {
     public var threadIds: [String]?
     public var itemKeys: [String]?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
+      self.isDefault = isDefault
       self.name = name
       self.color = color
       self.icon = icon
@@ -2748,6 +2758,7 @@ public enum Studio {
 
   public struct SpacesForThreadOutputSpacesItem: Sendable, Hashable, Codable {
     public var id: String?
+    public var isDefault: Bool?
     public var name: String?
     public var color: String?
     public var icon: String?
@@ -2757,8 +2768,9 @@ public enum Studio {
     public var threadIds: [String]?
     public var itemKeys: [String]?
 
-    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
       self.id = id
+      self.isDefault = isDefault
       self.name = name
       self.color = color
       self.icon = icon
