@@ -17,6 +17,12 @@ function useHost() {
     setFloatHost({
       open: (target, options) => {
         update((state) => openTab(state, target, options));
+        // BB shows one live view of a thread: floating the thread open in the
+        // main view moves it, and the main view goes back to its project.
+        const shown = /^\/projects\/([^/]+)\/threads\/([^/?#]+)/u.exec(window.location.pathname);
+        if (target.kind === "thread" && !options?.minimized && shown && decodeURIComponent(shown[2]!) === target.threadId) {
+          navigate.toProject(decodeURIComponent(shown[1]!));
+        }
         const key = floatWindowKey(target);
         if (!options?.minimized && getFloat().tabs.some((tab) => tab.key === key && tab.placement === "main")) {
           navigate.toPluginPanel("companions", { subPath: key });
