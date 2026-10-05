@@ -28,7 +28,9 @@ export interface SpaceThreadGroup {
   leadThreadId: string | null;
   /** The lead, when it's listed. It shows above the Space's lists, so it isn't in `threads`. */
   lead: SidebarThread | null;
-  /** Every other thread in the Space; the lead's workers show at the top level. */
+  /** The lead's sub-threads, at any depth; they nest under the lead. */
+  leadChildren: SidebarThread[];
+  /** Every other thread in the Space. */
   threads: SidebarThread[];
 }
 
@@ -97,15 +99,32 @@ export function buildSpaceThreadGroups(
     groups: spaces.map((space) => {
       const leadThreadId = leads[space.id] ?? null;
       const held = bySpace.get(space.id) ?? [];
+      const lead = held.find((thread) => thread.id === leadThreadId) ?? null;
+      const underLead = lead ? descendantIds(lead.id, held) : new Set<string>();
       return {
         space,
         leadThreadId,
-        lead: held.find((thread) => thread.id === leadThreadId) ?? null,
-        threads: held.filter((thread) => thread.id !== leadThreadId),
+        lead,
+        leadChildren: held.filter((thread) => underLead.has(thread.id)),
+        threads: held.filter((thread) => thread.id !== leadThreadId && !underLead.has(thread.id)),
       };
     }),
     loose,
   };
+}
+
+/** The ids of every thread below `rootId` among `threads`. */
+function descendantIds(rootId: string, threads: readonly SidebarThread[]): Set<string> {
+  const found = new Set<string>();
+  let frontier = [rootId];
+  while (frontier.length) {
+    const parents = new Set(frontier);
+    frontier = threads
+      .filter((thread) => thread.parentThreadId !== null && parents.has(thread.parentThreadId) && thread.id !== rootId && !found.has(thread.id))
+      .map((thread) => thread.id);
+    for (const id of frontier) found.add(id);
+  }
+  return found;
 }
 
 /** A Space heading's drop target; the section key itself belongs to its thread list. */

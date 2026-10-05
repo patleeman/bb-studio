@@ -20,13 +20,27 @@ describe("By space grouping", () => {
   ];
   const spaceOf = { newest: "sp_a", lead: "sp_a", beta: "sp_b", gone: "sp_deleted", child: "sp_b" };
 
-  it("keeps Studio's order, puts children with their root, and sends threads in no Space to the default Space", () => {
-    const { groups, loose } = buildSpaceThreadGroups(rows, spaces, spaceOf, { sp_a: "lead" });
-    expect(groups.map((group) => [group.space.id, group.leadThreadId, group.lead?.id ?? null, group.threads.map((thread) => thread.id)])).toEqual([
-      ["sp_b", null, null, ["beta"]],
-      ["sp_a", "lead", "lead", ["newest", "child", "none", "gone"]],
+  it("keeps Studio's order, nests the lead's sub-threads under it, and sends threads in no Space to the default Space", () => {
+    const grandchild = makeSidebarThread({ id: "grandchild", parentThreadId: "child", updatedAt: 6, latestAttentionAt: 6 });
+    const { groups, loose } = buildSpaceThreadGroups([...rows, grandchild], spaces, spaceOf, { sp_a: "lead" });
+    expect(groups.map((group) => [
+      group.space.id,
+      group.leadThreadId,
+      group.lead?.id ?? null,
+      group.leadChildren.map((thread) => thread.id),
+      group.threads.map((thread) => thread.id),
+    ])).toEqual([
+      ["sp_b", null, null, [], ["beta"]],
+      ["sp_a", "lead", "lead", ["child", "grandchild"], ["newest", "none", "gone"]],
     ]);
     expect(loose).toEqual([]);
+  });
+
+  it("lists the children of a thread that isn't the lead with the Space's threads", () => {
+    const { groups } = buildSpaceThreadGroups(rows, spaces, spaceOf, {});
+    const alpha = groups.find((group) => group.space.id === "sp_a");
+    expect(alpha?.leadChildren).toEqual([]);
+    expect(alpha?.threads.map((thread) => thread.id)).toEqual(["newest", "lead", "child", "none", "gone"]);
   });
 
   it("puts a thread Studio hasn't listed yet in its project's Space", () => {
@@ -60,9 +74,11 @@ describe("By space grouping", () => {
     expect(loose).toEqual([]);
   });
 
-  it("lists the lead's workers at the top level, since the lead shows apart", () => {
-    const threads = buildSpaceThreadGroups(rows, spaces, spaceOf, { sp_a: "lead" }).groups[1]!.threads;
-    const items = buildProjectThreadGroups(threads, compareStandardThreads, new Set(), false);
-    expect(items.map((item) => item.kind === "thread" ? item.node.thread.id : item.kind)).toEqual(["newest", "gone", "none", "child"]);
+  it("nests the lead's workers under the lead, apart from the Space's threads", () => {
+    const group = buildSpaceThreadGroups(rows, spaces, spaceOf, { sp_a: "lead" }).groups[1]!;
+    const leadItems = buildProjectThreadGroups([group.lead!, ...group.leadChildren], compareStandardThreads, new Set(), false);
+    expect(leadItems.map((item) => item.kind === "thread" ? [item.node.thread.id, item.node.children.map((child) => child.kind === "thread" ? child.node.thread.id : child.kind)] : item.kind)).toEqual([["lead", ["child"]]]);
+    const items = buildProjectThreadGroups(group.threads, compareStandardThreads, new Set(), false);
+    expect(items.map((item) => item.kind === "thread" ? item.node.thread.id : item.kind)).toEqual(["newest", "gone", "none"]);
   });
 });

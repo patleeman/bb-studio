@@ -240,9 +240,10 @@ export function SpaceModeSections({
       const sectionId = spaceSectionKey(found.space.id);
       const item = buildGroupSectionItem(found.space.id, sectionId, found.space.name, found.threads, compareThreads, draftThreadIds, groupThreadsByEnvironment);
       item.group.items = needsYouFirst(item.group.items);
-      const leadItems = found.lead ? buildProjectThreadGroups([found.lead], compareThreads, draftThreadIds, false) : [];
-      const all = found.lead ? [found.lead, ...found.threads] : found.threads;
-      return { ...found, sectionId, item, leadItems, all, activity: getCollapsedChildActivity(all, draftThreadIds) };
+      const leadThreads = found.lead ? [found.lead, ...found.leadChildren] : [];
+      const leadItems = buildProjectThreadGroups(leadThreads, compareThreads, draftThreadIds, false);
+      const all = [...leadThreads, ...found.threads];
+      return { ...found, sectionId, item, leadThreads, leadItems, all, activity: getCollapsedChildActivity(all, draftThreadIds) };
     }), [compareThreads, currentSpace?.id, draftThreadIds, groupThreadsByEnvironment, groups, isAll]);
   const shownBySection = useMemo(() => new Map(shown.map((candidate) => [candidate.sectionId as SidebarSectionId, candidate])), [shown]);
 
@@ -251,7 +252,7 @@ export function SpaceModeSections({
     const open = shown.filter((candidate) => !isAll || !collapsedSpaces.has(candidate.space.id));
     return threadLineIds(
       open.flatMap((candidate) => candidate.lead ? [candidate.lead] : []),
-      [...open.flatMap((candidate) => candidate.threads), ...pinnedThreads],
+      [...open.flatMap((candidate) => [...candidate.leadChildren, ...candidate.threads]), ...pinnedThreads],
     );
   }, [collapsedSpaces, isAll, pinnedThreads, shown]);
   const lines = useThreadLines(lineIds, useMemo(() => threadLineStatusKey(threads, lineIds), [lineIds, threads]));
@@ -388,7 +389,7 @@ export function SpaceModeSections({
                     {group.lead ? (
                       <div data-space-lead={group.lead.id}>
                         <SpaceSubheading title={heartbeat ? `Lead · heartbeat ${cadenceLabel(heartbeat)}` : "Lead"} />
-                        {tree({ rootItems: group.leadItems, threads: [group.lead] })}
+                        {tree({ rootItems: group.leadItems, threads: group.leadThreads })}
                       </div>
                     ) : null}
                     <SpaceStudioList
