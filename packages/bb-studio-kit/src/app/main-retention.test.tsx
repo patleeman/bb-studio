@@ -105,7 +105,8 @@ it("keeps the view alive when its main route leaves, then returns the same edito
   act(() => publishFloatBody({ windowKey: "one", element: null }));
   expect(main.host.querySelector("textarea")).toBe(input);
   expect(input.value).toBe("Keep across routes");
-  expect(document.querySelectorAll("textarea")).toHaveLength(1);
+  // "two" left its route too, so it waits parked.
+  expect([...document.querySelectorAll("textarea")].filter(node => node !== input).map(node => node.closest("[data-studio-retained-parking]") !== null)).toEqual([true]);
 });
 
 it("adopts the focused pane when the same document is open in two main panes", () => {
@@ -258,5 +259,45 @@ it("keeps the neighboring ordinary editor when splitting remounts its main pane"
   expect(main.host.querySelector("output")!.textContent).toBe("1");
   expect(disposed).not.toHaveBeenCalled();
   await act(() => main.root.render(null));
-  expect(disposed).toHaveBeenCalledTimes(1);
+  expect(disposed).not.toHaveBeenCalled();
+  expect(document.querySelector("[data-studio-retained-parking] textarea")).toBe(editor);
+});
+
+it("returns the same editor, state and scroll when an ordinary route leaves and comes back", async () => {
+  let mounts = 0;
+  function Editor({ subPath }: { subPath: string }) {
+    const [edits, setEdits] = useState(0);
+    useEffect(() => { mounts += 1; }, []);
+    return <div data-scroll=""><textarea defaultValue={subPath} /><button onClick={() => setEdits(value => value + 1)}>Edit</button><output>{edits}</output></div>;
+  }
+  const Main = retainPanel("pages", Editor);
+  mount(<FloatPanels path="pages" render={subPath => <Editor subPath={subPath} />} />);
+  const main = mount(<Main subPath="one" />);
+  const editor = main.host.querySelector("textarea")!;
+  editor.value = "Draft kept while I read a thread";
+  act(() => main.host.querySelector("button")!.click());
+  main.host.querySelector<HTMLElement>("[data-scroll]")!.scrollTop = 240;
+  await act(() => main.root.render(<p>A thread</p>));
+  expect(main.host.querySelector("textarea")).toBeNull();
+  await act(() => main.root.render(<Main subPath="one" />));
+  expect(main.host.querySelector("textarea")).toBe(editor);
+  expect(editor.value).toBe("Draft kept while I read a thread");
+  expect(main.host.querySelector("output")!.textContent).toBe("1");
+  expect(main.host.querySelector<HTMLElement>("[data-scroll]")!.scrollTop).toBe(240);
+  expect(mounts).toBe(1);
+  expect(document.querySelectorAll("textarea")).toHaveLength(1);
+});
+
+it("keeps only the most recent left views and disposes older ones", async () => {
+  const disposed: string[] = [];
+  function Editor({ subPath }: { subPath: string }) { useEffect(() => () => { disposed.push(subPath); }, [subPath]); return <textarea defaultValue={subPath} />; }
+  const Main = retainPanel("pages", Editor);
+  mount(<FloatPanels path="pages" render={subPath => <Editor subPath={subPath} />} />);
+  const main = mount(<Main subPath="a" />);
+  for (const subPath of ["b", "c", "d", "e"]) {
+    await act(() => main.root.render(null));
+    await act(() => main.root.render(<Main subPath={subPath} />));
+  }
+  expect(disposed).toEqual(["a"]);
+  expect([...document.querySelectorAll("[data-studio-retained-parking] textarea")].map(node => (node as HTMLTextAreaElement).value).sort()).toEqual(["b", "c", "d"]);
 });

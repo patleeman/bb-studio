@@ -110,10 +110,15 @@ type PanelView = {
   windowKey?: string;
   element: HTMLElement;
   placement?: FloatAnchor["placement"];
+  /** Set while the view waits hidden for its main route to come back. */
+  parkedAt?: number;
 };
+/** Main views kept alive after their route leaves, per panel, most recent first. */
+const PARKED_LIMIT = 3;
+let parkSequence = 0;
 const viewPath = (path: string) => path.split(/[?#]/)[0]!.replace(/\/$/, "");
 
-function placePanels(previous: PanelView[], mains: MainAnchor[], floats: FloatAnchor[], transfers: FloatTarget[]): PanelView[] {
+function placePanels(previous: PanelView[], mains: MainAnchor[], floats: FloatAnchor[], transfers: FloatTarget[], parking: HTMLElement | null): PanelView[] {
   const next: PanelView[] = [];
   const used = new Set<string>();
   const take = (view: PanelView) => { used.add(view.id); next.push(view); };
@@ -144,6 +149,16 @@ function placePanels(previous: PanelView[], mains: MainAnchor[], floats: FloatAn
       ?? previous.find(view => same(view) && !mains.some(anchor => anchor.id === view.mainId));
     take({ id: existing?.id ?? `main:${main.id}:${viewPath(main.target.path)}`, mainId: main.id, target: main.target, element: main.element, placement: "main" });
   }
+  // A main view whose route left stays parked, so switching back and forth
+  // returns the same editor instead of loading the page again.
+  if (parking) {
+    previous
+      .filter(view => !used.has(view.id) && view.mainId !== undefined && view.windowKey === undefined && !next.some(other => viewPath(other.target.path) === viewPath(view.target.path)))
+      .map(view => view.parkedAt !== undefined ? view : { ...view, element: parking, placement: undefined, parkedAt: ++parkSequence })
+      .sort((a, b) => b.parkedAt! - a.parkedAt!)
+      .slice(0, PARKED_LIMIT)
+      .forEach(take);
+  }
   return next;
 }
 
@@ -153,10 +168,20 @@ function moveElement(element: HTMLElement, destination: HTMLElement) {
   else destination.append(element);
 }
 
+type ScrollPosition = { node: HTMLElement; top: number; left: number };
+const scrollPositions = (element: HTMLElement): ScrollPosition[] => [element, ...element.querySelectorAll<HTMLElement>("*")]
+  .filter(node => node.scrollTop || node.scrollLeft).map(node => ({ node, top: node.scrollTop, left: node.scrollLeft }));
+
 function RetainedPanel({ view, pluginId, parking, children }: { view: PanelView; pluginId: string; parking: RefObject<HTMLDivElement | null>; children: ReactNode }) {
   const [element] = useState(() => document.createElement("div"));
+  // Scroll resets inside the hidden parking spot, so it's read before parking.
+  const parkedScroll = useRef<ScrollPosition[] | null>(null);
   useLayoutEffect(() => {
-    const park = () => { if (parking.current && element.parentElement === view.element) moveElement(element, parking.current); };
+    const park = () => {
+      if (!parking.current || element.parentElement !== view.element) return;
+      parkedScroll.current = scrollPositions(element);
+      moveElement(element, parking.current);
+    };
     const pending = () => {
       if (view.windowKey === undefined && floatTransfers().some(target => target.kind === "path" && viewPath(target.path) === viewPath(view.target.path))) park();
     };
@@ -174,13 +199,13 @@ function RetainedPanel({ view, pluginId, parking, children }: { view: PanelView;
     const selection = window.getSelection();
     const range = selection?.rangeCount && element.contains(selection.anchorNode) && element.contains(selection.focusNode)
       ? { anchor: selection.anchorNode!, anchorOffset: selection.anchorOffset, focus: selection.focusNode!, focusOffset: selection.focusOffset } : null;
-    const scroll = [element, ...element.querySelectorAll<HTMLElement>("*")].filter(node => node.scrollTop || node.scrollLeft)
-      .map(node => ({ node, top: node.scrollTop, left: node.scrollLeft }));
+    const scroll = element.parentElement === parking.current ? parkedScroll.current ?? [] : scrollPositions(element);
+    parkedScroll.current = null;
     moveElement(element, view.element);
     scroll.forEach(({ node, top, left }) => { node.scrollTop = top; node.scrollLeft = left; });
     if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
     if (range && selection) selection.setBaseAndExtent(range.anchor, range.anchorOffset, range.focus, range.focusOffset);
-  }, [element, pluginId, view.element]);
+  }, [element, parking, pluginId, view.element]);
   useLayoutEffect(() => () => element.remove(), [element]);
   return createPortal(<CompanionKeyContext.Provider value={view.windowKey ?? null}>
     <InFloatContext.Provider value={view.windowKey !== undefined && view.placement !== "main"}>{children}</InFloatContext.Provider>
@@ -201,7 +226,7 @@ export function FloatPanels({ path, render }: { path: string; render(subPath: st
   const mains = mainBodies().filter(anchor => anchor.element.isConnected && matches(anchor.target));
   const [snapshot, setSnapshot] = useState<{ revision: number; pluginId: string; path: string; views: PanelView[] }>({ revision: -1, pluginId, path, views: [] });
   const views = snapshot.revision === revision && snapshot.pluginId === pluginId && snapshot.path === path ? snapshot.views
-    : placePanels(snapshot.pluginId === pluginId && snapshot.path === path ? snapshot.views : [], mains, floatBodies().filter(anchor => matches(anchor.target)), floatTransfers().filter(matches));
+    : placePanels(snapshot.pluginId === pluginId && snapshot.path === path ? snapshot.views : [], mains, floatBodies().filter(anchor => matches(anchor.target)), floatTransfers().filter(matches), parking.current);
   if (views !== snapshot.views) setSnapshot({ revision, pluginId, path, views });
   useLayoutEffect(() => {
     mains.forEach(main => main.setMoved(views.some(view => view.mainId === main.id && viewPath(view.target.path) === viewPath(main.target.path) && view.windowKey !== undefined)));
