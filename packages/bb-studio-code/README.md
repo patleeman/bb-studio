@@ -16,7 +16,7 @@ to different folders.
   **Back** lists the thread's other workspaces.
 - **From a reply**, a `::workspace{id="cws_…"}` card opens the workspace in
   that tab.
-- **From the thread header**, a small **VS Code** chip appears once the
+- **From the thread header**, a small code-icon button appears once the
   thread has a workspace (made for it, or holding its folder) or has edited
   files in its folder. One click opens that exact workspace beside the chat.
   A dot pulses on it while the agent is editing.
