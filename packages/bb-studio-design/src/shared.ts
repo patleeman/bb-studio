@@ -114,4 +114,14 @@ export type DesignView = {
   rounds: RoundView[];
   /** Open comments, oldest first; their order numbers the pins. */
   comments: CommentView[];
+  /** The latest review, while the server remembers it. */
+  review: ReviewView | null;
+};
+
+export type ReviewView = {
+  state: "reviewing" | "done" | "needs_work" | "failed";
+  round: number | null;
+  screens: string[];
+  at: number;
+  summary: string | null;
 };

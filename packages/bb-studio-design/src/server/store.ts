@@ -304,6 +304,7 @@ export class DesignStore {
         createdAt: comment.created_at,
         sent: comment.sent_at !== null,
       })),
+      review: null,
     };
   }
 

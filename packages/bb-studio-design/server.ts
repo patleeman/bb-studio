@@ -8,10 +8,11 @@ import { studioSchemas } from "@bb-studio/kit/contract";
 import { createChangeBus, defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, designHref, parseSteps, type DesignView } from "./src/shared";
+import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, designHref, parseSteps, screenUrl, type DesignView } from "./src/shared";
 import { DesignStore, MIGRATIONS, displayName, type Writer } from "./src/server/store";
 import { registerStudio, screenText } from "./src/server/studio";
 import { withScreenScript } from "./src/server/screen-script";
+import { VERDICT_DONE, parseVerdict, reviewTargets, reviewerPrompt, type ReviewState } from "./src/server/review";
 import type { CommentRow, DesignRow } from "./src/server/store";
 
 /** Generous for one hand-written screen; keeps a runaway write from filling the database. */
@@ -50,6 +51,13 @@ const designViewSchema: z.ZodType<DesignView> = z.object({
     createdAt: z.number(),
     sent: z.boolean(),
   })),
+  review: z.object({
+    state: z.enum(["reviewing", "done", "needs_work", "failed"]),
+    round: z.number().nullable(),
+    screens: z.array(z.string()),
+    at: z.number(),
+    summary: z.string().nullable(),
+  }).nullable(),
 });
 
 export const rpcContract = defineRpcContract({
@@ -140,6 +148,86 @@ export default async function plugin(bb: BbPluginApi) {
   /** Tells Studio an agent made a design, so it joins the thread's spaces. */
   const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Studio is optional. */ });
 
+  // ---------------------------------------------------------------------
+  // Reviews (src/server/review.ts). The latest per design lives in memory:
+  // a restart forgets it, and the canvas then shows no status.
+  // ---------------------------------------------------------------------
+  const reviews = new Map<string, ReviewState>();
+  /** Bounds a review: a stuck reviewer is stopped, and the round counts as unreviewed. */
+  const REVIEW_TIMEOUT_MS = 15 * 60_000;
+  const disposed = new AbortController();
+
+  function setReview(designId: string, review: ReviewState) {
+    reviews.set(designId, review);
+    const row = store.get(designId);
+    if (row) changed(designId, store.bump(designId, "agent"), "agent");
+  }
+
+  /** Runs one review in a hidden thread beside the design's own, and reports back. */
+  async function review(designId: string, screenIds: string[], requesterThreadId: string) {
+    const row = store.get(designId);
+    if (!row) return;
+    const round = screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
+    setReview(designId, { state: "reviewing", round, screens: screenIds, at: Date.now(), summary: null });
+    let reviewerId: string | null = null;
+    try {
+      const requester = await bb.sdk.threads.get({ threadId: requesterThreadId });
+      const hostId = (await bb.sdk.system.config()).primaryHostId;
+      if (!hostId) throw new Error("This BB server has no local machine to run the reviewer's browser on.");
+      const screens = screenIds.flatMap((id) => {
+        const screen = store.screen(designId, id);
+        return screen ? [{ id, caption: screen.caption, viewport: (screen.viewport as "desktop") ?? "desktop", steps: parseSteps(screen.html), url: screenUrl(designId, id, screen.updated_at) }] : [];
+      });
+      const prompt = reviewerPrompt({
+        designName: displayName(row),
+        designId,
+        round,
+        screens,
+        targets: reviewTargets(bb.server.loopbackBaseUrl, screens),
+        hostId,
+        rules: "The \"Taste rules\" and \"Writing screens\" sections of the design skill. Read the skill first.",
+      });
+      const reviewer = await bb.sdk.threads.spawn({
+        projectId: requester.projectId,
+        environment: { type: "reuse", environmentId: requester.environmentId },
+        providerId: requester.providerId,
+        title: `Review: ${displayName(row)}${round ? `, round ${round}` : ""}`,
+        visibility: "hidden",
+        pluginMetadata: { role: "design-reviewer", designId },
+        prompt,
+      } as Parameters<typeof bb.sdk.threads.spawn>[0]);
+      reviewerId = reviewer.id;
+      const signal = AbortSignal.any([disposed.signal, AbortSignal.timeout(REVIEW_TIMEOUT_MS)]);
+      // Wait for it to start, then to finish; a fast reviewer may already be done.
+      await bb.sdk.threads.wait({ threadId: reviewer.id, status: "active", timeoutMs: 60_000, signal }).catch(() => undefined);
+      await bb.sdk.threads.wait({ threadId: reviewer.id, status: "idle", signal });
+      const { output } = await bb.sdk.threads.output({ threadId: reviewer.id });
+      const { verdict, findings } = parseVerdict(output ?? "");
+      if (verdict === "needs_work") {
+        setReview(designId, { state: "needs_work", round, screens: screenIds, at: Date.now(), summary: findings || null });
+        const thread = store.get(designId)?.thread_id ?? requesterThreadId;
+        await bb.sdk.threads.send({
+          threadId: thread,
+          input: [{ type: "text", mentions: [], text: [`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`, "", findings, "", "Fix them, then call design_ready again."].join("\n") }],
+          mode: "queue-if-active",
+        });
+      } else if (verdict === "done") {
+        setReview(designId, { state: "done", round, screens: screenIds, at: Date.now(), summary: null });
+      } else {
+        throw new Error(`The reviewer ended without a verdict (expected "${VERDICT_DONE}" or "needs_work").`);
+      }
+    } catch (error) {
+      bb.log.warn(`review of ${designId} failed: ${error instanceof Error ? error.message : String(error)}`);
+      setReview(designId, { state: "failed", round, screens: screenIds, at: Date.now(), summary: error instanceof Error ? error.message : String(error) });
+    } finally {
+      // Hidden workers must always be released, or the agent process lingers.
+      if (reviewerId) {
+        await bb.sdk.threads.archive({ threadId: reviewerId }).catch(() => undefined);
+        await bb.sdk.threads.stop({ threadId: reviewerId }).catch(() => undefined);
+      }
+    }
+  }
+
   /** Posts a comment to the design's conversation; it waits for a running turn instead of cutting in. */
   async function sendToThread(row: DesignRow, comment: CommentRow) {
     await bb.sdk.threads.send({ threadId: row.thread_id!, input: [{ type: "text", text: commentMessage(row, comment), mentions: [] }], mode: "queue-if-active" });
@@ -148,7 +236,8 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.rpc.register(rpcContract, {
     getDesign({ id }) {
-      return { design: store.view(id) };
+      const view = store.view(id);
+      return { design: view ? { ...view, review: reviews.get(id) ?? null } : null };
     },
     renameDesign({ id, name }) {
       if (!store.get(id)) throw new Error("Design not found.");
@@ -345,6 +434,30 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.agents.registerTool({
+    name: "design_ready",
+    description: "Call when a round (or a change) is ready for the user. A separate reviewer checks the screens in the background: it loads them at their size, takes screenshots, and checks layout, errors, steps and the design rules. It only comes back to you, in this thread, when something needs fixing. Don't call the work done until then. Pass skipReview for trivial edits (a word, a color).",
+    presentation: { label: { pending: "Sending for review", completed: "Sent for review" } },
+    parameters: z.object({
+      designId: z.string().min(1),
+      screenIds: z.array(screenIdSchema).max(12).optional().describe("Defaults to the newest round."),
+      skipReview: z.boolean().optional(),
+    }),
+    execute({ designId, screenIds, skipReview }, ctx) {
+      const view = store.view(designId);
+      if (!view) return notFound(designId);
+      const ids = screenIds?.length ? screenIds : view.rounds[0]?.screens.map((screen) => screen.id) ?? [];
+      const missing = ids.filter((id) => !store.screen(designId, id));
+      if (!ids.length) return fail("The design has no screens to review yet.");
+      if (missing.length) return fail(`Not in this design: ${missing.join(", ")}.`);
+      if (skipReview) return `Marked ready without a review.\n${card(designId)}`;
+      if (!ctx.threadId) return fail("A review needs a thread to report back to.");
+      if (reviews.get(designId)?.state === "reviewing") return "A review of this design is already running. It reports back here if anything needs fixing.";
+      void review(designId, ids, ctx.threadId);
+      return `Sent ${ids.join(", ")} for review. The reviewer reports back in this thread only if something needs fixing; until then, say the work is out for review, not done. Keep your summary short.\n${card(designId)}`;
+    },
+  });
+
+  bb.agents.registerTool({
     name: "design_comments",
     description: "List the comments the user pinned to elements of a design's screens: each comment's id, screen, the element's selector and markup, and the note. Open comments only unless includeResolved is set.",
     presentation: { label: { pending: "Reading comments", completed: "Read comments" } },
@@ -373,7 +486,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.agents.configure(() => ({
-    tools: ["design_list", "design_create", "design_rename", "design_read", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"],
+    tools: ["design_list", "design_create", "design_rename", "design_read", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"],
     skills: [],
   }));
 
@@ -405,6 +518,9 @@ export default async function plugin(bb: BbPluginApi) {
     },
   }));
 
-  bb.onDispose(() => changeBus.dispose());
+  bb.onDispose(() => {
+    disposed.abort();
+    changeBus.dispose();
+  });
   bb.log.info("loaded");
 }

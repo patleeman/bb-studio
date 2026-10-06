@@ -55,7 +55,12 @@ the open ones with `design_comments` first.
    a color, use `design_edit_screen` and change only that. Leave everything
    else exactly as it was. If a broader change would help, finish what was
    asked and suggest the rest.
-7. **Finish briefly.** End with a short summary: which options you added,
+7. **Send it for review.** When a round or a real change is ready, call
+   `design_ready`. A separate reviewer checks the screens in the background
+   and comes back to you only when something needs fixing; fix what it
+   reports and call `design_ready` again. Until then the work is out for
+   review, not done. Pass `skipReview` for trivial edits.
+8. **Finish briefly.** End with a short summary: which options you added,
    assumptions, and caveats. No restating of what the user can see. Put the
    design's card, `::design{id="dsn_…"}`, on its own line in the reply: it
    opens the canvas in the user's workbench, beside this chat.

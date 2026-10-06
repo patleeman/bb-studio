@@ -146,6 +146,7 @@ export function DesignBoard({ design, leftTools, inThread = false }: {
               {design.comments.length ? <span className="tabular-nums text-muted-foreground">{design.comments.length}</span> : null}
             </button>
           </div>
+          <ReviewStatus review={design.review} />
         </>
       }
       rightTools={
@@ -173,6 +174,27 @@ export function DesignBoard({ design, leftTools, inThread = false }: {
     {openComment && comments.open ? <CommentPopover key={openComment.id} design={design} comment={openComment} number={numbers.get(openComment.id) ?? 0} anchor={comments.open.anchor} board={board} inThread={inThread} onClose={() => comments.setOpen(null)} /> : null}
     {playing && played ? <PlayView key={`${playing.id}:${played.step}:${playing.updatedAt}:${reloads}`} designId={design.id} screen={playing} step={played.step} onClose={() => setPlayed(null)} /> : null}
     </div>
+  );
+}
+
+/** The latest review of the design, from the reviewer agent. */
+function ReviewStatus({ review }: { review: DesignView["review"] }) {
+  if (!review) return null;
+  const round = review.round ? ` round ${review.round}` : "";
+  const status = {
+    reviewing: { icon: "Loading", text: `Reviewing${round}…`, title: `A reviewer is checking ${review.screens.join(", ")}.`, tone: "text-muted-foreground" },
+    done: { icon: "Check", text: "Reviewed", title: `The reviewer found nothing to fix in ${review.screens.join(", ")}.`, tone: "text-muted-foreground" },
+    needs_work: { icon: "MessageSquare", text: "Needs work", title: review.summary ?? "The reviewer sent findings to the design's thread.", tone: "text-amber-500" },
+    failed: { icon: "X", text: "Review failed", title: review.summary ?? "The review didn't finish.", tone: "text-destructive" },
+  }[review.state];
+  return (
+    <>
+      <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
+      <span role="status" title={status.title} className={cn("flex h-7 items-center gap-1.5 px-2 text-xs", status.tone)}>
+        <Icon name={status.icon} className={cn("size-3.5", review.state === "reviewing" && "animate-spin motion-reduce:animate-none")} />
+        {status.text}
+      </span>
+    </>
   );
 }
 
