@@ -1,6 +1,6 @@
 // Pure helper: the agent-visible context for an artifact mention. Kept free of
 // bb imports so it can be unit-tested standalone.
-import { TYPE_LABELS, artifactHref, formatBytes, type ArtifactType } from "../src/shared";
+import { TYPE_LABELS, artifactHref, formatBytes, isTextType, type ArtifactType } from "../src/shared";
 
 const MAX_INLINE_CHARS = 60_000;
 
@@ -25,7 +25,13 @@ export function mentionContext(artifact: MentionArtifact): string {
     `Link to it in replies as [${artifact.title.replace(/[[\]]/g, "")}](${artifactHref(artifact.id)}).`,
   ];
   if (artifact.description) lines.push(`Description: ${artifact.description}`);
-  if (artifact.text === null) {
+  if (artifact.text === null && isTextType(artifact.type)) {
+    // Text types come back null only when they're past the scan limit.
+    lines.push(
+      `It's ${formatBytes(artifact.size)} of text, too large to inline. ` +
+        `Read it with 'bb artifacts show ${artifact.id}', or copy it into your workspace with 'bb artifacts export ${artifact.id}'.`,
+    );
+  } else if (artifact.text === null) {
     lines.push(
       `To look at it, copy it into your workspace with 'bb artifacts export ${artifact.id}' and open the file it prints.`,
     );

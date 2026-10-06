@@ -29,4 +29,10 @@ describe("mentionContext", () => {
     expect(image).toContain("bb artifacts export art_0123456789abcdef");
     expect(image).not.toContain("Contents of");
   });
+
+  it("says text past the read limit is too large, not that it isn't text", () => {
+    const big = mentionContext({ ...base, size: 3 * 1024 * 1024, text: null });
+    expect(big).toContain("too large to inline");
+    expect(big).toContain("bb artifacts show art_0123456789abcdef");
+  });
 });

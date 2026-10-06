@@ -29,3 +29,13 @@ it("artifacts_list and @artifact search find older artifacts past the newest few
     Date.now = realNow;
   }
 });
+
+it("artifacts_read says text over the read limit is too large, not that it isn't text", async () => {
+  const host = createFakePluginHost({ pluginId: "artifacts" });
+  hosts.push(host);
+  await plugin(host.bb);
+  const { id } = await host.harness.behavior.callRpc("importFile", { name: "big.md", mime: "text/markdown", bytes: Buffer.from("x".repeat(1024 * 1024 + 1)).toString("base64"), projectId: null }) as { id: string };
+  const result = JSON.stringify(await host.harness.behavior.callAgentTool("artifacts_read", { artifactId: id }));
+  expect(result).toContain("Too large to read here");
+  expect(result).not.toContain("Not text");
+});

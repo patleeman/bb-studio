@@ -18,7 +18,7 @@ import { mentionContext } from "./lib/mention";
 import { contentHeaders, utf8Prefix, withQuoteScript } from "./src/server/content";
 import { importedFile } from "./src/server/import-file";
 import { pageMarkdown } from "./src/server/page";
-import { artifactText, registerStudio } from "./src/server/studio";
+import { TEXT_SCAN_BYTES, artifactText, registerStudio } from "./src/server/studio";
 import {
   ArtifactStore,
   MIGRATIONS,
@@ -507,6 +507,9 @@ export default async function plugin(bb: BbPluginApi) {
       if (!artifact) return { content: [{ type: "text", text: `Artifact ${artifactId} not found.` }], isError: true };
       const text = artifactText(store, artifact);
       const head = savedLine({ artifact, outcome: "unchanged" }).replace(/ is already saved with these contents/, "");
+      if (text === null && isTextType(versionType(artifact.version))) {
+        return `${head}\n\nToo large to read here (text over ${formatBytes(TEXT_SCAN_BYTES)}). Print it with: bb artifacts show ${artifact.id}, or copy it into the workspace with: bb artifacts export ${artifact.id}`;
+      }
       if (text === null) return `${head}\n\nNot text. Copy it into the workspace with: bb artifacts export ${artifact.id}`;
       const shown = text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n…(truncated; full text: bb artifacts show ${artifact.id})` : text;
       return `${head}\n\n${artifact.description ? `Description: ${artifact.description}\n\n` : ""}${shown}`;
