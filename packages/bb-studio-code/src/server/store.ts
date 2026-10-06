@@ -9,15 +9,17 @@ export const MIGRATIONS = [
   id TEXT PRIMARY KEY, title TEXT NOT NULL, project_id TEXT, folders TEXT NOT NULL,
   archived INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 ); CREATE INDEX IF NOT EXISTS code_workspaces_updated ON code_workspaces(updated_at);`,
+  `ALTER TABLE code_workspaces ADD COLUMN thread_id TEXT; CREATE INDEX IF NOT EXISTS code_workspaces_thread ON code_workspaces(thread_id);`,
 ];
 
-type Row = { id: string; title: string; project_id: string | null; folders: string; archived: number; created_at: number; updated_at: number };
+type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; folders: string; archived: number; created_at: number; updated_at: number };
 
 function decode(row: Row): Workspace {
   return {
     id: row.id,
     title: row.title,
     projectId: row.project_id,
+    threadId: row.thread_id,
     folders: JSON.parse(row.folders) as string[],
     archived: row.archived === 1,
     createdAt: row.created_at,
@@ -37,12 +39,18 @@ export class WorkspaceStore {
     return row ? decode(row) : null;
   }
 
-  create(input: { title: string; projectId: string | null; folders: string[] }): Workspace {
+  /** The live workspace made for a thread's worktree. */
+  forThread(threadId: string): Workspace | null {
+    const row = this.db.prepare("SELECT * FROM code_workspaces WHERE thread_id = ? AND archived = 0 ORDER BY created_at DESC LIMIT 1").get(threadId) as Row | undefined;
+    return row ? decode(row) : null;
+  }
+
+  create(input: { title: string; projectId: string | null; folders: string[]; threadId?: string | null }): Workspace {
     const now = Date.now();
     const id = newId(ID_PREFIX);
     this.db
-      .prepare("INSERT INTO code_workspaces (id, title, project_id, folders, archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)")
-      .run(id, input.title, input.projectId, JSON.stringify(input.folders), now, now);
+      .prepare("INSERT INTO code_workspaces (id, title, project_id, thread_id, folders, archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)")
+      .run(id, input.title, input.projectId, input.threadId ?? null, JSON.stringify(input.folders), now, now);
     return this.get(id)!;
   }
 

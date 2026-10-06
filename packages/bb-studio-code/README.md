@@ -7,9 +7,16 @@ to different folders.
 
 ## Use it
 
-- In Studio, choose **New → Workspace**. The workspace starts with its
+- **In Studio**, choose **New → Workspace**. The workspace starts with its
   project's folder, which is the Space's own folder when you create it inside a
-  Space.
+  Space. With no Space chosen, it starts empty and asks for folders.
+- **Beside a thread**, open the **VS Code** tab in the right panel. It opens
+  the thread's own worktree, so you see the agent's changes, its branch and
+  its diff. The workspace is made the first time and reused after that.
+  **Back** lists the thread's other workspaces.
+- **From a reply**, a `::workspace{id="cws_…"}` card opens the workspace in
+  that tab.
+- **In a composer**, `@workspace` gives the agent a workspace's folders.
 - Use the folder button in the header to add or remove folders. You can type a
   full path (or `~/…`) or pick a BB project. VS Code shows every folder in one
   multi-root window. Changing folders while VS Code is open updates it live.
@@ -18,38 +25,64 @@ to different folders.
 - **Stop** ends the workspace's server. **Open in browser** opens the same
   editor in its own window.
 
+Agents get three tools and the `studio-code` skill:
+
+- `code_workspace_open` opens the thread's worktree, or new folders, and
+  prints the reply card.
+- `code_workspaces_list` lists workspaces.
+- `code_workspace_set_folders` changes a workspace's folders.
+
+## Phones and other computers
+
+VS Code answers only on the computer running BB. When BB is opened from
+anywhere else, such as the iOS app or a browser on another machine, the
+workspace shows its files read-only instead: you can walk its folders and read
+text files up to 1 MB. Paths are resolved through symlinks and must stay inside
+the workspace's folders. No editor starts for these views.
+
 ## How it works
 
 Each open workspace runs its own [code-server](https://github.com/coder/code-server)
 (MIT) process on a free loopback port. That process gets a
 `.code-workspace` file listing the folders, plus its own VS Code settings and
-state under `<dataDir>/plugins/studio-code/workspaces/<id>/`. Extensions are
-shared across workspaces and come from Open VSX. New workspaces turn off
-Restricted Mode, the welcome page and VS Code's own AI chat, and follow the
-system's light or dark theme.
+state under `<dataDir>/plugins/studio-code/workspaces/<id>/`. code-server's
+own data and config folders live there too, not in your home folder.
+Extensions are shared across workspaces and come from Open VSX. New workspaces
+turn off Restricted Mode, the welcome page and VS Code's own AI chat, and
+follow the system's light or dark theme.
 
-Servers never outlive BB. Each code-server runs under a small watchdog that
-holds a pipe to BB; when BB exits for any reason, even a crash or `kill -9`,
-the pipe closes and the watchdog stops code-server. As a backup, the plugin
-stops any code-server left in its folder when it next loads.
+**Idle shutdown.** A server stops after 30 minutes with no editor connected,
+and reopens when you come back to the workspace. A view that has been out of
+sight for 5 minutes lets go of its editor, so a tab left open in the
+background doesn't keep VS Code running forever. Each server uses roughly
+200–400 MB of memory.
 
-## Limits of this spike
+**Servers never outlive BB.** Each code-server runs under a small watchdog
+that holds a pipe to BB. When BB exits for any reason, even a crash or
+`kill -9`, the pipe closes and the watchdog stops code-server. As a backup,
+the plugin stops any code-server left in its install folder when it next
+loads.
 
-- **Local only.** The editor is reached at `http://127.0.0.1:<port>`, so it
-  works in the desktop app and in a browser on the same machine, but not from
-  another device or the iOS app.
-- **No authentication.** code-server runs with `--auth none` on loopback.
-  Other programs on this machine can reach the editor while it runs.
+Tested on macOS (arm64) and Linux (arm64, in Docker).
+
+## Limits
+
+- **No authentication.** code-server runs with `--auth none` on loopback, so
+  other programs on this machine can reach an open editor.
+- While VS Code has focus, it takes the keyboard, so BB's shortcuts don't
+  work until you click outside it.
+- A thread's worktree tab works only when the thread runs on the computer
+  running BB.
 - The download is pinned by version and served from GitHub over HTTPS, but its
   checksum isn't verified.
-- macOS and Linux only; code-server has no Windows build.
+- No Windows support; code-server has no Windows build.
 
 ## Staged preview
 
 ![A Studio Code workspace open in BB](assets/staged-preview.png)
 
-This is a staged stable BB 0.45 with Studio and Studio Code installed. The
-"Orbit" workspace is open from the Workspaces panel. It shows two folders,
-`orbit` (a demo Git project) and `orbit-docs`, side by side in VS Code's
-Explorer, with `src/retry.ts` open with syntax highlighting and the Git
-branch in the status bar.
+Captured by `scripts/capture/captures/bb-studio-code.mjs` from a staged stable
+BB 0.45. It creates a workspace the way Studio's New does, for the seeded
+Orbit project, and opens it. VS Code's Explorer shows the project's `src`
+folder and `README.md`, with `src/retry.ts` open and syntax-highlighted, and
+the Git branch in the status bar.

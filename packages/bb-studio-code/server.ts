@@ -7,9 +7,10 @@ import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
-import { createChangeBus, createStoreProvider, mustGet } from "@bb-studio/kit/server";
+import { createChangeBus, createStoreProvider, defineItemMention, mustGet, studioServices } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { listDir, readText } from "./src/server/files";
 import { CodeServers } from "./src/server/runtime";
 import { MIGRATIONS, WorkspaceStore } from "./src/server/store";
 import { CHANNEL, CODE_ICON, KIND_ID, PANEL_PATH, PLUGIN_ID, codeContract, workspaceHref, type Workspace } from "./src/shared";
@@ -23,9 +24,10 @@ const KIND: StudioKind = {
   actions: [],
   create: { mode: "rpc" },
   canArchive: true,
-  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: false },
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: false, templates: false },
+  mentionProviderId: "workspace",
   blurb: "VS Code on one or more folders.",
-  agentHint: "A workspace is a list of folders the user edits in VS Code; read its folders and work in them directly.",
+  agentHint: "A workspace is a list of folders the user edits in VS Code. Find one with code_workspaces_list; change its folders with code_workspace_set_folders.",
 };
 
 const LIST_LIMIT = 10_000;
@@ -41,7 +43,7 @@ function item(workspace: Workspace): StudioItem {
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
     updatedBy: null,
-    preview: workspace.folders.length ? workspace.folders.join(" · ") : "No folders yet",
+    preview: workspace.folders.length ? `${workspace.threadId ? "Thread worktree · " : ""}${workspace.folders.join(" · ")}` : "No folders yet",
     facts: [{ id: "folders", value: String(workspace.folders.length), sort: workspace.folders.length }],
     badge: null,
     thumbnailUrl: null,
@@ -81,6 +83,39 @@ export default function plugin(bb: BbPluginApi) {
   bb.onDispose(() => servers.dispose());
   const must = (id: string) => mustGet((key) => store.get(key), id, "Workspace not found.");
 
+  const services = studioServices(bb.sdk);
+  /** Links a workspace to a thread, so the thread's tab lists it. Studio is optional. */
+  const link = (id: string, threadId: string, role: "created" | "edited") => {
+    const at = Date.now();
+    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role, state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => undefined);
+  };
+  /** The reply card that opens the workspace beside the chat. */
+  const card = (id: string) => `Put this line on its own in your reply so the user can open the workspace beside the chat:\n::workspace{id="${id}"}`;
+
+  /** The thread's working folder, when it's on the machine running BB. */
+  const threadFolder = async (threadId: string) => {
+    const thread = (await bb.sdk.threads.get({ threadId, include: "environment" })) as {
+      title?: string | null;
+      projectId?: string | null;
+      environment?: { hostId: string; path: string | null } | null;
+    };
+    const environment = thread.environment;
+    if (!environment?.path) throw new Error("This thread has no worktree or folder yet.");
+    const { primaryHostId } = await bb.sdk.system.config();
+    if (environment.hostId !== primaryHostId) throw new Error("This thread works on another machine. VS Code here can only open folders on the computer running BB.");
+    return { path: environment.path, title: thread.title?.trim() || "Thread worktree", projectId: thread.projectId ?? null };
+  };
+  /** The thread's worktree workspace, made the first time. */
+  const forThread = async (threadId: string) => {
+    const existing = store.forThread(threadId);
+    if (existing) return existing;
+    const folder = await threadFolder(threadId);
+    const workspace = store.create({ title: folder.title, projectId: folder.projectId, folders: await checkFolders([folder.path]), threadId });
+    changes.changed(workspace.id);
+    link(workspace.id, threadId, "created");
+    return workspace;
+  };
+
   const projects = async () =>
     (await bb.sdk.projects.list({ includePersonal: true })).flatMap((project) => {
       const path = (project.sources.find((source) => source.isDefault) ?? project.sources[0])?.path;
@@ -101,8 +136,75 @@ export default function plugin(bb: BbPluginApi) {
     },
     open: async ({ id }) => ({ status: await servers.open(must(id)) }),
     stop: ({ id }) => ({ status: servers.stop(must(id).id) }),
+    forThread: async ({ threadId }) => ({ workspace: await forThread(threadId) }),
+    listDir: async ({ id, path }) => {
+      const { folders } = must(id);
+      // The empty path lists the workspace's folders themselves.
+      if (!path) return { entries: folders.map((folder) => ({ name: folder.split("/").filter(Boolean).at(-1) ?? folder, path: folder, dir: true })) };
+      return { entries: await listDir(folders, path) };
+    },
+    readFile: async ({ id, path }) => readText(must(id).folders, path),
     projects: async () => ({ projects: await projects() }),
   });
+
+  const summary = (workspace: Workspace) =>
+    `${workspace.id}\t${workspace.title}${workspace.threadId ? " (thread worktree)" : ""}\t${workspace.folders.join(", ") || "no folders"}`;
+  bb.agents.registerTool({
+    name: "code_workspaces_list",
+    description: "List the user's VS Code workspaces (Studio Code): id, title and folders.",
+    parameters: z.object({}),
+    execute: () => store.list().filter((workspace) => !workspace.archived).map(summary).join("\n") || "No workspaces.",
+  });
+  bb.agents.registerTool({
+    name: "code_workspace_open",
+    description:
+      "Give the user a VS Code workspace beside the chat. With no folders, it opens this thread's own worktree, so the user can review and edit your changes. With folders (full paths on the computer running BB), it makes a new workspace for them. Returns a card line for your reply.",
+    parameters: z.object({
+      folders: z.array(z.string().trim().min(1).max(4096)).max(50).optional(),
+      title: z.string().trim().min(1).max(200).optional(),
+    }),
+    execute: async ({ folders, title }, ctx) => {
+      let workspace: Workspace;
+      if (folders?.length) {
+        workspace = store.create({ title: title ?? "Workspace", projectId: ctx.projectId ?? null, folders: await checkFolders(folders) });
+        changes.changed(workspace.id);
+        link(workspace.id, ctx.threadId, "created");
+      } else {
+        workspace = await forThread(ctx.threadId);
+        if (title && title !== workspace.title) {
+          workspace = store.update(workspace.id, { title });
+          changes.changed(workspace.id);
+        }
+      }
+      return `${summary(workspace)}\n${card(workspace.id)}`;
+    },
+  });
+  bb.agents.registerTool({
+    name: "code_workspace_set_folders",
+    description: "Replace a workspace's folders (full paths on the computer running BB). An open VS Code updates without reloading.",
+    parameters: z.object({ id: z.string().min(1).max(100), folders: z.array(z.string().trim().min(1).max(4096)).min(1).max(50) }),
+    execute: async ({ id, folders }, ctx) => {
+      must(id);
+      const workspace = store.update(id, { folders: await checkFolders(folders) });
+      await servers.sync(workspace);
+      changes.changed(id);
+      link(id, ctx.threadId, "edited");
+      return `${summary(workspace)}\n${card(id)}`;
+    },
+  });
+  // `@workspace` in a composer: the workspace's folders, for the agent.
+  bb.ui.registerMentionProvider(
+    defineItemMention({
+      id: "workspace",
+      label: "Workspaces",
+      search: ({ query }) =>
+        store.list()
+          .filter((workspace) => !workspace.archived && `${workspace.title}\n${workspace.folders.join("\n")}`.toLowerCase().includes(query.toLowerCase()))
+          .map((workspace) => ({ id: workspace.id, title: workspace.title, subtitle: workspace.folders.join(" · ") || "No folders" })),
+      resolve: (id) => ({ context: `VS Code workspace "${must(id).title}" (${id}). Folders:\n${must(id).folders.map((folder) => `- ${folder}`).join("\n")}` }),
+    }),
+  );
+  bb.agents.configure(() => ({ tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders"], skills: ["studio-code"] }));
 
   createStoreProvider(bb, studio, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: PANEL_PATH, kinds: [KIND] }),

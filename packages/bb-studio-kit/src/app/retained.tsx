@@ -69,9 +69,13 @@ export function retainPanel(path: string, Component: ComponentType<{ subPath: st
   };
 }
 
+// crypto.randomUUID exists only in secure contexts; BB opened over plain
+// HTTP from another device isn't one. The id only has to be unique here.
+let nextPanelId = 0;
+
 function MainPanel({ path, subPath, children }: { path: string; subPath: string; children: ReactNode }) {
   const pluginId = experimental_usePluginId();
-  const [id] = useState(() => crypto.randomUUID());
+  const [id] = useState(() => `retained-${++nextPanelId}`);
   const element = useRef<HTMLDivElement>(null);
   const href = panelHref(pluginId, path, subPath);
   useRevision();

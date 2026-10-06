@@ -12,7 +12,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { promisify } from "node:util";
-import type { ServerStatus, Workspace } from "../shared";
+import { IDLE_TIMEOUT_SECONDS, type ServerStatus, type Workspace } from "../shared";
 
 export const CODE_SERVER_VERSION = "4.140.0";
 const READY_TIMEOUT_MS = 60_000;
@@ -120,10 +120,16 @@ export class CodeServers {
         "--config", config,
         "--disable-telemetry",
         "--disable-update-check",
+        "--idle-timeout-seconds", String(IDLE_TIMEOUT_SECONDS),
         "--user-data-dir", join(dir, "user-data"),
         "--extensions-dir", join(this.options.root, "extensions"),
         file,
-      ], { stdio: ["pipe", "pipe", "pipe"] });
+      ], {
+        stdio: ["pipe", "pipe", "pipe"],
+        // code-server keeps a heartbeat and state under XDG folders; keep
+        // them in this workspace's folder, not the user's home.
+        env: { ...process.env, XDG_DATA_HOME: join(dir, "xdg-data"), XDG_CONFIG_HOME: join(dir, "xdg-config") },
+      });
       const output: string[] = [];
       const keep = (chunk: Buffer) => { output.push(chunk.toString()); if (output.length > 40) output.shift(); };
       child.stdout?.on("data", keep);
@@ -132,8 +138,10 @@ export class CodeServers {
       this.set(id, entry);
       child.on("exit", (code, signal) => {
         if (this.entries.get(id)?.child !== child) return;
-        const error = entry.stopping ? null : `code-server exited (${signal ?? `code ${code}`}). ${tail(output)}`.trim();
+        // Exit code 0 unasked is the idle timeout: nobody had the editor open.
+        const error = entry.stopping || code === 0 ? null : `code-server exited (${signal ?? `code ${code}`}). ${tail(output)}`.trim();
         if (error) this.options.log.warn(`workspace ${id}: ${error}`);
+        else if (!entry.stopping) this.options.log.info(`workspace ${id}: stopped after ${IDLE_TIMEOUT_SECONDS}s idle`);
         this.set(id, { status: error ? { state: "failed", url: null, error } : STOPPED, child: null, file: null, stopping: false });
       });
       const origin = `http://127.0.0.1:${port}`;
@@ -143,7 +151,9 @@ export class CodeServers {
       this.options.log.info(`workspace ${id}: code-server on port ${port}`);
       return status;
     } catch (cause) {
-      const error = cause instanceof Error ? cause.message : String(cause);
+      // code-server's own exit message says more than "stopped while starting".
+      const current = this.entries.get(id)?.status;
+      const error = current?.state === "failed" && current.error ? current.error : cause instanceof Error ? cause.message : String(cause);
       const child = this.entries.get(id)?.child;
       if (child) { child.removeAllListeners("exit"); child.kill("SIGTERM"); }
       const status: ServerStatus = { state: "failed", url: null, error };

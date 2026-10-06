@@ -79,6 +79,7 @@ const LINK_ICONS: Record<string, string> = {
   "artifacts/artifacts": "artifacts/artifact",
   "talk/recordings": "talk/talk",
   "studio-tables/tables": "Rows2",
+  "studio-code/workspaces": "Code",
   "studio/spaces": "Layers",
   "studio/chats": "MessageSquare",
   "pages/explainers": "pages/explore",

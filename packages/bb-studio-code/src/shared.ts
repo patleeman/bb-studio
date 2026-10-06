@@ -14,6 +14,12 @@ export const CODE_ICON = "Code";
 /** Realtime channel; payload `{ id }` when a workspace or its server changed. */
 export const CHANNEL = "studio-code-changed";
 export const ID_PREFIX = "cws";
+/** The workbench tab's action id; reply cards open it with `{ workspaceId }`. */
+export const CODE_TAB = "code";
+/** VS Code stops after this long with no editor open. */
+export const IDLE_TIMEOUT_SECONDS = 30 * 60;
+/** A view out of sight this long lets go of its editor, so the idle timer can run. */
+export const HIDDEN_RELEASE_MS = 5 * 60 * 1000;
 
 export function workspaceHref(id: string): string {
   return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}`;
@@ -30,6 +36,8 @@ export const workspaceSchema = z.object({
   id,
   title: z.string(),
   projectId: z.string().nullable(),
+  /** The thread whose worktree this workspace opens, if it was made for one. */
+  threadId: z.string().nullable(),
   folders: z.array(z.string()),
   archived: z.boolean(),
   createdAt: z.number(),
@@ -63,6 +71,20 @@ export const codeContract = defineRpcContract({
   stop: {
     input: z.object({ id }),
     output: z.object({ status: serverStatusSchema }),
+  },
+  /** The thread's worktree workspace, made the first time. */
+  forThread: {
+    input: z.object({ threadId: id }),
+    output: z.object({ workspace: workspaceSchema }),
+  },
+  /** A folder's entries, for the read-only browser where VS Code can't run. */
+  listDir: {
+    input: z.object({ id, path: z.string().max(4096) }),
+    output: z.object({ entries: z.array(z.object({ name: z.string(), path: z.string(), dir: z.boolean() })) }),
+  },
+  readFile: {
+    input: z.object({ id, path: z.string().max(4096) }),
+    output: z.object({ text: z.string().nullable(), reason: z.string().nullable() }),
   },
   /** BB's projects with a local folder, to pick from. */
   projects: {

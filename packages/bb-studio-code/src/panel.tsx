@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { AddOnPanel, BAR_BUTTON, BarTitle, ICON_BUTTON, Icon, ItemHeader, ItemMenu } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { toast } from "sonner";
-import { CHANNEL, KIND_ID, PANEL_PATH, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
+import { FileBrowser } from "./file-browser";
+import { CHANNEL, HIDDEN_RELEASE_MS, KIND_ID, PANEL_PATH, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
 
 export function CodePanel({ subPath }: { subPath: string }) {
   return (
@@ -20,6 +21,29 @@ export function CodePanel({ subPath }: { subPath: string }) {
   );
 }
 
+/**
+ * VS Code answers on the computer running BB, at 127.0.0.1. Only a BB page
+ * served from that computer can reach it; phones and other computers get the
+ * read-only browser instead.
+ */
+export function canEmbedEditor(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
+}
+
+/** Whether the element is on screen: laid out, and its window visible. */
+function useShown(ref: RefObject<HTMLElement | null>): boolean {
+  const [shown, setShown] = useState(true);
+  useEffect(() => {
+    // Retained panels stay mounted but hidden, so poll layout as well.
+    const check = () => setShown(document.visibilityState === "visible" && (ref.current?.getClientRects().length ?? 0) > 0);
+    check();
+    const timer = setInterval(check, 5000);
+    document.addEventListener("visibilitychange", check);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", check); };
+  }, [ref]);
+  return shown;
+}
+
 const STATUS_TEXT: Record<ServerStatus["state"], string> = {
   stopped: "VS Code isn't running.",
   installing: "Downloading code-server (about 200 MB, once)…",
@@ -28,15 +52,32 @@ const STATUS_TEXT: Record<ServerStatus["state"], string> = {
   failed: "VS Code couldn't start.",
 };
 
-function WorkspaceView({ id, backLabel, onBack }: { id: string; backLabel: string; onBack(): void }) {
+export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
+  id: string;
+  backLabel: string;
+  onBack(): void;
+  /** A thread's narrow side panel: no item chat. */
+  compact?: boolean;
+}) {
   const rpc = useRpc<CodeContract>();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const [loadError, setLoadError] = useState("");
   const [version, setVersion] = useState(0);
   const [editing, setEditing] = useState(false);
-  // Open once on arrival; after Stop, the user starts it again.
-  const opened = useRef(false);
+  const embed = canEmbedEditor(window.location.hostname);
+  const body = useRef<HTMLDivElement>(null);
+  const shown = useShown(body);
+  // After Stop, the user starts it again; otherwise a visible view opens it.
+  const [userStopped, setUserStopped] = useState(false);
+  // Out of sight for a while, the frame lets go so VS Code's idle timer runs.
+  const [released, setReleased] = useState(false);
+  useEffect(() => {
+    if (shown) { setReleased(false); return; }
+    const timer = setTimeout(() => setReleased(true), HIDDEN_RELEASE_MS);
+    return () => clearTimeout(timer);
+  }, [shown]);
+
   useRealtime(CHANNEL, (event) => {
     if ((event as { id?: string } | null)?.id === id) setVersion((n) => n + 1);
   });
@@ -49,13 +90,23 @@ function WorkspaceView({ id, backLabel, onBack }: { id: string; backLabel: strin
     return () => { live = false; };
   }, [rpc, id, version]);
 
+  const opening = useRef(false);
   const open = () => {
-    opened.current = true;
-    void rpc.call("open", { id }).then((result) => setStatus(result.status), (error) => toast.error(errorMessage(error)));
+    if (opening.current) return;
+    opening.current = true;
+    setUserStopped(false);
+    void rpc.call("open", { id }).then(
+      (result) => setStatus(result.status),
+      (error) => toast.error(errorMessage(error)),
+    ).finally(() => { opening.current = false; });
+  };
+  const stop = () => {
+    setUserStopped(true);
+    void rpc.call("stop", { id }).then((result) => setStatus(result.status), (error) => toast.error(errorMessage(error)));
   };
   useEffect(() => {
-    if (!opened.current && workspace?.folders.length && status?.state === "stopped") open();
-  }, [workspace, status]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (embed && shown && !userStopped && workspace?.folders.length && status?.state === "stopped") open();
+  }, [embed, shown, userStopped, workspace, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (changes: { title?: string; folders?: string[] }) =>
     rpc.call("update", { id, ...changes }).then(
@@ -71,41 +122,47 @@ function WorkspaceView({ id, backLabel, onBack }: { id: string; backLabel: strin
       </div>
     );
 
-  const running = status?.state === "running" && status.url;
-  const showFolders = editing || !workspace.folders.length;
+  const url = status?.state === "running" ? status.url : null;
+  const showFolders = embed && (editing || !workspace.folders.length);
+  const reference = { title: workspace.title, href: workspaceHref(id) };
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
       <ItemHeader
         backLabel={backLabel}
         onBack={onBack}
         leading={<BarTitle title={workspace.title} label="Workspace name" placeholder="Untitled workspace" onRename={(title) => { if (title) void update({ title }); }} />}
-        item={{ title: workspace.title, href: workspaceHref(id) }}
+        item={reference}
+        chatAction={compact ? null : undefined}
         trailing={
           <>
-            <button type="button" className={ICON_BUTTON} title="Folders in this workspace" aria-label="Folders" aria-pressed={showFolders} onClick={() => setEditing((value) => !value)}>
-              <Icon name="FolderEdit" className="size-4" />
-            </button>
-            {running ? (
+            {embed && (
+              <button type="button" className={ICON_BUTTON} title="Folders in this workspace" aria-label="Folders" aria-pressed={showFolders} onClick={() => setEditing((value) => !value)}>
+                <Icon name="FolderEdit" className="size-4" />
+              </button>
+            )}
+            {url ? (
               <>
-                <button type="button" className={ICON_BUTTON} title="Open VS Code in a browser window" aria-label="Open in browser" onClick={() => window.open(status.url!, "_blank", "noopener")}>
+                <button type="button" className={ICON_BUTTON} title="Open VS Code in a browser window" aria-label="Open in browser" onClick={() => window.open(url, "_blank", "noopener")}>
                   <Icon name="ExternalLink" className="size-4" />
                 </button>
-                <button type="button" className={ICON_BUTTON} title="Stop VS Code" aria-label="Stop" onClick={() => void rpc.call("stop", { id }).then((result) => setStatus(result.status))}>
+                <button type="button" className={ICON_BUTTON} title="Stop VS Code" aria-label="Stop" onClick={stop}>
                   <Icon name="Square" className="size-4" />
                 </button>
               </>
             ) : null}
-            <ItemMenu reference={{ title: workspace.title, href: workspaceHref(id) }} item={{ pluginId: PLUGIN_ID, id }} projectId={workspace.projectId} onMoved={() => setVersion((n) => n + 1)} />
+            <ItemMenu reference={reference} item={{ pluginId: PLUGIN_ID, id }} projectId={workspace.projectId} onMoved={() => setVersion((n) => n + 1)} />
           </>
         }
       />
       {showFolders && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
-      <div className="relative min-h-0 flex-1">
-        {running ? (
+      <div ref={body} className="relative min-h-0 flex-1">
+        {!embed ? (
+          <FileBrowser workspace={workspace} />
+        ) : url && !released ? (
           <iframe
-            key={status.url}
+            key={url}
             title={`VS Code: ${workspace.title}`}
-            src={status.url!}
+            src={url}
             className="absolute inset-0 size-full border-0"
             allow="clipboard-read; clipboard-write"
           />
