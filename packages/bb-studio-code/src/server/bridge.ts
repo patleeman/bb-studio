@@ -29,6 +29,9 @@ export function bridgeSocketPath(dir: string, id: string): string {
 type Bridge = { server: Server; socket: string; clients: Set<ServerResponse>; state: EditorState | null; heartbeat?: ReturnType<typeof setInterval> };
 
 export class Bridges {
+  /** `log`: an editor window connected or left (each VS Code page load connects once). */
+  constructor(private readonly log: (message: string) => void = () => undefined) {}
+
   private readonly bridges = new Map<string, Bridge>();
   /** A command for an editor that isn't connected yet, delivered when it connects. */
   private readonly held = new Map<string, BridgeCommand>();
@@ -94,8 +97,11 @@ export class Bridges {
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
       res.write(": connected\n\n");
       bridge.clients.add(res);
+      const opened = Date.now();
+      this.log(`workspace ${id}: editor window connected (${bridge.clients.size} open)`);
       req.on("close", () => {
         bridge.clients.delete(res);
+        this.log(`workspace ${id}: editor window left after ${Math.round((Date.now() - opened) / 1000)}s (${bridge.clients.size} open)`);
         // The last window closed: what it reported no longer holds.
         if (!bridge.clients.size) bridge.state = null;
       });

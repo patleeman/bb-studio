@@ -95,7 +95,7 @@ export default function plugin(bb: BbPluginApi) {
   // Existing workspaces get a new layout once, the next time VS Code loads.
   void applyLayoutEverywhere(root, (message) => bb.log.warn(message)).catch(() => undefined);
   // The bridge between each workspace's VS Code and the agent (src/server/bridge.ts).
-  const bridges = new Bridges();
+  const bridges = new Bridges((message) => bb.log.info(message));
   void installBridge(join(root, "extensions")).catch((error) => bb.log.warn(`couldn't install the BB bridge extension: ${error instanceof Error ? error.message : String(error)}`));
   const servers = new CodeServers({
     root,
@@ -182,6 +182,7 @@ export default function plugin(bb: BbPluginApi) {
     syncTheme: async (next) => {
       const key = JSON.stringify(next);
       if (key === themeKey) return { changed: false };
+      bb.log.info(`theme changed (${next.mode}, background ${next.colors.background}); open editors reload`);
       theme = next;
       themeKey = key;
       await bb.storage.kv.set("theme", next);
