@@ -231,9 +231,10 @@
   }
 }
 
-/* A thread's side panel is narrow: keep room for the side menu, no more. */
+/* A thread's side panel is narrow, but the side menu's handles need room
+   inside its border, and boxed blocks need some on the right. */
 .pages-panel-tab .pages-main > .bn-editor {
-  padding-inline: 40px 16px;
+  padding-inline: 56px 28px;
 }
 
 /* Touch screens can't hover, so controls revealed on hover stay visible. A
