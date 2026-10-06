@@ -269,6 +269,8 @@ export default async function plugin(bb: BbPluginApi) {
     by: Writer;
   }): SaveResult {
     const name = basename(input.name.trim()) || "artifact.txt";
+    // "." and ".." would name a folder when the artifact is exported.
+    if (name === "." || name === "..") throw new Error("Give the file a name, like report.md.");
     const result = store.save({
       title: input.title ?? (input.artifactId ? null : titleFromName(name)),
       description: input.description,

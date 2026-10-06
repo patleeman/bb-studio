@@ -14,3 +14,14 @@ it("bb artifacts list --thread outside a thread refuses instead of listing every
   expect(result.exitCode).toBe(1);
   expect(result.stdout).not.toContain("Elsewhere");
 });
+
+it("artifacts_save refuses inline content named . or ..", async () => {
+  const host = createFakePluginHost({ pluginId: "artifacts" });
+  hosts.push(host);
+  await plugin(host.bb);
+  for (const name of ["..", "notes/..", "."]) {
+    const result = await host.harness.behavior.callAgentTool("artifacts_save", { content: "x", name, title: "Dots" });
+    expect(result).toMatchObject({ isError: true });
+  }
+  expect((await host.harness.behavior.runCli(["list"], {} as never)).stdout).toBe("No artifacts yet.\n");
+});
