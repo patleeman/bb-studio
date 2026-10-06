@@ -75,6 +75,11 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: z.string() }),
     output: z.object({ drawing: drawingFullSchema.nullable() }),
   },
+  /** A drawing's card in a reply: its name and size, without the scene. */
+  getDrawingMeta: {
+    input: z.object({ id: z.string() }),
+    output: z.object({ drawing: drawingMetaSchema.nullable() }),
+  },
   getDrawingUpdatedAt: {
     input: z.object({ id: z.string() }),
     output: z.object({ updatedAt: z.number() }),
@@ -147,6 +152,13 @@ export default async function plugin(bb: BbPluginApi) {
     return Buffer.from((await readThreadFile(bb, source)).bytes).toString("utf8");
   }
   const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Studio is optional. */ });
+  /** A drawing an agent changed belongs to its thread too, so the thread's tab lists it. */
+  const edited = (id: string, threadId: string) => {
+    const at = Date.now();
+    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Studio is optional. */ });
+  };
+  /** The reply card that opens the drawing in the user's workbench. */
+  const card = (id: string) => `Put this line on its own in your reply so the user can open the drawing beside the chat:\n::drawing{id="${id}"}`;
 
   const studio = studioSchemas(z);
   // Agents write drawings a few elements at a time; Studio only needs to hear about it now and then.
@@ -204,6 +216,10 @@ export default async function plugin(bb: BbPluginApi) {
   bb.log.info("loaded");
 
   bb.rpc.register(rpcContract, {
+    getDrawingMeta({ id }) {
+      const row = store.get(id);
+      return { drawing: row ? toMeta(row) : null };
+    },
     listDrawings() {
       return { drawings: store.list().map(toMeta) };
     },
@@ -402,7 +418,7 @@ export default async function plugin(bb: BbPluginApi) {
     execute({ name }, ctx) {
       const row = create(name, "agent", ctx.projectId ?? null);
       created(row.id, ctx.threadId);
-      return `Created Excalidraw drawing "${name}" (id ${row.id}). Link: [${name.replace(/[[\]]/g, "")}](${drawingHref(row.id)})`;
+      return `Created Excalidraw drawing "${name}" (id ${row.id}). Link: [${name.replace(/[[\]]/g, "")}](${drawingHref(row.id)})\n${card(row.id)}`;
     },
   });
 
@@ -417,7 +433,7 @@ export default async function plugin(bb: BbPluginApi) {
       appState: z.record(z.string(), z.unknown()).optional(),
       files: z.record(z.string(), z.unknown()).optional(),
     }),
-    execute({ drawingId, elements, deletedElementIds, appState, files }) {
+    execute({ drawingId, elements, deletedElementIds, appState, files }, ctx) {
       const row = store.get(drawingId);
       if (!row) {
         return {
@@ -447,6 +463,7 @@ export default async function plugin(bb: BbPluginApi) {
         skipped,
       });
       const updatedAt = write(row, merged, "agent");
+      if (ctx.threadId) edited(row.id, ctx.threadId);
       const clean = getNonDeletedElements(merged);
       return [
         `Updated drawing "${displayName(row)}" (id ${row.id}) — now ${clean.length} element(s): ${sceneSummary(merged)}.`,
@@ -456,6 +473,7 @@ export default async function plugin(bb: BbPluginApi) {
           : []),
         `- saved at ${new Date(updatedAt).toISOString()}`,
         `The user's open editor has been notified and shows the change live.`,
+        card(row.id),
       ].join("\n");
     },
   });

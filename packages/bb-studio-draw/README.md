@@ -37,9 +37,15 @@ own tools.
   status, the drawing's thread (with [Studio chat](../bb-studio);
   otherwise **New thread**, which starts a conversation that links the
   drawing), copy image, and a menu with Download PNG and Delete.
-- **In a thread's side panel.** The **Drawings** tab lists the drawings made
-  in that thread, then the project's recent ones. **New** makes a drawing in
-  the thread's project and links it to the thread in Studio. In the editor,
+- **A card in the agent's reply.** When an agent makes or changes a drawing,
+  its reply shows the drawing's card (`::drawing{id="…"}`): a thumbnail, the
+  name and the element count. Clicking it opens the drawing in a **Drawings**
+  tab in the thread's workbench, beside the chat. Where there's no workbench,
+  it opens in the main area.
+- **In a thread's workbench.** The **Drawings** tab lists the drawings made
+  or changed in that thread, then the project's recent ones. **New** makes a
+  drawing in the thread's project and links it to the thread in Studio. In
+  the editor,
   **Attach** adds the drawing to the conversation as an image; so does the
   composer's `+` menu → **Drawing**. Neither sends a message.
 - **`@drawing` mentions.** The agent receives the drawing's scene as context.

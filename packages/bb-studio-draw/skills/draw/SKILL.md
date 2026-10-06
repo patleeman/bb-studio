@@ -14,13 +14,22 @@ changes live.
 Drawings belong to a project or are global. Link to one as
 `[Name](/plugins/excalidraw/drawings/<drawing-id>)`.
 
+When you make or change a drawing, put its card on its own line in your reply:
+
+```
+::drawing{id="<drawing-id>"}
+```
+
+The card shows the drawing; clicking it opens the drawing in a tab beside the
+chat. The create and update tools print the line for you.
+
 ## Agent tools
 
 | Tool | Use it to |
 | --- | --- |
 | `excalidraw_list_drawings` | List drawings with ids, names and element counts. |
 | `excalidraw_get_drawing` | Read a drawing's current scene before changing it. |
-| `excalidraw_create_drawing` | Create a drawing. Returns its id and a link to share. |
+| `excalidraw_create_drawing` | Create a drawing. Returns its id, a link and its card. |
 | `excalidraw_update_drawing` | Upsert elements, delete elements by id, or patch appState. An upsert of an existing id merges: send `id`, `type` and just the properties to change. |
 
 ## CLI (works in every agent session)
@@ -50,7 +59,8 @@ storage, on the thread's host.
    elements out: omitted elements are kept.
 4. Bind a label to a shape with the shape's `boundElements` and the text's
    `containerId`, as Excalidraw does.
-5. Link the drawing in your reply so the user can open it.
+5. Put the drawing's card on its own line in your reply so the user can open
+   it beside the chat.
 
 ## Studio
 

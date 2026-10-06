@@ -3,9 +3,12 @@
 // Surfaces:
 //   - navPanel "Drawings": Studio's collection of drawings, and the editor
 //     at drawings/<id>. With Studio installed, Studio's page takes over.
-//   - threadPanelAction "Drawings": the thread's drawings and recent ones,
-//     and the editor, inside a thread's right panel. New makes a drawing
-//     linked to the thread; "Attach" adds the rendered drawing to it.
+//   - threadPanelAction "Drawings": the workbench tab beside a conversation,
+//     showing one drawing's editor or the thread's drawings and recent ones.
+//     New makes a drawing linked to the thread; "Attach" adds the rendered
+//     drawing to it.
+//   - messageDirective `::drawing{id="…"}`: a card in a reply that opens the
+//     drawing in the workbench.
 //   - composer `+` menu → "Drawing": pick a drawing (host picker)
 //     and upload it as a rendered image attachment for the current conversation.
 //   - mention provider (server): `@drawing` works in every composer.
@@ -15,26 +18,14 @@ import {
   definePluginApp,
   type PluginComposerScope,
 } from "@get-bb/plugin-sdk/app";
-import { DrawingEditor } from "./components/drawing-editor";
+import { DRAWINGS_TAB, DrawingDirective, DrawingsTab } from "./components/drawing-tab";
 import { DrawingsPanel } from "./components/drawings-panel";
 import { ExcalidrawPicker } from "./components/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./lib/composer-registration";
 import { blobToBase64, parseScene, renderSceneToPng } from "./lib/scene";
 import { callRpc } from "./lib/rpc";
-import { RetainedPanels, retainPanel, StudioBarSlot, ThreadItemsPanel } from "@bb-studio/kit/app";
-import { DRAW_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL } from "./src/shared";
-
-function DrawingsSurface({ threadId }: { threadId: string }) {
-  return (
-    <ThreadItemsPanel
-      threadId={threadId}
-      pluginId={PLUGIN_ID}
-      kind="drawing"
-      channel={REALTIME_CHANNEL}
-      renderItem={(id, { backLabel, onBack }) => <DrawingEditor key={id} drawingId={id} threadId={threadId} backLabel={backLabel} onBack={onBack} />}
-    />
-  );
-}
+import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
+import { DRAW_ICON, PANEL_PATH } from "./src/shared";
 
 /** `+` menu flow: pick a drawing, render it to a PNG, and attach it. */
 async function attachFromComposer(scope: PluginComposerScope) {
@@ -72,15 +63,17 @@ export default definePluginApp((app) => {
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path={PANEL_PATH} render={(subPath) => <DrawingsPanel subPath={subPath} />} /> });
   app.slots.threadPanelAction({
-    id: "excalidraw",
+    id: DRAWINGS_TAB,
     title: "Drawings",
     icon: DRAW_ICON,
     layout: "flush",
     run: async ({ openPanel }) => {
       await openPanel({ title: "Drawings" });
     },
-    component: ({ threadId }) => <DrawingsSurface threadId={threadId} />,
+    component: DrawingsTab,
   });
+
+  app.slots.messageDirective({ id: "drawing", component: DrawingDirective });
 
   app.slots.pendingInteraction({
     id: "excalidraw-picker",
