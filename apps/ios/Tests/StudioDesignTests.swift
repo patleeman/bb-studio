@@ -21,14 +21,45 @@ final class StudioDesignTests: XCTestCase {
             ::table{id="tbl_3"}
             ::design{id="dsn_0123456789abcdef"}
             ::design{id="not-a-design"}
+            ::recording{id="rec_abcd1234"}
+            ::recording{id="rec_x"}
             ::next{reply="👍 Agree"}
             """
         let items = MarkdownBlock.parse(reply).compactMap { block -> ReplyItem? in
             if case .item(let item) = block { return item }
             return nil
         }
-        XCTAssertEqual(items, [.page("pg_1"), .drawing("drw_2"), .table("tbl_3"), .design("dsn_0123456789abcdef")])
-        XCTAssertEqual(items.map(\.route), [.page(id: "pg_1"), .drawing(id: "drw_2"), .table(id: "tbl_3"), .design(id: "dsn_0123456789abcdef")])
+        XCTAssertEqual(items, [.page("pg_1"), .drawing("drw_2"), .table("tbl_3"), .design("dsn_0123456789abcdef"), .recording("rec_abcd1234")])
+        XCTAssertEqual(items.map(\.route), [.page(id: "pg_1"), .drawing(id: "drw_2"), .table(id: "tbl_3"), .design(id: "dsn_0123456789abcdef"), .recording(id: "rec_abcd1234")])
+        XCTAssertEqual(items.last?.kind.label, "Recording")
+    }
+
+    func testTablePreviewShowsTheFirstRowsWithoutHiddenColumns() {
+        let table = Tables.GetOutputTable(
+            columns: [.init(id: "name", name: "Name"), .init(id: "size", name: "Size")],
+            views: [.init(id: "v", name: "All", hidden: ["size"])],
+            rows: (0..<25).map { .init(id: "r\($0)", values: ["name": .string("Row \($0)"), "size": .number(Double($0))]) })
+        let preview = StudioTablePreview(table)
+        XCTAssertEqual(preview.columns, ["Name"])
+        XCTAssertEqual(preview.rows.count, StudioTablePreview.rowLimit)
+        XCTAssertEqual(preview.rows.first, ["Row 0"])
+        XCTAssertEqual(preview.total, 25)
+    }
+
+    func testRecordingPreviewPrefersCleanedTextAndSkipsEmptySegments() throws {
+        let json = """
+            {"recording":{"id":"rec_abcd1234","title":"Standup","status":"done","pendingCount":0,"meetingNotes":{"summary":" Ship Friday. "}},
+             "segments":[{"id":"s0","offsetMs":0,"text":"um hello","cleanedText":"Hello."},{"id":"s1","offsetMs":5000,"text":"  "},
+                         {"id":"s2","offsetMs":65000,"text":"Bye"}]}
+            """
+        let output = try JSONDecoder().decode(Talk.RecordingGetOutput.self, from: Data(json.utf8))
+        let preview = RecordingPreview(output)
+        XCTAssertEqual(preview.summary, "Ship Friday.")
+        XCTAssertEqual(preview.lines.map(\.text), ["Hello.", "Bye"])
+        XCTAssertEqual(preview.total, 2)
+        XCTAssertFalse(preview.transcribing)
+        XCTAssertEqual(RecordingPreview.clock(65_000), "1:05")
+        XCTAssertEqual(RecordingPreview.clock(3_725_000), "1:02:05")
     }
 
     func testDesignQuestionsAreAnsweredNatively() throws {

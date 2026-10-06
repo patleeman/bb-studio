@@ -454,57 +454,102 @@ struct ActivitySheet: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
-/// `::artifact{id="art_…"}` in a reply: the artifact's title and type, opening the viewer.
+/// `::artifact{id="art_…"}` in a reply: the artifact's title and type, opening
+/// the viewer, with files the phone can show previewed under them.
 struct ArtifactCard: View {
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     let id: String
     @State private var artifact: Artifact?
+    @State private var text: String?
     @State private var missing = false
 
-    /// Replies re-render often; each card looks its artifact up once.
-    @MainActor private static var cache: [String: Artifact] = [:]
+    /// Text past this is left to the viewer.
+    static let textLimit = 20_000
+
+    /// Replies re-render often; a card starts from what the last one showed.
+    @MainActor private static var cache: [String: (artifact: Artifact, text: String?)] = [:]
 
     var body: some View {
-        NavigationLink(value: Route.artifact(id: id)) {
-            HStack(spacing: 12) {
-                thumbnail
-                    .frame(width: 44, height: 44)
-                    .background(Color.teal.opacity(0.12), in: .rect(cornerRadius: 10))
-                    .clipShape(.rect(cornerRadius: 10))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(artifact?.displayTitle ?? (missing ? "Deleted artifact" : "Artifact"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(missing ? .secondary : .primary)
-                        .lineLimit(2)
-                    if let version = artifact?.version {
-                        Text([version.typeLabel, ByteCountFormatter.string(fromByteCount: Int64(version.size), countStyle: .file)]
-                            .joined(separator: " · "))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
-            }
-            .padding(10)
-            .frame(maxWidth: 420, alignment: .leading)
-            .background(.fill.quaternary, in: .rect(cornerRadius: 14))
-            .contentShape(.rect(cornerRadius: 14))
+        StudioCardChrome(
+            route: .artifact(id: id),
+            title: artifact?.displayTitle ?? (missing ? "Deleted artifact" : "Artifact"),
+            detail: artifact.map { [$0.version.typeLabel, ByteCountFormatter.string(fromByteCount: Int64($0.version.size), countStyle: .file)]
+                .joined(separator: " · ") },
+            missing: missing,
+            hasPreview: hasPreview,
+            identifier: "artifactCard"
+        ) {
+            thumbnail
+                .frame(width: 44, height: 44)
+                .background(Color.teal.opacity(0.12), in: .rect(cornerRadius: 10))
+                .clipShape(.rect(cornerRadius: 10))
+        } preview: {
+            preview
         }
-        .buttonStyle(.plain)
-        .disabled(missing)
-        .accessibilityIdentifier("artifactCard")
         .task(id: id) {
             let cacheKey = ServerScope.key(id, serverURL: client.baseURL)
-            if let cached = Self.cache[cacheKey] { artifact = cached }
+            if let cached = Self.cache[cacheKey] { (artifact, text) = cached }
             guard let result = try? await client.artifact(id) else { return }
-            if let found = result.artifact {
-                Self.cache[cacheKey] = found
-                artifact = found
-            } else {
+            guard let found = result.artifact else {
+                Self.cache[cacheKey] = nil
                 missing = true
+                return
+            }
+            artifact = found
+            if found.version.isText, let read = try? await client.artifactText(found.id, versionId: found.version.id).text {
+                text = String(read.prefix(Self.textLimit))
+            }
+            Self.cache[cacheKey] = (found, text)
+        }
+    }
+
+    private var hasPreview: Bool {
+        guard let version = artifact?.version, !missing else { return false }
+        return ["image", "html", "pdf"].contains(version.type) || (version.isText && text != nil)
+    }
+
+    @ViewBuilder
+    private var preview: some View {
+        if let artifact {
+            let url = client.artifactContentURL(artifact.id, versionId: artifact.version.id)
+            switch artifact.version.type {
+            case "image":
+                NavigationLink(value: Route.artifact(id: artifact.id)) {
+                    AsyncImage(url: url) { image in
+                        image.resizable().scaledToFit()
+                    } placeholder: {
+                        ProgressView()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: 240)
+                    .padding(8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open \(artifact.displayTitle)")
+            case "html":
+                // Served with a sandboxing CSP, so it can't reach BB.
+                ArtifactWebPreview(url: url, onFailure: { _ in }).frame(height: ReplyPreview.maxHeight)
+            case "pdf":
+                ArtifactPDFPreview(url: url, onFailure: { _ in }).frame(height: ReplyPreview.maxHeight)
+            default:
+                if let text {
+                    let body = Group {
+                        if artifact.version.type == "markdown" {
+                            MarkdownText(text)
+                        } else {
+                            Text(text).font(.caption.monospaced())
+                        }
+                    }
+                    .textSelection(.enabled)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    ViewThatFits(in: .vertical) {
+                        body
+                        ScrollView { body }
+                    }
+                    .frame(maxHeight: ReplyPreview.maxHeight)
+                }
             }
         }
     }

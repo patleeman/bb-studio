@@ -77,14 +77,17 @@ struct StudioTableView: View {
             .border(Color.secondary.opacity(0.2))
     }
 
-    private func display(_ value: StudioJSONValue) -> String {
+    private func display(_ value: StudioJSONValue) -> String { Self.text(value) }
+
+    /// A cell's value as text, here and in reply cards.
+    static func text(_ value: StudioJSONValue) -> String {
         switch value {
         case .null: ""
         case .bool(let value): value ? "Yes" : "No"
         case .number(let value): value.formatted()
         case .string(let value): value
-        case .array(let values): values.map(display).joined(separator: ", ")
-        case .object(let values): values.values.map(display).joined(separator: ", ")
+        case .array(let values): values.map(text).joined(separator: ", ")
+        case .object(let values): values.values.map(text).joined(separator: ", ")
         }
     }
 

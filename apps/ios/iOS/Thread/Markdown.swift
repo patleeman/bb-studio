@@ -3,8 +3,9 @@ import SwiftUI
 /// Block-level markdown on top of `AttributedString`'s inline parser: headings,
 /// paragraphs, ordered, nested and task lists, quotes, tables, rules and fenced
 /// code, and images. `::artifact{id="…"}` lines become artifact cards, `::page{…}`, `::drawing{…}`,
-/// `::table{…}` and `::design{…}` lines cards that open the item, `::inline-vis{…}`
-/// lines show the file they name, and `::task{id="…"}` lines task cards; other directives, such as `::reactions{…}`, are left out; see `Directive`.
+/// `::table{…}`, `::design{…}` and `::recording{…}` lines cards that preview and open the item,
+/// and `::inline-vis{…}` lines show the file they name; other directives, such as `::reactions{…}`,
+/// are left out; see `Directive`.
 struct MarkdownText: View {
     let source: String
 

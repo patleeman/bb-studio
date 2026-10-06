@@ -650,6 +650,12 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "apps/ios/iOS/Thread/ItemCard.swift",
+      "plugin": "talk",
+      "method": "recording_get",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/iOS/Thread/MutedThreads.swift",
       "plugin": "mobile",
       "method": "mute_list",
