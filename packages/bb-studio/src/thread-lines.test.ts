@@ -16,6 +16,19 @@ it("uses latest completed assistant prose, coalesces a turn, and never infers co
   expect(result.threads[0]?.status).toBe("idle");
 });
 
+it("leaves out directive lines such as the Next row and smart reactions, keeping prose that mentions one", () => {
+  const text = [
+    "SQLite is simpler. Which one do you want?",
+    '::next{reply="🗄️ SQLite|🐘 Postgres" btw="🐛 I noticed a {brace} here"}',
+    "  ::reactions{items=\"👍 Agree\"}  ",
+    "::explore[Queue]{id=1}",
+    "Mention ::next{inline} stays.",
+  ].join("\n");
+  expect(parseThreadStatus(thread, [message(10, text)]).progress.progress).toBe("SQLite is simpler. Which one do you want? Mention ::next{inline} stays.");
+  // A message that is only a directive leaves the previous prose as the line.
+  expect(parseThreadStatus(thread, [message(10, "Done."), message(20, "::next{reply=\"👍 Thanks\"}")]).progress.progress).toBe("Done.");
+});
+
 it("ignores malformed rows, wrong-thread events, reasoning, inputs and tool payloads", () => {
   const events = [null, {}, row("item/completed", NaN, {}), row("item/completed", 20, { item: { type: "agentMessage", text: 3 } }), message(21, "Wrong thread", { }), row("item/completed", 22, { item: { type: "commandExecution", command: "private command", aggregatedOutput: "private output" } }), row("item/completed", 23, { item: { type: "userMessage", content: [{ text: "private input" }] } }), row("item/completed", 24, { item: { type: "reasoning", text: "private thoughts" } }), message(25, " ```sh\nprivate command\n``` "), message(26, " `private command` ")];
   events[4] = { ...events[4] as object, threadId: "elsewhere" };

@@ -25,9 +25,15 @@ type Thread = { id: string; title: string; status: string; updatedAt: number; is
 export type ThreadProgress = { progress: string | null; progressAt: number | null; failureReason: string | null; blockedReason: string | null };
 export type ThreadActivity = { id: string; threadId: string; title: string; isLead: boolean; kind: "progress" | "failure" | "blocked"; summary: string; at: number };
 
-/** Keep prose bounded and omit code excerpts, including commands quoted in messages. */
+/**
+ * A line that is only a directive, such as the Next row's `::next{reply="…"}`
+ * or `::reactions{…}`. BB renders these as buttons, so they aren't prose.
+ */
+const DIRECTIVE_LINE = /^[ \t]*::[A-Za-z][\w-]*(?:\[[^\]\n]*\])?(?:\{[^\n]*\})?[ \t]*$/gmu;
+
+/** Keep prose bounded and omit code excerpts, including commands quoted in messages, and directives. */
 function prose(value: string): string | null {
-  const text = value.slice(0, 12_000).replace(/```[\s\S]*?(?:```|$)/gu, " ").replace(/`[^`]*`/gu, " ").replace(/[\u0000-\u001f\u007f]/gu, " ").replace(/\s+/gu, " ").trim();
+  const text = value.slice(0, 12_000).replace(DIRECTIVE_LINE, " ").replace(/```[\s\S]*?(?:```|$)/gu, " ").replace(/`[^`]*`/gu, " ").replace(/[\u0000-\u001f\u007f]/gu, " ").replace(/\s+/gu, " ").trim();
   return text ? text.slice(0, 240) : null;
 }
 
