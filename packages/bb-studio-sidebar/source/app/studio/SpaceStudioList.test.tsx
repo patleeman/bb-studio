@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SpaceStudioList } from "./SpaceStudioList.js";
+import { showsItem, SpaceStudioList } from "./SpaceStudioList.js";
 import type { SpaceItems } from "./studioSpaces.js";
 
 vi.mock("@get-bb/plugin-sdk/app", async (actual) => ({
@@ -38,5 +38,14 @@ describe("SpaceStudioList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close Mockup" }));
     rerender(list(withOpen([{ ...mockup }])));
     expect(screen.queryByText("Mockup")).toBeNull();
+  });
+});
+
+describe("showsItem", () => {
+  it("matches the item's own route and views under it, not a sibling that shares a prefix", () => {
+    expect(showsItem("/plugins/pages/pages/pg_1", "/plugins/pages/pages/pg_1")).toBe(true);
+    expect(showsItem("/plugins/pages/pages/pg_1/compose", "/plugins/pages/pages/pg_1?x=1")).toBe(true);
+    expect(showsItem("/plugins/pages/pages/pg_10", "/plugins/pages/pages/pg_1")).toBe(false);
+    expect(showsItem("/threads/thr_1", "/plugins/pages/pages/pg_1")).toBe(false);
   });
 });

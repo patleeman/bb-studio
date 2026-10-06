@@ -1,6 +1,6 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createStudioItem, openAppPath, openPathInSplit } from "@bb-studio/kit/app";
+import { createStudioItem, openAppPath, openPathInSplit, usePathname } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SIDEBAR_CONTROL_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
+import { SIDEBAR_CONTROL_BUTTON_CLASS, SIDEBAR_ROW_SELECTED_STATE_CLASS } from "../rows/sidebarRowClasses.js";
 import type { SpaceBrowseItem, SpaceItems } from "./studioSpaces.js";
 
 let splitting = false;
@@ -130,8 +130,16 @@ function copyText(text: string, done: string) {
  * in a split beside it, as a thread row does; × or a middle-click closes it
  * here; right-click (a long press on touch) has the rest, as a thread's menu does.
  */
+/** Whether the main view shows `href`, or a view under it such as a page's composer. */
+export function showsItem(pathname: string, href: string): boolean {
+  const path = href.split(/[?#]/)[0]!.replace(/\/+$/, "");
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
+
 function StudioItemChip({ item, onClose }: { item: OpenItem; onClose(): void }) {
   const sdk = useSdk();
+  // On screen: highlighted like the selected thread's row.
+  const active = showsItem(usePathname(), item.href);
   const link = useRef<HTMLAnchorElement>(null);
   const [renaming, setRenaming] = useState(false);
   const call = (method: "archive" | "remove" | "rename", input: Record<string, unknown>) =>
@@ -162,8 +170,14 @@ function StudioItemChip({ item, onClose }: { item: OpenItem; onClose(): void }) 
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <span
-          className="group/item relative inline-flex h-6 max-w-full min-w-0 items-center rounded-full border border-border bg-sidebar-accent/40 text-xs text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-within:bg-sidebar-accent data-[state=open]:bg-sidebar-accent max-md:pointer-coarse:h-8"
+          className={cn(
+            "group/item relative inline-flex h-6 max-w-full min-w-0 items-center rounded-full border text-xs text-sidebar-foreground transition-colors max-md:pointer-coarse:h-8",
+            active
+              ? cn(SIDEBAR_ROW_SELECTED_STATE_CLASS, "border-transparent font-medium")
+              : "border-border bg-sidebar-accent/40 hover:bg-sidebar-accent focus-within:bg-sidebar-accent data-[state=open]:bg-sidebar-accent",
+          )}
           data-space-studio-item={`${item.pluginId}:${item.id}`}
+          data-active={active ? "" : undefined}
         >
           {renaming ? (
             <input
@@ -183,6 +197,7 @@ function StudioItemChip({ item, onClose }: { item: OpenItem; onClose(): void }) 
             <a
               ref={link}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               title={item.preview ? `${item.title}\n${item.preview}` : item.title}
               onClick={(event) => {
                 // The split's own Mod-click goes on to BB.

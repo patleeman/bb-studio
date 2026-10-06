@@ -304,6 +304,9 @@ describe("thread-list plugin", () => {
     expect(within(chips).getByRole("button", { name: "Close Launch plan" })).not.toBeNull();
     fireEvent.click(within(alpha()).getByRole("link", { name: "Launch plan" }));
     expect(window.location.pathname).toBe("/plugins/pages/pages/pg_1");
+    // The item on screen is highlighted like the selected thread.
+    await waitFor(() => expect(alpha().querySelector('[data-space-studio-item="pages:pg_1"]')?.hasAttribute("data-active")).toBe(true));
+    expect(within(alpha()).getByRole("link", { name: "Launch plan" }).getAttribute("aria-current")).toBe("page");
     // Any thread can become the lead.
     fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_parent"]')!);
     fireEvent.click(await screen.findByRole("menuitem", { name: "Make Space lead" }));
