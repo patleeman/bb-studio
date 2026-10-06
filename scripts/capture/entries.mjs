@@ -11,6 +11,7 @@ import bb_studio_reactions from "./captures/bb-studio-reactions.mjs";
 import bb_studio_decisions from "./captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./captures/bb-studio-mobile.mjs";
 import bb_studio_tables from "./captures/bb-studio-tables.mjs";
+import design from "./captures/design.mjs";
 import sidebar_navigation from "./captures/sidebar-navigation.mjs";
 import compactHeaders from "./captures/compact-headers.mjs";
 
@@ -29,6 +30,7 @@ export function loadCaptures(context) {
     ...bb_studio_decisions(context),
     ...bb_studio_mobile(context),
     ...bb_studio_tables(context),
+    ...design(context),
     ...sidebar_navigation(context),
   ];
 }
