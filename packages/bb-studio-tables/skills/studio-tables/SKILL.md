@@ -11,6 +11,14 @@ From a terminal, `bb tables list`, `bb tables schema <id>`, and `bb tables query
 
 Link to a table, view, or row as `/plugins/studio-tables/tables/<table-id>`, with `/view/<view-id>` and `/row/<row-id>` appended as needed.
 
+When you create a table or change its rows, put its card on its own line in your reply, so the user can open the table beside the chat:
+
+```
+::table{id="<table-id>"}
+```
+
+`tables_create`, `tables_insert`, `tables_update` and `tables_delete_rows` print the line for you. Put it in once per table, not once per row.
+
 `tables_query` returns `{ rows, total, offset, nextOffset, revision }`. The default
 page has up to 100 rows; `limit` can be 1–500. To read the rest, keep the same
 view/filters/sorts and pass `offset: nextOffset` and `expectedRevision: revision`.

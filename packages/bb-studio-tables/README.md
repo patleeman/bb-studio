@@ -4,7 +4,9 @@ Structured tables for BB Studio. Each table has typed columns, rows, and saved t
 
 Pages embeds tables live, so edits in a page show in Tables and the other way round. Agents can create tables, inspect schemas, query rows, insert rows, and update cells. CSV import matches headers to columns by name.
 
-In a thread's side panel, the **Tables** tab lists the tables made in that thread, then the project's recent ones. **New** makes a table in the thread's project and links it to the thread in Studio.
+In a thread's workbench, the **Tables** tab lists the tables made or changed in that thread, then the project's recent ones. **New** makes a table in the thread's project and links it to the thread in Studio.
+
+When an agent creates a table or changes its rows, its reply shows the table's card (`::table{id="…"}`) with its row and column counts. Clicking it opens the table in the **Tables** tab, beside the chat. Where there's no workbench, it opens in the main area.
 
 The grid renders a window of visible rows for large tables, including embedded
 Pages tables. Keyboard navigation and clipboard ranges still span every row;

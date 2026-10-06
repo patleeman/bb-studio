@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRealtime, useRpc, type JsonValue } from "@get-bb/plugin-sdk/app";
 import { AddOnCollection, BAR_BUTTON, BarTitle, ICON_BUTTON, Icon, ItemHeader, ItemMenu, openAppPath, ThreadItemsPanel, useAddOnPanel } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { TABLES_CHANNEL, TABLES_PANEL, TABLES_PLUGIN_ID, parseTableSubPath, tableHref, tableSubPath, type TableTarget, type TablesContract } from "@bb-studio/kit/tables";
@@ -175,14 +175,17 @@ export function TablesPanel({ subPath }: { subPath: string }) {
   return <AddOnCollection pluginId={TABLES_PLUGIN_ID} title="Tables" kind="table" call={call} refreshKey={refreshKey} />;
 }
 
-/** Tables in a thread's side panel: the thread's tables and recent ones, and the grid. */
-export function ThreadTablesPanel({ threadId }: { threadId: string }) {
+/** Tables in a thread's workbench: the thread's tables and recent ones, and the grid. */
+export function ThreadTablesPanel({ threadId, params }: { threadId: string; params: JsonValue | null }) {
+  // A reply's card opens the tab with `{ tableId }`.
+  const tableId = params && typeof params === "object" && !Array.isArray(params) ? params.tableId : null;
   return (
     <ThreadItemsPanel
       threadId={threadId}
       pluginId={TABLES_PLUGIN_ID}
       kind="table"
       channel={TABLES_CHANNEL}
+      initialId={typeof tableId === "string" ? tableId : null}
       renderItem={(id, { backLabel, onBack }) => <ThreadTable key={id} tableId={id} backLabel={backLabel} onBack={onBack} />}
     />
   );

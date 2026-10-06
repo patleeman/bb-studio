@@ -89,6 +89,14 @@ export default function plugin(bb: BbPluginApi) {
   const services = studioServices(bb.sdk);
   /** Tells Studio an agent made a table, so it joins the thread's spaces. */
   const created = (tableId: string, threadId: string) => void services.created({ pluginId: TABLES_PLUGIN_ID, id: tableId }, threadId).catch(() => { /* Studio is optional. */ });
+  /** A table an agent changed belongs to its thread too, so the thread's tab lists it. */
+  const edited = (tableId: string, threadId: string | null | undefined) => {
+    if (!threadId) return;
+    const at = Date.now();
+    void services.linkThread({ threadId, ref: { pluginId: TABLES_PLUGIN_ID, id: tableId }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Studio is optional. */ });
+  };
+  /** The reply card that opens the table in the user's workbench. */
+  const card = (tableId: string) => `Put this line on its own in your reply so the user can open the table beside the chat:\n::table{id="${tableId}"}`;
   const index = studioIndex(bb.sdk, studio);
   const query = (table: Table, viewId?: string, filters?: Filter[], sorts?: Sort[]) => {
     const view: View | undefined = viewId ? table.views.find((item) => item.id === viewId) : undefined;
@@ -287,7 +295,7 @@ export default function plugin(bb: BbPluginApi) {
       const table = store.create(title, ctx.projectId ?? null, columns, rows);
       changed(table.id);
       created(table.id, ctx.threadId);
-      return JSON.stringify({ id: table.id, href: tableHref({ tableId: table.id }), rows: table.rows.length });
+      return `${JSON.stringify({ id: table.id, href: tableHref({ tableId: table.id }), rows: table.rows.length })}\n${card(table.id)}`;
     },
   });
   bb.agents.registerTool({
@@ -295,35 +303,38 @@ export default function plugin(bb: BbPluginApi) {
     description:
       "Insert a row. Read tables_schema first for typed column IDs and options.",
     parameters: z.object({ id, values: valuesSchema }),
-    execute: ({ id, values }) => {
+    execute: ({ id, values }, ctx) => {
       const row = store.insert(id, values);
       changed(id);
-      return JSON.stringify(row);
+      edited(id, ctx.threadId);
+      return `${JSON.stringify(row)}\n${card(id)}`;
     },
   });
   bb.agents.registerTool({
     name: "tables_update",
     description: "Update cells in a table row by row ID.",
     parameters: z.object({ id, rowId: id, values: valuesSchema }),
-    execute: ({ id, rowId, values }) => {
+    execute: ({ id, rowId, values }, ctx) => {
       const row = store.updateRow(id, rowId, values);
       changed(id);
-      return JSON.stringify(row);
+      edited(id, ctx.threadId);
+      return `${JSON.stringify(row)}\n${card(id)}`;
     },
   });
   bb.agents.registerTool({
     name: "tables_delete_rows",
     description: "Permanently delete rows from a table by row ID. Delete only rows the user asked to remove.",
     parameters: z.object({ id, rowIds: z.array(id).min(1).max(500) }),
-    execute: ({ id, rowIds }) => {
+    execute: ({ id, rowIds }, ctx) => {
       const existing = new Set(store.require(id).rows.map((row) => row.id));
       const remove = rowIds.filter((rowId) => existing.has(rowId));
       if (remove.length) {
         store.patchRows(id, { remove });
         changed(id);
+        edited(id, ctx.threadId);
       }
       const missing = rowIds.filter((rowId) => !existing.has(rowId));
-      return [`Deleted ${remove.length} row${remove.length === 1 ? "" : "s"}.`, ...(missing.length ? [`Not found: ${missing.join(", ")}`] : [])].join("\n");
+      return [`Deleted ${remove.length} row${remove.length === 1 ? "" : "s"}.`, ...(missing.length ? [`Not found: ${missing.join(", ")}`] : []), ...(remove.length ? [card(id)] : [])].join("\n");
     },
   });
   bb.agents.registerTool({
