@@ -24,10 +24,14 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       }
       // Threads outside Launch and Research stay in their own project's Space (Personal, or none).
       if ([fixture.spaces.launch.id, fixture.spaces.research.id].includes(threads[fixture.threads.loose])) throw new Error("Loose idea joined Launch or Research");
+      // Launch plan leads Launch and Launch checklist is pinned: a star and a pin mark them, with no headings.
+      await pluginRpc("studio", "space_set_lead", { spaceId: fixture.spaces.launch.id, threadId: fixture.threads.plan });
+      await bbCli(["thread", "pin", fixture.threads.checklist]);
     };
     const cleanup = async () => {
       fixture.active -= 1;
       if (fixture.active > 0 || !fixture.preferences) return;
+      if (fixture.spaces.launch) await pluginRpc("studio", "space_set_lead", { spaceId: fixture.spaces.launch.id, threadId: null }).catch(() => {});
       for (const id of Object.values(fixture.threads)) await bbCli(["thread", "delete", id, "--yes"]).catch(() => {});
       for (const key of ["organizationMode", "hiddenThreads", "currentSpace"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: fixture.preferences[key] });
       Object.assign(fixture, { spaces: {}, threads: {}, preferences: null });
@@ -37,7 +41,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       await pluginRpc("thread-list-plus", "setPreference", { key: "hiddenThreads", value: [] });
       // By space shows one Space at a time: Launch, with the switcher's dots below.
       await pluginRpc("thread-list-plus", "setPreference", { key: "currentSpace", value: fixture.spaces.launch.id });
-      await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+      // Not a thread: opening one shows its own Space (Personal here) instead of Launch.
+      await client.navigate("/plugins/studio/studio");
       // Studio's own Spaces section shows until the list is organized by Space.
       await client.waitForSelector('[data-studio-sidebar-anchor="studio:spaces"]');
       await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: "space" });
@@ -57,6 +62,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           studioSpaces: Boolean(document.querySelector('[data-studio-sidebar-anchor="studio:spaces"]')),
           emoji: section("space:${fixture.spaces.launch.id}")?.querySelector('[data-sidebar-space-mark]')?.textContent ?? null,
           statusDots: section("space:${fixture.spaces.launch.id}")?.querySelectorAll('[data-space-thread-dot]').length ?? 0,
+          marks: Array.from(section("space:${fixture.spaces.launch.id}")?.querySelectorAll('[data-space-thread-mark]') ?? [], (el) => el.getAttribute('data-space-thread-mark')),
+          subheadings: Array.from(section("space:${fixture.spaces.launch.id}")?.querySelectorAll('button[aria-label^="Collapse "], button[aria-label^="Expand "]') ?? [], (el) => el.getAttribute('aria-label')).filter((label) => /^(Collapse|Expand) (Lead|Studio|Threads)$/.test(label)),
         };
       })())`));
       if (!layout.labels.includes("Launch") || layout.labels.includes("Research") || layout.research) throw new Error(`By space should show only Launch: ${JSON.stringify(layout)}`);
@@ -67,6 +74,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       if (layout.studioSpaces) throw new Error("Studio's Spaces section still shows in By space");
       if (layout.emoji !== "🚀") throw new Error(`Launch lacks its emoji: ${JSON.stringify(layout)}`);
       if (layout.statusDots < layout.launch.length) throw new Error(`Launch's rows lack their status dots: ${JSON.stringify(layout)}`);
+      if (layout.launch[0] !== fixture.threads.plan || layout.launch[1] !== fixture.threads.checklist || layout.marks.join() !== "lead,pinned") throw new Error(`Launch's lead and pin aren't first with their marks: ${JSON.stringify(layout)}`);
+      if (layout.subheadings.length) throw new Error(`Launch still has subheadings: ${JSON.stringify(layout)}`);
     };
     // The thread list from Launch's heading down to the Space switcher.
     const clip = async (client) => client.evaluate(`(() => {
@@ -201,10 +210,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     showSidebar: true,
     setup: async (client) => {
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-      await client.waitForAriaButton("Threads actions");
-      await client.evaluate(`document.querySelector('button[aria-label="Threads actions"]')?.scrollIntoView({ block: 'center' })`);
+      // New project is in every section's menu. With no loose threads there's no
+      // Threads section, so the seeded Orbit project's menu opens it instead.
+      await client.waitForAriaButton("Orbit actions");
+      const menu = await client.evaluate(`document.querySelector('button[aria-label="Threads actions"]') ? "Threads actions" : "Orbit actions"`);
+      await client.evaluate(`document.querySelector('button[aria-label=${JSON.stringify(menu)}]')?.scrollIntoView({ block: 'center' })`);
       await sleep(350);
-      await client.clickAriaButtonWithPointer("Threads actions");
+      await client.clickAriaButtonWithPointer(menu);
       await client.waitForSelector('[role="menuitem"]');
       await client.clickElementWithTextAndPointer('[role="menuitem"]', "New project");
       await client.waitForSelector('[role="dialog"]');

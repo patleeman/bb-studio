@@ -44,8 +44,11 @@ section sits above Threads, and that it has no scroll area of its own.
 
 The By space capture creates two Spaces, Launch (🚀) and Research, and adds
 "Launch plan", "Launch checklist", and "Release digest" to Launch, and "Paper
-notes" and "Atlas weekly sync" to Research, then shows Launch. The live check
-verifies that only Launch shows, with its threads and emoji, that the switcher
+notes" and "Atlas weekly sync" to Research. It makes Launch plan the Space's
+lead and pins Launch checklist, then shows Launch. The live check verifies
+that only Launch shows, with its threads and emoji, that the lead comes first
+with a star and the pin next with a pin, under no Lead, Studio or Threads
+headings, that the switcher
 at the bottom has All first and a dot for each Space with Launch current, that
 every Launch row has its status dot, and that Studio's
 own Spaces section is gone while By space shows. No agent runs during this
@@ -60,7 +63,8 @@ and Launch's ⋯ menu, left open, now offers **Hide hidden threads**.
 
 ![New project folder dialog](assets/project-dialog.png)
 
-The dialog capture opens **New project** from the live **Threads ⋯** menu and
+The dialog capture opens **New project** from the live **Threads ⋯** menu (or,
+with no loose threads, the seeded Orbit project's ⋯ menu) and
 checks for the folder path, Browse, and Create project controls. No project
 is created during capture.
 
