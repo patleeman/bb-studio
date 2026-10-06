@@ -7,6 +7,8 @@ export const DESIGN_ICON = "design/design";
 /** Realtime channel: the server tells open canvases that a design changed. */
 export const REALTIME_CHANNEL = "design";
 export const DESIGN_UPDATE_TYPE = "design:updated";
+/** The question form's renderer: a pendingInteraction slot the design_ask tool opens. */
+export const QUESTIONS_RENDERER = "design-questions";
 
 export function designHref(id: string): string {
   return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}`;

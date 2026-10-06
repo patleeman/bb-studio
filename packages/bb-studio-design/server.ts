@@ -8,12 +8,22 @@ import { studioSchemas } from "@bb-studio/kit/contract";
 import { createChangeBus, defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, designHref, parseSteps, screenUrl, type DesignView } from "./src/shared";
+import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl, type DesignView } from "./src/shared";
 import { DesignStore, MIGRATIONS, displayName, type Writer } from "./src/server/store";
 import { registerStudio, screenText } from "./src/server/studio";
 import { withScreenScript } from "./src/server/screen-script";
 import { VERDICT_DONE, parseVerdict, reviewTargets, reviewerPrompt, type ReviewState } from "./src/server/review";
 import type { CommentRow, DesignRow } from "./src/server/store";
+import { summarizeAnswers, type Answers, type QuestionForm } from "./src/questions";
+
+const optionSchema = z.object({ label: z.string().trim().min(1).max(120), description: z.string().max(240).optional() });
+const questionSchema = z.discriminatedUnion("kind", [
+  z.object({ id: z.string().min(1).max(40), kind: z.enum(["choice", "multi"]), question: z.string().trim().min(1).max(200), help: z.string().max(300).optional(), options: z.array(optionSchema).min(2).max(8), other: z.boolean().optional().describe("Also offer a free-text \"Other\".") }),
+  z.object({ id: z.string().min(1).max(40), kind: z.literal("text"), question: z.string().trim().min(1).max(200), help: z.string().max(300).optional(), placeholder: z.string().max(120).optional() }),
+  z.object({ id: z.string().min(1).max(40), kind: z.literal("scale"), question: z.string().trim().min(1).max(200), help: z.string().max(300).optional(), minLabel: z.string().trim().min(1).max(40), maxLabel: z.string().trim().min(1).max(40) }),
+]);
+/** What the form sends back; untrusted, so kept to plain values. */
+const answersSchema = z.record(z.string().max(40), z.union([z.string().max(2000), z.array(z.string().max(200)).max(8), z.number().int().min(1).max(5), z.object({ decide: z.literal(true) })]));
 
 /** Generous for one hand-written screen; keeps a runaway write from filling the database. */
 const MAX_SCREEN_CHARS = 400_000;
@@ -434,6 +444,40 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.agents.registerTool({
+    name: "design_ask",
+    description: "Ask the user a short form of questions before designing, when the answers would change what you build and you can't find them yourself: the look is open (no design system, references or art direction), or the brief leaves out the platform, audience or flows. One round, at most 12 questions; never ask what the chat already settled, and don't ask for small follow-up edits. Kinds: choice (one option), multi (several), text (short answer), scale (1 to 5 between two labels). Every question gets a \"Decide for me\". The user's answers come back as this tool's result.",
+    presentation: { label: { pending: "Waiting for answers", completed: "Got answers" } },
+    parameters: z.object({
+      title: z.string().trim().min(1).max(120).optional().describe("Defaults to \"A few questions\"."),
+      intro: z.string().max(400).optional().describe("One sentence on why you're asking."),
+      questions: z.array(questionSchema).min(1).max(12),
+    }),
+    async execute({ title, intro, questions }, ctx) {
+      if (!ctx.threadId) return fail("Questions need a thread to show in.");
+      const ids = questions.map((question) => question.id);
+      if (new Set(ids).size !== ids.length) return fail("Each question needs its own id.");
+      const form: QuestionForm = { title: title ?? "A few questions", ...(intro ? { intro } : {}), questions };
+      const result = await bb.ui.requestInput({
+        threadId: ctx.threadId,
+        rendererId: QUESTIONS_RENDERER,
+        title: form.title,
+        payload: form as never,
+        // People think about these; give them the longest the host allows.
+        timeoutMs: 60 * 60_000,
+        presentation: { label: { pending: "Waiting for your answers", completed: "Questions answered" } },
+        describeSubmission: (value) => {
+          const parsed = answersSchema.safeParse(value);
+          return { title: "Questions answered", detail: parsed.success ? summarizeAnswers(form, parsed.data as Answers) : undefined };
+        },
+      }, { signal: ctx.signal });
+      if (result.outcome === "cancelled") return "The user closed the questions without answering. Go ahead with sensible defaults and list the assumptions you made.";
+      const parsed = answersSchema.safeParse(result.value);
+      if (!parsed.success) return fail("The answers didn't come back in a readable form. Ask again, or go ahead with sensible defaults.");
+      return `Questions answered:\n${summarizeAnswers(form, parsed.data as Answers)}\n\nUse these answers; for "you decide", choose well and say what you chose.`;
+    },
+  });
+
+  bb.agents.registerTool({
     name: "design_ready",
     description: "Call when a round (or a change) is ready for the user. A separate reviewer checks the screens in the background: it loads them at their size, takes screenshots, and checks layout, errors, steps and the design rules. It only comes back to you, in this thread, when something needs fixing. Don't call the work done until then. Pass skipReview for trivial edits (a word, a color).",
     presentation: { label: { pending: "Sending for review", completed: "Sent for review" } },
@@ -486,7 +530,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.agents.configure(() => ({
-    tools: ["design_list", "design_create", "design_rename", "design_read", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"],
+    tools: ["design_list", "design_create", "design_rename", "design_read", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"],
     skills: [],
   }));
 

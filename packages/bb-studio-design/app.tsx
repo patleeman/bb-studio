@@ -7,12 +7,15 @@
 //     showing one design's canvas or the thread's designs.
 //   - messageDirective `::design{id="dsn_…"}`: a card in a reply that opens
 //     the design in the workbench.
+//   - pendingInteraction "design-questions": the question form design_ask
+//     opens in the composer.
 //   - mention provider (server): `@design` works in every composer.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { DESIGN_TAB, DesignCard, DesignTab } from "./components/design-tab";
 import { DesignsPanel } from "./components/designs-panel";
-import { DESIGN_ICON, PANEL_PATH } from "./src/shared";
+import { QuestionFormView } from "./components/question-form";
+import { DESIGN_ICON, PANEL_PATH, QUESTIONS_RENDERER } from "./src/shared";
 
 export default definePluginApp((app) => {
   app.slots.navPanel({
@@ -36,6 +39,7 @@ export default definePluginApp((app) => {
   });
 
   app.slots.messageDirective({ id: "design", component: DesignCard });
+  app.slots.pendingInteraction({ id: QUESTIONS_RENDERER, component: QuestionFormView });
 
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path={PANEL_PATH} render={(subPath) => <DesignsPanel subPath={subPath} />} /> });

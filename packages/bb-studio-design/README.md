@@ -59,6 +59,11 @@ URL hash, with a Play button on each.
   agent** posts the comment, with the element's selector and markup, to the
   design's conversation; it waits for a running turn to finish instead of
   cutting in. Comments can also be resolved or deleted.
+- **Questions before designing.** When the look or a key part of the brief
+  is open, the agent asks with `design_ask`: a form in the thread's message
+  box with picks, toggles, short answers and 1–5 scales, each with "Decide
+  for me". The answers come back to the agent as one "Questions answered"
+  list.
 - **A reviewer for each round.** When the agent calls `design_ready`, a
   separate reviewer agent runs in a hidden thread. It loads each screen and
   step headlessly at its size (desktop screens at a phone's width too),
@@ -68,7 +73,7 @@ URL hash, with a Play button on each.
   thread; the canvas shows "Reviewing…", "Reviewed" or "Needs work". The
   reviewer thread is archived and stopped after every run.
 - **Agent tools:** `design_list`, `design_create`, `design_rename`,
-  `design_read`, `design_ready`, `design_write_screen` (a whole screen),
+  `design_read`, `design_ask`, `design_ready`, `design_write_screen` (a whole screen),
   `design_edit_screen` (replace one exact snippet), `design_comments` and
   `design_resolve_comments`. The `design` skill tells agents how to work:
   ask only what they can't find out, match the project's design system, make

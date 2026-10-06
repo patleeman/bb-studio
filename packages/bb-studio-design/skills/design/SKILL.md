@@ -10,7 +10,7 @@ one self-contained HTML screen. The user sees them on a canvas, newest round
 at the top, with each option's id badge (`1a`, `1b`, `2a`) and caption. They
 refer to options by id in chat.
 
-Tools: `design_create`, `design_read`, `design_write_screen`,
+Tools: `design_ask`, `design_create`, `design_read`, `design_write_screen`,
 `design_edit_screen`, `design_list`, `design_comments`,
 `design_resolve_comments`.
 
@@ -30,7 +30,10 @@ the open ones with `design_comments` first.
    brief. Ask the user (briefly, in one round of questions) only when the
    answer would change what you build: the look is open and nothing defines
    it, or the brief leaves out the platform, the audience or which flows to
-   cover. If the project has a design system and the brief is clear, start
+   cover. Ask with `design_ask`, a form of picks, toggles, short answers and
+   1–5 scales; keep it to what matters, and use picks wherever a tap answers
+   better than a sentence. Every question has "Decide for me": for those,
+   choose well and say what you chose. If the project has a design system and the brief is clear, start
    building and list the assumptions you made in your summary. Never ask about
    something the chat already settled. Don't ask for small follow-up edits.
 2. **Read before you build.** Look at the project's design system, components
