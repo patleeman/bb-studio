@@ -248,6 +248,30 @@
           "ref": "main"
         }
       }
+    },
+    {
+      "id": "design",
+      "displayName": "Studio Design",
+      "description": "Part of BB Studio. Design UI prototypes with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work.",
+      "icon": {
+        "url": "./packages/bb-studio-design/assets/icon.svg"
+      },
+      "tags": [
+        "design",
+        "prototyping",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-design",
+          "ref": "main"
+        }
+      }
     }
   ]
 }

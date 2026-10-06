@@ -1,0 +1,85 @@
+// Playing one screen inside the canvas pane, as Claude Design does: a bar
+// with back, the screen's label, download and Fit/Fill, over the screen
+// itself, live and interactive.
+import { useEffect, useRef, useState } from "react";
+import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
+import { VIEWPORTS, screenUrl, type ScreenView } from "../src/shared";
+
+const PADDING = 32;
+
+export function PlayView({ designId, screen, step = "", onClose }: { designId: string; screen: ScreenView; step?: string; onClose(): void }) {
+  const { width, height } = VIEWPORTS[screen.viewport] ?? VIEWPORTS.desktop;
+  const url = screenUrl(designId, screen.id, screen.updatedAt);
+  /** Starts at `step` and plays on from there with the prototype's own state. */
+  const playUrl = step ? `${url}#${encodeURIComponent(step)}` : url;
+  const stepLabel = screen.steps.find((each) => each.id === step)?.label;
+  const stage = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState({ width: 0, height: 0 });
+  /** Fit shows the whole screen; Fill uses the stage's width and scrolls. */
+  const [mode, setMode] = useState<"fit" | "fill">("fit");
+
+  useEffect(() => {
+    const element = stage.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setRoom({ width: entry?.contentRect.width ?? 0, height: entry?.contentRect.height ?? 0 }));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const availableWidth = Math.max(0, room.width - PADDING * 2);
+  const availableHeight = Math.max(0, room.height - PADDING * 2);
+  const scale = mode === "fill"
+    ? availableWidth / width
+    : Math.min(1, availableWidth / width, availableHeight / height);
+
+  return (
+    <div role="dialog" aria-label={`Playing ${screen.id}`} className="absolute inset-0 z-20 flex flex-col bg-background">
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
+        <button type="button" aria-label="Back to the canvas" title="Back to the canvas (Esc)" className={ICON_BUTTON} onClick={onClose}>
+          <Icon name="ChevronLeft" className="size-4" />
+        </button>
+        <span className="min-w-0 flex-1 truncate text-sm">
+          <span className="font-medium">{screen.id}</span>
+          {stepLabel ? <span className="text-muted-foreground"> · from {stepLabel}</span> : screen.caption ? <span className="text-muted-foreground"> · {screen.caption}</span> : null}
+        </span>
+        <a href={url} download={`${screen.id}.html`} aria-label="Download HTML" title="Download HTML" className={ICON_BUTTON}>
+          <Icon name="Download" className="size-4" />
+        </a>
+        <div role="group" aria-label="Size" className="flex rounded-md border border-border p-0.5 text-xs">
+          {(["fill", "fit"] as const).map((each) => (
+            <button
+              key={each}
+              type="button"
+              aria-pressed={mode === each}
+              onClick={() => setMode(each)}
+              className={cn("rounded px-2 py-0.5 capitalize", mode === each ? "bg-state-hover text-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              {each}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div ref={stage} className={cn("min-h-0 flex-1", mode === "fill" ? "overflow-auto" : "overflow-hidden")}>
+        {scale > 0 ? (
+          <div className="flex min-h-full items-center justify-center" style={{ padding: PADDING }}>
+            <div className="shrink-0 overflow-hidden rounded-[28px] bg-white shadow-[0_0_0_1px_oklch(1_0_0/0.06),0_16px_48px_oklch(0_0_0/0.35)]" style={{ width: width * scale, height: height * scale }}>
+              <iframe
+                title={`Screen ${screen.id}`}
+                src={playUrl}
+                sandbox="allow-scripts allow-forms allow-modals allow-popups"
+                className="origin-top-left border-0"
+                style={{ width, height, transform: `scale(${scale})` }}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}

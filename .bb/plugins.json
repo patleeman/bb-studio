@@ -42,6 +42,10 @@
     {
       "name": "studio-tables",
       "source": "./packages/bb-studio-tables"
+    },
+    {
+      "name": "design",
+      "source": "./packages/bb-studio-design"
     }
   ]
 }
