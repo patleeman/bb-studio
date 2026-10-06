@@ -342,6 +342,33 @@ describe("thread-list plugin", () => {
     await waitFor(() => expect(sectionHeaders()).toEqual(["Alpha"]));
   });
 
+  it("shows no empty placeholder under a Space whose only thread is its lead", async () => {
+    localStorage.removeItem("bb-studio:sidebar-organization");
+    const lead = makeSidebarThread({ id: "thr_only_lead", projectId: "proj_web", title: "Solo lead", createdAt: 1, updatedAt: 1, latestAttentionAt: 1, isUnread: false });
+    const studio: Record<string, (input: unknown) => unknown> = {
+      spaces: () => ({ spaces: [
+        { id: "sp_solo", name: "Solo", color: "#f00", icon: null, isDefault: true, defaultProjectId: "proj_web", projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
+      ] }),
+      space_of_threads: () => ({ threads: { thr_only_lead: "sp_solo" } }),
+      thread_lines: () => ({ lines: {} }),
+      space_lead: () => ({ leadThreadId: "thr_only_lead", run: null }),
+      spaceTree: () => ({ spaces: [{ id: "sp_solo", itemCount: 0, open: [] }] }),
+    };
+    renderList({ organizationMode: "space" }, {
+      sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads: [lead] },
+      sdk: { plugins: {
+        list: async () => ({ plugins: [{ id: "studio", enabled: true, status: "running" }] }) as never,
+        callRpc: async ({ pluginId, method, input }: { pluginId: string; method: string; input?: unknown }) =>
+          (pluginId === "studio" && studio[method] ? studio[method]!(input) : {}) as never,
+      } },
+    });
+    await screen.findByTitle("Solo");
+    await waitFor(() => expect(document.querySelector("[data-space-lead=thr_only_lead]")).not.toBeNull());
+    const solo = screen.getByTitle("Solo").closest("[data-sidebar-sticky-group]") as HTMLElement;
+    expect(within(solo).queryByText("No threads")).toBeNull();
+    expect(within(solo).queryByText("Nothing here yet")).toBeNull();
+  });
+
   it("keeps BB's one-line rows outside By space", async () => {
     renderList({ organizationMode: "chronological" });
     await screen.findByText("Parent thread");

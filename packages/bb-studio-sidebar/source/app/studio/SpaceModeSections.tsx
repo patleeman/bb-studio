@@ -5,7 +5,6 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { openAppPath } from "@bb-studio/kit/app";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
-import { EmptyState } from "@/components/ui/empty-state";
 import { SidebarControlButton } from "../rows/SidebarRowControls.js";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import type { SidebarThread } from "../model/sidebar-thread.js";
@@ -388,7 +387,6 @@ export function SpaceModeSections({
                 handOffNewThreadSpace(group.space.id, group.space.defaultProjectId);
                 onCreateThreadInProject(group.space.defaultProjectId);
               };
-              const empty = !group.lead && !group.pinned.length && !group.threads.length && !items[group.space.id]?.open.length;
               return (
                 <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>
                   <SpaceDropArea spaceId={group.space.id}>
@@ -426,16 +424,8 @@ export function SpaceModeSections({
                       </div>
                     ) : null}
                     <SpaceStudioList spaceName={group.space.name} items={items[group.space.id]} />
-                    {tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId })}
-                    {empty ? (
-                      <EmptyState
-                        message="Nothing here yet"
-                        icon="MessageSquare"
-                        className="px-2 py-0.5"
-                        iconClassName="size-3.5 text-subtle-foreground/50"
-                        messageClassName="text-xs leading-4 text-subtle-foreground/60"
-                      />
-                    ) : null}
+                    {/* No placeholder when there are none: the whole Space still takes dropped threads. */}
+                    {group.threads.length ? tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId }) : null}
                   </SpaceSidebarSection>
                   </SpaceDropArea>
                 </ThreadListVisibilityGroupScope>
