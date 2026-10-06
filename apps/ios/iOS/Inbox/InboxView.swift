@@ -728,8 +728,12 @@ struct InboxView: View {
                             Circle().fill(.orange).frame(width: 6, height: 6).accessibilityLabel("Needs you")
                         }
                         Spacer()
-                        Menu { spaceMenu(section.space) } label: { Image(systemName: "ellipsis") }
-                            .accessibilityLabel("\(section.space.name) options")
+                        // Borderless keeps the collapsible header from taking the tap.
+                        Menu { spaceMenu(section.space) } label: {
+                            Image(systemName: "ellipsis").frame(width: 32, height: 32).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("\(section.space.name) options")
                     }
                 }
             }
