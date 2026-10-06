@@ -37,7 +37,7 @@ const KIND: StudioKind = {
 };
 
 const LIST_LIMIT = 10_000;
-/** Typing takes about 3 seconds an edit; allow for up to 20 of them. */
+/** Typing takes about 3 seconds an edit; allow for up to 20 of them. A window with no screen says so within 5. */
 const EDIT_TIMEOUT_MS = 90_000;
 
 function item(workspace: Workspace): StudioItem {
@@ -366,12 +366,16 @@ export default function plugin(bb: BbPluginApi) {
       if (!found) return `None of the user's workspaces holds ${path}. Edit it with your own tools, or open a workspace for its folder with code_workspace_open first.`;
       const { workspace, file, name } = found;
       const result = await bridges.request(workspace.id, { type: "edit", path: file, edits }, EDIT_TIMEOUT_MS);
-      if (result) {
-        if (!result.ok) throw new Error(result.detail);
+      if (result?.ok) {
         link(workspace.id, ctx.threadId, "edited");
         return result.detail;
       }
-      // No editor open: the same edits, on disk.
+      // A window that tried and failed (text not found, say) has the answer.
+      if (result && result.code !== "no-window" && result.detail !== "The editor didn't answer in time.") throw new Error(result.detail);
+      // No editor on screen: the same edits, on disk, unless an editor holds
+      // unsaved changes to the file, which saving there would overwrite.
+      if (bridges.unsaved(workspace.id).includes(file))
+        throw new Error(`The user's editor has unsaved changes in ${name} but isn't on screen, so neither it nor the file on disk was changed. Ask them to open the workspace, then try again.`);
       await writeFile(file, applyEdits(await readFile(file, "utf8"), edits));
       link(workspace.id, ctx.threadId, "edited");
       return `No editor was open, so the ${edits.length === 1 ? "edit went" : `${edits.length} edits went`} to ${name} on disk.`;

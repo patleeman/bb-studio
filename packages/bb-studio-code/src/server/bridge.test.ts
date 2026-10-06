@@ -148,3 +148,23 @@ describe("bridge registration", () => {
     expect(JSON.parse(await readFile(join(extensions, ".obsolete"), "utf8"))).toEqual({ "other.ext-1.0.0": true });
   });
 });
+
+describe("live typing types only what changes", () => {
+  /** The extension's own helpers, loaded with a stand-in for the vscode module. */
+  async function helpers() {
+    const { BRIDGE_SOURCE } = await import("./bridge-extension");
+    const stub: unknown = new Proxy(function () {}, { get: () => stub, apply: () => stub, construct: () => stub as object });
+    const module = { exports: {} as Record<string, unknown> };
+    new Function("require", "exports", "process", BRIDGE_SOURCE)((name: string) => (name === "vscode" ? stub : require(name)), module.exports, { env: {} });
+    return module.exports as { narrow(oldText: string, newText: string): { skip: number; remove: number; text: string } };
+  }
+
+  it("keeps the shared start and end of a replacement", async () => {
+    const { narrow } = await helpers();
+    // Adding a comment above a line types only the comment.
+    expect(narrow("export async function f", "/** Does f. */\nexport async function f")).toEqual({ skip: 0, remove: 0, text: "/** Does f. */\n" });
+    // Dropping "/ 1000" removes just that.
+    expect(narrow("MAX_DELAY_MS / 1000", "MAX_DELAY_MS")).toEqual({ skip: 12, remove: 7, text: "" });
+    expect(narrow("abc", "abc")).toEqual({ skip: 3, remove: 0, text: "" });
+  });
+});

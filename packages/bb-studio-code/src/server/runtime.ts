@@ -19,6 +19,7 @@ import { applyLayout, applyTheme } from "./settings";
 
 export const CODE_SERVER_VERSION = "4.140.0";
 const READY_TIMEOUT_MS = 60_000;
+const RECONNECTION_GRACE_SECONDS = 30;
 const STOPPED: ServerStatus = { state: "stopped", url: null, password: null, error: null };
 const pending = (state: "installing" | "starting"): ServerStatus => ({ state, url: null, password: null, error: null });
 
@@ -54,6 +55,9 @@ export function codeServerArgs(options: { config: string; userData: string; exte
     "--disable-telemetry",
     "--disable-update-check",
     "--idle-timeout-seconds", String(IDLE_TIMEOUT_SECONDS),
+    // A closed tab's extension host waits this long for the tab to come back
+    // (VS Code's default is 3 hours), holding memory and looking connected.
+    "--reconnection-grace-time", String(RECONNECTION_GRACE_SECONDS),
     "--user-data-dir", options.userData,
     "--extensions-dir", options.extensions,
     ...(options.trusted ? ["--disable-workspace-trust"] : []),

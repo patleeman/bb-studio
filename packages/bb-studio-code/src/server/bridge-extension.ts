@@ -9,7 +9,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Raise with every change to the extension, so workspaces get the new one. */
-export const BRIDGE_VERSION = "0.2.0";
+export const BRIDGE_VERSION = "0.2.3";
 const NAME = "studio-bridge";
 const PUBLISHER = "bb";
 export const BRIDGE_ID = `${PUBLISHER}.${NAME}`;
@@ -139,6 +139,17 @@ function locate(text, change, name) {
   return [at, at + change.oldText.length];
 }
 
+// The part of a replacement that actually changes: the old and new text often
+// share a start or an end ("add a comment above this line" keeps the line),
+// and only the middle needs deleting and typing.
+function narrow(oldText, newText) {
+  let skip = 0;
+  while (skip < oldText.length && skip < newText.length && oldText[skip] === newText[skip]) skip++;
+  let tail = 0;
+  while (tail < oldText.length - skip && tail < newText.length - skip && oldText[oldText.length - 1 - tail] === newText[newText.length - 1 - tail]) tail++;
+  return { skip, remove: oldText.length - skip - tail, text: newText.slice(skip, newText.length - tail) };
+}
+
 // The last edit this extension made, so the change listener can tell it
 // apart from the user's typing.
 let mine = null;
@@ -150,13 +161,24 @@ async function apply(editor, from, to, text, stops) {
   if (!ok) throw new Error("VS Code didn't accept the edit.");
 }
 
+// This extension host outlives a closed tab for a while; with no screen,
+// showing a document never finishes. Give up quickly and say so.
+const SCREEN_MS = 5000;
+function onScreen(promise, what) {
+  return Promise.race([promise, sleep(SCREEN_MS).then(() => {
+    const error = new Error("No VS Code window is showing this workspace right now, so nothing was " + what + ".");
+    error.noWindow = true;
+    throw error;
+  })]);
+}
+
 async function edit(command) {
   const document = await vscode.workspace.openTextDocument(vscode.Uri.file(command.path));
   const name = vscode.workspace.asRelativePath(document.uri);
   // Text that changes on disk while it's unsaved here would be lost on save:
   // leave saving to the user when they have unsaved work in it.
   const hadUnsaved = document.isDirty;
-  const editor = await vscode.window.showTextDocument(document, { preview: false, preserveFocus: true });
+  const editor = await onScreen(vscode.window.showTextDocument(document, { preview: false, preserveFocus: true }), "changed");
   // Check every edit first, so a bad one changes nothing.
   let check = document.getText();
   for (const change of command.edits) {
@@ -166,7 +188,10 @@ async function edit(command) {
   let first = true;
   const inserted = [];
   for (const change of command.edits) {
-    const [start, end] = locate(editor.document.getText(), change, name);
+    const [found] = locate(editor.document.getText(), change, name);
+    const part = narrow(change.oldText, change.newText);
+    const start = found + part.skip;
+    const end = start + part.remove;
     let offset = start;
     // The user can keep typing elsewhere: shift our position past their edits.
     const follow = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -178,7 +203,7 @@ async function edit(command) {
     });
     try {
       if (end > start) { await apply(editor, start, end, "", first); first = false; }
-      const text = change.newText;
+      const text = part.text;
       const steps = Math.max(1, Math.min(Math.ceil(text.length / 2), Math.floor(TYPING_MS / STEP_MS)));
       const size = Math.ceil(text.length / steps);
       for (let i = 0; i < text.length; i += size) {
@@ -228,17 +253,20 @@ function listen() {
           if (command && command.type === "edit") {
             edit(command).then(
               (detail) => post("/result", { requestId: command.requestId, ok: true, detail }),
-              (error) => post("/result", { requestId: command.requestId, ok: false, detail: String(error && error.message || error) }),
+              (error) => post("/result", Object.assign({ requestId: command.requestId, ok: false, detail: String(error && error.message || error) }, error && error.noWindow ? { code: "no-window" } : {})),
             );
           }
         }
       }
     });
-    res.on("end", () => setTimeout(listen, 2000));
     // A fresh connection tells the plugin what's on screen now.
     report();
   });
-  req.on("error", () => setTimeout(listen, 2000));
+  // However the stream ends (closed, reset, the plugin reloading), try again.
+  let again = false;
+  const retry = () => { if (again) return; again = true; setTimeout(listen, 2000); };
+  req.on("error", retry);
+  req.on("close", retry);
 }
 
 async function copyForChat() {
@@ -269,6 +297,7 @@ exports.activate = (context) => {
   listen();
 };
 exports.deactivate = () => { stopped = true; };
+exports.narrow = narrow;
 `;
 
 type RegistryEntry = { identifier?: { id?: string }; version?: string; [key: string]: unknown };

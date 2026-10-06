@@ -115,3 +115,64 @@ describe("the message with nothing open", () => {
     expect(text).toMatch(/no file open/i);
   });
 });
+
+describe("a window that's gone", () => {
+  it("stops counting a window that didn't answer, until it's in use again", async () => {
+    const bridges = new Bridges();
+    const socket = await bridges.open("cws_gone", dir);
+    const a = connect(socket, "a");
+    await a.ready;
+    await post(socket, "/state", { ...blank, focused: true, unsavedFiles: ["/repo/a.ts"] }, "a");
+    await expect(bridges.request("cws_gone", { type: "edit", path: "/x", edits: [] }, 100)).resolves.toMatchObject({ ok: false });
+    // Still connected, but not answering: requests skip it.
+    expect(bridges.connected("cws_gone")).toBe(false);
+    await expect(bridges.request("cws_gone", { type: "edit", path: "/x", edits: [] }, 100)).resolves.toBeNull();
+    // What it last said about unsaved files still counts.
+    expect(bridges.unsaved("cws_gone")).toEqual(["/repo/a.ts"]);
+    // In use again: it counts again.
+    await post(socket, "/state", { ...blank, focused: true }, "a");
+    expect(bridges.connected("cws_gone")).toBe(true);
+    a.close();
+    await bridges.close("cws_gone");
+  });
+
+  it("takes a window's own word that it has no screen", async () => {
+    const bridges = new Bridges();
+    const socket = await bridges.open("cws_noscreen", dir);
+    const a = connect(socket, "a");
+    await a.ready;
+    await post(socket, "/state", { ...blank, focused: true }, "a");
+    const answer = bridges.request("cws_noscreen", { type: "edit", path: "/x", edits: [] }, 2000);
+    await wait(50);
+    await post(socket, "/result", { requestId: (a.events[0] as { requestId: string }).requestId, ok: false, code: "no-window", detail: "No window." });
+    await expect(answer).resolves.toEqual({ ok: false, code: "no-window", detail: "No window." });
+    expect(bridges.connected("cws_noscreen")).toBe(false);
+    a.close();
+    await bridges.close("cws_noscreen");
+  });
+
+  it("lets code-server drop a closed tab's extension host within a minute, not three hours", async () => {
+    const { codeServerArgs } = await import("./runtime");
+    const args = codeServerArgs({ config: "/c", userData: "/u", extensions: "/e", cookieSuffix: "s", trusted: true, file: "/f" });
+    const at = args.indexOf("--reconnection-grace-time");
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(Number(args[at + 1])).toBeLessThanOrEqual(60);
+  });
+});
+
+describe("two copies of the plugin during a reload", () => {
+  it("doesn't delete a socket the new copy already took over", async () => {
+    const { stat } = await import("node:fs/promises");
+    const old = new Bridges();
+    const fresh = new Bridges();
+    await old.open("cws_reload", dir);
+    const socket = await fresh.open("cws_reload", dir);
+    await old.close("cws_reload");
+    await expect(stat(socket)).resolves.toBeTruthy();
+    const a = connect(socket, "a");
+    await a.ready;
+    expect(fresh.connected("cws_reload")).toBe(true);
+    a.close();
+    await fresh.close("cws_reload");
+  });
+});
