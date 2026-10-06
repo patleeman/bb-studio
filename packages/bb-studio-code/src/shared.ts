@@ -90,6 +90,16 @@ export const codeContract = defineRpcContract({
     input: z.object({ id, path: z.string().max(4096) }),
     output: z.object({ entries: z.array(z.object({ name: z.string(), path: z.string(), dir: z.boolean() })) }),
   },
+  /** A folder's subfolders, for the folder picker; null starts at home. */
+  browseFolders: {
+    input: z.object({ path: z.string().max(4096).nullable(), showHidden: z.boolean() }),
+    output: z.object({
+      path: z.string(),
+      parent: z.string().nullable(),
+      choosable: z.boolean(),
+      folders: z.array(z.object({ name: z.string(), path: z.string(), choosable: z.boolean() })),
+    }),
+  },
   readFile: {
     input: z.object({ id, path: z.string().max(4096) }),
     output: z.object({ text: z.string().nullable(), reason: z.string().nullable() }),

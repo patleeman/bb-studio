@@ -11,7 +11,7 @@ import { createChangeBus, createStoreProvider, defineItemMention, mustGet, studi
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { listDir, readText } from "./src/server/files";
-import { sensitiveFolder } from "./src/server/folders";
+import { browseFolders, sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
 import { CodeServers } from "./src/server/runtime";
@@ -165,6 +165,7 @@ export default function plugin(bb: BbPluginApi) {
       return { entries: await listDir(folders, path) };
     },
     readFile: async ({ id, path }) => readText(safeFolders(must(id)), path),
+    browseFolders: ({ path, showHidden }) => browseFolders(path, homedir(), showHidden),
     projects: async () => ({ projects: await projects() }),
     syncTheme: async (next) => {
       const key = JSON.stringify(next);

@@ -18,8 +18,9 @@ to different folders.
   that tab.
 - **In a composer**, type `@` and a workspace's name to give the agent its
   folders.
-- Use the folder button in the header to add or remove folders. You can type a
-  full path (or `~/…`) or pick a BB project. VS Code shows every folder in one
+- Use the folder button in the header to add or remove folders. **Browse…**
+  walks the folders on the computer running BB (hidden ones on request, secret
+  ones never), or you can type a full path (or `~/…`) or pick a BB project. VS Code shows every folder in one
   multi-root window. Changing folders while VS Code is open updates it live.
 - The first open downloads code-server 4.140.0 (about 200 MB) into the plugin's
   data folder. Later opens start in a few seconds.

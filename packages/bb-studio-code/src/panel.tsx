@@ -4,6 +4,7 @@ import { AddOnPanel, BAR_BUTTON, BarTitle, ICON_BUTTON, Icon, ItemHeader, ItemMe
 import { errorMessage } from "@bb-studio/kit/format";
 import { toast } from "sonner";
 import { FileBrowser } from "./file-browser";
+import { FolderPicker } from "./folder-picker";
 import { themeChanges, useThemeSync } from "./theme-sync";
 import { CHANNEL, HIDDEN_RELEASE_MS, KIND_ID, PANEL_PATH, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
 
@@ -253,6 +254,7 @@ function FolderEditor({ folders, onChange }: { folders: string[]; onChange(folde
   const rpc = useRpc<CodeContract>();
   const [projects, setProjects] = useState<{ id: string; name: string; path: string }[]>([]);
   const [path, setPath] = useState("");
+  const [picking, setPicking] = useState(false);
   useEffect(() => {
     void rpc.call("projects", null).then((result) => setProjects(result.projects), () => undefined);
   }, [rpc]);
@@ -288,6 +290,9 @@ function FolderEditor({ folders, onChange }: { folders: string[]; onChange(folde
         <button type="submit" className={BAR_BUTTON} disabled={!path.trim()}>
           <Icon name="FolderPlus" className="size-4" /> Add
         </button>
+        <button type="button" className={BAR_BUTTON} aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
+          <Icon name="FolderOpen" className="size-4" /> Browse…
+        </button>
         {unused.length > 0 && (
           <select
             aria-label="Add a project's folder"
@@ -300,6 +305,7 @@ function FolderEditor({ folders, onChange }: { folders: string[]; onChange(folde
           </select>
         )}
       </form>
+      {picking && <FolderPicker exclude={folders} onCancel={() => setPicking(false)} onPick={(folder) => { void add(folder).then(() => setPicking(false)); }} />}
     </section>
   );
 }
