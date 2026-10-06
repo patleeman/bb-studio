@@ -16,6 +16,7 @@ struct DesignView: View {
     @State private var showingRelated = false
     @State private var chatting = false
     @State private var showingWeb = false
+    @State private var listener: UUID?
 
     var body: some View {
         Group {
@@ -61,11 +62,21 @@ struct DesignView: View {
         }
         .refreshable { await load() }
         .task(id: id) {
-            // Agents write a round a screen at a time; follow along while it's open.
-            while !Task.isCancelled {
-                await load()
-                try? await Task.sleep(for: .seconds(8))
+            // Agents write a round a screen at a time. The plugin says when this
+            // design changes, and a reconnect may have missed some: reload then.
+            if let listener { app.realtime.removeListener(listener) }
+            listener = app.realtime.listen { event in
+                switch event {
+                case .pluginSignal("design", _, let payload) where payload["designId"]?.stringValue == id: Task { await load() }
+                case .connected: Task { await load() }
+                default: break
+                }
             }
+            await load()
+        }
+        .onDisappear {
+            if let listener { app.realtime.removeListener(listener) }
+            listener = nil
         }
         .accessibilityIdentifier("designView")
     }
