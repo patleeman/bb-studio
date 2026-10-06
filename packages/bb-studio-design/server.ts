@@ -497,7 +497,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (!ctx.threadId) return fail("A review needs a thread to report back to.");
       const outcome = reviews.request(designId, { screenIds: ids, requesterThreadId: ctx.threadId });
       if (outcome === "disposed") return fail("Studio Design is reloading; call design_ready again in a moment.");
-      if (outcome === "running") return "A review of this design is already running. It reports back here if anything needs fixing.";
+      if (outcome === "queued") return `A review of this design is already running. Once it ends, ${ids.join(", ")} are reviewed again as they are then; findings come back only if something needs fixing.\n${card(designId)}`;
       return `Sent ${ids.join(", ")} for review. The reviewer reports back in this thread only if something needs fixing; until then, say the work is out for review, not done. Keep your summary short.\n${card(designId)}`;
     },
   });

@@ -54,3 +54,29 @@ describe("the review queue", () => {
     expect(deps.report).not.toHaveBeenCalled();
   });
 });
+
+describe("design_ready during a running review", () => {
+  it("queues one follow-up of the latest call instead of dropping it", async () => {
+    const { deps, runs, queue } = harness();
+    queue.request("dsn_a", request(["1a"]));
+    expect(queue.request("dsn_a", request(["1a", "1b"]))).toBe("queued");
+    expect(queue.request("dsn_a", request(["2a"]))).toBe("queued");
+    expect(deps.run).toHaveBeenCalledTimes(1);
+    runs[0]!.finish({ verdict: "done" });
+    await vi.waitFor(() => expect(runs).toHaveLength(2));
+    expect(runs[1]!.screenIds).toEqual(["2a"]);
+    runs[1]!.finish({ verdict: "done" });
+    await queue.settled("dsn_a");
+    expect(deps.run).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops the follow-up when the design is deleted", async () => {
+    const { deps, runs, queue } = harness();
+    queue.request("dsn_a", request());
+    queue.request("dsn_a", request());
+    queue.forget("dsn_a");
+    runs[0]!.finish({ verdict: "done" });
+    await queue.settled("dsn_a");
+    expect(deps.run).toHaveBeenCalledTimes(1);
+  });
+});

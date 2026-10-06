@@ -18,7 +18,7 @@ export type ReviewDeps = {
   now?(): number;
 };
 
-export type RequestOutcome = "started" | "running" | "disposed";
+export type RequestOutcome = "started" | "queued" | "disposed";
 
 function roundOf(screenIds: string[]): number | null {
   return screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
@@ -27,6 +27,8 @@ function roundOf(screenIds: string[]): number | null {
 export class ReviewQueue {
   private readonly states = new Map<string, ReviewState>();
   private readonly running = new Map<string, Promise<void>>();
+  /** One follow-up per design, asked for while a review ran; the latest call wins. */
+  private readonly queued = new Map<string, ReviewRequest>();
   /** Bumped when a design is deleted, so a review still running for it stays quiet. */
   private readonly generations = new Map<string, number>();
   private readonly disposed = new AbortController();
@@ -40,7 +42,10 @@ export class ReviewQueue {
 
   request(designId: string, request: ReviewRequest): RequestOutcome {
     if (this.disposed.signal.aborted) return "disposed";
-    if (this.running.has(designId)) return "running";
+    if (this.running.has(designId)) {
+      this.queued.set(designId, request);
+      return "queued";
+    }
     this.start(designId, request);
     return "started";
   }
@@ -48,6 +53,7 @@ export class ReviewQueue {
   /** The design was deleted: forget its reviews, and ignore one still running. */
   forget(designId: string): void {
     this.states.delete(designId);
+    this.queued.delete(designId);
     this.generations.set(designId, (this.generations.get(designId) ?? 0) + 1);
   }
 
@@ -63,6 +69,10 @@ export class ReviewQueue {
   private start(designId: string, request: ReviewRequest): void {
     const task = this.runOne(designId, request).finally(() => {
       this.running.delete(designId);
+      // The screens changed while it ran: review their latest state once more.
+      const next = this.queued.get(designId);
+      this.queued.delete(designId);
+      if (next && !this.disposed.signal.aborted) this.start(designId, next);
     });
     this.running.set(designId, task);
   }
