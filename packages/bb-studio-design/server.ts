@@ -14,7 +14,7 @@ import { registerStudio, screenText } from "./src/server/studio";
 import { withScreenScript } from "./src/server/screen-script";
 import { VERDICT_DONE, parseVerdict, reviewTargets, reviewerPrompt, type ReviewState } from "./src/server/review";
 import type { CommentRow, DesignRow } from "./src/server/store";
-import { summarizeAnswers, type Answers, type QuestionForm } from "./src/questions";
+import { MAX_OTHER_CHARS, MAX_TEXT_CHARS, summarizeAnswers, type Answers, type QuestionForm } from "./src/questions";
 
 const optionSchema = z.object({ label: z.string().trim().min(1).max(120), description: z.string().max(240).optional() });
 const questionSchema = z.discriminatedUnion("kind", [
@@ -22,8 +22,8 @@ const questionSchema = z.discriminatedUnion("kind", [
   z.object({ id: z.string().min(1).max(40), kind: z.literal("text"), question: z.string().trim().min(1).max(200), help: z.string().max(300).optional(), placeholder: z.string().max(120).optional() }),
   z.object({ id: z.string().min(1).max(40), kind: z.literal("scale"), question: z.string().trim().min(1).max(200), help: z.string().max(300).optional(), minLabel: z.string().trim().min(1).max(40), maxLabel: z.string().trim().min(1).max(40) }),
 ]);
-/** What the form sends back; untrusted, so kept to plain values. */
-const answersSchema = z.record(z.string().max(40), z.union([z.string().max(2000), z.array(z.string().max(200)).max(8), z.number().int().min(1).max(5), z.object({ decide: z.literal(true) })]));
+/** What the form sends back; untrusted, so kept to plain values. A multi pick holds up to 8 options plus "Other". */
+export const answersSchema = z.record(z.string().max(40), z.union([z.string().max(MAX_TEXT_CHARS), z.array(z.string().max(MAX_OTHER_CHARS)).max(9), z.number().int().min(1).max(5), z.object({ decide: z.literal(true) })]));
 
 /** Generous for one hand-written screen; keeps a runaway write from filling the database. */
 const MAX_SCREEN_CHARS = 400_000;

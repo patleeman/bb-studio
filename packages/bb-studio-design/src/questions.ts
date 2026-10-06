@@ -17,6 +17,11 @@ export type Answers = Record<string, Answer | undefined>;
 
 export const DECIDE = { decide: true } as const;
 
+/** Longest answer a multi question's picks may each be, its "Other" text included. */
+export const MAX_OTHER_CHARS = 200;
+/** Longest free-text answer: a text question, or a choice question's "Other". */
+export const MAX_TEXT_CHARS = 2000;
+
 function answerText(question: Question, answer: Answer | undefined): string {
   if (answer === undefined || (typeof answer === "object" && !Array.isArray(answer))) return "you decide";
   if (Array.isArray(answer)) return answer.length ? answer.join(", ") : "none";

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { answersSchema } from "../server";
 import { DECIDE, summarizeAnswers, type QuestionForm } from "./questions";
 
 const form: QuestionForm = {
@@ -27,5 +28,11 @@ describe("question answers", () => {
     expect(summarizeAnswers(form, { brand: "  ", flows: [] })).toContain("- Brand name: you decide");
     expect(summarizeAnswers(form, { flows: [] })).toContain("- Which flows: none");
     expect(summarizeAnswers(form, {})).toContain("- Which platform: you decide");
+  });
+
+  it("come back readable when every option of a multi question and its Other are picked", () => {
+    // design_ask allows 8 options plus "Other": up to 9 picks.
+    const picks = [...Array.from({ length: 8 }, (_, index) => `Option ${index + 1}`), "A ".repeat(100).trim()];
+    expect(answersSchema.safeParse({ flows: picks }).success).toBe(true);
   });
 });

@@ -4,7 +4,7 @@
 import { useState } from "react";
 import type { PluginPendingInteractionProps } from "@get-bb/plugin-sdk/app";
 import { GHOST_BUTTON, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
-import { DECIDE, type Answer, type Answers, type Question, type QuestionForm } from "../src/questions";
+import { DECIDE, MAX_OTHER_CHARS, MAX_TEXT_CHARS, type Answer, type Answers, type Question, type QuestionForm } from "../src/questions";
 
 const CHIP = "rounded-lg border px-3 py-2 text-left text-sm transition-colors";
 const CHIP_ON = "border-primary bg-primary/10 text-foreground";
@@ -117,12 +117,13 @@ function QuestionField({ number, question, answer, other, onAnswer, onOther }: {
         </div>
       ) : null}
       {(question.kind === "choice" && answer === "Other") || (question.kind === "multi" && Array.isArray(answer) && answer.includes("Other")) ? (
-        <input autoFocus value={other} onChange={(event) => onOther(event.target.value)} placeholder="Your answer" className="h-9 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-ring" />
+        <input autoFocus value={other} maxLength={question.kind === "multi" ? MAX_OTHER_CHARS : MAX_TEXT_CHARS} onChange={(event) => onOther(event.target.value)} placeholder="Your answer" className="h-9 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-ring" />
       ) : null}
       {question.kind === "text" ? (
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={typeof answer === "string" ? answer : ""}
+            maxLength={MAX_TEXT_CHARS}
             onChange={(event) => onAnswer(event.target.value || undefined)}
             placeholder={question.placeholder ?? "Your answer"}
             className="h-9 min-w-0 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-ring"
