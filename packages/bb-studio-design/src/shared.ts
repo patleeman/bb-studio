@@ -26,6 +26,11 @@ export function screenUrl(designId: string, screenId: string, updatedAt: number)
   return `/api/v1/plugins/${PLUGIN_ID}/http/screen?design=${encodeURIComponent(designId)}&screen=${encodeURIComponent(screenId)}&v=${updatedAt}&s=${SCREEN_SCRIPT_VERSION}`;
 }
 
+/** The screen's HTML as the agent wrote it, without the canvas script, as a download. */
+export function screenDownloadUrl(designId: string, screenId: string, updatedAt: number): string {
+  return `${screenUrl(designId, screenId, updatedAt)}&download=1`;
+}
+
 export function isDesignId(value: string): boolean {
   return /^dsn_[0-9a-f]{16}$/.test(value);
 }

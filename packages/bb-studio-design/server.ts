@@ -14,7 +14,7 @@ import { registerStudio, screenText } from "./src/server/studio";
 import { withScreenScript } from "./src/server/screen-script";
 import { VERDICT_DONE, parseVerdict, reviewTargets, reviewerPrompt } from "./src/server/review";
 import { MAX_REVIEWS_IN_A_ROW, ReviewQueue } from "./src/server/review-queue";
-import type { CommentRow, DesignRow } from "./src/server/store";
+import type { CommentRow, DesignRow, ScreenRow } from "./src/server/store";
 import { MAX_OTHER_CHARS, MAX_TEXT_CHARS, summarizeAnswers, type Answers, type QuestionForm } from "./src/questions";
 
 const optionSchema = z.object({ label: z.string().trim().min(1).max(120), description: z.string().max(240).optional() });
@@ -145,6 +145,18 @@ const SCREEN_CSP = [
   "media-src data: blob: https:",
   "connect-src https:",
 ].join("; ");
+
+/**
+ * A screen as the canvas loads it, with the canvas script added; or, for
+ * Download HTML, the agent's HTML as written, saved as a file.
+ */
+export function screenResponse(screen: Pick<ScreenRow, "id" | "html">, download: boolean): Response {
+  return serveBytes(download ? screen.html : withScreenScript(screen.html), {
+    "content-type": "text/html; charset=utf-8",
+    "content-security-policy": SCREEN_CSP,
+    ...(download ? { "content-disposition": `attachment; filename="${screen.id}.html"` } : {}),
+  });
+}
 
 export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
@@ -315,10 +327,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.http.route("GET", "/screen", (context) => {
     const screen = store.screen(context.req.query("design") ?? "", context.req.query("screen") ?? "");
     if (!screen) return context.text("Not found", 404);
-    return serveBytes(withScreenScript(screen.html), {
-      "content-type": "text/html; charset=utf-8",
-      "content-security-policy": SCREEN_CSP,
-    });
+    return screenResponse(screen, context.req.query("download") === "1");
   });
 
   // ---------------------------------------------------------------------

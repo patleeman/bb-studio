@@ -3,7 +3,7 @@
 // itself, live and interactive.
 import { useEffect, useRef, useState } from "react";
 import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
-import { VIEWPORTS, screenUrl, type ScreenView } from "../src/shared";
+import { VIEWPORTS, screenDownloadUrl, screenUrl, type ScreenView } from "../src/shared";
 
 const PADDING = 32;
 
@@ -48,7 +48,7 @@ export function PlayView({ designId, screen, step = "", onClose }: { designId: s
           <span className="font-medium">{screen.id}</span>
           {stepLabel ? <span className="text-muted-foreground"> · from {stepLabel}</span> : screen.caption ? <span className="text-muted-foreground"> · {screen.caption}</span> : null}
         </span>
-        <a href={url} download={`${screen.id}.html`} aria-label="Download HTML" title="Download HTML" className={ICON_BUTTON}>
+        <a href={screenDownloadUrl(designId, screen.id, screen.updatedAt)} download={`${screen.id}.html`} aria-label="Download HTML" title="Download HTML" className={ICON_BUTTON}>
           <Icon name="Download" className="size-4" />
         </a>
         <div role="group" aria-label="Size" className="flex rounded-md border border-border p-0.5 text-xs">
