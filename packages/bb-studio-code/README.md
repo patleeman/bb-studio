@@ -178,8 +178,20 @@ Tested on macOS (arm64) and Linux (arm64, in Docker).
 
 ![A Studio Code workspace open in BB](assets/staged-preview.png)
 
-Captured by `scripts/capture/captures/bb-studio-code.mjs` from a staged stable
-BB 0.45. It creates a workspace the way Studio's New does, for the seeded
-Orbit project, and opens it. VS Code's Explorer shows the project's `src`
-folder and `README.md`, with `src/retry.ts` open and syntax-highlighted, and
-the Git branch in the status bar.
+A workspace open in Studio, from a staged stable BB. It was made the way
+Studio's New makes one, for the seeded Orbit project. VS Code is laid out for
+BB, with its side bar and activity bar on the right. The retry loop in
+`src/retry.ts` (lines 8–18) is selected and highlighted the way `code_show`
+points an agent's user at code, and the status bar reads "BB showed you
+src/retry.ts:8–18".
+
+![VS Code beside a thread](assets/staged-thread.png)
+
+The same editor beside a conversation: the seeded thread on the left, its
+VS Code tab on the right. The thread hasn't run yet, so the tab offers the
+project's workspaces, and the capture opens Orbit's. Lines 13–15 are
+highlighted.
+
+Both are captured by `scripts/capture/captures/bb-studio-code.mjs`. It checks
+what VS Code shows through the bridge (the editor's own report of the file
+and selection), not just that a frame loaded.
