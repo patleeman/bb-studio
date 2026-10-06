@@ -72,6 +72,26 @@ don't touch your editor.
 The bridge talks to the plugin over a Unix socket in the workspace's folder
 that only you can open: no port and no token.
 
+## BB's shortcuts inside VS Code
+
+While VS Code has the keyboard, BB's page never sees your keys. The bridge
+passes BB's app-level shortcuts through, so getting around BB works from
+inside the editor:
+
+| Keys | In BB |
+|---|---|
+| ⌘K | Search threads |
+| ⇧⌘O | New thread |
+| ⌘\ | Toggle the sidebar |
+| ⌘J | Toggle the right panel |
+| ⇧⌘C | Focus the chat composer |
+| ⌘1–⌘9 | Jump to a thread |
+
+Ctrl replaces ⌘ off macOS. Editing keys and VS Code's own palettes (⌘P,
+⇧⌘P), ⌘W and tab switching stay with VS Code. VS Code's ⌘K chords (⌘K ⌘S
+and so on) don't work inside BB, since ⌘K belongs to BB; their commands
+are all in ⇧⌘P.
+
 ## Phones and other computers
 
 VS Code answers only on the computer running BB. When BB is opened from
@@ -150,8 +170,6 @@ Tested on macOS (arm64) and Linux (arm64, in Docker).
 
 ## Limits
 
-- While VS Code has focus, it takes the keyboard, so BB's shortcuts don't
-  work until you click outside it.
 - A thread's worktree tab works only when the thread runs on the computer
   running BB.
 - No Windows support; code-server has no Windows build.

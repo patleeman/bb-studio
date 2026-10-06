@@ -190,3 +190,24 @@ describe("an editor connecting", () => {
     await bridges.close("cws_hello");
   });
 });
+
+describe("BB's shortcuts from inside VS Code", () => {
+  it("hands a key pressed in VS Code to the plugin, and refuses anything else", async () => {
+    const keys: unknown[] = [];
+    const bridges = new Bridges(() => undefined, () => undefined, (id, key) => keys.push({ id, ...key }));
+    const socket = await bridges.open("cws_keys", dir);
+    expect(await post(socket, "/key", { key: "k", code: "KeyK", mod: true, shift: false, alt: false })).toBe(204);
+    expect(await post(socket, "/key", { key: "x".repeat(50), code: "KeyK", mod: true, shift: false, alt: false })).toBe(400);
+    expect(keys).toEqual([{ id: "cws_keys", key: "k", code: "KeyK", mod: true, shift: false, alt: false }]);
+    await bridges.close("cws_keys");
+  });
+
+  it("binds only BB's app-level shortcuts in VS Code", async () => {
+    const { PASSED_KEYS, BRIDGE_SOURCE } = await import("./bridge-extension");
+    const combos = PASSED_KEYS.map((each) => each.mac);
+    expect(combos).toEqual(expect.arrayContaining(["cmd+k", "cmd+shift+o", "cmd+\\", "cmd+j", "cmd+shift+c", "cmd+1", "cmd+9"]));
+    // Editing and VS Code's own palettes stay with VS Code.
+    for (const kept of ["cmd+p", "cmd+shift+p", "cmd+w", "cmd+d", "cmd+/"]) expect(combos).not.toContain(kept);
+    expect(BRIDGE_SOURCE).toContain("bbStudio.passKey");
+  });
+});

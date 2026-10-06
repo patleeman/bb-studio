@@ -102,7 +102,12 @@ export default function plugin(bb: BbPluginApi) {
   // The bridge between each workspace's VS Code and the agent (src/server/bridge.ts).
   // An editor connecting starts following threads already at work (declared below).
   let followWorking: (workspaceId: string) => void = () => undefined;
-  const bridges = new Bridges((message) => bb.log.info(message), (id) => followWorking(id));
+  const bridges = new Bridges(
+    (message) => bb.log.info(message),
+    (id) => followWorking(id),
+    // BB's shortcuts pressed inside VS Code: the page with that editor focused replays them.
+    (id, key) => bb.realtime.publish(CHANNEL, { type: "key", id, key }),
+  );
   void installBridge(join(root, "extensions")).catch((error) => bb.log.warn(`couldn't install the BB bridge extension: ${error instanceof Error ? error.message : String(error)}`));
   const servers = new CodeServers({
     root,
@@ -185,6 +190,13 @@ export default function plugin(bb: BbPluginApi) {
     readFile: async ({ id, path }) => readText(safeFolders(must(id)), path),
     browseFolders: ({ path, showHidden }) => browseFolders(path, homedir(), showHidden),
     editorState: ({ id }) => ({ state: bridges.connected(id) ? bridges.state(id) : null }),
+    reveal: async ({ id, path, startLine, endLine }) => {
+      const workspace = must(id);
+      const file = isAbsolute(path) ? resolve(path) : resolve(workspace.folders[0] ?? "/", path);
+      if (!workspace.folders.some((folder) => inside(folder, file))) throw new Error("That file isn't in this workspace.");
+      await contained(safeFolders(workspace), file);
+      return { shown: bridges.send(id, { type: "show", path: file, startLine, endLine: Math.max(endLine ?? startLine, startLine) }) };
+    },
     projects: async () => ({ projects: await projects() }),
     syncTheme: async (next) => {
       const key = JSON.stringify(next);

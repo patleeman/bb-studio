@@ -55,6 +55,8 @@ export class Bridges {
     private readonly log: (message: string) => void = () => undefined,
     /** An editor window connected to a workspace. */
     private readonly onConnect: (id: string) => void = () => undefined,
+    /** One of BB's shortcuts, pressed while VS Code had the keyboard. */
+    private readonly onKey: (id: string, key: PassedKey) => void = () => undefined,
   ) {}
 
   private readonly bridges = new Map<string, Bridge>();
@@ -189,7 +191,7 @@ export class Bridges {
       if (held) this.send(id, held);
       return;
     }
-    if (req.method !== "POST" || (url.pathname !== "/state" && url.pathname !== "/result")) { res.writeHead(404).end(); return; }
+    if (req.method !== "POST" || !["/state", "/result", "/key"].includes(url.pathname)) { res.writeHead(404).end(); return; }
     let body = "";
     let size = 0;
     req.on("data", (chunk: Buffer) => {
@@ -201,6 +203,13 @@ export class Bridges {
       if (res.writableEnded) return;
       let parsed: unknown;
       try { parsed = JSON.parse(body); } catch { res.writeHead(400).end(); return; }
+      if (url.pathname === "/key") {
+        const key = keySchema.safeParse(parsed);
+        if (!key.success) { res.writeHead(400).end(); return; }
+        this.onKey(id, key.data);
+        res.writeHead(204).end();
+        return;
+      }
       if (url.pathname === "/result") {
         const result = resultSchema.safeParse(parsed);
         if (!result.success) { res.writeHead(400).end(); return; }
@@ -219,6 +228,10 @@ export class Bridges {
     });
   }
 }
+
+/** A BB shortcut from inside VS Code: `mod` is ⌘ on macOS and Ctrl elsewhere. */
+export const keySchema = z.object({ key: z.string().min(1).max(20), code: z.string().max(30), mod: z.boolean(), shift: z.boolean(), alt: z.boolean() });
+export type PassedKey = z.infer<typeof keySchema>;
 
 const resultSchema = z.object({ requestId: z.string().max(100), ok: z.boolean(), detail: z.string().max(2000), code: z.literal("no-window").optional() });
 

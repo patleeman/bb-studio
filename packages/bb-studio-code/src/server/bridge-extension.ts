@@ -9,10 +9,24 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Raise with every change to the extension, so workspaces get the new one. */
-export const BRIDGE_VERSION = "0.3.1";
+export const BRIDGE_VERSION = "0.4.0";
 const NAME = "studio-bridge";
 const PUBLISHER = "bb";
 export const BRIDGE_ID = `${PUBLISHER}.${NAME}`;
+
+/**
+ * BB's app-level shortcuts, passed from VS Code to BB when VS Code has the
+ * keyboard: getting around BB works from inside the editor. Editing keys,
+ * VS Code's own palettes (⌘P, ⇧⌘P) and tab handling stay with VS Code.
+ */
+export const PASSED_KEYS: { mac: string; other: string; key: string; code: string; shift: boolean; does: string }[] = [
+  { mac: "cmd+k", other: "ctrl+k", key: "k", code: "KeyK", shift: false, does: "search threads" },
+  { mac: "cmd+shift+o", other: "ctrl+shift+o", key: "O", code: "KeyO", shift: true, does: "new thread" },
+  { mac: "cmd+\\", other: "ctrl+\\", key: "\\", code: "Backslash", shift: false, does: "toggle the sidebar" },
+  { mac: "cmd+j", other: "ctrl+j", key: "j", code: "KeyJ", shift: false, does: "toggle the right panel" },
+  { mac: "cmd+shift+c", other: "ctrl+shift+c", key: "C", code: "KeyC", shift: true, does: "focus the chat composer" },
+  ...Array.from({ length: 9 }, (_, index) => ({ mac: `cmd+${index + 1}`, other: `ctrl+${index + 1}`, key: String(index + 1), code: `Digit${index + 1}`, shift: false, does: `jump to thread ${index + 1}` })),
+];
 
 const MANIFEST = {
   name: NAME,
@@ -29,6 +43,12 @@ const MANIFEST = {
       { command: "bbStudio.toggleFollow", title: "Follow the agent", category: "BB" },
     ],
     menus: { "editor/context": [{ command: "bbStudio.copyForChat", when: "editorHasSelection", group: "9_cutcopypaste@9" }] },
+    keybindings: PASSED_KEYS.map((each) => ({
+      key: each.other,
+      mac: each.mac,
+      command: "bbStudio.passKey",
+      args: { key: each.key, code: each.code, mod: true, shift: each.shift, alt: false },
+    })),
   },
 };
 
@@ -403,6 +423,8 @@ exports.activate = (context) => {
   memento = context.globalState;
   follow = memento.get("bbStudio.follow", true);
   context.subscriptions.push(vscode.commands.registerCommand("bbStudio.copyForChat", copyForChat));
+  // BB's shortcuts pressed in VS Code: hand them to BB's page (src/panel.tsx).
+  context.subscriptions.push(vscode.commands.registerCommand("bbStudio.passKey", (key) => { if (SOCKET && key) post("/key", key); }));
   context.subscriptions.push(vscode.commands.registerCommand("bbStudio.toggleFollow", () => {
     follow = !follow;
     memento.update("bbStudio.follow", follow);

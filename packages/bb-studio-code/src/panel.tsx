@@ -124,8 +124,9 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
 
   // "*": the plugin restarted, and every server with it.
   useRealtime(CHANNEL, (event) => {
-    const changed = (event as { id?: string } | null)?.id;
-    if (changed === id || changed === "*") setVersion((n) => n + 1);
+    const message = event as { id?: string; type?: string } | null;
+    if (message?.type === "key") return;
+    if (message?.id === id || message?.id === "*") setVersion((n) => n + 1);
   });
   // A server can stop without a word reaching this view (a plugin update, say),
   // so recheck now and then, on screen or not: a frame left on a dead server
@@ -215,7 +216,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
         {!embed ? (
           <FileBrowser workspace={workspace} />
         ) : url && password && !released ? (
-          <EditorFrame key={`${url}#${frameLoad}`} url={url} password={password} label={`VS Code: ${workspace.title}`} />
+          <EditorFrame key={`${url}#${frameLoad}`} id={id} url={url} password={password} label={`VS Code: ${workspace.title}`} />
         ) : workspace.folders.length ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p role={status?.state === "failed" ? "alert" : "status"} className="text-sm text-muted-foreground">{STATUS_TEXT[status?.state ?? "stopped"]}</p>
@@ -232,13 +233,42 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
   );
 }
 
+/** Whether keys should be replayed as ⌘ (macOS) or Ctrl, like BB's own shortcuts. */
+const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+/**
+ * Replays one of BB's shortcuts on BB's page. Inside VS Code the frame has
+ * the keyboard, so BB never sees the key; the bridge extension catches it and
+ * sends it here (src/server/bridge-extension.ts, PASSED_KEYS).
+ */
+export function replayKey(key: { key: string; code: string; mod: boolean; shift: boolean; alt: boolean }, mac: boolean, target: EventTarget = document.body): void {
+  target.dispatchEvent(new KeyboardEvent("keydown", {
+    key: key.key,
+    code: key.code,
+    metaKey: key.mod && mac,
+    ctrlKey: key.mod && !mac,
+    shiftKey: key.shift,
+    altKey: key.alt,
+    bubbles: true,
+    cancelable: true,
+  }));
+}
+
 /** VS Code in a frame, signed in with this run's password. */
-function EditorFrame({ url, password, label }: { url: string; password: string; label: string }) {
+function EditorFrame({ id, url, password, label }: { id: string; url: string; password: string; label: string }) {
   const [name] = useState(() => `studio-code-${Math.random().toString(36).slice(2)}`);
   const frame = useRef<HTMLIFrameElement>(null);
   useEffect(() => {
     if (frame.current) signIn(url, password, name);
   }, [url, password, name]);
+  // A BB shortcut pressed in this editor: only the BB window whose frame has
+  // the keyboard acts on it.
+  useRealtime(CHANNEL, (event) => {
+    const message = event as { type?: string; id?: string; key?: Parameters<typeof replayKey>[0] } | null;
+    if (message?.type !== "key" || message.id !== id || !message.key) return;
+    if (!document.hasFocus() || document.activeElement !== frame.current) return;
+    replayKey(message.key, isMac());
+  });
   return (
     <iframe
       ref={frame}

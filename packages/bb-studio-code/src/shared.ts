@@ -124,6 +124,15 @@ export const codeContract = defineRpcContract({
     input: z.object({ id, path: z.string().max(4096) }),
     output: z.object({ text: z.string().nullable(), reason: z.string().nullable() }),
   },
+  /**
+   * Opens a file at lines in the workspace's editor, as code_show does for
+   * agents: for links into code, and for README captures. Held until an
+   * editor connects.
+   */
+  reveal: {
+    input: z.object({ id, path: z.string().min(1).max(4096), startLine: z.number().int().min(1), endLine: z.number().int().min(1).optional() }),
+    output: z.object({ shown: z.boolean() }),
+  },
   /** What the workspace's VS Code reports, as the agent sees it; null with no editor open. */
   editorState: {
     input: z.object({ id }),
