@@ -51,7 +51,11 @@ type Bridge = { server: Server; socket: string; windows: Map<string, Window>; he
 
 export class Bridges {
   /** `log`: an editor window connected or left (each VS Code page load connects once). */
-  constructor(private readonly log: (message: string) => void = () => undefined) {}
+  constructor(
+    private readonly log: (message: string) => void = () => undefined,
+    /** An editor window connected to a workspace. */
+    private readonly onConnect: (id: string) => void = () => undefined,
+  ) {}
 
   private readonly bridges = new Map<string, Bridge>();
   /** A command for an editor that isn't connected yet, delivered when it connects. */
@@ -176,6 +180,7 @@ export class Bridges {
       const opened = Date.now();
       const count = () => [...bridge.windows.values()].filter((each) => each.stream).length;
       this.log(`workspace ${id}: editor window connected (${count()} open)`);
+      this.onConnect(id);
       req.on("close", () => {
         if (window.stream === res) bridge.windows.delete(windowId);
         this.log(`workspace ${id}: editor window left after ${Math.round((Date.now() - opened) / 1000)}s (${count()} open)`);

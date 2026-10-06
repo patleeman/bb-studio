@@ -68,3 +68,22 @@ describe("compound commands (Codex reads several files at once)", () => {
     expect(activitiesFrom(started({ type: "commandExecution", command: "pwd && sed -n '3,9p' a.ts", cwd: "/repo" }))).toEqual([{ kind: "read", path: "/repo/a.ts", startLine: 3, endLine: 9 }]);
   });
 });
+
+describe("reads trimmed with head or tail", () => {
+  it("counts a read piped to head, with the lines it keeps", async () => {
+    const { activitiesFrom } = await import("./activity");
+    const read = (command: string) => activitiesFrom(started({ type: "commandExecution", command, cwd: "/repo" }));
+    expect(read("sed -n '1,40p' src/a.ts | head -12")).toEqual([{ kind: "read", path: "/repo/src/a.ts", startLine: 1, endLine: 12 }]);
+    expect(read("sed -n '60,95p' src/a.ts | head -n 8")).toEqual([{ kind: "read", path: "/repo/src/a.ts", startLine: 60, endLine: 67 }]);
+    expect(read("cat src/a.ts | head -n 20")).toEqual([{ kind: "read", path: "/repo/src/a.ts", startLine: 1, endLine: 20 }]);
+    // tail: the file, but which lines depends on its length.
+    expect(read("cat -n src/a.ts | tail -5")).toEqual([{ kind: "read", path: "/repo/src/a.ts" }]);
+    // The demo's own command: a trimmed read, then a pause.
+    expect(read("sed -n '1,40p' src/a.ts | head -12; sleep 6")).toEqual([{ kind: "read", path: "/repo/src/a.ts", startLine: 1, endLine: 12 }]);
+  });
+
+  it("still skips pipes through anything else", async () => {
+    const { activitiesFrom } = await import("./activity");
+    expect(activitiesFrom(started({ type: "commandExecution", command: "cat src/a.ts | grep foo", cwd: "/repo" }))).toEqual([]);
+  });
+});

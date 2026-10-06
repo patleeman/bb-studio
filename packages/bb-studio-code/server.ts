@@ -100,7 +100,9 @@ export default function plugin(bb: BbPluginApi) {
   // Existing workspaces get a new layout once, the next time VS Code loads.
   void applyLayoutEverywhere(root, (message) => bb.log.warn(message)).catch(() => undefined);
   // The bridge between each workspace's VS Code and the agent (src/server/bridge.ts).
-  const bridges = new Bridges((message) => bb.log.info(message));
+  // An editor connecting starts following threads already at work (declared below).
+  let followWorking: () => void = () => undefined;
+  const bridges = new Bridges((message) => bb.log.info(message), () => followWorking());
   void installBridge(join(root, "extensions")).catch((error) => bb.log.warn(`couldn't install the BB bridge extension: ${error instanceof Error ? error.message : String(error)}`));
   const servers = new CodeServers({
     root,
@@ -434,6 +436,18 @@ export default function plugin(bb: BbPluginApi) {
     onActivity: (threadId, activity) => void deliver(threadId, activity).catch((error) => bb.log.warn(`activity for ${threadId}: ${error instanceof Error ? error.message : String(error)}`)),
   });
   bb.onDispose(() => watcher.dispose());
+  // Threads already working when an editor connects, after a plugin reload say,
+  // would otherwise wait for their next turn to be followed.
+  followWorking = () => {
+    void bb.sdk.threads.list({ limit: 100 }).then((result) => {
+      const threads = (Array.isArray(result) ? result : (result as { threads?: unknown[] }).threads ?? []) as { id: string; status: string }[];
+      for (const thread of threads) {
+        if (thread.status !== "active" || watcher.watching(thread.id)) continue;
+        bb.log.info(`following thread ${thread.id} while it works`);
+        watcher.watch(thread.id);
+      }
+    }, () => undefined);
+  };
   // A thread is followed while it works, and only when an editor is open to show it.
   bb.events.on("thread.active", ({ thread }) => {
     if (!bridges.anyConnected() || watcher.watching(thread.id)) return;

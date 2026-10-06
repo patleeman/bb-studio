@@ -176,3 +176,17 @@ describe("two copies of the plugin during a reload", () => {
     await fresh.close("cws_reload");
   });
 });
+
+describe("an editor connecting", () => {
+  it("tells the plugin, so it can follow threads already working", async () => {
+    const connected: string[] = [];
+    const bridges = new Bridges(() => undefined, (id) => connected.push(id));
+    const socket = await bridges.open("cws_hello", dir);
+    const a = connect(socket, "a");
+    await a.ready;
+    await wait(20);
+    expect(connected).toEqual(["cws_hello"]);
+    a.close();
+    await bridges.close("cws_hello");
+  });
+});

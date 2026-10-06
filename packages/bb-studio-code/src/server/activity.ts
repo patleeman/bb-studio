@@ -62,6 +62,18 @@ function readsIn(text: string): Read[] {
   if (match) return [{ file: unquote(match[3]!), startLine: Number(match[1]), endLine: Number(match[2]) }];
   match = new RegExp(String.raw`^nl\s+(?:-\w+\s+)*(${word})\s*\|\s*sed\s+-n\s+'?(\d+),(\d+)p'?$`).exec(text);
   if (match) return [{ file: unquote(match[1]!), startLine: Number(match[2]), endLine: Number(match[3]) }];
+  // A read trimmed by head or tail: head keeps its first lines; with tail,
+  // which lines depends on the file's length, so only the file counts.
+  const trimmed = /^(.*\S)\s*\|\s*(head|tail)(?:\s+-n)?\s*-?(\d+)?\s*$/.exec(text);
+  if (trimmed && !trimmed[1]!.includes("|")) {
+    const reads = readsIn(trimmed[1]!);
+    if (reads.length !== 1) return [];
+    const [read] = reads as [Read];
+    if (trimmed[2] === "tail") return [{ file: read.file }];
+    const count = trimmed[3] ? Number(trimmed[3]) : 10;
+    const start = read.startLine ?? 1;
+    return [{ file: read.file, startLine: start, endLine: read.endLine !== undefined ? Math.min(read.endLine, start + count - 1) : start + count - 1 }];
+  }
   if (text.includes("|")) return [];
   match = new RegExp(String.raw`^head\s+(?:-n\s*)?-?(\d+)\s+(${word})$`).exec(text);
   if (match) return [{ file: unquote(match[2]!), startLine: 1, endLine: Number(match[1]) }];
