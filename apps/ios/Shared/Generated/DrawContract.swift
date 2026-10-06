@@ -6,6 +6,7 @@ public enum Draw {
     public static let listDrawings = "listDrawings"
     public static let createDrawing = "createDrawing"
     public static let getDrawing = "getDrawing"
+    public static let getDrawingMeta = "getDrawingMeta"
     public static let getDrawingUpdatedAt = "getDrawingUpdatedAt"
     public static let saveDrawing = "saveDrawing"
     public static let recoverDrawingCopy = "recoverDrawingCopy"
@@ -22,6 +23,8 @@ public enum Draw {
   public typealias CreateDrawing = CreateDrawingOutput
 
   public typealias GetDrawing = GetDrawingOutput
+
+  public typealias GetDrawingMeta = GetDrawingMetaOutput
 
   public typealias GetDrawingUpdatedAt = GetDrawingUpdatedAtOutput
 
@@ -133,6 +136,42 @@ public enum Draw {
     public var drawing: GetDrawingOutputDrawing?
 
     public init(drawing: GetDrawingOutputDrawing? = nil) {
+      self.drawing = drawing
+    }
+  }
+
+  public struct GetDrawingMetaInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct GetDrawingMetaOutputDrawing: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var elementCount: Double?
+    public var projectId: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, elementCount: Double? = nil, projectId: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.elementCount = elementCount
+      self.projectId = projectId
+      self.archived = archived
+    }
+  }
+
+  public struct GetDrawingMetaOutput: Sendable, Hashable, Codable {
+    public var drawing: GetDrawingMetaOutputDrawing?
+
+    public init(drawing: GetDrawingMetaOutputDrawing? = nil) {
       self.drawing = drawing
     }
   }
