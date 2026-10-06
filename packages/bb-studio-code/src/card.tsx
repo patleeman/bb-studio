@@ -20,6 +20,11 @@ function useWorkspace(id: string): Workspace | null | undefined {
   return workspace;
 }
 
+/** A folder as its last two parts, e.g. `worktrees/orbit`; full paths are long. */
+export function shortFolder(path: string): string {
+  return path.split("/").filter(Boolean).slice(-2).join("/") || path;
+}
+
 export function WorkspaceCard({ attributes }: PluginMessageDirectiveProps) {
   const navigate = useBbNavigate();
   const id = attributes.id ?? "";
@@ -36,7 +41,7 @@ export function WorkspaceCard({ attributes }: PluginMessageDirectiveProps) {
       icon={CODE_ICON}
       title={title}
       details={`${workspace.threadId ? "Thread worktree" : "VS Code workspace"} · ${folders} · ${relativeTime(workspace.updatedAt)}`}
-      preview={<span className="font-mono text-xs">{workspace.folders.join(" · ")}</span>}
+      preview={<span className="font-mono text-xs" title={workspace.folders.join("\n")}>{workspace.folders.map(shortFolder).join(" · ")}</span>}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
         if (!navigate.openThreadPanel({ actionId: CODE_TAB, title, params: { workspaceId: id } }))

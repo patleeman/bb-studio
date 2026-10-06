@@ -192,7 +192,7 @@ export default function plugin(bb: BbPluginApi) {
       return `${summary(workspace)}\n${card(id)}`;
     },
   });
-  // `@workspace` in a composer: the workspace's folders, for the agent.
+  // `@` and a workspace's name in a composer: its folders, for the agent.
   bb.ui.registerMentionProvider(
     defineItemMention({
       id: "workspace",

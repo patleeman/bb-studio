@@ -16,7 +16,8 @@ to different folders.
   **Back** lists the thread's other workspaces.
 - **From a reply**, a `::workspace{id="cws_…"}` card opens the workspace in
   that tab.
-- **In a composer**, `@workspace` gives the agent a workspace's folders.
+- **In a composer**, type `@` and a workspace's name to give the agent its
+  folders.
 - Use the folder button in the header to add or remove folders. You can type a
   full path (or `~/…`) or pick a BB project. VS Code shows every folder in one
   multi-root window. Changing folders while VS Code is open updates it live.

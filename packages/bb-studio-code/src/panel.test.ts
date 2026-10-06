@@ -7,3 +7,11 @@ describe("where VS Code can show", () => {
     for (const host of ["red4.tailnet.ts.net", "192.168.1.20", "bb.example.com"]) expect(canEmbedEditor(host)).toBe(false);
   });
 });
+
+describe("card preview", () => {
+  it("shortens folders to their last two parts", async () => {
+    const { shortFolder } = await import("./card");
+    expect(shortFolder("/tmp/data/worktrees/thr_x-1/orbit")).toBe("thr_x-1/orbit");
+    expect(shortFolder("/orbit")).toBe("orbit");
+  });
+});
