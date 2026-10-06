@@ -482,7 +482,7 @@ export default async function plugin(bb: BbPluginApi) {
     execute({ thisThread, query }, context) {
       const needle = query?.trim().toLowerCase();
       const rows = store
-        .list({ threadId: thisThread ? context.threadId : undefined, limit: 500 })
+        .list({ threadId: thisThread ? context.threadId : undefined, limit: needle ? undefined : 100 })
         .filter((artifact) => !needle || `${displayTitle(artifact)} ${artifact.description} ${artifact.version.name}`.toLowerCase().includes(needle))
         .slice(0, 100);
       if (!rows.length) return thisThread ? "Nothing has been saved from this thread yet." : "No artifacts match.";
@@ -520,7 +520,7 @@ export default async function plugin(bb: BbPluginApi) {
     search({ query }) {
       const needle = query.trim().toLowerCase();
       return store
-        .list({ limit: 200 })
+        .list({ limit: needle ? undefined : 50 })
         .filter((artifact) => !needle || displayTitle(artifact).toLowerCase().includes(needle))
         .slice(0, 50)
         .map((artifact) => ({
