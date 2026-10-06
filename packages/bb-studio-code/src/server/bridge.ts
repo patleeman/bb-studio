@@ -2,17 +2,23 @@
 // inside code-server reports what the user has in front of them and listens
 // for commands (show these lines). It talks over a Unix socket in the
 // workspace's folder that only this user can open: no port, no token.
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { chmod, rm } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { z } from "zod";
 import { editorStateSchema, type EditorState } from "../shared";
+import type { TextEdit } from "./edits";
 
 /** Something the agent asks the user's editor to do. */
-export type BridgeCommand = { type: "show"; path: string; startLine: number; endLine: number };
+export type BridgeCommand =
+  | { type: "show"; path: string; startLine: number; endLine: number }
+  | { type: "edit"; path: string; edits: TextEdit[] };
+/** A window's answer to a request. */
+export type BridgeResult = { ok: boolean; detail: string };
 
-const MAX_BODY = 64 * 1024;
+const MAX_BODY = 512 * 1024;
 /** Unix socket paths top out near 104 bytes on macOS. */
 const MAX_SOCKET_PATH = 100;
 
@@ -26,7 +32,9 @@ export function bridgeSocketPath(dir: string, id: string): string {
   return temp.length < MAX_SOCKET_PATH ? temp : join("/tmp", name);
 }
 
-type Bridge = { server: Server; socket: string; clients: Set<ServerResponse>; state: EditorState | null; heartbeat?: ReturnType<typeof setInterval> };
+/** One VS Code window (a browser tab or frame) connected to a workspace's bridge. */
+type Window = { stream: ServerResponse | null; state: EditorState | null; usedAt: number };
+type Bridge = { server: Server; socket: string; windows: Map<string, Window>; heartbeat?: ReturnType<typeof setInterval> };
 
 export class Bridges {
   /** `log`: an editor window connected or left (each VS Code page load connects once). */
@@ -35,15 +43,16 @@ export class Bridges {
   private readonly bridges = new Map<string, Bridge>();
   /** A command for an editor that isn't connected yet, delivered when it connects. */
   private readonly held = new Map<string, BridgeCommand>();
+  private readonly waiting = new Map<string, (result: BridgeResult) => void>();
 
   /** Starts a workspace's bridge and returns its socket path. */
   async open(id: string, dir: string): Promise<string> {
     await this.close(id);
     const socket = bridgeSocketPath(dir, id);
     await rm(socket, { force: true });
-    const bridge: Bridge = { server: createServer((req, res) => this.handle(id, req, res)), socket, clients: new Set(), state: null };
+    const bridge: Bridge = { server: createServer((req, res) => this.handle(id, req, res)), socket, windows: new Map() };
     // Keeps event streams open through idle proxies and notices dead ones.
-    bridge.heartbeat = setInterval(() => { for (const client of bridge.clients) client.write(": ping\n\n"); }, 25_000);
+    bridge.heartbeat = setInterval(() => { for (const window of bridge.windows.values()) window.stream?.write(": ping\n\n"); }, 25_000);
     bridge.heartbeat.unref?.();
     await new Promise<void>((resolve, reject) => {
       bridge.server.once("error", reject);
@@ -59,7 +68,7 @@ export class Bridges {
     if (!bridge) return;
     this.bridges.delete(id);
     clearInterval(bridge.heartbeat);
-    for (const client of bridge.clients) client.end();
+    for (const window of bridge.windows.values()) window.stream?.end();
     await new Promise<void>((resolve) => bridge.server.close(() => resolve()));
     await rm(bridge.socket, { force: true });
   }
@@ -68,69 +77,107 @@ export class Bridges {
     await Promise.all([...this.bridges.keys()].map((id) => this.close(id)));
   }
 
-  /** What the editor last reported, while it's connected. */
+  /** The connected window the user used last: the one the agent talks to. */
+  private current(id: string): Window | null {
+    const open = [...(this.bridges.get(id)?.windows.values() ?? [])].filter((window) => window.stream);
+    return open.sort((a, b) => b.usedAt - a.usedAt)[0] ?? null;
+  }
+
+  /** What that window last reported. */
   state(id: string): EditorState | null {
-    return this.bridges.get(id)?.state ?? null;
+    return this.current(id)?.state ?? null;
   }
 
   /** Whether a VS Code window is listening. */
   connected(id: string): boolean {
-    return (this.bridges.get(id)?.clients.size ?? 0) > 0;
+    return this.current(id) !== null;
   }
 
-  /** Sends a command; held for the next editor to connect when none is. Returns whether it went now. */
+  /** Sends a command to the current window; held for the next editor to connect when none is. Returns whether it went now. */
   send(id: string, command: BridgeCommand): boolean {
-    const bridge = this.bridges.get(id);
-    if (!bridge?.clients.size) {
+    const window = this.current(id);
+    if (!window?.stream) {
       this.held.set(id, command);
       return false;
     }
     this.held.delete(id);
-    for (const client of bridge.clients) client.write(`data: ${JSON.stringify(command)}\n\n`);
+    window.stream.write(`data: ${JSON.stringify(command)}\n\n`);
     return true;
+  }
+
+  /**
+   * Sends a command and waits for the window's answer. Null when no window is
+   * open, so the caller can act without one.
+   */
+  request(id: string, command: BridgeCommand, timeoutMs: number): Promise<BridgeResult | null> {
+    const window = this.current(id);
+    if (!window?.stream) return Promise.resolve(null);
+    const requestId = randomUUID();
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(requestId);
+        resolve({ ok: false, detail: "The editor didn't answer in time." });
+      }, timeoutMs);
+      this.waiting.set(requestId, (result) => { clearTimeout(timer); this.waiting.delete(requestId); resolve(result); });
+      window.stream!.write(`data: ${JSON.stringify({ ...command, requestId })}\n\n`);
+    });
   }
 
   private handle(id: string, req: IncomingMessage, res: ServerResponse): void {
     const bridge = this.bridges.get(id);
     if (!bridge) { res.writeHead(410).end(); return; }
-    if (req.method === "GET" && req.url === "/events") {
+    const url = new URL(req.url ?? "/", "http://bridge");
+    const windowId = (url.searchParams.get("window") ?? req.headers["x-window"]?.toString() ?? "default").slice(0, 100);
+    if (req.method === "GET" && url.pathname === "/events") {
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
       res.write(": connected\n\n");
-      bridge.clients.add(res);
+      const window = bridge.windows.get(windowId) ?? { stream: null, state: null, usedAt: 0 };
+      window.stream = res;
+      window.usedAt = Date.now();
+      bridge.windows.set(windowId, window);
       const opened = Date.now();
-      this.log(`workspace ${id}: editor window connected (${bridge.clients.size} open)`);
+      const count = () => [...bridge.windows.values()].filter((each) => each.stream).length;
+      this.log(`workspace ${id}: editor window connected (${count()} open)`);
       req.on("close", () => {
-        bridge.clients.delete(res);
-        this.log(`workspace ${id}: editor window left after ${Math.round((Date.now() - opened) / 1000)}s (${bridge.clients.size} open)`);
-        // The last window closed: what it reported no longer holds.
-        if (!bridge.clients.size) bridge.state = null;
+        if (window.stream === res) bridge.windows.delete(windowId);
+        this.log(`workspace ${id}: editor window left after ${Math.round((Date.now() - opened) / 1000)}s (${count()} open)`);
       });
       const held = this.held.get(id);
       if (held) this.send(id, held);
       return;
     }
-    if (req.method === "POST" && req.url === "/state") {
-      let body = "";
-      let size = 0;
-      req.on("data", (chunk: Buffer) => {
-        size += chunk.length;
-        if (size > MAX_BODY) { res.writeHead(413).end(); req.destroy(); return; }
-        body += chunk;
-      });
-      req.on("end", () => {
-        if (res.writableEnded) return;
-        let parsed: unknown;
-        try { parsed = JSON.parse(body); } catch { res.writeHead(400).end(); return; }
-        const result = editorStateSchema.safeParse(parsed);
+    if (req.method !== "POST" || (url.pathname !== "/state" && url.pathname !== "/result")) { res.writeHead(404).end(); return; }
+    let body = "";
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY) { res.writeHead(413).end(); req.destroy(); return; }
+      body += chunk;
+    });
+    req.on("end", () => {
+      if (res.writableEnded) return;
+      let parsed: unknown;
+      try { parsed = JSON.parse(body); } catch { res.writeHead(400).end(); return; }
+      if (url.pathname === "/result") {
+        const result = resultSchema.safeParse(parsed);
         if (!result.success) { res.writeHead(400).end(); return; }
-        bridge.state = result.data;
+        this.waiting.get(result.data.requestId)?.({ ok: result.data.ok, detail: result.data.detail });
         res.writeHead(204).end();
-      });
-      return;
-    }
-    res.writeHead(404).end();
+        return;
+      }
+      const result = editorStateSchema.safeParse(parsed);
+      if (!result.success) { res.writeHead(400).end(); return; }
+      const window = bridge.windows.get(windowId) ?? { stream: null, state: null, usedAt: 0 };
+      window.state = result.data;
+      // The window in focus is the one the user is using.
+      if (result.data.focused) window.usedAt = Date.now();
+      bridge.windows.set(windowId, window);
+      res.writeHead(204).end();
+    });
   }
 }
+
+const resultSchema = z.object({ requestId: z.string().max(100), ok: z.boolean(), detail: z.string().max(2000) });
 
 /** A path as the user knows it: relative to the workspace folder that holds it. */
 function shown(path: string, folders: string[]): string {
@@ -167,9 +214,9 @@ export function editorContext(editors: { title: string; folders: string[]; state
       lines.push(`- Unsaved changes in ${state.unsavedFiles.map((path) => shown(path, folders)).join(", ")}. The files on disk are older than what they see: don't edit these without asking first.`);
     const others = state.openFiles.filter((path) => path !== file?.path);
     if (others.length) lines.push(`- Also open: ${others.slice(0, 15).map((path) => shown(path, folders)).join(", ")}.`);
-    if (!lines.length) return [];
+    if (!lines.length) lines.push("- No file open right now.");
     return [`The user has VS Code workspace "${title}" open beside this chat${state.focused ? " and is in it now" : ""}:\n${lines.join("\n")}`];
   });
   if (!parts.length) return null;
-  return `${parts.join("\n\n")}\n\nWhen they say "this" or "here", they likely mean their selection or the file above. To point them at code, call code_show with a path and lines; their editor opens there. code_editor_state gives the latest view mid-turn.`;
+  return `${parts.join("\n\n")}\n\nWhen they say "this" or "here", they likely mean their selection or the file above. To point them at code, call code_show with a path and lines; their editor opens there. To change a file they have open, prefer code_edit: they watch it typed into their editor, and it merges with their unsaved changes. code_editor_state gives the latest view mid-turn.`;
 }

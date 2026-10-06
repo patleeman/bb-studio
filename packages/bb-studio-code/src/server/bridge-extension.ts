@@ -9,7 +9,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Raise with every change to the extension, so workspaces get the new one. */
-export const BRIDGE_VERSION = "0.1.0";
+export const BRIDGE_VERSION = "0.2.0";
 const NAME = "studio-bridge";
 const PUBLISHER = "bb";
 export const BRIDGE_ID = `${PUBLISHER}.${NAME}`;
@@ -35,11 +35,14 @@ const http = require("node:http");
 
 const SOCKET = process.env.STUDIO_CODE_BRIDGE;
 const MAX_SELECTION = 8000;
+// This window, among others open on the same workspace: the agent talks to
+// the one used last.
+const WINDOW = Math.random().toString(36).slice(2, 12);
 
 function post(path, body) {
   return new Promise((resolve) => {
     const data = JSON.stringify(body);
-    const req = http.request({ socketPath: SOCKET, path, method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data) } }, (res) => { res.resume(); res.on("end", resolve); });
+    const req = http.request({ socketPath: SOCKET, path, method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data), "x-window": WINDOW } }, (res) => { res.resume(); res.on("end", resolve); });
     req.on("error", resolve);
     req.end(data);
   });
@@ -114,10 +117,101 @@ async function show(command) {
   vscode.window.setStatusBarMessage("$(sparkle) BB showed you " + vscode.workspace.asRelativePath(document.uri) + ":" + (start + 1) + (end > start ? "–" + (end + 1) : ""), 6000);
 }
 
+// ---- Live edits: the agent types into the open buffer ----
+
+const caret = vscode.window.createTextEditorDecorationType({
+  after: { contentText: "BB", color: new vscode.ThemeColor("editorCursor.foreground"), fontWeight: "600", margin: "0 0 0 1px", textDecoration: "none; font-size: 0.75em; vertical-align: super" },
+  borderColor: new vscode.ThemeColor("editorCursor.foreground"),
+  borderStyle: "solid",
+  borderWidth: "0 2px 0 0",
+});
+const typed = vscode.window.createTextEditorDecorationType({ backgroundColor: new vscode.ThemeColor("diffEditor.insertedTextBackground") });
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Edits are typed in steps for at most this long each, however long the text.
+const TYPING_MS = 3000;
+const STEP_MS = 16;
+
+function locate(text, change, name) {
+  if (!change.oldText) return [text.length, text.length];
+  const at = text.indexOf(change.oldText);
+  if (at < 0) throw new Error("Couldn't find the text to replace in " + name + ": " + JSON.stringify(change.oldText.slice(0, 80)));
+  if (text.indexOf(change.oldText, at + 1) >= 0) throw new Error("The text to replace appears more than once in " + name + "; include more around it.");
+  return [at, at + change.oldText.length];
+}
+
+// The last edit this extension made, so the change listener can tell it
+// apart from the user's typing.
+let mine = null;
+async function apply(editor, from, to, text, stops) {
+  const document = editor.document;
+  const range = new vscode.Range(document.positionAt(from), document.positionAt(to));
+  mine = { offset: from, length: to - from, text };
+  const ok = await editor.edit((builder) => { if (from === to) builder.insert(range.start, text); else builder.replace(range, text); }, { undoStopBefore: stops, undoStopAfter: false });
+  if (!ok) throw new Error("VS Code didn't accept the edit.");
+}
+
+async function edit(command) {
+  const document = await vscode.workspace.openTextDocument(vscode.Uri.file(command.path));
+  const name = vscode.workspace.asRelativePath(document.uri);
+  // Text that changes on disk while it's unsaved here would be lost on save:
+  // leave saving to the user when they have unsaved work in it.
+  const hadUnsaved = document.isDirty;
+  const editor = await vscode.window.showTextDocument(document, { preview: false, preserveFocus: true });
+  // Check every edit first, so a bad one changes nothing.
+  let check = document.getText();
+  for (const change of command.edits) {
+    const [start, end] = locate(check, change, name);
+    check = check.slice(0, start) + change.newText + check.slice(end);
+  }
+  let first = true;
+  const inserted = [];
+  for (const change of command.edits) {
+    const [start, end] = locate(editor.document.getText(), change, name);
+    let offset = start;
+    // The user can keep typing elsewhere: shift our position past their edits.
+    const follow = vscode.workspace.onDidChangeTextDocument((event) => {
+      if (event.document !== editor.document) return;
+      for (const c of event.contentChanges) {
+        if (mine && c.rangeOffset === mine.offset && c.rangeLength === mine.length && c.text === mine.text) { mine = null; continue; }
+        if (c.rangeOffset <= offset) offset += c.text.length - c.rangeLength;
+      }
+    });
+    try {
+      if (end > start) { await apply(editor, start, end, "", first); first = false; }
+      const text = change.newText;
+      const steps = Math.max(1, Math.min(Math.ceil(text.length / 2), Math.floor(TYPING_MS / STEP_MS)));
+      const size = Math.ceil(text.length / steps);
+      for (let i = 0; i < text.length; i += size) {
+        const piece = text.slice(i, i + size);
+        await apply(editor, offset, offset, piece, first);
+        first = false;
+        offset += piece.length;
+        const at = editor.document.positionAt(offset);
+        editor.setDecorations(caret, [new vscode.Range(at, at)]);
+        editor.revealRange(new vscode.Range(at, at), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+        await sleep(STEP_MS);
+      }
+      inserted.push([offset - text.length, offset]);
+    } finally {
+      follow.dispose();
+    }
+  }
+  // One undo step for the whole edit.
+  await editor.edit(() => undefined, { undoStopBefore: false, undoStopAfter: true });
+  editor.setDecorations(caret, []);
+  const doc = editor.document;
+  editor.setDecorations(typed, inserted.map(([a, b]) => new vscode.Range(doc.positionAt(a), doc.positionAt(b))));
+  setTimeout(() => editor.setDecorations(typed, []), 4000);
+  if (!hadUnsaved) await doc.save();
+  vscode.window.setStatusBarMessage("$(sparkle) BB edited " + name + (hadUnsaved ? " (your unsaved changes kept; not saved)" : ""), 6000);
+  const count = command.edits.length;
+  return "Typed " + count + (count === 1 ? " edit" : " edits") + " into " + name + " in the user's VS Code" + (hadUnsaved ? ". The file had their unsaved changes, so it's left unsaved: the file on disk doesn't have your edit yet." : ", and saved it.");
+}
+
 let stopped = false;
 function listen() {
   if (stopped) return;
-  const req = http.get({ socketPath: SOCKET, path: "/events" }, (res) => {
+  const req = http.get({ socketPath: SOCKET, path: "/events?window=" + WINDOW }, (res) => {
     res.setEncoding("utf8");
     let buffer = "";
     res.on("data", (chunk) => {
@@ -131,6 +225,12 @@ function listen() {
           let command;
           try { command = JSON.parse(line.slice(6)); } catch { continue; }
           if (command && command.type === "show") show(command).catch((error) => vscode.window.showWarningMessage("BB couldn't show that: " + error.message));
+          if (command && command.type === "edit") {
+            edit(command).then(
+              (detail) => post("/result", { requestId: command.requestId, ok: true, detail }),
+              (error) => post("/result", { requestId: command.requestId, ok: false, detail: String(error && error.message || error) }),
+            );
+          }
         }
       }
     });

@@ -36,6 +36,10 @@ Agents get five tools and the `studio-code` skill:
 - `code_editor_state` reports what you have open right now.
 - `code_show` points you at code: your editor opens the file, scrolls to the
   lines, selects and highlights them ("BB showed you src/retry.ts:13").
+- `code_edit` edits live: you watch the agent's text typed into your editor
+  behind a "BB" caret, it's one undo step, and it merges with changes you
+  haven't saved (then it leaves saving to you). With no editor open it edits
+  the file on disk.
 
 ## Working with the agent
 
@@ -49,7 +53,8 @@ told not to edit files you have unsaved changes in. VS Code saves on its own
 after a second, so that mostly matters while you're typing.
 
 The other way round, the agent calls `code_show` to put your editor on the
-code it means. When no editor is open, it jumps there as soon as you open
+code it means, and `code_edit` to type into your open files. With the same
+workspace open in several tabs, the agent talks to the one you used last. When no editor is open, it jumps there as soon as you open
 one. **Copy for BB chat** in the editor's right-click menu copies the
 selection with its path and lines, for pasting into the chat.
 

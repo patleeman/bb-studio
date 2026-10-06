@@ -66,9 +66,14 @@ describe("bridge socket", () => {
   it("stores what the editor reports, and refuses malformed reports", async () => {
     const bridges = new Bridges();
     const socket = await bridges.open("cws_state", dir);
+    // State counts only from a connected window.
+    const window = request({ socketPath: socket, path: "/events" });
+    window.end();
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect((await call(socket, "POST", "/state", state)).status).toBe(204);
     expect(bridges.state("cws_state")?.activeFile?.path).toBe("/repo/src/retry.ts");
     expect((await call(socket, "POST", "/state", { focused: "yes" })).status).toBe(400);
+    window.destroy();
     await bridges.close("cws_state");
     expect(bridges.state("cws_state")).toBeNull();
   });

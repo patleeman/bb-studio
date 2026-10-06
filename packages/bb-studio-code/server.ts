@@ -3,7 +3,7 @@
 // A workspace is a Studio item: a title, the project (and so the Space) it
 // belongs to, and the folders VS Code opens. Opening one starts code-server
 // for it (src/server/runtime.ts); the app shows that editor in a frame.
-import { stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
@@ -12,6 +12,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { Bridges, editorContext } from "./src/server/bridge";
 import { installBridge } from "./src/server/bridge-extension";
+import { applyEdits, editSchema } from "./src/server/edits";
 import { contained, listDir, readText } from "./src/server/files";
 import { browseFolders, sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
@@ -36,6 +37,8 @@ const KIND: StudioKind = {
 };
 
 const LIST_LIMIT = 10_000;
+/** Typing takes about 3 seconds an edit; allow for up to 20 of them. */
+const EDIT_TIMEOUT_MS = 90_000;
 
 function item(workspace: Workspace): StudioItem {
   return {
@@ -305,6 +308,29 @@ export default function plugin(bb: BbPluginApi) {
     execute: async (_input, ctx) => contextFor(ctx.threadId, ctx.projectId ?? null, await threadPath(ctx.threadId)) ?? "The user has no VS Code workspace open for this thread right now.",
   });
 
+  /**
+   * The workspace and file a tool means: an open editor of this thread's
+   * first, then any open editor, then the thread's own worktree. The path is
+   * checked through symlinks, but used as the workspace knows it: VS Code
+   * treats /tmp/x and /private/tmp/x as two different files.
+   */
+  const target = async (path: string, ctx: { threadId: string; projectId?: string | null }) => {
+    const base = await threadPath(ctx.threadId);
+    const absolute = isAbsolute(path) ? resolve(path) : base ? resolve(base, path) : null;
+    if (!absolute) throw new Error("Give a full path: this thread has no working folder to start from.");
+    const holds = (workspace: Workspace) => !workspace.archived && workspace.folders.some((folder) => inside(folder, absolute));
+    const mine = editorsFor(ctx.threadId, ctx.projectId ?? null, base);
+    let workspace = mine.find(holds) ?? store.list().find((each) => holds(each) && bridges.connected(each.id));
+    if (!workspace && base && inside(base, absolute)) workspace = await forThread(ctx.threadId);
+    if (!workspace) workspace = store.list().find(holds);
+    if (!workspace) return null;
+    const real = await contained(workspace.folders, absolute);
+    if (!(await stat(real)).isFile()) throw new Error(`${absolute} is a folder; name a file.`);
+    const file = workspace.folders.some((folder) => inside(folder, absolute)) ? absolute : real;
+    const name = relative(workspace.folders.find((folder) => inside(folder, file)) ?? dirname(file), file);
+    return { workspace, file, name };
+  };
+
   bb.agents.registerTool({
     name: "code_show",
     description:
@@ -315,33 +341,45 @@ export default function plugin(bb: BbPluginApi) {
       endLine: z.number().int().min(1).optional(),
     }),
     execute: async ({ path, startLine, endLine }, ctx) => {
-      const base = await threadPath(ctx.threadId);
-      const absolute = isAbsolute(path) ? resolve(path) : base ? resolve(base, path) : null;
-      if (!absolute) throw new Error("Give a full path: this thread has no working folder to start from.");
-      const holds = (workspace: Workspace) => !workspace.archived && workspace.folders.some((folder) => inside(folder, absolute));
-      const mine = editorsFor(ctx.threadId, ctx.projectId ?? null, base);
-      // An open editor of this thread's first, then any open editor, then the thread's own worktree.
-      let workspace = mine.find(holds) ?? store.list().find((each) => holds(each) && bridges.connected(each.id));
-      if (!workspace && base && inside(base, absolute)) workspace = await forThread(ctx.threadId);
-      if (!workspace) workspace = store.list().find(holds);
-      if (!workspace) return `None of the user's workspaces holds ${absolute}. Open one for its folder with code_workspace_open first.`;
-      // Checked through symlinks, but opened by the path the workspace knows:
-      // VS Code treats /tmp/x and /private/tmp/x as two different files.
-      const real = await contained(workspace.folders, absolute);
-      if (!(await stat(real)).isFile()) throw new Error(`${absolute} is a folder; show a file.`);
-      const target = workspace.folders.some((folder) => inside(folder, absolute)) ? absolute : real;
+      const found = await target(path, ctx);
+      if (!found) return `None of the user's workspaces holds ${path}. Open one for its folder with code_workspace_open first.`;
+      const { workspace, file, name } = found;
       const start = startLine ?? 1;
       const end = Math.max(endLine ?? start, start);
-      const lines = start === end ? `line ${start}` : `lines ${start}–${end}`;
-      const where = `${relative(workspace.folders.find((folder) => inside(folder, target)) ?? dirname(target), target)} ${lines}`;
-      if (bridges.send(workspace.id, { type: "show", path: target, startLine: start, endLine: end }))
+      const where = `${name} ${start === end ? `line ${start}` : `lines ${start}–${end}`}`;
+      if (bridges.send(workspace.id, { type: "show", path: file, startLine: start, endLine: end }))
         return `Showing ${where} in the user's VS Code ("${workspace.title}").`;
       return `The user's VS Code for "${workspace.title}" isn't open. It will jump to ${where} when they open it.\n${card(workspace.id)}`;
     },
   });
 
+  bb.agents.registerTool({
+    name: "code_edit",
+    description:
+      "Edit a file live in the user's VS Code: they watch the text typed in, it merges with their unsaved changes, and it's one undo step for them. Prefer it over writing the file when they have it open, and always for files with unsaved changes. Each edit replaces oldText, which must appear exactly once (include enough around it), with newText; an empty oldText appends. With no editor open, the edits go to the file on disk.",
+    parameters: z.object({
+      path: z.string().trim().min(1).max(4096),
+      edits: z.array(editSchema).min(1).max(20),
+    }),
+    execute: async ({ path, edits }, ctx) => {
+      const found = await target(path, ctx);
+      if (!found) return `None of the user's workspaces holds ${path}. Edit it with your own tools, or open a workspace for its folder with code_workspace_open first.`;
+      const { workspace, file, name } = found;
+      const result = await bridges.request(workspace.id, { type: "edit", path: file, edits }, EDIT_TIMEOUT_MS);
+      if (result) {
+        if (!result.ok) throw new Error(result.detail);
+        link(workspace.id, ctx.threadId, "edited");
+        return result.detail;
+      }
+      // No editor open: the same edits, on disk.
+      await writeFile(file, applyEdits(await readFile(file, "utf8"), edits));
+      link(workspace.id, ctx.threadId, "edited");
+      return `No editor was open, so the ${edits.length === 1 ? "edit went" : `${edits.length} edits went`} to ${name} on disk.`;
+    },
+  });
+
   bb.agents.configure(() => ({
-    tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders", "code_editor_state", "code_show"],
+    tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders", "code_editor_state", "code_show", "code_edit"],
     skills: ["studio-code"],
   }));
 
