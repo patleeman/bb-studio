@@ -72,6 +72,9 @@ const QUOTE_SCRIPT = `(() => {
 export function withQuoteScript(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   const html = Buffer.from(bytes).toString("utf8");
   const tag = `<script>${QUOTE_SCRIPT}</script>`;
-  const at = html.toLowerCase().lastIndexOf("</body>");
+  // Not toLowerCase().lastIndexOf: lowercasing can change the length ("İ"),
+  // which would put the script at the wrong offset.
+  let at = -1;
+  for (const match of html.matchAll(/<\/body>/gi)) at = match.index;
   return new Uint8Array(Buffer.from(at < 0 ? html + tag : html.slice(0, at) + tag + html.slice(at), "utf8")) as Uint8Array<ArrayBuffer>;
 }

@@ -47,6 +47,11 @@ describe("withQuoteScript", () => {
     expect(out).toMatch(/<p>Hi<\/p><script>[\s\S]*bb-artifact-selection[\s\S]*<\/script><\/BODY><\/html>$/);
   });
 
+  it("finds the closing body tag after text that lowercases longer", () => {
+    const out = html(withQuoteScript(text("<html><body><p>İİİ</p></body></html>")));
+    expect(out).toMatch(/<p>İİİ<\/p><script>[\s\S]*<\/script><\/body><\/html>$/);
+  });
+
   it("appends it to a fragment without a body", () => {
     expect(html(withQuoteScript(text("<h1>x</h1>")))).toMatch(/^<h1>x<\/h1><script>/);
   });
