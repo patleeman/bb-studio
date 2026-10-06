@@ -10,9 +10,11 @@ export const MIGRATIONS = [
   archived INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 ); CREATE INDEX IF NOT EXISTS code_workspaces_updated ON code_workspaces(updated_at);`,
   `ALTER TABLE code_workspaces ADD COLUMN thread_id TEXT; CREATE INDEX IF NOT EXISTS code_workspaces_thread ON code_workspaces(thread_id);`,
+  // Workspaces made so far were made by the user, so they stay trusted.
+  `ALTER TABLE code_workspaces ADD COLUMN trusted INTEGER NOT NULL DEFAULT 1;`,
 ];
 
-type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; folders: string; archived: number; created_at: number; updated_at: number };
+type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; trusted: number; folders: string; archived: number; created_at: number; updated_at: number };
 
 function decode(row: Row): Workspace {
   return {
@@ -20,6 +22,7 @@ function decode(row: Row): Workspace {
     title: row.title,
     projectId: row.project_id,
     threadId: row.thread_id,
+    trusted: row.trusted === 1,
     folders: JSON.parse(row.folders) as string[],
     archived: row.archived === 1,
     createdAt: row.created_at,
@@ -45,22 +48,22 @@ export class WorkspaceStore {
     return row ? decode(row) : null;
   }
 
-  create(input: { title: string; projectId: string | null; folders: string[]; threadId?: string | null }): Workspace {
+  create(input: { title: string; projectId: string | null; folders: string[]; threadId?: string | null; trusted?: boolean }): Workspace {
     const now = Date.now();
     const id = newId(ID_PREFIX);
     this.db
-      .prepare("INSERT INTO code_workspaces (id, title, project_id, thread_id, folders, archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)")
-      .run(id, input.title, input.projectId, input.threadId ?? null, JSON.stringify(input.folders), now, now);
+      .prepare("INSERT INTO code_workspaces (id, title, project_id, thread_id, trusted, folders, archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)")
+      .run(id, input.title, input.projectId, input.threadId ?? null, input.trusted === false ? 0 : 1, JSON.stringify(input.folders), now, now);
     return this.get(id)!;
   }
 
-  update(id: string, changes: Partial<Pick<Workspace, "title" | "projectId" | "folders" | "archived">>): Workspace {
+  update(id: string, changes: Partial<Pick<Workspace, "title" | "projectId" | "folders" | "archived" | "trusted">>): Workspace {
     const current = this.get(id);
     if (!current) throw new Error("Workspace not found.");
     const next = { ...current, ...changes };
     this.db
-      .prepare("UPDATE code_workspaces SET title = ?, project_id = ?, folders = ?, archived = ?, updated_at = ? WHERE id = ?")
-      .run(next.title, next.projectId, JSON.stringify(next.folders), next.archived ? 1 : 0, Date.now(), id);
+      .prepare("UPDATE code_workspaces SET title = ?, project_id = ?, folders = ?, archived = ?, trusted = ?, updated_at = ? WHERE id = ?")
+      .run(next.title, next.projectId, JSON.stringify(next.folders), next.archived ? 1 : 0, next.trusted ? 1 : 0, Date.now(), id);
     return this.get(id)!;
   }
 

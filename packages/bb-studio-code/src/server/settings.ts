@@ -44,7 +44,7 @@ export async function applyTheme(workspaceDir: string, theme: BbTheme): Promise<
 }
 
 /** Raise to give every workspace a changed layout once. */
-export const LAYOUT_VERSION = 1;
+export const LAYOUT_VERSION = 2;
 
 /**
  * VS Code laid out for a pane inside BB: the editor against BB's own
@@ -65,6 +65,8 @@ export const LAYOUT_SETTINGS: Record<string, unknown> = {
   "editor.minimap.enabled": false,
   "workbench.tips.enabled": false,
   "workbench.editor.empty.hint": "hidden",
+  // Version 1 seeded trust off; the server now skips it per workspace instead.
+  "security.workspace.trust.enabled": true,
 };
 
 /**

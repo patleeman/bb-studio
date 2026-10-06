@@ -11,6 +11,7 @@ import { createChangeBus, createStoreProvider, defineItemMention, mustGet, studi
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { listDir, readText } from "./src/server/files";
+import { sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
 import { CodeServers } from "./src/server/runtime";
@@ -54,6 +55,11 @@ function item(workspace: Workspace): StudioItem {
   };
 }
 
+/** The folders the file browser may serve; ones from before the secrets rule are skipped. */
+function safeFolders(workspace: Workspace): string[] {
+  return workspace.folders.filter((folder) => !sensitiveFolder(folder, homedir()));
+}
+
 /** Folders must be full paths (or ~/…) to directories on this machine. */
 async function checkFolders(folders: string[]): Promise<string[]> {
   const paths = folders.map((folder) => {
@@ -63,6 +69,8 @@ async function checkFolders(folders: string[]): Promise<string[]> {
   });
   const unique = [...new Set(paths)];
   for (const folder of unique) {
+    const reason = sensitiveFolder(folder, homedir());
+    if (reason) throw new Error(`A workspace can't open ${folder}: it's ${reason}.`);
     const info = await stat(folder).catch(() => null);
     if (!info?.isDirectory()) throw new Error(`Not a folder on this machine: ${folder}`);
   }
@@ -148,12 +156,12 @@ export default function plugin(bb: BbPluginApi) {
     stop: ({ id }) => ({ status: servers.stop(must(id).id) }),
     forThread: async ({ threadId }) => ({ workspace: await forThread(threadId) }),
     listDir: async ({ id, path }) => {
-      const { folders } = must(id);
+      const folders = safeFolders(must(id));
       // The empty path lists the workspace's folders themselves.
       if (!path) return { entries: folders.map((folder) => ({ name: folder.split("/").filter(Boolean).at(-1) ?? folder, path: folder, dir: true })) };
       return { entries: await listDir(folders, path) };
     },
-    readFile: async ({ id, path }) => readText(must(id).folders, path),
+    readFile: async ({ id, path }) => readText(safeFolders(must(id)), path),
     projects: async () => ({ projects: await projects() }),
     syncTheme: async (next) => {
       const key = JSON.stringify(next);
@@ -165,6 +173,15 @@ export default function plugin(bb: BbPluginApi) {
       return { changed: true };
     },
   });
+
+  /** Agents name folders the user didn't pick: VS Code keeps trust on for them. */
+  const untrust = (workspace: Workspace) => {
+    if (!workspace.trusted) return workspace;
+    const next = store.update(workspace.id, { trusted: false });
+    // Its server skipped trust; restart without that. The open view reopens it.
+    if (servers.status(workspace.id).state !== "stopped") servers.stop(workspace.id);
+    return next;
+  };
 
   const summary = (workspace: Workspace) =>
     `${workspace.id}\t${workspace.title}${workspace.threadId ? " (thread worktree)" : ""}\t${workspace.folders.join(", ") || "no folders"}`;
@@ -185,7 +202,7 @@ export default function plugin(bb: BbPluginApi) {
     execute: async ({ folders, title }, ctx) => {
       let workspace: Workspace;
       if (folders?.length) {
-        workspace = store.create({ title: title ?? "Workspace", projectId: ctx.projectId ?? null, folders: await checkFolders(folders) });
+        workspace = store.create({ title: title ?? "Workspace", projectId: ctx.projectId ?? null, folders: await checkFolders(folders), trusted: false });
         changes.changed(workspace.id);
         link(workspace.id, ctx.threadId, "created");
       } else {
@@ -203,7 +220,7 @@ export default function plugin(bb: BbPluginApi) {
     description: "Replace a workspace's folders (full paths on the computer running BB). An open VS Code updates without reloading.",
     parameters: z.object({ id: z.string().min(1).max(100), folders: z.array(z.string().trim().min(1).max(4096)).min(1).max(50) }),
     execute: async ({ id, folders }, ctx) => {
-      must(id);
+      untrust(must(id));
       const workspace = store.update(id, { folders: await checkFolders(folders) });
       await servers.sync(workspace);
       changes.changed(id);

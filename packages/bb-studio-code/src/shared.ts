@@ -39,6 +39,11 @@ export const workspaceSchema = z.object({
   projectId: z.string().nullable(),
   /** The thread whose worktree this workspace opens, if it was made for one. */
   threadId: z.string().nullable(),
+  /**
+   * The user chose these folders (or they're a thread's own worktree), so
+   * VS Code skips workspace trust. Folders an agent names stay untrusted.
+   */
+  trusted: z.boolean(),
   folders: z.array(z.string()),
   archived: z.boolean(),
   createdAt: z.number(),
@@ -51,6 +56,8 @@ export const serverStatusSchema = z.object({
   state: z.enum(["stopped", "installing", "starting", "running", "failed"]),
   /** Where the editor answers, once running. */
   url: z.string().nullable(),
+  /** This run's password; the panel signs the editor in with it. */
+  password: z.string().nullable(),
   error: z.string().nullable(),
 });
 export type ServerStatus = z.infer<typeof serverStatusSchema>;

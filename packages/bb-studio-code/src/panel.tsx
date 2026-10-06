@@ -45,6 +45,28 @@ function useShown(ref: RefObject<HTMLElement | null>): boolean {
   return shown;
 }
 
+/**
+ * Signs an editor in: posts this run's password to code-server's /login,
+ * into the frame or window named `target`. code-server sets its session
+ * cookie and redirects to the workspace.
+ */
+export function signIn(url: string, password: string, target: string): void {
+  const address = new URL(url);
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = `${address.origin}/login?to=${encodeURIComponent(`${address.pathname}${address.search}`)}`;
+  form.target = target;
+  form.style.display = "none";
+  const field = document.createElement("input");
+  field.type = "hidden";
+  field.name = "password";
+  field.value = password;
+  form.appendChild(field);
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
 const STATUS_TEXT: Record<ServerStatus["state"], string> = {
   stopped: "VS Code isn't running.",
   installing: "Downloading code-server (about 200 MB, once)…",
@@ -132,6 +154,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
     );
 
   const url = status?.state === "running" ? status.url : null;
+  const password = status?.state === "running" ? status.password : null;
   const showFolders = embed && (editing || !workspace.folders.length);
   const reference = { title: workspace.title, href: workspaceHref(id) };
   return (
@@ -151,7 +174,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
             )}
             {url ? (
               <>
-                <button type="button" className={ICON_BUTTON} title="Open VS Code in a browser window" aria-label="Open in browser" onClick={() => window.open(url, "_blank", "noopener")}>
+                <button type="button" className={ICON_BUTTON} title="Open VS Code in a browser window" aria-label="Open in browser" onClick={() => { if (password) signIn(url, password, "_blank"); }}>
                   <Icon name="ExternalLink" className="size-4" />
                 </button>
                 <button type="button" className={ICON_BUTTON} title="Stop VS Code" aria-label="Stop" onClick={stop}>
@@ -167,15 +190,8 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
       <div ref={body} className="relative min-h-0 flex-1">
         {!embed ? (
           <FileBrowser workspace={workspace} />
-        ) : url && !released ? (
-          <iframe
-            key={`${url}#${frameLoad}`}
-            // aria-label, not title: a title shows as a tooltip over the whole editor.
-            aria-label={`VS Code: ${workspace.title}`}
-            src={url}
-            className="absolute inset-0 size-full border-0"
-            allow="clipboard-read; clipboard-write"
-          />
+        ) : url && password && !released ? (
+          <EditorFrame key={`${url}#${frameLoad}`} url={url} password={password} label={`VS Code: ${workspace.title}`} />
         ) : workspace.folders.length ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p role={status?.state === "failed" ? "alert" : "status"} className="text-sm text-muted-foreground">{STATUS_TEXT[status?.state ?? "stopped"]}</p>
@@ -189,6 +205,25 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** VS Code in a frame, signed in with this run's password. */
+function EditorFrame({ url, password, label }: { url: string; password: string; label: string }) {
+  const [name] = useState(() => `studio-code-${Math.random().toString(36).slice(2)}`);
+  const frame = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    if (frame.current) signIn(url, password, name);
+  }, [url, password, name]);
+  return (
+    <iframe
+      ref={frame}
+      name={name}
+      // aria-label, not title: a title shows as a tooltip over the whole editor.
+      aria-label={label}
+      className="absolute inset-0 size-full border-0"
+      allow="clipboard-read; clipboard-write"
+    />
   );
 }
 

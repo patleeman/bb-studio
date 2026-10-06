@@ -44,7 +44,7 @@ the workspace's folders. No editor starts for these views.
 ## How it works
 
 Each open workspace runs its own [code-server](https://github.com/coder/code-server)
-(MIT) process on a free loopback port. That process gets a
+(MIT) process on a loopback port. That process gets a
 `.code-workspace` file listing the folders, plus its own VS Code settings and
 state under `<dataDir>/plugins/studio-code/workspaces/<id>/`. code-server's
 own data and config folders live there too, not in your home folder.
@@ -83,16 +83,38 @@ loads.
 
 Tested on macOS (arm64) and Linux (arm64, in Docker).
 
+## Security
+
+- **Each server has its own password.** code-server runs with password auth
+  on a port the OS picks, with a new random password each start, kept in a
+  file only you can read (never on a command line). The panel signs the
+  editor in by posting it to code-server's login; each workspace has its
+  own session cookie. Other programs on the machine and web pages can't
+  use an open editor without it. Any BB client can still get it through
+  BB's API, like everything else BB serves.
+- **Checked download.** The code-server archive must match the SHA-256 pinned
+  for its platform before it's unpacked. An install without that check
+  (or a partial one) is replaced.
+- **Workspace trust.** VS Code skips workspace trust only for folders you
+  picked and for a thread's own worktree. Folders an agent names stay in
+  Restricted Mode until you trust them in VS Code, so their tasks and
+  settings don't run on their own.
+- **No secret folders.** A workspace can't open `/`, your home folder, or a
+  folder that holds or sits inside `~/.ssh`, `~/.aws`, `~/.gnupg`,
+  `~/Library/Keychains` and similar. The read-only file browser serves a
+  workspace's folders to any BB client, so it skips such folders even if
+  they were added before this rule.
+- **Stop ends everything.** code-server runs in its own process group, and
+  Stop (or BB exiting) ends the whole group, extension hosts and terminals
+  included. Stopping, archiving or deleting a workspace while it downloads
+  or starts cancels the start.
+
 ## Limits
 
-- **No authentication.** code-server runs with `--auth none` on loopback, so
-  other programs on this machine can reach an open editor.
 - While VS Code has focus, it takes the keyboard, so BB's shortcuts don't
   work until you click outside it.
 - A thread's worktree tab works only when the thread runs on the computer
   running BB.
-- The download is pinned by version and served from GitHub over HTTPS, but its
-  checksum isn't verified.
 - No Windows support; code-server has no Windows build.
 
 ## Staged preview
