@@ -25,3 +25,18 @@ it("artifacts_save refuses inline content named . or ..", async () => {
   }
   expect((await host.harness.behavior.runCli(["list"], {} as never)).stdout).toBe("No artifacts yet.\n");
 });
+
+it("bb artifacts save refuses a file the host reports as over 25 MB before decoding it", async () => {
+  const host = createFakePluginHost({ pluginId: "artifacts" });
+  hosts.push(host);
+  await plugin(host.bb);
+  const stub = host.harness.sdk.stub as unknown as (path: string, fn: () => unknown) => void;
+  stub("threads.get", async () => ({ projectId: null, environment: { hostId: "local", path: "/work" } }));
+  stub("threads.storageLocation", async () => { throw new Error("no storage"); });
+  // Tiny content, but the host reports 26 MB: the size check must come first.
+  stub("files.read", async () => ({ path: "/work/huge.bin", content: "AAAA", contentEncoding: "base64", sha256: "x", sizeBytes: 26 * 1024 * 1024 }));
+  const result = await host.harness.behavior.runCli(["save", "huge.bin"], { threadId: "thr_1", cwd: "/work" } as never);
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr).toContain("at most 25 MB");
+  expect((await host.harness.behavior.runCli(["list"], {} as never)).stdout).toBe("No artifacts yet.\n");
+});

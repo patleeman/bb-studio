@@ -1,5 +1,5 @@
 import { parseFlags } from "@bb-studio/kit/cli";
-import { defineItemMention, displayPath, readThreadFile, resolveSource, serveBytes, threadRoots as rootsOf, type ResolvedSource } from "@bb-studio/kit/server";
+import { defineItemMention, displayPath, resolveSource, serveBytes, threadRoots as rootsOf, type ResolvedSource } from "@bb-studio/kit/server";
 import { errorMessage } from "@bb-studio/kit/format";
 // Studio Artifacts (plugin id `artifacts`): keep the files agents make.
 //
@@ -213,7 +213,19 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   const threadRoots = (threadId: string) => rootsOf(bb, threadId);
-  const readSource = (source: ResolvedSource) => readThreadFile(bb, source);
+  /**
+   * Reads a file to save. BB has no stat, so the host still sends the file,
+   * but its reported size is checked before the content is decoded, hashed
+   * or stored.
+   */
+  async function readSource(source: ResolvedSource): Promise<{ bytes: Uint8Array; mime: string | undefined }> {
+    const file = await bb.sdk.files.read({ hostId: source.root.hostId, rootPath: source.root.path, path: source.path });
+    if (file.sizeBytes > MAX_ARTIFACT_BYTES) {
+      throw new Error(`${basename(source.path)} is ${formatBytes(file.sizeBytes)}; artifacts can be at most ${formatBytes(MAX_ARTIFACT_BYTES)}.`);
+    }
+    const bytes = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64") : Buffer.from(file.content, "utf8");
+    return { bytes: new Uint8Array(bytes), mime: file.mimeType };
+  }
 
   /** Whether a file is there. A read that fails counts as no file; a write would fail the same way. */
   async function exists(source: ResolvedSource): Promise<boolean> {
