@@ -99,6 +99,9 @@ export default function plugin(bb: BbPluginApi) {
     theme: () => theme,
   });
   bb.onDispose(() => servers.dispose());
+  // A reload stopped every server; open views recheck and start theirs again.
+  const reloaded = setTimeout(() => { try { bb.realtime.publish(CHANNEL, { id: "*" }); } catch { /* No views yet. */ } }, 1000);
+  bb.onDispose(() => clearTimeout(reloaded));
   const must = (id: string) => mustGet((key) => store.get(key), id, "Workspace not found.");
 
   const services = studioServices(bb.sdk);

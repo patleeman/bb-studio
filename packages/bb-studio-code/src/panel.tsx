@@ -67,6 +67,9 @@ export function signIn(url: string, password: string, target: string): void {
   form.remove();
 }
 
+/** How often a view on screen rechecks its server, to notice one that died quietly. */
+const STATUS_RECHECK_MS = 15_000;
+
 const STATUS_TEXT: Record<ServerStatus["state"], string> = {
   stopped: "VS Code isn't running.",
   installing: "Downloading code-server (about 200 MB, once)…",
@@ -103,15 +106,32 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
   const [userStopped, setUserStopped] = useState(false);
   // Out of sight for a while, the frame lets go so VS Code's idle timer runs.
   const [released, setReleased] = useState(false);
+  // Coming back to the view asks for the editor again: forget an earlier
+  // Stop, and allow one more try after a failure.
+  const [retried, setRetried] = useState(false);
+  const wasShown = useRef(shown);
+  useEffect(() => {
+    if (shown && !wasShown.current) { setUserStopped(false); setRetried(false); }
+    wasShown.current = shown;
+  }, [shown]);
   useEffect(() => {
     if (shown) { setReleased(false); return; }
     const timer = setTimeout(() => setReleased(true), HIDDEN_RELEASE_MS);
     return () => clearTimeout(timer);
   }, [shown]);
 
+  // "*": the plugin restarted, and every server with it.
   useRealtime(CHANNEL, (event) => {
-    if ((event as { id?: string } | null)?.id === id) setVersion((n) => n + 1);
+    const changed = (event as { id?: string } | null)?.id;
+    if (changed === id || changed === "*") setVersion((n) => n + 1);
   });
+  // A server can stop without a word reaching this view (BB restarting, say),
+  // so recheck now and then while it's on screen.
+  useEffect(() => {
+    if (!shown) return;
+    const timer = setInterval(() => setVersion((n) => n + 1), STATUS_RECHECK_MS);
+    return () => clearInterval(timer);
+  }, [shown]);
   useEffect(() => {
     let live = true;
     rpc.call("get", { id }).then(
@@ -136,8 +156,10 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
     void rpc.call("stop", { id }).then((result) => setStatus(result.status), (error) => toast.error(errorMessage(error)));
   };
   useEffect(() => {
-    if (embed && shown && !userStopped && workspace?.folders.length && status?.state === "stopped") open();
-  }, [embed, shown, userStopped, workspace, status]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!embed || !shown || userStopped || !workspace?.folders.length) return;
+    if (status?.state === "stopped") open();
+    else if (status?.state === "failed" && !retried) { setRetried(true); open(); }
+  }, [embed, shown, userStopped, retried, workspace, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (changes: { title?: string; folders?: string[] }) =>
     rpc.call("update", { id, ...changes }).then(
