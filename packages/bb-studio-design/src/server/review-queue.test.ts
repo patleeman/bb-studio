@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ReviewQueue, type ReviewDeps, type ReviewResult } from "./review-queue";
+import { MAX_REVIEWS_IN_A_ROW, ReviewQueue, type ReviewDeps, type ReviewResult } from "./review-queue";
 
 /** A reviewer the test finishes by hand, one run at a time. */
 function harness() {
@@ -26,7 +26,7 @@ describe("the review queue", () => {
     runs[0]!.finish({ verdict: "needs_work", findings: "- 1a overflows" });
     await queue.settled("dsn_a");
     expect(queue.state("dsn_a")).toMatchObject({ state: "needs_work", summary: "- 1a overflows" });
-    expect(deps.report).toHaveBeenCalledWith("dsn_a", request(), "- 1a overflows");
+    expect(deps.report).toHaveBeenCalledWith("dsn_a", request(), "- 1a overflows", false);
   });
 
   it("touches nothing once disposed while a review runs", async () => {
@@ -78,5 +78,41 @@ describe("design_ready during a running review", () => {
     runs[0]!.finish({ verdict: "done" });
     await queue.settled("dsn_a");
     expect(deps.run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the automatic review cap", () => {
+  async function needsWork(queue: ReviewQueue, runs: ReturnType<typeof harness>["runs"]) {
+    expect(queue.request("dsn_a", request())).toBe("started");
+    runs.at(-1)!.finish({ verdict: "needs_work", findings: "- still broken" });
+    await queue.settled("dsn_a");
+  }
+
+  it(`pauses after ${MAX_REVIEWS_IN_A_ROW} needs-work reviews in a row and says so`, async () => {
+    const { deps, runs, queue } = harness();
+    for (let index = 0; index < MAX_REVIEWS_IN_A_ROW; index++) await needsWork(queue, runs);
+    expect(deps.report.mock.calls.map((call) => (call as unknown[])[3])).toEqual([...Array(MAX_REVIEWS_IN_A_ROW - 1).fill(false), true]);
+    expect(queue.request("dsn_a", request())).toBe("paused");
+    expect(deps.run).toHaveBeenCalledTimes(MAX_REVIEWS_IN_A_ROW);
+  });
+
+  it("resumes after a user edit or when the user asks", async () => {
+    const { runs, queue } = harness();
+    for (let index = 0; index < MAX_REVIEWS_IN_A_ROW; index++) await needsWork(queue, runs);
+    queue.userChanged("dsn_a");
+    await needsWork(queue, runs);
+    for (let index = 1; index < MAX_REVIEWS_IN_A_ROW; index++) await needsWork(queue, runs);
+    expect(queue.request("dsn_a", request())).toBe("paused");
+    expect(queue.request("dsn_a", request(), { userAsked: true })).toBe("started");
+  });
+
+  it("starts the count over when a review passes", async () => {
+    const { runs, queue } = harness();
+    for (let index = 1; index < MAX_REVIEWS_IN_A_ROW; index++) await needsWork(queue, runs);
+    queue.request("dsn_a", request());
+    runs.at(-1)!.finish({ verdict: "done" });
+    await queue.settled("dsn_a");
+    for (let index = 1; index < MAX_REVIEWS_IN_A_ROW; index++) await needsWork(queue, runs);
+    expect(queue.paused("dsn_a")).toBe(false);
   });
 });

@@ -71,7 +71,12 @@ URL hash, with a Play button on each.
   looks at the screenshots against the design skill, and ends with a
   verdict. Only "needs work" comes back, as findings posted to the design's
   thread; the canvas shows "Reviewing…", "Reviewed" or "Needs work". The
-  reviewer thread is archived and stopped after every run.
+  reviewer thread is archived and stopped after every run. A `design_ready`
+  call while a review runs queues one more review of the latest screens.
+  After 3 reviews in a row find problems (`MAX_REVIEWS_IN_A_ROW` in
+  `src/server/review-queue.ts`), automatic review pauses for that design and
+  the agent is told to say so plainly; it resumes when the user edits or
+  comments on the design, or asks for another review.
 - **Agent tools:** `design_list`, `design_create`, `design_rename`,
   `design_read`, `design_ask`, `design_ready`, `design_write_screen` (a whole screen),
   `design_edit_screen` (replace one exact snippet), `design_comments` and

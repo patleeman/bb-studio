@@ -4,6 +4,14 @@
 // storage or the change feed once the plugin is disposed or the design is gone.
 import type { ReviewState } from "./review";
 
+/**
+ * Reviews in a row that may find problems before automatic review pauses for
+ * a design. Each "needs work" wakes the agent, which fixes and asks again, so
+ * without a cap a reviewer that never agrees spawns agents forever. A user
+ * edit or comment, or the user asking for another review, starts the count over.
+ */
+export const MAX_REVIEWS_IN_A_ROW = 3;
+
 export type ReviewRequest = { screenIds: string[]; requesterThreadId: string };
 export type ReviewResult = { verdict: "done" } | { verdict: "needs_work"; findings: string };
 
@@ -12,13 +20,13 @@ export type ReviewDeps = {
   run(designId: string, request: ReviewRequest, signal: AbortSignal): Promise<ReviewResult>;
   /** Announces a design's new review state (bumps it so open canvases refetch). */
   publish(designId: string, review: ReviewState): void;
-  /** Posts the findings to the design's thread. */
-  report(designId: string, request: ReviewRequest, findings: string): Promise<void>;
+  /** Posts the findings to the design's thread; `paused` when this was the last review in a row. */
+  report(designId: string, request: ReviewRequest, findings: string, paused: boolean): Promise<void>;
   warn(message: string): void;
   now?(): number;
 };
 
-export type RequestOutcome = "started" | "queued" | "disposed";
+export type RequestOutcome = "started" | "queued" | "paused" | "disposed";
 
 function roundOf(screenIds: string[]): number | null {
   return screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
@@ -32,6 +40,8 @@ export class ReviewQueue {
   /** Bumped when a design is deleted, so a review still running for it stays quiet. */
   private readonly generations = new Map<string, number>();
   private readonly disposed = new AbortController();
+  /** "Needs work" verdicts in a row since the user last stepped in. */
+  private readonly streaks = new Map<string, number>();
 
   constructor(private readonly deps: ReviewDeps) {}
 
@@ -40,8 +50,16 @@ export class ReviewQueue {
     return this.states.get(designId) ?? null;
   }
 
-  request(designId: string, request: ReviewRequest): RequestOutcome {
+  /** Whether automatic review is paused for the design. */
+  paused(designId: string): boolean {
+    return (this.streaks.get(designId) ?? 0) >= MAX_REVIEWS_IN_A_ROW;
+  }
+
+  /** `userAsked`: the user asked for another review, which resumes a paused one. */
+  request(designId: string, request: ReviewRequest, options: { userAsked?: boolean } = {}): RequestOutcome {
     if (this.disposed.signal.aborted) return "disposed";
+    if (options.userAsked) this.streaks.delete(designId);
+    if (this.paused(designId)) return "paused";
     if (this.running.has(designId)) {
       this.queued.set(designId, request);
       return "queued";
@@ -50,10 +68,16 @@ export class ReviewQueue {
     return "started";
   }
 
+  /** The user edited or commented on the design: reviews may run again. */
+  userChanged(designId: string): void {
+    this.streaks.delete(designId);
+  }
+
   /** The design was deleted: forget its reviews, and ignore one still running. */
   forget(designId: string): void {
     this.states.delete(designId);
     this.queued.delete(designId);
+    this.streaks.delete(designId);
     this.generations.set(designId, (this.generations.get(designId) ?? 0) + 1);
   }
 
@@ -72,7 +96,7 @@ export class ReviewQueue {
       // The screens changed while it ran: review their latest state once more.
       const next = this.queued.get(designId);
       this.queued.delete(designId);
-      if (next && !this.disposed.signal.aborted) this.start(designId, next);
+      if (next && !this.disposed.signal.aborted && !this.paused(designId)) this.start(designId, next);
     });
     this.running.set(designId, task);
   }
@@ -91,11 +115,14 @@ export class ReviewQueue {
       const result = await this.deps.run(designId, request, this.disposed.signal);
       if (!live()) return;
       if (result.verdict === "done") {
+        this.streaks.delete(designId);
         this.set(designId, { ...base, state: "done", summary: null });
         return;
       }
+      const streak = (this.streaks.get(designId) ?? 0) + 1;
+      this.streaks.set(designId, streak);
       this.set(designId, { ...base, state: "needs_work", summary: result.findings || null });
-      await this.deps.report(designId, request, result.findings);
+      await this.deps.report(designId, request, result.findings, streak >= MAX_REVIEWS_IN_A_ROW);
     } catch (error) {
       if (!live()) return;
       const message = error instanceof Error ? error.message : String(error);

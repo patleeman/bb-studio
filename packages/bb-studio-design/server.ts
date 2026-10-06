@@ -13,7 +13,7 @@ import { DesignStore, MIGRATIONS, displayName, type Writer } from "./src/server/
 import { registerStudio, screenText } from "./src/server/studio";
 import { withScreenScript } from "./src/server/screen-script";
 import { VERDICT_DONE, parseVerdict, reviewTargets, reviewerPrompt } from "./src/server/review";
-import { ReviewQueue } from "./src/server/review-queue";
+import { MAX_REVIEWS_IN_A_ROW, ReviewQueue } from "./src/server/review-queue";
 import type { CommentRow, DesignRow } from "./src/server/store";
 import { MAX_OTHER_CHARS, MAX_TEXT_CHARS, summarizeAnswers, type Answers, type QuestionForm } from "./src/questions";
 
@@ -166,18 +166,23 @@ export default async function plugin(bb: BbPluginApi) {
   /** Bounds a review: a stuck reviewer is stopped, and the round counts as unreviewed. */
   const REVIEW_TIMEOUT_MS = 15 * 60_000;
 
+  const pausedNote = [
+    `That's ${MAX_REVIEWS_IN_A_ROW} reviews in a row that found problems, so automatic review is paused for this design.`,
+    "Fix what you can, then tell the user plainly: review paused after " + MAX_REVIEWS_IN_A_ROW + " rounds, and what still needs work.",
+    "Don't call design_ready again until the user edits or comments on the design, or asks for another review (then pass userAsked).",
+  ].join(" ");
   const reviews = new ReviewQueue({
     publish(designId) {
       if (store.get(designId)) changed(designId, store.bump(designId, "agent"), "agent");
     },
     warn: (message) => bb.log.warn(message),
-    async report(designId, { screenIds, requesterThreadId }, findings) {
+    async report(designId, { screenIds, requesterThreadId }, findings, paused) {
       const row = store.get(designId);
       if (!row) return;
       const round = screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
       await bb.sdk.threads.send({
         threadId: row.thread_id ?? requesterThreadId,
-        input: [{ type: "text", mentions: [], text: [`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`, "", findings, "", "Fix them, then call design_ready again."].join("\n") }],
+        input: [{ type: "text", mentions: [], text: [`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`, "", findings, "", paused ? pausedNote : "Fix them, then call design_ready again."].join("\n") }],
         mode: "queue-if-active",
       });
     },
@@ -247,6 +252,7 @@ export default async function plugin(bb: BbPluginApi) {
     renameDesign({ id, name }) {
       if (!store.get(id)) throw new Error("Design not found.");
       const updatedAt = store.rename(id, name.trim(), "editor");
+      reviews.userChanged(id);
       changed(id, updatedAt, "editor");
       return { ok: true, updatedAt };
     },
@@ -261,6 +267,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (!store.screen(designId, screenId)) throw new Error(`Screen ${screenId} not found.`);
       if (send && !row.thread_id) throw new Error("This design has no conversation yet. Start one with Chat, then send the comment.");
       const comment = store.addComment(designId, { screenId, step, selector, elementHtml, elementText, body });
+      reviews.userChanged(designId);
       if (send) await sendToThread(row, comment);
       changed(designId, store.bump(designId, "editor"), "editor");
       return { id: comment.id, sent: send };
@@ -271,6 +278,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (!comment || !row) throw new Error("Comment not found.");
       if (!row.thread_id) throw new Error("This design has no conversation yet. Start one with Chat, then send the comment.");
       await sendToThread(row, comment);
+      reviews.userChanged(row.id);
       changed(row.id, store.bump(row.id, "editor"), "editor");
       return { ok: true };
     },
@@ -278,6 +286,7 @@ export default async function plugin(bb: BbPluginApi) {
       const comment = store.comment(id);
       if (!comment) throw new Error("Comment not found.");
       store.setResolved(id, resolved);
+      reviews.userChanged(comment.design_id);
       changed(comment.design_id, store.bump(comment.design_id, "editor"), "editor");
       return { ok: true };
     },
@@ -285,6 +294,7 @@ export default async function plugin(bb: BbPluginApi) {
       const comment = store.comment(id);
       if (!comment) return { ok: true };
       store.deleteComment(id);
+      reviews.userChanged(comment.design_id);
       changed(comment.design_id, store.bump(comment.design_id, "editor"), "editor");
       return { ok: true };
     },
@@ -295,6 +305,7 @@ export default async function plugin(bb: BbPluginApi) {
     changed: (id) => {
       // Studio deletes through here too: a deleted design's reviews are forgotten.
       if (!store.get(id)) reviews.forget(id);
+      else reviews.userChanged(id);
       changed(id, store.get(id)?.updated_at ?? Date.now(), "studio");
     },
   });
@@ -485,8 +496,9 @@ export default async function plugin(bb: BbPluginApi) {
       designId: z.string().min(1),
       screenIds: z.array(screenIdSchema).max(12).optional().describe("Defaults to the newest round."),
       skipReview: z.boolean().optional(),
+      userAsked: z.boolean().optional().describe("Set only when the user's own message asks for another review after review paused."),
     }),
-    execute({ designId, screenIds, skipReview }, ctx) {
+    execute({ designId, screenIds, skipReview, userAsked }, ctx) {
       const view = store.view(designId);
       if (!view) return notFound(designId);
       const ids = screenIds?.length ? screenIds : view.rounds[0]?.screens.map((screen) => screen.id) ?? [];
@@ -495,7 +507,8 @@ export default async function plugin(bb: BbPluginApi) {
       if (missing.length) return fail(`Not in this design: ${missing.join(", ")}.`);
       if (skipReview) return `Marked ready without a review.\n${card(designId)}`;
       if (!ctx.threadId) return fail("A review needs a thread to report back to.");
-      const outcome = reviews.request(designId, { screenIds: ids, requesterThreadId: ctx.threadId });
+      const outcome = reviews.request(designId, { screenIds: ids, requesterThreadId: ctx.threadId }, { userAsked });
+      if (outcome === "paused") return `Automatic review is paused for this design: the last ${MAX_REVIEWS_IN_A_ROW} reviews in a row found problems. Tell the user plainly what still needs work. Call design_ready again only after the user edits or comments on the design, or asks for another review (then pass userAsked).`;
       if (outcome === "disposed") return fail("Studio Design is reloading; call design_ready again in a moment.");
       if (outcome === "queued") return `A review of this design is already running. Once it ends, ${ids.join(", ")} are reviewed again as they are then; findings come back only if something needs fixing.\n${card(designId)}`;
       return `Sent ${ids.join(", ")} for review. The reviewer reports back in this thread only if something needs fixing; until then, say the work is out for review, not done. Keep your summary short.\n${card(designId)}`;
