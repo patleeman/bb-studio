@@ -14,6 +14,7 @@ export const HUB_PANELS = [
   "talk/recordings",
   "studio-tables/tables",
   "design/designs",
+  "studio-code/workspaces",
 ];
 
 /**

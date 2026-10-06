@@ -272,6 +272,31 @@
           "ref": "main"
         }
       }
+    },
+    {
+      "id": "studio-code",
+      "displayName": "Studio Code",
+      "description": "Part of BB Studio. VS Code workspaces in your Spaces: open one or more folders in a full editor, run by a local code-server.",
+      "icon": {
+        "url": "./packages/bb-studio-code/assets/icon.svg"
+      },
+      "tags": [
+        "productivity",
+        "developer-tools",
+        "editor",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-code",
+          "ref": "main"
+        }
+      }
     }
   ]
 }

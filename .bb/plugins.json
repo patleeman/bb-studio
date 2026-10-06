@@ -46,6 +46,10 @@
     {
       "name": "design",
       "source": "./packages/bb-studio-design"
+    },
+    {
+      "name": "studio-code",
+      "source": "./packages/bb-studio-code"
     }
   ]
 }
