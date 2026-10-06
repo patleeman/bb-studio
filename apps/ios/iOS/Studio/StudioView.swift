@@ -603,7 +603,7 @@ struct StudioView: View {
 
     /// Capture first, file later: each tile opens straight into typing or recording.
     private var quickActions: some View {
-        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 1 + (store.plugins.contains("talk") ? 2 : 0)
+        let count = store.plugins.contains("talk") || dynamicTypeSize.isAccessibilitySize ? 2 : 1
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
             if store.plugins.contains("talk") {
                 tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
@@ -619,9 +619,6 @@ struct StudioView: View {
                         Task { await create(kind) }
                     }
                 }
-            }
-            if store.plugins.contains("talk") {
-                tile("Record", "record.circle", .red) { recordingKind = "recording" } menu: {}
             }
         }
         .padding(.vertical, 4)
