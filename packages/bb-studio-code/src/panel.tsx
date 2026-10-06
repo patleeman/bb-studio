@@ -170,7 +170,8 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
         ) : url && !released ? (
           <iframe
             key={`${url}#${frameLoad}`}
-            title={`VS Code: ${workspace.title}`}
+            // aria-label, not title: a title shows as a tooltip over the whole editor.
+            aria-label={`VS Code: ${workspace.title}`}
             src={url}
             className="absolute inset-0 size-full border-0"
             allow="clipboard-read; clipboard-write"

@@ -11,7 +11,7 @@ import { createChangeBus, createStoreProvider, defineItemMention, mustGet, studi
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { listDir, readText } from "./src/server/files";
-import { applyThemeEverywhere } from "./src/server/settings";
+import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
 import { CodeServers } from "./src/server/runtime";
 import { MIGRATIONS, WorkspaceStore } from "./src/server/store";
@@ -82,6 +82,8 @@ export default function plugin(bb: BbPluginApi) {
   let theme: BbTheme | null = null;
   let themeKey = "";
   void bb.storage.kv.get<BbTheme>("theme").then((saved) => { theme ??= saved ?? null; themeKey = JSON.stringify(theme); });
+  // Existing workspaces get a new layout once, the next time VS Code loads.
+  void applyLayoutEverywhere(root, (message) => bb.log.warn(message)).catch(() => undefined);
   const servers = new CodeServers({
     root,
     log: bb.log,

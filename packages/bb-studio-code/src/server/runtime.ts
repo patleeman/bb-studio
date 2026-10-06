@@ -14,7 +14,7 @@ import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { promisify } from "node:util";
 import { IDLE_TIMEOUT_SECONDS, type ServerStatus, type Workspace } from "../shared";
 import type { BbTheme } from "../theme";
-import { applyTheme } from "./settings";
+import { applyLayout, applyTheme } from "./settings";
 
 export const CODE_SERVER_VERSION = "4.140.0";
 const READY_TIMEOUT_MS = 60_000;
@@ -111,6 +111,7 @@ export class CodeServers {
       const file = join(dir, workspaceFileName(workspace.title));
       await writeFile(file, workspaceFile(workspace.folders));
       await seedSettings(join(dir, "user-data", "User"));
+      await applyLayout(dir).catch(() => false);
       const theme = this.options.theme?.();
       if (theme) await applyTheme(dir, theme).catch(() => false);
       const config = join(this.options.root, "config.yaml");

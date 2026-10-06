@@ -51,6 +51,14 @@ own data and config folders live there too, not in your home folder.
 Extensions are shared across workspaces and come from Open VSX. New workspaces
 turn off Restricted Mode, the welcome page and VS Code's own AI chat.
 
+**Layout for BB.** VS Code is laid out for a pane inside BB: the editor sits
+against BB's own sidebar, and VS Code's side bar and activity bar are on the
+right. There's no title bar, menu bar, command center, layout buttons,
+breadcrumbs, minimap or tips. The menu is the ≡ at the top of the activity
+bar, and ⇧⌘P opens the command palette. Each workspace gets this layout once
+(a `layout-version` file beside it records which), so changes you make in
+VS Code afterwards stay.
+
 **BB's theme.** VS Code takes BB's colors, whatever theme BB uses, including
 custom and plugin themes. While a workspace is on screen, the app reads BB's
 palette from the page, converts it to hex, and the server writes it into every

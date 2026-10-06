@@ -41,3 +41,23 @@ describe("settings merge", () => {
     expect(JSON.parse(mergeSettings(null, { a: 1 })!)).toEqual({ a: 1 });
   });
 });
+
+describe("layout", () => {
+  it("applies once, then leaves the user's changes", async () => {
+    const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { applyLayout, settingsDir } = await import("./server/settings");
+    const dir = await mkdtemp(join(tmpdir(), "studio-code-layout-"));
+    try {
+      expect(await applyLayout(dir)).toBe(true);
+      const file = join(settingsDir(dir), "settings.json");
+      expect(JSON.parse(await readFile(file, "utf8"))["workbench.sideBar.location"]).toBe("right");
+      await writeFile(file, JSON.stringify({ "workbench.sideBar.location": "left" }));
+      expect(await applyLayout(dir)).toBe(true);
+      expect(JSON.parse(await readFile(file, "utf8"))["workbench.sideBar.location"]).toBe("left");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
