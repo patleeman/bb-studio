@@ -8,12 +8,15 @@
 //     open to the thread's own worktree, or the workspace a card names.
 //   - messageDirective `::workspace{id="cws_…"}`: a card in a reply that
 //     opens the workspace in the workbench.
+//   - experimental_threadHeaderAction: a "VS Code" chip in the thread header
+//     once the thread has a workspace or has edited files.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { WorkspaceCard } from "./src/card";
 import { CodePanel } from "./src/panel";
 import { CODE_ICON, CODE_TAB, PANEL_PATH } from "./src/shared";
 import { ThreadCodePanel } from "./src/thread-tab";
+import { ThreadCodeChip } from "./src/thread-chip";
 
 export default definePluginApp((app) => {
   app.slots.navPanel({
@@ -35,4 +38,7 @@ export default definePluginApp((app) => {
     component: ThreadCodePanel,
   });
   app.slots.messageDirective({ id: "workspace", component: WorkspaceCard });
+  // A quiet "VS Code" chip in a thread's header once it has a workspace or
+  // has edited files: one click to the exact workspace.
+  app.slots.experimental_threadHeaderAction({ id: "code-chip", title: "VS Code", component: ThreadCodeChip });
 });

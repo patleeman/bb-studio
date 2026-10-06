@@ -133,6 +133,11 @@ export const codeContract = defineRpcContract({
     input: z.object({ id, path: z.string().min(1).max(4096), startLine: z.number().int().min(1), endLine: z.number().int().min(1).optional() }),
     output: z.object({ shown: z.boolean() }),
   },
+  /** The thread header's VS Code chip: the workspace it opens (null: the thread's worktree), or no chip. */
+  threadChip: {
+    input: z.object({ threadId: id }),
+    output: z.object({ chip: z.object({ workspaceId: z.string().nullable(), title: z.string(), working: z.boolean() }).nullable() }),
+  },
   /** What the workspace's VS Code reports, as the agent sees it; null with no editor open. */
   editorState: {
     input: z.object({ id }),

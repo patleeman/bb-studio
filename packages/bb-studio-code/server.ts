@@ -15,6 +15,7 @@ import { Bridges, editorContext } from "./src/server/bridge";
 import { installBridge } from "./src/server/bridge-extension";
 import { applyEdits, editSchema } from "./src/server/edits";
 import { contained, listDir, readText } from "./src/server/files";
+import { chipFor } from "./src/server/chip";
 import { browseFolders, sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
@@ -190,6 +191,9 @@ export default function plugin(bb: BbPluginApi) {
     readFile: async ({ id, path }) => readText(safeFolders(must(id)), path),
     browseFolders: ({ path, showHidden }) => browseFolders(path, homedir(), showHidden),
     editorState: ({ id }) => ({ state: bridges.connected(id) ? bridges.state(id) : null }),
+    threadChip: async ({ threadId }) => ({
+      chip: chipFor({ threadId, threadPath: await threadPath(threadId), workspaces: store.list(), touched: touchedFiles.get(threadId) ?? null }),
+    }),
     reveal: async ({ id, path, startLine, endLine }) => {
       const workspace = must(id);
       const file = isAbsolute(path) ? resolve(path) : resolve(workspace.folders[0] ?? "/", path);
@@ -411,7 +415,23 @@ export default function plugin(bb: BbPluginApi) {
   };
   /** The workspaces each thread's activity reached this turn, to tell them when it's done. */
   const touched = new Map<string, Set<string>>();
+  /** Threads that have edited files in their folder or a workspace's: they get the header chip. */
+  const touchedFiles = new Map<string, { working: boolean }>();
+  const chipChanged = (threadId: string) => { try { bb.realtime.publish(CHANNEL, { type: "thread", threadId }); } catch { /* No views. */ } };
   const deliver = async (threadId: string, activity: Activity) => {
+    if (activity.kind === "turn" && activity.state === "done" && touchedFiles.get(threadId)?.working) {
+      touchedFiles.set(threadId, { working: false });
+      chipChanged(threadId);
+    }
+    if (activity.kind === "edit") {
+      const path = await threadPath(threadId);
+      const ours = (path !== null && inside(path, activity.path)) || store.list().some((workspace) => !workspace.archived && workspace.folders.some((folder) => inside(folder, activity.path)));
+      if (ours && !touchedFiles.get(threadId)?.working) {
+        touchedFiles.set(threadId, { working: true });
+        chipChanged(threadId);
+      }
+    }
+    if (!bridges.anyConnected()) return;
     const by = await titleOf(threadId);
     bb.log.debug(`activity ${threadId}: ${activity.kind} ${"path" in activity ? activity.path : activity.state}`);
     if (activity.kind === "turn") {
@@ -461,8 +481,10 @@ export default function plugin(bb: BbPluginApi) {
     }, () => undefined);
   };
   // A thread is followed while it works, and only when an editor is open to show it.
+  // Every working thread is followed (a cheap local poll while it works): its
+  // edits light the header chip even before any editor is open.
   bb.events.on("thread.active", ({ thread }) => {
-    if (!bridges.anyConnected() || watcher.watching(thread.id)) return;
+    if (watcher.watching(thread.id)) return;
     bb.log.info(`following thread ${thread.id} while it works`);
     watcher.watch(thread.id);
   });
