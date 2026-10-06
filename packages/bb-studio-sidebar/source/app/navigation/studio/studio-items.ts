@@ -13,6 +13,7 @@ export const HUB_PANELS = [
   "artifacts/artifacts",
   "talk/recordings",
   "studio-tables/tables",
+  "design/designs",
 ];
 
 /**
