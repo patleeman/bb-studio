@@ -118,7 +118,28 @@ describe("bridge extension", () => {
     await installBridge(extensions);
     await installBridge(extensions);
     expect((await readdir(extensions)).filter((name) => name.startsWith(BRIDGE_ID))).toEqual([`${BRIDGE_ID}-${BRIDGE_VERSION}`]);
-    expect(JSON.parse(await readFile(join(extensions, "extensions.json"), "utf8"))).toEqual([{ identifier: { id: "other.ext" }, version: "1.0.0" }]);
+    // The old version's entry is replaced by the new one; others stay.
+    expect(JSON.parse(await readFile(join(extensions, "extensions.json"), "utf8"))).toEqual([
+      { identifier: { id: "other.ext" }, version: "1.0.0" },
+      expect.objectContaining({ identifier: { id: BRIDGE_ID }, version: BRIDGE_VERSION }),
+    ]);
     expect(JSON.parse(await readFile(join(extensions, `${BRIDGE_ID}-${BRIDGE_VERSION}`, "package.json"), "utf8")).main).toBe("./extension.js");
+  });
+});
+
+describe("bridge registration", () => {
+  it("registers itself where VS Code already keeps a list, and undoes VS Code marking it removed", async () => {
+    const { BRIDGE_ID, BRIDGE_VERSION, installBridge } = await import("./bridge-extension");
+    const { mkdir, writeFile, readFile } = await import("node:fs/promises");
+    const extensions = join(dir, "existing-registry");
+    await mkdir(extensions, { recursive: true });
+    // What VS Code had written: an empty list, and our folder marked removed.
+    await writeFile(join(extensions, "extensions.json"), "[]");
+    await writeFile(join(extensions, ".obsolete"), JSON.stringify({ [`${BRIDGE_ID}-${BRIDGE_VERSION}`]: true, "other.ext-1.0.0": true }));
+    await installBridge(extensions);
+    const registry = JSON.parse(await readFile(join(extensions, "extensions.json"), "utf8"));
+    expect(registry).toEqual([expect.objectContaining({ identifier: { id: BRIDGE_ID }, version: BRIDGE_VERSION, relativeLocation: `${BRIDGE_ID}-${BRIDGE_VERSION}` })]);
+    expect(registry[0].location).toEqual({ $mid: 1, path: join(extensions, `${BRIDGE_ID}-${BRIDGE_VERSION}`), scheme: "file" });
+    expect(JSON.parse(await readFile(join(extensions, ".obsolete"), "utf8"))).toEqual({ "other.ext-1.0.0": true });
   });
 });

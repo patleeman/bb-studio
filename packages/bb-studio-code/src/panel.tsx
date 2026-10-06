@@ -70,6 +70,7 @@ export function signIn(url: string, password: string, target: string): void {
 
 /** How often a view on screen rechecks its server, to notice one that died quietly. */
 const STATUS_RECHECK_MS = 15_000;
+const STATUS_RECHECK_HIDDEN_MS = 60_000;
 
 const STATUS_TEXT: Record<ServerStatus["state"], string> = {
   stopped: "VS Code isn't running.",
@@ -126,11 +127,11 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
     const changed = (event as { id?: string } | null)?.id;
     if (changed === id || changed === "*") setVersion((n) => n + 1);
   });
-  // A server can stop without a word reaching this view (BB restarting, say),
-  // so recheck now and then while it's on screen.
+  // A server can stop without a word reaching this view (a plugin update, say),
+  // so recheck now and then, on screen or not: a frame left on a dead server
+  // keeps flashing VS Code's "reconnecting" screen.
   useEffect(() => {
-    if (!shown) return;
-    const timer = setInterval(() => setVersion((n) => n + 1), STATUS_RECHECK_MS);
+    const timer = setInterval(() => setVersion((n) => n + 1), shown ? STATUS_RECHECK_MS : STATUS_RECHECK_HIDDEN_MS);
     return () => clearInterval(timer);
   }, [shown]);
   useEffect(() => {

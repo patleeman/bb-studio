@@ -171,31 +171,46 @@ exports.activate = (context) => {
 exports.deactivate = () => { stopped = true; };
 `;
 
+type RegistryEntry = { identifier?: { id?: string }; version?: string; [key: string]: unknown };
+
+async function readJson<T>(file: string, fallback: T): Promise<T> {
+  if (!existsSync(file)) return fallback;
+  try { return JSON.parse(await readFile(file, "utf8")) as T; } catch { return fallback; }
+}
+
 /**
- * Writes the bridge into the shared extensions folder once per version, and
- * removes older versions so VS Code loads only this one.
+ * Writes the bridge into the shared extensions folder and registers it.
+ * VS Code keeps its own list of installed extensions (extensions.json): a
+ * folder missing from an existing list is taken as uninstalled and marked
+ * for removal (.obsolete), so the bridge adds its entry and clears that
+ * mark. Older versions are removed.
  */
 export async function installBridge(extensionsDir: string): Promise<void> {
-  const folder = join(extensionsDir, `${BRIDGE_ID}-${BRIDGE_VERSION}`);
+  const name = `${BRIDGE_ID}-${BRIDGE_VERSION}`;
+  const folder = join(extensionsDir, name);
   await mkdir(extensionsDir, { recursive: true });
-  for (const name of await readdir(extensionsDir)) {
-    if (name.startsWith(`${BRIDGE_ID}-`) && name !== `${BRIDGE_ID}-${BRIDGE_VERSION}`) await rm(join(extensionsDir, name), { recursive: true, force: true });
+  for (const entry of await readdir(extensionsDir)) {
+    if (entry.startsWith(`${BRIDGE_ID}-`) && entry !== name) await rm(join(extensionsDir, entry), { recursive: true, force: true });
   }
-  // VS Code's own list of installed extensions: drop entries for removed versions.
-  const registry = join(extensionsDir, "extensions.json");
-  if (existsSync(registry)) {
-    try {
-      const entries = JSON.parse(await readFile(registry, "utf8")) as { identifier?: { id?: string }; version?: string }[];
-      const kept = entries.filter((entry) => entry.identifier?.id !== BRIDGE_ID || entry.version === BRIDGE_VERSION);
-      if (kept.length !== entries.length) await writeFile(registry, JSON.stringify(kept));
-    } catch {
-      // VS Code rebuilds it.
-    }
+  const current = existsSync(join(folder, "extension.js")) && (await readFile(join(folder, "extension.js"), "utf8")) === EXTENSION;
+  if (!current) {
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, "package.json"), `${JSON.stringify(MANIFEST, null, 2)}\n`);
+    await writeFile(join(folder, "extension.js"), EXTENSION);
   }
-  if (existsSync(join(folder, "extension.js")) && (await readFile(join(folder, "extension.js"), "utf8")) === EXTENSION) return;
-  await mkdir(folder, { recursive: true });
-  await writeFile(join(folder, "package.json"), `${JSON.stringify(MANIFEST, null, 2)}\n`);
-  await writeFile(join(folder, "extension.js"), EXTENSION);
+  const registryFile = join(extensionsDir, "extensions.json");
+  const registry = await readJson<RegistryEntry[]>(registryFile, []);
+  const others = Array.isArray(registry) ? registry.filter((entry) => entry.identifier?.id !== BRIDGE_ID) : [];
+  const ours = { identifier: { id: BRIDGE_ID }, version: BRIDGE_VERSION, location: { $mid: 1, path: folder, scheme: "file" }, relativeLocation: name, metadata: { installedTimestamp: Date.now(), source: "resource" } };
+  const kept = Array.isArray(registry) ? registry.find((entry) => entry.identifier?.id === BRIDGE_ID && entry.version === BRIDGE_VERSION) : undefined;
+  if (!kept || registry.length !== others.length + 1) await writeFile(registryFile, JSON.stringify([...others, kept ?? ours]));
+  const obsoleteFile = join(extensionsDir, ".obsolete");
+  const obsolete = await readJson<Record<string, boolean>>(obsoleteFile, {});
+  if (Object.keys(obsolete).some((key) => key.startsWith(`${BRIDGE_ID}-`))) {
+    const rest = Object.fromEntries(Object.entries(obsolete).filter(([key]) => !key.startsWith(`${BRIDGE_ID}-`)));
+    if (Object.keys(rest).length) await writeFile(obsoleteFile, JSON.stringify(rest));
+    else await rm(obsoleteFile, { force: true });
+  }
 }
 
 /** For tests: the extension's source. */
