@@ -10,6 +10,7 @@ import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-stu
 import { createChangeBus, createStoreProvider, defineItemMention, mustGet, studioServices } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import type { Activity } from "./src/server/activity";
 import { Bridges, editorContext } from "./src/server/bridge";
 import { installBridge } from "./src/server/bridge-extension";
 import { applyEdits, editSchema } from "./src/server/edits";
@@ -18,6 +19,7 @@ import { browseFolders, sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
 import { CodeServers } from "./src/server/runtime";
+import { ThreadWatcher } from "./src/server/watch";
 import { MIGRATIONS, WorkspaceStore } from "./src/server/store";
 import { CHANNEL, CODE_ICON, KIND_ID, PANEL_PATH, PLUGIN_ID, codeContract, workspaceHref, type Workspace } from "./src/shared";
 
@@ -380,6 +382,63 @@ export default function plugin(bb: BbPluginApi) {
       link(workspace.id, ctx.threadId, "edited");
       return `No editor was open, so the ${edits.length === 1 ? "edit went" : `${edits.length} edits went`} to ${name} on disk.`;
     },
+  });
+
+  // ---- Watching the agent work (layer 2) -------------------------------------
+
+  /** Thread titles, for "Fix the retry backoff: reading retry.ts". */
+  const titles = new Map<string, string>();
+  const titleOf = async (threadId: string) => {
+    if (!titles.has(threadId)) {
+      const thread = (await bb.sdk.threads.get({ threadId }).catch(() => null)) as { title?: string | null } | null;
+      titles.set(threadId, thread?.title?.trim() || "Agent");
+    }
+    return titles.get(threadId)!;
+  };
+  /** The workspaces each thread's activity reached this turn, to tell them when it's done. */
+  const touched = new Map<string, Set<string>>();
+  const deliver = async (threadId: string, activity: Activity) => {
+    const by = await titleOf(threadId);
+    bb.log.debug(`activity ${threadId}: ${activity.kind} ${"path" in activity ? activity.path : activity.state}`);
+    if (activity.kind === "turn") {
+      // The thread's own workspace, ones over its folder, and any its work reached.
+      const path = await threadPath(threadId);
+      const related = store.list()
+        .filter((workspace) => !workspace.archived && (workspace.threadId === threadId || (path !== null && workspace.folders.some((folder) => inside(folder, path) || inside(path, folder)))))
+        .map((workspace) => workspace.id);
+      const reached = new Set([...(touched.get(threadId) ?? []), ...related]);
+      if (activity.state === "working") touched.set(threadId, new Set(related));
+      else touched.delete(threadId);
+      for (const id of reached) bridges.notify(id, { type: "activity", by, threadId, activity });
+      return;
+    }
+    // Only editors holding the file hear about it: threads working elsewhere stay out.
+    for (const workspace of store.list()) {
+      if (workspace.archived || !bridges.connected(workspace.id) || !workspace.folders.some((folder) => inside(folder, activity.path))) continue;
+      const sent = bridges.notify(workspace.id, { type: "activity", by, threadId, activity });
+      bb.log.debug(`  -> ${workspace.id}: ${sent ? "sent" : "no window"}`);
+      if (sent) {
+        const reached = touched.get(threadId) ?? new Set<string>();
+        reached.add(workspace.id);
+        touched.set(threadId, reached);
+      }
+    }
+  };
+  const watcher = new ThreadWatcher({
+    events: async ({ threadId, afterSeq, order, limit }) => ({
+      events: (await bb.sdk.threads.events.list({ threadId, limit, ...(afterSeq ? { afterSeq } : {}), ...(order ? { order } : {}) })) as unknown as { seq: number; type: string; data?: unknown }[],
+    }),
+    threadPath,
+    status: async (threadId) => ((await bb.sdk.threads.get({ threadId })) as { status: string }).status,
+    log: (message) => bb.log.info(message),
+    onActivity: (threadId, activity) => void deliver(threadId, activity).catch((error) => bb.log.warn(`activity for ${threadId}: ${error instanceof Error ? error.message : String(error)}`)),
+  });
+  bb.onDispose(() => watcher.dispose());
+  // A thread is followed while it works, and only when an editor is open to show it.
+  bb.events.on("thread.active", ({ thread }) => {
+    if (!bridges.anyConnected() || watcher.watching(thread.id)) return;
+    bb.log.info(`following thread ${thread.id} while it works`);
+    watcher.watch(thread.id);
   });
 
   bb.agents.configure(() => ({

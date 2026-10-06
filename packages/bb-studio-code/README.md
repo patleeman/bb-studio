@@ -58,6 +58,17 @@ workspace open in several tabs, the agent talks to the one you used last. When n
 one. **Copy for BB chat** in the editor's right-click menu copies the
 selection with its path and lines, for pasting into the chat.
 
+**Watching the agent work.** While a thread works, Studio Code follows its
+events and shows what it's doing in any open editor whose folders hold the
+files: Claude Code's reads, plain shell reads such as Codex's `sed -n` and
+`cat`, file changes, and its live edits. The status bar says what it's on
+("Fix the retry: editing retry.ts", then "changed 2 files"), lines it reads
+get a soft highlight, and lines it changed are tinted with an accent bar
+until its next turn. **Follow** (the eye in the status bar; on by default)
+moves your editor to where the agent is working, but never while you've
+typed or clicked in the last few seconds. Threads working in other folders
+don't touch your editor.
+
 The bridge talks to the plugin over a Unix socket in the workspace's folder
 that only you can open: no port and no token.
 

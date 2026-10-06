@@ -9,12 +9,15 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { z } from "zod";
 import { editorStateSchema, type EditorState } from "../shared";
+import type { Activity } from "./activity";
 import type { TextEdit } from "./edits";
 
-/** Something the agent asks the user's editor to do. */
+/** Something the agent asks the user's editor to do, or tells it is happening. */
 export type BridgeCommand =
   | { type: "show"; path: string; startLine: number; endLine: number }
-  | { type: "edit"; path: string; edits: TextEdit[] };
+  | { type: "edit"; path: string; edits: TextEdit[] }
+  /** What an agent is doing (src/server/activity.ts); `by` names its thread. */
+  | { type: "activity"; by: string; threadId: string; activity: Activity };
 /** A window's answer to a request. `code: "no-window"`: nothing on screen to do it in. */
 export type BridgeResult = { ok: boolean; detail: string; code?: "no-window" };
 
@@ -119,6 +122,19 @@ export class Bridges {
     this.held.delete(id);
     window.stream.write(`data: ${JSON.stringify(command)}\n\n`);
     return true;
+  }
+
+  /** Sends a passing notice to the current window; dropped when none is open. */
+  notify(id: string, command: BridgeCommand): boolean {
+    const window = this.current(id);
+    if (!window?.stream) return false;
+    window.stream.write(`data: ${JSON.stringify(command)}\n\n`);
+    return true;
+  }
+
+  /** Whether any workspace has an editor open. */
+  anyConnected(): boolean {
+    return [...this.bridges.keys()].some((id) => this.connected(id));
   }
 
   /**

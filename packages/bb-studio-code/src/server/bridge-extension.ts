@@ -9,7 +9,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Raise with every change to the extension, so workspaces get the new one. */
-export const BRIDGE_VERSION = "0.2.3";
+export const BRIDGE_VERSION = "0.3.1";
 const NAME = "studio-bridge";
 const PUBLISHER = "bb";
 export const BRIDGE_ID = `${PUBLISHER}.${NAME}`;
@@ -24,7 +24,10 @@ const MANIFEST = {
   main: "./extension.js",
   activationEvents: ["onStartupFinished"],
   contributes: {
-    commands: [{ command: "bbStudio.copyForChat", title: "Copy for BB chat", category: "BB" }],
+    commands: [
+      { command: "bbStudio.copyForChat", title: "Copy for BB chat", category: "BB" },
+      { command: "bbStudio.toggleFollow", title: "Follow the agent", category: "BB" },
+    ],
     menus: { "editor/context": [{ command: "bbStudio.copyForChat", when: "editorHasSelection", group: "9_cutcopypaste@9" }] },
   },
 };
@@ -233,6 +236,121 @@ async function edit(command) {
   return "Typed " + count + (count === 1 ? " edit" : " edits") + " into " + name + " in the user's VS Code" + (hadUnsaved ? ". The file had their unsaved changes, so it's left unsaved: the file on disk doesn't have your edit yet." : ", and saved it.");
 }
 
+// ---- Watching the agent work: what it reads and changes, live ----
+
+const readMark = vscode.window.createTextEditorDecorationType({
+  isWholeLine: true,
+  backgroundColor: new vscode.ThemeColor("editor.wordHighlightBackground"),
+});
+const editMark = vscode.window.createTextEditorDecorationType({
+  isWholeLine: true,
+  // A tint across the line, and the accent bar: visible at a glance.
+  backgroundColor: new vscode.ThemeColor("diffEditor.insertedLineBackground"),
+  borderColor: new vscode.ThemeColor("editorCursor.foreground"),
+  borderStyle: "solid",
+  borderWidth: "0 0 0 3px",
+  overviewRulerColor: new vscode.ThemeColor("editorCursor.foreground"),
+  overviewRulerLane: vscode.OverviewRulerLane.Left,
+});
+const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+status.command = "bbStudio.toggleFollow";
+let follow = true;
+let memento = null;
+// Lines each file had changed this turn: path -> line numbers (0-based).
+const changed = new Map();
+let reading = null;
+let lastUser = 0;
+let statusTimer = null;
+// Following never moves the editor while the user is working in it.
+const USER_PAUSE_MS = 4000;
+
+function base(path) { return path.split("/").pop(); }
+
+function setStatus(text, tooltip, ttl) {
+  clearTimeout(statusTimer);
+  status.text = text + (follow ? "  $(eye)" : "  $(eye-closed)");
+  status.tooltip = tooltip + "\n\n" + (follow ? "Following the agent: click to stop" : "Not following: click to follow the agent");
+  status.show();
+  if (ttl) statusTimer = setTimeout(() => status.hide(), ttl);
+}
+
+function editorsOf(path) {
+  return vscode.window.visibleTextEditors.filter((editor) => editor.document.uri.scheme === "file" && editor.document.uri.fsPath === path);
+}
+
+function paint(editor) {
+  const path = editor.document.uri.fsPath;
+  const lines = changed.get(path);
+  editor.setDecorations(editMark, lines ? [...lines].filter((n) => n < editor.document.lineCount).map((n) => new vscode.Range(n, 0, n, 0)) : []);
+  editor.setDecorations(readMark, reading && reading.path === path && reading.start !== undefined
+    ? [new vscode.Range(reading.start, 0, Math.min(reading.end, editor.document.lineCount - 1), 0)] : []);
+}
+function repaint() { for (const editor of vscode.window.visibleTextEditors) paint(editor); }
+
+async function go(path, line) {
+  if (!follow || Date.now() - lastUser < USER_PAUSE_MS) return;
+  try {
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path));
+    const editor = await onScreen(vscode.window.showTextDocument(document, { preview: true, preserveFocus: true }), "shown");
+    const at = Math.min(Math.max(line || 0, 0), Math.max(document.lineCount - 1, 0));
+    editor.revealRange(new vscode.Range(at, 0, at, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  } catch (error) { /* A file it can't open, or no screen: nothing to follow. */ }
+}
+
+// The lines a change added, found in the file once VS Code has reloaded it.
+async function markEdit(path, added) {
+  const wanted = added.map((line) => line.trim()).filter((line) => line.length > 2);
+  for (const delay of [150, 600, 1500]) {
+    await sleep(delay);
+    let document;
+    try { document = await vscode.workspace.openTextDocument(vscode.Uri.file(path)); } catch (error) { return null; }
+    const lines = new Set(changed.get(path) || []);
+    let found = 0;
+    let from = 0;
+    for (const text of wanted) {
+      for (let n = from; n < document.lineCount; n++) {
+        if (document.lineAt(n).text.trim() === text) { lines.add(n); from = n + 1; found++; break; }
+      }
+    }
+    if (found || !wanted.length) {
+      changed.set(path, lines);
+      repaint();
+      return lines.size ? Math.min(...[...lines]) : 0;
+    }
+  }
+  return null;
+}
+
+async function watch(command) {
+  const activity = command.activity;
+  if (activity.kind === "turn") {
+    if (activity.state === "working") {
+      changed.clear(); reading = null; repaint();
+      setStatus("$(sparkle) " + command.by + " is working", command.by + " started a turn.");
+    } else {
+      reading = null; repaint();
+      const files = changed.size;
+      setStatus("$(check) " + command.by + (files ? ": changed " + files + (files === 1 ? " file" : " files") : " is done"), "Lines it changed stay marked until its next turn.", 8000);
+    }
+    return;
+  }
+  if (activity.kind === "read") {
+    const start = activity.startLine ? activity.startLine - 1 : undefined;
+    reading = { path: activity.path, start, end: activity.endLine ? activity.endLine - 1 : start };
+    setStatus("$(eye) " + command.by + ": reading " + base(activity.path) + (activity.startLine ? ":" + activity.startLine + "–" + activity.endLine : ""), activity.path);
+    await go(activity.path, start);
+    repaint();
+    return;
+  }
+  if (activity.kind === "edit") {
+    reading = null;
+    setStatus("$(edit) " + command.by + ": editing " + base(activity.path), activity.path);
+    const first = await markEdit(activity.path, activity.added);
+    await go(activity.path, first === null ? 0 : first);
+    repaint();
+  }
+}
+
 let stopped = false;
 function listen() {
   if (stopped) return;
@@ -250,6 +368,7 @@ function listen() {
           let command;
           try { command = JSON.parse(line.slice(6)); } catch { continue; }
           if (command && command.type === "show") show(command).catch((error) => vscode.window.showWarningMessage("BB couldn't show that: " + error.message));
+          if (command && command.type === "activity") watch(command);
           if (command && command.type === "edit") {
             edit(command).then(
               (detail) => post("/result", { requestId: command.requestId, ok: true, detail }),
@@ -281,8 +400,21 @@ async function copyForChat() {
 }
 
 exports.activate = (context) => {
+  memento = context.globalState;
+  follow = memento.get("bbStudio.follow", true);
   context.subscriptions.push(vscode.commands.registerCommand("bbStudio.copyForChat", copyForChat));
+  context.subscriptions.push(vscode.commands.registerCommand("bbStudio.toggleFollow", () => {
+    follow = !follow;
+    memento.update("bbStudio.follow", follow);
+    setStatus(follow ? "$(eye) Following the agent" : "$(eye-closed) Not following the agent", follow ? "Your editor goes where the agent works." : "Your editor stays put.", 4000);
+  }));
+  context.subscriptions.push(status);
   if (!SOCKET) return;
+  // The user's own typing and clicks pause following for a moment.
+  context.subscriptions.push(
+    vscode.window.onDidChangeTextEditorSelection((event) => { if (event.kind === vscode.TextEditorSelectionChangeKind.Keyboard || event.kind === vscode.TextEditorSelectionChangeKind.Mouse) lastUser = Date.now(); }),
+    vscode.window.onDidChangeVisibleTextEditors(repaint),
+  );
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(report),
     vscode.window.onDidChangeTextEditorSelection(report),
