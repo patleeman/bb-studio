@@ -101,8 +101,8 @@ export default function plugin(bb: BbPluginApi) {
   void applyLayoutEverywhere(root, (message) => bb.log.warn(message)).catch(() => undefined);
   // The bridge between each workspace's VS Code and the agent (src/server/bridge.ts).
   // An editor connecting starts following threads already at work (declared below).
-  let followWorking: () => void = () => undefined;
-  const bridges = new Bridges((message) => bb.log.info(message), () => followWorking());
+  let followWorking: (workspaceId: string) => void = () => undefined;
+  const bridges = new Bridges((message) => bb.log.info(message), (id) => followWorking(id));
   void installBridge(join(root, "extensions")).catch((error) => bb.log.warn(`couldn't install the BB bridge extension: ${error instanceof Error ? error.message : String(error)}`));
   const servers = new CodeServers({
     root,
@@ -438,14 +438,14 @@ export default function plugin(bb: BbPluginApi) {
   bb.onDispose(() => watcher.dispose());
   // Threads already working when an editor connects, after a plugin reload say,
   // would otherwise wait for their next turn to be followed.
-  followWorking = () => {
-    void bb.sdk.threads.list({ limit: 100 }).then((result) => {
-      const threads = (Array.isArray(result) ? result : (result as { threads?: unknown[] }).threads ?? []) as { id: string; status: string }[];
-      for (const thread of threads) {
-        if (thread.status !== "active" || watcher.watching(thread.id)) continue;
-        bb.log.info(`following thread ${thread.id} while it works`);
-        watcher.watch(thread.id);
-      }
+  followWorking = (workspaceId) => {
+    // The workspace's own thread: a thread's VS Code tab is how its work is watched.
+    const threadId = store.get(workspaceId)?.threadId;
+    if (!threadId || watcher.watching(threadId)) return;
+    void bb.sdk.threads.get({ threadId }).then((thread) => {
+      if ((thread as { status?: string }).status !== "active" || watcher.watching(threadId)) return;
+      bb.log.info(`following thread ${threadId} while it works`);
+      watcher.watch(threadId);
     }, () => undefined);
   };
   // A thread is followed while it works, and only when an editor is open to show it.

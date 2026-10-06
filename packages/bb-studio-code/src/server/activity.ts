@@ -4,7 +4,8 @@
 // tool (fileRead items); Codex reads through the shell, so plain read
 // commands (sed -n, cat, head, nl) are understood too. Anything else is
 // left out.
-import { isAbsolute, resolve } from "node:path";
+import { homedir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 
 export type Activity =
   | { kind: "read"; path: string; startLine?: number; endLine?: number }
@@ -87,7 +88,11 @@ function readsOf(command: string): Read[] {
   return segments(unwrap(command)).flatMap(readsIn);
 }
 
-const at = (from: string | null, file: string) => (isAbsolute(file) ? file : from ? resolve(from, file) : null);
+/** A file's full path: ~ is the home folder; other relative paths start where the command ran. */
+const at = (from: string | null, file: string) => {
+  if (file === "~" || file.startsWith("~/")) return join(homedir(), file.slice(2));
+  return isAbsolute(file) ? file : from ? resolve(from, file) : null;
+};
 
 /**
  * The first activity in one thread event, or null. `base` is the thread's

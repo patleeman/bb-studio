@@ -87,3 +87,12 @@ describe("reads trimmed with head or tail", () => {
     expect(activitiesFrom(started({ type: "commandExecution", command: "cat src/a.ts | grep foo", cwd: "/repo" }))).toEqual([]);
   });
 });
+
+describe("home-relative paths", () => {
+  it("reads ~/ as the home folder, not a folder named ~", async () => {
+    const { activitiesFrom } = await import("./activity");
+    const { homedir } = await import("node:os");
+    expect(activitiesFrom(started({ type: "commandExecution", command: "sed -n '1,5p' ~/notes/a.md", cwd: "/repo" })))
+      .toEqual([{ kind: "read", path: `${homedir()}/notes/a.md`, startLine: 1, endLine: 5 }]);
+  });
+});
