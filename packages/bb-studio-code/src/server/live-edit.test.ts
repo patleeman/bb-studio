@@ -1,9 +1,10 @@
+import { readFileSync } from "node:fs";
 import { request } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Bridges, editorContext } from "./bridge";
+import { Bridges, editorContext, tokenFileFor } from "./bridge";
 import { applyEdits } from "./edits";
 import type { EditorState } from "../shared";
 
@@ -15,7 +16,7 @@ const blank: EditorState = { focused: false, activeFile: null, openFiles: [], un
 
 function post(socketPath: string, path: string, body: unknown, window?: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const req = request({ socketPath, method: "POST", path, headers: { "content-type": "application/json", ...(window ? { "x-window": window } : {}) } }, (res) => { res.resume(); resolve(res.statusCode ?? 0); });
+    const req = request({ socketPath, method: "POST", path, headers: { "content-type": "application/json", ...auth(socketPath), ...(window ? { "x-window": window } : {}) } }, (res) => { res.resume(); resolve(res.statusCode ?? 0); });
     req.on("error", reject);
     req.end(JSON.stringify(body));
   });
@@ -26,7 +27,7 @@ function connect(socketPath: string, window: string): { events: unknown[]; close
   const events: unknown[] = [];
   let close = () => undefined as void;
   const ready = new Promise<void>((resolve) => {
-    const req = request({ socketPath, path: `/events?window=${window}` }, (res) => {
+    const req = request({ socketPath, path: `/events?window=${window}`, headers: auth(socketPath) }, (res) => {
       let buffer = "";
       res.on("data", (chunk) => {
         buffer += chunk;
@@ -45,6 +46,9 @@ function connect(socketPath: string, window: string): { events: unknown[]; close
   });
   return { events, close: () => close(), ready };
 }
+
+/** The bridge's secret, read from its file beside the socket, as the extension does. */
+const auth = (socketPath: string) => ({ authorization: `Bearer ${readFileSync(tokenFileFor(socketPath), "utf8").trim()}` });
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -26,3 +26,36 @@ export function applyEdits(text: string, edits: TextEdit[]): string {
     return current.slice(0, start) + edit.newText + current.slice(end);
   }, text);
 }
+
+/**
+ * What to do with a live edit's answer. Only an edit no editor took ("no
+ * window", or none open) goes to disk: after a timeout the editor may still
+ * be typing, so writing the file too could apply it twice.
+ */
+export function editOutcome(result: { ok: boolean; detail: string; code?: string } | null): "done" | "disk" | "fail" {
+  if (result === null || result.code === "no-window") return "disk";
+  return result.ok ? "done" : "fail";
+}
+
+/** Files this size and up aren't edited on disk. */
+export const MAX_DISK_EDIT_BYTES = 1024 * 1024;
+
+/**
+ * The edits applied to a file on disk, when no editor is open. The path is
+ * resolved through symlinks and must stay inside `folders`, and the resolved
+ * file is the one written. Files that aren't plain UTF-8 text (or are too
+ * big) are refused rather than risk damaging them.
+ */
+export async function editOnDisk(path: string, folders: string[], edits: TextEdit[]): Promise<void> {
+  const { contained } = await import("./files");
+  const { readFile, stat, writeFile } = await import("node:fs/promises");
+  const real = await contained(folders, path);
+  const info = await stat(real);
+  if (!info.isFile()) throw new Error(`${path} isn't a file.`);
+  if (info.size >= MAX_DISK_EDIT_BYTES) throw new Error(`${path} is too large to edit this way (${info.size} bytes).`);
+  const bytes = await readFile(real);
+  if (bytes.includes(0)) throw new Error(`${path} isn't a text file.`);
+  const text = bytes.toString("utf8");
+  if (!Buffer.from(text, "utf8").equals(bytes)) throw new Error(`${path} isn't UTF-8 text; editing it this way could damage it.`);
+  await writeFile(real, applyEdits(text, edits));
+}

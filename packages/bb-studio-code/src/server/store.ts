@@ -12,9 +12,11 @@ export const MIGRATIONS = [
   `ALTER TABLE code_workspaces ADD COLUMN thread_id TEXT; CREATE INDEX IF NOT EXISTS code_workspaces_thread ON code_workspaces(thread_id);`,
   // Workspaces made so far were made by the user, so they stay trusted.
   `ALTER TABLE code_workspaces ADD COLUMN trusted INTEGER NOT NULL DEFAULT 1;`,
+  // Whether agents may see what the user has open in this workspace.
+  `ALTER TABLE code_workspaces ADD COLUMN share INTEGER NOT NULL DEFAULT 1;`,
 ];
 
-type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; trusted: number; folders: string; archived: number; created_at: number; updated_at: number };
+type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; trusted: number; share: number; folders: string; archived: number; created_at: number; updated_at: number };
 
 function decode(row: Row): Workspace {
   return {
@@ -23,6 +25,7 @@ function decode(row: Row): Workspace {
     projectId: row.project_id,
     threadId: row.thread_id,
     trusted: row.trusted === 1,
+    share: row.share !== 0,
     folders: JSON.parse(row.folders) as string[],
     archived: row.archived === 1,
     createdAt: row.created_at,
@@ -57,13 +60,13 @@ export class WorkspaceStore {
     return this.get(id)!;
   }
 
-  update(id: string, changes: Partial<Pick<Workspace, "title" | "projectId" | "folders" | "archived" | "trusted">>): Workspace {
+  update(id: string, changes: Partial<Pick<Workspace, "title" | "projectId" | "folders" | "archived" | "trusted" | "share">>): Workspace {
     const current = this.get(id);
     if (!current) throw new Error("Workspace not found.");
     const next = { ...current, ...changes };
     this.db
-      .prepare("UPDATE code_workspaces SET title = ?, project_id = ?, folders = ?, archived = ?, trusted = ?, updated_at = ? WHERE id = ?")
-      .run(next.title, next.projectId, JSON.stringify(next.folders), next.archived ? 1 : 0, next.trusted ? 1 : 0, Date.now(), id);
+      .prepare("UPDATE code_workspaces SET title = ?, project_id = ?, folders = ?, archived = ?, trusted = ?, share = ?, updated_at = ? WHERE id = ?")
+      .run(next.title, next.projectId, JSON.stringify(next.folders), next.archived ? 1 : 0, next.trusted ? 1 : 0, next.share ? 1 : 0, Date.now(), id);
     return this.get(id)!;
   }
 

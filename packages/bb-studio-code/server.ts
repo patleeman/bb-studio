@@ -3,7 +3,7 @@
 // A workspace is a Studio item: a title, the project (and so the Space) it
 // belongs to, and the folders VS Code opens. Opening one starts code-server
 // for it (src/server/runtime.ts); the app shows that editor in a frame.
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
@@ -13,9 +13,9 @@ import { z } from "zod";
 import type { Activity } from "./src/server/activity";
 import { Bridges, editorContext } from "./src/server/bridge";
 import { installBridge } from "./src/server/bridge-extension";
-import { applyEdits, editSchema } from "./src/server/edits";
+import { editOnDisk, editOutcome, editSchema } from "./src/server/edits";
 import { contained, listDir, readText } from "./src/server/files";
-import { chipFor } from "./src/server/chip";
+import { chipFor, relatedWorkspaces } from "./src/server/chip";
 import { browseFolders, sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
@@ -169,9 +169,10 @@ export default function plugin(bb: BbPluginApi) {
 
   bb.rpc.register(codeContract, {
     get: ({ id }) => ({ workspace: store.get(id), status: servers.status(id) }),
-    update: async ({ id, title, folders }) => {
+    update: async ({ id, title, folders, share }) => {
       must(id);
       const workspace = store.update(id, {
+        ...(share !== undefined ? { share } : {}),
         ...(title !== undefined ? { title } : {}),
         ...(folders !== undefined ? { folders: await checkFolders(folders) } : {}),
       });
@@ -282,6 +283,11 @@ export default function plugin(bb: BbPluginApi) {
   );
   // ---- The agent and the user's editor --------------------------------------
 
+  /** Per-thread caches keep their newest entries only. */
+  const MAX_THREADS_KEPT = 500;
+  const cap = <V>(map: Map<string, V>) => { while (map.size > MAX_THREADS_KEPT) map.delete(map.keys().next().value!); };
+  /** Forgets a deleted or archived thread (set below, once its caches exist). */
+  let forget: (threadId: string) => void = () => undefined;
   /** Each thread's working folder, refreshed when it starts a turn. */
   const threadPaths = new Map<string, string | null>();
   const threadPath = async (threadId: string): Promise<string | null> => {
@@ -290,27 +296,24 @@ export default function plugin(bb: BbPluginApi) {
       const thread = (await bb.sdk.threads.get({ threadId, include: "environment" })) as { environment?: { path: string | null } | null };
       const path = thread.environment?.path ?? null;
       threadPaths.set(threadId, path);
+      cap(threadPaths);
       return path;
     } catch {
       return null;
     }
   };
   bb.events.on("thread.active", ({ thread }) => { threadPaths.delete(thread.id); void threadPath(thread.id); });
-  bb.events.on("thread.deleted", ({ thread }) => { threadPaths.delete(thread.id); });
+  for (const event of ["thread.deleted", "thread.archived"] as const)
+    bb.events.on(event, ({ thread }) => { threadPaths.delete(thread.id); forget(thread.id); });
 
   const inside = (folder: string, path: string) => path === folder || path.startsWith(`${folder.replace(/\/+$/, "")}/`);
   /**
-   * Workspaces with a VS Code open that belong with this thread: made for it,
-   * in its project, or holding (or held by) its working folder.
+   * Workspaces with a VS Code open whose editor this thread may see: the one
+   * made for it, or one whose folders hold its folder, with sharing on
+   * (src/server/chip.ts, relatedWorkspaces).
    */
-  const editorsFor = (threadId: string, projectId: string | null, path: string | null) =>
-    store.list().filter((workspace) =>
-      !workspace.archived &&
-      bridges.connected(workspace.id) &&
-      bridges.state(workspace.id) !== null &&
-      (workspace.threadId === threadId ||
-        (projectId !== null && workspace.projectId === projectId) ||
-        (path !== null && workspace.folders.some((folder) => inside(folder, path) || inside(path, folder)))));
+  const editorsFor = (threadId: string, _projectId: string | null, path: string | null) =>
+    relatedWorkspaces(store.list(), threadId, path).filter((workspace) => bridges.connected(workspace.id) && bridges.state(workspace.id) !== null);
   const contextFor = (threadId: string, projectId: string | null, path: string | null) =>
     editorContext(editorsFor(threadId, projectId, path).map((workspace) => ({ title: workspace.title, folders: workspace.folders, state: bridges.state(workspace.id)! })));
 
@@ -386,17 +389,19 @@ export default function plugin(bb: BbPluginApi) {
       if (!found) return `None of the user's workspaces holds ${path}. Edit it with your own tools, or open a workspace for its folder with code_workspace_open first.`;
       const { workspace, file, name } = found;
       const result = await bridges.request(workspace.id, { type: "edit", path: file, edits }, EDIT_TIMEOUT_MS);
-      if (result?.ok) {
+      const outcome = editOutcome(result);
+      if (outcome === "done") {
         link(workspace.id, ctx.threadId, "edited");
-        return result.detail;
+        return result!.detail;
       }
-      // A window that tried and failed (text not found, say) has the answer.
-      if (result && result.code !== "no-window" && result.detail !== "The editor didn't answer in time.") throw new Error(result.detail);
+      // An editor took the edit and failed, or didn't answer in time and may
+      // still be typing: report it, never write the file as well.
+      if (outcome === "fail") throw new Error(result!.detail);
       // No editor on screen: the same edits, on disk, unless an editor holds
       // unsaved changes to the file, which saving there would overwrite.
       if (bridges.unsaved(workspace.id).includes(file))
         throw new Error(`The user's editor has unsaved changes in ${name} but isn't on screen, so neither it nor the file on disk was changed. Ask them to open the workspace, then try again.`);
-      await writeFile(file, applyEdits(await readFile(file, "utf8"), edits));
+      await editOnDisk(file, safeFolders(workspace), edits);
       link(workspace.id, ctx.threadId, "edited");
       return `No editor was open, so the ${edits.length === 1 ? "edit went" : `${edits.length} edits went`} to ${name} on disk.`;
     },
@@ -410,6 +415,7 @@ export default function plugin(bb: BbPluginApi) {
     if (!titles.has(threadId)) {
       const thread = (await bb.sdk.threads.get({ threadId }).catch(() => null)) as { title?: string | null } | null;
       titles.set(threadId, thread?.title?.trim() || "Agent");
+      cap(titles);
     }
     return titles.get(threadId)!;
   };
@@ -417,6 +423,7 @@ export default function plugin(bb: BbPluginApi) {
   const touched = new Map<string, Set<string>>();
   /** Threads that have edited files in their folder or a workspace's: they get the header chip. */
   const touchedFiles = new Map<string, { working: boolean }>();
+  forget = (threadId) => { titles.delete(threadId); touchedFiles.delete(threadId); touched.delete(threadId); };
   const chipChanged = (threadId: string) => { try { bb.realtime.publish(CHANNEL, { type: "thread", threadId }); } catch { /* No views. */ } };
   const deliver = async (threadId: string, activity: Activity) => {
     if (activity.kind === "turn" && activity.state === "done" && touchedFiles.get(threadId)?.working) {
@@ -428,6 +435,7 @@ export default function plugin(bb: BbPluginApi) {
       const ours = (path !== null && inside(path, activity.path)) || store.list().some((workspace) => !workspace.archived && workspace.folders.some((folder) => inside(folder, activity.path)));
       if (ours && !touchedFiles.get(threadId)?.working) {
         touchedFiles.set(threadId, { working: true });
+        cap(touchedFiles);
         chipChanged(threadId);
       }
     }

@@ -164,7 +164,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
     else if (status?.state === "failed" && !retried) { setRetried(true); open(); }
   }, [embed, shown, userStopped, retried, workspace, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const update = (changes: { title?: string; folders?: string[] }) =>
+  const update = (changes: { title?: string; folders?: string[]; share?: boolean }) =>
     rpc.call("update", { id, ...changes }).then(
       (result) => { setWorkspace(result.workspace); return true; },
       (error) => { toast.error(errorMessage(error)); return false; },
@@ -193,9 +193,21 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
         trailing={
           <>
             {embed && (
+              <>
+              <button
+                type="button"
+                className={ICON_BUTTON}
+                title={workspace.share ? "Agents see what you have open here (file, selection, errors). Click to stop sharing." : "Agents don't see what you have open here. Click to share it with this workspace's threads."}
+                aria-label={workspace.share ? "Stop sharing your editor with agents" : "Share your editor with agents"}
+                aria-pressed={workspace.share}
+                onClick={() => void update({ share: !workspace.share })}
+              >
+                <Icon name={workspace.share ? "Eye" : "EyeOff"} className="size-4" />
+              </button>
               <button type="button" className={ICON_BUTTON} title="Folders in this workspace" aria-label="Folders" aria-pressed={showFolders} onClick={() => setEditing((value) => !value)}>
                 <Icon name="FolderEdit" className="size-4" />
               </button>
+              </>
             )}
             {url ? (
               <>

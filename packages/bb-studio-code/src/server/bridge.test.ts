@@ -1,10 +1,14 @@
+import { readFileSync } from "node:fs";
 import { request } from "node:http";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Bridges, bridgeSocketPath, editorContext } from "./bridge";
+import { Bridges, bridgeSocketPath, editorContext, tokenFileFor } from "./bridge";
 import type { EditorState } from "../shared";
+
+/** The bridge's secret, read from its file beside the socket, as the extension does. */
+const auth = (socketPath: string) => ({ authorization: `Bearer ${readFileSync(tokenFileFor(socketPath), "utf8").trim()}` });
 
 let dir = "";
 beforeAll(async () => { dir = await mkdtemp(join(tmpdir(), "scb-")); });
@@ -12,7 +16,7 @@ afterAll(() => rm(dir, { recursive: true, force: true }));
 
 function call(socketPath: string, method: string, path: string, body?: unknown): Promise<{ status: number; text: string }> {
   return new Promise((resolve, reject) => {
-    const req = request({ socketPath, method, path, headers: { "content-type": "application/json" } }, (res) => {
+    const req = request({ socketPath, method, path, headers: { "content-type": "application/json", ...auth(socketPath) } }, (res) => {
       let text = "";
       res.on("data", (chunk) => { text += chunk; });
       res.on("end", () => resolve({ status: res.statusCode ?? 0, text }));
@@ -26,7 +30,7 @@ function call(socketPath: string, method: string, path: string, body?: unknown):
 /** Opens the event stream and resolves with the first event. */
 function nextEvent(socketPath: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const req = request({ socketPath, path: "/events" }, (res) => {
+    const req = request({ socketPath, path: "/events", headers: auth(socketPath) }, (res) => {
       let buffer = "";
       res.on("data", (chunk) => {
         buffer += chunk;
@@ -67,7 +71,7 @@ describe("bridge socket", () => {
     const bridges = new Bridges();
     const socket = await bridges.open("cws_state", dir);
     // State counts only from a connected window.
-    const window = request({ socketPath: socket, path: "/events" });
+    const window = request({ socketPath: socket, path: "/events", headers: auth(socket) });
     window.end();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect((await call(socket, "POST", "/state", state)).status).toBe(204);

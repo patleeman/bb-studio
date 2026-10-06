@@ -9,7 +9,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Raise with every change to the extension, so workspaces get the new one. */
-export const BRIDGE_VERSION = "0.4.0";
+export const BRIDGE_VERSION = "0.5.0";
 const NAME = "studio-bridge";
 const PUBLISHER = "bb";
 export const BRIDGE_ID = `${PUBLISHER}.${NAME}`;
@@ -57,6 +57,12 @@ const vscode = require("vscode");
 const http = require("node:http");
 
 const SOCKET = process.env.STUDIO_CODE_BRIDGE;
+// This run's secret, from a 0600 file beside the socket (never the
+// environment, which every task and terminal inherits). Read each time the
+// bridge connects, since a new run writes a new one.
+function token() {
+  try { return require("node:fs").readFileSync(SOCKET.replace(/\.sock$/, "") + ".token", "utf8").trim(); } catch (error) { return ""; }
+}
 const MAX_SELECTION = 8000;
 // This window, among others open on the same workspace: the agent talks to
 // the one used last.
@@ -65,7 +71,7 @@ const WINDOW = Math.random().toString(36).slice(2, 12);
 function post(path, body) {
   return new Promise((resolve) => {
     const data = JSON.stringify(body);
-    const req = http.request({ socketPath: SOCKET, path, method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data), "x-window": WINDOW } }, (res) => { res.resume(); res.on("end", resolve); });
+    const req = http.request({ socketPath: SOCKET, path, method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data), "x-window": WINDOW, authorization: "Bearer " + token() } }, (res) => { res.resume(); res.on("end", resolve); });
     req.on("error", resolve);
     req.end(data);
   });
@@ -203,36 +209,50 @@ async function edit(command) {
   const hadUnsaved = document.isDirty;
   const editor = await onScreen(vscode.window.showTextDocument(document, { preview: false, preserveFocus: true }), "changed");
   // Check every edit first, so a bad one changes nothing.
-  let check = document.getText();
+  const original = editor.document.getText();
+  let check = original;
   for (const change of command.edits) {
     const [start, end] = locate(check, change, name);
     check = check.slice(0, start) + change.newText + check.slice(end);
   }
   let first = true;
+  // The user typed in the file while this ran: their keystrokes start a new
+  // undo step (so ⌘Z on the agent's edit leaves them), and the file isn't saved.
+  let userTyped = false;
+  let stopNext = false;
+  let offset = 0;
+  const follow = vscode.workspace.onDidChangeTextDocument((event) => {
+    if (event.document !== editor.document) return;
+    for (const c of event.contentChanges) {
+      if (mine && c.rangeOffset === mine.offset && c.rangeLength === mine.length && c.text === mine.text) { mine = null; continue; }
+      userTyped = true;
+      stopNext = true;
+      // Keep our place when they type above it.
+      if (c.rangeOffset <= offset) offset += c.text.length - c.rangeLength;
+    }
+  });
+  const step = async (from, to, text) => {
+    // Taken before applying: typing during this change marks the next one.
+    const stops = first || stopNext;
+    first = false;
+    stopNext = false;
+    await apply(editor, from, to, text, stops);
+  };
   const inserted = [];
-  for (const change of command.edits) {
-    const [found] = locate(editor.document.getText(), change, name);
-    const part = narrow(change.oldText, change.newText);
-    const start = found + part.skip;
-    const end = start + part.remove;
-    let offset = start;
-    // The user can keep typing elsewhere: shift our position past their edits.
-    const follow = vscode.workspace.onDidChangeTextDocument((event) => {
-      if (event.document !== editor.document) return;
-      for (const c of event.contentChanges) {
-        if (mine && c.rangeOffset === mine.offset && c.rangeLength === mine.length && c.text === mine.text) { mine = null; continue; }
-        if (c.rangeOffset <= offset) offset += c.text.length - c.rangeLength;
-      }
-    });
-    try {
-      if (end > start) { await apply(editor, start, end, "", first); first = false; }
+  try {
+    for (const change of command.edits) {
+      const [found] = locate(editor.document.getText(), change, name);
+      const part = narrow(change.oldText, change.newText);
+      const start = found + part.skip;
+      const end = start + part.remove;
+      offset = start;
+      if (end > start) await step(start, end, "");
       const text = part.text;
       const steps = Math.max(1, Math.min(Math.ceil(text.length / 2), Math.floor(TYPING_MS / STEP_MS)));
       const size = Math.ceil(text.length / steps);
       for (let i = 0; i < text.length; i += size) {
         const piece = text.slice(i, i + size);
-        await apply(editor, offset, offset, piece, first);
-        first = false;
+        await step(offset, offset, piece);
         offset += piece.length;
         const at = editor.document.positionAt(offset);
         editor.setDecorations(caret, [new vscode.Range(at, at)]);
@@ -240,20 +260,35 @@ async function edit(command) {
         await sleep(STEP_MS);
       }
       inserted.push([offset - text.length, offset]);
-    } finally {
-      follow.dispose();
     }
+  } catch (error) {
+    editor.setDecorations(caret, []);
+    // Put the file back as it was, unless the user typed meanwhile: then their
+    // text is mixed in, and ⌘Z is the safe way back.
+    if (!userTyped) {
+      const doc = editor.document;
+      mine = { offset: 0, length: doc.getText().length, text: original };
+      await editor.edit((builder) => builder.replace(new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), original), { undoStopBefore: true, undoStopAfter: true });
+      throw new Error((error && error.message || String(error)) + " The edit stopped partway and was rolled back; " + name + " is as it was.");
+    }
+    throw new Error((error && error.message || String(error)) + " The edit stopped partway while the user was typing in " + name + ", so the partial edit was left in place; ⌘Z undoes it.");
+  } finally {
+    follow.dispose();
   }
-  // One undo step for the whole edit.
+  // Close the agent's undo step.
   await editor.edit(() => undefined, { undoStopBefore: false, undoStopAfter: true });
   editor.setDecorations(caret, []);
   const doc = editor.document;
   editor.setDecorations(typed, inserted.map(([a, b]) => new vscode.Range(doc.positionAt(a), doc.positionAt(b))));
   setTimeout(() => editor.setDecorations(typed, []), 4000);
-  if (!hadUnsaved) await doc.save();
-  vscode.window.setStatusBarMessage("$(sparkle) BB edited " + name + (hadUnsaved ? " (your unsaved changes kept; not saved)" : ""), 6000);
+  const save = !hadUnsaved && !userTyped;
+  if (save) await doc.save();
+  vscode.window.setStatusBarMessage("$(sparkle) BB edited " + name + (save ? "" : " (not saved: your changes are in it too)"), 6000);
   const count = command.edits.length;
-  return "Typed " + count + (count === 1 ? " edit" : " edits") + " into " + name + " in the user's VS Code" + (hadUnsaved ? ". The file had their unsaved changes, so it's left unsaved: the file on disk doesn't have your edit yet." : ", and saved it.");
+  const done = "Typed " + count + (count === 1 ? " edit" : " edits") + " into " + name + " in the user's VS Code";
+  if (save) return done + ", and saved it.";
+  if (userTyped) return done + ". The user typed in the file meanwhile, so it's left unsaved: the file on disk doesn't have your edit yet.";
+  return done + ". The file had their unsaved changes, so it's left unsaved: the file on disk doesn't have your edit yet.";
 }
 
 // ---- Watching the agent work: what it reads and changes, live ----
@@ -374,7 +409,7 @@ async function watch(command) {
 let stopped = false;
 function listen() {
   if (stopped) return;
-  const req = http.get({ socketPath: SOCKET, path: "/events?window=" + WINDOW }, (res) => {
+  const req = http.get({ socketPath: SOCKET, path: "/events?window=" + WINDOW, headers: { authorization: "Bearer " + token() } }, (res) => {
     res.setEncoding("utf8");
     let buffer = "";
     res.on("data", (chunk) => {
@@ -452,6 +487,7 @@ exports.activate = (context) => {
 };
 exports.deactivate = () => { stopped = true; };
 exports.narrow = narrow;
+exports.edit = edit;
 `;
 
 type RegistryEntry = { identifier?: { id?: string }; version?: string; [key: string]: unknown };

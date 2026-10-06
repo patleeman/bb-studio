@@ -167,6 +167,24 @@ Tested on macOS (arm64) and Linux (arm64, in Docker).
   `~/Library/Keychains` and similar. The read-only file browser serves a
   workspace's folders to any BB client, so it skips such folders even if
   they were added before this rule.
+- **The bridge only talks to its extension.** Every process inside
+  code-server (tasks, terminals, extensions) inherits the bridge socket's
+  path, so each run also has a secret, handed to the bridge extension in a
+  0600 file beside the socket and never in the environment, and every
+  request must carry it. Keys passed to BB must be exactly the listed
+  shortcuts. Code that runs as you can still read your files, that file
+  included: this stops casual and inherited use, not deliberate attacks.
+- **What agents see.** Only the workspace's own thread, or a thread working
+  inside its folders, gets what you have open; a thread in a parent folder
+  (your home folder, `/`) gets nothing. The eye in the workspace header
+  turns sharing off. What agents get is marked as untrusted data, not
+  instructions.
+- **Edits that can't half-land.** A live edit that fails partway rolls the
+  file back (unless you typed meanwhile; then ⌘Z). Your typing during an
+  edit gets its own undo step, and the file isn't saved for you. An edit
+  that times out is reported, never repeated on disk. Edits on disk refuse
+  files over 1 MB or that aren't plain UTF-8 text, and write the file the
+  path really points at, inside the workspace.
 - **Stop ends everything.** code-server runs in its own process group, and
   Stop (or BB exiting) ends the whole group, extension hosts and terminals
   included. Stopping, archiving or deleting a workspace while it downloads

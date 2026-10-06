@@ -44,6 +44,8 @@ export const workspaceSchema = z.object({
    * VS Code skips workspace trust. Folders an agent names stay untrusted.
    */
   trusted: z.boolean(),
+  /** Agents in related threads see what the user has open here. */
+  share: z.boolean(),
   folders: z.array(z.string()),
   archived: z.boolean(),
   createdAt: z.number(),
@@ -88,7 +90,7 @@ export const codeContract = defineRpcContract({
     output: z.object({ workspace: workspaceSchema.nullable(), status: serverStatusSchema }),
   },
   update: {
-    input: z.object({ id, title: z.string().trim().max(200).optional(), folders: z.array(folder).max(50).optional() }),
+    input: z.object({ id, title: z.string().trim().max(200).optional(), folders: z.array(folder).max(50).optional(), share: z.boolean().optional() }),
     output: z.object({ workspace: workspaceSchema }),
   },
   /** Installs code-server if needed and starts this workspace's server. */

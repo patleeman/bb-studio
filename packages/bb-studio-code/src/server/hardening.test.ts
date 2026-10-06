@@ -99,7 +99,7 @@ describe("5. Stop during download or start cancels it", () => {
       install: () => new Promise<string>((resolve) => { finishInstall = resolve; }),
       spawn: () => { spawned += 1; throw new Error("should not spawn"); },
     });
-    const opening = servers.open({ id: "cws_cancel", title: "T", projectId: null, threadId: null, trusted: true, folders: [dir], archived: false, createdAt: 0, updatedAt: 0 });
+    const opening = servers.open({ id: "cws_cancel", title: "T", projectId: null, threadId: null, trusted: true, share: true, folders: [dir], archived: false, createdAt: 0, updatedAt: 0 });
     await new Promise((resolve) => setTimeout(resolve, 20));
     servers.stop("cws_cancel");
     finishInstall("/bin/false");

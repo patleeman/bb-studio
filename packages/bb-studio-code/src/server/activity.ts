@@ -90,8 +90,9 @@ function readsOf(command: string): Read[] {
 
 /** A file's full path: ~ is the home folder; other relative paths start where the command ran. */
 const at = (from: string | null, file: string) => {
-  if (file === "~" || file.startsWith("~/")) return join(homedir(), file.slice(2));
-  return isAbsolute(file) ? file : from ? resolve(from, file) : null;
+  // Always normalized (no ..), before anything checks which folder it's in.
+  if (file === "~" || file.startsWith("~/")) return resolve(join(homedir(), file.slice(2)));
+  return isAbsolute(file) ? resolve(file) : from ? resolve(from, file) : null;
 };
 
 /**
@@ -108,7 +109,7 @@ export function activitiesFrom(event: Event, base: string | null = null): Activi
   if (event.type === "turn/completed") return [{ kind: "turn", state: "done" }];
   const item = (event.data as { item?: Record<string, unknown> } | undefined)?.item;
   if (!item) return [];
-  if (item.type === "fileRead" && event.type === "item/started" && typeof item.path === "string") return [{ kind: "read", path: item.path }];
+  if (item.type === "fileRead" && event.type === "item/started" && typeof item.path === "string") return [{ kind: "read", path: resolve(item.path) }];
   if (item.type === "commandExecution" && event.type === "item/started" && typeof item.command === "string") {
     const from = typeof item.cwd === "string" && item.cwd ? item.cwd : base;
     return readsOf(item.command).flatMap((read) => {
