@@ -20,8 +20,14 @@ vi.mock("./connection", () => ({ PageConnection: class {
   retrySave = state.retry;
   retryRecovery = state.read;
 } }));
-vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toPluginPanel: vi.fn() }), useRpc: () => ({ call: vi.fn() }) }));
-vi.mock("@bb-studio/kit/app", () => ({ PAGE_TITLE: "", SECTION_TITLE: "", ThreadItemsPanel: () => null }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toPluginPanel: vi.fn() }), useRpc: () => ({ call: vi.fn(async () => ({ page: null })) }) }));
+// Like the real list, opened with a page it shows that page.
+vi.mock("@bb-studio/kit/app", () => ({
+  PAGE_TITLE: "",
+  SECTION_TITLE: "",
+  ThreadItemsPanel: ({ initialId, renderItem }: { initialId: string | null; renderItem(id: string, options: { backLabel: string; onBack(): void }): unknown }) =>
+    initialId ? renderItem(initialId, { backLabel: "Pages", onBack: () => {} }) : null,
+}));
 vi.mock("@bb-studio/kit/ui", () => ({ Icon: () => null }));
 vi.mock("./shared", () => ({ relativeTime: () => "now" }));
 vi.mock("./PanelShell", () => ({

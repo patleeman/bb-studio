@@ -27,6 +27,7 @@ export const AGENT_INSTRUCTIONS = [
   'Chart JSON: {"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"unit":"$","data":[{"label":"Q1","Revenue":10}]}. Stats JSON: [{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up"}] (1–6 items). Embed JSON: {"kind":"bookmark|thread|page|drawing|artifact|recording|table|item","target":"https://… or an id","title":"…"}; item targets are plugin:id from studio_list_items; a table target may be <table id>/view/<view id>.',
   "An ```html block renders its HTML in a sandboxed iframe: scripts run, but with no same-origin access (no cookies, storage or BB APIs), and don't assume network access. Keep it self-contained with inline <style> and <script>, follow light and dark with prefers-color-scheme, and keep it under 200,000 characters (longer ones show as code). Use ```html only for something to render; show HTML source as code with ```html source (or another language such as ```xml).",
   "Answer comments with pages_comment_reply in the same thread; start new threads with pages_comment on the text you are discussing.",
+  'When you create or change a page, put its card on its own line in your reply, `::page{id="pg_…"}`, so the user can open it beside the chat.',
 ].join("\n");
 
 const ref = z.string().min(1).describe("Page id (pg_…) or exact page title");
@@ -49,8 +50,19 @@ const opSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("replace_all"), markdown: z.string() }),
 ]);
 
-/** `created` tells Studio an agent made a page, so it joins the thread's spaces. */
-export function registerTools(bb: BbPluginApi, service: PagesService, created: (pageId: string, threadId: string) => void = () => {}): void {
+/** The reply card that opens a page in the user's workbench. */
+export const pageCard = (id: string) => `Put this line on its own in your reply so the user can open the page beside the chat:\n::page{id="${id}"}`;
+
+/**
+ * `created` tells Studio an agent made a page, so it joins the thread's
+ * spaces; `edited` links a page an agent changed to its thread.
+ */
+export function registerTools(
+  bb: BbPluginApi,
+  service: PagesService,
+  created: (pageId: string, threadId: string) => void = () => {},
+  edited: (pageId: string, threadId: string) => void = () => {},
+): void {
   const { store } = service;
 
   const pageLine = (page: PageMeta, depth = 0) =>
@@ -130,7 +142,7 @@ export function registerTools(bb: BbPluginApi, service: PagesService, created: (
         actor: actor.key,
       });
       created(page.id, ctx.threadId);
-      return `Created page "${page.title}" (id ${page.id}). The user can open it at ${pageUrl(page.id)}.`;
+      return `Created page "${page.title}" (id ${page.id}). The user can open it at ${pageUrl(page.id)}.\n${pageCard(page.id)}`;
     },
   });
 
@@ -154,11 +166,12 @@ export function registerTools(bb: BbPluginApi, service: PagesService, created: (
           service.publish({ type: "tree", projectId: meta.project_id });
         }
         const touched = result.touched.map((id) => `^${shortId(id)}`).join(", ");
-        return result.changed
+        const header = params.title !== undefined || params.icon !== undefined;
+        if (!result.changed && !header) return "Nothing changed; the page already matched.";
+        if (ctx.threadId) edited(meta.id, ctx.threadId);
+        return `${result.changed
           ? `Updated "${params.title ?? meta.title}".${touched ? ` Changed blocks: ${touched}.` : ""}`
-          : params.title !== undefined || params.icon !== undefined
-            ? "Updated the page header; the content was already as requested."
-            : "Nothing changed; the page already matched.";
+          : "Updated the page header; the content was already as requested."}\n${pageCard(meta.id)}`;
       } catch (error) {
         return { content: [{ type: "text", text: `Edit failed, nothing was changed: ${errorText(error)}` }], isError: true };
       }

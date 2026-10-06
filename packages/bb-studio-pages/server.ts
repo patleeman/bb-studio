@@ -363,7 +363,12 @@ async function registerPages(bb: BbPluginApi) {
   // Agents --------------------------------------------------------------------
 
   const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Studio is optional. */ });
-  registerTools(bb, service, created);
+  /** A page an agent changed belongs to its thread too, so the thread's tab lists it. */
+  const edited = (id: string, threadId: string) => {
+    const at = Date.now();
+    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Studio is optional. */ });
+  };
+  registerTools(bb, service, created, edited);
   bb.agents.configure(() => agentConfiguration());
 
   bb.ui.registerMentionProvider(defineItemMention({

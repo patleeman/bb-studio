@@ -1,6 +1,7 @@
 import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useEffect } from "react";
+import { PAGE_TAB, PageCard } from "./src/ui/PageCard";
 import { PagePanel } from "./src/ui/PagePanel";
 import { PagesPanel } from "./src/ui/PagesPanel";
 import { ThreadPageLink } from "./src/ui/ThreadPageLink";
@@ -34,5 +35,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
   app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
   // Pages next to a thread: its pages and recent ones, or a page with `{ pageId }`.
-  app.slots.threadPanelAction({ id: "page", title: "Pages", icon: "pages/pages", layout: "flush", component: PagePanel });
+  app.slots.threadPanelAction({ id: PAGE_TAB, title: "Pages", icon: "pages/pages", layout: "flush", component: PagePanel });
+  // `::page{id="pg_…"}` in a reply: a card that opens the page beside the chat.
+  app.slots.messageDirective({ id: "page", component: PageCard });
 });

@@ -19,17 +19,12 @@ function pageIdFrom(params: PluginThreadPanelProps["params"]): string | null {
 }
 
 /**
- * Pages in a thread's side panel. Opened with a page, it shows that page in
- * the same live editor as the Pages view; from the panel's launcher, it lists
- * the thread's pages and recent ones, and New makes one linked to the thread.
+ * Pages in a thread's workbench: the thread's pages and recent ones, and New
+ * makes one linked to the thread. Opened with a page, as a reply's card does,
+ * it shows that page in the same live editor as the Pages view, with a way
+ * back to the list.
  */
 export function PagePanel({ threadId, params }: PluginThreadPanelProps) {
-  const pageId = pageIdFrom(params);
-  if (pageId) return <PageTab key={pageId} pageId={pageId} />;
-  return <ThreadPages threadId={threadId} />;
-}
-
-function ThreadPages({ threadId }: { threadId: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const [chatPageId, setChatPageId] = useState<string | null>(null);
   useEffect(() => {
@@ -49,6 +44,7 @@ function ThreadPages({ threadId }: { threadId: string }) {
       pluginId={PLUGIN_ID}
       kind="page"
       channel={REALTIME_CHANNEL}
+      initialId={pageIdFrom(params)}
       linkedIds={linkedIds}
       renderItem={(id, { backLabel, onBack }) => <PageTab key={id} pageId={id} backLabel={backLabel} onBack={onBack} />}
     />

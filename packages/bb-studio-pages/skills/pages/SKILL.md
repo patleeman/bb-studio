@@ -18,6 +18,15 @@ overwritten.
 Pages belong to a project or are global, and nest into a tree. Link to one as
 `[Title](/plugins/pages/pages/<page-id>)`.
 
+When you create or change a page, put its card on its own line in your reply:
+
+```
+::page{id="<page-id>"}
+```
+
+The card shows the page's title; clicking it opens the page in a tab beside
+the chat. `pages_create` and `pages_edit` print the line for you.
+
 ## Agent tools
 
 | Tool | Use it to |
