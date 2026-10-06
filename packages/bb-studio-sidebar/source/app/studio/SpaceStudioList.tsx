@@ -6,7 +6,6 @@ import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
-import { COARSE_POINTER_ROW_HEIGHT_CLASS } from "@/components/ui/coarse-pointer-sizing";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
   DropdownMenu,
@@ -15,14 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  SIDEBAR_CONTROL_BUTTON_CLASS,
-  SIDEBAR_ROW_BASE_CLASS,
-  SIDEBAR_ROW_GLYPH_SLOT_CLASS,
-  SIDEBAR_ROW_INTERACTIVE_STATE_CLASS,
-} from "../rows/sidebarRowClasses.js";
+import { SIDEBAR_CONTROL_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
 import type { SpaceBrowseItem, SpaceItems } from "./studioSpaces.js";
-import { compactAge } from "./SpaceThreadRow.js";
 
 let splitting = false;
 
@@ -132,17 +125,12 @@ function copyText(text: string, done: string) {
   navigator.clipboard.writeText(text).then(() => toast.success(done), () => toast.error("Couldn't copy."));
 }
 
-/** Opens a row's context menu from its ⋯, below the button, as right-click would. */
-function openMenu(button: HTMLElement) {
-  const rect = button.getBoundingClientRect();
-  button.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom }));
-}
-
 /**
- * An open Studio item: click opens it in the main pane, ⌘/Ctrl-click in a
- * split beside it, as a thread row does; right-click or ⋯ has the rest, as a thread's menu does.
+ * An open Studio item as a chip: click opens it in the main pane, ⌘/Ctrl-click
+ * in a split beside it, as a thread row does; × or a middle-click closes it
+ * here; right-click (a long press on touch) has the rest, as a thread's menu does.
  */
-function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
+function StudioItemChip({ item, onClose }: { item: OpenItem; onClose(): void }) {
   const sdk = useSdk();
   const link = useRef<HTMLAnchorElement>(null);
   const [renaming, setRenaming] = useState(false);
@@ -173,34 +161,10 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group/item relative" data-space-studio-item={`${item.pluginId}:${item.id}`}>
-          <a
-            ref={link}
-            href={item.href}
-            title={item.title}
-            onClick={(event) => {
-              // The split's own Mod-click goes on to BB.
-              if (splitting || event.button !== 0 || event.altKey) return;
-              event.preventDefault();
-              openStudioItem(link.current, item.href, event.metaKey || event.ctrlKey);
-            }}
-            onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); onClose(); } }}
-            className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "h-auto flex-wrap items-center pr-12 pb-1.5 pl-2 text-left max-md:pointer-coarse:h-auto")}
-            style={{ rowGap: 0 }}
-          >
-            <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}>
-              {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
-            </span>
-            {/* Line one is as tall as the hover buttons, so they stay off the preview. */}
-            {renaming ? null : <span className="flex h-7 min-w-0 flex-1 items-center max-md:pointer-coarse:h-9"><span className="truncate">{item.title}</span></span>}
-            <span className="pointer-events-none min-w-0 basis-full truncate pl-6 text-xs leading-4 text-subtle-foreground">{item.preview ?? item.kindLabel}</span>
-          </a>
-          {renaming ? null : (
-            <span className="pointer-events-none absolute top-0 right-1 flex h-7 items-center gap-1 max-md:pointer-coarse:h-9 text-xs tabular-nums text-subtle-foreground group-hover/item:hidden group-focus-within/item:hidden">
-              {item.pinned ? <Icon name="Pin" aria-label="Pinned" className="size-3" /> : null}
-              {item.updatedAt ? compactAge(item.updatedAt) : null}
-            </span>
-          )}
+        <span
+          className="group/item relative inline-flex h-6 max-w-full min-w-0 items-center rounded-full border border-border bg-sidebar-accent/40 text-xs text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-within:bg-sidebar-accent data-[state=open]:bg-sidebar-accent max-md:pointer-coarse:h-8"
+          data-space-studio-item={`${item.pluginId}:${item.id}`}
+        >
           {renaming ? (
             <input
               autoFocus
@@ -213,31 +177,39 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
                 if (event.key === "Escape") { event.preventDefault(); setRenaming(false); }
               }}
               onBlur={(event) => rename(event.currentTarget.value)}
-              className="absolute inset-y-0.5 right-1 left-8 rounded-sm border border-sidebar-ring bg-sidebar px-1.5 text-sm outline-none"
+              className="h-full w-40 rounded-full border border-sidebar-ring bg-sidebar px-2 text-xs outline-none"
             />
-          ) : null}
-          <span className="absolute top-0 right-0.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">
+          ) : (
+            <a
+              ref={link}
+              href={item.href}
+              title={item.preview ? `${item.title}\n${item.preview}` : item.title}
+              onClick={(event) => {
+                // The split's own Mod-click goes on to BB.
+                if (splitting || event.button !== 0 || event.altKey) return;
+                event.preventDefault();
+                openStudioItem(link.current, item.href, event.metaKey || event.ctrlKey);
+              }}
+              onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); onClose(); } }}
+              className="flex h-full min-w-0 items-center gap-1.5 rounded-full pr-2 pl-2 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-hover/item:pr-0.5 group-focus-within/item:pr-0.5 max-md:pointer-coarse:pr-0.5"
+            >
+              {item.icon ? <span className="text-[12px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-3.5 shrink-0" />}
+              <span className="max-w-40 truncate">{item.title}</span>
+              {item.pinned ? <Icon name="Pin" aria-label="Pinned" className="size-3 shrink-0 text-subtle-foreground" /> : null}
+            </a>
+          )}
+          {renaming ? null : (
             <button
               type="button"
               aria-label={`Close ${item.title}`}
               title="Close"
               onClick={onClose}
-              className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
+              className="mr-0.5 hidden size-5 shrink-0 items-center justify-center rounded-full text-subtle-foreground hover:bg-state-hover hover:text-muted-foreground group-hover/item:inline-flex group-focus-within/item:inline-flex max-md:pointer-coarse:inline-flex"
             >
-              <Icon name="X" className="size-3.5" />
+              <Icon name="X" className="size-3" />
             </button>
-            <button
-              type="button"
-              aria-label={`${item.title} options`}
-              title="Options"
-              aria-haspopup="menu"
-              onClick={(event) => openMenu(event.currentTarget)}
-              className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
-            >
-              <Icon name="MoreHorizontal" className="size-3.5" />
-            </button>
-          </span>
-        </div>
+          )}
+        </span>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52" aria-label={`${item.title} actions`}>
         <ContextMenuItem onSelect={() => openStudioItem(link.current, item.href, true)}><Icon name="Columns2" className="size-4" />Open in split</ContextMenuItem>
@@ -310,9 +282,10 @@ export function SpaceStudioList({ spaceName, items }: {
   };
   if (!open.length) return null;
   return (
-    <div role="group" aria-label={`${spaceName} Studio items`}>
+    // Chips, not rows: open items read as tabs, apart from the threads below.
+    <div role="group" aria-label={`${spaceName} Studio items`} className="flex flex-wrap gap-1 px-2 pt-0.5 pb-1.5">
       {open.map((item) => (
-        <StudioItemRow key={key(item)} item={item} onClose={() => close(item)} />
+        <StudioItemChip key={key(item)} item={item} onClose={() => close(item)} />
       ))}
     </div>
   );

@@ -411,7 +411,8 @@ export function SpaceModeSections({
                       </>
                     )}
                   >
-                    {/* Lead, pins, open Studio items, then threads: marks and icons tell them apart. */}
+                    {/* Open Studio items as chips, then the lead, pins and threads, told apart by their marks. */}
+                    <SpaceStudioList spaceName={group.space.name} items={items[group.space.id]} />
                     {group.lead ? (
                       <div data-space-lead={group.lead.id}>
                         {tree({ rootItems: group.leadItems, threads: group.leadThreads })}
@@ -422,7 +423,6 @@ export function SpaceModeSections({
                         {tree({ rootItems: group.pinnedItems, threads: group.pinnedThreadsHere })}
                       </div>
                     ) : null}
-                    <SpaceStudioList spaceName={group.space.name} items={items[group.space.id]} />
                     {/* No placeholder when there are none: the whole Space still takes dropped threads. */}
                     {group.threads.length ? tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId }) : null}
                   </SpaceSidebarSection>

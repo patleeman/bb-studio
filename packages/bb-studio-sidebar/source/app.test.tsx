@@ -298,6 +298,10 @@ describe("thread-list plugin", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Thread" }));
     expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_web", focusPrompt: true } });
     // An item opens in the main area (in place here, where BB can't split).
+    // Open items are chips above the lead.
+    const chips = within(alpha()).getByRole("group", { name: "Alpha Studio items" });
+    expect(chips.compareDocumentPosition(alpha().querySelector("[data-space-lead]")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(chips).getByRole("button", { name: "Close Launch plan" })).not.toBeNull();
     fireEvent.click(within(alpha()).getByRole("link", { name: "Launch plan" }));
     expect(window.location.pathname).toBe("/plugins/pages/pages/pg_1");
     // Any thread can become the lead.
