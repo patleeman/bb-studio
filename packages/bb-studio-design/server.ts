@@ -146,6 +146,9 @@ const SCREEN_CSP = [
   "connect-src https:",
 ].join("; ");
 
+/** Where findings go matches review(): the design's own thread, not necessarily the caller's. */
+export const DESIGN_READY_DESCRIPTION = "Call when a round (or a change) is ready for the user. A separate reviewer checks the screens in the background: it loads them at their size, takes screenshots, and checks layout, errors, steps and the design rules. It only reports back when something needs fixing, and then in the design's own thread (the thread that made the design, which may not be this one). Don't call the work done until then. Pass skipReview for trivial edits (a word, a color).";
+
 /**
  * A screen as the canvas loads it, with the canvas script added; or, for
  * Download HTML, the agent's HTML as written, saved as a file.
@@ -499,7 +502,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.agents.registerTool({
     name: "design_ready",
-    description: "Call when a round (or a change) is ready for the user. A separate reviewer checks the screens in the background: it loads them at their size, takes screenshots, and checks layout, errors, steps and the design rules. It only comes back to you, in this thread, when something needs fixing. Don't call the work done until then. Pass skipReview for trivial edits (a word, a color).",
+    description: DESIGN_READY_DESCRIPTION,
     presentation: { label: { pending: "Sending for review", completed: "Sent for review" } },
     parameters: z.object({
       designId: z.string().min(1),
@@ -520,7 +523,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (outcome === "paused") return `Automatic review is paused for this design: the last ${MAX_REVIEWS_IN_A_ROW} reviews in a row found problems. Tell the user plainly what still needs work. Call design_ready again only after the user edits or comments on the design, or asks for another review (then pass userAsked).`;
       if (outcome === "disposed") return fail("Studio Design is reloading; call design_ready again in a moment.");
       if (outcome === "queued") return `A review of this design is already running. Once it ends, ${ids.join(", ")} are reviewed again as they are then; findings come back only if something needs fixing.\n${card(designId)}`;
-      return `Sent ${ids.join(", ")} for review. The reviewer reports back in this thread only if something needs fixing; until then, say the work is out for review, not done. Keep your summary short.\n${card(designId)}`;
+      return `Sent ${ids.join(", ")} for review. The reviewer reports back only if something needs fixing, in the design's own thread (the one that made it, which may not be this one); until then, say the work is out for review, not done. Keep your summary short.\n${card(designId)}`;
     },
   });
 
