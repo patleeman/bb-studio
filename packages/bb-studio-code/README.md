@@ -27,12 +27,34 @@ to different folders.
 - **Stop** ends the workspace's server. **Open in browser** opens the same
   editor in its own window.
 
-Agents get three tools and the `studio-code` skill:
+Agents get five tools and the `studio-code` skill:
 
 - `code_workspace_open` opens the thread's worktree, or new folders, and
   prints the reply card.
 - `code_workspaces_list` lists workspaces.
 - `code_workspace_set_folders` changes a workspace's folders.
+- `code_editor_state` reports what you have open right now.
+- `code_show` points you at code: your editor opens the file, scrolls to the
+  lines, selects and highlights them ("BB showed you src/retry.ts:13").
+
+## Working with the agent
+
+Every workspace runs the **BB Studio bridge**, a small VS Code extension
+Studio Code installs. It reports what you have in front of you: the file,
+the lines on screen, your selection, errors and warnings, and files with
+unsaved changes. Each agent turn in a related thread (the workspace's own
+thread, its project, or a thread working in its folders) starts knowing
+that, so "is this line right?" works without pasting anything. The agent is
+told not to edit files you have unsaved changes in. VS Code saves on its own
+after a second, so that mostly matters while you're typing.
+
+The other way round, the agent calls `code_show` to put your editor on the
+code it means. When no editor is open, it jumps there as soon as you open
+one. **Copy for BB chat** in the editor's right-click menu copies the
+selection with its path and lines, for pasting into the chat.
+
+The bridge talks to the plugin over a Unix socket in the workspace's folder
+that only you can open: no port and no token.
 
 ## Phones and other computers
 

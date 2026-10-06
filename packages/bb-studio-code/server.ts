@@ -5,12 +5,14 @@
 // for it (src/server/runtime.ts); the app shows that editor in a frame.
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
 import { createChangeBus, createStoreProvider, defineItemMention, mustGet, studioServices } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { listDir, readText } from "./src/server/files";
+import { Bridges, editorContext } from "./src/server/bridge";
+import { installBridge } from "./src/server/bridge-extension";
+import { contained, listDir, readText } from "./src/server/files";
 import { browseFolders, sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
@@ -92,13 +94,22 @@ export default function plugin(bb: BbPluginApi) {
   void bb.storage.kv.get<BbTheme>("theme").then((saved) => { theme ??= saved ?? null; themeKey = JSON.stringify(theme); });
   // Existing workspaces get a new layout once, the next time VS Code loads.
   void applyLayoutEverywhere(root, (message) => bb.log.warn(message)).catch(() => undefined);
+  // The bridge between each workspace's VS Code and the agent (src/server/bridge.ts).
+  const bridges = new Bridges();
+  void installBridge(join(root, "extensions")).catch((error) => bb.log.warn(`couldn't install the BB bridge extension: ${error instanceof Error ? error.message : String(error)}`));
   const servers = new CodeServers({
     root,
     log: bb.log,
-    onChange: (id) => bb.realtime.publish(CHANNEL, { id }),
+    onChange: (id) => {
+      bb.realtime.publish(CHANNEL, { id });
+      const state = servers.status(id).state;
+      if (state === "stopped" || state === "failed") void bridges.close(id);
+    },
     theme: () => theme,
+    env: async (id, dir) => ({ STUDIO_CODE_BRIDGE: await bridges.open(id, dir) }),
   });
   bb.onDispose(() => servers.dispose());
+  bb.onDispose(() => bridges.closeAll());
   // A reload stopped every server; open views recheck and start theirs again.
   const reloaded = setTimeout(() => { try { bb.realtime.publish(CHANNEL, { id: "*" }); } catch { /* No views yet. */ } }, 1000);
   bb.onDispose(() => clearTimeout(reloaded));
@@ -166,6 +177,7 @@ export default function plugin(bb: BbPluginApi) {
     },
     readFile: async ({ id, path }) => readText(safeFolders(must(id)), path),
     browseFolders: ({ path, showHidden }) => browseFolders(path, homedir(), showHidden),
+    editorState: ({ id }) => ({ state: bridges.connected(id) ? bridges.state(id) : null }),
     projects: async () => ({ projects: await projects() }),
     syncTheme: async (next) => {
       const key = JSON.stringify(next);
@@ -244,7 +256,93 @@ export default function plugin(bb: BbPluginApi) {
       resolve: (id) => ({ context: `VS Code workspace "${must(id).title}" (${id}). Folders:\n${must(id).folders.map((folder) => `- ${folder}`).join("\n")}` }),
     }),
   );
-  bb.agents.configure(() => ({ tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders"], skills: ["studio-code"] }));
+  // ---- The agent and the user's editor --------------------------------------
+
+  /** Each thread's working folder, refreshed when it starts a turn. */
+  const threadPaths = new Map<string, string | null>();
+  const threadPath = async (threadId: string): Promise<string | null> => {
+    if (threadPaths.has(threadId)) return threadPaths.get(threadId)!;
+    try {
+      const thread = (await bb.sdk.threads.get({ threadId, include: "environment" })) as { environment?: { path: string | null } | null };
+      const path = thread.environment?.path ?? null;
+      threadPaths.set(threadId, path);
+      return path;
+    } catch {
+      return null;
+    }
+  };
+  bb.events.on("thread.active", ({ thread }) => { threadPaths.delete(thread.id); void threadPath(thread.id); });
+  bb.events.on("thread.deleted", ({ thread }) => { threadPaths.delete(thread.id); });
+
+  const inside = (folder: string, path: string) => path === folder || path.startsWith(`${folder.replace(/\/+$/, "")}/`);
+  /**
+   * Workspaces with a VS Code open that belong with this thread: made for it,
+   * in its project, or holding (or held by) its working folder.
+   */
+  const editorsFor = (threadId: string, projectId: string | null, path: string | null) =>
+    store.list().filter((workspace) =>
+      !workspace.archived &&
+      bridges.connected(workspace.id) &&
+      bridges.state(workspace.id) !== null &&
+      (workspace.threadId === threadId ||
+        (projectId !== null && workspace.projectId === projectId) ||
+        (path !== null && workspace.folders.some((folder) => inside(folder, path) || inside(path, folder)))));
+  const contextFor = (threadId: string, projectId: string | null, path: string | null) =>
+    editorContext(editorsFor(threadId, projectId, path).map((workspace) => ({ title: workspace.title, folders: workspace.folders, state: bridges.state(workspace.id)! })));
+
+  // Each turn starts knowing what the user has open. The provider can't wait,
+  // so a thread's folder comes from the cache (filled as turns start).
+  bb.agents.contributeInstructions(({ threadId, projectId }) => {
+    if (!threadPaths.has(threadId)) void threadPath(threadId);
+    return contextFor(threadId, projectId, threadPaths.get(threadId) ?? null);
+  });
+
+  bb.agents.registerTool({
+    name: "code_editor_state",
+    description: "What the user has open in VS Code (Studio Code) right now: the file, the lines on screen, their selection, errors, and files with unsaved changes.",
+    parameters: z.object({}),
+    execute: async (_input, ctx) => contextFor(ctx.threadId, ctx.projectId ?? null, await threadPath(ctx.threadId)) ?? "The user has no VS Code workspace open for this thread right now.",
+  });
+
+  bb.agents.registerTool({
+    name: "code_show",
+    description:
+      "Point the user at code: their VS Code opens the file, scrolls to the lines, selects and highlights them. Use it when you refer to specific code, so they see what you mean. path: full, or relative to your working folder. Lines are 1-based.",
+    parameters: z.object({
+      path: z.string().trim().min(1).max(4096),
+      startLine: z.number().int().min(1).optional(),
+      endLine: z.number().int().min(1).optional(),
+    }),
+    execute: async ({ path, startLine, endLine }, ctx) => {
+      const base = await threadPath(ctx.threadId);
+      const absolute = isAbsolute(path) ? resolve(path) : base ? resolve(base, path) : null;
+      if (!absolute) throw new Error("Give a full path: this thread has no working folder to start from.");
+      const holds = (workspace: Workspace) => !workspace.archived && workspace.folders.some((folder) => inside(folder, absolute));
+      const mine = editorsFor(ctx.threadId, ctx.projectId ?? null, base);
+      // An open editor of this thread's first, then any open editor, then the thread's own worktree.
+      let workspace = mine.find(holds) ?? store.list().find((each) => holds(each) && bridges.connected(each.id));
+      if (!workspace && base && inside(base, absolute)) workspace = await forThread(ctx.threadId);
+      if (!workspace) workspace = store.list().find(holds);
+      if (!workspace) return `None of the user's workspaces holds ${absolute}. Open one for its folder with code_workspace_open first.`;
+      // Checked through symlinks, but opened by the path the workspace knows:
+      // VS Code treats /tmp/x and /private/tmp/x as two different files.
+      const real = await contained(workspace.folders, absolute);
+      if (!(await stat(real)).isFile()) throw new Error(`${absolute} is a folder; show a file.`);
+      const target = workspace.folders.some((folder) => inside(folder, absolute)) ? absolute : real;
+      const start = startLine ?? 1;
+      const end = Math.max(endLine ?? start, start);
+      const lines = start === end ? `line ${start}` : `lines ${start}–${end}`;
+      const where = `${relative(workspace.folders.find((folder) => inside(folder, target)) ?? dirname(target), target)} ${lines}`;
+      if (bridges.send(workspace.id, { type: "show", path: target, startLine: start, endLine: end }))
+        return `Showing ${where} in the user's VS Code ("${workspace.title}").`;
+      return `The user's VS Code for "${workspace.title}" isn't open. It will jump to ${where} when they open it.\n${card(workspace.id)}`;
+    },
+  });
+
+  bb.agents.configure(() => ({
+    tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders", "code_editor_state", "code_show"],
+    skills: ["studio-code"],
+  }));
 
   createStoreProvider(bb, studio, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: PANEL_PATH, kinds: [KIND] }),

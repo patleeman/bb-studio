@@ -113,6 +113,8 @@ export class CodeServers {
     onChange(id: string): void;
     /** BB's theme as last seen, for a workspace that starts. */
     theme?(): BbTheme | null;
+    /** Extra environment for a workspace's server (the bridge's socket). */
+    env?(id: string, dir: string): Promise<Record<string, string>>;
     /** Tests: the installed binary, and the process launcher. */
     install?(): Promise<string>;
     spawn?: Spawn;
@@ -192,6 +194,7 @@ export class CodeServers {
       // reason, even SIGKILL, the pipe closes and it stops code-server.
       const watchdog = join(this.options.root, "watchdog.cjs");
       await writeFile(watchdog, WATCHDOG);
+      const extra = (await this.options.env?.(id, dir)) ?? {};
       check();
       const launch = this.options.spawn ?? (spawnProcess as Spawn);
       child = launch(join(dirname(dirname(bin)), "lib", "node"), [watchdog, bin, ...codeServerArgs({
@@ -205,7 +208,7 @@ export class CodeServers {
         stdio: ["pipe", "pipe", "pipe"],
         // code-server keeps a heartbeat and state under XDG folders; keep
         // them in this workspace's folder, not the user's home.
-        env: { ...process.env, XDG_DATA_HOME: join(dir, "xdg-data"), XDG_CONFIG_HOME: join(dir, "xdg-config") },
+        env: { ...process.env, ...extra, XDG_DATA_HOME: join(dir, "xdg-data"), XDG_CONFIG_HOME: join(dir, "xdg-config") },
       });
       const started = child;
       const output: string[] = [];

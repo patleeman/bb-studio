@@ -62,6 +62,26 @@ export const serverStatusSchema = z.object({
 });
 export type ServerStatus = z.infer<typeof serverStatusSchema>;
 
+const line = z.number().int().min(1);
+/** What the user has in front of them in VS Code, as the bridge extension reports it. */
+export const editorStateSchema = z.object({
+  /** The window has focus. */
+  focused: z.boolean(),
+  activeFile: z.object({
+    path: z.string().max(4096),
+    language: z.string().max(100),
+    selection: z.object({ startLine: line, startColumn: line, endLine: line, endColumn: line }),
+    /** The selected text, cut to a few thousand characters. */
+    selectedText: z.string().max(8000),
+    visible: z.object({ startLine: line, endLine: line }).nullable(),
+    problems: z.array(z.object({ line, severity: z.enum(["error", "warning"]), message: z.string().max(400) })).max(20),
+  }).nullable(),
+  openFiles: z.array(z.string().max(4096)).max(50),
+  /** Files with edits not yet saved: on disk they're older than what the user sees. */
+  unsavedFiles: z.array(z.string().max(4096)).max(50),
+});
+export type EditorState = z.infer<typeof editorStateSchema>;
+
 export const codeContract = defineRpcContract({
   get: {
     input: z.object({ id }),
@@ -103,6 +123,11 @@ export const codeContract = defineRpcContract({
   readFile: {
     input: z.object({ id, path: z.string().max(4096) }),
     output: z.object({ text: z.string().nullable(), reason: z.string().nullable() }),
+  },
+  /** What the workspace's VS Code reports, as the agent sees it; null with no editor open. */
+  editorState: {
+    input: z.object({ id }),
+    output: z.object({ state: editorStateSchema.nullable() }),
   },
   /** BB's palette, as the app sees it; every workspace follows it. */
   syncTheme: {
