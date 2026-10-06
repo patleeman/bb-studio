@@ -11,6 +11,8 @@ import { createChangeBus, createStoreProvider, defineItemMention, mustGet, studi
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { listDir, readText } from "./src/server/files";
+import { applyThemeEverywhere } from "./src/server/settings";
+import type { BbTheme } from "./src/theme";
 import { CodeServers } from "./src/server/runtime";
 import { MIGRATIONS, WorkspaceStore } from "./src/server/store";
 import { CHANNEL, CODE_ICON, KIND_ID, PANEL_PATH, PLUGIN_ID, codeContract, workspaceHref, type Workspace } from "./src/shared";
@@ -74,11 +76,17 @@ export default function plugin(bb: BbPluginApi) {
   const studio = studioSchemas(z);
   const changes = createChangeBus({ bb, channel: CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ id }) });
   bb.onDispose(() => changes.dispose());
+  // <dataDir>/plugins/<id>/, beside the plugin's database.
+  const root = dirname(db.name);
+  /** BB's palette as the app last sent it; kept so new workspaces start in it. */
+  let theme: BbTheme | null = null;
+  let themeKey = "";
+  void bb.storage.kv.get<BbTheme>("theme").then((saved) => { theme ??= saved ?? null; themeKey = JSON.stringify(theme); });
   const servers = new CodeServers({
-    // <dataDir>/plugins/<id>/, beside the plugin's database.
-    root: dirname(db.name),
+    root,
     log: bb.log,
     onChange: (id) => bb.realtime.publish(CHANNEL, { id }),
+    theme: () => theme,
   });
   bb.onDispose(() => servers.dispose());
   const must = (id: string) => mustGet((key) => store.get(key), id, "Workspace not found.");
@@ -145,6 +153,15 @@ export default function plugin(bb: BbPluginApi) {
     },
     readFile: async ({ id, path }) => readText(must(id).folders, path),
     projects: async () => ({ projects: await projects() }),
+    syncTheme: async (next) => {
+      const key = JSON.stringify(next);
+      if (key === themeKey) return { changed: false };
+      theme = next;
+      themeKey = key;
+      await bb.storage.kv.set("theme", next);
+      await applyThemeEverywhere(root, next, (message) => bb.log.warn(message));
+      return { changed: true };
+    },
   });
 
   const summary = (workspace: Workspace) =>

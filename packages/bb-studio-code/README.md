@@ -49,8 +49,17 @@ Each open workspace runs its own [code-server](https://github.com/coder/code-ser
 state under `<dataDir>/plugins/studio-code/workspaces/<id>/`. code-server's
 own data and config folders live there too, not in your home folder.
 Extensions are shared across workspaces and come from Open VSX. New workspaces
-turn off Restricted Mode, the welcome page and VS Code's own AI chat, and
-follow the system's light or dark theme.
+turn off Restricted Mode, the welcome page and VS Code's own AI chat.
+
+**BB's theme.** VS Code takes BB's colors, whatever theme BB uses, including
+custom and plugin themes. While a workspace is on screen, the app reads BB's
+palette from the page, converts it to hex, and the server writes it into every
+workspace's settings as `workbench.colorCustomizations` over VS Code's Dark
+Modern or Light Modern, matching BB's mode. Syntax colors stay VS Code's. When
+BB's colors or mode change, open editors reload to pick them up, keeping
+their open files; code-server reads settings on load but doesn't watch them.
+A settings file you edited with comments isn't plain JSON, so it is left
+alone.
 
 **Idle shutdown.** A server stops after 30 minutes with no editor connected,
 and reopens when you come back to the workspace. A view that has been out of

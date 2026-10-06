@@ -1,6 +1,7 @@
 // Names, schemas and links the server and the app share.
 import type { PluginRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { bbThemeSchema } from "./theme";
 
 // The SDK's defineRpcContract, inlined: the app bundles this file, and BB
 // doesn't serve the bare SDK to frontends.
@@ -85,6 +86,12 @@ export const codeContract = defineRpcContract({
   readFile: {
     input: z.object({ id, path: z.string().max(4096) }),
     output: z.object({ text: z.string().nullable(), reason: z.string().nullable() }),
+  },
+  /** BB's palette, as the app sees it; every workspace follows it. */
+  syncTheme: {
+    input: bbThemeSchema,
+    /** `changed`: the workspaces' settings were rewritten, so open editors should reload. */
+    output: z.object({ changed: z.boolean() }),
   },
   /** BB's projects with a local folder, to pick from. */
   projects: {

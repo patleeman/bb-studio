@@ -4,6 +4,7 @@ import { AddOnPanel, BAR_BUTTON, BarTitle, ICON_BUTTON, Icon, ItemHeader, ItemMe
 import { errorMessage } from "@bb-studio/kit/format";
 import { toast } from "sonner";
 import { FileBrowser } from "./file-browser";
+import { themeChanges, useThemeSync } from "./theme-sync";
 import { CHANNEL, HIDDEN_RELEASE_MS, KIND_ID, PANEL_PATH, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
 
 export function CodePanel({ subPath }: { subPath: string }) {
@@ -66,6 +67,14 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
   const [version, setVersion] = useState(0);
   const [editing, setEditing] = useState(false);
   const embed = canEmbedEditor(window.location.hostname);
+  useThemeSync(embed);
+  // VS Code takes new colors on load; reloading keeps its open files.
+  const [frameLoad, setFrameLoad] = useState(0);
+  useEffect(() => {
+    const reload = () => setFrameLoad((n) => n + 1);
+    themeChanges.addEventListener("change", reload);
+    return () => themeChanges.removeEventListener("change", reload);
+  }, []);
   const body = useRef<HTMLDivElement>(null);
   const shown = useShown(body);
   // After Stop, the user starts it again; otherwise a visible view opens it.
@@ -160,7 +169,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
           <FileBrowser workspace={workspace} />
         ) : url && !released ? (
           <iframe
-            key={url}
+            key={`${url}#${frameLoad}`}
             title={`VS Code: ${workspace.title}`}
             src={url}
             className="absolute inset-0 size-full border-0"

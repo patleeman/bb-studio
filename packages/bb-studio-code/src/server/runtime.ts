@@ -13,6 +13,8 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { promisify } from "node:util";
 import { IDLE_TIMEOUT_SECONDS, type ServerStatus, type Workspace } from "../shared";
+import type { BbTheme } from "../theme";
+import { applyTheme } from "./settings";
 
 export const CODE_SERVER_VERSION = "4.140.0";
 const READY_TIMEOUT_MS = 60_000;
@@ -51,6 +53,8 @@ export class CodeServers {
     log: { info(message: string): void; warn(message: string): void };
     /** A workspace's status changed. */
     onChange(id: string): void;
+    /** BB's theme as last seen, for a workspace that starts. */
+    theme?(): BbTheme | null;
   }) {
     this.swept = this.sweep();
   }
@@ -107,6 +111,8 @@ export class CodeServers {
       const file = join(dir, workspaceFileName(workspace.title));
       await writeFile(file, workspaceFile(workspace.folders));
       await seedSettings(join(dir, "user-data", "User"));
+      const theme = this.options.theme?.();
+      if (theme) await applyTheme(dir, theme).catch(() => false);
       const config = join(this.options.root, "config.yaml");
       await writeFile(config, "auth: none\n");
       const port = await freePort();
@@ -220,9 +226,10 @@ export const DEFAULT_SETTINGS = {
   "workbench.startupEditor": "none",
   "chat.disableAIFeatures": true,
   "workbench.secondarySideBar.defaultVisibility": "hidden",
+  // Until the app sends BB's palette, follow the system like BB's default.
   "window.autoDetectColorScheme": true,
-  "workbench.preferredLightColorTheme": "Default Light Modern",
-  "workbench.preferredDarkColorTheme": "Default Dark Modern",
+  "workbench.preferredLightColorTheme": "Light Modern",
+  "workbench.preferredDarkColorTheme": "Dark Modern",
 };
 
 async function seedSettings(dir: string): Promise<void> {
