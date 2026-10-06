@@ -318,23 +318,24 @@ struct ReactionChips: View {
     }
 }
 
-/// Lays children out left to right, wrapping onto new lines.
+/// Lays children out left to right, wrapping onto new lines. A child wider
+/// than `maxItemWidth` (or the row) is offered that width, so its text truncates.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
+    var maxItemWidth: CGFloat = .infinity
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = arrange(proposal.width ?? .infinity, subviews)
-        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
-        let width = rows.map(\.width).max() ?? 0
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map { $0.width }.max() ?? 0
+        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(0, rows.count - 1))
         return CGSize(width: proposal.width ?? width, height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var y = bounds.minY
-        for row in arrange(bounds.width, subviews) {
+        for row in arrange(width: bounds.width, subviews: subviews) {
             var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
+            for (index, size) in row.items {
                 subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
                 x += size.width + spacing
             }
@@ -343,25 +344,29 @@ struct FlowLayout: Layout {
     }
 
     private struct Row {
-        var indices: [Int] = []
+        var items: [(Int, CGSize)] = []
         var width: CGFloat = 0
         var height: CGFloat = 0
     }
 
-    private func arrange(_ maxWidth: CGFloat, _ subviews: Subviews) -> [Row] {
-        var rows: [Row] = [Row()]
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        let limit = min(width, maxItemWidth)
+        var rows: [Row] = []
+        var row = Row()
         for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            let extra = rows[rows.count - 1].indices.isEmpty ? size.width : size.width + spacing
-            if rows[rows.count - 1].width + extra > maxWidth, !rows[rows.count - 1].indices.isEmpty {
-                rows.append(Row())
+            let ideal = subviews[index].sizeThatFits(.unspecified)
+            let size = ideal.width > limit ? subviews[index].sizeThatFits(ProposedViewSize(width: limit, height: ideal.height)) : ideal
+            let needed = row.items.isEmpty ? size.width : row.width + spacing + size.width
+            if !row.items.isEmpty, needed > width {
+                rows.append(row)
+                row = Row()
             }
-            let last = rows.count - 1
-            rows[last].width += rows[last].indices.isEmpty ? size.width : size.width + spacing
-            rows[last].height = max(rows[last].height, size.height)
-            rows[last].indices.append(index)
+            row.width = row.items.isEmpty ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+            row.items.append((index, size))
         }
-        return rows.filter { !$0.indices.isEmpty }
+        if !row.items.isEmpty { rows.append(row) }
+        return rows
     }
 }
 

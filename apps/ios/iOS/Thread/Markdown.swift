@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Block-level markdown on top of `AttributedString`'s inline parser: headings,
 /// paragraphs, ordered, nested and task lists, quotes, tables, rules and fenced
-/// code, and images. `::artifact{id="…"}` lines become artifact cards, `::inline-vis{…}`
+/// code, and images. `::artifact{id="…"}` lines become artifact cards, `::page{…}`, `::drawing{…}`,
+/// `::table{…}` and `::design{…}` lines cards that open the item, `::inline-vis{…}`
 /// lines show the file they name, and `::task{id="…"}` lines task cards; other directives, such as `::reactions{…}`, are left out; see `Directive`.
 struct MarkdownText: View {
     let source: String
@@ -52,6 +53,8 @@ struct MarkdownText: View {
             Divider().padding(.vertical, 2)
         case .artifact(let id):
             ArtifactCard(id: id)
+        case .item(let item):
+            ReplyItemCard(item: item)
         case .inlineVis(let vis):
             InlineVisCard(vis: vis)
         case .image(let alt, let src):
@@ -158,6 +161,8 @@ enum MarkdownBlock {
     case rule
     /// A Studio artifact an agent put in its reply.
     case artifact(String)
+    /// A page, drawing, table or design an agent put in its reply.
+    case item(ReplyItem)
     /// A workspace or thread-storage file shown in the reply.
     case inlineVis(InlineVis)
     /// `![alt](src)`, shown below the text of its paragraph.
@@ -219,6 +224,9 @@ enum MarkdownBlock {
                 if directive.name == "artifact", let id = directive.attributes["id"], Artifact.isId(id) {
                     flush()
                     blocks.append(.artifact(id))
+                } else if let item = ReplyItem(directive) {
+                    flush()
+                    blocks.append(.item(item))
                 } else if directive.name == "inline-vis" {
                     flush()
                     blocks.append(.inlineVis(InlineVis(directive)))

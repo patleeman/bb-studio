@@ -17,10 +17,11 @@ public struct PendingInteraction: Codable, Identifiable, Hashable, Sendable {
         public var rendererId: String?
     }
 
-    /// Approvals, questions, and the ask-user-question and secrets plugin
-    /// forms are answered natively; other plugin forms need the web app.
+    /// Approvals, questions, and the ask-user-question, secrets and Studio
+    /// Design plugin forms are answered natively; other plugin forms need the web app.
     public var isNative: Bool {
         payload.kind == "approval" || payload.kind == "user_question" || pluginQuestions != nil || secretRequest != nil
+            || designQuestions != nil
     }
 
     /// Core questions, or the ask-user-question plugin's.
@@ -35,10 +36,50 @@ public struct PendingInteraction: Codable, Identifiable, Hashable, Sendable {
         return questions.decoded()
     }
 
+    /// Studio Design's `design_ask` form: what to build, asked before designing.
+    public var designQuestions: DesignQuestionForm? {
+        guard rendererId == "design-questions" else { return nil }
+        return payload.data?.decoded()
+    }
+
     /// The secrets plugin asking for credentials to write to a dotenv file.
     public var secretRequest: SecretRequest? {
         guard rendererId == "secret-request" else { return nil }
         return payload.data?.decoded()
+    }
+}
+
+/// Mirrors `packages/bb-studio-design/src/questions.ts`. Every question can be
+/// left to the agent; unanswered ones are.
+public struct DesignQuestionForm: Decodable, Hashable, Sendable {
+    public struct Option: Decodable, Hashable, Sendable {
+        public var label: String
+        public var description: String?
+    }
+
+    public struct Question: Decodable, Hashable, Identifiable, Sendable {
+        public var id: String
+        /// choice, multi, text or scale.
+        public var kind: String
+        public var question: String
+        public var help: String?
+        public var options: [Option]?
+        public var other: Bool?
+        public var placeholder: String?
+        public var minLabel: String?
+        public var maxLabel: String?
+    }
+
+    public var title: String?
+    public var intro: String?
+    public var questions: [Question]
+
+    /// What the agent reads for "Decide for me".
+    public static let decide: JSONValue = ["decide": true]
+
+    /// Every question left to the agent, for Skip All.
+    public var allDecided: JSONValue {
+        .object(Dictionary(uniqueKeysWithValues: questions.map { ($0.id, Self.decide) }))
     }
 }
 
@@ -129,6 +170,8 @@ extension PendingInteraction {
             return payload.questions?.first?.prompt ?? "BB has a question"
         case "plugin" where pluginQuestions != nil:
             return pluginQuestions?.first?.prompt ?? payload.title ?? "BB has a question"
+        case "plugin" where designQuestions != nil:
+            return designQuestions?.questions.first?.question ?? payload.title ?? "A few questions"
         default:
             return payload.title ?? "BB needs input"
         }

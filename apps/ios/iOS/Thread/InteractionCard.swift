@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Answers a pending approval, question, or secret request in place. Other
+/// Answers a pending approval, question, design brief, or secret request in place. Other
 /// plugin forms fall back to the web app.
 struct InteractionCard: View {
     let interaction: PendingInteraction
@@ -27,6 +27,10 @@ struct InteractionCard: View {
                 if let title = interaction.payload.title { Text(title).font(.subheadline.weight(.semibold)) }
                 questions
                 Button("Skip", role: .cancel) { decline() }.font(.footnote)
+            case "plugin" where interaction.designQuestions != nil:
+                if let form = interaction.designQuestions {
+                    DesignQuestionsForm(form: form, submit: submit, decline: decline)
+                }
             case "plugin" where interaction.secretRequest != nil:
                 if let request = interaction.secretRequest {
                     SecretRequestForm(request: request, submit: submit, decline: decline)
@@ -53,6 +57,7 @@ struct InteractionCard: View {
 
     private var header: String {
         if interaction.secretRequest != nil { return "An agent needs credentials" }
+        if interaction.designQuestions != nil { return "Before designing" }
         return interaction.allQuestions != nil ? "BB has a question" : "Waiting for your approval"
     }
 
@@ -177,6 +182,148 @@ struct InteractionCard: View {
             _ = await resolve(resolution)
             working = false
         }
+    }
+}
+
+/// Studio Design's questions before a design: picks, toggles, a short answer
+/// or a 1–5 scale, each with Decide for Me. Unanswered questions go to the
+/// agent to decide, as on the web.
+private struct DesignQuestionsForm: View {
+    let form: DesignQuestionForm
+    let submit: (JSONValue) -> Void
+    let decline: () -> Void
+    @State private var answers: [String: JSONValue] = [:]
+    @State private var others: [String: String] = [:]
+
+    var body: some View {
+        Text(form.title ?? "A few questions").font(.subheadline.weight(.semibold))
+        if let intro = form.intro, !intro.isEmpty { Text(intro).font(.footnote).foregroundStyle(.secondary) }
+        ForEach(Array(form.questions.enumerated()), id: \.element.id) { index, question in
+            VStack(alignment: .leading, spacing: 6) {
+                Text("\(index + 1). \(question.question)").font(.subheadline.weight(.medium))
+                if let help = question.help, !help.isEmpty { Text(help).font(.caption).foregroundStyle(.secondary) }
+                field(question)
+            }
+            .padding(.top, 4)
+        }
+        HStack {
+            Button("Send Answers") { submit(final()) }
+                .buttonStyle(.borderedProminent)
+            Button("Skip All") { submit(form.allDecided) }
+                .buttonStyle(.bordered)
+            Spacer()
+            Button("Close", role: .cancel, action: decline).font(.footnote)
+        }
+        .controlSize(.small)
+    }
+
+    @ViewBuilder
+    private func field(_ question: DesignQuestionForm.Question) -> some View {
+        switch question.kind {
+        case "choice", "multi":
+            let labels = (question.options ?? []).map(\.label) + (question.other == true ? ["Other"] : [])
+            ForEach(labels, id: \.self) { label in
+                let picked = isPicked(label, in: question)
+                Button { pick(label, in: question) } label: {
+                    HStack(alignment: .top) {
+                        Image(systemName: question.kind == "multi"
+                            ? (picked ? "checkmark.square.fill" : "square")
+                            : (picked ? "checkmark.circle.fill" : "circle"))
+                        VStack(alignment: .leading) {
+                            Text(label)
+                            if let description = question.options?.first(where: { $0.label == label })?.description {
+                                Text(description).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(picked ? .isSelected : [])
+            }
+            if isPicked("Other", in: question) {
+                TextField("Your answer", text: Binding(get: { others[question.id] ?? "" }, set: { others[question.id] = $0 }))
+                    .textFieldStyle(.roundedBorder)
+            }
+            decideButton(question)
+        case "text":
+            TextField(question.placeholder ?? "Your answer", text: Binding(
+                get: { if case .string(let text) = answers[question.id] { text } else { "" } },
+                set: { answers[question.id] = $0.isEmpty ? nil : .string($0) }), axis: .vertical)
+                .lineLimit(1...4)
+                .textFieldStyle(.roundedBorder)
+            decideButton(question)
+        case "scale":
+            HStack(spacing: 6) {
+                ForEach(1...5, id: \.self) { value in
+                    let picked = answers[question.id] == .number(Double(value))
+                    Button { answers[question.id] = picked ? nil : .number(Double(value)) } label: {
+                        Text("\(value)").frame(maxWidth: .infinity, minHeight: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(picked ? .accentColor : .secondary)
+                    .accessibilityAddTraits(picked ? .isSelected : [])
+                }
+            }
+            HStack {
+                Text(question.minLabel ?? "")
+                Spacer()
+                Text(question.maxLabel ?? "")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            decideButton(question)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func decideButton(_ question: DesignQuestionForm.Question) -> some View {
+        let decided = answers[question.id] == DesignQuestionForm.decide
+        return Button {
+            answers[question.id] = decided ? nil : DesignQuestionForm.decide
+        } label: {
+            Label("Decide for Me", systemImage: decided ? "checkmark.circle.fill" : "sparkles")
+        }
+        .font(.caption)
+        .buttonStyle(.borderless)
+        .accessibilityAddTraits(decided ? .isSelected : [])
+    }
+
+    private func isPicked(_ label: String, in question: DesignQuestionForm.Question) -> Bool {
+        switch answers[question.id] {
+        case .string(let picked): picked == label
+        case .array(let picked): picked.contains(.string(label))
+        default: false
+        }
+    }
+
+    private func pick(_ label: String, in question: DesignQuestionForm.Question) {
+        let picked = isPicked(label, in: question)
+        if question.kind == "choice" {
+            answers[question.id] = picked ? nil : .string(label)
+            return
+        }
+        var current: [JSONValue] = if case .array(let list) = answers[question.id] { list } else { [] }
+        if picked { current.removeAll { $0 == .string(label) } } else if current.count < 8 { current.append(.string(label)) }
+        answers[question.id] = .array(current)
+    }
+
+    /// Unanswered questions, and Other picks, resolved to what the agent should get.
+    private func final() -> JSONValue {
+        var out: [String: JSONValue] = [:]
+        for question in form.questions {
+            let other = others[question.id]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            var answer = answers[question.id]
+            if case .array(let list) = answer {
+                answer = .array(list.map { $0 == .string("Other") ? .string(other.isEmpty ? "Other" : other) : $0 })
+            }
+            if answer == .string("Other") { answer = other.isEmpty ? nil : .string(other) }
+            if case .string(let text) = answer, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { answer = nil }
+            out[question.id] = answer ?? DesignQuestionForm.decide
+        }
+        return .object(out)
     }
 }
 

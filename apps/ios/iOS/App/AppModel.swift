@@ -16,6 +16,7 @@ enum Route: Hashable {
     case recording(id: String)
     case artifact(id: String)
     case table(id: String)
+    case design(id: String)
     case terminals(scope: TerminalScope, title: String)
 }
 
@@ -31,6 +32,7 @@ extension Route {
         case ("excalidraw", "drawings"): self = .drawing(id: id)
         case ("talk", "recordings"): self = .recording(id: id)
         case ("studio-tables", "tables"): self = .table(id: id)
+        case ("design", "designs"): self = .design(id: id)
         default: return nil
         }
     }
@@ -180,6 +182,7 @@ final class AppModel: ObservableObject {
         case "pages": openStudio(kind: "page")
         case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
+        case "design", "designs": openStudio(kind: "design", id.map { .design(id: $0) })
         case "space": if let id { openSpace(id) }
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording

@@ -7,7 +7,7 @@ import SwiftUI
 final class StudioStore: ObservableObject {
     let serverURL = ServerScope.selectedURL
     static var shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tables"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tables", "design"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
@@ -325,6 +325,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "table", label: "Table", plural: "Tables", symbol: "tablecells", tint: .cyan),
+        StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
         StudioKind(id: "space", label: "Space", plural: "Spaces", symbol: "square.stack.3d.up", tint: .mint),
     ]
 
@@ -844,6 +845,7 @@ struct StudioView: View {
         case "excalidraw": .drawing(id: item.itemId)
         case "artifacts": .artifact(id: item.itemId)
         case "studio-tables": .table(id: item.itemId)
+        case "design": .design(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
     }
@@ -924,6 +926,7 @@ struct StudioView: View {
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
+        case "design": "Ask an agent to design a screen, and its rounds of options show up here."
         case "space": "Spaces gather threads and Studio items. Make one with New."
         default: "Pages, recordings, dictations, drawings and artifacts show up here."
         }

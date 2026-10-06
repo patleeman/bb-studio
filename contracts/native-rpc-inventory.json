@@ -248,6 +248,12 @@
       "coverage": "literal method checked against contract"
     },
     {
+      "file": "apps/ios/Shared/Designs.swift",
+      "plugin": "design",
+      "method": "getDesign",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "excalidraw",
       "method": "listDrawings",

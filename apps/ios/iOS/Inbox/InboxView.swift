@@ -204,13 +204,15 @@ final class InboxModel: ObservableObject {
 
     private static func recency(_ thread: ThreadEntry) -> Double { max(thread.updatedAt, thread.latestAttentionAt ?? 0) }
 
-    /// One Space's part of Home: its lead, open Studio items and other threads.
+    /// One Space's part of Home: its open Studio items, lead, pinned and other threads.
     struct SpaceSection: Identifiable {
         var space: StudioSpace
         var lead: ThreadEntry?
         var leadInfo: SpaceLead?
         var open: [SpaceOpenItem]
-        /// Threads that need the user first, then in the sidebar's order.
+        /// Pinned threads in the Space, in pin order, below the lead.
+        var pinned: [ThreadEntry]
+        /// Threads that wait on the user first, then in the sidebar's order.
         var threads: [ThreadEntry]
         /// Hidden threads, shown on request.
         var hidden: [ThreadEntry]
@@ -222,28 +224,48 @@ final class InboxModel: ObservableObject {
 
     func spaceId(of thread: ThreadEntry) -> String? { assignment.spaceId(of: thread, among: [:]) }
 
-    /// Every Space in Studio's order. Pinned threads show under Pinned instead,
-    /// as in the web sidebar; a Space's lead always shows, hidden or not.
+    /// Every Space in Studio's order. As in the web sidebar, a pinned thread sits
+    /// in its own Space under the lead, and a Space's lead always shows, hidden or not.
     var spaceSections: [SpaceSection] {
         let assignment = assignment
         let hidden = hidden
         var bySpace: [String: [ThreadEntry]] = [:]
-        for thread in threads where thread.pinnedAt == nil {
+        for thread in threads {
             guard let id = assignment.spaceId(of: thread, among: [:]) else { continue }
             bySpace[id, default: []].append(thread)
         }
         return spaces.map { space in
             let held = bySpace[space.id] ?? []
             let leadId = leads[space.id]?.threadId
-            let rest = Self.sidebarSorted(held.filter { $0.id != leadId })
+            let others = held.filter { $0.id != leadId }
+            let rest = Self.sidebarSorted(others.filter { $0.pinnedAt == nil })
             let needs = { (thread: ThreadEntry) in thread.hasPendingInteraction == true }
-            let shown = rest.filter { !hidden.contains($0.id) }
             return SpaceSection(
                 space: space, lead: held.first { $0.id == leadId }, leadInfo: leads[space.id], open: openItems[space.id] ?? [],
-                threads: shown.filter(needs) + shown.filter { !needs($0) },
+                pinned: Self.pinOrder(others.filter { $0.pinnedAt != nil }),
+                threads: waitingFirst(rest.filter { !hidden.contains($0.id) }),
                 hidden: rest.filter { hidden.contains($0.id) },
                 needsYou: held.contains(where: needs))
         }
+    }
+
+    /// The sidebar's pin order: by sort key, then the newest pin first.
+    static func pinOrder(_ list: [ThreadEntry]) -> [ThreadEntry] {
+        list.sorted { ($0.pinSortKey ?? "", $1.pinnedAt ?? 0) < ($1.pinSortKey ?? "", $0.pinnedAt ?? 0) }
+    }
+
+    /// Threads that wait on the user, or have a sub-thread that does, come first:
+    /// questions, then unread failures, then unread results. Each tier keeps its order.
+    func waitingFirst(_ list: [ThreadEntry]) -> [ThreadEntry] {
+        func rank(_ thread: ThreadEntry, depth: Int = 0) -> Int {
+            let own = SpaceThreadRow.state(of: thread).waitRank
+            guard depth < 8 else { return own }
+            return ([own] + (children[thread.id] ?? []).map { rank($0, depth: depth + 1) }).min() ?? own
+        }
+        return list.enumerated()
+            .map { (index: $0.offset, rank: rank($0.element), thread: $0.element) }
+            .sorted { $0.rank != $1.rank ? $0.rank < $1.rank : $0.index < $1.index }
+            .map(\.thread)
     }
 
     /// The Space Home shows: the chosen one if it still exists, else the web sidebar's, else the default.
@@ -382,8 +404,7 @@ final class InboxModel: ObservableObject {
     /// Pinned first, then either one group per project (the sidebar's project
     /// mode, in the user's order) or custom sections, then everything else.
     var groups: [Group] {
-        let pinned = threads.filter { $0.pinnedAt != nil }
-            .sorted { ($0.pinSortKey ?? "", $1.pinnedAt ?? 0) < ($1.pinSortKey ?? "", $0.pinnedAt ?? 0) }
+        let pinned = Self.pinOrder(threads.filter { $0.pinnedAt != nil })
         let unpinned = threads.filter { $0.pinnedAt == nil }
         var groups = [Group(id: "pinned", title: "Pinned", threads: pinned, showsProject: true)]
         if preferences?.organizationMode == "project", let sidebar {
@@ -503,6 +524,16 @@ struct InboxView: View {
                     Button { app.newThread(space: currentSpace?.id) } label: {
                         Label(currentSpace.map { "New Thread in \($0.name)" } ?? "New Thread", systemImage: "square.and.pencil")
                     }
+                    // Like the web Space heading's +: a thread or any Studio item.
+                    if let space = currentSpace, !studio.creatable.isEmpty {
+                        Section {
+                            ForEach(studio.creatable, id: \.id) { kind in
+                                Button { createItem(kind, in: space) } label: {
+                                    Label("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol)
+                                }
+                            }
+                        }
+                    }
                 } label: {
                     Image(systemName: "square.and.pencil")
                 } primaryAction: {
@@ -525,7 +556,7 @@ struct InboxView: View {
         .sheet(item: $leadSheet) { space in
             SpaceLeadSheet(
                 space: space, lead: model.leads[space.id],
-                threads: model.spaceSections.first { $0.id == space.id }.map { ($0.lead.map { [$0] } ?? []) + $0.threads + $0.hidden } ?? []
+                threads: model.spaceSections.first { $0.id == space.id }.map { ($0.lead.map { [$0] } ?? []) + $0.pinned + $0.threads + $0.hidden } ?? []
             ) { await model.loadSpaces(app.client, force: true) }
         }
         .sheet(item: $commandSpace) { space in
@@ -678,46 +709,18 @@ struct InboxView: View {
         return currentSpace?.label ?? "All Spaces"
     }
 
-    /// Pinned, then one Space's page (its lead, Studio items and threads), or every Space under All.
+    /// One Space's page, or every Space under All. As in the web sidebar there
+    /// are no Lead, Studio or Threads headings: open items are chips on top,
+    /// then the lead with a star, pinned threads with a pin, and the rest.
     @ViewBuilder
     private func spaceHome(_ id: String) -> some View {
-        let pinned = model.threads.filter { $0.pinnedAt != nil }
-            .sorted { ($0.pinSortKey ?? "", $1.pinnedAt ?? 0) < ($1.pinSortKey ?? "", $0.pinnedAt ?? 0) }
-        if !pinned.isEmpty {
-            collapsible("pinned", "Pinned") {
-                ForEach(pinned) { thread in spaceThreadLinks(thread, lead: false) }
-            }
-        }
         let sections = model.spaceSections
         if let section = sections.first(where: { $0.id == id }) {
-            let space = section.space
-            if let lead = section.lead {
-                Section("Lead") { spaceThreadLinks(lead, lead: true, heartbeat: section.leadInfo?.heartbeat) }
-            }
-            if !section.open.isEmpty {
-                Section("Studio") { ForEach(section.open) { item in openItemRow(item) } }
-            }
-            Section {
-                ForEach(section.threads) { thread in spaceThreadLinks(thread, lead: false) }
-                hiddenRows(section.id, section.hidden) { spaceThreadLinks($0, lead: false) }
-                if section.threads.isEmpty, section.hidden.isEmpty {
-                    Button { app.newThread(space: space.id) } label: { Label("New Thread", systemImage: "plus") }
-                }
-            } header: {
-                HStack {
-                    Text("Threads")
-                    Spacer()
-                    NavigationLink(value: Route.spaceArchived(id: space.id)) { Image(systemName: "archivebox") }
-                        .accessibilityLabel("Archived threads in \(space.name)")
-                }
-            }
+            Section { spaceRows(section) }
         } else {
             ForEach(sections) { section in
                 Section(isExpanded: expanded("space:\(section.id)")) {
-                    if let lead = section.lead { spaceThreadLinks(lead, lead: true, heartbeat: section.leadInfo?.heartbeat) }
-                    ForEach(section.open) { item in openItemRow(item) }
-                    ForEach(section.threads) { thread in spaceThreadLinks(thread, lead: false) }
-                    hiddenRows(section.id, section.hidden) { spaceThreadLinks($0, lead: false) }
+                    spaceRows(section)
                 } header: {
                     HStack(spacing: 6) {
                         Text(section.space.label)
@@ -733,19 +736,36 @@ struct InboxView: View {
         }
     }
 
+    /// A Space's rows: open items, the lead, pins, then the rest, or a quiet empty line.
     @ViewBuilder
-    private func spaceThreadLinks(_ thread: ThreadEntry, lead: Bool, heartbeat: String? = nil) -> some View {
-        spaceThreadLink(thread, lead: lead, heartbeat: heartbeat, depth: 0)
-        ForEach(shownChildren(of: thread)) { child in
-            spaceThreadLink(child, lead: false, heartbeat: nil, depth: 1)
+    private func spaceRows(_ section: InboxModel.SpaceSection) -> some View {
+        if !section.open.isEmpty { openItemChips(section.open) }
+        if let lead = section.lead {
+            let heartbeat = section.leadInfo?.heartbeat
+            spaceThreadLinks(lead, mark: .lead(heartbeat.map { "Space lead, heartbeat \(SpaceLead.cadenceLabel($0))" } ?? "Space lead"))
+        }
+        ForEach(section.pinned) { thread in spaceThreadLinks(thread, mark: .pinned) }
+        ForEach(section.threads) { thread in spaceThreadLinks(thread) }
+        hiddenRows(section.id, section.hidden) { spaceThreadLinks($0) }
+        if section.lead == nil, section.pinned.isEmpty, section.threads.isEmpty, section.hidden.isEmpty, section.open.isEmpty {
+            Label("Nothing here yet", systemImage: "bubble.left")
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
         }
     }
 
-    private func spaceThreadLink(_ thread: ThreadEntry, lead: Bool, heartbeat: String?, depth: Int) -> some View {
+    @ViewBuilder
+    private func spaceThreadLinks(_ thread: ThreadEntry, mark: SpaceThreadRow.Mark? = nil) -> some View {
+        spaceThreadLink(thread, mark: mark, depth: 0)
+        ForEach(shownChildren(of: thread)) { child in
+            spaceThreadLink(child, mark: nil, depth: 1)
+        }
+    }
+
+    private func spaceThreadLink(_ thread: ThreadEntry, mark: SpaceThreadRow.Mark?, depth: Int) -> some View {
         NavigationLink(value: Route.thread(id: thread.id)) {
             SpaceThreadRow(
-                thread: thread, line: model.lines[thread.id],
-                badge: lead ? (heartbeat.map { "Lead · heartbeat \(SpaceLead.cadenceLabel($0))" } ?? "Lead") : nil,
+                thread: thread, line: model.lines[thread.id], mark: mark,
                 hidden: model.hidden.contains(thread.id), collapsedChildren: collapsedChildren(of: thread))
                 .padding(.leading, CGFloat(depth) * 18)
         }
@@ -754,19 +774,23 @@ struct InboxView: View {
         .contextMenu { menu(thread) }
     }
 
-    private func openItemRow(_ item: SpaceOpenItem) -> some View {
-        Button {
-            if let route = Route(href: item.href) { app.push(route) }
-        } label: {
-            SpaceItemRow(item: item)
+    /// A Space's open Studio items as chips: tap opens, a long press closes.
+    private func openItemChips(_ items: [SpaceOpenItem]) -> some View {
+        FlowLayout(spacing: 6, maxItemWidth: 240) {
+            ForEach(items) { item in
+                Button {
+                    if let route = Route(href: item.href) { app.push(route) }
+                } label: {
+                    SpaceItemChip(item: item)
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button { closeItem(item) } label: { Label("Close", systemImage: "xmark") }
+                }
+            }
         }
-        .foregroundStyle(.primary)
-        .swipeActions(edge: .trailing) {
-            Button { closeItem(item) } label: { Label("Close", systemImage: "xmark") }.tint(.gray)
-        }
-        .contextMenu {
-            Button { closeItem(item) } label: { Label("Close", systemImage: "xmark") }
-        }
+        .padding(.vertical, 2)
+        .accessibilityIdentifier("spaceItemChips")
     }
 
     private func closeItem(_ item: SpaceOpenItem) {

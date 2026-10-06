@@ -135,13 +135,22 @@ struct CollapsedChildrenMark: View {
     }
 }
 
-/// By space's two-line row: a status dot, the title with its age, and the
-/// thread's latest line from Studio, red when it failed and amber when blocked.
+/// By space's two-line row, as the web sidebar draws it: a status dot (or the
+/// lead's star or a pin), the title with its age, and the thread's latest line
+/// from Studio, red when it failed and amber when blocked. A thread that waits
+/// on you swaps its age for a pill that says why; a read, idle one has no dot
+/// and steps back.
 struct SpaceThreadRow: View {
+    /// How the lead and pinned threads are told apart without a heading.
+    enum Mark: Hashable {
+        /// The label names the heartbeat when one runs.
+        case lead(String)
+        case pinned
+    }
+
     let thread: ThreadEntry
     var line: ThreadLine?
-    /// "Lead", with the heartbeat when one runs.
-    var badge: String?
+    var mark: Mark?
     var hidden = false
     /// Sub-threads folded away under this one.
     var collapsedChildren = 0
@@ -149,10 +158,10 @@ struct SpaceThreadRow: View {
     /// Written by the thread screen as the reader types; see `Drafts`.
     @AppStorage private var draft: Data?
 
-    init(thread: ThreadEntry, line: ThreadLine?, badge: String? = nil, hidden: Bool = false, collapsedChildren: Int = 0) {
+    init(thread: ThreadEntry, line: ThreadLine?, mark: Mark? = nil, hidden: Bool = false, collapsedChildren: Int = 0) {
         self.thread = thread
         self.line = line
-        self.badge = badge
+        self.mark = mark
         self.hidden = hidden
         self.collapsedChildren = collapsedChildren
         _draft = AppStorage(ServerScope.key("draft.\(thread.id)"))
@@ -160,39 +169,44 @@ struct SpaceThreadRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Circle()
-                .fill(state.color)
-                .frame(width: 8, height: 8)
-                .padding(.top, 6)
-                .accessibilityLabel(state.label ?? "")
-                .accessibilityHidden(state.label == nil)
+            leading
+                .frame(width: 12, height: 12)
+                .padding(.top, 4)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(ThreadTitles.resolve(thread.displayTitle))
-                        .font(.body.weight(thread.isUnread ? .semibold : .regular))
+                        .font(.body.weight(state.waits ? .semibold : .regular))
+                        .foregroundStyle(state == .idle ? .secondary : .primary)
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     Group {
                         if collapsedChildren > 0 { CollapsedChildrenMark(count: collapsedChildren) }
                         if hidden { Image(systemName: "eye.slash").accessibilityLabel("Hidden") }
                         if muted.ids.contains(thread.id) { Image(systemName: "bell.slash").accessibilityLabel("Muted") }
-                        Text(Self.age(Date(timeIntervalSince1970: at / 1000))).monospacedDigit()
+                        if let pill = state.pill {
+                            Text(pill.label)
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.4)
+                                .foregroundStyle(pill.text)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(state.color, in: .capsule)
+                                .fixedSize()
+                        } else {
+                            Text(Self.age(Date(timeIntervalSince1970: at / 1000))).monospacedDigit()
+                        }
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 4) {
-                    if let badge {
-                        Text(badge).foregroundStyle(Color.accentColor)
-                        if line != nil || draft != nil { Text("·") }
-                    }
                     if draft != nil {
                         Text("Draft").foregroundStyle(.red)
                         if line != nil { Text("·") }
                     }
                     if let line {
                         Text(line.text).foregroundStyle(lineColor(line.kind))
-                    } else if badge == nil, draft == nil {
+                    } else if draft == nil {
                         // Rows keep two lines while a thread has nothing to say yet.
                         Text(" ")
                     }
@@ -206,6 +220,29 @@ struct SpaceThreadRow: View {
     }
 
     private var at: Double { max(thread.updatedAt, thread.latestAttentionAt ?? 0, line?.at ?? 0) }
+
+    /// The status dot, or the lead's star or a pin in the state's colour.
+    @ViewBuilder private var leading: some View {
+        switch mark {
+        case .lead(let label):
+            Image(systemName: "star.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(state == .idle ? Color.secondary : state.color)
+                .accessibilityLabel([label, state.label].compactMap { $0 }.joined(separator: ", "))
+        case .pinned:
+            Image(systemName: "pin.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(state == .idle ? Color.secondary : state.color)
+                .accessibilityLabel(["Pinned", state.label].compactMap { $0 }.joined(separator: ", "))
+        case nil:
+            // A read, idle thread has no dot, so one that wants you stands out.
+            Circle()
+                .fill(state == .idle ? Color.clear : state.color)
+                .frame(width: 8, height: 8)
+                .accessibilityLabel(state.label ?? "")
+                .accessibilityHidden(state.label == nil)
+        }
+    }
 
     private func lineColor(_ kind: ThreadLine.Kind) -> Color {
         switch kind {
@@ -237,6 +274,29 @@ struct SpaceThreadRow: View {
             case .idle: nil
             }
         }
+
+        /// A question, an unread failure or an unread result: the thread waits on you.
+        var waits: Bool { pill != nil }
+
+        /// What a waiting thread shows in place of its age.
+        var pill: (label: String, text: Color)? {
+            switch self {
+            case .needsYou: ("NEEDS YOU", .black)
+            case .error: ("FAILED", .white)
+            case .unread: ("DONE", .white)
+            case .working, .idle: nil
+            }
+        }
+
+        /// A question outranks a failure, which outranks a result.
+        var waitRank: Int {
+            switch self {
+            case .needsYou: 0
+            case .error: 1
+            case .unread: 2
+            case .working, .idle: 3
+            }
+        }
     }
 
     /// The most urgent state, as the web's By space dot shows it.
@@ -264,12 +324,13 @@ struct SpaceThreadRow: View {
     }
 }
 
-/// An open Studio item in a Space, like a tab.
-struct SpaceItemRow: View {
+/// An open Studio item in a Space: a small chip, like a tab, so items don't
+/// blur into the thread rows below.
+struct SpaceItemChip: View {
     let item: SpaceOpenItem
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 5) {
             Group {
                 if let emoji = item.emoji {
                     Text(emoji)
@@ -277,16 +338,16 @@ struct SpaceItemRow: View {
                     Image(systemName: symbol).foregroundStyle(.secondary)
                 }
             }
-            .frame(width: 22)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(item.title).lineLimit(1)
-                if !item.kindLabel.isEmpty {
-                    Text(item.kindLabel).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: 0)
-            if item.pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary).accessibilityLabel("Pinned") }
+            .font(.caption)
+            Text(item.title.isEmpty ? "Untitled" : item.title).font(.subheadline).lineLimit(1)
+            if item.pinned { Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(.secondary).accessibilityLabel("Pinned") }
         }
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(Color.secondary.opacity(0.12), in: .capsule)
+        .contentShape(.capsule)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(item.kindLabel)
     }
 
     private var symbol: String {
@@ -296,6 +357,7 @@ struct SpaceItemRow: View {
         case .artifact: StudioKind.of("artifact").symbol
         case .recording: StudioKind.of("recording").symbol
         case .table: "tablecells"
+        case .design: StudioKind.of("design").symbol
         default: "doc"
         }
     }

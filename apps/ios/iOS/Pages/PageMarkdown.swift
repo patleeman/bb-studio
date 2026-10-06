@@ -376,6 +376,7 @@ struct EmbedCard: View {
         case "artifacts": .artifact(id: ref.id)
         case "talk": .recording(id: ref.id)
         case "pages": .page(id: ref.id)
+        case "design": .design(id: ref.id)
         default: nil
         }
     }
