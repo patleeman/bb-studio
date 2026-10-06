@@ -1,6 +1,6 @@
 // A thread's space in its header, beside its other links: it opens the
 // space, or moves the thread to another one (a thread is in one at a time).
-import { DropdownMenu, DropdownMenuTrigger, cn } from "@bb-studio/kit/app";
+import { DropdownMenu, DropdownMenuTrigger, Icon, cn } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRpc, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
@@ -33,12 +33,14 @@ export function ThreadSpaceLink({ threadId, isCompactViewport }: PluginThreadHea
           aria-label={first ? `Space: ${names}` : "Add to a space"}
           title={first ? names : "Add to a space"}
           className={cn(
-            "flex h-7 min-w-0 items-center gap-1.5 rounded-md text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active data-[state=open]:text-foreground [&_svg]:size-4 [&_svg]:shrink-0",
-            isCompactViewport || !first ? "w-7 justify-center" : "max-w-56 px-2",
+            // Drawn like the header's other dropdowns: an edge, and a chevron.
+            "flex h-7 min-w-0 items-center gap-1.5 rounded-md border border-border bg-background text-sm text-muted-foreground shadow-sm outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-state-active data-[state=open]:text-foreground [&_svg]:size-4 [&_svg]:shrink-0",
+            isCompactViewport || !first ? "w-7 justify-center" : "max-w-56 pr-1.5 pl-2",
           )}>
           <SpaceMark space={first} />
           {first && !isCompactViewport ? <span className="truncate">{first.name}</span> : null}
           {holding.length > 1 && !isCompactViewport ? <span className="shrink-0">+{holding.length - 1}</span> : null}
+          {first && !isCompactViewport ? <Icon name="ChevronDown" className="opacity-70" /> : null}
         </button>
       </DropdownMenuTrigger>
       <SpacesMenuContent heading="In space" othersHeading="Move to" holding={holding} inherited={held.inherited} all={all} align="end" onChange={(space, add) => void change(space, add)} />
