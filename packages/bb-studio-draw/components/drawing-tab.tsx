@@ -2,7 +2,7 @@
 // reply. The tab shows one drawing's editor beside the conversation; opened
 // without one, it lists the thread's drawings and recent ones.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, THUMBNAIL, ThreadItemsPanel } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, THUMBNAIL, ThreadItemsPanel, remember } from "@bb-studio/kit/app";
 import { relativeTime } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc, type JsonValue, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
@@ -53,12 +53,12 @@ function useDrawingMeta(id: string): DrawingMeta | null | undefined {
   return drawing;
 }
 
-/** `::drawing{id="…"}` in a reply: a card that opens the drawing in the workbench. */
+/** `::drawing{id="…"}` in a reply: the drawing's picture, under a header that opens it in the workbench. */
 export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
   const navigate = useBbNavigate();
   const id = attributes.id ?? "";
   const valid = isDrawingId(id);
-  const drawing = useDrawingMeta(valid ? id : "");
+  const drawing = remember(`drawing:${id}`, useDrawingMeta(valid ? id : ""));
   if (!valid || drawing === null) return <ItemDirectiveCard state="deleted" kind="drawing" icon={DRAW_ICON} />;
   if (!drawing) return <ItemDirectiveCard state="loading" kind="drawing" icon={DRAW_ICON} />;
   const name = drawingName(drawing);
@@ -68,11 +68,11 @@ export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
       kind="drawing"
       icon={DRAW_ICON}
       title={name}
-      preview={drawing.elementCount > 0 ? (
-        <div className="flex h-36 w-full items-center justify-center border-b border-border/70 bg-foreground/[0.03] p-3">
-          <img src={thumbnailUrl(drawing.id, drawing.updatedAt)} alt="" loading="lazy" className={THUMBNAIL} />
+      body={drawing.elementCount > 0 ? (
+        <div className="flex h-72 w-full items-center justify-center bg-foreground/[0.03] p-3">
+          <img src={thumbnailUrl(drawing.id, drawing.updatedAt)} alt={name} loading="lazy" className={THUMBNAIL} />
         </div>
-      ) : undefined}
+      ) : <p className="px-3 py-2 text-sm text-muted-foreground">This drawing is empty.</p>}
       details={`Drawing · ${drawing.elementCount} ${drawing.elementCount === 1 ? "element" : "elements"} · ${relativeTime(drawing.updatedAt)}`}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.

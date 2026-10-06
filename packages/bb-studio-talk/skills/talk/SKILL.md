@@ -30,6 +30,14 @@ with the command for the next page. It prints the original transcript;
 paused, resumed, or reloaded the page.
 
 Link to a recording as `[Title](/plugins/talk/recordings/<recording-id>)`.
+To show a recording in your reply, put its card on its own line:
+
+```
+::recording{id="<recording-id>"}
+```
+
+The card shows the recording's summary and the start of its transcript, and
+opens the recording when clicked. Use a link instead inside a sentence.
 
 A transcript can be incomplete: `show` reports segments still transcribing
 or failed. Say so instead of guessing at the missing part.

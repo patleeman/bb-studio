@@ -24,8 +24,9 @@ When you create or change a page, put its card on its own line in your reply:
 ::page{id="<page-id>"}
 ```
 
-The card shows the page's title; clicking it opens the page in a tab beside
-the chat. `pages_create` and `pages_edit` print the line for you.
+The card shows the page's title and its text inline, so don't repeat the
+page's content in your reply. Its arrow opens the page in a tab beside the
+chat. `pages_create` and `pages_edit` print the line for you.
 
 ## Agent tools
 

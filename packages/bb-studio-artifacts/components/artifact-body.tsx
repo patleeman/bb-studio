@@ -47,11 +47,14 @@ export function ArtifactBody({
   artifactId,
   version,
   view,
+  dense = false,
   onArea,
 }: {
   artifactId: string;
   version: ArtifactVersion;
   view: BodyView;
+  /** Smaller padding, for a preview in a chat card. */
+  dense?: boolean;
   /** An area of an image was picked. */
   onArea?: (picked: Picked) => void;
 }) {
@@ -73,7 +76,7 @@ export function ArtifactBody({
       The image could not be loaded or decoded. Retry, or download the original file to open it elsewhere.
     </EmptyState>;
     return (
-      <div className={cn("flex h-full min-h-0 overflow-auto bg-muted/40 p-6 max-md:p-3", actualSize ? "" : "items-center justify-center")}>
+      <div className={cn("flex h-full min-h-0 overflow-auto bg-muted/40", dense ? "p-3" : "p-6 max-md:p-3", actualSize ? "" : "items-center justify-center")}>
         <img
           key={`${src}:${retry}`}
           src={retry ? `${src}&previewRetry=${retry}` : src}
@@ -140,7 +143,7 @@ export function ArtifactBody({
     return (
       <div className="h-full min-h-0 overflow-auto">
         {truncated}
-        <div className="mx-auto w-full max-w-3xl px-10 py-10 max-md:px-5 max-md:py-6">
+        <div className={dense ? "px-4 py-3 text-sm" : "mx-auto w-full max-w-3xl px-10 py-10 max-md:px-5 max-md:py-6"}>
           <Markdown content={text.text ?? ""} />
         </div>
       </div>

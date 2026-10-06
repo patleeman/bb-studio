@@ -6,6 +6,7 @@
 //   lets other plugins' fields ask for dictation (src/client/fields.ts).
 // - Another watches the hold-to-talk key (src/client/hold-to-talk.ts).
 // - The Recordings nav panel lists recordings and is each recording's page.
+// - `::recording{id="rec_…"}` in a reply shows the recording inline.
 import { RetainedPanels, retainPanel, openAppPath, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { PANEL_PATH, TALK_ICON } from "./src/shared/format";
@@ -17,6 +18,7 @@ import { TalkOverlay } from "./src/client/overlay";
 import { RecordingsPanel } from "./src/client/recordings-panel";
 import { ComposerBridge } from "./src/client/ComposerBridge";
 import { linkRecordingMentions } from "./src/client/recording-mentions";
+import { RecordingCard } from "./src/client/recording-card";
 import { ModelSettings } from "./src/client/model-settings";
 
 export default definePluginApp((app) => {
@@ -37,6 +39,8 @@ export default definePluginApp((app) => {
     component: retainPanel(PANEL_PATH, RecordingsPanel),
     headerContent: StudioBarSlot,
   });
+
+  app.slots.messageDirective({ id: "recording", component: RecordingCard });
 
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path={PANEL_PATH} render={(subPath) => <RecordingsPanel subPath={subPath} />} /> });

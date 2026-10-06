@@ -93,9 +93,12 @@ afterwards.
   sandboxed frame (no access to BB, its cookies, or storage) that grows to
   fit its content. Click its label to edit the source.
 - **A card in the agent's reply.** When an agent creates or changes a page,
-  its reply shows the page's card (`::page{id="…"}`). Clicking it opens the
-  page in a **Pages** tab in the thread's workbench, beside the chat. Where
-  there's no workbench, it opens in the main area.
+  its reply shows the page's card (`::page{id="…"}`). The card shows the
+  page's text inline, read-only, and updates as the page changes. The chevron
+  hides or shows the text; the choice is remembered for every Studio card.
+  Click the title or the arrow to open the page in a **Pages** tab in the
+  thread's workbench, beside the chat. Where there's no workbench, it opens
+  in the main area.
 - **In a thread's workbench.** The **Pages** tab lists the thread's pages
   (the ones made or changed in it, and the page it was started from), then
   the project's recent ones. **New** makes a page in the thread's project and links it to

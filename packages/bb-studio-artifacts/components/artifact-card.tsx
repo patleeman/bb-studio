@@ -1,11 +1,13 @@
 // `::artifact{id="art_…"}` in a reply: a card for a saved artifact that opens
-// its viewer in the thread's workbench, beside the chat. Images show a preview.
+// its viewer in the thread's workbench, beside the chat. Files BB can show
+// are previewed inline, as in the viewer.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, remember } from "@bb-studio/kit/app";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../server";
-import { ARTIFACT_ICON, ARTIFACTS_TAB, ARTIFACT_UPDATE_TYPE, PANEL_PATH, REALTIME_CHANNEL, TYPE_ICONS, TYPE_LABELS, contentUrl, formatBytes, isArtifactId } from "../src/shared";
+import { ArtifactBody } from "./artifact-body";
+import { ARTIFACT_ICON, ARTIFACTS_TAB, ARTIFACT_UPDATE_TYPE, PANEL_PATH, REALTIME_CHANNEL, TYPE_ICONS, TYPE_LABELS, formatBytes, isArtifactId } from "../src/shared";
 
 type Artifact = NonNullable<z.infer<(typeof rpcContract)["get"]["output"]>["artifact"]>;
 
@@ -14,7 +16,8 @@ export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
   const valid = isArtifactId(id);
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
-  const [artifact, setArtifact] = useState<Artifact | null | undefined>(undefined);
+  const [loaded, setArtifact] = useState<Artifact | null | undefined>(undefined);
+  const artifact = remember(`artifact:${id}`, valid ? loaded : null);
 
   const load = useCallback(() => {
     if (!valid) return;
@@ -33,7 +36,6 @@ export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
   if (!artifact) return <ItemDirectiveCard state="loading" kind="artifact" icon={ARTIFACT_ICON} />;
 
   const { version } = artifact;
-  const image = version.type === "image";
   return (
     <ItemDirectiveCard
       state="ready"
@@ -45,11 +47,11 @@ export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
         if (!navigate.openThreadPanel({ actionId: ARTIFACTS_TAB, title: artifact.title, params: { artifactId: artifact.id } }))
           navigate.toPluginPanel(PANEL_PATH, { subPath: artifact.id });
       }}
-      preview={image ? (
-        <div className="flex max-h-64 w-full items-center justify-center overflow-hidden border-b border-border/70 bg-muted/40">
-          <img src={contentUrl(artifact.id, version.id)} alt={artifact.title} loading="lazy" className="max-h-64 max-w-full object-contain" />
+      body={version.type === "other" ? undefined : (
+        <div className="h-80">
+          <ArtifactBody artifactId={artifact.id} version={version} view="preview" dense />
         </div>
-      ) : undefined}
+      )}
       details={<>{TYPE_LABELS[version.type]} · {formatBytes(version.size)}{artifact.versions > 1 ? ` · v${version.number}` : ""} · Saved to Studio</>}
     />
   );

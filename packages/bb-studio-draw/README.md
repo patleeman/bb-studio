@@ -38,8 +38,9 @@ own tools.
   otherwise **New thread**, which starts a conversation that links the
   drawing), copy image, and a menu with Download PNG and Delete.
 - **A card in the agent's reply.** When an agent makes or changes a drawing,
-  its reply shows the drawing's card (`::drawing{id="…"}`): a thumbnail, the
-  name and the element count. Clicking it opens the drawing in a **Drawings**
+  its reply shows the drawing's card (`::drawing{id="…"}`): the drawing's
+  picture inline, its name and element count. The chevron hides or shows the
+  picture. Clicking the name or the arrow opens the drawing in a **Drawings**
   tab in the thread's workbench, beside the chat. Where there's no workbench,
   it opens in the main area.
 - **In a thread's workbench.** The **Drawings** tab lists the drawings made

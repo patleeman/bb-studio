@@ -109,6 +109,10 @@ The same message at a 390-pixel viewport, with the source pill in view.
   need without inserting anywhere. Use recordings for brain dumps, ideas,
   personal notes, or meetings. **Send to agent** opens a thread with the
   recording attached; mentions include its saved cleaned version when available.
+- **A card in the agent's reply.** An agent can show a recording with
+  `::recording{id="rec_…"}` on its own line: the summary and the first lines
+  of the transcript, read-only. Clicking the title or the arrow opens the
+  recording's page.
 - **Clean up a recording.** **Clean up transcript** on a finished recording
   creates a saved cleaned version while retaining the original transcript and
   audio. Switch between **Cleaned** and **Original**; copy and text downloads

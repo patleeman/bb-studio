@@ -36,7 +36,8 @@ URL hash, with a Play button on each.
   between projects, rename, duplicate, archive, delete and export. Without
   Studio, the **Designs** panel lists them on its own.
 - **A card in the agent's reply.** When an agent makes or changes a design,
-  its reply shows the design's card (`::design{id="…"}`). Clicking it opens
+  its reply shows the design's card (`::design{id="…"}`), with the newest
+  round's first screens inline. Clicking the name or the arrow opens
   the design in a **Design** tab in the thread's workbench, beside the chat.
   Opened without a design, the tab lists the thread's designs.
 - **The full-screen view** (`/plugins/design/designs/<id>`): the design under

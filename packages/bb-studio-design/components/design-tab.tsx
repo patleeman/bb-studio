@@ -1,9 +1,9 @@
 // The Design tab in a thread's workbench, and the card that opens it from a
 // reply. The tab shows one design's canvas beside the conversation; opened
 // without one, it lists the thread's designs.
-import { BarTitle, ICON_BUTTON, Icon, ItemDirectiveCard, ThreadItemsPanel } from "@bb-studio/kit/app";
+import { BarTitle, ICON_BUTTON, Icon, ItemDirectiveCard, ThreadItemsPanel, remember } from "@bb-studio/kit/app";
 import { useBbNavigate, type JsonValue, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { DESIGN_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, isDesignId } from "../src/shared";
+import { DESIGN_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, VIEWPORTS, isDesignId, screenUrl, type DesignView, type ScreenView } from "../src/shared";
 import { DesignBoard, useDesign } from "./design-view";
 
 /** The workbench tab's action id; reply cards open it with `{ designId }`. */
@@ -44,12 +44,44 @@ function TabCanvas({ designId, backLabel, onBack }: { designId: string; backLabe
   return <div className="relative h-full min-h-0">{design ? <DesignBoard design={design} leftTools={back} inThread /> : null}</div>;
 }
 
-/** `::design{id="dsn_…"}` in a reply: a card that opens the design in the workbench. */
+/** Screens a card shows from the newest round. */
+export const PREVIEW_SCREENS = 3;
+const PREVIEW_HEIGHT = 240;
+
+/** A screen at its own size, scaled down to the preview's height. Clicks go to the card. */
+function ScreenThumb({ designId, screen }: { designId: string; screen: ScreenView }) {
+  const { width, height } = VIEWPORTS[screen.viewport] ?? VIEWPORTS.desktop;
+  const scale = PREVIEW_HEIGHT / height;
+  return (
+    <figure className="flex shrink-0 flex-col gap-1.5">
+      <div className="overflow-hidden rounded-md border border-border/70 bg-white" style={{ width: width * scale, height: PREVIEW_HEIGHT }}>
+        <iframe
+          title={`Screen ${screen.id}`}
+          src={screenUrl(designId, screen.id, screen.updatedAt)}
+          sandbox="allow-scripts"
+          loading="lazy"
+          tabIndex={-1}
+          className="pointer-events-none origin-top-left border-0"
+          style={{ width, height, transform: `scale(${scale})` }}
+        />
+      </div>
+      <figcaption className="max-w-full truncate text-xs text-muted-foreground" style={{ width: width * scale }}>{screen.caption || screen.title || screen.id}</figcaption>
+    </figure>
+  );
+}
+
+function DesignPreview({ design }: { design: DesignView }) {
+  const screens = design.rounds[0]?.screens.slice(0, PREVIEW_SCREENS) ?? [];
+  if (!screens.length) return <p className="px-3 py-2 text-sm text-muted-foreground">This design has no screens yet.</p>;
+  return <div className="flex gap-3 overflow-x-auto p-3">{screens.map((screen) => <ScreenThumb key={screen.id} designId={design.id} screen={screen} />)}</div>;
+}
+
+/** `::design{id="dsn_…"}` in a reply: the newest round's screens, under a header that opens the design in the workbench. */
 export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
   const navigate = useBbNavigate();
   const id = attributes.id ?? "";
   const valid = isDesignId(id);
-  const { design } = useDesign(valid ? id : "");
+  const design = remember(`design:${id}`, useDesign(valid ? id : "").design);
   if (!valid || design === null) return <ItemDirectiveCard state="deleted" kind="design" icon={DESIGN_ICON} />;
   if (!design) return <ItemDirectiveCard state="loading" kind="design" icon={DESIGN_ICON} />;
   const screens = design.rounds.reduce((sum, round) => sum + round.screens.length, 0);
@@ -61,6 +93,7 @@ export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
       icon={DESIGN_ICON}
       title={name}
       details={`Design · ${design.rounds.length} ${design.rounds.length === 1 ? "round" : "rounds"} · ${screens} ${screens === 1 ? "screen" : "screens"}`}
+      body={<DesignPreview design={design} />}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
         if (!navigate.openThreadPanel({ actionId: DESIGN_TAB, title: name, params: { designId: id } }))
