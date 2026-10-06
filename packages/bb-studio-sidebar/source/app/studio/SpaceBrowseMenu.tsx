@@ -7,11 +7,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SIDEBAR_CONTROL_BUTTON_CLASS } from "../rows/sidebarRowClasses.js";
 import { compactAge } from "./SpaceThreadRow.js";
 import { createSpaceResolver, defaultSpaceId, projectSpaces, type StudioSpace } from "./space-groups.js";
+import { browsableItems, useOpenInSpace } from "./SpaceStudioList.js";
+import type { SpaceBrowseItem, SpaceItems } from "./studioSpaces.js";
 
 /**
  * The Space's archived threads, newest archived first. An archived child of
@@ -35,17 +39,25 @@ export function spaceArchivedThreads(
 /** How many archived threads the menu lists at first, and how many more each Load more adds. */
 export const ARCHIVED_MENU_LIMIT = 10;
 
+const terms = (query: string) => query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+/** The Space's unopened Studio items whose titles match every search term. */
+export function searchStudioItems(items: readonly SpaceBrowseItem[], query: string): SpaceBrowseItem[] {
+  const words = terms(query);
+  return words.length ? items.filter((item) => words.every((word) => item.title.toLowerCase().includes(word))) : [...items];
+}
+
 /** The archived threads to list for a search: the newest matches, up to the limit. */
 export function searchArchivedThreads(
   threads: readonly PluginSidebarThread[],
   query: string,
   limit = ARCHIVED_MENU_LIMIT,
 ): { shown: PluginSidebarThread[]; hidden: number } {
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = terms.length
+  const words = terms(query);
+  const matches = words.length
     ? threads.filter((thread) => {
       const title = thread.displayTitle.toLowerCase();
-      return terms.every((term) => title.includes(term));
+      return words.every((word) => title.includes(word));
     })
     : threads;
   return { shown: matches.slice(0, limit), hidden: Math.max(0, matches.length - limit) };
@@ -100,18 +112,24 @@ function ArchivedItems({ space, spaces, spaceOf, activeThreads, query, limit, on
   );
 }
 
-/** Beside a Space's Threads +: its archived threads, to open one. */
-export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
+/**
+ * A Space heading's Browse: one search over the Space's Studio items that
+ * aren't open and its archived threads, to open one of either.
+ */
+export function SpaceBrowseMenu({ space, spaces, spaceOf, activeThreads, items }: {
   space: StudioSpace;
   spaces: readonly StudioSpace[];
   spaceOf: Readonly<Record<string, string>>;
   /** The sidebar's threads, so archived children follow their parent's Space. */
   activeThreads: readonly PluginSidebarThread[];
+  items: SpaceItems | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(ARCHIVED_MENU_LIMIT);
   const searchRef = useRef<HTMLInputElement>(null);
+  const openItem = useOpenInSpace();
+  const studioItems = useMemo(() => searchStudioItems(browsableItems(items), query), [items, query]);
   // The menu focuses itself on open; the search takes focus after it.
   useEffect(() => {
     if (!open) return;
@@ -123,26 +141,26 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`Archived threads in ${space.name}`}
-          title="Archived threads"
+          aria-label={`Browse ${space.name}`}
+          title="Studio items and archived threads"
           className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
           onClick={(event) => event.stopPropagation()}
         >
-          <Icon name="Archive" className="size-3.5" />
+          <Icon name="Layers" className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="max-h-80 w-64 overflow-auto"
-        aria-label={`Archived threads in ${space.name}`}
+        className="max-h-96 w-72 overflow-auto"
+        aria-label={`Browse ${space.name}`}
       >
         <div className="sticky -top-1 z-10 -mx-1 -mt-1 bg-popover px-1 pt-1 pb-1">
           <input
             ref={searchRef}
             type="search"
             value={query}
-            placeholder="Search archived threads"
-            aria-label={`Search archived threads in ${space.name}`}
+            placeholder="Search items and archived threads"
+            aria-label={`Search ${space.name}`}
             onChange={(event) => { setQuery(event.currentTarget.value); setLimit(ARCHIVED_MENU_LIMIT); }}
             onKeyDown={(event) => {
               // Keep typing out of the menu's typeahead; arrow down moves into the list.
@@ -156,6 +174,20 @@ export function SpaceArchivedMenu({ space, spaces, spaceOf, activeThreads }: {
             className="h-7 w-full rounded-sm border border-input bg-transparent px-2 text-sm outline-none placeholder:text-subtle-foreground focus:border-ring"
           />
         </div>
+        {studioItems.length ? (
+          <>
+            <DropdownMenuLabel className="text-xs font-medium text-subtle-foreground">Studio items</DropdownMenuLabel>
+            {studioItems.map((item) => (
+              <DropdownMenuItem key={`${item.pluginId}:${item.id}`} textValue={item.title} onSelect={() => openItem(item.href)}>
+                {item.icon ? <span className="w-4 text-center text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
+                <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                {item.updatedAt ? <span className="shrink-0 text-xs tabular-nums text-subtle-foreground">{compactAge(item.updatedAt)}</span> : null}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
+        <DropdownMenuLabel className="text-xs font-medium text-subtle-foreground">Archived threads</DropdownMenuLabel>
         {open ? <ArchivedItems space={space} spaces={spaces} spaceOf={spaceOf} activeThreads={activeThreads} query={query} limit={limit} onLoadMore={() => setLimit((current) => current + ARCHIVED_MENU_LIMIT)} /> : null}
       </DropdownMenuContent>
     </DropdownMenu>

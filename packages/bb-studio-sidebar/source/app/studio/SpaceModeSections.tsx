@@ -57,8 +57,8 @@ import {
   type StudioSpace,
 } from "./space-groups.js";
 import { useMoveThreadsToSpace } from "./MoveToSpace.js";
-import { SpaceNewMenus, SpaceStudioList } from "./SpaceStudioList.js";
-import { SpaceArchivedMenu } from "./SpaceArchivedMenu.js";
+import { SpaceNewMenu, SpaceStudioList } from "./SpaceStudioList.js";
+import { SpaceBrowseMenu } from "./SpaceBrowseMenu.js";
 import { HiddenThreadsMenuItem } from "./HiddenThreads.js";
 import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
 import { setSpaceNewThreadTarget } from "./new-thread-space.js";
@@ -401,12 +401,11 @@ export function SpaceModeSections({
                     collapse={isAll ? { isCollapsed: collapsedSpaces.has(group.space.id), onToggleCollapsed: () => toggleSpaceCollapsed(group.space.id) } : undefined}
                     headerActions={(
                       <>
-                        <SpaceArchivedMenu space={group.space} spaces={spaces} spaceOf={spaceOf} activeThreads={threads} />
-                        <SpaceNewMenus
+                        <SpaceBrowseMenu space={group.space} spaces={spaces} spaceOf={spaceOf} activeThreads={threads} items={items[group.space.id]} />
+                        <SpaceNewMenu
                           spaceId={group.space.id}
                           spaceName={group.space.name}
                           defaultProjectId={group.space.defaultProjectId}
-                          items={items[group.space.id]}
                           onNewThread={newThread}
                         />
                       </>
@@ -517,7 +516,7 @@ function SpaceSidebarSection({
   consumeClickSuppression?: Parameters<typeof SortableSidebarSection>[0]["consumeClickSuppression"];
   needsYou?: boolean;
   collapse?: { isCollapsed: boolean; onToggleCollapsed: () => void };
-  /** Archived threads, open an item, and + for a new thread or item. */
+  /** Browse (items and archived threads), and + for a new thread or item. */
   headerActions: ReactNode;
   children: ReactNode;
 }) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeSidebarThread } from "../testing/fixtures.js";
-import { searchArchivedThreads, spaceArchivedThreads } from "./SpaceArchivedMenu.js";
+import { searchArchivedThreads, searchStudioItems, spaceArchivedThreads } from "./SpaceBrowseMenu.js";
+import { browsableItems } from "./SpaceStudioList.js";
 import type { StudioSpace } from "./space-groups.js";
 
 const spaces: StudioSpace[] = [
@@ -48,5 +49,18 @@ describe("searchArchivedThreads", () => {
     expect(searchArchivedThreads(threads, "INVOICE 1", 10).shown.map((thread) => thread.id)).toEqual(["t1", "t11"]);
     expect(searchArchivedThreads(threads, "audit", 3)).toMatchObject({ hidden: 3 });
     expect(searchArchivedThreads(threads, "nothing").shown).toEqual([]);
+  });
+});
+
+describe("Browse's Studio items", () => {
+  const item = (id: string, title: string) => ({ pluginId: "pages", id, title, icon: null, kindIcon: "FileText", href: `/plugins/pages/pages/${id}`, updatedAt: 0 });
+  const plan = item("plan", "Launch plan"), notes = item("notes", "Release notes"), open = item("open", "Launch checklist");
+
+  it("lists the Space's items that aren't open, matching every search word", () => {
+    const browsable = browsableItems({ open: [{ ...open, pinned: false, kindLabel: "Page", preview: null }], all: [plan, notes, open], count: 3 });
+    expect(browsable.map((each) => each.id)).toEqual(["plan", "notes"]);
+    expect(searchStudioItems(browsable, "").map((each) => each.id)).toEqual(["plan", "notes"]);
+    expect(searchStudioItems(browsable, "launch PLAN").map((each) => each.id)).toEqual(["plan"]);
+    expect(searchStudioItems(browsable, "checklist")).toEqual([]);
   });
 });

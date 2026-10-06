@@ -256,30 +256,8 @@ function StudioItemRow({ item, onClose }: { item: OpenItem; onClose(): void }) {
   );
 }
 
-/** The Space's items that aren't open, newest first; type to jump to one. */
-function BrowseMenu({ spaceName, items, onPick }: { spaceName: string; items: readonly SpaceBrowseItem[]; onPick(href: string): void }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={`Open a Studio item in ${spaceName}`} title="Open an item" className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")} onClick={(event) => event.stopPropagation()}>
-          <Icon name="Layers" className="size-3.5" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-80 w-64 overflow-auto" aria-label={`Studio items in ${spaceName}`}>
-        {items.map((item) => (
-          <DropdownMenuItem key={`${item.pluginId}:${item.id}`} textValue={item.title} onSelect={() => onPick(item.href)}>
-            {item.icon ? <span className="w-4 text-center text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
-            <span className="min-w-0 flex-1 truncate">{item.title}</span>
-            {item.updatedAt ? <span className="shrink-0 text-xs tabular-nums text-subtle-foreground">{compactAge(item.updatedAt)}</span> : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 /** Opens an item picked or made from a Space's menus, and lists it as open in the Space. */
-function useOpenInSpace(): (href: string) => void {
+export function useOpenInSpace(): (href: string) => void {
   const sdk = useSdk();
   return (href) => {
     openStudioItem(null, href);
@@ -287,26 +265,21 @@ function useOpenInSpace(): (href: string) => void {
   };
 }
 
-/**
- * The Space heading's buttons for its Studio items and threads: open one of
- * its items, and + for a new thread or item, made in the Space.
- */
-export function SpaceNewMenus({ spaceId, spaceName, defaultProjectId, items, onNewThread }: {
+/** The Space's items that aren't open, to open one from the heading's Browse menu. */
+export function browsableItems(items: SpaceItems | undefined): SpaceBrowseItem[] {
+  const open = new Set((items?.open ?? []).map((item) => `${item.pluginId}:${item.id}`));
+  return (items?.all ?? []).filter((item) => !open.has(`${item.pluginId}:${item.id}`));
+}
+
+/** The Space heading's +: a new thread, or any kind of Studio item, made in the Space. */
+export function SpaceNewMenu({ spaceId, spaceName, defaultProjectId, onNewThread }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
-  items: SpaceItems | undefined;
   onNewThread(): void;
 }) {
   const openPicked = useOpenInSpace();
-  const openKeys = new Set((items?.open ?? []).map((item) => `${item.pluginId}:${item.id}`));
-  const browsable = (items?.all ?? []).filter((item) => !openKeys.has(`${item.pluginId}:${item.id}`));
-  return (
-    <>
-      {browsable.length ? <BrowseMenu spaceName={spaceName} items={browsable} onPick={openPicked} /> : null}
-      <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openPicked} onNewThread={onNewThread} />
-    </>
-  );
+  return <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={openPicked} onNewThread={onNewThread} />;
 }
 
 /**
