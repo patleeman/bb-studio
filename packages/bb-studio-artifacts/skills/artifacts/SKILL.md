@@ -38,7 +38,8 @@ Give each artifact a short, human title ("Q3 revenue chart", not
 | `artifacts_read` | Read an artifact's details and, for text types, its contents. |
 
 `artifacts_save` returns a line like `::artifact{id="art_…"}`. Put it on its
-own line in your reply and the user sees a card that opens the artifact.
+own line in your reply and the user sees a card that opens the artifact in a
+tab beside the chat.
 
 ## CLI (works in every agent session)
 

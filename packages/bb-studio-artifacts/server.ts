@@ -468,7 +468,7 @@ export default async function plugin(bb: BbPluginApi) {
         } else {
           throw new Error("Pass either `path` or `content`, not both.");
         }
-        return `${savedLine(result)}\n\nTo show it in your reply, put this on its own line:\n${directive(result.artifact.id)}`;
+        return `${savedLine(result)}\n\nPut this line on its own in your reply so the user can open the artifact beside the chat:\n${directive(result.artifact.id)}`;
       } catch (error) {
         return { content: [{ type: "text", text: errorMessage(error) }], isError: true };
       }

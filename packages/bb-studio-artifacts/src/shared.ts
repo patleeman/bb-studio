@@ -2,6 +2,8 @@
 
 export const PLUGIN_ID = "artifacts";
 /** The nav panel: /plugins/artifacts/artifacts, and artifacts/<id> for one artifact. */
+/** The "Artifacts" workbench tab's action id; reply cards open it with `{ artifactId }`. */
+export const ARTIFACTS_TAB = "save-to-studio";
 export const PANEL_PATH = "artifacts";
 export const ARTIFACT_ICON = "artifacts/artifact";
 /** The Artifacts thread panel and its "Save to Studio" button. */

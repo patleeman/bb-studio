@@ -69,7 +69,9 @@ Download and the ⋯ menu.
 - **Agents save too.** The `artifacts_save`, `artifacts_list` and
   `artifacts_read` tools, and the `artifacts` skill, cover when to save
   something. When the agent puts `::artifact{id="art_…"}` in a reply, it shows
-  a card that opens the viewer. For repository coding tasks, agents keep changes
+  a card that opens the viewer in the thread's **Artifacts** tab, beside the
+  chat, with a way back to the tab's list. Where there's no workbench, it
+  opens in the main area. For repository coding tasks, agents keep changes
   in Git and save patches, source copies, logs or implementation summaries only
   when you explicitly request that export.
 - **`@artifact` mentions.** The agent receives the artifact's details and,

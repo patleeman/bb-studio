@@ -1,7 +1,8 @@
 // "Artifacts" in a thread's side panel: the files a reply made and the
 // thread's storage files, to tick and save, and what this thread has saved.
 // Opened from a message's action bar (params `{ seq }`) or the panel launcher
-// (the latest reply).
+// (the latest reply). A reply's card opens it on one artifact
+// (`{ artifactId }`), with a way back to the list.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Checkbox, EmptyState, Icon, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
@@ -9,7 +10,7 @@ import { errorMessage, plural, relativeTime } from "@bb-studio/kit/format";
 import { useRealtime, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../server";
-import { REALTIME_CHANNEL, SAVE_ICON, TYPE_ICONS, TYPE_LABELS, artifactType, baseName, mimeFor, prunePicked } from "../src/shared";
+import { REALTIME_CHANNEL, SAVE_ICON, TYPE_ICONS, TYPE_LABELS, artifactType, baseName, isArtifactId, mimeFor, prunePicked } from "../src/shared";
 import { ArtifactViewer } from "./artifact-viewer";
 
 type Candidates = z.infer<(typeof rpcContract)["candidates"]["output"]>;
@@ -25,8 +26,14 @@ export function pickerSeq(params: unknown): number | null {
   return typeof seq === "number" && Number.isInteger(seq) && seq >= 0 ? seq : null;
 }
 
+/** The `{ artifactId }` a reply's card opens the panel with. */
+export function pickerArtifactId(params: unknown): string | null {
+  const id = (params as { artifactId?: unknown } | null)?.artifactId;
+  return typeof id === "string" && isArtifactId(id) ? id : null;
+}
+
 export function SavePicker({ threadId, params }: PluginThreadPanelProps) {
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(() => pickerArtifactId(params));
   const back = useCallback(() => setOpenId(null), []);
   if (openId) return <ArtifactViewer artifactId={openId} backLabel="Artifacts" onBack={back} />;
   const seq = pickerSeq(params);
