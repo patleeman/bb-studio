@@ -110,3 +110,12 @@ it("marks the 2 MiB text preview truncated while downloads retain all bytes", as
   expect(result.text).toHaveLength(2 * 1024 * 1024);
   expect(Buffer.from(await (await host.rpc.fetchHttp("GET", `${saved.url}&download=1`)).arrayBuffer())).toEqual(bytes);
 });
+
+it("cuts the 2 MiB text preview before a multi-byte character, not inside it", async () => {
+  const host = await fixture();
+  const saved = await host.save("accents.txt", "text/plain", Buffer.from("x".repeat(2 * 1024 * 1024 - 1) + "é tail"));
+  const result = await host.rpc.callRpc("text", { id: saved.id, versionId: saved.version.id }) as { text: string; truncated: boolean };
+  expect(result.truncated).toBe(true);
+  expect(result.text).not.toContain("\uFFFD");
+  expect(result.text).toBe("x".repeat(2 * 1024 * 1024 - 1));
+});

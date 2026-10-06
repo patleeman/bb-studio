@@ -78,3 +78,12 @@ export function withQuoteScript(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   for (const match of html.matchAll(/<\/body>/gi)) at = match.index;
   return new Uint8Array(Buffer.from(at < 0 ? html + tag : html.slice(0, at) + tag + html.slice(at), "utf8")) as Uint8Array<ArrayBuffer>;
 }
+
+/** At most `max` bytes, cut before a character rather than inside one. */
+export function utf8Prefix(bytes: Buffer, max: number): Buffer {
+  if (bytes.byteLength <= max) return bytes;
+  let end = max;
+  // 0b10xxxxxx bytes continue a character; back up to where one starts.
+  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
+  return bytes.subarray(0, end);
+}

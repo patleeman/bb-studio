@@ -15,7 +15,7 @@ import { createChangeBus, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext } from "./lib/mention";
-import { contentHeaders, withQuoteScript } from "./src/server/content";
+import { contentHeaders, utf8Prefix, withQuoteScript } from "./src/server/content";
 import { importedFile } from "./src/server/import-file";
 import { pageMarkdown } from "./src/server/page";
 import { artifactText, registerStudio } from "./src/server/studio";
@@ -318,7 +318,7 @@ export default async function plugin(bb: BbPluginApi) {
       const bytes = store.bytes(version.sha256);
       if (!bytes) return { text: null, truncated: false };
       const truncated = bytes.byteLength > MAX_VIEW_TEXT;
-      return { text: bytes.subarray(0, MAX_VIEW_TEXT).toString("utf8"), truncated };
+      return { text: utf8Prefix(bytes, MAX_VIEW_TEXT).toString("utf8"), truncated };
     },
     update({ id, title, description }) {
       store.update(id, { title, description }, "app");
