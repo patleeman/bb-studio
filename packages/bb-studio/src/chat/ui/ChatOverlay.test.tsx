@@ -5,38 +5,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ItemChatHost } from "@bb-studio/kit/app";
 import type { Viewed } from "../contract";
 import { ChatOverlay } from "./ChatOverlay";
+import { chooseThreadPath, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
 
 const state = vi.hoisted(() => ({
   path: "/plugins/pages/pages/main",
   rpc: { call: vi.fn() },
   host: null as ItemChatHost | null,
-  composer: null as any,
-  picker: null as any,
-  navigate: { toThread: vi.fn() },
+  open: vi.fn(),
   error: vi.fn(),
 }));
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({
-  experimental_Icon: () => null,
   useRpc: () => state.rpc,
-  useBbNavigate: () => state.navigate,
-  experimental_NewThreadComposer: (props: any) => {
-    state.composer = props;
-    return <textarea aria-label="New conversation" defaultValue={props.initialPrompt} />;
-  },
 }));
-vi.mock("@bb-studio/kit/app", async () => ({
-  NewConversationComposer: (await import("../../../../bb-studio-kit/src/app/new-conversation")).NewConversationComposer,
-  cn: (...classes: string[]) => classes.join(" "),
+vi.mock("@bb-studio/kit/app", () => ({
   usePathname: () => state.path,
+  useOpenTarget: () => ({ open: state.open, anchor: null }),
   itemChatChanged: () => {},
   setItemChatHost: (host: ItemChatHost) => { state.host = host; return () => { state.host = null; }; },
-  Icon: () => null,
 }));
 vi.mock("sonner", () => ({ toast: { error: state.error } }));
-vi.mock("./ThreadPicker", () => ({
-  ThreadPicker: (props: any) => { state.picker = props; return <div>Choose conversation</div>; },
-}));
 
 const main: Viewed = {
   pluginId: "pages", id: "main", kind: "page", kindLabel: "Page", title: "Main page",
@@ -47,6 +35,8 @@ const companion: Viewed = {
   title: "Companion drawing", projectId: "project_companion", href: "/plugins/excalidraw/drawings/companion",
 };
 const quote = { text: "Keep this arrow", note: "", image: null, where: null };
+const homeOf = (threadId: string) => ({ thread: { threadId, title: "Linked", origin: "chosen" as const } });
+const split = (path: string) => [{ kind: "path", path, title: expect.any(String), icon: "MessageSquare" }, "split"];
 let root: Root;
 let container: HTMLDivElement;
 const render = async () => { await act(async () => { root.render(<ChatOverlay />); }); };
@@ -56,7 +46,6 @@ beforeEach(async () => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
   state.path = main.href;
-  state.composer = state.picker = null;
   state.rpc.call.mockImplementation(async (method, input) => {
     if (method === "chat.viewing") return { item: main };
     if (method === "chat.subject") return { item: input.id === companion.id ? companion : main };
@@ -91,119 +80,54 @@ describe("item Chat actions", () => {
     expect(state.host!.home(companion)).toEqual(thread);
   });
 
-  it("keeps an image quote in the submission", async () => {
-    const image = "data:image/png;base64,aGVsbG8=";
-    await actHost(host => host.send(companion, { ...quote, image }));
-    expect(container.querySelector("img")?.src).toBe(image);
-    await act(async () => { await state.composer.onSubmit({ input: [{ type: "text", text: "Fix the arrow" }] }); });
-    expect(state.rpc.call).toHaveBeenCalledWith("chat.start", {
-      item: { pluginId: companion.pluginId, id: companion.id },
-      request: { input: [{ type: "text", text: "Fix the arrow" }, { type: "image", url: image }] },
-    });
-  });
-  it("opens an unlinked item's composer and submits that item after navigating away", async () => {
-    await actHost((host) => host.open(companion));
-    expect(container.textContent).toContain("Companion drawing");
-    expect(state.composer.defaultProjectId).toBe("project_companion");
-    expect(state.composer.draftKey).toBe("studio-chat:excalidraw:companion");
-    state.path = "/settings";
-    await render();
-    expect(container.querySelector("textarea")).not.toBeNull();
-    const request = { input: [{ type: "text", text: "Fix it" }] };
-    await act(async () => { await state.composer.onSubmit(request); });
-    expect(state.rpc.call).toHaveBeenCalledWith("chat.start", { item: { pluginId: companion.pluginId, id: companion.id }, request });
-    expect(state.navigate.toThread).toHaveBeenCalledWith("created_thread");
+  it("draws nothing over the screen", () => {
+    expect(container.innerHTML).toBe("");
   });
 
-  it("links a picked conversation to the companion instead of the main item", async () => {
-    await actHost((host) => host.choose(companion));
-    expect(container.textContent).toContain("Companion drawing");
-    await act(async () => { state.picker.onPick("picked_thread"); });
-    expect(state.rpc.call).toHaveBeenCalledWith("chat.link", { pluginId: companion.pluginId, id: companion.id, threadId: "picked_thread" });
-    expect(state.host!.home(companion)?.threadId).toBe("picked_thread");
-    expect(state.host!.home(main)).toBeNull();
+  it("opens an item's thread in a split", async () => {
+    state.rpc.call.mockImplementation(async (method) => (method === "chat.home" ? homeOf("linked") : { item: main }));
+    await actHost(host => host.watch(companion));
+    await actHost(host => host.open(companion));
+    expect(state.open).toHaveBeenCalledWith({ kind: "thread", threadId: "linked" }, "split");
   });
 
-  it("keeps a companion's quote and project in its new conversation", async () => {
-    await actHost((host) => host.send(companion, quote));
-    expect(state.composer.initialPrompt).toContain("Keep this arrow");
-    expect(state.composer.defaultProjectId).toBe(companion.projectId);
-    expect(container.textContent).toContain(companion.title);
-    expect(state.rpc.call).toHaveBeenCalledWith("chat.subject", { pluginId: companion.pluginId, id: companion.id });
+  it("opens a new conversation about an unlinked item in a split", async () => {
+    await actHost(host => host.watch(companion));
+    await actHost(host => host.open(companion));
+    expect(state.open).toHaveBeenCalledWith(...split(itemDraftPath(companion)));
   });
 
-  it("continues the linked conversation and can explicitly start another", async () => {
-    await actHost((host) => host.choose(companion));
-    await act(async () => { state.picker.onPick("picked_thread"); });
-    state.navigate.toThread.mockClear();
-    await actHost((host) => host.open(companion));
-    expect(state.navigate.toThread).toHaveBeenCalledWith("picked_thread");
-    expect(container.querySelector("textarea")).toBeNull();
-    await actHost((host) => host.start!(companion));
-    expect(container.querySelector("textarea")).not.toBeNull();
-    expect(state.host!.home(companion)?.threadId).toBe("picked_thread");
+  it("starts another conversation in a split even when one is linked", async () => {
+    state.rpc.call.mockImplementation(async (method) => (method === "chat.home" ? homeOf("linked") : { item: main }));
+    await actHost(host => host.watch(companion));
+    await actHost(host => host.start(companion));
+    expect(state.open).toHaveBeenCalledWith(...split(itemDraftPath(companion)));
   });
 
-  it("keeps the latest intent when an earlier item resolves late", async () => {
-    let release!: (value: { item: Viewed }) => void;
-    state.rpc.call.mockImplementation((method, input) => method === "chat.subject" && input.id === main.id
-      ? new Promise((resolve) => { release = resolve; })
-      : Promise.resolve({ item: companion }));
-    await actHost((host) => host.start!(main));
-    await actHost((host) => host.start!(companion));
-    await act(async () => { release({ item: main }); });
-    expect(container.textContent).toContain(companion.title);
-    expect(container.textContent).not.toContain(main.title);
+  it("opens the thread picker in a split", async () => {
+    await actHost(host => host.choose(companion));
+    expect(state.open).toHaveBeenCalledWith(...split(chooseThreadPath(companion)));
   });
 
-  it("does not reopen a closed dialog when a pending item resolves", async () => {
-    await actHost((host) => host.start!(companion));
-    let release!: (value: { item: Viewed }) => void;
-    state.rpc.call.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
-    await actHost((host) => host.start!(main));
-    await act(async () => { (container.querySelector('[aria-label="Close composer"]') as HTMLButtonElement).click(); });
-    await act(async () => { release({ item: main }); });
-    expect(container.querySelector("textarea")).toBeNull();
+  it("sends a quote to the linked thread and opens it in a split", async () => {
+    state.rpc.call.mockImplementation(async (method) => (method === "chat.send" ? { threadId: "linked" } : { item: main }));
+    await actHost(host => host.send(companion, quote));
+    expect(state.rpc.call).toHaveBeenCalledWith("chat.send", { item: { pluginId: companion.pluginId, id: companion.id }, quote });
+    expect(state.open).toHaveBeenCalledWith({ kind: "thread", threadId: "linked" }, "split");
   });
 
-  it("reports missing items instead of composing about the main item", async () => {
-    state.rpc.call.mockResolvedValue({ item: null });
-    await actHost((host) => host.start!(companion));
-    expect(state.error).toHaveBeenCalledWith("That Studio item is archived or gone.");
-    expect(container.querySelector("textarea")).toBeNull();
+  it("saves a quote for an unlinked item and composes with it in a split", async () => {
+    const id = "1a0fdc3e-8eb5-4652-b596-424a021e409b";
+    const save = vi.spyOn(quoteDrafts, "save").mockResolvedValue({ id, item: { pluginId: companion.pluginId, id: companion.id }, quote, createdAt: 1 });
+    await actHost(host => host.send(companion, quote));
+    expect(save).toHaveBeenCalledWith({ pluginId: companion.pluginId, id: companion.id }, quote);
+    expect(state.open).toHaveBeenCalledWith(...split(quoteDraftPath(id)));
   });
 
-  it("keeps a newer composer open when an earlier submission finishes", async () => {
-    await actHost((host) => host.start!(companion));
-    let release!: (value: { threadId: string }) => void;
-    const original = state.rpc.call.getMockImplementation()!;
-    state.rpc.call.mockImplementation((method, input) => method === "chat.start"
-      ? new Promise((resolve) => { release = resolve; }) : original(method, input));
-    let sending!: Promise<void>;
-    await act(async () => { sending = state.composer.onSubmit({ input: [{ type: "text", text: "Fix it" }] }); });
-    await actHost((host) => host.start!(main));
-    await act(async () => { release({ threadId: "created_thread" }); await sending; });
-    expect(container.textContent).toContain(main.title);
-    expect(container.querySelector("textarea")).not.toBeNull();
-    expect(state.composer.draftKey).toBe("studio-chat:pages:main");
-  });
-
-  it("keeps the draft available after a failed submission", async () => {
-    await actHost((host) => host.start!(companion));
-    const draft = container.querySelector("textarea")!;
-    draft.value = "Keep my changes";
-    state.rpc.call.mockRejectedValue(new Error("Connection lost"));
-    await act(async () => {
-      await expect(state.composer.onSubmit({ input: [{ type: "text", text: draft.value }] })).rejects.toThrow("Connection lost");
-    });
-    expect(container.querySelector("textarea")).toBe(draft);
-    expect(draft.value).toBe("Keep my changes");
-    expect(container.textContent).toContain("Connection lost");
-  });
-
-  it("opens a picked conversation in the main thread view", async () => {
-    await actHost((host) => host.choose(companion));
-    await act(async () => { state.picker.onPick("picked_thread"); });
-    expect(state.navigate.toThread).toHaveBeenCalledWith("picked_thread");
+  it("reports a quote that couldn't be saved", async () => {
+    vi.spyOn(quoteDrafts, "save").mockRejectedValue(new Error("Close other BB tabs"));
+    await actHost(host => host.send(companion, quote));
+    expect(state.error).toHaveBeenCalledWith("Close other BB tabs");
+    expect(state.open).not.toHaveBeenCalled();
   });
 });

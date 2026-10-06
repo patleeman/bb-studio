@@ -32,7 +32,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
   // Right-click and Mod-click on Studio items and threads anywhere on screen.
   app.slots.experimental_appOverlay({ id: "item-gestures", component: ItemGestures });
-  app.slots.navPanel({ id: "chats", path: "chats", title: "Chat", icon: "MessageSquare", component: retainPanel("chats", ConversationPage) });
+  app.slots.navPanel({ id: "chats", path: "chats", title: "Chat", icon: "MessageSquare", component: retainPanel("chats", ConversationPage), headerContent: StudioBarSlot });
   app.slots.experimental_appOverlay({ id: "retained-chats", component: () => <RetainedPanels path="chats" render={subPath => <ConversationPage subPath={subPath} />} /> });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // Keeps the panel's views alive across route changes (with retainPanel).

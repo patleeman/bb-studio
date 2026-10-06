@@ -1,30 +1,22 @@
+import { useRpc } from "@get-bb/plugin-sdk/app";
 import {
-  useBbNavigate,
-  useRpc,
-} from "@get-bb/plugin-sdk/app";
-import {
-  cn,
   itemChatChanged,
   setItemChatHost,
+  useOpenTarget,
   usePathname,
   type HomeThread,
   type ItemChatHost,
   type ItemChatRef,
 } from "@bb-studio/kit/app";
-import { errorMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { errorMessage, type ItemQuote } from "@bb-studio/kit/format";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, Viewed } from "../contract";
 import { ref as itemRefSchema } from "../schemas";
 import { itemKey } from "../context";
-import { ThreadPicker } from "./ThreadPicker";
-import { useChatDialog } from "./use-chat-dialog";
-import { ConversationComposer } from "./ConversationComposer";
-import { CONVERSATION_STARTED } from "./conversation-drafts";
+import { CHAT_ICON, CONVERSATION_STARTED, chooseThreadPath, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
-
-const CARD = "pointer-events-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl";
 
 /** The Studio item on screen, or null; each path is asked once. */
 function useViewing(rpc: Rpc, path: string): Viewed | null {
@@ -141,73 +133,27 @@ function useHomeThreads(
   return { cache, put, load };
 }
 
-/** The composer or picker, bottom right, over whatever is on screen. */
-function Corner({ children }: { children: ReactNode }) {
-  return <div className="studio-chat pointer-events-none fixed right-6 bottom-4 z-40 max-md:inset-x-2 max-md:bottom-2">{children}</div>;
-}
-
+/**
+ * Studio Chat as the item-chat host. It draws nothing of its own: an item's
+ * thread, a new conversation about it, or the thread picker opens in a split
+ * beside the item.
+ */
 export function ChatOverlay() {
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
   const viewed = useViewing(rpc, usePathname());
-  const resolve = useCallback(async (ref: ItemChatRef) => (await rpc.call("chat.subject", { pluginId: ref.pluginId, id: ref.id })).item, [rpc]);
+  const { open, anchor } = useOpenTarget();
   const reportError = useCallback((cause: unknown) => toast.error(errorMessage(cause)), []);
-  const { dialog, open, close } = useChatDialog(resolve, reportError);
-
-  const show = (threadId: string, dialogRequest?: number) => {
-    close(dialogRequest);
-    navigate.toThread(threadId);
-  };
-  const homes = useHomeThreads(rpc, viewed, {
-    show,
-    choose: (ref) => { void open(ref, "choose"); },
-    compose: (ref, quote) => { void open(ref, "compose", quote); },
+  useHomeThreads(rpc, viewed, {
+    show: (threadId) => open({ kind: "thread", threadId }, "split"),
+    choose: (ref) => open({ kind: "path", path: chooseThreadPath(ref), title: "Choose conversation", icon: CHAT_ICON }, "split"),
+    compose: (ref, quote) => {
+      const title = "New conversation";
+      if (!quote) return open({ kind: "path", path: itemDraftPath(ref), title, icon: CHAT_ICON }, "split");
+      quoteDrafts.save({ pluginId: ref.pluginId, id: ref.id }, quote).then(
+        (draft) => open({ kind: "path", path: quoteDraftPath(draft.id), title, icon: CHAT_ICON }, "split"),
+        reportError,
+      );
+    },
   });
-  if (!dialog) return null;
-
-  const { item, mode, quote, request: focus } = dialog;
-  const key = itemKey(item);
-  const home = homes.cache.get(key) ?? null;
-  const kindLabel = item.kindLabel.toLowerCase();
-  return (
-    <Corner>
-      {mode === "compose" ? (
-        <div className={cn(CARD, "w-[min(460px,calc(100vw-1rem))] h-[min(520px,calc(100dvh-6rem))] mb-2")}>
-          <ConversationComposer
-            key={quote ? `${key}:quote:${focus}` : key}
-            item={item}
-            {...(quote ? { quote } : {})}
-            draftKey={quote ? `studio-chat:${key}:quote:${focus}` : `studio-chat:${key}`}
-            focusRequest={focus}
-            onClose={() => close()}
-            onSubmit={async (request) => {
-              const { threadId } = await rpc.call("chat.start", { item: { pluginId: item.pluginId, id: item.id }, request });
-              homes.load(item);
-              show(threadId, focus);
-            }}
-          />
-        </div>
-      ) : (
-        <section aria-label={`Choose this ${kindLabel}'s conversation`} className={cn(CARD, "studio-chat-picker w-[min(380px,calc(100vw-1rem))] mb-2")}>
-          <p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
-            Quotes and chat about "{untitled(item.title)}" will go to the conversation you pick.
-          </p>
-          <ThreadPicker
-            homeThreadId={home?.threadId ?? null}
-            onClose={() => close()}
-            onPick={(threadId) => {
-              close();
-              rpc.call("chat.link", { pluginId: item.pluginId, id: item.id, threadId }).then(
-                ({ thread }) => {
-                  homes.put(key, thread);
-                  show(threadId, focus);
-                },
-                reportError,
-              );
-            }}
-          />
-        </section>
-      )}
-    </Corner>
-  );
+  return anchor;
 }

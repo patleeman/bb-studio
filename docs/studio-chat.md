@@ -42,13 +42,17 @@ archived item produces an error rather than borrowing the main pane's item.
 Choosing a conversation changes the item's link; starting another changes
 it only after successful submission.
 
-**Chat** opens the linked thread in BB's main thread view. Without a link,
-it opens a compact new-conversation composer in the bottom-right corner, so
-the item stays on screen while you write. A successful submission opens the
+Studio Chat draws nothing over the screen. **Chat** opens the linked thread
+in a BB split beside the item. Without a link, it opens the Chat panel's
+new-conversation composer for the item (`/plugins/studio/chats/item/…`,
+draft key `studio-chat:<plugin>:<id>`) in that split, so the item stays on
+screen while you write. A successful submission navigates that pane to the
 new thread and refreshes the item's home link. Failed submissions keep the
-draft and quote. The Chat navigation panel also has a new-conversation
-composer at a route per item (`/plugins/studio/chats/item/…`), keeping the
-`studio-chat:<plugin>:<id>` draft key. Quote routes saved before Float was
+draft and quote. **Choose conversation…** opens a thread picker at
+`/plugins/studio/chats/choose/…` in the same split; picking links the thread
+and opens it there. A quote without a link is saved to IndexedDB and opens
+its composer at `/plugins/studio/chats/quote/<id>`. Where BB doesn't split,
+each of these opens in the main view. Quote routes saved before Float was
 removed still open from their IndexedDB copy.
 
 ## Stable SDK integration
@@ -57,9 +61,9 @@ removed still open from their IndexedDB copy.
 | --- | --- |
 | Chat button and options | Shared kit `ItemHeader` and item-chat host |
 | Shared controller | `experimental_appOverlay` |
-| Conversation creation | `experimental_NewThreadComposer`, in the corner or a retained `RetainedPanels` route |
+| Conversation creation | `experimental_NewThreadComposer` on a retained `RetainedPanels` route, opened in a split |
 | Conversation picker | `threads.list`, `threads.search`, `threads.get` |
-| Thread presentation | `navigate.toThread` |
+| Thread presentation | `experimental_useSidebarThreadActions().open(…, { split: true })`, then `navigate.toThread` from the split |
 | Sent context | Registered item mention provider |
 | Main-pane discovery | Kit `usePathname` and Studio `itemAt` |
 

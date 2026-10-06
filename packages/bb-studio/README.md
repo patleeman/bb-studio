@@ -218,11 +218,14 @@ The same run checks [the overview](assets/command.png), [rearranging panes](asse
 ## Item chat
 
 Studio owns each item's **Chat** action, conversation picker, linked thread and
-quotes. **Chat** opens the item's linked thread in the main view. Without one,
-a compact new-conversation composer opens in the bottom-right corner, and
-sending opens the new thread in the main view. A new conversation keeps the
-item's context, project and draft; a quote goes to its linked thread, or opens
-the corner composer with the quote when there is none. Pages keeps its
+quotes. Everything **Chat** opens goes in a split beside the item, which stays
+on screen. **Chat** opens the item's linked thread. Without one, it opens a
+new-conversation composer, and sending turns that pane into the new thread.
+**Choose conversation…** opens a thread picker in the same split. A new
+conversation keeps the item's context, project and draft; a quote goes to its
+linked thread, or opens the composer with the quote when there is none. Where
+BB doesn't split (a small screen, or splits turned off), these open in the
+main view. Pages keeps its
 page-chat history; standalone Pages still provides its own chat when Studio is
 absent.
 

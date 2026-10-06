@@ -21,15 +21,15 @@ changed it. If the note says the item can't be found, it was probably
 deleted; use `studio_list_items` to look for it by title.
 
 "This", "here" and "the page" mean the item in the latest note. The thread
-opens in BB's main view, and the user can move to other items, but later messages don't
+opens in a split beside the item, and the user can move to other items, but later messages don't
 say which item is on screen now. If they seem to mean a different item, ask,
 or find it with `studio_list_items`.
 
 Chats about pages go through Studio Pages, so they also appear in the page's
 Chats menu.
 
-**Chat** opens the item's linked thread in the main view. Without a link, a
-compact composer opens in the bottom-right corner, and sending opens the new
-thread in the main view. ⌘/Ctrl-click, or **Open in split** in a menu, opens a
+**Chat** opens the item's linked thread in a split beside the item. Without a
+link, a composer opens in that split, and sending turns it into the new
+thread. ⌘/Ctrl-click, or **Open in split** in a menu, opens a
 thread or item in a split instead. There are no Studio Chat CLI commands or
 agent tools.

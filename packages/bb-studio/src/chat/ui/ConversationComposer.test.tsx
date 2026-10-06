@@ -3,12 +3,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConversationPage } from "./ConversationComposer";
-import { itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
+import { chooseThreadPath, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
 
 const state = vi.hoisted(() => ({
   rpc: { call: vi.fn() },
   navigate: { toThread: vi.fn() },
   submit: new Map<string, (request: any) => Promise<void>>(),
+  picker: null as any,
   props: new Map<string, any>(),
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
@@ -23,6 +24,9 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
     state.submit.set(props.draftKey, props.onSubmit);
     return <><textarea aria-label="Draft" defaultValue={props.initialPrompt} /><input type="file" aria-label="Attachment" /></>;
   },
+}));
+vi.mock("./ThreadPicker", () => ({
+  ThreadPicker: (props: any) => { state.picker = props; return <div>Threads</div>; },
 }));
 vi.mock("@bb-studio/kit/app", async importOriginal => ({ ...(await importOriginal<typeof import("@bb-studio/kit/app")>()), Icon: () => null }));
 
@@ -42,6 +46,8 @@ beforeEach(() => {
   state.rpc.call.mockImplementation(async method => {
     if (method === "chat.subject") return { item };
     if (method === "chat.start") return { threadId: "created" };
+    if (method === "chat.home") return { thread: { threadId: "home", title: "Home", origin: "created" } };
+    if (method === "chat.link") return { thread: { threadId: "picked", title: "Picked", origin: "chosen" } };
     throw new Error(`Unexpected RPC ${method}`);
   });
   container = document.createElement("div");
@@ -92,5 +98,19 @@ describe("new-conversation page", () => {
     expect(container.querySelector("textarea")).toBeNull();
     await act(async () => { container.querySelector("button")!.click(); });
     expect(container.querySelector("textarea")).not.toBeNull();
+  });
+
+  it("links a picked thread to the item and opens it", async () => {
+    const started = vi.fn();
+    window.addEventListener("bb-studio-chat:started", started);
+    await render(chooseThreadPath(ref));
+    expect(container.textContent).toContain('Quotes and chat about "Release diagram"');
+    expect(state.picker.homeThreadId).toBe("home");
+    expect(state.picker.onClose).toBeUndefined();
+    await act(async () => { state.picker.onPick("picked"); });
+    expect(state.rpc.call).toHaveBeenCalledWith("chat.link", { ...ref, threadId: "picked" });
+    expect(started).toHaveBeenCalled();
+    expect(state.navigate.toThread).toHaveBeenCalledWith("picked");
+    window.removeEventListener("bb-studio-chat:started", started);
   });
 });
