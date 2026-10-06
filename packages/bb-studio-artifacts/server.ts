@@ -581,7 +581,9 @@ export default async function plugin(bb: BbPluginApi) {
           }
         }
         case "list": {
-          const rows = store.list({ threadId: flags.values.thread !== undefined ? ctx.threadId : undefined });
+          const thisThread = flags.values.thread !== undefined;
+          if (thisThread && !ctx.threadId) return { exitCode: 1, stderr: "--thread lists one thread's artifacts; run it from a BB thread.\n" };
+          const rows = store.list({ threadId: thisThread ? ctx.threadId : undefined });
           if (!rows.length) return { exitCode: 0, stdout: "No artifacts yet.\n" };
           const lines = rows.map(
             (artifact) =>
