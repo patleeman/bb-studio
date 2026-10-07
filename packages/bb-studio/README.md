@@ -178,6 +178,20 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
 `bb studio setup` prints the same status, the retired plugins and the
 commands left to run; `--json` prints the whole summary.
 
+## Backup and restore
+
+`bb studio backup [--out <file|folder>]` saves every Studio item into one
+`.zip`. That covers pages, recordings with their audio, drawings, artifacts,
+tables, designs, and Studio's tags, Spaces, views, links, comments and
+versions. `bb studio restore <file>` shows what would change, and `--yes`
+restores it. Restore matches each item by its original id, so running it
+again changes nothing, and it never overwrites a copy that is newer here.
+Projects are matched by path or name; items whose project isn't on the BB
+become global items. The Setup page has the same **Back up** and **Restore…**
+actions; restoring there shows the dry run and asks before it changes
+anything. [docs/backup.md](../../docs/backup.md) describes the file format,
+what's left out and how conflicts are handled.
+
 ## Plugin health
 
 Studio checks every enabled plugin when it starts and every 3 minutes after
