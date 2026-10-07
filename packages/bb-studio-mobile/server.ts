@@ -405,7 +405,10 @@ export default async function plugin(bb: BbPluginApi) {
         ? { kind: input.kind, threadId: input.threadId, projectId: input.projectId, ...(input.path ? { path: input.path } : {}) }
         : { projectId: input.projectId, ...(input.path ? { path: input.path } : {}) };
       const tickets = devices.length > 0
-        ? await deliver(devices.map((to) => ({ to, title: input.title, body: input.body, sound: "default", data })))
+        ? await deliver(devices.map((to) => ({
+            to, title: input.title, body: input.body, sound: "default", data,
+            ...(input.coalesceKey ? { collapseId: input.coalesceKey } : {}),
+          })))
         : [];
       const muted = new Set((await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? []);
       const sent = tickets.filter((ticket, index) => ticket.status === "ok" &&

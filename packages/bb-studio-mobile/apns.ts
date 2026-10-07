@@ -1,7 +1,7 @@
 // APNs delivery for BB Studio. BB's push-notifications plugin posts Expo-format
 // batches to its relay URL; this module sends `apns:` tokens to Apple and
 // answers with Expo-format tickets so the sender's bookkeeping keeps working.
-import { createPrivateKey, sign, type KeyObject } from "node:crypto";
+import { createHash, createPrivateKey, sign, type KeyObject } from "node:crypto";
 import { connect, type ClientHttp2Session } from "node:http2";
 
 export const APNS_TOKEN_PREFIX = "apns:";
@@ -12,8 +12,15 @@ export type ExpoMessage = {
   body?: string;
   sound?: string;
   data?: Record<string, unknown>;
+  /** Pushes sharing this key replace each other on the device (`apns-collapse-id`). */
+  collapseId?: string;
   [key: string]: unknown;
 };
+
+/** APNs caps `apns-collapse-id` at 64 bytes; longer keys are hashed to exactly 64 hex characters. */
+export function apnsCollapseId(key: string): string {
+  return Buffer.byteLength(key) <= 64 ? key : createHash("sha256").update(key).digest("hex");
+}
 
 export type ExpoTicket =
   | { status: "ok"; id?: string }
@@ -158,6 +165,7 @@ export type ApnsPush = {
   /** `alert` and `background` pushes use the bundle ID; Live Activity pushes use `<bundle>.push-type.liveactivity`. */
   pushType: "alert" | "background" | "liveactivity";
   priority: 5 | 10;
+  collapseId?: string;
 };
 
 /** Sends one push, retrying in the sandbox when `auto` meets a development-build token. */
@@ -172,6 +180,7 @@ export async function sendApns(
     "apns-topic": push.pushType === "liveactivity" ? `${config.bundleId}.push-type.liveactivity` : config.bundleId,
     "apns-push-type": push.pushType,
     "apns-priority": String(push.priority),
+    ...(push.collapseId ? { "apns-collapse-id": apnsCollapseId(push.collapseId) } : {}),
   };
   const environments: ApnsEnvironment[] =
     config.environment === "auto" ? ["production", "development"] : [config.environment];
@@ -198,7 +207,13 @@ export async function deliverApns(
     return { status: "error", message: "Malformed APNs token", details: { error: "DeviceNotRegistered" } };
   }
   const result = await sendApns(
-    { deviceToken, payload: apnsPayload(message), pushType: "alert", priority: 10 },
+    {
+      deviceToken,
+      payload: apnsPayload(message),
+      pushType: "alert",
+      priority: 10,
+      ...(typeof message.collapseId === "string" && message.collapseId !== "" ? { collapseId: message.collapseId } : {}),
+    },
     config,
     token,
     send,

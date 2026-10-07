@@ -1,5 +1,6 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { generateKeyPairSync } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import plugin from "./server.js";
 import { Http2ApnsSender, type ExpoMessage } from "./apns.js";
@@ -91,6 +92,50 @@ describe("push relay", () => {
       })).toEqual({ ok: true, sent: 0 });
       expect(host.forwarded).toEqual([]);
       expect(await host.bb.storage.kv.get("last-delivery")).toBeUndefined();
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+});
+
+function recordingSession() {
+  const requests: Array<{ headers: Record<string, string>; body: string }> = [];
+  vi.spyOn(Http2ApnsSender.prototype, "close").mockImplementation(() => {});
+  vi.spyOn(Http2ApnsSender.prototype as any, "session").mockReturnValue({
+    request: (headers: Record<string, string>) => {
+      const request = new EventEmitter() as any;
+      request.setTimeout = () => {};
+      request.setEncoding = () => {};
+      request.end = (body: string) => {
+        requests.push({ headers, body });
+        request.emit("response", { ":status": 200 });
+        request.emit("close");
+      };
+      return request;
+    },
+  });
+  return requests;
+}
+
+async function configuredHost() {
+  const key = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+  const host = createFakePluginHost({ pluginId: "mobile", settings: { apnsKey: key, apnsKeyId: "test", apnsEnvironment: "production" },
+    sdk: { threads: { interactions: { list: async () => [] } } },
+  });
+  await plugin(host.bb);
+  return host;
+}
+
+describe("notify", () => {
+  it("sends the coalesce key as a collapse id, hashing keys over 64 bytes", async () => {
+    const requests = recordingSession();
+    const host = await configuredHost();
+    try {
+      await host.bb.storage.kv.set("devices", { ["apns:" + "a".repeat(64)]: Date.now() });
+      const base = { title: "Build", body: "Running", kind: "turn-finished", threadId: "thr_a", projectId: "proj_demo" } as const;
+      await host.harness.behavior.callRpc("notify", { ...base, coalesceKey: "build-status" });
+      await host.harness.behavior.callRpc("notify", { ...base, coalesceKey: "é".repeat(40) });
+      expect(requests[0]!.headers["apns-collapse-id"]).toBe("build-status");
+      expect(requests[1]!.headers["apns-collapse-id"]).toMatch(/^[0-9a-f]{64}$/);
+      expect(JSON.parse(requests[0]!.body)).not.toHaveProperty("collapseId");
     } finally { await host.harness.lifecycle.dispose(); }
   });
 });
