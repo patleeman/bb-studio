@@ -41,6 +41,33 @@ final class RefreshRaceTests: XCTestCase {
     }
 
     @MainActor
+    func testSlowerOlderStudioLoadCannotReplaceANewerList() async {
+        let original = BBClient.storedServerURL
+        defer { BBClient.storedServerURL = original }
+        BBClient.storedServerURL = server
+        let store = StudioStore()
+        let client = BBClient(baseURL: server)
+        let calls = LockedCounter()
+        client.transport = { _, path, _ in
+            if path == "/api/v1/plugins" { return (200, Data(#"{"plugins":[{"id":"studio","status":"running"}]}"#.utf8)) }
+            if path.hasSuffix("/studio/rpc/overview") {
+                if calls.next() == 1 {
+                    try await Task.sleep(for: .milliseconds(400))
+                    return (200, Data(#"{"ok":true,"result":{"items":[{"pluginId":"pages","id":"old","kind":"page","title":"Old"}]}}"#.utf8))
+                }
+                return (200, Data(#"{"ok":true,"result":{"items":[{"pluginId":"pages","id":"new","kind":"page","title":"New"}]}}"#.utf8))
+            }
+            return (404, Data())
+        }
+        async let first: Void = store.load(client)
+        try? await Task.sleep(for: .milliseconds(100))
+        await store.load(client)
+        await first
+        XCTAssertEqual(store.items.map(\.itemId), ["new"])
+        XCTAssertEqual(DiskCache.load(StudioSnapshot.self, key: StudioSnapshot.cacheKey, serverURL: server)?.items.map(\.itemId), ["new"])
+    }
+
+    @MainActor
     func testSlowFirstLoadCannotOverwriteANewerRefresh() async {
         let client = BBClient(baseURL: server)
         let calls = LockedCounter()

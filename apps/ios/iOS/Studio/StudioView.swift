@@ -75,16 +75,28 @@ final class StudioStore: ObservableObject {
         plugins = Set(UserDefaults.standard.string(forKey: ServerScope.key("runningPlugins", serverURL: serverURL))?.split(separator: ",").map(String.init) ?? [])
     }
 
+    /// Loads overlap (pull to refresh, signals, a sheet closing); only the newest one may land.
+    private var loadGeneration = 0
+
     func load(_ client: BBClient) async {
         guard client.baseURL == serverURL else { return }
+        loadGeneration += 1
+        let generation = loadGeneration
         async let projects = try? client.projects()
-        if let running = try? await client.runningPlugins() {
+        if let running = try? await client.runningPlugins(), generation == loadGeneration {
             plugins = running
             UserDefaults.standard.set(running.sorted().joined(separator: ","), forKey: ServerScope.key("runningPlugins", serverURL: serverURL))
         }
         do {
-            let items = try await fetch(client)
-            self.items = items.sorted { $0.updatedAt > $1.updatedAt }
+            let listing = try await fetch(client)
+            guard generation == loadGeneration else { return }
+            viaStudio = listing.viaStudio
+            kindInfo = listing.kinds
+            tags = listing.tags ?? []
+            supportsTags = listing.tags != nil
+            spaces = Self.sorted(listing.spaces ?? [])
+            supportsSpaces = listing.spaces != nil
+            self.items = listing.items.sorted { $0.updatedAt > $1.updatedAt }
             Spotlight.indexStudio(self.items, serverURL: serverURL)
             error = nil
             DiskCache.save(
@@ -92,23 +104,27 @@ final class StudioStore: ObservableObject {
                 as: StudioSnapshot.cacheKey, serverURL: serverURL)
         } catch where BBClient.isCancellation(error) {
         } catch {
+            guard generation == loadGeneration else { return }
             self.error = BBClient.describe(error, server: client.baseURL)
         }
         for project in await projects ?? [] { projectNames[project.id] = project.name }
         loaded = true
     }
 
-    private func fetch(_ client: BBClient) async throws -> [StudioItem] {
+    /// What one load found. Nil tags or spaces: the source doesn't have them.
+    private struct Listing {
+        var items: [StudioItem]
+        var viaStudio = false
+        var kinds: [StudioKindInfo] = []
+        var tags: [StudioTag]?
+        var spaces: [StudioSpace]?
+    }
+
+    private func fetch(_ client: BBClient) async throws -> Listing {
         if plugins.contains("studio") {
             do {
                 let overview = try await client.studioOverview()
-                viaStudio = true
-                kindInfo = overview.kinds
-                tags = overview.tags ?? []
-                supportsTags = overview.tags != nil
-                spaces = Self.sorted(overview.spaces ?? [])
-                supportsSpaces = overview.spaces != nil
-                return overview.items
+                return Listing(items: overview.items, viaStudio: true, kinds: overview.kinds, tags: overview.tags, spaces: overview.spaces)
             } catch where BBClient.isCancellation(error) {
                 // A superseded reload: keep Studio's tags, Spaces and kinds rather than falling back.
                 throw error
@@ -116,12 +132,6 @@ final class StudioStore: ObservableObject {
                 // Studio failed; list the add-ons directly below.
             }
         }
-        viaStudio = false
-        kindInfo = []
-        tags = []
-        supportsTags = false
-        spaces = []
-        supportsSpaces = false
         async let pages = Self.attempt(plugins.contains("pages")) { try await client.pages() }
         async let recordings = Self.attempt(plugins.contains("talk")) { try await client.recordings(limit: 200) }
         async let drawings = Self.attempt(plugins.contains("excalidraw")) { try await client.drawings() }
@@ -134,7 +144,7 @@ final class StudioStore: ObservableObject {
         // One add-on failing shouldn't hide the others.
         let loaded = lists.compactMap { try? $0.get() }
         if loaded.isEmpty, case .failure(let error)? = lists.first { throw error }
-        return loaded.flatMap { $0 }
+        return Listing(items: loaded.flatMap { $0 })
     }
 
     private nonisolated static func attempt<T>(_ running: Bool, _ fetch: @Sendable () async throws -> T) async -> Result<T, Error>? {
