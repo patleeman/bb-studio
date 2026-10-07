@@ -1,5 +1,5 @@
 import { subcommand, takeOption } from "@bb-studio/kit/cli";
-import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
+import { defineItemMention, registerStudioBackup, serveBytes } from "@bb-studio/kit/server";
 // bb-studio-talk — durable long-form dictation.
 //
 // The browser captures audio in short segments and uploads each one over RPC
@@ -29,6 +29,7 @@ import { cleanTranscript } from "./src/server/cleanup";
 import { talkModels } from "./src/server/models";
 import { NotesMaker, PAGES_MISSING, generateNotes, notesPagePath, pagesClient } from "./src/server/notes";
 import { HOLD_KEY_OPTIONS } from "./src/shared/format";
+import { talkBackupHandlers } from "./src/server/backup";
 
 export type { TalkRpcContract } from "./src/shared/contract";
 
@@ -367,6 +368,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   registerStudio(bb, studio, { store, removeAudio: (id) => files.removeRecording(id), readAudio: (file) => files.read(file), changed });
+  registerStudioBackup(bb, z, talkBackupHandlers({ db, files, changed }));
 
   // Segment audio for the recording page's player. Same-origin GET only.
   bb.http.route("GET", "/audio", async (context) => {
