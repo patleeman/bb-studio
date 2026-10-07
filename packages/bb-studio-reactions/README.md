@@ -146,9 +146,11 @@ Smart-reaction instructions use saved settings when a thread starts or resumes.
   plugin settings endpoint) and falls back to the defaults when the server
   is unreachable. If every `showIn*` toggle is off, no actions are registered
   — the plugin is effectively hidden until a location is re-enabled.
-- A zero-visibility composer banner captures the bound `useComposer()` API
-  into a module ref — `messageAction` runs are plain host-chrome callbacks
-  with no hook access, and banners mount in every composer layout.
+- A zero-visibility composer banner (the kit's `ComposerBridge`) registers
+  each mounted composer — `messageAction` runs are plain host-chrome callbacks
+  with no hook access, and banners mount in every composer layout. A reaction
+  drafts into the composer for the message's thread, else a new-thread
+  composer, never another thread's.
 - BB's host settings form is the only editor. The plugin's settings section
   previews saved choices and compares them with this window's setup snapshot.
   The default reaction list is retained if reading that snapshot fails.
