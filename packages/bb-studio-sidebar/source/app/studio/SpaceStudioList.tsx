@@ -64,8 +64,9 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated, onNewThr
   const sdk = useSdk();
   const [kinds, setKinds] = useState<Kind[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const call = useCallback(<T,>(method: string, input: unknown, outputSchema: z.ZodType<T>) =>
-    sdk.plugins.callRpc({ pluginId: "studio", method, input: input as never, outputSchema, signal: AbortSignal.timeout(15_000) }) as Promise<T>, [sdk]);
+  // Parsed here, so a malformed answer lands in the error path instead of throwing in a then.
+  const call = useCallback(async <T,>(method: string, input: unknown, outputSchema: z.ZodType<T>): Promise<T> =>
+    outputSchema.parse(await sdk.plugins.callRpc({ pluginId: "studio", method, input: input as never, outputSchema, signal: AbortSignal.timeout(15_000) })), [sdk]);
   const load = () => {
     setError(null);
     call("overview", null, overviewSchema).then(

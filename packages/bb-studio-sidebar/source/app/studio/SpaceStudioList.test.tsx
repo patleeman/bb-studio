@@ -3,12 +3,13 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { showsItem, SpaceStudioList } from "./SpaceStudioList.js";
+import { showsItem, SpaceNewMenu, SpaceStudioList } from "./SpaceStudioList.js";
 import type { SpaceItems } from "./studioSpaces.js";
 
+const rpc = vi.hoisted(() => ({ answer: (): unknown => ({ ok: true }) }));
 vi.mock("@get-bb/plugin-sdk/app", async (actual) => ({
   ...(await actual<object>()),
-  useSdk: () => ({ plugins: { callRpc: () => Promise.resolve({ ok: true }) } }),
+  useSdk: () => ({ plugins: { callRpc: () => Promise.resolve(rpc.answer()) } }),
 }));
 
 installTestPluginRuntime();
@@ -38,6 +39,16 @@ describe("SpaceStudioList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close Mockup" }));
     rerender(list(withOpen([{ ...mockup }])));
     expect(screen.queryByText("Mockup")).toBeNull();
+  });
+});
+
+describe("SpaceNewMenu", () => {
+  it("offers Retry when Studio's overview answer is malformed, instead of loading forever", async () => {
+    rpc.answer = () => ({ ok: true });
+    render(<SpaceNewMenu spaceId="sp_work" spaceName="Work" defaultProjectId={null} onNewThread={() => {}} />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "New in Work" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByRole("menuitem", { name: "Retry" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Loading…" })).toBeNull();
   });
 });
 
