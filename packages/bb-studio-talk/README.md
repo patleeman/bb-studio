@@ -48,10 +48,14 @@ To stage it, the capture script:
 - Lets BB's voice service transcribe it.
 
 The capture generates an optional summary and a saved cleaned transcript.
+It clicks **Make notes**, checks that the notes page links back to the
+recording and has decisions and an action-item checklist, and checks that
+updating the notes rewrites the same page. The page then shows **Open notes**
+and **Update notes**.
 It plays the audio, seeks to the second section, adjusts volume, and pauses.
 The page shows the scrubber, playback controls, **Original** and **Cleaned**
 views, and timestamped sections. The script checks that the original transcript
-is unchanged, then deletes the seeded recording afterwards.
+is unchanged, then deletes the seeded recording and its notes page afterwards.
 
 ![Talk playback and transcript controls on mobile](assets/staged-mobile.png)
 
