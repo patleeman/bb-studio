@@ -125,7 +125,8 @@ export class TableStore {
   save(table: Table): Table {
     table.columns = checkedColumns(table.columns);
     table.views = checkedViews(table.views, table.columns);
-    table.rows = table.rows.map((row) => ({ ...row, values: validateValues(table.columns, row.values) }));
+    // New input was checked as it came in; older rows may hold what today's rules reject.
+    table.rows = table.rows.map((row) => ({ ...row, values: validateValues(table.columns, row.values, false, true) }));
     table.updatedAt = Date.now();
     const result = this.db
       .prepare("UPDATE studio_tables SET title=?, project_id=?, data=?, archived=?, updated_at=? WHERE id=?")

@@ -82,3 +82,23 @@ it("keeps a column or option added while the UI saved its stale column list", ()
   expect(removed.columns.map((column) => column.name)).toEqual(["Name", "Owner"]);
   db.close();
 });
+
+/** A table that already holds `link`, saved before the store checked it. */
+function legacy(db: Database.Database, store: TableStore, column: { id: string; name: string; type: "url" | "date" }, stored: string) {
+  const table = store.create("Legacy", null, [{ id: "name", name: "Name", type: "text", options: [] }, { ...column, options: [] }], [{ name: "Old" }]);
+  const data = { columns: table.columns, views: table.views, rows: [{ ...table.rows[0]!, values: { name: "Old", [column.id]: stored } }] };
+  db.prepare("UPDATE studio_tables SET data=? WHERE id=?").run(JSON.stringify(data), table.id);
+  return table;
+}
+
+it("rejects script and data URLs on new input but keeps saving a table that holds one", () => {
+  const { db, store } = open();
+  const table = legacy(db, store, { id: "link", name: "Link", type: "url" }, "javascript:alert(1)");
+  for (const link of ["javascript:alert(1)", " JavaScript:alert(1)", "data:text/html,<script>1</script>", "vbscript:msgbox(1)"])
+    expect(() => store.insert(table.id, { link })).toThrow(/Invalid URL/);
+  expect(store.insert(table.id, { link: "https://example.com" }).values.link).toBe("https://example.com");
+  expect(store.updateRow(table.id, table.rows[0]!.id, { name: "Renamed" }).values).toMatchObject({ name: "Renamed", link: "javascript:alert(1)" });
+  expect(store.importCsv(table.id, "Name,Link\nNew,javascript:alert(1)\n")).toBe(1);
+  expect(store.require(table.id).rows.at(-1)!.values.link).toBeNull();
+  db.close();
+});

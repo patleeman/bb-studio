@@ -124,6 +124,17 @@ function isUrl(text: string): boolean {
   }
 }
 
+/** Schemes a link must not run: a URL cell opens in the browser. */
+const UNSAFE_SCHEMES = new Set(["javascript:", "data:", "vbscript:"]);
+
+function isSafeUrl(text: string): boolean {
+  try {
+    return !UNSAFE_SCHEMES.has(new URL(text).protocol);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * A row's own cell: a column named like an Object built-in ("constructor")
  * reads its value, never the inherited one.
@@ -137,7 +148,11 @@ function put(values: Values, columnId: string, cell: Cell): void {
   Object.defineProperty(values, columnId, { value: cell, writable: true, enumerable: true, configurable: true });
 }
 
-export function validateValues(columns: Column[], values: Values, partial = false): Values {
+/**
+ * Values checked against their columns' types. `stored` rechecks values a
+ * table already holds: it keeps ones that only today's input rules reject.
+ */
+export function validateValues(columns: Column[], values: Values, partial = false, stored = false): Values {
   const result: Values = {};
   for (const [key, value] of Object.entries(values)) {
     const column = columns.find((item) => item.id === key);
@@ -157,7 +172,7 @@ export function validateValues(columns: Column[], values: Values, partial = fals
       if (column.type === "select" && !column.options.includes(value as string)) throw new Error(`Unknown option for ${column.name}`);
       if (column.type === "date" && (!DAY.test(value as string) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))))
         throw new Error(`Invalid date for ${column.name}`);
-      if (column.type === "url" && !isUrl(value as string)) throw new Error(`Invalid URL for ${column.name}`);
+      if (column.type === "url" && !(stored ? isUrl(value as string) : isSafeUrl(value as string))) throw new Error(`Invalid URL for ${column.name}`);
     }
     put(result, key, value);
   }
@@ -263,7 +278,7 @@ export function convertCell(cell: Cell | undefined, column: Pick<Column, "type">
     }
     case "url": {
       const url = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`;
-      return isUrl(url) && !/\s/.test(text) ? url.slice(0, 10000) : null;
+      return isSafeUrl(url) && !/\s/.test(text) ? url.slice(0, 10000) : null;
     }
     case "relation": {
       if (isRelation(cell)) return cell;
