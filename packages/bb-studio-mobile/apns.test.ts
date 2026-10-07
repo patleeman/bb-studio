@@ -177,4 +177,15 @@ describe("rememberedDevices", () => {
     );
     expect(devices).toEqual({ "apns:new": now, "apns:recent": now - 1000 });
   });
+
+  it("stores one trimmed, lowercase key per device and merges case variants", () => {
+    const now = DEVICE_TTL_MS * 2;
+    const devices = rememberedDevices(
+      { "apns:ABCD": now - 5000, "apns:abcd": now - 9000, "apns:Gone": now - 1000 },
+      [{ to: "apns: EF01 " }, { to: "apns:GONE" }],
+      [{ status: "ok" }, { status: "error", details: { error: "DeviceNotRegistered" } }],
+      now,
+    );
+    expect(devices).toEqual({ "apns:abcd": now - 5000, "apns:ef01": now });
+  });
 });

@@ -192,6 +192,11 @@ export async function sendApns(
   return result;
 }
 
+/** `apns:<token>` with the token trimmed and lowercased, so one device has one key. */
+export function normalizeDeviceKey(to: string): string {
+  return `${APNS_TOKEN_PREFIX}${to.slice(APNS_TOKEN_PREFIX.length).trim().toLowerCase()}`;
+}
+
 export function isHexToken(value: string): boolean {
   return /^[0-9a-f]{64,200}$/.test(value);
 }
@@ -202,7 +207,7 @@ export async function deliverApns(
   token: ProviderToken,
   send: ApnsSend,
 ): Promise<ExpoTicket> {
-  const deviceToken = message.to.slice(APNS_TOKEN_PREFIX.length).toLowerCase();
+  const deviceToken = normalizeDeviceKey(message.to).slice(APNS_TOKEN_PREFIX.length);
   if (!isHexToken(deviceToken)) {
     return { status: "error", message: "Malformed APNs token", details: { error: "DeviceNotRegistered" } };
   }
@@ -305,12 +310,18 @@ export function rememberedDevices(
   tickets: ExpoTicket[],
   now: number,
 ): Record<string, number> {
-  const next = { ...devices };
+  // Entries stored before normalization collapse into one key, keeping the latest sighting.
+  const next: Record<string, number> = {};
+  for (const [to, seen] of Object.entries(devices)) {
+    const key = to.startsWith(APNS_TOKEN_PREFIX) ? normalizeDeviceKey(to) : to;
+    next[key] = Math.max(next[key] ?? 0, seen);
+  }
   messages.forEach((message, index) => {
     if (!message.to.startsWith(APNS_TOKEN_PREFIX)) return;
+    const key = normalizeDeviceKey(message.to);
     const ticket = tickets[index];
-    if (ticket?.status === "ok") next[message.to] = now;
-    else if (ticket?.details?.error === "DeviceNotRegistered") delete next[message.to];
+    if (ticket?.status === "ok") next[key] = now;
+    else if (ticket?.details?.error === "DeviceNotRegistered") delete next[key];
   });
   for (const [to, seen] of Object.entries(next)) if (now - seen > DEVICE_TTL_MS) delete next[to];
   return next;
