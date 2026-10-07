@@ -80,10 +80,12 @@ final class PagesStore: ObservableObject {
             DiskCache.save(PagesSnapshot(pages: pages, projectNames: projectNames), as: PagesSnapshot.cacheKey, serverURL: serverURL)
         } catch where BBClient.isCancellation(error) {
         } catch {
-            self.error = BBClient.describe(error, server: client.baseURL)
+            self.error = BBClient.describe(error, plugin: Self.plugin, server: client.baseURL)
         }
         loaded = true
     }
+
+    static let plugin = "Studio Pages"
 
     func page(_ id: String) -> PageMeta? { pages.first { $0.id == id } }
 
@@ -154,7 +156,11 @@ struct PagesView: View {
                 }
             }
             if let error = store.error {
-                Section { PagesErrorRow(message: error) { await store.load(app.client) } }
+                if error == BBClient.missingPluginMessage(PagesStore.plugin) {
+                    Section { MissingPluginRow(message: error) }
+                } else {
+                    Section { PagesErrorRow(message: error) { await store.load(app.client) } }
+                }
             }
             if query.isEmpty {
                 ForEach(store.groups) { group in

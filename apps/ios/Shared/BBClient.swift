@@ -34,6 +34,15 @@ extension BBClient {
         return error.status == 404 || error.status == 503
     }
 
+    /// What a screen says when the plugin it needs isn't installed or running.
+    public static func missingPluginMessage(_ plugin: String) -> String { "Install \(plugin) to use this." }
+
+    /// A failed load, as a screen backed by `plugin` shows it: an install prompt
+    /// when the plugin is missing, instead of BB's raw 404 or 503 text.
+    public static func describe(_ error: Error, plugin: String, server: URL) -> String {
+        isMissingRPC(error) ? missingPluginMessage(plugin) : describe(error, server: server)
+    }
+
     /// The request never left the phone or never reached BB, so sending again can't duplicate it.
     /// Timeouts and dropped connections don't count: BB may have acted before the reply was lost.
     public static func neverArrived(_ error: Error) -> Bool {

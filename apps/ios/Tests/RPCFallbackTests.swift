@@ -79,4 +79,21 @@ final class RPCFallbackTests: XCTestCase {
         let paths = await calls.paths
         XCTAssertEqual(paths.count, 1)
     }
+
+    @MainActor
+    func testMissingPagesPluginSaysToInstallItInsteadOfRawServerText() async {
+        let original = BBClient.storedServerURL
+        defer { BBClient.storedServerURL = original }
+        let server = URL(string: "https://missing-plugin.invalid")!
+        BBClient.storedServerURL = server
+        let store = PagesStore()
+        let client = BBClient(baseURL: server)
+        client.transport = { _, _, _ in (404, Data(#"{"error":{"message":"unknown plugin: pages"}}"#.utf8)) }
+        await store.load(client)
+        XCTAssertEqual(store.error, "Install Studio Pages to use this.")
+
+        client.transport = { _, _, _ in (500, Data(#"{"error":{"message":"tree exploded"}}"#.utf8)) }
+        await store.load(client)
+        XCTAssertEqual(store.error, "tree exploded")
+    }
 }

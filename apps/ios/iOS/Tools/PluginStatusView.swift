@@ -1,5 +1,16 @@
 import SwiftUI
 
+/// Stands in for a screen's content when the plugin behind it isn't installed or running.
+struct MissingPluginRow: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "puzzlepiece.extension")
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(.secondary)
+    }
+}
+
 struct PluginStatusView: View {
     @EnvironmentObject private var app: AppModel
     @State private var plugins: [InstalledPlugin] = []

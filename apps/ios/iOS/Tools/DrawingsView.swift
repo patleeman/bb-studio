@@ -10,11 +10,16 @@ struct DrawingsView: View {
     @State private var error: String?
     @State private var deleting: DrawingSummary?
     @State private var creating = false
+    private static let plugin = "Studio Draw"
 
     var body: some View {
         List {
             if let error {
-                Section { ConnectionBanner(message: error) { await load() } }
+                if error == BBClient.missingPluginMessage(Self.plugin) {
+                    Section { MissingPluginRow(message: error) }
+                } else {
+                    Section { ConnectionBanner(message: error) { await load() } }
+                }
             }
             ForEach(drawings) { drawing in
                 NavigationLink(value: Route.drawing(id: drawing.id)) {
@@ -73,7 +78,7 @@ struct DrawingsView: View {
             error = nil
         } catch where BBClient.isCancellation(error) {
         } catch {
-            self.error = BBClient.describe(error, server: client.baseURL)
+            self.error = BBClient.describe(error, plugin: Self.plugin, server: client.baseURL)
         }
         loaded = true
     }

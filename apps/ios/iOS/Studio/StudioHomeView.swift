@@ -9,6 +9,7 @@ struct StudioHomeView: View {
     @State private var collection = true
     @State private var answering: Studio.HomeOutputNeedsYouItem?
     @State private var answer = ""
+    private static let plugin = "Studio"
 
     var body: some View {
         Group {
@@ -22,7 +23,13 @@ struct StudioHomeView: View {
                     }
             } else {
                 List {
-                    if let error { Text(error).foregroundStyle(.red) }
+                    if let error {
+                        if error == BBClient.missingPluginMessage(Self.plugin) {
+                            MissingPluginRow(message: error)
+                        } else {
+                            Text(error).foregroundStyle(.red)
+                        }
+                    }
                     if let home {
                         if let needs = home.needsYou, !needs.isEmpty {
                             Section {
@@ -155,8 +162,9 @@ struct StudioHomeView: View {
         do {
             home = try await app.client.studioHome()
             error = nil
+        } catch where BBClient.isCancellation(error) {
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, plugin: Self.plugin, server: app.client.baseURL)
         }
     }
 

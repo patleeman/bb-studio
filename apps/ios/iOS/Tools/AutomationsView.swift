@@ -9,11 +9,16 @@ struct AutomationsView: View {
     @State private var running: Automation?
     @State private var creating = false
     @State private var done = 0
+    static let plugin = "Automations"
 
     var body: some View {
         List {
             if let error {
-                Section { ConnectionBanner(message: error) { await load() } }
+                if error == BBClient.missingPluginMessage(Self.plugin) {
+                    Section { MissingPluginRow(message: error) }
+                } else {
+                    Section { ConnectionBanner(message: error) { await load() } }
+                }
             }
             ForEach(projects, id: \.self) { project in
                 Section {
@@ -85,7 +90,7 @@ struct AutomationsView: View {
             error = nil
         } catch where BBClient.isCancellation(error) {
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, plugin: Self.plugin, server: app.client.baseURL)
         }
         loaded = true
     }
