@@ -126,6 +126,20 @@ describe("table model", () => {
     expect(ids(true)).toEqual(["yes"]);
     expect(ids(true, "neq")).toEqual(["unset", "no"]);
   });
+  it("reads cells of columns named like Object built-ins as values, never inherited ones", () => {
+    const columns = [
+      { id: "constructor", name: "Constructor", type: "text" as const, options: [] },
+      { id: "__proto__", name: "Proto", type: "text" as const, options: [] },
+    ];
+    const empty = validateValues(columns, {});
+    expect(Object.hasOwn(empty, "constructor") && empty.constructor).toBeNull();
+    expect(Object.hasOwn(empty, "__proto__") && empty["__proto__"]).toBeNull();
+    const set = validateValues(columns, JSON.parse('{"__proto__":"x","constructor":"y"}'));
+    expect(JSON.parse(JSON.stringify(set))).toEqual(JSON.parse('{"__proto__":"x","constructor":"y"}'));
+    const added = withColumns({ ...table, views: [] }, [...table.columns, ...columns]);
+    expect(Object.hasOwn(added.rows[0]!.values, "constructor") && added.rows[0]!.values.constructor).toBeNull();
+    expect(Object.hasOwn(added.rows[0]!.values, "__proto__") && added.rows[0]!.values["__proto__"]).toBeNull();
+  });
   it("carries values to a new type and cleans views of removed columns", () => {
     const next = withColumns(table, [
       { id: "name", name: "Name", type: "select", options: [] },

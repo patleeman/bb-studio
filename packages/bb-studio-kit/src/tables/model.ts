@@ -124,6 +124,19 @@ function isUrl(text: string): boolean {
   }
 }
 
+/**
+ * A row's own cell: a column named like an Object built-in ("constructor")
+ * reads its value, never the inherited one.
+ */
+export function cellOf(values: Values, columnId: string): Cell | undefined {
+  return Object.hasOwn(values, columnId) ? values[columnId] : undefined;
+}
+
+/** Sets a cell as an own value, even for "__proto__". */
+function put(values: Values, columnId: string, cell: Cell): void {
+  Object.defineProperty(values, columnId, { value: cell, writable: true, enumerable: true, configurable: true });
+}
+
 export function validateValues(columns: Column[], values: Values, partial = false): Values {
   const result: Values = {};
   for (const [key, value] of Object.entries(values)) {
@@ -146,9 +159,9 @@ export function validateValues(columns: Column[], values: Values, partial = fals
         throw new Error(`Invalid date for ${column.name}`);
       if (column.type === "url" && !isUrl(value as string)) throw new Error(`Invalid URL for ${column.name}`);
     }
-    result[key] = value;
+    put(result, key, value);
   }
-  if (!partial) for (const column of columns) result[column.id] ??= null;
+  if (!partial) for (const column of columns) if (!Object.hasOwn(result, column.id)) put(result, column.id, null);
   return result;
 }
 
@@ -184,11 +197,11 @@ export function queryRows(table: Table, view?: View, filters = view?.filters ?? 
     if (!table.columns.some((column) => column.id === sort.columnId)) throw new Error(`Unknown sort column: ${sort.columnId}`);
   const order = new Map(table.rows.map((row, index) => [row.id, index]));
   return table.rows
-    .filter((row) => filters.every((filter) => matches(row.values[filter.columnId], filter)))
+    .filter((row) => filters.every((filter) => matches(cellOf(row.values, filter.columnId), filter)))
     .sort((a, b) => {
       for (const { columnId, direction } of sorts) {
-        const left = a.values[columnId];
-        const right = b.values[columnId];
+        const left = cellOf(a.values, columnId);
+        const right = cellOf(b.values, columnId);
         const result = compareCells(left, right);
         // Empty cells stay last either way.
         if (result) return direction === "asc" || isEmpty(left) || isEmpty(right) ? result : -result;
@@ -212,7 +225,7 @@ export function titleColumn(table: Pick<Table, "columns">): Column | undefined {
 
 export function rowTitle(table: Pick<Table, "columns">, row: Row): string {
   const column = titleColumn(table);
-  return (column && cellText(row.values[column.id])) || "Untitled";
+  return (column && cellText(cellOf(row.values, column.id))) || "Untitled";
 }
 
 /**
@@ -268,7 +281,7 @@ export function withOptions(columns: Column[], values: readonly Values[]): Colum
     if (column.type !== "select" && column.type !== "multi-select") return column;
     const options = [...column.options];
     for (const each of values) {
-      const cell = each[column.id];
+      const cell = cellOf(each, column.id);
       for (const option of typeof cell === "string" ? [cell] : Array.isArray(cell) ? cell : [])
         if (!options.includes(option) && options.length < 100) options.push(option);
     }
@@ -307,8 +320,8 @@ export function withColumns(table: Table, next: Column[]): Pick<Table, "columns"
   const converted = table.rows.map((row) => {
     const values: Values = {};
     for (const column of next) {
-      const cell = row.values[column.id];
-      values[column.id] = retyped.has(column.id) ? convertCell(cell, column) : (cell ?? null);
+      const cell = cellOf(row.values, column.id);
+      put(values, column.id, retyped.has(column.id) ? convertCell(cell, column) : (cell ?? null));
     }
     return { row, values };
   });
@@ -317,11 +330,11 @@ export function withColumns(table: Table, next: Column[]): Pick<Table, "columns"
   const merged = next.map((column) => columns.find((each) => each.id === column.id) ?? column);
   const rows = converted.map(({ row, values }) => {
     for (const column of merged) {
-      const cell = values[column.id];
-      if (column.type === "select" && typeof cell === "string" && !column.options.includes(cell)) values[column.id] = null;
+      const cell = cellOf(values, column.id);
+      if (column.type === "select" && typeof cell === "string" && !column.options.includes(cell)) put(values, column.id, null);
       if (column.type === "multi-select" && Array.isArray(cell)) {
         const kept = cell.filter((option) => column.options.includes(option));
-        values[column.id] = kept.length ? kept : null;
+        put(values, column.id, kept.length ? kept : null);
       }
     }
     return { ...row, values };
@@ -391,7 +404,7 @@ export function markdown(table: Table, rows = table.rows): string {
     "",
     `| ${table.columns.map((column) => escape(column.name)).join(" | ")} |`,
     `| ${table.columns.map(() => "---").join(" | ")} |`,
-    ...rows.map((row) => `| ${table.columns.map((column) => escape(cellText(row.values[column.id]))).join(" | ")} |`),
+    ...rows.map((row) => `| ${table.columns.map((column) => escape(cellText(cellOf(row.values, column.id)))).join(" | ")} |`),
   ].join("\n");
 }
 
@@ -400,7 +413,7 @@ export function csv(table: Table, rows = table.rows): string {
   return (
     [
       table.columns.map((column) => quote(column.name)).join(","),
-      ...rows.map((row) => table.columns.map((column) => quote(cellText(row.values[column.id]))).join(",")),
+      ...rows.map((row) => table.columns.map((column) => quote(cellText(cellOf(row.values, column.id)))).join(",")),
     ].join("\r\n") + "\r\n"
   );
 }
