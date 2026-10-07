@@ -7,6 +7,7 @@
   "description": "Shared contract and UI for BB Studio plugins. Bundled into each Studio plugin; not a plugin itself.",
   "exports": {
     "./contract": "./src/contract.ts",
+    "./backup": "./src/backup.ts",
     "./decisions-contract": "./src/decisions-contract.ts",
     "./decisions": "./src/decisions.ts",
     "./server": "./src/server/index.ts",

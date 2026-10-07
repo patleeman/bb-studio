@@ -10,3 +10,4 @@ export { studioServices, type StudioActivity, type StudioLink, type StudioRef } 
 export { displayPath, readThreadFile, resolveSource, threadRoots, type ResolvedSource, type SourceRoot } from "./thread-files";
 export { personalProjectId, primaryHostId } from "./project";
 export { indexItem, studioIndex, type StudioIndexItem } from "./studio-index";
+export { backupSectionDir, backupSessionRoot, BackupReader, BackupWriter, fileSafeId, registerStudioBackup, runBackup, runRestore, sectionPath, type BackupHandlers } from "./backup";
