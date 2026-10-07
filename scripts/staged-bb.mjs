@@ -17,16 +17,27 @@
  * every start seeds the same state.
  */
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { cp, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { createServer } from "node:net";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoSource = "git:github.com/patleeman/bb-studio";
 const releaseFeedUrl = "https://github.com/get-bb/bb/releases/download/desktop-latest/latest-mac.yml";
-const stagedDir = process.env.BB_STAGED_DIR ?? join(tmpdir(), "bb-studio-staged");
+const stagedDir = resolve(process.env.BB_STAGED_DIR || join(tmpdir(), "bb-studio-staged"));
+// start and stop delete stagedDir: refuse anything that holds the repository,
+// the home directory, the current directory, or the BB you work in.
+{
+  const within = (child, parent) => !relative(parent, child).startsWith("..") && !relative(parent, child).startsWith(sep);
+  const realBB = join(homedir(), ".bb");
+  const unsafe = [repoRoot, homedir(), process.cwd()].some((path) => within(path, stagedDir)) || within(stagedDir, realBB);
+  if (unsafe || stagedDir === dirname(stagedDir)) throw new Error(`Refusing to use ${stagedDir} as BB_STAGED_DIR: it would delete the repository, your home directory, or ~/.bb.`);
+}
 const port = Number(process.env.BB_STAGED_PORT ?? "48986");
+if (!Number.isInteger(port) || port < 1024 || port > 65533) throw new Error(`BB_STAGED_PORT must be a port from 1024 to 65533, not ${process.env.BB_STAGED_PORT}`);
 const serverUrl = `http://127.0.0.1:${port}`;
 const dataDir = join(stagedDir, "data");
 const binDir = join(stagedDir, "bb-app", "node_modules", ".bin");
@@ -92,6 +103,15 @@ async function healthy() {
   } catch {
     return false;
   }
+}
+
+/** Whether nothing listens on 127.0.0.1:port, so the staged BB can't reach another server. */
+function portFree(candidate) {
+  return new Promise((resolvePromise) => {
+    const server = createServer();
+    server.once("error", () => resolvePromise(false));
+    server.listen(candidate, "127.0.0.1", () => server.close(() => resolvePromise(true)));
+  });
 }
 
 async function stableVersion() {
@@ -206,6 +226,11 @@ async function start() {
   const refFlag = process.argv.indexOf("--ref");
   const ref = await pushedRef(refFlag >= 0 ? process.argv[refFlag + 1] : "HEAD");
   if (await healthy()) throw new Error(`Something already answers at ${serverUrl}. Run stop, or set BB_STAGED_PORT.`);
+  // Anything else on these ports (another BB that rejects /health, a Chrome
+  // with remote debugging) would receive the staged CLI calls and captures.
+  for (const candidate of [port, port + 1, port + 2]) {
+    if (!(await portFree(candidate))) throw new Error(`Port ${candidate} is in use. Set BB_STAGED_PORT to a free range of three ports.`);
+  }
   await rm(stagedDir, { recursive: true, force: true });
   await mkdir(stagedDir, { recursive: true });
 
@@ -221,6 +246,30 @@ async function start() {
   );
   launcher.unref();
   await log.close();
+  // From here a failure or Ctrl-C stops the staged BB instead of leaving it
+  // running; the directory stays for launcher.log until stop.
+  const stopLaunched = async () => {
+    await run(join(binDir, "bb-app"), ["stop", "--data-dir", dataDir], { quiet: true }).catch(() => {});
+  };
+  const interrupted = async () => {
+    await stopLaunched();
+    process.exit(130);
+  };
+  process.once("SIGINT", interrupted);
+  process.once("SIGTERM", interrupted);
+  try {
+    await seed({ plugins, capturePlugin, ref, version });
+  } catch (error) {
+    process.stderr.write(`Start failed; stopping the staged BB. Logs: ${join(stagedDir, "launcher.log")}\n`);
+    await stopLaunched();
+    throw error;
+  } finally {
+    process.off("SIGINT", interrupted);
+    process.off("SIGTERM", interrupted);
+  }
+}
+
+async function seed({ plugins, capturePlugin, ref, version }) {
   const started = Date.now();
   while (!(await healthy())) {
     if (Date.now() - started > 120000) throw new Error(`BB didn't start; see ${join(stagedDir, "launcher.log")}`);
@@ -287,7 +336,15 @@ async function start() {
 }
 
 async function stop() {
-  if (await healthy()) await run(join(binDir, "bb-app"), ["stop", "--data-dir", dataDir]);
+  // Stop even when /health doesn't answer (still starting, or wedged), so
+  // deleting the directory can't orphan a running BB.
+  if (existsSync(join(binDir, "bb-app"))) {
+    try {
+      await run(join(binDir, "bb-app"), ["stop", "--data-dir", dataDir]);
+    } catch (error) {
+      if (await healthy()) throw error;
+    }
+  }
   await rm(stagedDir, { recursive: true, force: true });
   process.stdout.write(`Stopped the staged BB and removed ${stagedDir}\n`);
 }
