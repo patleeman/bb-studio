@@ -396,6 +396,7 @@ export default async function plugin(bb: BbPluginApi) {
     { auth: "token" },
   );
 
+  let mutedQueue: Promise<unknown> = Promise.resolve();
   bb.rpc.register(mobileContract, {
     async notify(input) {
       if (isQuietCompletion({ body: input.body, data: { kind: input.kind } })) return { ok: true as const, sent: 0 };
@@ -418,12 +419,17 @@ export default async function plugin(bb: BbPluginApi) {
     async mute_list() {
       return { threadIds: (await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? [] };
     },
-    async mute_set(input) {
-      const current = (await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? [];
-      const rest = current.filter((id) => id !== input.threadId);
-      const threadIds = input.muted ? [...rest, input.threadId].slice(-MAX_MUTED) : rest;
-      await bb.storage.kv.set(MUTED_KEY, threadIds);
-      return { threadIds };
+    mute_set(input) {
+      // Serialized so quick toggles from several devices never overwrite each other.
+      const next = mutedQueue.then(async () => {
+        const current = (await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? [];
+        const rest = current.filter((id) => id !== input.threadId);
+        const threadIds = input.muted ? [...rest, input.threadId].slice(-MAX_MUTED) : rest;
+        await bb.storage.kv.set(MUTED_KEY, threadIds);
+        return { threadIds };
+      });
+      mutedQueue = next.catch(() => {});
+      return next;
     },
   });
 

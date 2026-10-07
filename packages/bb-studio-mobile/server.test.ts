@@ -140,6 +140,17 @@ describe("notify", () => {
   });
 });
 
+describe("muting", () => {
+  it("keeps every thread when mutes arrive at the same time", async () => {
+    const host = createFakePluginHost({ pluginId: "mobile" });
+    await plugin(host.bb);
+    try {
+      await Promise.all(["thr_a", "thr_b", "thr_c"].map((threadId) => host.harness.behavior.callRpc("mute_set", { threadId, muted: true })));
+      expect([...((await host.bb.storage.kv.get<string[]>("muted-threads")) ?? [])].sort()).toEqual(["thr_a", "thr_b", "thr_c"]);
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+});
+
 describe("clearing notifications", () => {
   async function clearingHost(interactions: () => Promise<never[]>) {
     const key = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
