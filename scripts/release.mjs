@@ -12,7 +12,7 @@
 // (unless --skip-tests), and with --solo the one-plugin-at-a-time install check.
 // Then origin/stable moves to it. Never force: a non-fast-forward is refused.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,6 +87,20 @@ try {
         step(`${name} tests`, bin("vitest"), ["run", ...(config ? ["--config", config] : [])], dir);
       }
     }
+  }
+  // Build each plugin the way BB installs it from Git: its package directory
+  // alone beside the packed kit, `npm install --omit=dev` as BB runs it, then
+  // `bb plugin build`. The workspace's shared node_modules can hide a missing
+  // dependency or a frontend import that only resolves there.
+  const plugins = JSON.parse(execFileSync("git", ["show", `${sha}:.bb/plugins.json`], { cwd: repo, encoding: "utf8" })).plugins;
+  const builds = join(work, "builds");
+  for (const { name, source } of plugins) {
+    const dir = join(builds, "packages", source.replace(/^\.\/packages\//, ""));
+    mkdirSync(join(builds, "packages"), { recursive: true });
+    cpSync(join(tree, source), dir, { recursive: true, filter: (path) => !/\/(node_modules|dist)(\/|$)/.test(path.slice(join(tree, source).length)) });
+    if (!existsSync(join(builds, "packages", "bb-studio-kit.tgz"))) cpSync(join(tree, "packages", "bb-studio-kit.tgz"), join(builds, "packages", "bb-studio-kit.tgz"));
+    // Same command BB runs (apps/server/src/services/plugins/git-plugin-dependencies.ts).
+    if (step(`${name} clean install`, "npm", ["install", "--prefix", dir, "--ignore-scripts", "--omit=dev", "--omit=optional", "--no-audit", "--no-fund"], dir)) step(`${name} build`, "bb", ["plugin", "build", "."], dir);
   }
   if (flag("--solo")) {
     const solo = join(tree, "scripts", "solo-check.mjs");
