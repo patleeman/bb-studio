@@ -11,10 +11,11 @@ import { errorMessage } from "@bb-studio/kit/format";
 // Studio's collection (src/server/studio.ts).
 import { basename } from "node:path";
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { createChangeBus, studioServices } from "@bb-studio/kit/server";
+import { createChangeBus, registerStudioBackup, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext } from "./lib/mention";
+import { artifactBackupHandlers } from "./src/server/backup";
 import { contentHeaders, utf8Prefix, withQuoteScript } from "./src/server/content";
 import { importedFile } from "./src/server/import-file";
 import { pageMarkdown } from "./src/server/page";
@@ -437,6 +438,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   registerStudio(bb, studio, { store, changed });
+  registerStudioBackup(bb, z, artifactBackupHandlers(z, { db, store, changed }));
 
   // A version's bytes, for images, the HTML and PDF viewers, and Download.
   // Headers (a sandbox CSP on everything that isn't a real PDF) are in
