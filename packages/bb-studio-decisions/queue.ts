@@ -111,6 +111,8 @@ export class SmartQueue {
   private readonly batching = new Map<string, AbortController>();
   /** Threads whose next turn is arranged; cleared once the thread is busy again. */
   private readonly batched = new Set<string>();
+  /** When tracked rows were sent or cancelled, so a queue snapshot listed earlier cannot bring them back. */
+  private readonly departed = new Map<string, number>();
   private readonly now: () => number;
 
   constructor(private readonly deps: SmartQueueDeps) {
@@ -190,12 +192,13 @@ export class SmartQueue {
   sync(rows: readonly QueuedRow[], listedAt: number) {
     const live = new Map(rows.map((row) => [row.id, row]));
     for (const id of this.routed) if (!live.has(id)) this.routed.delete(id);
+    for (const [id, at] of this.departed) if (at < listedAt) this.departed.delete(id);
     for (const [id, entry] of this.entries) {
       if (entry.seenAt >= listedAt) continue;
       const row = live.get(id);
-      if (!row || !row.editable || rowText(row) !== entry.text) this.gone({ id });
+      if (!row || !row.editable || rowText(row) !== entry.text) this.drop(id);
     }
-    for (const row of rows) this.queued(row);
+    for (const row of rows) if (!this.departed.has(row.id)) this.queued(row);
   }
 
   /** `message.queued`: decide each owner row this plugin holds, and route the ones core queued. */
@@ -385,11 +388,16 @@ export class SmartQueue {
 
   /** `message.dispatched` and `message.cancelled`. */
   gone(row: Pick<QueuedRow, "id">) {
-    this.routed.delete(row.id);
-    const entry = this.entries.get(row.id);
+    if (this.entries.has(row.id) || this.routed.has(row.id)) this.departed.set(row.id, this.now());
+    this.drop(row.id);
+  }
+
+  private drop(id: string) {
+    this.routed.delete(id);
+    const entry = this.entries.get(id);
     if (entry?.state === "pending") entry.controller.abort();
     entry?.finish();
-    this.entries.delete(row.id);
+    this.entries.delete(id);
   }
 
   /** `thread.idle` and `thread.failed`: release the follow-ups held for this thread. */

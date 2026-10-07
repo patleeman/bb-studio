@@ -505,3 +505,19 @@ test("visible bot profile threads use Smart Queue for owner sends", async()=>{
  const decision=await queue.dispatch(context({thread:thread({originPluginId:"bot-teams"})}));
  assert.equal(decision.action,"wait");
 });
+
+test("a snapshot taken before a row was sent does not decide it again", async () => {
+  const { queue, calls, advance } = harness(followup);
+  queue.queued(row());
+  await settle();
+  assert.equal(calls.classified, 1);
+  // The watcher lists the queue, then the row is sent before the list returns.
+  const listedAt = 1_000;
+  advance(10);
+  queue.gone(row());
+  queue.sync([row()], listedAt);
+  await settle();
+  assert.equal(calls.classified, 1, "the sent row is not classified twice");
+  assert.equal(calls.records.length, 1);
+  assert.equal(queue.entries.size, 0);
+});
