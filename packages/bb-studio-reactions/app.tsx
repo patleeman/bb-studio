@@ -78,13 +78,14 @@ function draftReaction(
     quoteSelection &&
     selectedText !== null &&
     selectedText.trim().length > 0;
+  const draftBeforeQuote = composer.text;
   if (quoted) {
     // `addQuote` appends the quote block to the draft; composeReactionDraft
     // then slots the reaction text in before or after it.
     composer.addQuote(selectedText);
   }
   composer.updateText((current) =>
-    composeReactionDraft(current, itemText, quoted, quotePosition),
+    composeReactionDraft(current, itemText, quoted, quotePosition, draftBeforeQuote),
   );
   composer.focus();
 }

@@ -33,6 +33,13 @@ describe("composeReactionDraft", () => {
     );
   });
 
+  it("keeps the reaction next to its quote after an existing draft with quotePosition after", () => {
+    // `addQuote` appends the quote below what the user already typed.
+    expect(
+      composeReactionDraft("my notes\n> selected text\n", "👍 Agree", true, "after", "my notes"),
+    ).toBe("my notes\n\n👍 Agree\n\n> selected text\n");
+  });
+
   it("appends the reaction when there is no quote, regardless of position", () => {
     expect(composeReactionDraft("existing draft", "👍 Agree", false, "before")).toBe(
       "existing draft\n\n👍 Agree",

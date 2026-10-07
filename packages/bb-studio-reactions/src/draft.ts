@@ -19,18 +19,30 @@ export function parseQuotePosition(raw: unknown): QuotePosition {
  * stands once the quote block (if any) has been added; `reaction` is the
  * trimmed reaction text; `hasQuote` tells whether a quote block is present
  * (the position only applies when there is a quote to position).
+ * `draftBeforeQuote` is the draft as it stood before the quote was appended,
+ * so "after" puts the reaction between that text and its quote instead of
+ * above the user's existing draft.
  */
 export function composeReactionDraft(
   current: string,
   reaction: string,
   hasQuote: boolean,
   quotePosition: QuotePosition,
+  draftBeforeQuote = "",
 ): string {
   const trimmed = reaction.trim();
   if (trimmed.length === 0) return current;
   if (current.length === 0) return trimmed;
   // "after" = the quote sits AFTER the reaction text → reaction goes first.
-  return hasQuote && quotePosition === "after"
-    ? `${trimmed}\n\n${current}`
-    : `${current}\n\n${trimmed}`;
+  if (hasQuote && quotePosition === "after") {
+    const kept =
+      draftBeforeQuote.trim().length > 0 && current.startsWith(draftBeforeQuote)
+        ? draftBeforeQuote
+        : "";
+    const quote = current.slice(kept.length).replace(/^\s+/, "");
+    return kept.length > 0
+      ? `${kept.trimEnd()}\n\n${trimmed}\n\n${quote}`
+      : `${trimmed}\n\n${quote}`;
+  }
+  return `${current}\n\n${trimmed}`;
 }
