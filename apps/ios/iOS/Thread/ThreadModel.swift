@@ -73,6 +73,8 @@ final class ThreadModel: ObservableObject {
     private var loadingOlder = false
     private var listener: UUID?
     private var refreshTask: Task<Void, Never>?
+    /// Bumped when a refresh loop is abandoned, so it doesn't clear its successor's slot.
+    private var refreshRun = 0
     /// Change kinds waiting for the next refresh; nil refreshes everything.
     private var pending: Set<String>? = []
     /// What the newest page was built from: its `maxSeq`, for asking only for what
@@ -130,6 +132,11 @@ final class ThreadModel: ObservableObject {
         if readPending {
             Task { await markRead(client, force: true) }
         }
+        // A refresh still running would mark rows read that nobody saw.
+        refreshRun += 1
+        refreshTask?.cancel()
+        refreshTask = nil
+        pending = []
         realtime?.unsubscribeThread(threadId)
         if let listener { realtime?.removeListener(listener) }
     }
@@ -211,17 +218,19 @@ final class ThreadModel: ObservableObject {
 
     /// Streaming output arrives as a burst of change signals; coalesce them into
     /// at most one refresh every ~150ms.
-    private func scheduleRefresh(_ changes: Set<String>?) {
+    func scheduleRefresh(_ changes: Set<String>?) {
         if let changes, let known = pending { pending = known.union(changes) } else { pending = nil }
         guard refreshTask == nil else { return }
+        let run = refreshRun
         refreshTask = Task {
-            while pending?.isEmpty != true {
+            while !Task.isCancelled, pending?.isEmpty != true {
                 try? await Task.sleep(for: .milliseconds(150))
+                if Task.isCancelled { break }
                 let changes = pending
                 pending = []
                 await refresh(changes)
             }
-            refreshTask = nil
+            if run == refreshRun { refreshTask = nil }
         }
     }
 
@@ -246,7 +255,7 @@ final class ThreadModel: ObservableObject {
             if let thread = try await thread { self.thread = thread }
             error = nil
             if touched("interactions-changed", "queue-changed", "status-changed") { await loadInteractions() }
-            if grew {
+            if grew, !Task.isCancelled {
                 cache(force: false)
                 await markRead(client)
             }

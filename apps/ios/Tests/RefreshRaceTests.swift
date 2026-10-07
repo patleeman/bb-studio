@@ -68,6 +68,26 @@ final class RefreshRaceTests: XCTestCase {
     }
 
     @MainActor
+    func testLeavingAThreadStopsAPendingRefreshFromMarkingItRead() async {
+        let client = BBClient(baseURL: server)
+        let reads = LockedCounter()
+        client.transport = { method, path, _ in
+            if path.hasPrefix("/api/v1/threads/thr_leave/timeline") {
+                try await Task.sleep(for: .milliseconds(100))
+                return (200, Data(#"{"rows":[{"id":"r1","kind":"conversation","role":"assistant","text":"new"}],"maxSeq":1}"#.utf8))
+            }
+            if method == "POST", path == "/api/v1/threads/thr_leave/read" { _ = reads.next() }
+            return (404, Data(#"{"error":{"message":"not here"}}"#.utf8))
+        }
+        let model = ThreadModel(threadId: "thr_leave", client: client)
+        model.scheduleRefresh(["events-appended"])
+        try? await Task.sleep(for: .milliseconds(200))
+        model.detach()
+        try? await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(reads.next(), 1, "A refresh after leaving marked the thread read")
+    }
+
+    @MainActor
     func testSlowFirstLoadCannotOverwriteANewerRefresh() async {
         let client = BBClient(baseURL: server)
         let calls = LockedCounter()
