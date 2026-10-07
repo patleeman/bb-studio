@@ -89,7 +89,6 @@ export default async function plugin(bb: BbPluginApi) {
     );
   });
 
-
   bb.agents.configure(() => {
     // Recheck for the next session; this one uses the latest answer.
     void nextRow.refresh();
