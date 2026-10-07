@@ -9,6 +9,7 @@ const setup = vi.hoisted(() => ({
   checkAgain: vi.fn(), install: vi.fn(async () => {}), enable: vi.fn(async () => {}), remove: vi.fn(async () => {}),
 }));
 vi.mock("./use-setup", () => ({ useSetup: () => setup }));
+vi.mock("./BackupSection", () => ({ BackupSection: () => null }));
 vi.mock("../health/use-health", () => ({ useHealth: () => ({}) }));
 vi.mock("../health/HealthViews", () => ({ ProblemRow: ({ problem }: { problem: { title: string } }) => React.createElement("li", null, problem.title) }));
 vi.mock("@bb-studio/kit/ui", () => ({

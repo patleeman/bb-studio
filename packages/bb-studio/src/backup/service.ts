@@ -319,7 +319,6 @@ export function formatRestore(summary: RestoreSummary): string {
     lines.push("Projects not on this BB; their items are global items now (move them with bb studio move):");
     for (const project of summary.projects.unmapped) lines.push(`  ${project.name}${project.path ? ` (${project.path})` : ""}`);
   }
-  if (summary.dryRun) lines.push("Run again without --dry-run to restore.");
   return `${lines.join("\n")}\n`;
 }
 

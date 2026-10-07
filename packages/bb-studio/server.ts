@@ -68,6 +68,11 @@ import { HealthMonitor } from "./src/health";
 import { healthContract } from "./src/health-contract";
 import { formatSetup, SetupService } from "./src/setup";
 import { setupContract } from "./src/setup-contract";
+import { BackupService, formatBackup, formatRestore, restoreFailed } from "./src/backup/service";
+import { studioDataBackup } from "./src/backup/studio-data";
+import { backupFileName, registerBackup } from "./src/backup/register";
+import { stat as statPath } from "node:fs/promises";
+import { isAbsolute, resolve as resolvePath } from "node:path";
 
 /** How often Studio re-checks plugin health on its own. */
 const HEALTH_INTERVAL_MS = 3 * 60_000;
@@ -997,6 +1002,28 @@ export default async function plugin(bb: BbPluginApi) {
     "setup.remove": ({ pluginId }) => setup.remove(pluginId),
   });
 
+  // Backup and restore of every Studio item (src/backup/, docs/backup.md).
+  const threadExists = (threadId: string) => bb.sdk.threads.get({ threadId }).then((thread) => thread.deletedAt == null, () => false);
+  const backups = new BackupService({
+    dataDir: bb.server.experimental_dataDir,
+    sdk: bb.sdk,
+    bbVersion: () => Promise.race([
+      bb.sdk.system.version().then((version) => version.currentVersion),
+      new Promise<null>((done) => setTimeout(() => done(null), 3000)),
+    ]),
+    studioData: studioDataBackup(db, {
+      threadExists,
+      changed: () => {
+        changes.append(null);
+        bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+        void searchIndex.rebuild().catch((error) => bb.log.warn(`Reindex after restore failed: ${errorText(error)}`));
+      },
+    }),
+  });
+  registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));
+  /** A CLI path, relative to where the command ran. */
+  const cliPath = (path: string, cwd: string | undefined) => (isAbsolute(path) ? path : resolvePath(cwd ?? homedir(), path));
+
   bb.cli.register({
     name: "studio",
     summary: "List BB Studio items across Pages, Talk, Draw and other add-ons",
@@ -1009,6 +1036,8 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "health", summary: "Check every plugin for setup problems and failures", usage: "bb studio health [--json]" },
       { name: "setup", summary: "Show which BB Studio add-ons are installed and working, and the commands to finish setup", usage: "bb studio setup [--json]" },
       { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
+      { name: "backup", summary: "Save every Studio item, from every add-on, into one .zip file", usage: "bb studio backup [--out <file|folder>]" },
+      { name: "restore", summary: "Restore a Studio backup; shows what would change first", usage: "bb studio restore <file> [--dry-run | --yes]" },
       { name: "retitle", summary: "Give threads a short title now and keep it current as they grow", usage: "bb studio retitle (<thread-id>… | --self | --recent <count>)" },
     ],
     async run(argv, ctx) {
@@ -1017,6 +1046,8 @@ export default async function plugin(bb: BbPluginApi) {
         list: "bb studio list [query…] [--all] [--json] [--space <name>] [--kind <kind>] [--tag <tag>] [--query <text>]",
         move: "bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)",
         retitle: "bb studio retitle (<thread-id>… | --self | --recent <count>)",
+        backup: "bb studio backup [--out <file|folder>]",
+        restore: "bb studio restore <file> [--dry-run | --yes]",
       };
       const SPECS: Record<string, CliSpec> = {
         list: { flags: ["--json", "--all"], options: ["--space", "--kind", "--tag", "--query"] },
@@ -1024,9 +1055,11 @@ export default async function plugin(bb: BbPluginApi) {
         setup: { flags: ["--json"] },
         move: { options: ["--space", "--project"] },
         retitle: { flags: ["--self"], options: ["--recent"] },
+        backup: { options: ["--out"] },
+        restore: { flags: ["--dry-run", "--yes"] },
       };
       const parsed = parseCliArgs(raw, SPECS[command ?? ""] ?? {});
-      const known = ["list", "tags", "spaces", "move", "providers", "health", "setup", "reindex", "retitle"].includes(command ?? "");
+      const known = ["list", "tags", "spaces", "move", "providers", "health", "setup", "reindex", "retitle", "backup", "restore"].includes(command ?? "");
       if (!parsed.ok && known) return usage(`${USAGE[command!] ?? `bb studio ${command}`}\n${parsed.error}`);
       const rest = parsed.ok ? parsed.positional : [];
       const flag = (name: string) => parsed.ok && parsed.flags.has(name);
@@ -1098,6 +1131,24 @@ export default async function plugin(bb: BbPluginApi) {
           case "setup": {
             const summary = await setup.summary(0);
             return { exitCode: 0, stdout: flag("--json") ? `${JSON.stringify(summary, null, 2)}\n` : formatSetup(summary) };
+          }
+          case "backup": {
+            if (rest.length) return usage(USAGE.backup!);
+            const requested = option("--out");
+            let out = cliPath(requested ?? backupFileName(), ctx.cwd);
+            if (requested && (await statPath(out).catch(() => null))?.isDirectory()) out = join(out, backupFileName());
+            if (await statPath(out).catch(() => null)) return { exitCode: 1, stderr: `${out} already exists; choose another --out.\n` };
+            const summary = await backups.backup(out);
+            const failed = summary.manifest.sections.some((section) => section.status === "failed");
+            return { exitCode: failed ? 1 : 0, stdout: formatBackup(summary) };
+          }
+          case "restore": {
+            if (rest.length !== 1 || (flag("--dry-run") && flag("--yes"))) return usage(USAGE.restore!);
+            // Without --yes it only shows what would change.
+            const dryRun = !flag("--yes");
+            const summary = await backups.restore(cliPath(rest[0]!, ctx.cwd), { dryRun });
+            const text = formatRestore(summary) + (dryRun ? "Run again with --yes to restore.\n" : "");
+            return { exitCode: restoreFailed(summary) ? 1 : 0, stdout: text };
           }
           case "reindex": {
             const count = await searchIndex.rebuild();
