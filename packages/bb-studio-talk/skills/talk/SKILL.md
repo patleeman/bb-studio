@@ -22,7 +22,13 @@ pages. The CLI is also available.
 bb talk list [--query <text>] [--json]     # 50 most recent, or matches in titles and transcripts
 bb talk show <recording-id> [--json]       # status, length, words, segment counts, link
 bb talk transcript <recording-id> [--cleaned] [--offset <chars>] [--limit <chars>]
+bb talk notes <recording-id> [--json]      # make or update the recording's notes page in Studio Pages
 ```
+
+To turn a finished recording into notes (summary, decisions, and action items
+as a Pages checklist), use `talk_make_notes` or `bb talk notes`. Running it
+again updates the same page. It needs Studio Pages; without it, the error
+says to install Studio Pages.
 
 `transcript` prints 20,000 characters by default (at most 60,000) and ends
 with the command for the next page. It prints the original transcript;

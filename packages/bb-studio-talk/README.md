@@ -170,10 +170,22 @@ The same message at a 390-pixel viewport, with the source pill in view.
   **Automatically summarize recordings** in settings to summarize when a
   recording finishes. Saved summaries stay collapsed until you open them and
   can be regenerated.
+- **Notes pages.** On a finished recording, **Make notes** writes a Studio
+  Page with a short summary, the decisions made, and the action items as a
+  checklist, so you can hand any item to an agent from the page. The page
+  links back to the recording, and the recording shows **Open notes**.
+  Running it again shows **Update notes** and rewrites the same page: Pages
+  saves a version first, and action items you checked off or handed to an
+  agent keep their state. Notes use the Summaries model through Studio
+  Decisions. Long transcripts are read in parts of about 30,000 characters
+  and combined; past six parts, the page says the notes cover the first part.
+  Without Studio Pages, the button is disabled and says
+  "Install Studio Pages to make notes."
 - **Exports.** Download a finished transcript as Markdown or plain text, or
   download its original audio segments together as a tar archive.
 - **Agent tools.** `talk_list`, `talk_read`, and `talk_search` let agents find
-  and read bounded portions of recordings and summaries.
+  and read bounded portions of recordings and summaries. `talk_make_notes`
+  makes or updates a recording's notes page.
 - **Mobile layout.** The pill, Recordings page, and composer mic all work in
   the BB mobile app, with larger touch targets on small screens.
 
@@ -238,7 +250,7 @@ The same message at a 390-pixel viewport, with the source pill in view.
 | Automatically summarize recordings | off | Summarizes on completion; the recording menu can summarize on demand. |
 | Cleanup model | Studio Decisions | Provider, model, reasoning, and supported service tier for dictation and saved-transcript cleanup. |
 | Titles model | Studio Decisions | Model for automatic recording titles. |
-| Summaries model | Studio Decisions | Model for automatic and on-demand summaries. |
+| Summaries model | Studio Decisions | Model for automatic and on-demand summaries, and for notes pages. |
 | Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
 | Keep dictation audio (days) | 1 | Deletes a finished dictation's audio after this many days. 0 keeps it. |
 
@@ -261,6 +273,7 @@ From a terminal or an agent:
 bb talk list [--query <text>] [--json]
 bb talk show <recording-id> [--json]
 bb talk transcript <recording-id> [--cleaned] [--offset <chars>] [--limit <chars>]
+bb talk notes <recording-id> [--json]
 ```
 
 The bundled `talk` skill documents these for agents.
@@ -316,6 +329,9 @@ DOM, defined in [src/client/fields.ts](src/client/fields.ts):
 - **Summaries.** They need Studio Decisions and its configured fallback
   model. If generation fails, use **Generate** or **Regenerate** in the
   recording menu after the model is available.
+- **Notes pages.** They need Studio Pages and Studio Decisions. Updating
+  notes replaces the page's text with fresh notes; restore an earlier version
+  from the page's history to get your edits back.
 - **Personal project threads.** Titling runs hidden agent threads in BB's
   Personal project.
 

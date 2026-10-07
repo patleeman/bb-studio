@@ -218,7 +218,11 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
     setup: async (client) => {
       const recordingId = await seedTalkRecording(projectId);
       const original = await talkRpc("recording_get", { id: recordingId });
-      const cleanup = async () => { await talkRpc("recording_delete", { id: recordingId }); };
+      let notesPageId = null;
+      const cleanup = async () => {
+        await talkRpc("recording_delete", { id: recordingId });
+        if (notesPageId) await pluginRpc("pages", "remove", { id: notesPageId }).catch(() => {});
+      };
       try {
         // Summaries are optional. Generate this fixture's summary explicitly.
         await talkRpc("meeting_regenerate", { id: recordingId });
@@ -229,6 +233,19 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         await client.waitForText("Summary");
         const notes = await client.evaluate(`document.querySelector('details[aria-label="Summary"] p')?.textContent?.trim() ?? ""`);
         if (!notes || notes.startsWith("Notes appear")) throw new Error("Seeded recording summary is missing.");
+        // Make notes writes one Studio Page with a checklist and links both ways.
+        await client.clickButtonText("Make notes");
+        await client.waitForText("Open notes", 180000);
+        const { recording: withNotes } = await talkRpc("recording_get", { id: recordingId });
+        if (!withNotes.notesPageId) throw new Error("Make notes did not save the notes page on the recording.");
+        notesPageId = withNotes.notesPageId;
+        const { markdown: notesMarkdown } = await pluginRpc("pages", "markdown", { id: notesPageId });
+        if (!notesMarkdown.includes(`(item:talk:${recordingId})`) || !/## Action items\n\n- \[ \] /.test(notesMarkdown) || !notesMarkdown.includes("## Decisions")) {
+          throw new Error(`The notes page is missing its recording link, decisions, or action-item checklist: ${notesMarkdown}`);
+        }
+        await client.waitForText("Update notes");
+        const { pageId: updatedPageId, created: createdAgain } = await talkRpc("notes_make", { id: recordingId });
+        if (updatedPageId !== notesPageId || createdAgain) throw new Error("Updating notes made a second page.");
         await client.waitForSelector('input[aria-label="Recording position"]');
         await client.waitForSelector('input[aria-label="Playback volume"]');
         await client.waitForText("Send to agent");
