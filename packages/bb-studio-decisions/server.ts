@@ -173,13 +173,14 @@ export default async function plugin(bb: BbPluginApi) {
   }
   // The latest Smart Queue Jev outcome, for the health check.
   let jevFailure: { at: number; message: string } | null = null;
-  async function tracked<T>(attempt: Promise<T>): Promise<T> {
+  async function tracked<T>(attempt: Promise<T>, signal?: AbortSignal): Promise<T> {
     try {
       const verdict = await attempt;
       jevFailure = null;
       return verdict;
     } catch (error) {
-      if (!(error instanceof UnavailableError)) jevFailure = { at: Date.now(), message: errorMessage(error) };
+      // A decision cancelled because its row was sent or edited says nothing about Jev.
+      if (!(error instanceof UnavailableError) && !signal?.aborted) jevFailure = { at: Date.now(), message: errorMessage(error) };
       throw error;
     }
   }
@@ -350,7 +351,7 @@ export default async function plugin(bb: BbPluginApi) {
       const state = await situation(row.threadId, rowText(row), thread);
       return classify(
         {
-          jev: (s) => tracked(askJev(settingsNow, state, s)),
+          jev: (s) => tracked(askJev(settingsNow, state, s), s),
           model: async (s) =>
             askModel(
               bb,

@@ -85,3 +85,37 @@ function expectSelection(call: unknown) {
   const { providerId, model, reasoningLevel, serviceTier } = (call as any[])[0];
   return { providerId, model, reasoningLevel, serviceTier };
 }
+
+test("a Smart Queue decision cancelled by a hand send does not count as a Jev failure", async () => {
+  const { bb, handlers } = setup();
+  const events: Record<string, (payload: any) => unknown> = {};
+  bb.settings.define = () => ({
+    get: async () => ({ enabled: true, jevProvider: "custom", customJevEndpoint: "https://gw.example.com/v1/systemone", customJevModel: "jev" }),
+  });
+  (bb.events as any).on = (name: string, handler: (payload: any) => unknown) => { events[name] = handler; };
+  Object.assign(bb.sdk, {
+    threads: {
+      get: async () => ({ id: "thr_1", status: "active", visibility: "visible", originPluginId: null, title: "Work", environmentId: null }),
+      promptHistory: async () => [],
+      output: async () => ({ output: null }),
+    },
+  });
+  let started!: () => void;
+  const fetching = new Promise<void>((resolve) => (started = resolve));
+  vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+    started();
+    return new Promise((_resolve, reject) => init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason)));
+  });
+  await plugin(bb as never);
+  const entry = {
+    id: "q_1", threadId: "thr_1", createdAt: 1, initiator: "user", senderThreadId: null, originPluginId: null,
+    payload: { kind: "inline" }, editable: true, waitingOn: { kind: "plugin", pluginId: "smart-decisions", reason: "" },
+    content: [{ type: "text", text: "Also add tests", mentions: [] }],
+  };
+  events["message.queued"]!({ entry });
+  await fetching;
+  events["message.dispatched"]!({ entry });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const { checks } = await handlers["studio_health"]!(null);
+  assert.deepEqual(checks.map((check: { id: string }) => check.id), ["jev-route"]);
+});
