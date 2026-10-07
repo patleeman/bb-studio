@@ -99,14 +99,22 @@ final class StudioStore: ObservableObject {
     }
 
     private func fetch(_ client: BBClient) async throws -> [StudioItem] {
-        if plugins.contains("studio"), let overview = try? await client.studioOverview() {
-            viaStudio = true
-            kindInfo = overview.kinds
-            tags = overview.tags ?? []
-            supportsTags = overview.tags != nil
-            spaces = Self.sorted(overview.spaces ?? [])
-            supportsSpaces = overview.spaces != nil
-            return overview.items
+        if plugins.contains("studio") {
+            do {
+                let overview = try await client.studioOverview()
+                viaStudio = true
+                kindInfo = overview.kinds
+                tags = overview.tags ?? []
+                supportsTags = overview.tags != nil
+                spaces = Self.sorted(overview.spaces ?? [])
+                supportsSpaces = overview.spaces != nil
+                return overview.items
+            } catch where BBClient.isCancellation(error) {
+                // A superseded reload: keep Studio's tags, Spaces and kinds rather than falling back.
+                throw error
+            } catch {
+                // Studio failed; list the add-ons directly below.
+            }
         }
         viaStudio = false
         kindInfo = []
