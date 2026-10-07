@@ -107,8 +107,10 @@ it("marks the 2 MiB text preview truncated while downloads retain all bytes", as
   const saved = await host.save("large.txt", "text/plain", bytes);
   const result = await host.rpc.callRpc("text", { id: saved.id, versionId: saved.version.id }) as { text: string; truncated: boolean };
   expect(result.truncated).toBe(true);
-  expect(result.text).toHaveLength(2 * 1024 * 1024);
-  expect(Buffer.from(await (await host.rpc.fetchHttp("GET", `${saved.url}&download=1`)).arrayBuffer())).toEqual(bytes);
+  expect(result.text.length).toBe(2 * 1024 * 1024);
+  const downloaded = Buffer.from(await (await host.rpc.fetchHttp("GET", `${saved.url}&download=1`)).arrayBuffer());
+  // Buffer.equals is a memcmp; toEqual walks 2 MiB element by element, which blows the timeout under CPU load.
+  expect(downloaded.equals(bytes)).toBe(true);
 });
 
 it("cuts the 2 MiB text preview before a multi-byte character, not inside it", async () => {
@@ -117,5 +119,5 @@ it("cuts the 2 MiB text preview before a multi-byte character, not inside it", a
   const result = await host.rpc.callRpc("text", { id: saved.id, versionId: saved.version.id }) as { text: string; truncated: boolean };
   expect(result.truncated).toBe(true);
   expect(result.text).not.toContain("\uFFFD");
-  expect(result.text).toBe("x".repeat(2 * 1024 * 1024 - 1));
+  expect(result.text === "x".repeat(2 * 1024 * 1024 - 1)).toBe(true);
 });
