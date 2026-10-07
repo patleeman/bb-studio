@@ -293,4 +293,4 @@ Existing Studio Chat installs must [migrate their links](../bb-studio-chat/READM
 before removing the old plugin; the [Setup page](#setup) checks this for you.
 Old draft keys and quote storage are retained.
 
-![Studio item chat with a staged drawing and its draft](assets/chat-preview.png)
+![Studio item chat: a staged image on the left, and in a split beside it a new-thread composer quoting a cropped area of it, with a note and an attached file](assets/chat-preview.png)
