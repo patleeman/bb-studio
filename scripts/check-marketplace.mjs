@@ -23,6 +23,8 @@ for (const entry of market.plugins) {
   if (!plugin) errors.push(`${entry.id}: absent from .bb/plugins.json`);
   const source = entry.source?.git;
   if (source?.url !== "https://github.com/patleeman/bb-studio.git" || !source?.ref || !source?.subdir) errors.push(`${entry.id}: invalid Git source`);
+  // Users install released code: main moves all day, stable only through scripts/release.mjs.
+  if (source?.ref !== "stable") errors.push(`${entry.id}: installs from ${JSON.stringify(source?.ref)}; marketplace entries must use ref "stable"`);
   if (plugin && source?.subdir !== plugin.source.replace(/^\.\//, "")) errors.push(`${entry.id}: source paths differ`);
   if (!entry.tags?.includes("bb-studio")) errors.push(`${entry.id}: missing bb-studio tag`);
   const dir = source?.subdir;

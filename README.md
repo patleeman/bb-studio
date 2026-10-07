@@ -72,6 +72,19 @@ with the source `git:github.com/patleeman/bb-studio@main` (or run the
 The `@bb-studio` suffix matters if you have another marketplace that lists
 the same IDs. Without it, BB refuses the install and lists the choices.
 
+### Releases
+
+Plugins install from the `stable` branch, not `main`. Work lands on `main`
+all day; `stable` moves forward only after every check and test passes on a
+clean copy of the commit (`node scripts/release.mjs`). `bb plugin update`
+gets the latest release.
+
+An install made before 7 October 2026 follows `main`, because BB updates a
+plugin from the branch it was installed from. To switch one to releases,
+reinstall it: `bb plugin remove <id>`, then
+`bb plugin install <id>@bb-studio --yes`. Removing a plugin deletes its
+settings and secrets, so note them first; your items are kept.
+
 ### Coming from patleeman/bb-plugins
 
 These plugins also ship in [patleeman/bb-plugins](https://github.com/patleeman/bb-plugins)
@@ -132,6 +145,7 @@ pnpm check            # typecheck, tests, compatibility, documentation and marke
 pnpm typecheck
 pnpm test
 pnpm check:compat        # every plugin installs on the current stable BB
+node scripts/release.mjs --dry-run  # check a commit for release; without --dry-run it moves stable
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
 scripts/refresh-locks.sh bb-studio-pages  # refresh a plugin npm lock in a clean clone

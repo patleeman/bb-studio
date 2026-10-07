@@ -26,7 +26,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -53,7 +53,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-pages",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -78,7 +78,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-talk",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -102,7 +102,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-draw",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -126,7 +126,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-artifacts",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -149,7 +149,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-sidebar",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -172,7 +172,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-mobile",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -196,7 +196,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-reactions",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -220,7 +220,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-decisions",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -245,7 +245,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-tables",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -269,7 +269,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-design",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     },
@@ -294,7 +294,7 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-code",
-          "ref": "main"
+          "ref": "stable"
         }
       }
     }

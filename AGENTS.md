@@ -18,6 +18,16 @@ Work directly on `main`. Don't create branches or pull requests.
 - Resolve conflicts by keeping both sides' intent. If you can't tell what the
   other change meant, ask its thread or the user instead of guessing.
 
+## Releases
+
+Marketplace entries install from the `stable` branch (`ref: "stable"`;
+`node scripts/check-marketplace.mjs` enforces it). Keep committing to `main`;
+never commit to `stable` or push it by hand. Move it only with
+`node scripts/release.mjs [--ref <commit>] [--solo]`, which checks the commit
+out alone, runs every repo check and package test there (and with `--solo`
+the one-plugin-at-a-time install check), and then fast-forwards `stable`.
+Release only when Patrick asks or the project lead thread does it.
+
 ## Marketplace maintenance
 
 Keep the root `marketplace.json` current in the same change as the plugins it
