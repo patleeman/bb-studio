@@ -101,7 +101,7 @@ export interface HiddenFilterInput {
 export interface HiddenFilterResult {
   /** Threads to list, in the input's order. */
   visible: SidebarThread[];
-  /** Per section: how many threads it hides (or would, while revealed). */
+  /** Per section: how many hidden trees it hides (or would, while revealed); a tree counts once. */
   hidden: Map<string, number>;
 }
 
@@ -128,7 +128,9 @@ export function filterHiddenThreads({ threads, hiddenIds, sectionKeyOf, revealed
   const visible = threads.filter((thread) => {
     if (kept.has(thread.id)) return true;
     const key = keys.get(thread.id)!;
-    if (!thread.isHidden) hidden.set(key, (hidden.get(key) ?? 0) + 1);
+    // Hiding takes a whole tree, so a tree counts once: its top hidden thread.
+    const underHidden = thread.parentThreadId !== null && keys.has(thread.parentThreadId);
+    if (!thread.isHidden && !underHidden) hidden.set(key, (hidden.get(key) ?? 0) + 1);
     return revealed.has(key);
   });
   return { visible, hidden };

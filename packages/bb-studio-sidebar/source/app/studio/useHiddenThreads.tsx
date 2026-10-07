@@ -7,6 +7,8 @@ import { filterHiddenThreads, hiddenThreadIds } from "./hidden-threads.js";
 
 export interface HiddenThreadsState {
   hidden: ReadonlyMap<string, number>;
+  /** Every hidden thread, including those hidden with a hidden ancestor. */
+  hiddenIds: ReadonlySet<string>;
   revealed: ReadonlySet<string>;
   setRevealed: (sectionKey: string, revealed: boolean) => void;
 }
@@ -60,6 +62,6 @@ export function useHiddenThreads({
     });
     return { visibleProjects: filtered, hidden: result.hidden };
   }, [allThreads, hiddenIds, keepIds, projects, revealed, sectionKeyOf]);
-  const state = useMemo<HiddenThreadsState>(() => ({ hidden, revealed, setRevealed }), [hidden, revealed, setRevealed]);
+  const state = useMemo<HiddenThreadsState>(() => ({ hidden, hiddenIds, revealed, setRevealed }), [hidden, hiddenIds, revealed, setRevealed]);
   return { projects: visibleProjects, hiddenIds, state };
 }

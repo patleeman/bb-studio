@@ -3,13 +3,19 @@ import { ActionMenuItem } from "../ui/action-menu-items.js";
 import { sidebarHiddenThreadsAtom } from "../preferences/atoms.js";
 import { useHiddenThreadsState } from "./useHiddenThreads.js";
 
-/** Hide, or Unhide for a hidden thread that is showing, in a thread's actions menu. */
+/**
+ * Hide, or Unhide for a hidden thread that is showing, in a thread's actions
+ * menu. A thread hidden only through a hidden ancestor gets neither.
+ */
 export function HideThreadItem({ threadId, surface }: {
   threadId: string;
   surface: "context" | "dropdown";
 }) {
   const [hiddenIds, setHiddenIds] = useAtom(sidebarHiddenThreadsAtom);
+  const state = useHiddenThreadsState();
   const isHidden = hiddenIds.includes(threadId);
+  // Hidden with its ancestor: Hide would do nothing, and Unhide belongs to the ancestor.
+  if (!isHidden && state?.hiddenIds.has(threadId)) return null;
   return (
     <ActionMenuItem
       surface={surface}

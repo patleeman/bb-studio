@@ -40,6 +40,16 @@ describe("hidden threads", () => {
     expect(revealed.hidden.get("project:proj_a")).toBe(1);
   });
 
+  it("counts a hidden tree once, as the one thread the user hid", () => {
+    const rows = [
+      makeSidebarThread({ id: "root", projectId: "proj_a" }),
+      makeSidebarThread({ id: "kid", projectId: "proj_a", parentThreadId: "root" }),
+      makeSidebarThread({ id: "grandkid", projectId: "proj_a", parentThreadId: "kid" }),
+      makeSidebarThread({ id: "lone", projectId: "proj_a" }),
+    ];
+    expect(filter(rows, ["root", "lone"]).hidden).toEqual(new Map([["project:proj_a", 2]]));
+  });
+
   it("keeps the open thread and its hidden ancestors", () => {
     const rows = [
       makeSidebarThread({ id: "root" }),

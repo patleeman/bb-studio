@@ -180,8 +180,19 @@ describe("thread-list plugin", () => {
     await screen.findByText("Pinned thread");
     expect(threadIds()).not.toContain("thr_parent");
     expect(threadIds()).not.toContain("thr_child");
+    // The parent and its child were hidden as one.
     fireEvent.pointerDown(screen.getByRole("button", { name: "App actions" }), { button: 0, ctrlKey: false });
-    expect(await screen.findByRole("menuitem", { name: "Show 2 hidden threads" })).not.toBeNull();
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Show 1 hidden thread" }));
+    await screen.findByText("Child thread");
+    // Unhide is on the parent; its child, hidden with it, offers neither.
+    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_parent"]')!);
+    expect(await screen.findByRole("menuitem", { name: "Unhide" })).not.toBeNull();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Unhide" })).toBeNull());
+    fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_child"]')!);
+    expect(await screen.findByRole("menuitem", { name: "Rename" })).not.toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Hide" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Unhide" })).toBeNull();
   });
 
   it.each(["project", "chronological"] as const)("keeps Archive off a Space lead outside By space (%s)", async (organizationMode) => {
