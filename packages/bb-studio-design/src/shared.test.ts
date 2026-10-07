@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { VIEWPORTS, VIEWPORT_PATTERN, frameSize, isDeck, parseSteps, parseViewport } from "./shared";
+import { VIEWPORTS, clampSlide, VIEWPORT_PATTERN, frameSize, isDeck, parseSteps, parseViewport } from "./shared";
 
 describe("slide decks", () => {
   const html = `<meta name="bb-design-steps" content="title=Title; plan=Our plan">`;
@@ -12,6 +12,14 @@ describe("slide decks", () => {
   it("needs both the slide size and slides", () => {
     expect(isDeck({ viewport: "slide", steps: [] })).toBe(false);
     expect(isDeck({ viewport: "desktop", steps: parseSteps(html) })).toBe(false);
+  });
+});
+
+describe("playing a deck", () => {
+  it("keeps the slide on show in range when the deck shrinks", () => {
+    expect(clampSlide(4, 3)).toBe(2);
+    expect(clampSlide(-1, 3)).toBe(0);
+    expect(clampSlide(1, 3)).toBe(1);
   });
 });
 

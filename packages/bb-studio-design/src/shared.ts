@@ -107,6 +107,11 @@ export function isDeck(screen: Pick<ScreenView, "viewport" | "steps">): boolean 
   return screen.viewport === "slide" && screen.steps.length > 0;
 }
 
+/** A slide index within a deck of `count` slides, kept in range when a playing deck shrinks. */
+export function clampSlide(index: number, count: number): number {
+  return Math.max(0, Math.min(count - 1, index));
+}
+
 /** One step of a prototype: its hash (`#welcome`) and its label. */
 export type ScreenStep = { id: string; label: string };
 

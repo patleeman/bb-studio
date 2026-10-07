@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
 import { ExportPdfButton } from "./export-pdf";
-import { frameSize, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../src/shared";
+import { clampSlide, frameSize, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../src/shared";
 
 const PADDING = 32;
 
@@ -15,14 +15,16 @@ export function PlayView({ designId, screen, step = "", onClose }: { designId: s
   const url = screenUrl(designId, screen.id, screen.updatedAt);
   const deck = isDeck(screen);
   /** The slide on show; only a deck moves between steps from here. */
-  const [slide, setSlide] = useState(() => Math.max(0, screen.steps.findIndex((each) => each.id === step)));
+  const [chosen, setSlide] = useState(() => Math.max(0, screen.steps.findIndex((each) => each.id === step)));
+  /** Kept in range when the agent rewrites the deck with fewer slides while it plays. */
+  const slide = clampSlide(chosen, screen.steps.length);
   const current = deck ? screen.steps[slide]?.id ?? "" : step;
   /** Starts at `step` and plays on from there with the prototype's own state. A new hash moves the frame without reloading it. */
   const playUrl = current ? `${url}#${encodeURIComponent(current)}` : url;
   const stepLabel = screen.steps.find((each) => each.id === step)?.label;
   const stage = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
-  const go = (by: number) => setSlide((index) => Math.min(screen.steps.length - 1, Math.max(0, index + by)));
+  const go = (by: number) => setSlide((index) => clampSlide(clampSlide(index, screen.steps.length) + by, screen.steps.length));
   const [room, setRoom] = useState({ width: 0, height: 0 });
   /** Fit shows the whole screen; Fill uses the stage's width and scrolls. */
   const [mode, setMode] = useState<"fit" | "fill">("fit");
@@ -43,7 +45,7 @@ export function PlayView({ designId, screen, step = "", onClose }: { designId: s
       const by = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, " ": 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1 }[event.key];
       if (by) {
         event.preventDefault();
-        setSlide((index) => Math.min(screen.steps.length - 1, Math.max(0, index + by)));
+        setSlide((index) => clampSlide(clampSlide(index, screen.steps.length) + by, screen.steps.length));
       } else if (event.key === "Home") setSlide(0);
       else if (event.key === "End") setSlide(screen.steps.length - 1);
     };
