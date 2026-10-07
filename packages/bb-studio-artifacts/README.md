@@ -32,82 +32,47 @@ Download and the ⋯ menu.
 
 ## What you get
 
-- **Artifacts in Studio.** With the [Studio](../bb-studio) plugin
-  installed, artifacts join Studio's collection next to pages, recordings
-  and drawings. They get type, size and version columns, image thumbnails,
-  projects, search over titles and text, archive, move and delete. Saving
-  to an archived artifact again brings it back. Studio
-  can't create an artifact, because artifacts come from threads. Without
-  Studio, the **Artifacts** panel shows the same collection on its own.
-- **The viewer** (`/plugins/artifacts/artifacts/<id>`) shows each type in
-  the way that suits it:
-  - Images fit the window, and a click switches to actual size.
+- **Artifacts in Studio.** With [Studio](../bb-studio) installed, artifacts join its collection next to pages, recordings and drawings. They get type, size and version columns, image thumbnails, projects, archive, move and delete. Studio search matches titles, descriptions and the text of text files up to 1 MB (HTML is searched by its words). Saving to an archived artifact brings it back. Studio can't create an artifact, because artifacts come from threads. Without Studio, the **Artifacts** panel shows the same collection.
+- **Viewer** (`/plugins/artifacts/artifacts/<id>`):
+  - Images fit the window. Click to switch to actual size.
   - HTML runs in a sandboxed frame.
   - PDFs open in the browser's viewer.
   - Markdown renders as a document.
-  - Code and text use BB's source viewer.
+  - Code and text use BB's source viewer. Only the first 2 MB shows; Download has the rest.
   - Other files offer a download.
 
-  The header has an editable title, the artifact's thread (with
-  [Studio chat](../bb-studio); otherwise **New thread**, which starts a
-  thread that mentions the artifact), Copy (text, or the image), Download,
-  and a menu.
-  The menu has Open source thread, Save as page (for Markdown, text and code),
-  Versions, Move to, and Delete.
-- **Send to thread.** Select text in a Markdown, HTML, code or text
-  artifact, or drag over an image, and **Send to thread** appears. Add a
-  note and send: the passage (or the area, cropped, with its pixel
-  coordinates) goes to the artifact's thread, which is the thread that made
-  it unless you've picked another. Without Studio, BB's composer opens
-  with the quote. PDFs aren't supported yet.
-- **Save from a thread.** **Artifacts** in the thread panel launcher opens a
-  side panel with the files the latest reply created, changed, or generated,
-  with the new ones already ticked. The panel also lists the thread's storage
-  files and what the thread has already saved.
-- **Capture from iPhone.** The Capture sheet accepts a photo or file and saves
-  it directly as an artifact in the selected default project.
-- **Agents save too.** The `artifacts_save`, `artifacts_list` and
-  `artifacts_read` tools, and the `artifacts` skill, cover when to save
-  something. When the agent puts `::artifact{id="art_…"}` in a reply, it shows
-  a card with the artifact previewed inline (images, HTML, PDFs, Markdown and
-  text). Clicking the title or the arrow opens the viewer in the thread's **Artifacts** tab, beside the
-  chat, with a way back to the tab's list. Where there's no workbench, it
-  opens in the main area. For repository coding tasks, agents keep changes
-  in Git and save patches, source copies, logs or implementation summaries only
-  when you explicitly request that export.
-- **`@artifact` mentions.** The agent receives the artifact's details and,
-  for text types, its contents.
-- **`bb artifacts` CLI**: `save <path> [--title] [--description]`,
-  `list [--thread]`, `show <id>`, `export <id> [path] [--force]` (copies an
-  artifact into the thread's workspace, so an agent can edit it and save it
-  back; it won't replace an existing file without `--force`), and
-  `delete <id>`.
+  The header has an editable title, the artifact's thread (with [Studio chat](../bb-studio); otherwise **New thread**, which starts a thread that mentions the artifact), Copy (text, or the image), Download, and a menu with Open source thread, Save as page (Markdown, text and code up to 1 MB), Versions, Move to, and Delete.
+- **Send to thread.** Select text in a Markdown, HTML, code or text artifact, or drag over an image, then choose **Send to thread**. Add a note and send. The passage (or the cropped area, with pixel coordinates) goes to the artifact's thread, or to the thread you pick. Without Studio, BB's composer opens with the quote. PDFs aren't supported.
+- **Save from a thread.** **Artifacts** in the thread panel launcher opens a side panel with the files the latest reply created, changed or generated (new ones ticked), the thread's storage files, and what the thread already saved. Nothing is saved automatically.
+- **Capture from iPhone.** The Mobile Capture sheet saves a photo or file as an artifact in the default project.
+- **Agent tools.** `artifacts_save` (a workspace or storage `path`, or short `content` plus `name`), `artifacts_list` (`thisThread`, `query`) and `artifacts_read`. The `artifacts` skill says when to save. A saved artifact comes back as `::artifact{id="art_…"}`, which shows as a card with an inline preview. The title or arrow opens the viewer in the thread's **Artifacts** tab beside the chat; without a workbench, in the main area. For repository coding tasks, agents keep changes in Git and save patches, logs or summaries only when you ask.
+- **`@artifact` mentions.** The agent gets the artifact's details and, for text up to 1 MB, its contents.
+- **Duplicate and export.** Studio can duplicate an artifact from its latest version. Export gives the original file with its name and type.
+- **Backup.** `bb studio backup` includes every artifact with all version bytes. See [Backup and restore](../../docs/backup.md).
+
+## Commands
+
+- `bb artifacts save <path> [--title <title>] [--description <text>]`
+- `bb artifacts list [--thread]`
+- `bb artifacts show <id>` prints a text artifact.
+- `bb artifacts export <id> [path] [--force]` copies it into the thread's workspace so an agent can edit it and save it back. It won't replace a file without `--force`.
+- `bb artifacts delete <id>` deletes it and all its versions.
+
+The plugin has no settings.
+
+## Limits
+
+- **25 MB per file.** Larger files are refused, including phone captures.
+- **Versions.** A version is keyed on its source thread and path. A save with unchanged bytes adds no version.
+- **Source paths.** Saving reads from the thread's workspace or thread storage on the thread's machine. Other paths are refused.
+- **Text.** Search, mentions, `artifacts_read` and Save as page use text up to 1 MB. `artifacts_read` returns at most 100,000 characters.
 
 ## How it works
 
-- Artifacts and their versions are stored as BLOBs in the plugin's SQLite
-  database, up to 25 MB per file. A version is keyed on its source thread
-  and path. A save whose bytes haven't changed doesn't add a version.
-- Saving reads the file from the thread's workspace or thread storage on
-  the thread's machine. Paths outside those two roots are refused.
-- Phone capture uses the additive `importFile` RPC. It accepts Base64 file bytes,
-  a name, MIME type and project ID, applies the same 25 MB limit, and creates
-  an artifact without a source thread.
-- The "this reply's files" list comes from the thread's event history:
-  generated images and file changes between the reply's turn request and its
-  end, with deleted files left out.
-- The viewer's HTML preview asks for `content?…&quote=1`, which adds a small
-  script before `</body>`. It posts the selected text and its position to
-  the viewer, which accepts messages only from its own frame. The page stays
-  sandboxed. A page whose own CSP blocks inline scripts just can't be quoted.
-- Contents are served from `GET /api/v1/plugins/artifacts/http/content`.
-  Every response except a real PDF carries a `sandbox allow-scripts` CSP.
-  This gives HTML an opaque origin, so it can't call BB's API with your
-  session, even if it's opened directly. Chrome's PDF viewer won't load in a
-  sandbox. The route checks that a file's bytes really are a PDF before it
-  serves it unsandboxed, and a PDF can't run page scripts.
-- The Studio provider (`src/server/studio.ts`) implements the kit's
-  `studio_*` methods on top of the store (`src/server/store.ts`).
+- Files are stored as BLOBs in the plugin's SQLite database.
+- The "this reply's files" list comes from the thread's event history: generated images and file changes between the reply's turn request and its end, minus deleted files.
+- HTML quoting: the preview asks for `content?…&quote=1`, which adds a small script that posts the selected text to the viewer. The viewer accepts messages only from its own frame. A page whose CSP blocks inline scripts can't be quoted.
+- Contents come from `GET /api/v1/plugins/artifacts/http/content`. Every response except a real PDF carries a `sandbox allow-scripts` CSP, so HTML gets an opaque origin and can't call BB's API with your session, even when opened directly. Chrome's PDF viewer won't load in a sandbox, so the route checks that a file's bytes are really a PDF before serving it unsandboxed.
 
 ## Development
 
@@ -115,14 +80,6 @@ Download and the ⋯ menu.
 bb plugin install .     # register (path install; server.ts loads from source)
 bb plugin dev           # watch: rebuild frontend + reload on every save
 bb plugin build .       # emit dist/ (server.js + app.js/app.css)
-pnpm typecheck
-pnpm test
 ```
 
-`@bb-studio/kit` is a `file:../bb-studio-kit` dependency. Keep
-`package-lock.json` current (regenerate it in a clean clone, not the pnpm
-workspace), because BB's Git install runs `npm install` from it.
-
-## Duplicate and export
-
-Studio can duplicate an artifact as a separate item using its latest file version. The provider exports the original file with its name and MIME type.
+`@bb-studio/kit` is a `file:../bb-studio-kit.tgz` dependency. Keep `package-lock.json` current (regenerate it in a clean clone, not the pnpm workspace), because BB's Git install runs `npm install` from it.
