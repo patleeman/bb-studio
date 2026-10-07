@@ -210,7 +210,7 @@ export const preferenceDefinitions = {
   collapsedSpaceSections: definePreference(
     stringListSchema,
     [],
-    "Sections collapsed inside a Studio Space, as \"<space id>:lead\", \":studio\" or \":threads\".",
+    "Unused: left from when a Studio Space had Lead, Studio and Threads sections. Nothing reads it.",
     null,
   ),
 } as const;

@@ -716,7 +716,7 @@ index 13d58a8..1031cca 100644
 @@ -761,0 +787 @@ function ThreadRowComponent({
 +      {spaceRow?.line}
 diff --git a/source/shared/preferences.ts b/source/shared/preferences.ts
-index 98a5200..fb842be 100644
+index 98a5200..f7d89c6 100644
 --- a/source/shared/preferences.ts
 +++ b/source/shared/preferences.ts
 @@ -12,0 +13 @@ export const organizationModeSchema = z.enum([
@@ -762,6 +762,6 @@ index 98a5200..fb842be 100644
 +  collapsedSpaceSections: definePreference(
 +    stringListSchema,
 +    [],
-+    "Sections collapsed inside a Studio Space, as \"<space id>:lead\", \":studio\" or \":threads\".",
++    "Unused: left from when a Studio Space had Lead, Studio and Threads sections. Nothing reads it.",
 +    null,
 +  ),
