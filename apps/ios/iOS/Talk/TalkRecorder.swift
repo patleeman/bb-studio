@@ -24,6 +24,10 @@ final class TalkRecorder: ObservableObject {
     /// Set while recording when the microphone has sent only silence for a few seconds.
     @Published private(set) var silentInput: String?
     @Published private(set) var needsRecovery = false
+    /// Between the tap and capture starting: permission, the session, `recording_create`.
+    @Published private(set) var starting = false
+    /// Closed while starting, so the start stops before it turns the microphone on.
+    private var abandoned = false
 
     private let client: BBClient
     private let outbox = TalkOutbox.shared
@@ -40,7 +44,10 @@ final class TalkRecorder: ObservableObject {
     }
 
     func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil) async {
-        guard !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
+        guard !starting, !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
+        starting = true
+        abandoned = false
+        defer { starting = false }
         transcript = ""
         captureSession = nil
         stoppedSegments = nil
@@ -49,12 +56,19 @@ final class TalkRecorder: ObservableObject {
                 phase = .failed("Microphone access is off. Enable it in Settings.")
                 return
             }
+            guard !abandoned, !Task.isCancelled else { return }
             let session = AVAudioSession.sharedInstance()
             // The iPhone mic: switching to AirPods' hands-free mic mid-start stalls the engine and sends silence.
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothA2DP])
             try session.setActive(true)
 
             let recording = try await client.createRecording(kind: kind, threadId: threadId, projectId: projectId)
+            if abandoned || Task.isCancelled {
+                // Talk discards a recording that finishes with no audio.
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                _ = try? await client.setRecordingState(recording.id, "finishing")
+                return
+            }
             recordingId = recording.id
             let sessionId = Self.clientId()
             let captureSession = try outbox.beginCapture(recordingId: recording.id, sessionId: sessionId, serverURL: client.baseURL)
@@ -145,6 +159,10 @@ final class TalkRecorder: ObservableObject {
     /// Waits for local persistence before closing; uploads and transcription
     /// continue through the outbox after this view leaves.
     func cancel() async -> Bool {
+        if starting {
+            abandoned = true
+            return true
+        }
         if completing { return !needsRecovery }
         guard phase == .recording || needsRecovery, let id = recordingId else { return true }
         completing = true

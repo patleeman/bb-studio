@@ -97,7 +97,7 @@ struct DictationView: View {
             }
             .sheet(isPresented: $creatingThread) { NewThreadView(text: text) }
         }
-        .interactiveDismissDisabled(recorder.phase == .recording || recorder.needsRecovery)
+        .interactiveDismissDisabled(recorder.phase == .recording || recorder.needsRecovery || recorder.starting)
         .task {
             if autoStart { await recorder.start(kind: kind, threadId: threadId) }
         }
