@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: BB Studio
 
@@ -166,6 +167,13 @@ public struct StudioKindInfo: Codable, Hashable, Sendable {
         public var label: String
         /// "copy" puts the returned text on the clipboard; "toast" shows the message.
         public var result: String
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            label = (try? c.decode(String.self, forKey: .label)) ?? id
+            result = (try? c.decode(String.self, forKey: .result)) ?? "toast"
+        }
     }
 
     public var pluginId: String
@@ -187,6 +195,35 @@ public struct StudioTag: Codable, Identifiable, Hashable, Sendable {
     public var name: String
     /// `#rrggbb`.
     public var color: String
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = (try? c.decode(String.self, forKey: .name)) ?? id
+        color = (try? c.decode(String.self, forKey: .color)) ?? "#64748b"
+    }
+}
+
+/// The entries of a JSON array that decode; each one that doesn't is logged and
+/// skipped, so one malformed entry can't fail a whole list.
+struct LossyArray<Element: Decodable>: Decodable {
+    var elements: [Element]
+
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var elements: [Element] = []
+        while !container.isAtEnd {
+            do {
+                elements.append(try container.decode(Element.self))
+            } catch {
+                Logger(subsystem: "nyc.plee.bbgo", category: "decoding")
+                    .error("Skipped a malformed \(String(describing: Element.self), privacy: .public): \(String(describing: error), privacy: .public)")
+                // A failed decode doesn't move past the entry.
+                guard (try? container.decode(JSONValue.self)) != nil else { break }
+            }
+        }
+        self.elements = elements
+    }
 }
 
 public struct StudioOverview: Sendable {
@@ -213,9 +250,9 @@ extension BBClient {
         struct Create: Decodable { var mode: String }
         struct Kind: Decodable {
             var id: String
-            var label: String
-            var plural: String
-            var actions: [StudioKindInfo.Action]?
+            var label: String?
+            var plural: String?
+            var actions: LossyArray<StudioKindInfo.Action>?
             var canArchive: Bool?
             var blurb: String?
             var create: Create?
@@ -223,20 +260,33 @@ extension BBClient {
         }
         struct Provider: Decodable {
             var pluginId: String
-            var kinds: [Kind]
+            var kinds: LossyArray<Kind>
         }
+        // Only `items` is required. A malformed entry anywhere is skipped, and a
+        // malformed optional list reads as missing, so add-ons don't vanish with it.
         struct Overview: Decodable {
             var items: [StudioItem]
             var providers: [Provider]?
             var tags: [StudioTag]?
             var spaces: [StudioSpace]?
+
+            enum CodingKeys: String, CodingKey { case items, providers, tags, spaces }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                items = try c.decode(LossyArray<StudioItem>.self, forKey: .items).elements
+                providers = (try? c.decodeIfPresent(LossyArray<Provider>.self, forKey: .providers))?.elements
+                tags = (try? c.decodeIfPresent(LossyArray<StudioTag>.self, forKey: .tags))?.elements
+                spaces = (try? c.decodeIfPresent(LossyArray<StudioSpace>.self, forKey: .spaces))?.elements
+            }
         }
         let overview: Overview = try await rpc("studio", "overview")
         let kinds = (overview.providers ?? []).flatMap { provider in
-            provider.kinds.map {
-                StudioKindInfo(
-                    pluginId: provider.pluginId, id: $0.id, label: $0.label, plural: $0.plural,
-                    actions: $0.actions ?? [], canArchive: $0.canArchive ?? false, blurb: $0.blurb ?? "",
+            provider.kinds.elements.map {
+                let label = $0.label ?? $0.id.capitalized
+                return StudioKindInfo(
+                    pluginId: provider.pluginId, id: $0.id, label: label, plural: $0.plural ?? label + "s",
+                    actions: $0.actions?.elements ?? [], canArchive: $0.canArchive ?? false, blurb: $0.blurb ?? "",
                     createMode: $0.create?.mode, background: $0.background)
             }
         }
