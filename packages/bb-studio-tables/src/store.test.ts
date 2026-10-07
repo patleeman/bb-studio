@@ -45,3 +45,17 @@ it("imports CSV by header name, adding columns it doesn't have", () => {
   expect(imported.rows[0]!.values).toMatchObject({ name: "Ada" });
   db.close();
 });
+
+it("deletes the select column a table's only board view groups by", () => {
+  const { db, store } = open();
+  const table = store.create("Tasks", null, [
+    { id: "name", name: "Name", type: "text", options: [] },
+    { id: "state", name: "State", type: "select", options: ["Open"] },
+  ]);
+  store.update(table.id, { views: [{ id: "board", name: "Board", type: "board", groupBy: "state", dateBy: null, filters: [], sorts: [], hidden: [] }] });
+  const saved = store.update(table.id, { columns: [{ id: "name", name: "Name", type: "text", options: [] }] });
+  expect(saved.columns.map((column) => column.id)).toEqual(["name"]);
+  expect(saved.views).toHaveLength(1);
+  expect(saved.views[0]!.type).toBe("table");
+  db.close();
+});

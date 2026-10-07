@@ -142,6 +142,8 @@ export class TableStore {
     let table = this.require(id);
     if (changes.columns) table = { ...table, ...withColumns(table, checkedColumns(changes.columns)) };
     if (changes.views) table.views = viewsFor(changes.views, table.columns);
+    // A removed column can take a table's only board or calendar view with it.
+    if (!table.views.length) table.views = [defaultView()];
     if (changes.title !== undefined) table.title = changes.title.trim() || table.title;
     if (changes.projectId !== undefined) table.projectId = changes.projectId;
     if (changes.archived !== undefined) table.archived = changes.archived;
