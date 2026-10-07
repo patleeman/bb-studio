@@ -69,6 +69,12 @@ describe("apnsPayload", () => {
     });
   });
 
+  it("never lets data replace the aps dictionary", () => {
+    const payload = JSON.parse(apnsPayload({ to: "apns:x", title: "T", body: "B", data: { threadId: "thr_1", aps: { alert: "spoof" } } }));
+    expect(payload.aps).toMatchObject({ alert: { title: "T", body: "B" }, "thread-id": "thr_1" });
+    expect(payload.threadId).toBe("thr_1");
+  });
+
   it("shortens long multi-byte bodies to fit APNs' 4 KB limit without splitting characters", () => {
     const body = "日本語の結果😀".repeat(400);
     const payload = apnsPayload({ to: "apns:x", title: "T", body, data: { threadId: "thr_1", kind: "turn-finished" } });

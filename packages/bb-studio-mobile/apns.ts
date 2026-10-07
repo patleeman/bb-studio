@@ -136,7 +136,8 @@ export function apnsPayload(message: ExpoMessage): string {
 }
 
 function renderPayload(message: ExpoMessage, body: string): string {
-  const data = message.data ?? {};
+  // `aps` belongs to Apple; a data field of that name would replace the alert.
+  const { aps: _reserved, ...data } = message.data ?? {};
   const threadId = typeof data.threadId === "string" ? data.threadId : undefined;
   const category = notificationCategory(data);
   return JSON.stringify({
