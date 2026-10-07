@@ -72,6 +72,7 @@ const SCREEN_AGENT = String.raw`(() => {
 
   function startEdit(element, event) {
     const before = element.innerHTML;
+    post({ type: "edit-start", before: before });
     showOutline(null);
     element.setAttribute("contenteditable", element.children.length ? "true" : "plaintext-only");
     element.focus();

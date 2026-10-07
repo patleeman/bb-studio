@@ -11,6 +11,7 @@ import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../server";
 import { frameSize, frameKey, type CommentView, type DesignView } from "../src/shared";
 import type { CanvasApi } from "./canvas";
+import { createEditGate } from "./edit-gate";
 
 export type Rect = { x: number; y: number; width: number; height: number };
 type Point = { x: number; y: number };
@@ -24,6 +25,7 @@ type ScreenMessage =
   | { type: "rects"; rects: Record<string, Rect | null> }
   | { type: "wheel"; deltaX: number; deltaY: number; zoom: boolean; x: number; y: number }
   | { type: "space"; down: boolean }
+  | { type: "edit-start"; before: string }
   | { type: "text"; before: string; text: string }
   | { type: "not-editable" };
 
@@ -39,6 +41,8 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
   const [commenting, setCommentingState] = useState(false);
   /** Edit mode: click text on a screen to type over it. Comment and edit modes exclude each other. */
   const [editing, setEditingState] = useState(false);
+  /** The edit the user started; a screen's script can't post one of its own. */
+  const editGate = useRef(createEditGate());
   const setCommenting = useCallback((on: boolean) => { setCommentingState(on); if (on) setEditingState(false); }, []);
   const setEditing = useCallback((on: boolean) => { setEditingState(on); if (on) setCommentingState(false); }, []);
   /** Per frame: each commented selector's box, in the screen's own pixels. */
@@ -108,7 +112,11 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
         });
       } else if (data.type === "space") {
         canvas.current?.setSpace(data.down);
+      } else if (data.type === "edit-start") {
+        // The user's click in the frame activates the canvas too; a script alone can't.
+        editGate.current.start(key, data.before, { editing, activated: navigator.userActivation?.isActive ?? false });
       } else if (data.type === "text") {
+        if (!editGate.current.take(key, data.before, editing)) return;
         rpc.call("editText", { designId: design.id, screenId, before: data.before, after: data.text })
           .then((result) => {
             if (result.ok) return;
@@ -134,6 +142,7 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
   useEffect(() => {
     for (const key of frames.current.keys()) send(key, { type: "mode", on: commenting, edit: editing });
     if (!commenting) setDraft(null);
+    if (!editing) editGate.current.reset();
   }, [commenting, editing, send]);
 
   // Re-place pins when comments change.
