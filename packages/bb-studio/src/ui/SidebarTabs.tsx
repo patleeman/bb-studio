@@ -1,7 +1,7 @@
 // The Studio section of the sidebar: a tab for each Studio item the user has
 // opened, from any add-on. Opening an item's view adds its tab; × closes it,
 // and closing the one on screen opens the next. A tab's ⋯ or right-click
-// floats it or opens it in a split.
+// opens it in a split.
 import {
   DropdownMenuItem,
   Icon,
