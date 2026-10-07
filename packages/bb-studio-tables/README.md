@@ -41,7 +41,7 @@ The live 390-pixel Release inventory table contains a seeded Review notes row.
 **Chat** stays visible, and **Item actions** keeps Export and More clickable
 above the sticky table header.
 These compact captures run on stable BB 0.45.0 with the full suite installed
-from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+from pushed commit 306c841. They check viewport bounds, button hit targets,
 and the Related popover before capture.
 
 ![A seeded inventory table in the live BB Studio Tables panel](assets/staged-preview.png)
