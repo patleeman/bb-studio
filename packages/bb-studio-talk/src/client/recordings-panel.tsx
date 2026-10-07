@@ -255,6 +255,77 @@ function usePlayer(recordingId: string, segments: readonly Segment[]) {
     toggle: () => player.toggle(), pause: () => player.pause(), setRate: (rate: number) => player.setRate(rate), setVolume: (volume: number) => player.setVolume(volume) };
 }
 
+// ── Notes page ───────────────────────────────────────────────────────────
+function useNotes(id: string, refetch: () => void) {
+  const rpc = useRpc<TalkRpcContract>();
+  // null while checking.
+  const [pagesAvailable, setPagesAvailable] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
+  useEffect(() => {
+    let live = true;
+    rpc.call("notes_status", null).then(
+      (result) => live && setPagesAvailable(result.pagesAvailable),
+      () => live && setPagesAvailable(false),
+    );
+    return () => { live = false; };
+  }, [rpc]);
+  const make = useCallback(() => {
+    // The server also shares one run per recording; this keeps a double click to one request.
+    if (running.current) return;
+    running.current = true;
+    setBusy(true);
+    rpc.call("notes_make", { id }).then(
+      ({ pageId, created }) => {
+        toast.success(created ? "Notes page made" : "Notes page updated", { action: { label: "Open", onClick: () => openAppPath(notesPath(pageId)) } });
+        refetch();
+      },
+      (cause) => {
+        const message = errorMessage(cause);
+        if (message.includes(PAGES_MISSING)) setPagesAvailable(false);
+        toast.error(message);
+      },
+    ).finally(() => {
+      running.current = false;
+      setBusy(false);
+    });
+  }, [rpc, id, refetch]);
+  const canMake = (recording: Recording) =>
+    recording.status === "done" && recording.pendingCount === 0 && recording.failedCount === 0 && recording.wordCount > 0;
+  return { pagesAvailable, busy, make, canMake };
+}
+
+const PAGES_MISSING = "Install Studio Pages to make notes.";
+const notesPath = (pageId: string) => `/plugins/pages/pages/${pageId}`;
+
+function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnType<typeof useNotes> }) {
+  const pageId = recording.notesPageId ?? null;
+  if (!notes.canMake(recording) && !pageId) return null;
+  const missing = notes.pagesAvailable === false;
+  return (
+    <section aria-label="Notes" className="mt-6 flex flex-wrap items-center gap-2">
+      {pageId && !missing ? (
+        <button type="button" className={OUTLINE_BUTTON} onClick={() => openAppPath(notesPath(pageId))}>
+          <Icon name="FileText" /> Open notes
+        </button>
+      ) : null}
+      {notes.canMake(recording) ? (
+        <button
+          type="button"
+          className={OUTLINE_BUTTON}
+          disabled={notes.busy || notes.pagesAvailable !== true}
+          title={missing ? PAGES_MISSING : "Summary, decisions and action items as a Studio Page"}
+          onClick={notes.make}
+        >
+          {notes.busy ? <Icon name="Loading" className="animate-spin motion-reduce:animate-none" /> : <Icon name="ListTodo" />}
+          {notes.busy ? (pageId ? "Updating notes…" : "Making notes…") : pageId ? "Update notes" : "Make notes"}
+        </button>
+      ) : null}
+      {missing ? <span className="text-sm text-muted-foreground">{PAGES_MISSING}</span> : null}
+    </section>
+  );
+}
+
 function RecordingDetail({ id }: { id: string }) {
   const { rpc, data, error, refetch } = useRecording(id);
   const navigate = useBbNavigate();
@@ -266,6 +337,7 @@ function RecordingDetail({ id }: { id: string }) {
   const [version, setVersion] = useState<"original" | "cleaned">("cleaned");
   const [cleaning, setCleaning] = useState<string | null>(null);
   const cleanupRun = useRef(0);
+  const notes = useNotes(id, refetch);
   useEffect(() => { setVersion("cleaned"); setCleaning(null); return () => { cleanupRun.current++; }; }, [id]);
   const spoken = segments.filter((segment) => segment.status !== "empty");
   const hasCleaned = spoken.length > 0 && spoken.every((segment) => segment.status === "done" && segment.cleanedText != null);
@@ -395,6 +467,11 @@ function RecordingDetail({ id }: { id: string }) {
                     <Icon name="AiContentGenerator01" className="size-4" /> {recording.meetingNotes ? "Regenerate summary" : "Generate summary"}
                   </DropdownMenuItem>
                 ) : null}
+                {notes.canMake(recording) && notes.pagesAvailable ? (
+                  <DropdownMenuItem disabled={notes.busy} onSelect={notes.make}>
+                    <Icon name="ListTodo" className="size-4" /> {recording.notesPageId ? "Update notes" : "Make notes"}
+                  </DropdownMenuItem>
+                ) : null}
                 {recording.status === "done" ? (
                   <>
                     <DropdownMenuItem onSelect={() => downloadTranscript("markdown")}><Icon name="Download" className="size-4" /> Download Markdown</DropdownMenuItem>
@@ -449,6 +526,8 @@ function RecordingDetail({ id }: { id: string }) {
             <p className="mt-3 whitespace-pre-wrap text-sm">{recording.meetingNotes.summary}</p>
           </details>
         ) : null}
+
+        <NotesRow recording={recording} notes={notes} />
 
         {confirmDelete ? (
           <div className="mt-6">
