@@ -586,13 +586,18 @@ struct ThreadView: View {
         attachments = []
         Task {
             if await !model.send(text, mentions: sentMentions, attachments: files) {
-                if draft.isEmpty {
-                    draft = text
-                    mentions = sentMentions
-                }
+                restoreDraft(text, sentMentions)
                 if attachments.isEmpty { attachments = files }
             }
         }
+    }
+
+    /// Puts unsent text back in the composer, and in storage in case the thread closed meanwhile.
+    private func restoreDraft(_ text: String, _ sentMentions: [Mention]) {
+        Drafts.restore(model.threadId, text: text, mentions: sentMentions, serverURL: model.serverURL)
+        guard draft.isEmpty else { return }
+        draft = text
+        mentions = sentMentions
     }
 
     private var lastUserRowId: String? {
@@ -612,10 +617,7 @@ struct ThreadView: View {
         let sentMentions = mentions
         draft = ""
         Task {
-            if await !model.send(text, mentions: sentMentions, at: date), draft.isEmpty {
-                draft = text
-                mentions = sentMentions
-            }
+            if await !model.send(text, mentions: sentMentions, at: date) { restoreDraft(text, sentMentions) }
         }
     }
 
@@ -624,10 +626,7 @@ struct ThreadView: View {
         let sentMentions = mentions
         draft = ""
         Task {
-            if await !model.saveDraft(text, mentions: sentMentions), draft.isEmpty {
-                draft = text
-                mentions = sentMentions
-            }
+            if await !model.saveDraft(text, mentions: sentMentions) { restoreDraft(text, sentMentions) }
         }
     }
 

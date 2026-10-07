@@ -22,6 +22,14 @@ enum Drafts {
         }
     }
 
+    /// Keeps text whose send failed, unless the thread already has a newer draft.
+    /// The thread may have closed while it was sending, and then the composer
+    /// can't save it.
+    static func restore(_ threadId: String, text: String, mentions: [Mention], serverURL: URL) {
+        guard load(threadId, serverURL: serverURL) == nil else { return }
+        save(threadId, text: text, mentions: mentions, serverURL: serverURL)
+    }
+
     /// Legacy drafts have no trustworthy origin. Copy only after explicit recovery;
     /// keep the originals, and never overwrite a draft already on this server.
     static var legacyKeys: [String] {

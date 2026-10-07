@@ -57,6 +57,20 @@ final class ServerIsolationTests: XCTestCase {
         XCTAssertNotNil(defaults.data(forKey: legacy))
     }
 
+    func testFailedSendKeepsTextWithoutReplacingANewerDraft() {
+        let id = "test-\(UUID())"
+        defer { Drafts.save(id, text: "", mentions: [], serverURL: a) }
+        // The composer cleared the stored draft when it sent; the send failed after the thread closed.
+        Drafts.save(id, text: "", mentions: [], serverURL: a)
+        Drafts.restore(id, text: "unsent", mentions: [], serverURL: a)
+        XCTAssertEqual(Drafts.load(id, serverURL: a)?.text, "unsent")
+        XCTAssertNil(Drafts.load(id, serverURL: b))
+        // The thread reopened and the user typed something new before the failure.
+        Drafts.save(id, text: "newer", mentions: [], serverURL: a)
+        Drafts.restore(id, text: "unsent", mentions: [], serverURL: a)
+        XCTAssertEqual(Drafts.load(id, serverURL: a)?.text, "newer")
+    }
+
     func testPermissionModeSentOnADoesNotClearB() {
         let id = "test-\(UUID())"
         defer { for server in [a, b] { PermissionMode.setPending(nil, for: id, serverURL: server) } }
