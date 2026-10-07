@@ -101,29 +101,24 @@ plugin deletes its settings and secrets, so note them first.
 
 ## Consolidation upgrades
 
-Chat now ships in Studio, and Navigation ships in Studio Sidebar. New installs
-need at most 12 plugins. For an existing install, update Studio and the old Chat plugin,
-then run `bb studio-chat migrate`. Wait for **Migration complete** before
-removing the bridge. Keep it for older native clients or chat bookmarks that
-still address `studio-chat`.
+Chat now ships in Studio, Navigation ships in Studio Sidebar, and Float and
+Studio Teams (`bot-teams`) are retired. New installs need at most 12 plugins.
+To upgrade an existing install, update Studio and open **Studio → Setup**. It
+lists the add-ons you're missing, flags installed retired plugins, says what
+removing each keeps and deletes, and removes one only after you confirm. See
+[Studio's Setup page](packages/bb-studio/README.md#setup).
 
-Float is retired: threads and Studio items open in the main view, or in a
-split with ⌘-click, and the sidebar lists what you open. Update every Studio
-plugin, then remove it with `bb plugin remove float`.
+Without the page, `bb studio setup` prints the same list and the commands to
+run. The short version:
 
-Update Studio Sidebar and select its **Studio Navigation** provider in
-Appearance before removing `studio-navigation`. Navigation visibility and order
-remain in BB's existing preferences. Saved drafts, quotes, page history and
-historical bot authors remain readable.
-
-Studio Teams (`bot-teams`) is retired and its package is deleted, so it gets no
-more updates. An installed copy keeps running until you remove it. Space Command
-now ships in Studio. Before removing Teams, export what you want to keep:
-`bb bots list --json` lists every bot, `bb bots show <bot> --json` prints a
-profile with its bot home, and `bb bots mission <bot>` and
-`bb bots memory <bot>` print its MISSION.md and MEMORY.md. Copy any bot home you
-still need, then run `bb plugin remove bot-teams`. Threads that worked as a bot
-remain ordinary BB threads.
+```sh
+bb studio-chat migrate              # wait for "Migration complete" first
+bb plugin remove studio-chat
+bb plugin remove studio-navigation  # after picking Studio Sidebar's Studio Navigation provider in Appearance
+bb plugin remove float
+bb bots list --json                 # export the bots you want before removing Teams
+bb plugin remove bot-teams
+```
 
 ## Development
 

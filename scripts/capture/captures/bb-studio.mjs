@@ -304,8 +304,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     fileName: "plugin-setup.png",
     setup: async (client) => {
       await client.navigate("/plugins/studio/studio/setup");
-      await client.waitForText("Plugin setup", 30000);
-      await client.waitForText("Needs attention (1)");
+      await client.waitForText("Set up BB Studio", 30000);
+      await client.waitForText("Add-ons");
+      await client.waitForText("Studio Decisions");
+      await client.waitForText("Needs setup");
       await client.waitForText("No Jev provider is set up");
       await client.waitForText("Last checked");
       await sleep(400);

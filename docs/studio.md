@@ -55,3 +55,13 @@ Templates and bulk export are described in the [Studio README](../packages/bb-st
 `packages/bb-studio-kit` (`@bb-studio/kit`) is a source package. Each add-on depends on its packed copy, `file:../bb-studio-kit.tgz` (rebuilt by `scripts/refresh-locks.sh`), and `bb plugin build` bundles it. The kit exports `CollectionPage`, `AddOnCollection`, `AddOnPanel`, item headers and menus, directive cards, format helpers and shared UI primitives. Plugins use the kit's `bb.pluginTailwindContent` so its classes are included in their builds.
 
 BB installs a Git plugin by cloning the repository and running `npm install --omit=dev` in the package directory. Each plugin's `package-lock.json` must therefore include the kit link. Use `scripts/refresh-locks.sh <package>` to regenerate locks in a clean clone.
+
+## Setup
+
+Studio's Setup page (`/plugins/studio/studio/setup`) and `bb studio setup` are the one place to set up BB Studio. `src/setup.ts` joins three things: the add-on list, BB's plugin list and the latest plugin health result.
+
+- **Add-ons.** `src/setup-addons.ts` is a copy of `marketplace.json`'s entries, bundled so Studio needs no network call; `setup.test.ts` fails when the two drift. Each add-on is installed, not installed, turned off, needs setup (a degraded health problem) or broken (a broken one), with its health checks.
+- **Actions.** Install uses `sdk.plugins.catalog.installPlan` and `catalog.install` for `<id>@bb-studio`, passing the source BB resolved as the confirmation a third-party marketplace needs. Turn on uses `sdk.plugins.enable`. Each action also shows its CLI command (`bb plugin install <id>@bb-studio --yes`, `bb plugin enable <id>`) with a Copy button, for when the call fails.
+- **Retired plugins.** `studio-chat`, `studio-navigation`, `float` and `bot-teams` show up when installed, with what's kept, what's deleted and the steps first. Remove uses `sdk.plugins.remove` after a confirm. Studio Chat is blocked until its links are in Studio: the bridge (0.2.0 or later) runs its migration before answering any legacy call, so Studio calls its `viewing` method and treats an answer as a finished migration. Studio Navigation is blocked until Studio Sidebar is installed and on.
+
+The RPCs are `setup.summary`, `setup.install`, `setup.enable` and `setup.remove` (`src/setup-contract.ts`).

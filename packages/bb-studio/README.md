@@ -154,6 +154,30 @@ bb studio retitle (<thread-id>… | --self | --recent <count>)
 
 See [`docs/studio.md`](../../docs/studio.md) for the design.
 
+## Setup
+
+**Studio → Setup** (`/plugins/studio/studio/setup`) is the one place to set up
+BB Studio. It lists every add-on from this repository's marketplace with its
+one-line description and status: **Installed**, **Not installed**, **Turned
+off**, **Needs setup** or **Broken**, with its health checks under it.
+
+- **Install** and **Install all** install missing add-ons from the
+  `bb-studio` marketplace, and **Turn on** enables one that's off. Install all
+  skips Studio Mobile, which only the iOS app needs. Each action shows the
+  same CLI command with a Copy button, for when it fails.
+- If BB doesn't know the `bb-studio` marketplace yet, the page shows
+  `bb marketplace add git:github.com/patleeman/bb-studio@main` first.
+- **Retired plugins** shows `studio-chat`, `studio-navigation`, `float` and
+  `bot-teams` if they're installed: why each is retired, what removing it
+  keeps and deletes, and what to do first. **Remove…** asks before it removes
+  anything. Studio Chat can't be removed until its chat links are in Studio
+  (`bb studio-chat migrate` reports **Migration complete**), and Studio
+  Navigation can't until Studio Sidebar is installed and on.
+- Problems with plugins outside BB Studio are listed at the bottom.
+
+`bb studio setup` prints the same status, the retired plugins and the
+commands left to run; `--json` prints the whole summary.
+
 ## Plugin health
 
 Studio checks every enabled plugin when it starts and every 3 minutes after
@@ -174,14 +198,13 @@ apart, so a plugin that's only reloading doesn't open it. It closes by itself
 once those problems are fixed or hidden, or with its close button. Each problem has three
 actions: **Fix** opens the place to fix it, **Turn off plugin** disables the
 plugin, and **Hide** hides it until it changes or goes away and comes back.
-**Open plugin setup** goes to the full list at `/plugins/studio/studio/setup`,
-which includes hidden problems, plugins whose check didn't answer, and what
-passed. `bb studio health` prints the same list and exits 1 when a problem
-isn't hidden.
+**Open plugin setup** goes to the Setup page, which also shows hidden
+problems and what passed. `bb studio health` prints every plugin's problems
+and exits 1 when a problem isn't hidden.
 
 ![The Plugin health card open above the sidebar footer on staged stable BB, showing that Studio Decisions has no Jev provider set up, with Add a key, Turn off plugin and Hide](assets/plugin-health.png)
 
-![Studio's Plugin setup page on the same staged BB, listing the Studio Decisions problem and when Studio last checked](assets/plugin-setup.png)
+![Studio's Setup page on the same staged BB, listing BB Studio's add-ons with Studio Decisions marked Needs setup because no Jev provider is set up](assets/plugin-setup.png)
 
 ## Development
 
@@ -230,6 +253,7 @@ page-chat history; standalone Pages still provides its own chat when Studio is
 absent.
 
 Existing Studio Chat installs must [migrate their links](../bb-studio-chat/README.md)
-before removing the old plugin. Old draft keys and quote storage are retained.
+before removing the old plugin; the [Setup page](#setup) checks this for you.
+Old draft keys and quote storage are retained.
 
 ![Studio item chat with a staged drawing and its draft](assets/chat-preview.png)
