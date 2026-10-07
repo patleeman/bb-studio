@@ -20,7 +20,7 @@ import {
 import { defaultFallback, fallbackSchema, rpcContract, type Fallback } from "./contract";
 import { jevProviderChoices, jevRoutes } from "./jev-providers";
 import { askSystemOne } from "./system-one";
-import { SmartQueue, describeVerdict, rowText, type DecisionRecord, type ThreadInfo } from "./queue";
+import { RouteFailed, SmartQueue, describeVerdict, rowText, type DecisionRecord, type ThreadInfo } from "./queue";
 
 const recentKey = "recent-decisions";
 const fallbackKey = "fallback";
@@ -383,14 +383,15 @@ export default async function plugin(bb: BbPluginApi) {
         // Sent the way the composer steers, so the dispatch hook sees it.
         await bb.sdk.threads.send({ ...message, mode: "steer-if-active" });
       } catch (error) {
+        let restoredId: string | null = null;
         try {
-          await bb.sdk.threads.queuedMessages.create(message);
+          restoredId = (await bb.sdk.threads.queuedMessages.create(message)).id;
         } catch (restoreError) {
           bb.log.error(
             `Smart Queue lost a message in ${row.threadId}: sending failed (${String(error)}) and re-queueing failed (${String(restoreError)}). Message: ${rowText(row)}`,
           );
         }
-        throw error;
+        throw new RouteFailed(String(error), restoredId, { cause: error });
       }
     },
     list: (threadId) => bb.sdk.threads.queuedMessages.list({ threadId }),

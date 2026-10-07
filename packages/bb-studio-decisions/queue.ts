@@ -74,6 +74,21 @@ export function describeVerdict(verdict: Verdict) {
 export const followupReason = (verdict: Verdict) =>
   `Smart Queue: follow-up after the current turn (${describeVerdict(verdict)}).`;
 
+/**
+ * Taking over a core row failed after the row was deleted. `restoredId` is
+ * the row put back in its place, which stays with core so a lasting failure
+ * does not delete and re-send it every time the queue is read.
+ */
+export class RouteFailed extends Error {
+  constructor(
+    message: string,
+    readonly restoredId: string | null,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+  }
+}
+
 export const isBusy = (status: ThreadInfo["status"]) => status === "active" || status === "starting";
 export const rowText = (row: Pick<QueuedRow, "content">) =>
   row.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("\n");
@@ -242,9 +257,9 @@ export class SmartQueue {
   private async route(row: QueuedRow) {
     // Sent by hand or cancelled while earlier rows were routed.
     if (!this.routed.has(row.id)) return;
-    const ignore = () => {
-      this.routed.delete(row.id);
-      this.entries.set(row.id, {
+    const ignore = (id = row.id) => {
+      this.routed.delete(id);
+      this.entries.set(id, {
         state: "ignored",
         threadId: row.threadId,
         createdAt: row.createdAt,
@@ -261,6 +276,7 @@ export class SmartQueue {
     } catch (error) {
       if (!/not found|HTTP 404|already being sent/i.test(String(error)))
         this.deps.warn(`Smart Queue could not take over ${row.id}: ${String(error)}`);
+      if (error instanceof RouteFailed && error.restoredId) ignore(error.restoredId);
       ignore();
     }
   }

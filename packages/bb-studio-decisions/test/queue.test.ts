@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { MessageDispatchHookContext } from "@get-bb/plugin-sdk";
 import type { Verdict } from "../classifier";
 import {
+  RouteFailed,
   SmartQueue,
   batchingReason,
   decidingReason,
@@ -520,4 +521,21 @@ test("a snapshot taken before a row was sent does not decide it again", async ()
   assert.equal(calls.classified, 1, "the sent row is not classified twice");
   assert.equal(calls.records.length, 1);
   assert.equal(queue.entries.size, 0);
+});
+
+test("a row restored after a failed take-over is left with core, not taken over again", async () => {
+  let attempts = 0;
+  const { queue, advance } = harness(steer, {
+    route: async () => {
+      attempts++;
+      throw new RouteFailed("Another plugin rejected the message.", "q_restored");
+    },
+  });
+  queue.sync([row({ id: "q_core", waitingOn: { kind: "thread-busy" } })], 1_000);
+  await settle();
+  assert.equal(attempts, 1);
+  advance(10);
+  queue.sync([row({ id: "q_restored", waitingOn: { kind: "thread-busy" } })], 1_005);
+  await settle();
+  assert.equal(attempts, 1, "the restored row is not deleted and re-sent in a loop");
 });
