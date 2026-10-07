@@ -41,7 +41,13 @@ export class CdpClient {
         fn(value);
       };
       this.pending.set(id, { resolve: settle(resolvePromise), reject: settle(reject) });
-      this.socket.send(JSON.stringify({ id, method, params }));
+      try {
+        this.socket.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        // A socket that never opened or already closed: don't leave the timer holding the process open.
+        this.pending.delete(id);
+        settle(reject)(error);
+      }
     });
   }
 
