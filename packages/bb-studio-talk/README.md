@@ -160,9 +160,10 @@ The same message at a 390-pixel viewport, with the source pill in view.
   appears while you are still talking.
 - **Linkable and mentionable.** Each recording has its own page at
   `/plugins/talk/recordings/<id>`. It shows up in the composer's @ menu, and
-  mentioning it gives the agent its transcript. Its header names its thread
-  with [Studio chat](../bb-studio), or has **New thread**, which starts
-  a thread that links to it, without.
+  mentioning it gives the agent its transcript. With [Studio](../bb-studio)
+  installed, its **Chat** button opens the linked thread in a split beside the
+  recording. Without it, the header has **New thread**, which starts a thread
+  that links to it.
 - **Auto titles.** Studio Decisions uses its configured fallback model to
   title each recording from its transcript. If Decisions is missing or reports
   that no model is available, Talk uses the transcript's first words and the

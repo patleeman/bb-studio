@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts and Tables keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
+BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts, Tables and Design keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
 
 ## Provider contract
 
@@ -65,3 +65,5 @@ Studio's Setup page (`/plugins/studio/studio/setup`) and `bb studio setup` are t
 - **Retired plugins.** `studio-chat`, `studio-navigation`, `float` and `bot-teams` show up when installed, with what's kept, what's deleted and the steps first. Remove uses `sdk.plugins.remove` after a confirm. Studio Chat is blocked until its links are in Studio: the bridge (0.2.0 or later) runs its migration before answering any legacy call, so Studio calls its `viewing` method and treats an answer as a finished migration. Studio Navigation is blocked until Studio Sidebar is installed and on.
 
 The RPCs are `setup.summary`, `setup.install`, `setup.enable` and `setup.remove` (`src/setup-contract.ts`).
+
+Backup and restore (`bb studio backup|restore` and the Setup page) are described in [backup.md](backup.md).

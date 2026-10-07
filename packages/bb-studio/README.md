@@ -81,22 +81,25 @@ open in the background, so it's as you left it when you come back.
   be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
   The tag menu also renames and deletes the active tag.
-- **Spaces are meta-projects.** Each BB project belongs to one space, and
+- **Spaces** are areas of work. Each BB project belongs to one space, and
   items and threads follow their project; projects nobody filed, and items
   with no project, are in the default space, Personal. A new space gets its
-  own catch-all project under `~/Spaces`, where its new threads and items go.
+  own catch-all folder under `~/Spaces`, where its new threads and items go.
   A thread can also be added to a space by itself, which moves it there.
-  A space can have a lead: one of its threads, which a Heartbeat wakes on a
-  schedule (see [`docs/spaces.md`](../../docs/spaces.md)). Nothing is made
-  for a space but its folder. Deleting a space hands its projects and threads
-  back to Personal.
+  A space can have a lead, one of its threads, which a Heartbeat wakes on a
+  schedule. [Studio Sidebar](../bb-studio-sidebar)'s **By space** view shows
+  one Space at a time with its lead (a star), pinned threads, open items as
+  chips and a **Browse** menu; without it, Studio's own **Spaces** section
+  lists them. Nothing is made for a space but its folder. Deleting a space
+  hands its projects and threads back to Personal. See
+  [`docs/spaces.md`](../../docs/spaces.md).
 - **Shared actions**: select items (shift-click for a range) to start a
   **New thread** that mentions them, move them to a project, archive, or
   delete. Actions an add-on defines, like Talk's "Copy transcripts" or Draw's
   "Copy text", appear when the selection is all that kind.
 - **Tabs in the sidebar.** With [Studio Sidebar](../bb-studio-sidebar)
   as the thread list, each Studio item you open gets a tab in a Studio section
-  above your threads. × or middle-click closes a tab; closing the one on
+  above your threads. Tabs can be pinned. × or middle-click closes a tab; closing the one on
   screen opens the next. The section's ⋯ menu groups tabs by app, sorts them,
   and closes other or all tabs. Studio keeps the tabs, so every window shows
   the same ones, and closes tabs of deleted items.
@@ -113,7 +116,7 @@ open in the background, so it's as you left it when you come back.
 - **Short thread titles.** BB titles a thread once, from the start of its
   first message. Studio renames new threads in 2–5 words after their first
   turn, such as "Invoice PDF pagination bug", and again as the conversation
-  moves on (after 2, 4 and 8 requests, then every 8). The model sees the
+  moves on (after 1, 2, 4 and 8 requests, then every 8). The model sees the
   first request, the latest ones and the agent's latest reply, and keeps the
   current title while it still fits. A title you set, or one a thread was
   spawned with, is never changed. Older threads keep their titles until you
@@ -240,7 +243,27 @@ The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `
 
 ## Space Command view
 
-Open **Command view** from a Space’s sidebar heading. It shows the Space’s ordinary threads as native transcripts. With nothing opened, one pane follows whichever thread is working. Open another thread from the list beside the composer, where a check marks each open thread, and it joins as a pane, so the view becomes a grid you can rearrange. Closing a pane only hides it: open it again from the list, or choose **Follow work** (⚡ in the bar) to go back to one following pane. Panes open on the newest message and keep up as the thread streams. Working panes glow blue with a moving bar, idle ones dim, and a thread with something new since you last read it gets a pulsing orange ring and a **New** badge until you click into its pane. Press **⌘N** or **+** to start a thread right in the grid: a New thread pane opens with BB’s composer and the Space’s project picked, and once you send, the thread joins the Space and takes the pane’s place. Each thread has a one-letter alias, shown on its pane and in the list: type **@b** to address thread B, or @mention threads by title, or use @all. A thread keeps its letter as long as it’s in the Space, even when it isn’t shown, and a letter left by a thread that moved out isn’t handed to another thread until the rest of the alphabet is taken. “To” follows whoever the draft addresses, including a draft restored when the view opens. With nobody addressed, a message goes to the lead, or to the thread you picked with its ↩ or whose message you acted on, such as a suggested reaction. Clicking into a pane to read it doesn't change “To”. The lead forwards it if it’s clearly meant for another thread. Attached files and images reach every recipient, whatever its project; files sent to the lead are also copied to every thread it may forward to, but pasted images can’t be forwarded, so the lead asks you to send those to the thread yourself. If a send reaches some threads but not others, the draft stays and “To” becomes **Retry to** the ones it missed, so sending again doesn’t repeat it to the rest. Files, drafts, permissions and send modes use BB’s composer.
+Open **Command view** from a Space's ⋯ menu in the sidebar. It shows the
+Space's ordinary threads as native transcripts in a grid of panes.
+
+- **Panes.** With nothing opened, one pane follows whichever thread is working
+  (**Follow work**, ⚡). Open more threads from the list beside the composer;
+  each joins as a pane you can rearrange. Closing a pane only hides it.
+  **⌘N** or **+** opens a New thread pane with the Space's project picked.
+- **Status.** Working panes glow blue, idle ones dim, and a thread with
+  something new gets an orange ring and a **New** badge until you click into it.
+- **Aliases.** Each thread has a one-letter alias: type **@b** to address
+  thread B, @mention a title, or use @all. A thread keeps its letter while it
+  is in the Space.
+- **To.** "To" follows whoever the draft addresses. With nobody addressed, a
+  message goes to the lead, or to the thread you picked with ↩ or reacted to.
+  The lead forwards it if it is clearly meant for another thread. Files reach
+  every recipient and are copied to the threads the lead may forward to;
+  pasted images can't be forwarded, so the lead asks you to send those.
+- **Retries.** If a send misses some threads, the draft stays and "To"
+  becomes **Retry to** the ones it missed.
+
+Drafts, permissions and send modes use BB's composer.
 
 ![One pane following the Space's working thread, with the thread list beside the composer](assets/command-follow.png)
 

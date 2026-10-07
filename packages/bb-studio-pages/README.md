@@ -143,24 +143,20 @@ afterwards.
 - **Projects and nesting.** Pages belong to a project or are global, and
   nest to any depth, with a breadcrumb back up. Give a page an emoji icon,
   move it, archive it, or delete it from its ⋯ menu.
-- **Chat about a page.** **Chat** continues the page's conversation or opens
-  BB's new-thread composer. **New conversation** starts another. Sending
-  starts an agent thread in the page's project with the page as context.
-  Conversations open in BB's main view. Existing page chats and links still
-  work.
-  [Studio chat](../bb-studio) provides the suite-wide item links and
-  conversation picker when installed. Standalone Pages keeps its existing
-  composer draft keys. New conversation opens
-  `/plugins/pages/pages/<id>/compose` in the main view; it keeps drafts and
-  attachments while you navigate other pages. The page's Chat
-  action updates when that draft becomes a thread.
+- **Chat about a page.** With [Studio](../bb-studio) installed, **Chat**
+  opens beside the page, in a split: the page's linked thread, or a new
+  conversation with the page as context. **Choose conversation…** picks
+  another. Without Studio, Pages keeps its own composer and history, and
+  conversations open in BB's main view at
+  `/plugins/pages/pages/<id>/compose`, with drafts and attachments kept as you
+  move between pages. Sending starts an agent thread in the page's project.
 - **Version history.** Pages saves a version before an agent's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.
 
 ## Dictation with Talk
 
-With the [Talk](../bb-studio-talk) plugin installed, you can dictate into a
+With [Studio Talk](../bb-studio-talk) installed, you can dictate into a
 page:
 
 - The **Dictate** button at the top right, or **Dictate** in the `/` menu, starts Talk. Press
@@ -178,9 +174,9 @@ Talk, the dictation controls are hidden.
 
 ## For agents
 
-Agents get eight tools: `pages_list`, `pages_read`, `pages_create`,
+Agents get nine tools: `pages_list`, `pages_read`, `pages_create`,
 `pages_edit`, `pages_comments`, `pages_comment`, `pages_comment_reply`, and
-`pages_comment_resolve`. `pages_read` returns Markdown with a block id on the
+`pages_comment_resolve`, plus `explore_explain` (see [Explore](#explore)). `pages_read` returns Markdown with a block id on the
 line before each block, and `pages_edit` applies small operations against those ids. An
 agent can then change one checklist item or paragraph without overwriting
 what you are typing.
@@ -241,7 +237,9 @@ told not to.
 
 ## Explore
 
-Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page, opened in the thread's panel (its **Explore** tab), or on its own page when the thread panel isn't available. Agents can write an explainer themselves with the `explore_explain` tool. Explore keeps its explainers in its own `explore.db` next to Pages' database. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate|stats`.
+Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page, opened in the thread's panel (its **Explore** tab), or on its own page when the thread panel isn't available. Agents can write an explainer themselves with the `explore_explain` tool. Explore keeps its explainers in its own `explore.db` next to Pages' database. The CLI is `bb pages explore list|open|regenerate|stats`.
+
+Explore's settings appear in Pages' settings with an **Explore:** prefix: **End replies with a Next row** (on), **Suggest things to explore** (on), and **Explainer time limit (minutes)** (20). They apply to agent sessions started after the change.
 
 ### Next row
 
