@@ -21,6 +21,9 @@ export const MAX_SMART_REACTIONS = 5;
 /** Longer items are dropped: a reaction is a short reply, not a paragraph. */
 export const MAX_SMART_REACTION_LENGTH = 60;
 
+/** An emoji glyph: pictographs, flags (regional indicators), and keycaps. */
+const EMOJI = /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u;
+
 /** Parse the directive's `items` attribute into reaction items. */
 export function parseSmartReactions(raw: string | undefined): EmojiItem[] {
   if (typeof raw !== "string") return [];
@@ -30,8 +33,9 @@ export function parseSmartReactions(raw: string | undefined): EmojiItem[] {
     const text = part.replace(/\s+/g, " ").trim();
     if (text.length === 0 || text.length > MAX_SMART_REACTION_LENGTH) continue;
     const item = parseEmojiItem(text);
-    // A bare word is not a reaction; the button shows the emoji.
-    if (item.label.length === 0 || seen.has(item.text)) continue;
+    // A bare word is not a reaction, and neither is a label with no emoji:
+    // the button shows the first token as the emoji.
+    if (item.label.length === 0 || !EMOJI.test(item.emoji) || seen.has(item.text)) continue;
     seen.add(item.text);
     items.push(item);
     if (items.length >= MAX_SMART_REACTIONS) break;

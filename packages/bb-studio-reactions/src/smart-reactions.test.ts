@@ -27,6 +27,12 @@ describe("parseSmartReactions", () => {
     ).toEqual(["👍 Agree", "❓ Why"]);
   });
 
+  it("drops items that don't start with an emoji, and keeps flags, keycaps and ZWJ emoji", () => {
+    expect(
+      parseSmartReactions("Ship it|Looks good to me|🇯🇵 Tokyo|1️⃣ First|🏳️‍🌈 Pride|👍🏽 Fine").map((item) => item.emoji),
+    ).toEqual(["🇯🇵", "1️⃣", "🏳️‍🌈", "👍🏽"]);
+  });
+
   it("collapses whitespace, including newlines", () => {
     expect(parseSmartReactions("✅\n Do   it")[0]?.text).toBe("✅ Do it");
   });
