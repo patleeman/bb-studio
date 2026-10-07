@@ -51,6 +51,13 @@ describe("Pages' Next row", () => {
 });
 
 describe("tracking Pages' Next row", () => {
+  it("returns at once, off, while BB hasn't answered yet", () => {
+    const hung = { plugins: { list: () => new Promise<never>(() => {}), getSettings: async () => ({ schema: NEXT_SCHEMA, values: {} }) } };
+    const tracker = trackPagesNextRow(hung, 60_000);
+    expect(tracker.on()).toBe(false);
+    tracker.dispose();
+  });
+
   it("rechecks as soon as BB reports a system change, not a minute later", async () => {
     let values: Record<string, unknown> = { explore_next: true };
     let emit: (event: unknown) => void = () => {};
@@ -64,8 +71,8 @@ describe("tracking Pages' Next row", () => {
         return () => { emit = () => {}; };
       },
     };
-    const tracker = await trackPagesNextRow(live, 50);
-    expect(tracker.on()).toBe(true);
+    const tracker = trackPagesNextRow(live, 50);
+    expect(await tracker.refresh()).toBe(true);
     values = { explore_next: false };
     emit({ entity: "system", type: "changed", changes: ["plugins-changed"] });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -86,7 +93,8 @@ describe("tracking Pages' Next row", () => {
           : new Promise<{ schema: typeof NEXT_SCHEMA; values: Record<string, unknown> }>((resolve) => answers.push(resolve)),
       },
     };
-    const tracker = await trackPagesNextRow(slow, 1_000);
+    const tracker = trackPagesNextRow(slow, 1_000);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const older = tracker.refresh();
     const newer = tracker.refresh();
     await new Promise((resolve) => setTimeout(resolve, 0));

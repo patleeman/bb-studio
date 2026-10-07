@@ -68,18 +68,21 @@ export interface NextRowTracker {
 /**
  * Keeps `pagesNextRowOn` current: rechecks when BB reports a system change
  * (plugins enabled, disabled, reloaded or reconfigured), when asked (each
- * session start), and every `NEXT_ROW_REFRESH_MS` as a backstop.
+ * session start), and every `NEXT_ROW_REFRESH_MS` as a backstop. Returns at
+ * once; the first check runs in the background.
  */
-export async function trackPagesNextRow(sdk: TrackerSdk, timeoutMs: number = NEXT_ROW_TIMEOUT_MS): Promise<NextRowTracker> {
+export function trackPagesNextRow(sdk: TrackerSdk, timeoutMs: number = NEXT_ROW_TIMEOUT_MS): NextRowTracker {
+  // Off until the first check answers, so startup never waits on Pages.
   let current = false;
   let latest = 0;
+  let disposed = false;
   const refresh = async () => {
     const id = ++latest;
     const on = await pagesNextRowOn(sdk, timeoutMs);
-    if (id === latest) current = on;
+    if (id === latest && !disposed) current = on;
     return current;
   };
-  await refresh();
+  void refresh();
   const timer = setInterval(() => void refresh(), NEXT_ROW_REFRESH_MS);
   (timer as { unref?: () => void }).unref?.();
   let unsubscribe: (() => void) | undefined;
@@ -92,6 +95,7 @@ export async function trackPagesNextRow(sdk: TrackerSdk, timeoutMs: number = NEX
     on: () => current,
     refresh,
     dispose() {
+      disposed = true;
       clearInterval(timer);
       unsubscribe?.();
     },

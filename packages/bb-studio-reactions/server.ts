@@ -75,6 +75,10 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
+  // Starts in the background; registered before any await so it's always disposed.
+  const nextRow = trackPagesNextRow(bb.sdk);
+  bb.onDispose(() => nextRow.dispose());
+
   // `configure` is synchronous, so keep the latest values in memory.
   let current = await settings.get();
 
@@ -85,8 +89,6 @@ export default async function plugin(bb: BbPluginApi) {
     );
   });
 
-  const nextRow = await trackPagesNextRow(bb.sdk);
-  bb.onDispose(() => nextRow.dispose());
 
   bb.agents.configure(() => {
     // Recheck for the next session; this one uses the latest answer.
