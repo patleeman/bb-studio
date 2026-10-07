@@ -5,12 +5,13 @@
 // the canvas shows them newest round first, and Studio lists designs in its
 // collection (src/server/studio.ts).
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { createChangeBus, defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
+import { createChangeBus, defineItemMention, registerStudioBackup, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl, type DesignView } from "./src/shared";
 import { DesignStore, MIGRATIONS, displayName, type Writer } from "./src/server/store";
 import { registerStudio, screenText } from "./src/server/studio";
+import { designBackupHandlers } from "./src/server/backup";
 import { withScreenScript } from "./src/server/screen-script";
 import { VERDICT_DONE, parseVerdict, reviewTargets, reviewerPrompt } from "./src/server/review";
 import { MAX_REVIEWS_IN_A_ROW, ReviewQueue } from "./src/server/review-queue";
@@ -324,6 +325,16 @@ export default async function plugin(bb: BbPluginApi) {
       changed(id, store.get(id)?.updated_at ?? Date.now(), "studio");
     },
   });
+
+  // `bb studio backup` / `bb studio restore` (src/server/backup.ts).
+  registerStudioBackup(bb, z, designBackupHandlers({
+    db,
+    store,
+    changed: (id, updatedAt) => {
+      reviews.forget(id);
+      changed(id, updatedAt, "studio");
+    },
+  }));
 
   // One screen's HTML, for the canvas frames and the reviewer's browser. The
   // URL carries the design's revision, so a cached response never goes stale.
