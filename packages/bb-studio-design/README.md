@@ -17,7 +17,7 @@ Captured from a staged BB (`node scripts/staged-bb.mjs start`): the seeded
 Its one round, "Welcome screen", shows two live options side by side: `1a`, a
 desktop welcome page for a release planner, and `1b`, the same screen at
 phone size. The floating pill at the top left holds Reload and the
-**Select** / **Comment** mode switch; the one at the top right holds Present
+**Select** / **Edit text** / **Comment** mode switch; the one at the top right holds Present
 and the zoom controls, fitted at 74%. The capture checks the design's name,
 the round and both option captions, both pills, and that each frame shows its
 screen.
@@ -28,6 +28,22 @@ The seeded "New release flow" design: one mobile prototype that declares
 three steps (Name the release, Pick a checklist, Release created). The canvas
 splays it into one live frame per step, each opened at its step through the
 URL hash, with a Play button on each.
+
+![Live BB screenshot of a four-slide deck laid out on the canvas](assets/staged-deck.png)
+
+The seeded "ORBIT-42 all-hands" deck: one `slide` screen (1920×1080) whose
+four steps are its slides. The canvas lays the slides out as a grid, one
+live frame per slide, each opened at its slide through the URL hash. The
+capture checks the "4 slides" label, that every frame shows its slide's text,
+and that the four slides share one row.
+
+![Live BB screenshot of the deck presented at its second slide](assets/staged-deck-present.png)
+
+The same deck presented with Play from its first slide, then moved on with
+the → key: the bar shows "Why it matters" and "2 / 4", with previous and
+next, **Full screen**, **Export PDF**, **Download HTML** and Fit/Fill. The
+capture checks the counter, the slide title, both buttons and that the frame
+opened at `#why`.
 
 ## What you get
 

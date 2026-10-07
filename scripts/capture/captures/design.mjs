@@ -162,6 +162,56 @@ const releasePrototype = `<!doctype html>
 </body>
 </html>`;
 
+/** A four-slide deck: one slide-size screen whose steps are its slides, shown by the URL hash. */
+const SLIDES = [
+  { id: "what", label: "What it is", kicker: "What it is", title: "Offline sync", accent: "ships Friday", body: "Uploads wait out a dropped connection and finish on their own." },
+  { id: "why", label: "Why it matters", kicker: "Why it matters", title: "Field teams lose work", accent: "when the signal drops", body: "One in five uploads from the field failed last quarter. Each one was redone by hand." },
+  { id: "friday", label: "What ships Friday", kicker: "What ships Friday", title: "Queue, retry,", accent: "and a clear status", body: "Uploads queue offline, retry when the connection returns, and show what still needs attention." },
+  { id: "try", label: "How to try it", kicker: "How to try it", title: "Turn on airplane mode", accent: "and upload a photo", body: "Reconnect and watch it finish. Tell #orbit-launch what happened." },
+];
+const releaseDeck = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<meta name="bb-design-steps" content="${SLIDES.map((slide) => `${slide.id}=${slide.label}`).join("; ")}">
+<title>ORBIT-42 all-hands</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: oklch(0.97 0.01 80); color: oklch(0.24 0.01 80); font-family: Georgia, "Times New Roman", serif; }
+  section { display: none; width: 1920px; height: 1080px; padding: 120px 160px; flex-direction: column; }
+  section.on { display: flex; }
+  .top { display: flex; justify-content: space-between; padding-bottom: 28px; border-bottom: 2px solid oklch(0.85 0.01 80); font: 500 26px/1 ${FONT}; text-transform: uppercase; color: oklch(0.45 0.01 80); }
+  h1 { margin: 160px 0 0; font-size: 140px; font-weight: 400; line-height: 1.02; }
+  h1 em { font-style: normal; color: oklch(0.55 0.15 45); display: block; }
+  p { margin: 56px 0 0; max-width: 30em; font: 44px/1.4 ${FONT}; text-wrap: pretty; }
+  .foot { margin-top: auto; display: flex; justify-content: space-between; font: 26px/1 ${FONT}; color: oklch(0.5 0.01 80); }
+</style>
+</head>
+<body>
+${SLIDES.map((slide, index) => `<section id="${slide.id}">
+  <div class="top"><span>ORBIT-42 / ${slide.kicker}</span><span>Company all-hands</span></div>
+  <h1>${slide.title}<em>${slide.accent}</em></h1>
+  <p>${slide.body}</p>
+  <div class="foot"><span>Offline sync release</span><span>0${index + 1} / 0${SLIDES.length}</span></div>
+</section>`).join("\n")}
+<script>
+  const ids = ${JSON.stringify(SLIDES.map((slide) => slide.id))};
+  const show = () => {
+    const id = ids.includes(location.hash.slice(1)) ? location.hash.slice(1) : ids[0];
+    for (const section of document.querySelectorAll("section")) section.classList.toggle("on", section.id === id);
+  };
+  addEventListener("hashchange", show);
+  addEventListener("keydown", (event) => {
+    const at = ids.indexOf(location.hash.slice(1));
+    const by = { ArrowRight: 1, ArrowLeft: -1, " ": 1 }[event.key];
+    if (by) location.hash = ids[Math.min(ids.length - 1, Math.max(0, (at < 0 ? 0 : at) + by))];
+  });
+  show();
+</script>
+</body>
+</html>`;
+
 const DESIGNS = {
   welcome: {
     name: "Orbit onboarding",
@@ -175,6 +225,11 @@ const DESIGNS = {
     name: "New release flow",
     rounds: [{ round: 1, title: "Create a release", intro: "One prototype for the whole flow, played from any step." }],
     screens: [{ id: "1a", viewport: "mobile", title: "New release", caption: "Three steps on a phone", html: releasePrototype }],
+  },
+  deck: {
+    name: "ORBIT-42 all-hands",
+    rounds: [{ round: 1, title: "All-hands deck", intro: "Four slides on the offline sync release, in the Editorial look." }],
+    screens: [{ id: "1a", viewport: "slide", title: "Deck", caption: "Editorial: warm paper, serif headlines", html: releaseDeck }],
   },
 };
 
@@ -252,12 +307,12 @@ async function waitForFrame(client, sleep, title, text) {
   }
 }
 
-/** The floating pills: Select/Comment mode on the left, zoom on the right. */
+/** The floating pills: Select, Edit text and Comment modes on the left, zoom on the right. */
 async function waitForPills(client) {
   await client.waitForAriaButton("Reload screens");
   await client.waitForSelector('[role="group"][aria-label="Mode"] button[aria-pressed="true"]');
   const modes = await client.evaluate(`[...document.querySelectorAll('[role="group"][aria-label="Mode"] button')].map((b) => b.textContent.trim()).join("|")`);
-  if (!/^Select\|Comment/.test(modes)) throw new Error(`The mode pill shows ${modes}`);
+  if (!/^Select\|Edit text\|Comment/.test(modes)) throw new Error(`The mode pill shows ${modes}`);
   await client.waitForAriaButton("Zoom out");
   await client.waitForAriaButton("Zoom in");
   await client.waitForSelector('button[title="Zoom to fit"]');
@@ -312,6 +367,60 @@ export default (context) => [
         // Each frame opens at its own step through the URL hash.
         const hashes = await client.evaluate(`[...document.querySelectorAll('iframe[title^="Screen 1a,"]')].map((f) => new URL(f.src).hash).join(",")`);
         if (hashes !== "#name,#checklist,#done") throw new Error(`The prototype's frames open at ${hashes}`);
+        await context.sleep(2500);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
+    id: "design-deck",
+    packageDir: "bb-studio-design",
+    fileName: "staged-deck.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const { id, cleanup } = await seedDesign("deck", context);
+      try {
+        await client.navigate(`/plugins/design/designs/${id}`);
+        await client.waitForInputValue("Design name", "ORBIT-42 all-hands");
+        await client.waitForText("All-hands deck");
+        await client.waitForText("4 slides");
+        await waitForPills(client);
+        for (const slide of SLIDES) await waitForFrame(client, context.sleep, `Screen 1a, ${slide.label}`, slide.body);
+        // A deck lays its slides out as a grid: four slides, one row.
+        const tops = await client.evaluate(`[...new Set([...document.querySelectorAll('iframe[title^="Screen 1a,"]')].map((f) => Math.round(f.getBoundingClientRect().top)))].length`);
+        if (tops !== 1) throw new Error(`The deck's slides sit on ${tops} rows`);
+        await context.sleep(2500);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
+    id: "design-deck-present",
+    packageDir: "bb-studio-design",
+    fileName: "staged-deck-present.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const { id, cleanup } = await seedDesign("deck", context);
+      try {
+        await client.navigate(`/plugins/design/designs/${id}`);
+        await client.waitForSelector('button[title="Play 1a from What it is"]');
+        await client.evaluate(`document.querySelector('button[title="Play 1a from What it is"]').click()`);
+        await client.waitForSelector('[role="dialog"][aria-label="Playing 1a"]');
+        // The arrow key moves the presenter to the next slide.
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
+        await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
+        await client.waitForText("2 / 4");
+        await client.waitForText("Why it matters");
+        await client.waitForAriaButton("Export PDF");
+        await client.waitForAriaButton("Full screen");
+        const hash = await client.evaluate(`new URL(document.querySelector('[role="dialog"] iframe').src).hash`);
+        if (hash !== "#why") throw new Error(`The presenter shows ${hash}`);
         await context.sleep(2500);
       } catch (error) {
         await cleanup();
