@@ -25,6 +25,7 @@ import { createSpaceResolver, defaultSpaceId, projectSpaces, type StudioSpace } 
 import {
   beginPendingSpaceMove,
   SPACE_CHANGED_EVENT,
+  startSpaceLoad,
   STUDIO_CHANGED_EVENT,
   studioSpacesAtom,
   useStudioSpaces,
@@ -90,6 +91,25 @@ export function currentSpaceIdOf(
   )(thread);
 }
 
+/** A `space_of_threads` answer fetched outside By space, numbered like a load. */
+export interface SpaceOfLookup {
+  threads: Readonly<Record<string, string>>;
+  load: number;
+}
+
+/**
+ * The thread's Space from a lookup, with moves still in flight laid over it.
+ * Moves that settled before the lookup began, including failed ones, are
+ * already in its answer, so they drop.
+ */
+export function lookedUpSpaceId(
+  thread: SidebarThread,
+  spaces: readonly StudioSpace[],
+  looked: SpaceOfLookup,
+): string | null {
+  return currentSpaceIdOf(thread, spaces, withPendingSpaceMoves(looked.threads, looked.load));
+}
+
 /**
  * Move to Space ▸ in a top-level thread's menu: each Space, the thread's
  * current one checked. By space knows each thread's Space; elsewhere it's
@@ -104,7 +124,7 @@ export function MoveToSpaceItem({ thread, surface }: {
   const compact = useIsCompactViewport();
   const sdk = useSdk();
   const move = useMoveThreadsToSpace();
-  const [looked, setLooked] = useState<Record<string, string> | null | undefined>(undefined);
+  const [looked, setLooked] = useState<SpaceOfLookup | null | undefined>(undefined);
   if (state.status !== "ready" || state.spaces.length < 2) return null;
   if (thread.parentThreadId !== null || thread.archivedAt !== null) return null;
   // The phone drawer has no submenus.
@@ -114,16 +134,17 @@ export function MoveToSpaceItem({ thread, surface }: {
   const currentId = known !== undefined ? known
     : looked === undefined ? undefined
     : looked === null ? null
-    : currentSpaceIdOf(thread, state.spaces, withPendingSpaceMoves(looked));
+    : lookedUpSpaceId(thread, state.spaces, looked);
   const lookUp = (open: boolean) => {
     if (!open || known !== undefined || looked !== undefined) return;
+    const load = startSpaceLoad();
     void sdk.plugins.callRpc({
       pluginId: "studio",
       method: "space_of_threads",
       input: {} as never,
       outputSchema: spaceOfSchema,
       signal: AbortSignal.timeout(10_000),
-    }).then((result) => setLooked(spaceOfSchema.parse(result).threads), () => setLooked(null));
+    }).then((result) => setLooked({ threads: spaceOfSchema.parse(result).threads, load }), () => setLooked(null));
   };
 
   const Sub = surface === "context" ? ContextMenuSub : DropdownMenuSub;

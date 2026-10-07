@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeSidebarThread } from "../testing/fixtures.js";
-import { currentSpaceIdOf } from "./MoveToSpace.js";
+import { currentSpaceIdOf, lookedUpSpaceId } from "./MoveToSpace.js";
+import { beginPendingSpaceMove, startSpaceLoad } from "./studioSpaces.js";
 import type { StudioSpace } from "./space-groups.js";
 
 const spaces: StudioSpace[] = [
@@ -17,5 +18,18 @@ describe("currentSpaceIdOf", () => {
     expect(currentSpaceIdOf(member, spaces, spaceOf)).toBe("sp_home");
     expect(currentSpaceIdOf(viaProject, spaces, spaceOf)).toBe("sp_work");
     expect(currentSpaceIdOf(loose, spaces, spaceOf)).toBe("sp_home");
+  });
+});
+
+describe("lookedUpSpaceId", () => {
+  it("drops a move that failed outside By space once a later lookup answers", () => {
+    const thread = makeSidebarThread({ id: "thr_failed", projectId: "proj_other" });
+    // Outside By space no load numbers the moves, so only the lookup can clear them.
+    const settle = beginPendingSpaceMove([thread.id], "sp_work");
+    const during = { threads: { thr_failed: "sp_home" }, load: startSpaceLoad() };
+    expect(lookedUpSpaceId(thread, spaces, during)).toBe("sp_work");
+    settle();
+    const after = { threads: { thr_failed: "sp_home" }, load: startSpaceLoad() };
+    expect(lookedUpSpaceId(thread, spaces, after)).toBe("sp_home");
   });
 });
