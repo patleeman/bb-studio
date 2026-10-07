@@ -467,20 +467,51 @@ function SpaceDropArea({ spaceId, children }: { spaceId: string; children: React
 
 const COMMAND_PLUGIN_ID = "studio";
 let commandInstalled: Promise<boolean> | null = null;
+let commandCheckedFor: unknown = null;
 
-/** Whether Studio is installed and running; checked once per window. */
-function useCommandInstalled(): boolean {
+type Sdk = ReturnType<typeof useSdk>;
+
+/** One check per window, redone once per BB plugins change however many headings ask. */
+function checkCommandInstalled(sdk: Sdk, change?: unknown): Promise<boolean> {
+  if (change !== undefined && change !== commandCheckedFor) {
+    commandCheckedFor = change;
+    commandInstalled = null;
+  }
+  commandInstalled ??= sdk.plugins.list().then(
+    ({ plugins }) => plugins.some((plugin) => plugin.id === COMMAND_PLUGIN_ID && plugin.enabled && plugin.status !== "error" && plugin.status !== "incompatible"),
+    () => false,
+  );
+  return commandInstalled;
+}
+
+/** Whether Studio is installed and running; checked again when BB's plugins change. */
+export function useCommandInstalled(): boolean {
   const sdk = useSdk();
   const [installed, setInstalled] = useState(false);
   useEffect(() => {
     let live = true;
-    commandInstalled ??= sdk.plugins.list().then(
-      ({ plugins }) => plugins.some((plugin) => plugin.id === COMMAND_PLUGIN_ID && plugin.enabled && plugin.status !== "error" && plugin.status !== "incompatible"),
-      () => false,
-    );
-    void commandInstalled.then((value) => live && setInstalled(value));
+    let latest = 0;
+    const apply = (check: Promise<boolean>) => {
+      const call = ++latest;
+      void check.then((value) => {
+        if (live && call === latest) setInstalled(value);
+      });
+    };
+    apply(checkCommandInstalled(sdk));
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = sdk.subscribe({
+        event: "system:changed",
+        callback: (event) => {
+          if (event.changes.includes("plugins-changed")) apply(checkCommandInstalled(sdk, event));
+        },
+      });
+    } catch {
+      // No realtime here: the first check stands.
+    }
     return () => {
       live = false;
+      unsubscribe?.();
     };
   }, [sdk]);
   return installed;
@@ -489,6 +520,7 @@ function useCommandInstalled(): boolean {
 /** Forget the cached Studio check. */
 export function resetCommandInstalledForTest(): void {
   commandInstalled = null;
+  commandCheckedFor = null;
 }
 
 /**
