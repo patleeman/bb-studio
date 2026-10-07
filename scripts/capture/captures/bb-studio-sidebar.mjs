@@ -210,9 +210,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     showSidebar: true,
     setup: async (client) => {
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-      // New project is in every section's menu. With no loose threads there's no
-      // Threads section, so the seeded Orbit project's menu opens it instead.
-      await client.waitForAriaButton("Orbit actions");
+      // New project is in every section's menu: the loose Threads section's, or
+      // with no loose threads, the seeded Orbit project's.
+      await client.waitForSelector('button[aria-label="Threads actions"], button[aria-label="Orbit actions"]');
       const menu = await client.evaluate(`document.querySelector('button[aria-label="Threads actions"]') ? "Threads actions" : "Orbit actions"`);
       await client.evaluate(`document.querySelector('button[aria-label=${JSON.stringify(menu)}]')?.scrollIntoView({ block: 'center' })`);
       await sleep(350);
