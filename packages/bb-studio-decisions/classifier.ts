@@ -241,6 +241,11 @@ export async function askModel(
 export async function discardSession(bb: BbPluginApi, threadId: string, sessions: Set<string>) {
   try {
     await bb.sdk.threads.stop({ threadId });
+  } catch (error) {
+    // Delete anyway, so a stop that fails never leaves the hidden thread behind.
+    if (!/not found|HTTP 404/i.test(String(error))) bb.log.warn(`Studio Decisions could not stop session ${threadId}: ${String(error)}`);
+  }
+  try {
     await bb.sdk.threads.delete({ threadId, childThreadsConfirmed: false });
     sessions.delete(threadId);
   } catch (error) {

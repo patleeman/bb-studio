@@ -9,6 +9,7 @@ import {
   askBatch,
   askJev,
   classify,
+  discardSession,
   modelPrompt,
   parseModelVerdict,
   situationState,
@@ -222,4 +223,27 @@ test("Jev picks the follow-ups that belong in the next turn, as data, above the 
   assert.deepEqual(Object.keys(body!.questions), ["m1", "m2"]);
   assert.equal(body!.questions.m1!.type, "noul");
   assert.deepEqual(JSON.parse(body!.state).messages, { m1: "Also, what's for lunch?", m2: "And keep the old schema" });
+});
+
+test("a hidden fallback session is deleted even when stopping it fails", async () => {
+  const removed: string[] = [];
+  const warnings: string[] = [];
+  const bb = {
+    sdk: {
+      threads: {
+        stop: async () => {
+          throw new Error("HTTP 409: the machine could not confirm the stop");
+        },
+        delete: async ({ threadId }: { threadId: string }) => {
+          removed.push(threadId);
+        },
+      },
+    },
+    log: { warn: (message: string) => warnings.push(message) },
+  };
+  const sessions = new Set(["thr_hidden"]);
+  await discardSession(bb as never, "thr_hidden", sessions);
+  assert.deepEqual(removed, ["thr_hidden"]);
+  assert.equal(sessions.has("thr_hidden"), false);
+  assert.equal(warnings.length, 1, "the failed stop is logged");
 });
