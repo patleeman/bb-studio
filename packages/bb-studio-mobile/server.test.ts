@@ -148,4 +148,34 @@ describe("clearing notifications", () => {
       expect(JSON.parse(payloads[0]!)).toMatchObject({ serverId: expect.any(String), clearThreadIds: ["thr_a"] });
     } finally { await host.harness.lifecycle.dispose(); }
   });
+
+  it("forgets a device Apple rejects for good instead of retrying the clear every minute", async () => {
+    vi.useFakeTimers();
+    const { EventEmitter } = await import("node:events");
+    const goneToken = "b".repeat(64);
+    const sent: string[] = [];
+    vi.spyOn(Http2ApnsSender.prototype as any, "session").mockReturnValue({
+      request: (headers: Record<string, string>) => {
+        const request = new EventEmitter() as any;
+        request.setTimeout = () => {};
+        request.setEncoding = () => {};
+        request.end = () => {
+          sent.push(headers[":path"]!);
+          const gone = headers[":path"]!.endsWith(goneToken);
+          request.emit("response", { ":status": gone ? 410 : 200 });
+          if (gone) request.emit("data", JSON.stringify({ reason: "Unregistered" }));
+          request.emit("close");
+        };
+        return request;
+      },
+    });
+    const host = await clearingHost(async () => []);
+    try {
+      await host.bb.storage.kv.set("devices", { ["apns:" + "a".repeat(64)]: Date.now(), ["apns:" + goneToken]: Date.now() });
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(await host.bb.storage.kv.get("notified-threads")).toEqual({});
+      expect(Object.keys((await host.bb.storage.kv.get("devices")) as object)).toEqual(["apns:" + "a".repeat(64)]);
+      expect(sent).toHaveLength(2);
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
 });

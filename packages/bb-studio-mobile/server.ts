@@ -19,6 +19,7 @@ import {
   APNS_TOKEN_PREFIX,
   deliverApns,
   Http2ApnsSender,
+  isGoneResult,
   notificationCategory,
   ProviderToken,
   rememberedDevices,
@@ -324,15 +325,22 @@ export default async function plugin(bb: BbPluginApi) {
       if ("missing" in apns) return notified;
       const states = Object.fromEntries(await Promise.all(threadIds.map(async (id) => [id, await readState(id)] as const)));
       const { clear, keep } = partition(notified, states, Date.now());
-      const devices = Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {})
+      let devices = Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {})
         .filter((to) => to.startsWith(APNS_TOKEN_PREFIX))
         .map((to) => to.slice(APNS_TOKEN_PREFIX.length));
+      const gone = new Set<string>();
       for (let start = 0; start < clear.length; start += CLEAR_BATCH) {
         const batch = clear.slice(start, start + CLEAR_BATCH);
         const payload = clearPayload(batch, serverId);
+        devices = devices.filter((deviceToken) => !gone.has(deviceToken));
         let delivered = devices.length > 0;
         for (const deviceToken of devices) {
           const result = await sendApns({ deviceToken, payload, pushType: "background", priority: 5 }, apns.config, apns.token, sender.send);
+          // A token Apple rejects for good is forgotten instead of blocking every clear and retrying it each minute.
+          if (isGoneResult(result)) {
+            gone.add(deviceToken);
+            continue;
+          }
           if (result.status !== 200) {
             delivered = false;
             bb.log.warn(`clear push failed: ${result.reason ?? result.status}`);
@@ -340,6 +348,11 @@ export default async function plugin(bb: BbPluginApi) {
         }
         // Clearing twice is harmless; dropping a failed clear is permanent.
         if (!delivered) for (const id of batch) keep[id] = notified[id]!;
+      }
+      if (gone.size > 0) {
+        const current = (await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {};
+        for (const deviceToken of gone) delete current[`${APNS_TOKEN_PREFIX}${deviceToken}`];
+        await bb.storage.kv.set(DEVICES_KEY, current);
       }
       return keep;
     });

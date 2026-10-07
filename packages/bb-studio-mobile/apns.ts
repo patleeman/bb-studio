@@ -147,6 +147,11 @@ function renderPayload(message: ExpoMessage, body: string): string {
 /** Tokens Apple will never accept again; the sender deletes their subscription rows. */
 const GONE_REASONS = new Set(["BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic"]);
 
+/** Apple will never accept this token again. */
+export function isGoneResult(result: ApnsResult): boolean {
+  return result.status === 410 || (result.reason !== undefined && GONE_REASONS.has(result.reason));
+}
+
 export type ApnsPush = {
   deviceToken: string;
   payload: string;
@@ -203,7 +208,7 @@ export async function deliverApns(
   return {
     status: "error",
     message: `APNs rejected the notification: ${reason}`,
-    details: { error: GONE_REASONS.has(reason) || result.status === 410 ? "DeviceNotRegistered" : reason },
+    details: { error: isGoneResult(result) ? "DeviceNotRegistered" : reason },
   };
 }
 
