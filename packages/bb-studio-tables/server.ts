@@ -1,7 +1,7 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
-import { createChangeBus, createStoreProvider, defineItemMention, studioIndex, studioServices } from "@bb-studio/kit/server";
+import { createChangeBus, createStoreProvider, defineItemMention, registerStudioBackup, studioIndex, studioServices } from "@bb-studio/kit/server";
 import {
   columnSchema,
   csv,
@@ -23,6 +23,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { MIGRATIONS, TableStore } from "./src/store";
 import { agentPage, queryPage } from "./src/query";
+import { tablesBackup } from "./src/backup";
 
 const id = z.string().min(1).max(100);
 
@@ -86,6 +87,8 @@ export default function plugin(bb: BbPluginApi) {
     event: (tableId) => ({ tableId }),
   });
   const changed = (tableId: string) => changes.changed(tableId);
+  // `bb studio backup` and `bb studio restore` (src/backup.ts).
+  registerStudioBackup(bb, z, tablesBackup(store, (ids) => ids.forEach(changed)));
   const services = studioServices(bb.sdk);
   /** Tells Studio an agent made a table, so it joins the thread's spaces. */
   const created = (tableId: string, threadId: string) => void services.created({ pluginId: TABLES_PLUGIN_ID, id: tableId }, threadId).catch(() => { /* Studio is optional. */ });

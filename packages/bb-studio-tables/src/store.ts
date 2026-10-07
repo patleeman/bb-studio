@@ -192,4 +192,34 @@ export class TableStore {
   delete(id: string): void {
     this.db.prepare("DELETE FROM studio_tables WHERE id=?").run(id);
   }
+
+  /** A backed-up table's columns and views, checked as a save checks them. */
+  checked(table: Table): Table {
+    const columns = checkedColumns(table.columns);
+    return { ...table, columns, views: checkedViews(table.views, columns) };
+  }
+
+  /** Writes a checked table as a backup had it, keeping its id and times (src/backup.ts). */
+  put(table: Table): void {
+    this.db
+      .prepare(
+        `INSERT INTO studio_tables (id, title, project_id, data, archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET title = excluded.title, project_id = excluded.project_id, data = excluded.data,
+           archived = excluded.archived, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+      )
+      .run(
+        table.id,
+        table.title,
+        table.projectId,
+        JSON.stringify({ columns: table.columns, views: table.views, rows: table.rows }),
+        Number(table.archived),
+        table.createdAt,
+        table.updatedAt,
+      );
+  }
+
+  /** Runs `work` in one transaction. */
+  transaction(work: () => void): void {
+    this.db.transaction(work)();
+  }
 }
