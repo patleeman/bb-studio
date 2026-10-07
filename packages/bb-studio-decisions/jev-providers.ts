@@ -80,13 +80,18 @@ const headerName = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
  */
 export function customHeaders(value: string): Record<string, string> {
   const headers: Record<string, string> = {};
+  let position = 0;
   for (const entry of value.split(/[\n;]/)) {
     if (!entry.trim()) continue;
+    position++;
     const colon = entry.indexOf(":");
     const name = entry.slice(0, colon).trim();
     const headerValue = entry.slice(colon + 1).trim();
+    // Never quote the entry: a header value can be a credential.
     if (colon < 1 || !headerName.test(name) || !headerValue)
-      throw new Error(`The custom Jev header "${entry.trim()}" is not in \`name: value\` form.`);
+      throw new Error(
+        `Custom Jev header ${position}${colon >= 1 && headerName.test(name) ? ` (${name})` : ""} is not in \`name: value\` form.`,
+      );
     if (reservedHeaders.has(name.toLowerCase()))
       throw new Error(`Studio Decisions sets ${name} itself; use the custom key settings for authorization.`);
     headers[name] = headerValue;

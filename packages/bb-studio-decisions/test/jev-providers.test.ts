@@ -77,3 +77,16 @@ test("custom headers must be well formed and leave authorization to the key sett
   assert.match(problem({ customJevHeaders: "Authorization: Bearer x" })!, /sets Authorization itself/);
   assert.match(problem({ customJevApiKey: "k", customJevApiKeyCommand: "cmd" })!, /not both/);
 });
+
+test("a malformed custom header is named by position, never by its value", () => {
+  const problem = (customJevHeaders: string) =>
+    jevRoutes({ jevProvider: "custom", customJevEndpoint: "https://gw.example.com/x", customJevModel: "m", customJevHeaders }, {})
+      .problems.join(" ");
+  const missingColon = problem("source: bb; x-api-key=sk-secret-123");
+  assert.doesNotMatch(missingColon, /sk-secret-123/);
+  assert.match(missingColon, /header 2\b/);
+  const badName = problem("x api key: sk-secret-456");
+  assert.doesNotMatch(badName, /sk-secret-456/);
+  assert.match(badName, /header 1\b/);
+  assert.match(problem("x-token:"), /header 1 \(x-token\)/);
+});
