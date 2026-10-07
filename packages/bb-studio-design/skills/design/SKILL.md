@@ -58,6 +58,12 @@ generous margins, and the same grid on every slide. Put speaker notes in the
 chat, not on the slides. For later changes, edit the one slide with
 `design_edit_screen`; for a new look, start a new round.
 
+## Edits on the canvas
+
+The user can also type over a screen's text right on the canvas, which
+changes its HTML. Always read a screen with `design_read` before editing it,
+and keep their wording.
+
 ## Comments
 
 The user can pin comments to elements of a screen. Ones they send to you

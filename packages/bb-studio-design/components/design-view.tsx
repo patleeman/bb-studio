@@ -138,8 +138,11 @@ export function DesignBoard({ design, leftTools, inThread = false }: {
           </button>
           <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
           <div role="group" aria-label="Mode" className="flex items-center gap-0.5">
-            <button type="button" aria-pressed={!comments.commenting} className={cn(MODE_BUTTON, !comments.commenting && MODE_ON)} onClick={() => comments.setCommenting(false)}>
+            <button type="button" aria-pressed={!comments.commenting && !comments.editing} className={cn(MODE_BUTTON, !comments.commenting && !comments.editing && MODE_ON)} onClick={() => { comments.setCommenting(false); comments.setEditing(false); }}>
               Select
+            </button>
+            <button type="button" aria-pressed={comments.editing} title="Click text on a screen to type over it. Enter saves, Esc cancels." className={cn(MODE_BUTTON, comments.editing && MODE_ON)} onClick={() => comments.setEditing(true)}>
+              <Icon name="TextFont" className="size-3.5" /> Edit text
             </button>
             <button type="button" aria-pressed={comments.commenting} title="Click an element on a screen to comment on it" className={cn(MODE_BUTTON, comments.commenting && MODE_ON)} onClick={() => comments.setCommenting(true)}>
               <Icon name="MessageSquare" className="size-3.5" /> Comment

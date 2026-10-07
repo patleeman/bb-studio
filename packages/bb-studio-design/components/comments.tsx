@@ -23,7 +23,9 @@ type ScreenMessage =
   | { type: "pick"; selector: string; html: string; text: string; rect: Rect }
   | { type: "rects"; rects: Record<string, Rect | null> }
   | { type: "wheel"; deltaX: number; deltaY: number; zoom: boolean; x: number; y: number }
-  | { type: "space"; down: boolean };
+  | { type: "space"; down: boolean }
+  | { type: "text"; before: string; text: string }
+  | { type: "not-editable" };
 
 /**
  * The comment layer's state for one board: the frames, comment mode, where
@@ -33,7 +35,12 @@ type ScreenMessage =
  */
 export function useComments(design: DesignView, board: RefObject<HTMLDivElement | null>, canvas: RefObject<CanvasApi | null>) {
   const frames = useRef(new Map<string, HTMLIFrameElement>());
-  const [commenting, setCommenting] = useState(false);
+  const rpc = useRpc<typeof rpcContract>();
+  const [commenting, setCommentingState] = useState(false);
+  /** Edit mode: click text on a screen to type over it. Comment and edit modes exclude each other. */
+  const [editing, setEditingState] = useState(false);
+  const setCommenting = useCallback((on: boolean) => { setCommentingState(on); if (on) setEditingState(false); }, []);
+  const setEditing = useCallback((on: boolean) => { setEditingState(on); if (on) setCommentingState(false); }, []);
   /** Per frame: each commented selector's box, in the screen's own pixels. */
   const [rects, setRects] = useState<Record<string, Record<string, Rect | null>>>({});
   const [draft, setDraft] = useState<Pick | null>(null);
@@ -79,7 +86,7 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
       if (!key) return;
       const [screenId = "", step = ""] = key.split("#");
       if (data.type === "ready") {
-        send(key, { type: "mode", on: commenting });
+        send(key, { type: "mode", on: commenting, edit: editing });
         locate(key);
       } else if (data.type === "rects") {
         setRects((current) => ({ ...current, [key]: { ...current[key], ...data.rects } }));
@@ -101,24 +108,36 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
         });
       } else if (data.type === "space") {
         canvas.current?.setSpace(data.down);
+      } else if (data.type === "text") {
+        rpc.call("editText", { designId: design.id, screenId, before: data.before, after: data.text })
+          .then((result) => {
+            if (result.ok) return;
+            // The live text no longer matches the source exactly once; reload the frame to undo the typing.
+            toast.error(result.reason === "ambiguous" ? "That text appears more than once in the screen. Comment on it instead, and the agent will change it." : "That text is drawn by the screen's script, so it can't be edited here. Comment on it instead.");
+            const frame = frames.current.get(key);
+            if (frame) frame.src = frame.src;
+          })
+          .catch((error) => toast.error(errorMessage(error)));
+      } else if (data.type === "not-editable") {
+        toast.info("Only text can be edited here. Click a heading, label or paragraph, or comment on the element instead.");
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [canvas, commenting, frameBox, locate, send, toBoard]);
+  }, [canvas, commenting, design.id, editing, frameBox, locate, rpc, send, toBoard]);
 
-  // Every screen follows the mode; leaving it drops an unsent draft.
+  // Every screen follows the mode; leaving comment mode drops an unsent draft.
   useEffect(() => {
-    for (const key of frames.current.keys()) send(key, { type: "mode", on: commenting });
+    for (const key of frames.current.keys()) send(key, { type: "mode", on: commenting, edit: editing });
     if (!commenting) setDraft(null);
-  }, [commenting, send]);
+  }, [commenting, editing, send]);
 
   // Re-place pins when comments change.
   useEffect(() => {
     for (const key of frames.current.keys()) locate(key);
   }, [locate]);
 
-  return { commenting, setCommenting, rects, register, draft, setDraft, open, setOpen };
+  return { commenting, setCommenting, editing, setEditing, rects, register, draft, setDraft, open, setOpen };
 }
 
 /** Numbered pins over one screen, in the screen's own pixels (the canvas scales them with it). */

@@ -13,6 +13,8 @@
 const SCREEN_AGENT = String.raw`(() => {
   const MARK = "data-bb-design-ui";
   let commenting = false;
+  /** Edit mode: click an element's text to type over it. */
+  let editing = false;
   let outline = null;
   const post = (message) => window.parent.postMessage(Object.assign({ bbDesign: true }, message), "*");
 
@@ -56,8 +58,55 @@ const SCREEN_AGENT = String.raw`(() => {
     Object.assign(outline.style, { display: "block", left: (rect.x - 2) + "px", top: (rect.y - 2) + "px", width: (rect.width + 4) + "px", height: (rect.height + 4) + "px" });
   }
 
-  document.addEventListener("mouseover", (event) => { if (commenting) showOutline(target(event)); }, true);
+  // Only elements that hold text alone can be edited in place; others take a comment.
+  function editable(element) {
+    if (!element || element.children.length || element.closest("script, style, textarea, select, [" + MARK + "]")) return null;
+    return (element.textContent || "").trim() ? element : null;
+  }
+
+  function startEdit(element) {
+    const before = element.innerHTML;
+    const original = element.innerText;
+    showOutline(null);
+    element.setAttribute("contenteditable", "plaintext-only");
+    element.focus();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    let finished = false;
+    const finish = (save) => {
+      if (finished) return;
+      finished = true;
+      element.removeAttribute("contenteditable");
+      element.removeEventListener("keydown", onKey, true);
+      const text = element.innerText;
+      if (!save) element.innerHTML = before;
+      else if (text.trim() !== original.trim()) post({ type: "text", before: before, text: text });
+    };
+    const onKey = (event) => {
+      event.stopPropagation();
+      if (event.key === "Escape") { event.preventDefault(); finish(false); element.blur(); }
+      if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); element.blur(); }
+    };
+    element.addEventListener("keydown", onKey, true);
+    element.addEventListener("blur", () => finish(true), { once: true });
+  }
+
+  document.addEventListener("mouseover", (event) => {
+    if (commenting) showOutline(target(event));
+    else if (editing && !document.activeElement?.isContentEditable) showOutline(editable(target(event)));
+  }, true);
   document.addEventListener("click", (event) => {
+    if (editing) {
+      const element = editable(target(event));
+      if (element?.isContentEditable) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (element) startEdit(element);
+      else post({ type: "not-editable" });
+      return;
+    }
     if (!commenting) return;
     const element = target(event);
     if (!element) return;
@@ -79,8 +128,9 @@ const SCREEN_AGENT = String.raw`(() => {
     if (!data || !data.bbDesign) return;
     if (data.type === "mode") {
       commenting = Boolean(data.on);
-      document.documentElement.style.cursor = commenting ? "crosshair" : "";
-      if (!commenting) showOutline(null);
+      editing = !commenting && Boolean(data.edit);
+      document.documentElement.style.cursor = commenting ? "crosshair" : editing ? "text" : "";
+      if (!commenting && !editing) showOutline(null);
     }
     if (data.type === "locate") {
       const rects = {};
@@ -114,7 +164,7 @@ const SCREEN_AGENT = String.raw`(() => {
   }, { passive: false });
 
   // Space held outside a text field lets the canvas pan by dragging.
-  const typing = (target) => target instanceof Element && Boolean(target.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']"));
+  const typing = (target) => target instanceof Element && Boolean((target.closest("input, textarea, select") || (target instanceof HTMLElement && target.isContentEditable)));
   window.addEventListener("keydown", (event) => {
     if (event.code === "Space" && !event.repeat && !typing(event.target)) { event.preventDefault(); post({ type: "space", down: true }); }
   });

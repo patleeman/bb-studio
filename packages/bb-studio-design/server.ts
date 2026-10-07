@@ -10,6 +10,7 @@ import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { printCsp, printPage } from "./src/server/print";
+import { applyTextEdit } from "./src/server/text-edit";
 import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, VIEWPORTS, MIN_SIDE, MAX_SIDE, frameSize, parseViewport, type Viewport, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl, type DesignView } from "./src/shared";
 import { DesignStore, MIGRATIONS, displayName, type Writer } from "./src/server/store";
 import { registerStudio, screenText } from "./src/server/studio";
@@ -31,6 +32,8 @@ export const answersSchema = z.record(z.string().max(40), z.union([z.string().ma
 
 /** Generous for one hand-written screen; keeps a runaway write from filling the database. */
 const MAX_SCREEN_CHARS = 400_000;
+/** Longest text one on-canvas edit replaces. */
+const MAX_EDIT_TEXT = 5000;
 /** A style's CSS: tokens and base rules, not whole screens. */
 const MAX_STYLE_CSS = 40_000;
 /** Above this, design_read lists screens instead of inlining their HTML. */
@@ -102,6 +105,11 @@ export const rpcContract = defineRpcContract({
       send: z.boolean(),
     }),
     output: z.object({ id: z.string(), sent: z.boolean() }),
+  },
+  /** Text the user typed over an element's text right on the canvas (src/server/text-edit.ts). */
+  editText: {
+    input: z.object({ designId: z.string(), screenId: z.string().regex(SCREEN_ID), before: z.string().min(1).max(MAX_EDIT_TEXT), after: z.string().max(MAX_EDIT_TEXT) }),
+    output: z.object({ ok: z.boolean(), reason: z.enum(["missing", "ambiguous"]).optional() }),
   },
   sendComment: {
     input: z.object({ id: z.string() }),
@@ -291,6 +299,17 @@ export default async function plugin(bb: BbPluginApi) {
       if (send) await sendToThread(row, comment);
       changed(designId, store.bump(designId, "editor"), "editor");
       return { id: comment.id, sent: send };
+    },
+    editText({ designId, screenId, before, after }) {
+      const screen = store.screen(designId, screenId);
+      if (!screen) throw new Error("Screen not found.");
+      const edit = applyTextEdit(screen.html, before, after);
+      if (!edit.ok) return edit;
+      if (edit.html.length > MAX_SCREEN_CHARS) throw new Error("The screen would be too large.");
+      const updatedAt = store.writeScreen(designId, { id: screenId, html: edit.html }, "editor");
+      reviews.userChanged(designId);
+      changed(designId, updatedAt, "editor");
+      return { ok: true };
     },
     async sendComment({ id }) {
       const comment = store.comment(id);
