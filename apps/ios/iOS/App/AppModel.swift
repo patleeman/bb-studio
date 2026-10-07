@@ -1,5 +1,7 @@
 import Foundation
 import SwiftUI
+import UIKit
+import UserNotifications
 
 enum Route: Hashable {
     case thread(id: String)
@@ -137,6 +139,18 @@ final class AppModel: ObservableObject {
         replyThreadId = nil
         Outbox.shared.flush()
         TalkOutbox.shared.kick()
+        registerPushWithNewServer()
+    }
+
+    /// The phone registers its push token at launch, with the server selected then.
+    /// Register again so the new server can notify this phone before the next launch.
+    private func registerPushWithNewServer() {
+        #if !targetEnvironment(simulator)
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard [UNAuthorizationStatus.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus) else { return }
+            DispatchQueue.main.async { UIApplication.shared.registerForRemoteNotifications() }
+        }
+        #endif
     }
 
     /// The socket keeps the radio awake, and nothing shows its updates in the
