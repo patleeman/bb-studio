@@ -62,7 +62,13 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
         synthesizer.delegate = self
     }
 
+    /// Bumped by each start and end, so a start the user closed mid-way stops there
+    /// instead of turning the mic on behind a dismissed sheet.
+    private var run = 0
+
     func start() async {
+        run += 1
+        let run = run
         let speech = await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
         }
@@ -73,11 +79,13 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
                 : "Speech recognition is off for BB Studio. Turn it on in Settings, then try again.")
             return
         }
+        guard run == self.run else { return }
         guard await AVAudioApplication.requestRecordPermission() else {
             needsSettings = true
             state = .failed("Microphone access is off for BB Studio. Turn it on in Settings, then try again.")
             return
         }
+        guard run == self.run else { return }
         do {
             // Default mode and A2DP, as dictation does: `.voiceChat` routes input
             // to a Bluetooth headset's HFP mic, which is often silent or muted.
@@ -102,10 +110,12 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
         observe()
         if let thread = try? await client.thread(threadId) { threadTitle = thread.displayTitle }
         baselineReplyId = try? await latestReply()?.id
+        guard run == self.run else { return }
         listen()
     }
 
     func end() {
+        run += 1
         stopListening()
         synthesizer.stopSpeaking(at: .immediate)
         checkTask?.cancel()
