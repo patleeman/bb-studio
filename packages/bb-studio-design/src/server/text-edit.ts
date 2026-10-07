@@ -28,7 +28,20 @@ const INLINE_TAGS = new Set(["br", "em", "strong", "b", "i", "u", "s", "span", "
 /** Text and inline formatting only: no other tags, event handlers or script URLs. */
 export function isInlineMarkup(html: string): boolean {
   for (const [, name] of html.matchAll(/<\/?\s*([a-zA-Z][\w-]*)/g)) if (!INLINE_TAGS.has(name!.toLowerCase())) return false;
-  return !/\son[a-z]+\s*=|javascript:|<!--/i.test(html);
+  if (/[\s/"'=]on[a-z]+\s*=|<!--/i.test(html)) return false;
+  // A browser reads "java&#115;cript:" and "java\tscript:" as a script URL too.
+  return !/(?:java|vb)script:/i.test(withoutEntities(html).replace(/[\u0000-\u0020]/g, ""));
+}
+
+/** Numeric character references and &colon; spelled out, the way a browser reads an attribute. */
+function withoutEntities(html: string): string {
+  return html
+    .replace(/&#(x[0-9a-f]{1,6}|\d{1,7});?/gi, (entity, code: string) => {
+      const point = code[0] === "x" || code[0] === "X" ? parseInt(code.slice(1), 16) : Number(code);
+      return point <= 0x10ffff ? String.fromCodePoint(point) : entity;
+    })
+    .replace(/&colon;/gi, ":")
+    .replace(/&(?:tab|newline);/gi, " ");
 }
 
 export type TextEdit = { ok: true; html: string } | { ok: false; reason: "missing" | "ambiguous" | "markup" };

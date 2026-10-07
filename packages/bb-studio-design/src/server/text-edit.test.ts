@@ -26,7 +26,8 @@ describe("editing text on the canvas", () => {
 
   it("takes only text and inline formatting", () => {
     expect(isInlineMarkup(`Hi <strong>there</strong><br>`)).toBe(true);
-    for (const bad of [`<script>x()</script>`, `<img src=x onerror=alert(1)>`, `<a href="javascript:x()">y</a>`, `<span onclick="x()">y</span>`, `<div>y</div>`])
+    for (const bad of [`<script>x()</script>`, `<img src=x onerror=alert(1)>`, `<a href="javascript:x()">y</a>`, `<span onclick="x()">y</span>`, `<div>y</div>`,
+      `<span/onclick="x()">y</span>`, `<a href="java&#115;cript:x()">y</a>`, `<a href="java&#x09;script&colon;x()">y</a>`, `<a href=" javascript\n:x()">y</a>`])
       expect(isInlineMarkup(bad)).toBe(false);
     expect(applyTextEdit(`<p>Hi</p>`, "Hi", `<img src=x onerror=alert(1)>`)).toEqual({ ok: false, reason: "markup" });
   });
