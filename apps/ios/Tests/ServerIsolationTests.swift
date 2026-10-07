@@ -75,6 +75,23 @@ final class ServerIsolationTests: XCTestCase {
         XCTAssertFalse(AppLink.acceptsOrigin(link, serverURL: b))
     }
 
+    @MainActor
+    func testSwitchingServersKeepsEachServersLastThread() {
+        let model = AppModel.shared
+        let original = model.serverURL
+        defer {
+            model.setServerURL(original)
+            for server in [a, b] { UserDefaults.standard.removeObject(forKey: ServerScope.key("lastThreadId", serverURL: server)) }
+        }
+        model.setServerURL(a)
+        model.lastThreadId = "thr_a"
+        model.setServerURL(b)
+        XCTAssertEqual(model.lastThreadId, "")
+        model.lastThreadId = "thr_b"
+        model.setServerURL(a)
+        XCTAssertEqual(model.lastThreadId, "thr_a")
+    }
+
     func testStatusSnapshotCountsIncludeOrigin() {
         let first = StatusSnapshot(ThreadSummary([]), serverURL: a)
         let second = StatusSnapshot(ThreadSummary([]), serverURL: b)

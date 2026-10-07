@@ -132,7 +132,6 @@ final class AppModel: ObservableObject {
         flushOutboxOnConnect()
         path = []
         studioPath = []
-        lastThreadId = ""
         newThreadDraft = nil
         newThreadSpace = nil
         replyThreadId = nil
