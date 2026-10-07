@@ -124,6 +124,13 @@ function isUrl(text: string): boolean {
   }
 }
 
+/** A YYYY-MM-DD day the calendar has: Date.parse rolls 2024-02-30 over to March. */
+function isDay(text: string): boolean {
+  if (!DAY.test(text)) return false;
+  const time = Date.parse(`${text}T00:00:00Z`);
+  return !Number.isNaN(time) && new Date(time).toISOString().startsWith(text);
+}
+
 /** Schemes a link must not run: a URL cell opens in the browser. */
 const UNSAFE_SCHEMES = new Set(["javascript:", "data:", "vbscript:"]);
 
@@ -170,7 +177,7 @@ export function validateValues(columns: Column[], values: Values, partial = fals
                 : typeof value === "string";
       if (!valid) throw new Error(`Invalid value for ${column.name} (${column.type})`);
       if (column.type === "select" && !column.options.includes(value as string)) throw new Error(`Unknown option for ${column.name}`);
-      if (column.type === "date" && (!DAY.test(value as string) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))))
+      if (column.type === "date" && (stored ? !DAY.test(value as string) || Number.isNaN(Date.parse(`${value}T00:00:00Z`)) : !isDay(value as string)))
         throw new Error(`Invalid date for ${column.name}`);
       if (column.type === "url" && !(stored ? isUrl(value as string) : isSafeUrl(value as string))) throw new Error(`Invalid URL for ${column.name}`);
     }
@@ -267,10 +274,10 @@ export function convertCell(cell: Cell | undefined, column: Pick<Column, "type">
       return options.length ? options : null;
     }
     case "date": {
-      if (DAY.test(text)) return Number.isNaN(Date.parse(`${text}T00:00:00Z`)) ? null : text;
+      if (DAY.test(text)) return isDay(text) ? text : null;
       // A timestamp's date as written; read in the server's time zone, midnight UTC is the day before in the Americas.
       const stamp = /^(\d{4}-\d{2}-\d{2})[T ]\d/.exec(text);
-      if (stamp && !Number.isNaN(Date.parse(text))) return stamp[1]!;
+      if (stamp) return isDay(stamp[1]!) && !Number.isNaN(Date.parse(text)) ? stamp[1]! : null;
       const time = Date.parse(text);
       if (Number.isNaN(time)) return null;
       const date = new Date(time);

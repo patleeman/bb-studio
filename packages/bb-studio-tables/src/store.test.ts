@@ -102,3 +102,14 @@ it("rejects script and data URLs on new input but keeps saving a table that hold
   expect(store.require(table.id).rows.at(-1)!.values.link).toBeNull();
   db.close();
 });
+
+it("rejects impossible dates on new input but keeps saving a table that holds one", () => {
+  const { db, store } = open();
+  const table = legacy(db, store, { id: "due", name: "Due", type: "date" }, "2024-02-30");
+  for (const due of ["2024-02-30", "2023-02-29", "2024-04-31"]) expect(() => store.insert(table.id, { due })).toThrow(/Invalid date/);
+  expect(store.insert(table.id, { due: "2024-02-29" }).values.due).toBe("2024-02-29");
+  expect(store.updateRow(table.id, table.rows[0]!.id, { name: "Renamed" }).values).toMatchObject({ name: "Renamed", due: "2024-02-30" });
+  expect(store.importCsv(table.id, "Name,Due\nA,2024-02-30\nB,2024-02-30T10:00:00Z\n")).toBe(2);
+  expect(store.require(table.id).rows.slice(-2).map((row) => row.values.due)).toEqual([null, null]);
+  db.close();
+});
