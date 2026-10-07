@@ -29,8 +29,15 @@ export function neighbourSpaceId(spaces: readonly StudioSpace[], currentId: stri
   return ids[((index < 0 ? 1 : index) + step + ids.length) % ids.length]!;
 }
 
+/** Whether `target` takes typed text: an input, textarea, select or editable element. */
+export function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable || target.closest("[contenteditable]:not([contenteditable=false])")) return true;
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
+}
+
 /**
- * ⌃⌥← / ⌃⌥→ anywhere, and a horizontal two-finger swipe over `area`, step
+ * ⌃⌥← / ⌃⌥→ outside text fields, and a horizontal two-finger swipe over `area`, step
  * through the Spaces. A swipe switches once per gesture.
  */
 export function useSpaceSwitchGestures(area: RefObject<HTMLElement | null>, step: (direction: -1 | 1) => void): void {
@@ -39,6 +46,8 @@ export function useSpaceSwitchGestures(area: RefObject<HTMLElement | null>, step
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || !event.ctrlKey || !event.altKey || event.metaKey || event.shiftKey) return;
+      // Text fields keep their keys, and an IME composition its arrows.
+      if (event.isComposing || event.keyCode === 229 || isTextEntryTarget(event.target)) return;
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       event.preventDefault();
       stepRef.current(event.key === "ArrowLeft" ? -1 : 1);
