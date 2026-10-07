@@ -219,6 +219,11 @@ export class SmartQueue {
   /** `message.queued`: decide each owner row this plugin holds, and route the ones core queued. */
   queued(row: QueuedRow) {
     if (this.entries.has(row.id)) return;
+    // Smart Queue's own re-sends (`route`) still pass this check: a plugin's
+    // `threads.send` reaches core's send route, which dispatches with
+    // `originPluginId: null` and trigger "user". Only spawn and fork stamp the
+    // plugin (BB 536b292a: apps/server/src/services/threads/thread-send-request.ts,
+    // and withPluginThreadAttribution in apps/server/src/services/plugins/plugin-api.ts).
     if (row.initiator !== "user" || row.senderThreadId !== null || row.originPluginId !== null) return;
     // A claimed row is already on its way to the provider.
     if (row.payload.kind !== "inline" || !row.editable) return;
