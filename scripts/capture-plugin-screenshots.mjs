@@ -21,20 +21,25 @@ const captureOnly = process.env.BB_CAPTURE_ONLY
 if (!projectId || !threadId) throw new Error("Set BB_CAPTURE_PROJECT_ID and BB_CAPTURE_THREAD_ID to a seeded BB thread before capturing.");
 const context = { projectId, threadId, pluginRpc, bbCli, launchSpace, getLaunchSpaceId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
 const captures = loadCaptures(context);
+const selected = captures.filter((capture) => (!captureOnly || captureOnly.has(capture.id)) && (!packageOnly || capture.packageDir === packageOnly));
+const unknown = [...(captureOnly ?? [])].filter((id) => !captures.some((capture) => capture.id === id));
+if (unknown.length) throw new Error(`Unknown capture IDs in BB_CAPTURE_ONLY: ${unknown.join(", ")}`);
+// Capturing nothing must not look like a successful run.
+if (selected.length === 0) throw new Error(`No captures match${pluginOnly ? ` --plugin ${pluginOnly}` : ""}${captureOnly ? ` BB_CAPTURE_ONLY=${[...captureOnly].join(",")}` : ""}.`);
 
 const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();
 const client = new CdpClient(webSocketUrl);
-await client.connect();
-await client.command("Emulation.setDeviceMetricsOverride", {
-  width: 1440,
-  height: 1000,
-  deviceScaleFactor: 1,
-  mobile: false,
-});
 
 try {
-  for (const capture of captures) {
-    if ((captureOnly && !captureOnly.has(capture.id)) || (packageOnly && capture.packageDir !== packageOnly)) continue;
+  // Inside try, so a failed connection still stops the Chrome started above.
+  await client.connect();
+  await client.command("Emulation.setDeviceMetricsOverride", {
+    width: 1440,
+    height: 1000,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  for (const capture of selected) {
     process.stdout.write(`Capturing ${capture.id}...\n`);
     const cleanup = await capture.setup(client);
     try {
