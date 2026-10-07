@@ -24,6 +24,9 @@ export const MAX_SMART_REACTION_LENGTH = 60;
 /** An emoji glyph: pictographs, flags (regional indicators), and keycaps. */
 const EMOJI = /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u;
 
+/** Cap on the preferred-reactions list in the instructions. */
+const MAX_PREFERRED_LENGTH = 600;
+
 /** Parse the directive's `items` attribute into reaction items. */
 export function parseSmartReactions(raw: string | undefined): EmojiItem[] {
   if (typeof raw !== "string") return [];
@@ -49,7 +52,19 @@ export function parseSmartReactions(raw: string | undefined): EmojiItem[] {
  * specific choices.
  */
 export function smartReactionInstructions(configured: readonly EmojiItem[]): string {
-  const preferred = configured.map((item) => item.text).join(" | ");
+  // Saved items go into the prompt and may be copied into the directive, so
+  // strip the directive's delimiters and keep only items the parser accepts.
+  // The total cap keeps the host's 4096-character limit from cutting the list.
+  const preferredItems: string[] = [];
+  let length = 0;
+  for (const item of configured) {
+    const text = item.text.replace(/["|]/g, "").replace(/\s+/g, " ").trim();
+    if (text.length === 0 || text.length > MAX_SMART_REACTION_LENGTH) continue;
+    if (length + text.length + 3 > MAX_PREFERRED_LENGTH) break;
+    preferredItems.push(text);
+    length += text.length + 3;
+  }
+  const preferred = preferredItems.join(" | ");
   return [
     "Smart reactions are on. When your reply ends by asking the user to decide, choose, approve, or answer something, finish it with one extra line that offers quick replies:",
     `::${SMART_REACTIONS_DIRECTIVE}{items="👍 Looks good|🔁 Try another way|❓ Explain more"}`,
