@@ -1,5 +1,5 @@
 import { subcommand } from "@bb-studio/kit/cli";
-import { defineItemMention, readThreadFile, resolveSource, serveBytes, studioServices, threadRoots } from "@bb-studio/kit/server";
+import { defineItemMention, readThreadFile, registerStudioBackup, resolveSource, serveBytes, studioServices, threadRoots } from "@bb-studio/kit/server";
 import { errorMessage } from "@bb-studio/kit/format";
 // Studio Draw (plugin id `excalidraw`): create, edit, and attach Excalidraw
 // drawings.
@@ -32,6 +32,7 @@ import {
 } from "./lib/merge";
 import { DRAWING_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, drawingHref } from "./src/shared";
 import { registerStudio } from "./src/server/studio";
+import { createDrawBackup } from "./src/server/backup";
 import { DrawingStore, MIGRATIONS, displayName, toMeta, type DrawingRow, type Writer } from "./src/server/store";
 import { sceneThumbnail } from "./src/server/thumbnail";
 
@@ -316,6 +317,9 @@ export default async function plugin(bb: BbPluginApi) {
     store,
     changed: (id) => changed(id, store.get(id)?.updated_at ?? Date.now(), "studio"),
   });
+
+  // `bb studio backup` / `bb studio restore`.
+  registerStudioBackup(bb, z, createDrawBackup({ db, store, changed: (id, updatedAt) => changed(id, updatedAt, "studio") }));
 
   // Thumbnails for Studio's cards. The URL carries the revision, so a
   // response never goes stale.
