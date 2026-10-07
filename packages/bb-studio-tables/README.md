@@ -2,7 +2,7 @@
 
 Structured tables for BB Studio. Each table has typed columns, rows, and saved table, board, or calendar views, edited in a spreadsheet grid: arrow keys, Enter to edit, typing to replace, copy and paste with Excel or Sheets, fill a range by pasting, undo and redo, and drag to resize columns. Every view and row has a link (`/plugins/studio-tables/tables/<id>/view/<view>/row/<row>`).
 
-Pages embeds tables live, so edits in a page show in Tables and the other way round. Agents can create tables, inspect schemas, query rows, insert rows, and update cells. CSV import matches headers to columns by name.
+Pages embeds tables live, so edits in a page show in Tables and the other way round. Agents can list, create, and delete tables, inspect schemas, query rows, insert and delete rows, and update cells. CSV import matches headers to columns by name.
 
 In a thread's workbench, the **Tables** tab lists the tables made or changed in that thread, then the project's recent ones. **New** makes a table in the thread's project and links it to the thread in Studio.
 
@@ -19,8 +19,8 @@ including direct access to the first and last page; every row remains editable.
 
 `bb tables list`, `create <title>`, `schema <id>`, `query <id>`, `insert <id> <json>`, `update <id> <row-id> <json>`, `export <id>`, and `import <id> --csv <text>` (headers match columns by name).
 
-Queries return `{ rows, total, offset, nextOffset, revision }`. Agent and RPC
-queries accept `limit` (100 by default, up to 500) and `offset`. Continue with
+Queries return `{ rows, total, offset, nextOffset, revision }`. Agent queries
+accept `limit` (100 by default, up to 500) and `offset`. Continue with
 `offset: nextOffset` and `expectedRevision: revision` until `nextOffset` is null.
 Keep the same view, filters and sorts. If the table changes, the revision check
 asks you to restart the scan. The CLI uses `--limit`, `--offset`, and `--revision`.
