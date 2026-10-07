@@ -29,6 +29,8 @@ export const answersSchema = z.record(z.string().max(40), z.union([z.string().ma
 
 /** Generous for one hand-written screen; keeps a runaway write from filling the database. */
 const MAX_SCREEN_CHARS = 400_000;
+/** A style's CSS: tokens and base rules, not whole screens. */
+const MAX_STYLE_CSS = 40_000;
 /** Above this, design_read lists screens instead of inlining their HTML. */
 const MAX_READ_CHARS = 120_000;
 
@@ -568,8 +570,48 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
+  bb.agents.registerTool({
+    name: "design_save_style",
+    description: "Save the look of a design as a named style, so later designs and decks can start from it: after the user picks a direction, or when they ask to reuse a look. Saving under a name that exists updates that style.",
+    presentation: { label: { pending: "Saving a style", completed: "Saved a style" } },
+    parameters: z.object({
+      name: z.string().trim().min(1).max(80).describe("Short and specific: \"Forkful editorial\", not \"Style 1\"."),
+      notes: z.string().trim().min(1).max(4000).describe("The system in words: fonts and their roles, colors and their roles, type scale, spacing and grid, and the rules that make it this look."),
+      css: z.string().trim().min(1).max(MAX_STYLE_CSS).describe("The CSS that carries it, ready to paste into a screen's <style>: font @import lines, :root custom properties, and base rules for type and layout. No page-specific rules."),
+      designId: z.string().optional().describe("The design it comes from."),
+      screenId: screenIdSchema.optional().describe("The option it comes from, like \"1b\"."),
+    }),
+    execute({ name, notes, css, designId, screenId }) {
+      if (designId && !store.get(designId)) return notFound(designId);
+      const existed = store.styles().some((style) => style.name.toLowerCase() === name.toLowerCase());
+      const style = store.saveStyle({ name, notes, css, designId, screenId });
+      return `${existed ? "Updated" : "Saved"} the style "${style.name}" (id ${style.id}). Later designs can start from it with design_styles.`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_styles",
+    description: "List the user's saved styles, or read one in full (its notes and CSS) by id. Check before a new design or deck: when there are styles, offer them as a starting point.",
+    presentation: { label: { pending: "Reading styles", completed: "Read styles" } },
+    parameters: z.object({
+      styleId: z.string().optional().describe("Read this style in full."),
+      deleteStyleId: z.string().optional().describe("Delete this style. Only when the user asks."),
+    }),
+    execute({ styleId, deleteStyleId }) {
+      if (deleteStyleId) return store.deleteStyle(deleteStyleId) ? "Deleted the style." : fail(`Style ${deleteStyleId} not found.`);
+      if (styleId) {
+        const style = store.style(styleId);
+        if (!style) return fail(`Style ${styleId} not found.`);
+        return [`Style "${style.name}" (id ${style.id})${style.source_design_id ? `, from design ${style.source_design_id}${style.source_screen_id ? ` option ${style.source_screen_id}` : ""}` : ""}.`, "", style.notes, "", "```css", style.css, "```"].join("\n");
+      }
+      const styles = store.styles();
+      if (!styles.length) return "No saved styles yet. Save one with design_save_style after the user picks a direction.";
+      return `Saved styles:\n${styles.map((style) => `- ${style.name} (id ${style.id}): ${style.notes.split("\n")[0]!.slice(0, 160)}`).join("\n")}\n\nRead one in full with styleId before using it.`;
+    },
+  });
+
   bb.agents.configure(() => ({
-    tools: ["design_list", "design_create", "design_rename", "design_read", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"],
+    tools: ["design_save_style", "design_styles", "design_list", "design_create", "design_rename", "design_read", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"],
     skills: [],
   }));
 

@@ -37,6 +37,7 @@ URL hash, with a Play button on each.
 - **Canvas.** Drag the background or hold Space to pan. Pinch, or hold ⌘ and scroll, to zoom. Rounds stack newest first, each with a title and intro. Each option is a live frame at its real size (desktop 1280×800, tablet 834×1112, mobile 390×844, slide 1920×1080, square, story, A4, Letter, email, or any `WIDTHxHEIGHT` from 200 to 4000 px a side) that you can click and type in. Screens update as the agent writes them.
 - **Prototype steps.** A multi-step flow is one screen that declares its steps with a `bb-design-steps` meta tag. The canvas shows one frame per step, each opened at that step.
 - **Slide decks.** Ask for slides and the agent first shows 2–3 visual directions, each a title slide and a content slide, and asks you to pick one. It then writes the deck as one `slide` screen whose steps are its slides. The canvas lays the slides out four to a row, and the card in the reply reads "Deck · N slides". **Play** presents the deck: ←/→, Space, Page Up/Down, Home and End move between slides, and **Full screen** presents it alone.
+- **Saved styles.** After you pick a direction, the agent saves it as a named style: the system in words and the CSS that carries it. Before the next design or deck, it offers your saved styles as a starting point, so you can skip the round of directions. Styles aren't in `bb studio backup` yet.
 - **Player.** **Play** on a frame, or **Present** for the newest option, opens the screen over the canvas, live, at the chosen step. It has Fit, Fill and **Download HTML** (the screen's file, without Studio's preview script).
 - **Comments.** In **Comment** mode, click an element to pin a note. **Send to agent** posts the comment, with the element's selector and markup, to the design's thread. It waits for a running turn to finish. You can also resolve or delete comments.
 - **Questions.** When the brief or look is open, the agent calls `design_ask`. A form appears in the thread with choices, multi-select, short answers and 1 to 5 scales, up to 12 questions, each with "Decide for me". The answers return as one "Questions answered" list. If you close the form, the agent proceeds with defaults.
@@ -46,7 +47,7 @@ URL hash, with a Play button on each.
 
 ## Agent tools
 
-`design_list`, `design_create`, `design_rename`, `design_read`, `design_ask`, `design_ready`, `design_write_screen` (a whole screen), `design_edit_screen` (replace one exact snippet), `design_comments` and `design_resolve_comments`.
+`design_list`, `design_create`, `design_rename`, `design_read`, `design_ask`, `design_ready`, `design_write_screen` (a whole screen), `design_edit_screen` (replace one exact snippet), `design_comments`, `design_resolve_comments`, `design_save_style` and `design_styles` (list, read or delete saved styles).
 
 The `design` skill tells agents how to work: ask only what they can't find out, match the project's design system, make two or three different options per round, keep small edits small, write flows as one prototype with steps, and build decks by picking a direction first.
 

@@ -12,7 +12,22 @@ refer to options by id in chat.
 
 Tools: `design_ask`, `design_create`, `design_read`, `design_write_screen`,
 `design_edit_screen`, `design_list`, `design_comments`,
-`design_resolve_comments`.
+`design_resolve_comments`, `design_save_style`, `design_styles`.
+
+## Saved styles
+
+A style is a look the user chose, saved by name: its system in words and
+the CSS that carries it (font imports, `:root` custom properties, base
+rules).
+
+- **Before a new design or deck,** call `design_styles`. If there are
+  styles, offer them in your questions ("Start from Forkful editorial" or
+  "Something new"). When the user picks one, read it in full, paste its CSS
+  into each screen and keep to its notes; you can skip the round of
+  directions.
+- **After the user picks a direction,** save it with `design_save_style`
+  under a short, specific name, and say so in one line. Save again under the
+  same name when they refine it.
 
 ## Slide decks
 
@@ -27,6 +42,8 @@ A deck is a design too. Make it in three steps:
    different (type, color, layout). Then ask the user to pick with
    `design_ask`: one `choice` question whose options are the screen ids and
    captions (`1a · Editorial serif`), with `other` for changes they want.
+   Save the pick with `design_save_style`. If the user chose a saved style
+   instead, skip this step.
 3. **Build the deck.** Write the whole deck as one screen, `2a`, at viewport
    `slide`, in the chosen direction. Each slide is a step:
    `<meta name="bb-design-steps" content="title=Title; problem=The problem; plan=Our plan">`,

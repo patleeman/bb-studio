@@ -32,6 +32,18 @@ describe("the design store", () => {
     ]);
   });
 
+  it("saves styles by name, updating one saved again", () => {
+    let at = 1_000;
+    const { store } = memoryStore(() => at++);
+    const first = store.saveStyle({ name: "Editorial", notes: "Serif heads", css: ":root{--ink:#111}" });
+    const again = store.saveStyle({ name: "editorial", notes: "Serif heads, wider margins", css: ":root{--ink:#222}", designId: "dsn_x", screenId: "1b" });
+    expect(again.id).toBe(first.id);
+    expect(store.styles()).toHaveLength(1);
+    expect(store.style(first.id)).toMatchObject({ notes: "Serif heads, wider margins", source_screen_id: "1b" });
+    expect(store.deleteStyle(first.id)).toBe(true);
+    expect(store.styles()).toEqual([]);
+  });
+
   it("rejects screen ids that don't name a round and an option", () => {
     const { store } = memoryStore();
     const row = store.create({ name: "", by: "app" });

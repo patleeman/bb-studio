@@ -55,7 +55,31 @@ export const MIGRATIONS = [
      );
    CREATE INDEX IF NOT EXISTS design_comments_design ON design_comments(design_id, created_at);`,
   `ALTER TABLE design_comments ADD COLUMN step TEXT NOT NULL DEFAULT '';`,
+  `CREATE TABLE IF NOT EXISTS design_styles (
+       id TEXT PRIMARY KEY,
+       name TEXT NOT NULL,
+       notes TEXT NOT NULL DEFAULT '',
+       css TEXT NOT NULL,
+       source_design_id TEXT,
+       source_screen_id TEXT,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL
+     );`,
 ];
+
+/** A look the user picked, saved so later designs and decks can start from it. */
+export type StyleRow = {
+  id: string;
+  name: string;
+  /** Fonts, colors, layout rhythm and rules, in words. */
+  notes: string;
+  /** The CSS that carries it: font links as @import, custom properties, base rules. */
+  css: string;
+  source_design_id: string | null;
+  source_screen_id: string | null;
+  created_at: number;
+  updated_at: number;
+};
 
 export type DesignRow = {
   id: string;
@@ -273,6 +297,32 @@ export class DesignStore {
 
   deleteComment(id: string): boolean {
     return this.db.prepare("DELETE FROM design_comments WHERE id = ?").run(id).changes > 0;
+  }
+
+  styles(): StyleRow[] {
+    return this.db.prepare("SELECT * FROM design_styles ORDER BY updated_at DESC").all() as StyleRow[];
+  }
+
+  style(id: string): StyleRow | null {
+    return (this.db.prepare("SELECT * FROM design_styles WHERE id = ?").get(id) as StyleRow | undefined) ?? null;
+  }
+
+  /** Saves a style; a name already in use is replaced, so saving again updates it. */
+  saveStyle(input: { name: string; notes: string; css: string; designId?: string | null; screenId?: string | null }): StyleRow {
+    const at = this.now();
+    const existing = this.db.prepare("SELECT id FROM design_styles WHERE lower(name) = lower(?)").get(input.name) as { id: string } | undefined;
+    const id = existing?.id ?? newId("dst");
+    this.db
+      .prepare(`INSERT INTO design_styles (id, name, notes, css, source_design_id, source_screen_id, created_at, updated_at)
+        VALUES (@id, @name, @notes, @css, @designId, @screenId, @at, @at)
+        ON CONFLICT(id) DO UPDATE SET name = excluded.name, notes = excluded.notes, css = excluded.css,
+          source_design_id = excluded.source_design_id, source_screen_id = excluded.source_screen_id, updated_at = excluded.updated_at`)
+      .run({ id, name: input.name, notes: input.notes, css: input.css, designId: input.designId ?? null, screenId: input.screenId ?? null, at });
+    return this.style(id)!;
+  }
+
+  deleteStyle(id: string): boolean {
+    return this.db.prepare("DELETE FROM design_styles WHERE id = ?").run(id).changes > 0;
   }
 
   /** The design as the canvas shows it: rounds newest first, options in letter order. */
