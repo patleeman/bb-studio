@@ -68,6 +68,16 @@ export class PageHub {
     return this.pages.has(pageId);
   }
 
+  /**
+   * Whether a page is in memory and, if so, whether anyone has it open or it
+   * has unsaved changes. An idle page can be evicted without losing anything.
+   */
+  activity(pageId: string): "closed" | "idle" | "editing" {
+    const page = this.pages.get(pageId);
+    if (!page) return "closed";
+    return page.sockets.size || page.dirtyBy.size || page.saveTimer ? "editing" : "idle";
+  }
+
   open(pageId: string): LivePage {
     const existing = this.pages.get(pageId);
     if (existing) return existing;

@@ -4,7 +4,8 @@ import { createRequire } from "node:module";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { untitled } from "@bb-studio/kit/format";
-import { createStudioNotifier } from "@bb-studio/kit/server";
+import { createStudioNotifier, registerStudioBackup } from "@bb-studio/kit/server";
+import { pagesBackup } from "./src/backup";
 import * as Y from "yjs";
 import { z } from "zod";
 import { actorColor } from "./src/actors";
@@ -359,6 +360,10 @@ async function registerPages(bb: BbPluginApi) {
     else if (event.type === "deleted") for (const id of event.pageIds) { studioNotifier.changed(id); syncLinks(id); }
     else studioNotifier.changed();
   };
+
+  // Backup: `bb studio backup` / `bb studio restore`. Publishing tells open
+  // views and, through onPublish, Studio about restored pages.
+  registerStudioBackup(bb, z, pagesBackup({ db, hub: service.hub, publish: (event) => service.publish(event) }));
 
   // Agents --------------------------------------------------------------------
 
