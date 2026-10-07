@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { resolve, join, relative } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
@@ -29,6 +29,8 @@ for (const entry of market.plugins) {
   if (!dir) continue;
   try {
     const manifest = await readJson(join(dir, "package.json"));
+    // BB installs a plugin under its package name without the scope.
+    if (manifest.name?.replace(/^@[^/]+\//, "") !== entry.id) errors.push(`${entry.id}: ID differs from installed ID ${manifest.name}`);
     if (manifest.bb?.name !== entry.displayName || manifest.bb?.description !== entry.description) errors.push(`${entry.id}: display metadata differs from package`);
     if (manifest.bb?.branding?.icon !== (typeof entry.icon === "string" ? entry.icon : `./${relative(dir, entry.icon.url.replace(/^\.\//, ""))}`)) errors.push(`${entry.id}: icon differs from package`);
   } catch { errors.push(`${entry.id}: missing package directory or manifest`); }
@@ -40,6 +42,15 @@ for (const plugin of installed.plugins) {
   if (!marketIds.has(plugin.name)) errors.push(`${plugin.name}: absent from marketplace.json`);
   if (index.get(plugin.name) !== plugin) errors.push(`Duplicate installed ID: ${plugin.name}`);
   try { await stat(join(root, plugin.source)); } catch { errors.push(`${plugin.name}: missing package directory`); }
+}
+// A plugin package listed in neither index would otherwise pass unnoticed.
+const retired = new Set(["packages/bb-studio-chat"]); // kept only for existing installs
+const listed = new Set(installed.plugins.map((plugin) => plugin.source.replace(/^\.\//, "").replace(/\/$/, "")));
+for (const dir of await readdir(join(root, "packages"))) {
+  const path = `packages/${dir}`;
+  let manifest;
+  try { manifest = await readJson(join(path, "package.json")); } catch { continue; }
+  if (manifest.bb?.name && !listed.has(path) && !retired.has(path)) errors.push(`${path}: plugin absent from both indexes`);
 }
 if (errors.length) { console.error(errors.join("\n")); process.exitCode = 1; }
 else console.log(`Marketplace: ${marketIds.size} matching plugins`);
