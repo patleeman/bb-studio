@@ -81,3 +81,41 @@ final class LockedFlag: @unchecked Sendable {
         set { lock.lock(); stored = newValue; lock.unlock() }
     }
 }
+
+final class RecordingPlayerRefreshTests: XCTestCase {
+    private func segment(_ id: String, offset: Double) -> Segment {
+        Segment(id: id, sessionId: "s", status: "done", text: nil, offsetMs: offset, durationMs: 1000, mimeType: "audio/mp4", error: nil)
+    }
+
+    @MainActor
+    func testAudioRemovedWhileLoadingStopsInsteadOfIndexingTheOldList() async {
+        let client = BBClient(baseURL: URL(string: "https://player.invalid")!)
+        client.transport = { _, _, _ in
+            try await Task.sleep(for: .milliseconds(200))
+            return (500, Data())
+        }
+        let player = RecordingPlayer()
+        player.configure(client: client, recordingId: "rec", title: "Talk", segments: [segment("a", offset: 0), segment("b", offset: 1000)])
+        player.play(from: 1500)
+        XCTAssertTrue(player.loading)
+        // A refresh finds the audio expired.
+        player.configure(client: client, recordingId: "rec", title: "Talk", segments: [])
+        XCTAssertFalse(player.loading)
+        try? await Task.sleep(for: .milliseconds(400))
+        XCTAssertFalse(player.loading)
+        XCTAssertNil(player.error)
+        player.stop()
+    }
+
+    @MainActor
+    func testAppendedSegmentKeepsLoading() {
+        let player = RecordingPlayer()
+        let client = BBClient(baseURL: URL(string: "https://player.invalid")!)
+        client.transport = { _, _, _ in try await Task.sleep(for: .seconds(5)); return (500, Data()) }
+        player.configure(client: client, recordingId: "rec", title: "Talk", segments: [segment("a", offset: 0)])
+        player.play(from: 0)
+        player.configure(client: client, recordingId: "rec", title: "Talk", segments: [segment("a", offset: 0), segment("b", offset: 1000)])
+        XCTAssertTrue(player.loading)
+        player.stop()
+    }
+}

@@ -78,10 +78,16 @@ final class RecordingPlayer: ObservableObject {
             buffers = [:]
             loads = [:]
         }
+        let playable = segments.filter { ($0.durationMs ?? 0) > 0 }
+        // Playback and loads in flight hold indexes into the old list. A refresh that only
+        // appends keeps them valid; anything else (audio removed, a segment gone) stops first.
+        if playing || loading, self.recordingId != recordingId || !playable.map(\.id).starts(with: self.segments.map(\.id)) {
+            pause()
+        }
         self.client = client
         self.recordingId = recordingId
         self.title = title
-        self.segments = segments.filter { ($0.durationMs ?? 0) > 0 }
+        self.segments = playable
         if playing { updateNowPlaying() }
     }
 
@@ -116,6 +122,7 @@ final class RecordingPlayer: ObservableObject {
         let generation = generation
         Task {
             do {
+                guard generation == self.generation else { return }
                 try activate()
                 let buffer = try await buffer(first)
                 guard generation == self.generation else { return }
@@ -184,6 +191,7 @@ final class RecordingPlayer: ObservableObject {
         guard next < segments.count else { return }
         let generation = generation
         Task {
+            guard generation == self.generation else { return }
             let buffer = try? await buffer(next)
             guard generation == self.generation else { return }
             guard let buffer else { return queueAfter(next) }
