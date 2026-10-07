@@ -30,17 +30,17 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 
 | File | Reason |
 | --- | --- |
-| `source/app.tsx` | Mount Studio section anchors above the thread list, name the provider Studio Sidebar, move thread reveal into ProjectList so new automated results do not expand their collapsed groups, and register Studio Navigation. |
-| `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, filter empty project rows, apply each section's Automated threads choice, render By space with each Space's Studio items, export the grouped-mode helpers By space reuses, and pass By space's group move to the grouped drag and drop. |
-| `source/app/list/useSidebarThreadReveal.ts` | Keep ancestor reveal while new automated results leave their collapsed group alone; By space reveals its own sections. |
+| `source/app.tsx` | Mount Studio section anchors above the thread list, name the provider Studio Sidebar, move thread reveal into ProjectList, and register Studio Navigation. |
+| `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, filter empty project rows, render By space with each Space's Studio items, export the grouped-mode helpers By space reuses, and pass By space's group move to the grouped drag and drop. |
+| `source/app/list/useSidebarThreadReveal.ts` | By space reveals its own sections. |
 | `source/app/list/SidebarHeaderControls.tsx` | Add the project action to the creation context, and let a section put its own button, such as Command view, in place of New thread. |
-| `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, empty project, By space, per-section Automated threads, and Needs me sort menu items. |
-| `source/app/preferences/atoms.ts` | Expose synced empty project, Automated threads, and collapsed Space preferences. |
+| `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, empty project, By space, and Needs me sort menu items. |
+| `source/app/preferences/atoms.ts` | Expose synced empty project and collapsed Space preferences. |
 | `source/app/model/project-thread-groups.ts`, `thread-activity.ts`, and the `attention` branch of `getSidebarThreadComparator` in `ProjectList.tsx` | Add the Needs me sort: threads waiting on the user first, then working ones, then the rest. A parent or group ranks by its most urgent descendant, so `buildSortedItems` honors a comparator's `compareItems`. |
 | `source/app/list/sortComparator.test.ts` | Check the Needs me tiers, direction, and descendant ranking. |
-| `source/shared/preferences.ts` | Add the `attention` sort, the `space` organization and `space:` groups, and define synced empty project, Automated threads, and collapsed Space preferences. |
+| `source/shared/preferences.ts` | Add the `attention` sort, the `space` organization and `space:` groups, and define synced empty project and collapsed Space preferences. |
 | `source/app/list/SidebarHeaderControls.test.tsx` | Check the empty project menu toggle. |
-| `source/app/list/ProjectList.modes.test.tsx`, `ProjectList.sectionCreate.test.tsx`, and `useSidebarThreadReveal.test.tsx` | Leave By space out of the stored-order probe, count the Automated threads divider, and check that an automated thread's group expands only when opened. |
+| `source/app/list/ProjectList.modes.test.tsx`, `ProjectList.sectionCreate.test.tsx`, and `useSidebarThreadReveal.test.tsx` | Leave By space out of the stored-order probe, and check that a thread's group expands only when opened. |
 | `source/server.test.ts` | Check the new preference default and parsing. |
 | `source/app/list/TopLevelSidebarSection.tsx` | Add a label mark and a clickable label for Space sections, and highlight the label of the open Space. |
 | `source/app/list/ThreadListVisibility.tsx` | Expose the section key a component renders in, and add Show or Hide hidden threads to a section's menu. |
@@ -49,7 +49,7 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/app/dnd/useSectionThreadDnd.ts` (group move) | Let By space move threads dropped on a Space's section, heading or dot into that Space through Studio. |
 | `source/app/list/ProjectRow.tsx` | An environment's Archive threads leaves a Space lead and its ancestors, archiving the rest one by one. |
 | `source/app/rows/ThreadActionsMenu.tsx` | Insert Move to Space beside Move; drop Archive from a Space lead in every organization. |
-| `source/app/rows/ThreadRow.tsx` | Show a Studio app's badge, such as a bot's avatar, and the automated thread mark before the title; in By space, draw the two-line row (status dot, age, latest line) from `studio/SpaceThreadRow.tsx`. |
+| `source/app/rows/ThreadRow.tsx` | Show a Studio app's badge before the title; in By space, draw the two-line row (status dot, age, latest line) from `studio/SpaceThreadRow.tsx`. |
 
 The restored upstream tests have import path changes for the relocated
 fixture and expectations for Studio menu items, preferences, and presence calls. Studio's own
