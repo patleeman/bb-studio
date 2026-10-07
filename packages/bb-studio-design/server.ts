@@ -7,8 +7,10 @@
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { createChangeBus, defineItemMention, registerStudioBackup, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, VIEWPORTS, MIN_SIDE, MAX_SIDE, parseViewport, type Viewport, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl, type DesignView } from "./src/shared";
+import { printCsp, printPage } from "./src/server/print";
+import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, VIEWPORTS, MIN_SIDE, MAX_SIDE, frameSize, parseViewport, type Viewport, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl, type DesignView } from "./src/shared";
 import { DesignStore, MIGRATIONS, displayName, type Writer } from "./src/server/store";
 import { registerStudio, screenText } from "./src/server/studio";
 import { designBackupHandlers } from "./src/server/backup";
@@ -344,6 +346,23 @@ export default async function plugin(bb: BbPluginApi) {
     const screen = store.screen(context.req.query("design") ?? "", context.req.query("screen") ?? "");
     if (!screen) return context.text("Not found", 404);
     return screenResponse(screen, context.req.query("download") === "1");
+  });
+
+  // Export to PDF (src/server/print.ts): every step of a screen, a page each.
+  bb.http.route("GET", "/print", (context) => {
+    const designId = context.req.query("design") ?? "";
+    const row = store.get(designId);
+    const screen = store.screen(designId, context.req.query("screen") ?? "");
+    if (!row || !screen) return context.text("Not found", 404);
+    const steps = parseSteps(screen.html);
+    const url = screenUrl(designId, screen.id, screen.updated_at);
+    const frames = steps.length ? steps.map((step) => ({ url: `${url}#${encodeURIComponent(step.id)}`, label: step.label })) : [{ url, label: screen.caption || screen.id }];
+    const nonce = randomBytes(16).toString("base64");
+    return serveBytes(printPage({ title: `${displayName(row)} ${screen.id}`, ...frameSize(screen.viewport), frames, nonce }), {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": printCsp(nonce),
+      "cache-control": "no-store",
+    });
   });
 
   // ---------------------------------------------------------------------

@@ -5,6 +5,7 @@
 // Full screen presents it alone.
 import { useEffect, useRef, useState } from "react";
 import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
+import { ExportPdfButton } from "./export-pdf";
 import { frameSize, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../src/shared";
 
 const PADDING = 32;
@@ -80,6 +81,7 @@ export function PlayView({ designId, screen, step = "", onClose }: { designId: s
             </button>
           </>
         ) : null}
+        <ExportPdfButton designId={designId} screen={screen} />
         <a href={screenDownloadUrl(designId, screen.id, screen.updatedAt)} download={`${screen.id}.html`} aria-label="Download HTML" title="Download HTML" className={ICON_BUTTON}>
           <Icon name="Download" className="size-4" />
         </a>

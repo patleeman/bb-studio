@@ -31,6 +31,11 @@ export function screenDownloadUrl(designId: string, screenId: string, updatedAt:
   return `${screenUrl(designId, screenId, updatedAt)}&download=1`;
 }
 
+/** Every step of a screen (a deck's slides), a page each, for Save as PDF. */
+export function printUrl(designId: string, screenId: string, updatedAt: number): string {
+  return `/api/v1/plugins/${PLUGIN_ID}/http/print?design=${encodeURIComponent(designId)}&screen=${encodeURIComponent(screenId)}&v=${updatedAt}`;
+}
+
 export function isDesignId(value: string): boolean {
   return /^dsn_[0-9a-f]{16}$/.test(value);
 }
