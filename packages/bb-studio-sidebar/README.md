@@ -96,7 +96,7 @@ By space is stored like the other organizations, in the synced
 `organizationMode` preference (now `project`, `chronological`, `machine`, or
 `space`), because this package owns its copy of BB's preference schema.
 Hidden threads are the synced `hiddenThreads` preference, a list of thread
-ids, so they follow across windows. Set it with
+ids, so they follow across windows. Ids of deleted threads drop out once the list has loaded; archived threads stay hidden. Set it with
 `bb thread-list-plus prefs set hiddenThreads '["thr_…"]'`. The Space By space
 shows is the synced `currentSpace` preference (a Space id, `all` for All, or
 null for the default Space); `collapsedSpaces` lists the Spaces collapsed in
