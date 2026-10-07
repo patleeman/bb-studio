@@ -171,7 +171,9 @@ function matches(cell: Cell | undefined, { op, value }: Filter): boolean {
     if (isEmpty(value)) return true;
     return cellText(cell).toLowerCase().includes(cellText(value ?? null).toLowerCase());
   }
-  const equal = Array.isArray(cell) && typeof value === "string" ? cell.includes(value) : cellText(cell) === cellText(value ?? null);
+  // An unset checkbox shows unchecked, so it matches "unchecked".
+  const equal = typeof value === "boolean" ? (cell === true) === value
+    : Array.isArray(cell) && typeof value === "string" ? cell.includes(value) : cellText(cell) === cellText(value ?? null);
   return op === "eq" ? equal : !equal;
 }
 

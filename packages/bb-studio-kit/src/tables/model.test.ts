@@ -110,6 +110,22 @@ describe("table model", () => {
       else process.env.TZ = zone;
     }
   });
+  it("counts an unset checkbox as unchecked in filters", () => {
+    const tasks: Table = {
+      ...table,
+      columns: [{ id: "done", name: "Done", type: "checkbox", options: [] }],
+      views: [],
+      rows: [
+        { id: "unset", values: { done: null }, createdAt: 1, updatedAt: 1 },
+        { id: "no", values: { done: false }, createdAt: 1, updatedAt: 1 },
+        { id: "yes", values: { done: true }, createdAt: 1, updatedAt: 1 },
+      ],
+    };
+    const ids = (value: boolean, op: "eq" | "neq" = "eq") => queryRows(tasks, undefined, [{ columnId: "done", op, value }]).map((row) => row.id);
+    expect(ids(false)).toEqual(["unset", "no"]);
+    expect(ids(true)).toEqual(["yes"]);
+    expect(ids(true, "neq")).toEqual(["unset", "no"]);
+  });
   it("carries values to a new type and cleans views of removed columns", () => {
     const next = withColumns(table, [
       { id: "name", name: "Name", type: "select", options: [] },
