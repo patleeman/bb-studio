@@ -14,11 +14,12 @@ the cursor, then review it and post when ready. The page body stays separate.
 
 ![The compact Pages header](assets/compact-header.png)
 
-The live 390-pixel page keeps **Chat** visible while **Item actions** opens the
-space, related items, Open in split, and page controls. The standalone phone capture
+The live 390-pixel "Offline mode launch" page keeps **Chat** visible while
+**Item actions** is open with Related, Open in split, Dictate, Comments and the
+page menu. The standalone phone capture
 also checks that Version history remains reachable through Page actions.
 These compact captures run on stable BB 0.45.0 with the full suite installed
-from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+from pushed commit 306c841. They check viewport bounds, button hit targets,
 and the Related popover before capture.
 
 ![A Pages document with stats, a chart, and a checklist](assets/staged-preview.png)
@@ -35,13 +36,15 @@ The launch page is open. It holds:
 - a stacked bar chart of weekly active teams
 - a launch checklist with two items done
 
-At the top left are the **Studio** back pill and the breadcrumb. At the top
-right are **Chat**, **Dictate**, **Version history**, **Comments** and page menu
-buttons. **Dictate** appears because Talk is installed in the staged app.
+At the top left is the **Studio** / "Offline mode launch" breadcrumb. At the
+top right are **Chat**, Related, Open in split, **Dictate**, **Version
+history**, **Comments** and the page menu. **Dictate** appears because Talk is installed in the staged app.
 
 ![Standalone Pages Chat with its retained draft](assets/standalone-chat.png)
 
-The standalone Chat check temporarily disables Studio in the isolated
+The capture shows Pages' own **Chat about "Offline mode launch"** composer in
+the main view, holding its retained draft and `release-review.txt`. The
+standalone Chat check temporarily disables Studio in the isolated
 staged app. It resumes a legacy page conversation without creating another
 thread, then opens **New conversation** in the main view. Its draft and
 file survive navigation to another page and back, and a browser reload. The
@@ -69,9 +72,9 @@ and an unchanged page body. The reply microphone also fits in the
 ![The Pages collection listing the seeded pages](assets/collection.png)
 
 The collection is what the **Pages** nav item opens. It shows:
-- the query bar, filtered to `Kind: Pages`
-- the filter rail, with counts by kind, project and tag
-- the list/grid toggle and **New page**
+- Studio search, filtered to `Kind: Pages`, with **Clear filters**
+- the Space, Kind and **More filters** menus and **Save view**
+- **New** in the header
 - the three seeded pages, with their project and last activity
 
 "Rollout risks" shows the page it sits in. The script deletes its three pages
