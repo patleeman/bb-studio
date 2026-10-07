@@ -24,6 +24,6 @@ export const ADDONS: readonly AddOn[] = [
   { id: "emoji-react", displayName: "Studio Reactions", description: "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer. Optional smart reactions let the assistant suggest the ones that fit each reply." },
   { id: "smart-decisions", displayName: "Studio Decisions", description: "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and other plugins can ask it for quick decisions." },
   { id: "studio-tables", displayName: "Studio Tables", description: "Part of BB Studio. Structured tables with typed columns, rows, views, CSV import and export, and agent tools." },
-  { id: "design", displayName: "Studio Design", description: "Part of BB Studio. Design UI prototypes with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work." },
+  { id: "design", displayName: "Studio Design", description: "Part of BB Studio. Design UI prototypes and slide decks with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work." },
   { id: "studio-code", displayName: "Studio Code", description: "Part of BB Studio. VS Code workspaces in your Spaces: open one or more folders in a full editor, run by a local code-server." },
 ];
