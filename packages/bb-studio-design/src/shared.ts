@@ -149,6 +149,8 @@ export type ScreenView = {
   updatedAt: number;
   /** Declared steps; empty for a single-state screen. */
   steps: ScreenStep[];
+  /** Where a frame loads the screen (screenUrl): it changes with each revision and with the canvas script, so apps never show a stale cached copy. */
+  url: string;
 };
 
 export type RoundView = { round: number; title: string; intro: string; screens: ScreenView[] };

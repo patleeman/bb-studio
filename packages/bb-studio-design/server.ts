@@ -58,6 +58,7 @@ const designViewSchema: z.ZodType<DesignView> = z.object({
       viewport: z.custom<Viewport>((value) => typeof value === "string" && parseViewport(value) === value),
       updatedAt: z.number(),
       steps: z.array(z.object({ id: z.string(), label: z.string() })),
+      url: z.string(),
     })),
   })),
   comments: z.array(z.object({

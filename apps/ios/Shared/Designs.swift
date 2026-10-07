@@ -47,16 +47,22 @@ extension BBClient {
         return result.design
     }
 
-    /// One screen's HTML, sandboxed by the plugin. `v` changes with each revision so a cached copy never goes stale.
+    /// One screen's HTML, sandboxed by the plugin, at the address the plugin gives it: that
+    /// changes with each revision and each canvas-script version, so a cached copy never goes stale.
     public func designScreenURL(_ designId: String, _ screen: DesignScreen, step: String? = nil) -> URL {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
-        components.path = "/api/v1/plugins/design/http/screen"
-        components.queryItems = [
-            URLQueryItem(name: "design", value: designId),
-            URLQueryItem(name: "screen", value: screen.id ?? ""),
-            URLQueryItem(name: "v", value: String(Int(screen.updatedAt ?? 0))),
-            URLQueryItem(name: "s", value: "2"),
-        ]
+        if let url = screen.url, let given = URLComponents(string: url), given.path.hasPrefix("/api/v1/plugins/design/") {
+            components.path = given.path
+            components.percentEncodedQuery = given.percentEncodedQuery
+        } else {
+            // A Design plugin older than ScreenView.url.
+            components.path = "/api/v1/plugins/design/http/screen"
+            components.queryItems = [
+                URLQueryItem(name: "design", value: designId),
+                URLQueryItem(name: "screen", value: screen.id ?? ""),
+                URLQueryItem(name: "v", value: String(Int(screen.updatedAt ?? 0))),
+            ]
+        }
         if let step, !step.isEmpty { components.fragment = step }
         return components.url!
     }

@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
+import { SCREEN_SCRIPT_VERSION, screenUrl } from "../shared";
 import { DesignStore, MIGRATIONS, displayName } from "./store";
 
 function memoryStore(now: () => number = Date.now) {
@@ -30,6 +31,15 @@ describe("the design store", () => {
       ["1a", "a", "desktop", "Calm"],
       ["1b", "b", "mobile", ""],
     ]);
+  });
+
+  it("gives each screen the address apps load it from, with the current canvas script version", () => {
+    const { store } = memoryStore(() => 5_000);
+    const row = store.create({ name: "", by: "app" });
+    store.writeScreen(row.id, { id: "1a", html: html("A") }, "agent");
+    const screen = store.view(row.id)!.rounds[0]!.screens[0]!;
+    expect(screen.url).toBe(screenUrl(row.id, "1a", screen.updatedAt));
+    expect(screen.url).toContain(`&s=${SCREEN_SCRIPT_VERSION}`);
   });
 
   it("saves styles by name, updating one saved again", () => {

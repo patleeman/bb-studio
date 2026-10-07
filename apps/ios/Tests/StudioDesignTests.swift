@@ -19,6 +19,17 @@ final class StudioDesignTests: XCTestCase {
         XCTAssertTrue(screen.size == (1080, 1920))
     }
 
+    /// Frames load the address the plugin gives each screen, so the canvas script version can't drift.
+    func testDesignScreenURLUsesThePluginsAddress() throws {
+        let client = BBClient(baseURL: URL(string: "https://design.invalid")!)
+        let screen = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","updatedAt":7,"url":"/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6"}"#.utf8))
+        XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", screen, step: "intro").absoluteString,
+                       "https://design.invalid/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6#intro")
+        let older = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","updatedAt":7}"#.utf8))
+        XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", older).absoluteString,
+                       "https://design.invalid/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7")
+    }
+
     func testDesignPathsAndLinksOpenTheDesign() {
         XCTAssertEqual(Route(href: "/plugins/design/designs/dsn_0123456789abcdef"), .design(id: "dsn_0123456789abcdef"))
         XCTAssertTrue(BBClient.isDesignId("dsn_0123456789abcdef"))
