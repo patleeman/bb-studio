@@ -44,6 +44,20 @@ function withoutEntities(html: string): string {
     .replace(/&(?:tab|newline);/gi, " ");
 }
 
+/**
+ * Whether html[open] (a ">") ends an element's opening tag and html[close]
+ * (a "<") starts the same element's closing tag: the match is that element's
+ * whole content, not the start of a longer paragraph whose DOM differs.
+ */
+function wholeContent(html: string, open: number, close: number): boolean {
+  const tag = /<([a-zA-Z][\w-]*)(?:\s[^<>]*)?$/.exec(html.slice(Math.max(0, open - 2000), open));
+  if (!tag || VOID_TAGS.has(tag[1]!.toLowerCase())) return false;
+  const end = new RegExp(`^</\\s*${tag[1]}\\s*>`, "i");
+  return end.test(html.slice(close, close + tag[1]!.length + 8));
+}
+
+const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+
 export type TextEdit = { ok: true; html: string } | { ok: false; reason: "missing" | "ambiguous" | "markup" };
 
 /** Replaces the one element whose inner HTML is `before` with `after`, both as the browser serialized them. */
@@ -52,7 +66,7 @@ export function applyTextEdit(html: string, before: string, after: string): Text
   if (!isInlineMarkup(after)) return { ok: false, reason: "markup" };
   // Not inside a script, style or comment: text a script draws can look like markup in its source.
   const hidden = [...html.matchAll(/<(script|style|textarea|title)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)|<!--[\s\S]*?(?:-->|$)/gi)].map((block) => [block.index!, block.index! + block[0].length] as const);
-  const matches = [...html.matchAll(sourcePattern(before))].filter((match) => !hidden.some(([from, to]) => match.index! > from && match.index! < to));
+  const matches = [...html.matchAll(sourcePattern(before))].filter((match) => !hidden.some(([from, to]) => match.index! > from && match.index! < to) && wholeContent(html, match.index!, match.index! + match[0].length - 1));
   if (!matches.length) return { ok: false, reason: "missing" };
   if (matches.length > 1) return { ok: false, reason: "ambiguous" };
   const match = matches[0]!;

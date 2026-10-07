@@ -123,7 +123,7 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
             // The live text no longer matches the source exactly once; reload the frame to undo the typing.
             toast.error({
               ambiguous: "That text appears more than once in the screen. Comment on it instead, and the agent will change it.",
-              missing: "That text is drawn by the screen's script, so it can't be edited here. Comment on it instead.",
+              missing: "Couldn't find that text in the screen's source (a script may draw it), so it wasn't changed. Comment on it instead.",
               markup: "Only text and simple formatting can be edited here. Comment on it instead.",
             }[result.reason ?? "missing"]);
             const frame = frames.current.get(key);

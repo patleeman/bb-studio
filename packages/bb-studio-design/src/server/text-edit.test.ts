@@ -18,6 +18,15 @@ describe("editing text on the canvas", () => {
       .toEqual({ ok: true, html: `<h1>Offline sync<br><em>ships Friday</em></h1>` });
   });
 
+  it("edits only an element's whole content, not part of another element", () => {
+    // The DOM's <span>Hello</span> isn't in the source; "Hello" begins a longer paragraph.
+    expect(applyTextEdit(`<p>Hello<br>world</p>`, "Hello", "Bye")).toEqual({ ok: false, reason: "missing" });
+    expect(applyTextEdit(`<p>Intro <b>x</b>Hello</p>`, "Hello", "Bye")).toEqual({ ok: false, reason: "missing" });
+    expect(applyTextEdit(`<div><h2>Hello</h2></div>`, "<h2>Hello</h2>", "Bye")).toEqual({ ok: true, html: `<div>Bye</div>` });
+    expect(applyTextEdit(`<p class="a">Hello</p >`, "Hello", "Bye")).toEqual({ ok: true, html: `<p class="a">Bye</p >` });
+    expect(applyTextEdit(`<p>Hello<br>world</p>`, "Hello<br>world", "Bye")).toEqual({ ok: true, html: `<p>Bye</p>` });
+  });
+
   it("changes nothing when the content is missing or appears more than once", () => {
     expect(applyTextEdit(`<p>Next</p><a>Next</a>`, "Next", "Go")).toEqual({ ok: false, reason: "ambiguous" });
     expect(applyTextEdit(`<p>Next</p>`, "Back", "Go")).toEqual({ ok: false, reason: "missing" });
