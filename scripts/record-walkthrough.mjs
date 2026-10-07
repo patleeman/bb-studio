@@ -91,19 +91,24 @@ const drift = (progress) => `(() => {
   el.scrollTop = Math.round(room * Math.sin(Math.PI * ${progress}) ** 2);
 })()`;
 
+const scenes = SCENES.filter(([id]) => !only || only.has(id));
+const unknownScenes = [...(only ?? [])].filter((id) => !SCENES.some(([sceneId]) => sceneId === id));
+if (unknownScenes.length) throw new Error(`Unknown scene IDs in BB_WALKTHROUGH_ONLY: ${unknownScenes.join(", ")}`);
+
 const workDir = await mkdtemp(join(tmpdir(), "bb-walkthrough-"));
-const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();
-const client = new CdpClient(webSocketUrl);
-await client.connect();
+// Set up inside the try below, so any failure still stops Chrome and removes the temp files.
+let chromeProcess = null;
+let profileDir = null;
+let client = null;
+let space = null;
 const setView = (width) => client.command("Emulation.setDeviceMetricsOverride", { width, height: viewHeight(width), deviceScaleFactor: 2, mobile: false });
-await setView(VIEW_W);
 
 // Screencast frames arrive only when the page paints. Keep the ones shown
 // while a scene is on camera, timed by when they arrived.
 const frames = [];
 const writes = [];
 let recording = false;
-client.socket.addEventListener("message", (event) => {
+const onFrame = (event) => {
   const message = JSON.parse(event.data);
   if (message.method !== "Page.screencastFrame") return;
   const { data, sessionId } = message.params;
@@ -112,8 +117,7 @@ client.socket.addEventListener("message", (event) => {
   const file = join(workDir, `frame-${String(frames.length).padStart(6, "0")}.jpg`);
   frames.push({ file, at: Date.now() });
   writes.push(writeFile(file, Buffer.from(data, "base64")));
-});
-await client.command("Page.startScreencast", { format: "jpeg", quality: 92, maxWidth: 4000, maxHeight: 4000, everyNthFrame: 1 });
+};
 
 // BB remembers the sidebar across navigations, so set it rather than toggle it.
 const setSidebar = async (open) => {
@@ -156,10 +160,17 @@ async function shoot(scene, seconds) {
   shots.push({ scene, start, end: frames.length, until: Date.now() });
 }
 
-const scenes = SCENES.filter(([id]) => !only || only.has(id));
-// The collection's filter rail lists Spaces once one exists.
-const { space } = await pluginRpc("studio", "createSpace", { name: "Q4 planning", icon: "🗂️", description: "Plans for the quarter.", defaultProjectId: projectId });
 try {
+  const chrome = await ensureChrome();
+  chromeProcess = chrome.process;
+  profileDir = chrome.profileDir;
+  client = new CdpClient(chrome.webSocketUrl);
+  await client.connect();
+  await setView(VIEW_W);
+  client.socket.addEventListener("message", onFrame);
+  await client.command("Page.startScreencast", { format: "jpeg", quality: 92, maxWidth: 4000, maxHeight: 4000, everyNthFrame: 1 });
+  // The collection's filter rail lists Spaces once one exists.
+  ({ space } = await pluginRpc("studio", "createSpace", { name: "Q4 planning", icon: "🗂️", description: "Plans for the quarter.", defaultProjectId: projectId }));
   for (const scene of scenes) {
     const [id] = scene;
     const capture = ownScenes[id] ? { setup: ownScenes[id] } : captures.find((candidate) => candidate.id === id);
@@ -311,9 +322,9 @@ try {
   await ffmpeg(["-f", "concat", "-safe", "0", "-i", joinList, "-c", "copy", "-movflags", "+faststart", outPath]);
   process.stdout.write(`Wrote ${outPath}\n`);
 } finally {
-  await pluginRpc("studio", "deleteSpace", { id: space.id }).catch(() => {});
-  await client.command("Page.stopScreencast").catch(() => {});
-  client.socket?.close();
+  if (space) await pluginRpc("studio", "deleteSpace", { id: space.id }).catch(() => {});
+  await client?.command("Page.stopScreencast").catch(() => {});
+  client?.socket?.close();
   if (chromeProcess) {
     const exited = new Promise((resolvePromise) => chromeProcess.once("exit", resolvePromise));
     chromeProcess.kill();
