@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { ActionMenuItem } from "../ui/action-menu-items.js";
 import type { SidebarThread } from "../model/sidebar-thread.js";
-import { STUDIO_CHANGED_EVENT, studioSpacesAtom, type StudioSpacesState } from "./studioSpaces.js";
+import { beginPendingLead, STUDIO_CHANGED_EVENT, studioSpacesAtom, withPendingLeads, type StudioSpacesState } from "./studioSpaces.js";
 
 /** By space only: which Space each thread is in, and each Space's lead. */
 export interface SpaceLeadState {
@@ -65,7 +65,9 @@ export function SpaceLeadItem({ thread, surface }: {
   if (!state || !spaceId) return null;
   const isLead = state.leads[spaceId] === thread.id;
   const setLead = (threadId: string | null) => {
-    setSpaces((current) => current.status === "ready" ? { ...current, leads: { ...current.leads, [spaceId]: threadId } } : current);
+    // Shown at once, and kept over refetches that started before Studio answered.
+    const settle = beginPendingLead(spaceId, threadId);
+    setSpaces((current) => current.status === "ready" ? { ...current, leads: withPendingLeads(current.leads) } : current);
     void sdk.plugins.callRpc({
       pluginId: "studio",
       method: "space_set_lead",
@@ -73,8 +75,12 @@ export function SpaceLeadItem({ thread, surface }: {
       outputSchema: z.unknown(),
       signal: AbortSignal.timeout(15_000),
     }).then(
-      () => window.dispatchEvent(new Event(STUDIO_CHANGED_EVENT)),
+      () => {
+        settle();
+        window.dispatchEvent(new Event(STUDIO_CHANGED_EVENT));
+      },
       (cause: unknown) => {
+        settle();
         window.dispatchEvent(new Event(STUDIO_CHANGED_EVENT));
         toast.error(`Couldn't change the lead: ${errorMessage(cause)}`);
       },

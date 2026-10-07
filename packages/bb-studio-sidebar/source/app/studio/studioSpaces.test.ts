@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { beginPendingSpaceMove, startSpaceLoad, withPendingSpaceMoves } from "./studioSpaces.js";
+import { beginPendingLead, beginPendingSpaceMove, startSpaceLoad, withPendingLeads, withPendingSpaceMoves } from "./studioSpaces.js";
 
 describe("pending Space moves", () => {
   it("stay over refetched data until a load that began after the move settled", () => {
@@ -28,5 +28,28 @@ describe("pending Space moves", () => {
     expect(withPendingSpaceMoves({}, startSpaceLoad()).thr_x).toBe("sp_b");
     settleSecond();
     expect(withPendingSpaceMoves({}, startSpaceLoad()).thr_x).toBeUndefined();
+  });
+});
+
+describe("pending lead changes", () => {
+  it("stay over refetched leads until a load that began after the change settled", () => {
+    const settle = beginPendingLead("sp_a", "thr_new");
+    const fetched = { sp_a: "thr_old", sp_b: null };
+    expect(withPendingLeads(fetched, startSpaceLoad())).toEqual({ sp_a: "thr_new", sp_b: null });
+    // A refetch that began before Studio answered still has the old lead.
+    const straddling = startSpaceLoad();
+    settle();
+    expect(withPendingLeads(fetched, straddling).sp_a).toBe("thr_new");
+    // The first load after it settled is the truth, even a failure's old lead.
+    expect(withPendingLeads(fetched, startSpaceLoad()).sp_a).toBe("thr_old");
+    expect(withPendingLeads(fetched).sp_a).toBe("thr_old");
+  });
+
+  it("keeps a removal pending as no lead", () => {
+    const settle = beginPendingLead("sp_c", null);
+    expect(withPendingLeads({ sp_c: "thr_lead" }, startSpaceLoad()).sp_c).toBeNull();
+    settle();
+    startSpaceLoad();
+    expect(withPendingLeads({ sp_c: null }, startSpaceLoad()).sp_c).toBeNull();
   });
 });

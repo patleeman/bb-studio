@@ -78,6 +78,41 @@ export function withPendingSpaceMoves(
   return next;
 }
 
+/**
+ * Lead changes sent to Studio but maybe not in a fetched `space_lead` yet, by
+ * Space, laid over each load like pending moves so an older refetch can't
+ * put the old lead back.
+ */
+interface PendingLead {
+  threadId: string | null;
+  /** The last load started before the change settled; null while in flight. */
+  settledAfterLoad: number | null;
+}
+const pendingLeads = new Map<string, PendingLead>();
+
+/** Records a lead change; call the returned function once Studio answers. */
+export function beginPendingLead(spaceId: string, threadId: string | null): () => void {
+  const change: PendingLead = { threadId, settledAfterLoad: null };
+  pendingLeads.set(spaceId, change);
+  return () => { change.settledAfterLoad = spaceLoadSeq; };
+}
+
+/** `leads` with pending changes laid over it; pass the load that fetched it. */
+export function withPendingLeads(
+  leads: Readonly<Record<string, string | null>>,
+  load?: number,
+): Record<string, string | null> {
+  const next = { ...leads };
+  for (const [spaceId, change] of pendingLeads) {
+    if (load !== undefined && change.settledAfterLoad !== null && load > change.settledAfterLoad) {
+      if (pendingLeads.get(spaceId) === change) pendingLeads.delete(spaceId);
+      continue;
+    }
+    next[spaceId] = change.threadId;
+  }
+  return next;
+}
+
 const spacesSchema = z.object({
   spaces: z.array(z.object({
     id: z.string(),
@@ -223,7 +258,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
           }]));
         }
         const leadRows = await leadsLoad;
-        leads = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null]));
+        leads = withPendingLeads(Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null])), loadSeq);
         heartbeats = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId && lead.run?.enabled ? lead.run.cadence : null]));
         const list = spaces.map(({ id, name, color, icon, defaultProjectId, isDefault, projectIds }) => ({ id, name, color, icon, defaultProjectId, isDefault, projectIds }));
         if (active) setState({ status: "ready", spaces: list, spaceOf, leads, heartbeats, items, threadsLoaded: spaceMode });
