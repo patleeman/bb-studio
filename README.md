@@ -146,7 +146,14 @@ pnpm plugins:install     # install every plugin from this checkout
 scripts/refresh-locks.sh bb-studio-pages  # refresh a plugin npm lock in a clean clone
 node scripts/staged-bb.mjs start         # stage the suite; stop removes it
 node scripts/staged-bb.mjs start --plugin studio # all plugins, only this capture's fixtures
+node scripts/solo-check.mjs [--plugin <id>] [--ref <sha>] # each plugin alone on a fresh stable BB
 ```
+
+`scripts/solo-check.mjs` installs each plugin from GitHub (default:
+`origin/main`) as the only BB Studio plugin on its own fresh stable BB, then
+checks that BB reports it running, that its CLI and `studio_health` answer, and
+that its main surface loads in headless Chrome without an error screen or
+uncaught exception. It prints a pass/fail table and exits 1 on any failure.
 
 The iOS app builds with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 from `apps/ios`; its README has the commands.

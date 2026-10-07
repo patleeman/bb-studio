@@ -63,6 +63,15 @@ Stable BB then refuses the plugin with "requires bb plugin SDK ...".
   raise a floor past stable to make it pass; wait for the API to ship in
   stable instead.
 
+## Solo install
+
+Every plugin must work when it is the only BB Studio plugin installed. Don't
+make a plugin need Studio, Pages or another plugin to start or render; degrade
+when they're absent. After a change that could affect that (dependencies, kit,
+cross-plugin RPC, startup), push it and run
+`node scripts/solo-check.mjs --plugin <id>` (all plugins without `--plugin`).
+It stages a fresh stable BB per plugin and cleans up after itself.
+
 ## Plugin documentation
 
 All new plugins must include at least one screenshot captured from the running
