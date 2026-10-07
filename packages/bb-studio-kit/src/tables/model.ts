@@ -238,6 +238,9 @@ export function convertCell(cell: Cell | undefined, column: Pick<Column, "type">
     }
     case "date": {
       if (DAY.test(text)) return Number.isNaN(Date.parse(`${text}T00:00:00Z`)) ? null : text;
+      // A timestamp's date as written; read in the server's time zone, midnight UTC is the day before in the Americas.
+      const stamp = /^(\d{4}-\d{2}-\d{2})[T ]\d/.exec(text);
+      if (stamp && !Number.isNaN(Date.parse(text))) return stamp[1]!;
       const time = Date.parse(text);
       if (Number.isNaN(time)) return null;
       const date = new Date(time);

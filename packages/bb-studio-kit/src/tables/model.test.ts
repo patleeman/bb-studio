@@ -98,6 +98,18 @@ describe("table model", () => {
     expect(convertCell("example.com", { type: "url" })).toBe("https://example.com");
     expect(convertCell("talk:rec_1", { type: "relation" })).toEqual({ pluginId: "talk", itemId: "rec_1" });
   });
+  it("keeps a timestamp's written date in a date column, whatever the server's time zone", () => {
+    const zone = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    try {
+      expect(convertCell("2026-02-03T00:00:00Z", { type: "date" })).toBe("2026-02-03");
+      expect(convertCell("2026-02-03 23:30", { type: "date" })).toBe("2026-02-03");
+      expect(convertCell("Feb 3, 2026", { type: "date" })).toBe("2026-02-03");
+    } finally {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+  });
   it("carries values to a new type and cleans views of removed columns", () => {
     const next = withColumns(table, [
       { id: "name", name: "Name", type: "select", options: [] },
