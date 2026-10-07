@@ -64,9 +64,11 @@ The plugin asks the assistant for one last line:
 
 ![Live BB screenshot of Studio Reactions settings](assets/staged-preview.png)
 
-Captured from isolated stable BB at checkpoint `38f64b5`. The native settings
-form is the only reaction editor. It shows the default reaction list, all
-three location toggles enabled, and Smart reactions off. The saved preview
+Captured from a staged stable BB at commit `306c841`. The native settings
+form is the only reaction editor. It shows the default reaction list (Agree,
+Disagree, Do it, Clarify), quoting before the reaction, all three location
+toggles enabled, and Smart reactions on, as the staged BB sets it for the
+live reply below. The saved preview
 below confirms these menu settings are applied in this window. Live checks
 also verified the pending reload notice, each location toggle independently,
 emoji-only selection entries, and cleanup when the plugin is disabled.
