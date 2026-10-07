@@ -3,8 +3,12 @@
 # Git installs do.
 set -eu
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
+# --fresh rebuilds each lock from package.json instead of updating it, for a
+# lock npm ci rejects as out of sync.
+fresh=0
+if [ "${1:-}" = "--fresh" ]; then fresh=1; shift; fi
 if [ "$#" -eq 0 ]; then
-  echo "Usage: scripts/refresh-locks.sh bb-studio-pages [bb-studio-decisions ...]" >&2
+  echo "Usage: scripts/refresh-locks.sh [--fresh] bb-studio-pages [bb-studio-decisions ...]" >&2
   exit 2
 fi
 sh "$repo_dir/scripts/pack-kit.sh"
@@ -22,6 +26,7 @@ for package_name in "$@"; do
   mkdir -p "$target_dir"
   cp "$source_dir/package.json" "$target_dir/package.json"
   cp "$source_dir/package-lock.json" "$target_dir/package-lock.json" 2>/dev/null || rm -f "$target_dir/package-lock.json"
+  if [ "$fresh" = 1 ]; then rm -f "$target_dir/package-lock.json"; fi
   # npm keeps a locked tarball's integrity, so drop the kit to rehash it.
   test ! -f "$target_dir/package-lock.json" || node -e '
     const fs = require("node:fs");
