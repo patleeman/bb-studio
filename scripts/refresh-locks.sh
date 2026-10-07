@@ -30,5 +30,7 @@ for package_name in "$@"; do
     fs.writeFileSync(process.argv[1], JSON.stringify(lock, null, 2) + "\n");
   ' "$target_dir/package-lock.json"
   (cd "$target_dir" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund)
-  cp "$target_dir/package-lock.json" "$source_dir/package-lock.json"
+  # Copy beside the lock, then rename: an interrupted copy never leaves a partial lock.
+  cp "$target_dir/package-lock.json" "$source_dir/package-lock.json.tmp"
+  mv "$source_dir/package-lock.json.tmp" "$source_dir/package-lock.json"
 done
