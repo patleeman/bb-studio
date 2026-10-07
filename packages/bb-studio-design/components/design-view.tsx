@@ -9,7 +9,7 @@ import { BarTitle, ICON_BUTTON, Icon, ItemHeader, cn } from "@bb-studio/kit/app"
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../server";
-import { DESIGN_UPDATE_TYPE, REALTIME_CHANNEL, VIEWPORTS, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../src/shared";
+import { DESIGN_UPDATE_TYPE, REALTIME_CHANNEL, frameSize, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../src/shared";
 import { Canvas, type CanvasApi } from "./canvas";
 import { CommentPopover, DraftPopover, Pins, useComments, type Rect } from "./comments";
 import { PlayView } from "./play-view";
@@ -249,7 +249,7 @@ function Frame({ designId, screen, step, index = 0, reloads, onPlay, layer }: {
   onPlay: Play;
   layer: Layer;
 }) {
-  const { width, height } = VIEWPORTS[screen.viewport] ?? VIEWPORTS.desktop;
+  const { width, height } = frameSize(screen.viewport);
   const key = frameKey(screen.id, step?.id ?? "");
   const url = screenUrl(designId, screen.id, screen.updatedAt) + (step ? `#${encodeURIComponent(step.id)}` : "");
   const label = step ? `${index + 1} · ${step.label}` : screen.caption || screen.title;

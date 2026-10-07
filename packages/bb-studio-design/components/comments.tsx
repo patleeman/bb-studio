@@ -9,7 +9,7 @@ import { Icon, cn } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../server";
-import { VIEWPORTS, frameKey, type CommentView, type DesignView } from "../src/shared";
+import { frameSize, frameKey, type CommentView, type DesignView } from "../src/shared";
 import type { CanvasApi } from "./canvas";
 
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -60,7 +60,7 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
     const screen = design.rounds.flatMap((round) => round.screens).find((each) => each.id === key.split("#")[0]);
     if (!frame || !screen) return null;
     const box = frame.getBoundingClientRect();
-    return { box, scale: box.width / (VIEWPORTS[screen.viewport] ?? VIEWPORTS.desktop).width };
+    return { box, scale: box.width / frameSize(screen.viewport).width };
   }, [design.rounds]);
 
   /** A point inside a frame (screen pixels) in the board's coordinates. */

@@ -5,12 +5,12 @@
 // Full screen presents it alone.
 import { useEffect, useRef, useState } from "react";
 import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
-import { VIEWPORTS, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../src/shared";
+import { frameSize, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../src/shared";
 
 const PADDING = 32;
 
 export function PlayView({ designId, screen, step = "", onClose }: { designId: string; screen: ScreenView; step?: string; onClose(): void }) {
-  const { width, height } = VIEWPORTS[screen.viewport] ?? VIEWPORTS.desktop;
+  const { width, height } = frameSize(screen.viewport);
   const url = screenUrl(designId, screen.id, screen.updatedAt);
   const deck = isDeck(screen);
   /** The slide on show; only a deck moves between steps from here. */

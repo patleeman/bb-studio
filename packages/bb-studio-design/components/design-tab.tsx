@@ -3,7 +3,7 @@
 // without one, it lists the thread's designs.
 import { BarTitle, ICON_BUTTON, Icon, ItemDirectiveCard, ThreadItemsPanel, remember } from "@bb-studio/kit/app";
 import { useBbNavigate, type JsonValue, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { DESIGN_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, VIEWPORTS, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../src/shared";
+import { DESIGN_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../src/shared";
 import { DesignBoard, useDesign } from "./design-view";
 
 /** The workbench tab's action id; reply cards open it with `{ designId }`. */
@@ -50,7 +50,7 @@ const PREVIEW_HEIGHT = 240;
 
 /** A screen at its own size, scaled down to the preview's height. Clicks go to the card. */
 function ScreenThumb({ designId, screen }: { designId: string; screen: ScreenView }) {
-  const { width, height } = VIEWPORTS[screen.viewport] ?? VIEWPORTS.desktop;
+  const { width, height } = frameSize(screen.viewport);
   const scale = PREVIEW_HEIGHT / height;
   return (
     <figure className="flex shrink-0 flex-col gap-1.5">

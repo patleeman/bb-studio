@@ -8,7 +8,7 @@ import { studioSchemas } from "@bb-studio/kit/contract";
 import { createChangeBus, defineItemMention, registerStudioBackup, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl, type DesignView } from "./src/shared";
+import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, SCREEN_ID, VIEWPORT_NAMES, VIEWPORTS, MIN_SIDE, MAX_SIDE, parseViewport, type Viewport, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl, type DesignView } from "./src/shared";
 import { DesignStore, MIGRATIONS, displayName, type Writer } from "./src/server/store";
 import { registerStudio, screenText } from "./src/server/studio";
 import { designBackupHandlers } from "./src/server/backup";
@@ -48,7 +48,7 @@ const designViewSchema: z.ZodType<DesignView> = z.object({
       option: z.string(),
       title: z.string(),
       caption: z.string(),
-      viewport: z.enum(VIEWPORT_NAMES),
+      viewport: z.custom<Viewport>((value) => typeof value === "string" && parseViewport(value) === value),
       updatedAt: z.number(),
       steps: z.array(z.object({ id: z.string(), label: z.string() })),
     })),
@@ -214,7 +214,7 @@ export default async function plugin(bb: BbPluginApi) {
         if (!hostId) throw new Error("This BB server has no local machine to run the reviewer's browser on.");
         const screens = screenIds.flatMap((id) => {
           const screen = store.screen(designId, id);
-          return screen ? [{ id, caption: screen.caption, viewport: (screen.viewport as "desktop") ?? "desktop", steps: parseSteps(screen.html), url: screenUrl(designId, id, screen.updated_at) }] : [];
+          return screen ? [{ id, caption: screen.caption, viewport: parseViewport(screen.viewport) ?? "desktop", steps: parseSteps(screen.html), url: screenUrl(designId, id, screen.updated_at) }] : [];
         });
         const prompt = reviewerPrompt({
           designName: displayName(row),
@@ -428,13 +428,15 @@ export default async function plugin(bb: BbPluginApi) {
       screenId: screenIdSchema,
       html: z.string().min(1).max(MAX_SCREEN_CHARS),
       caption: z.string().max(300).optional().describe("One line on what this option tries, shown above its frame."),
-      viewport: z.enum(VIEWPORT_NAMES).optional().describe("Frame size on the canvas. Defaults to desktop. Use slide (1920×1080) for presentation slides and decks."),
+      viewport: z.string().optional().describe(`Frame size on the canvas. Defaults to desktop. A preset: ${VIEWPORT_NAMES.map((name) => `${name} (${VIEWPORTS[name].width}×${VIEWPORTS[name].height})`).join(", ")}. Use slide for presentation slides and decks. Or any size as "WIDTHxHEIGHT", ${MIN_SIDE}–${MAX_SIDE} px a side, like "1200x630" for a link preview.`),
       roundTitle: z.string().max(200).optional().describe("Sets the round's heading."),
       roundIntro: z.string().max(2000).optional().describe("Sets the round's short intro: what this round explores and how the options differ."),
     }),
-    execute({ designId, screenId, html, caption, viewport, roundTitle, roundIntro }, ctx) {
+    execute({ designId, screenId, html, caption, viewport: size, roundTitle, roundIntro }, ctx) {
       const row = store.get(designId);
       if (!row) return notFound(designId);
+      const viewport = size === undefined ? undefined : parseViewport(size);
+      if (viewport === null) return fail(`"${size}" isn't a frame size. Use a preset (${VIEWPORT_NAMES.join(", ")}) or "WIDTHxHEIGHT" with sides of ${MIN_SIDE}–${MAX_SIDE} px.`);
       // A design written from a thread shows that thread beside its canvas.
       if (!row.thread_id && ctx.threadId) {
         store.setThread(designId, ctx.threadId);

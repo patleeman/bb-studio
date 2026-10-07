@@ -53,10 +53,46 @@ export const VIEWPORTS = {
   mobile: { width: 390, height: 844 },
   /** A 16:9 presentation slide. */
   slide: { width: 1920, height: 1080 },
+  /** A square social post. */
+  square: { width: 1080, height: 1080 },
+  /** A 9:16 story or reel. */
+  story: { width: 1080, height: 1920 },
+  /** Printed pages at 96 dpi. */
+  a4: { width: 794, height: 1123 },
+  letter: { width: 816, height: 1056 },
+  /** An email body; its height is a first screen. */
+  email: { width: 600, height: 900 },
 } as const;
 
-export type Viewport = keyof typeof VIEWPORTS;
-export const VIEWPORT_NAMES = Object.keys(VIEWPORTS) as [Viewport, ...Viewport[]];
+export type Preset = keyof typeof VIEWPORTS;
+export const VIEWPORT_NAMES = Object.keys(VIEWPORTS) as [Preset, ...Preset[]];
+/** A preset name, or any frame size as "WIDTHxHEIGHT" ("1200x630"). */
+export type Viewport = Preset | `${number}x${number}`;
+
+/** Bounds on a custom frame's sides, in CSS pixels. */
+export const MIN_SIDE = 200;
+export const MAX_SIDE = 4000;
+/** Matches a preset or a custom "WIDTHxHEIGHT" within the bounds. */
+export const VIEWPORT_PATTERN = new RegExp(`^(?:${VIEWPORT_NAMES.join("|")}|\\d{3,4}x\\d{3,4})$`);
+
+/** The viewport as stored, or null when it's neither a preset nor a size within the bounds. */
+export function parseViewport(value: string): Viewport | null {
+  const text = value.trim().toLowerCase().replace("×", "x");
+  if (text in VIEWPORTS) return text as Preset;
+  const match = /^(\d{3,4})x(\d{3,4})$/.exec(text);
+  if (!match) return null;
+  const [width, height] = [Number(match[1]), Number(match[2])];
+  return width >= MIN_SIDE && width <= MAX_SIDE && height >= MIN_SIDE && height <= MAX_SIDE ? `${width}x${height}` : null;
+}
+
+/** A frame's size; unknown values fall back to desktop. */
+export function frameSize(viewport: string): { width: number; height: number } {
+  const parsed = parseViewport(viewport);
+  if (!parsed) return VIEWPORTS.desktop;
+  if (parsed in VIEWPORTS) return VIEWPORTS[parsed as Preset];
+  const [width, height] = parsed.split("x").map(Number) as [number, number];
+  return { width, height };
+}
 
 /**
  * A slide deck is one screen at the slide size whose steps are its slides,

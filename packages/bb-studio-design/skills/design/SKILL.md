@@ -129,7 +129,10 @@ the open ones with `design_comments` first.
   scripts may load over https. There's no shared file between screens, so
   repeat shared CSS in each.
 - Pick the frame with `viewport`: `desktop` (1280×800), `tablet` (834×1112),
-  `mobile` (390×844) or `slide` (1920×1080, for decks). Design for that size; the canvas shows it there.
+  `mobile` (390×844), `slide` (1920×1080, for decks), `square` (1080×1080)
+  and `story` (1080×1920) for social posts, `a4` and `letter` for printed
+  pages, `email` (600 wide). For anything else, pass `"WIDTHxHEIGHT"`, like
+  `"1200x630"` for a link preview. Design for that size; the canvas shows it there.
 - Make prototypes work: real navigation between states, working form
   controls, and believable sample data that fits the product.
 - **Flows: one prototype, splayed by step.** For a multi-step flow, write

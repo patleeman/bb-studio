@@ -5,7 +5,7 @@
 // errors, steps that don't open), looks at the screenshots against the design
 // rules, and ends with a verdict. Only "needs work" reaches the design's
 // thread; "done" stays quiet.
-import { VIEWPORTS, type ScreenStep, type Viewport } from "../shared";
+import { frameSize, type ScreenStep, type Viewport } from "../shared";
 
 export type ReviewState = {
   state: "reviewing" | "done" | "needs_work" | "failed";
@@ -23,9 +23,9 @@ export function reviewTargets(baseUrl: string, screens: { id: string; viewport: 
   const targets: ReviewTarget[] = [];
   for (const screen of screens) {
     const frames = screen.steps.length ? screen.steps.map((step) => ({ label: `${screen.id} · ${step.label}`, url: `${screen.url}#${encodeURIComponent(step.id)}` })) : [{ label: screen.id, url: screen.url }];
-    const sizes = screen.viewport === "desktop" ? (["desktop", "mobile"] as const) : [screen.viewport];
+    const sizes: Viewport[] = screen.viewport === "desktop" ? ["desktop", "mobile"] : [screen.viewport];
     for (const frame of frames)
-      for (const size of sizes) targets.push({ label: `${frame.label} at ${size}`, url: baseUrl + frame.url, ...VIEWPORTS[size] });
+      for (const size of sizes) targets.push({ label: `${frame.label} at ${size}`, url: baseUrl + frame.url, ...frameSize(size) });
   }
   return targets;
 }

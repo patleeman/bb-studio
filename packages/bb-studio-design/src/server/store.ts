@@ -3,7 +3,7 @@
 import type { Actor } from "@bb-studio/kit/server";
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
-import { parseScreenId, parseSteps, type DesignView, type RoundView, type ScreenView, type Viewport } from "../shared";
+import { parseScreenId, parseSteps, parseViewport, type DesignView, type RoundView, type ScreenView, type Viewport } from "../shared";
 
 /**
  * Append-only: statement index is the migration id, and BB checks each
@@ -122,7 +122,7 @@ function toScreenView(row: ScreenRow): ScreenView {
     option: row.id.slice(-1),
     title: row.title,
     caption: row.caption,
-    viewport: (row.viewport as Viewport) ?? "desktop",
+    viewport: parseViewport(row.viewport) ?? "desktop",
     updatedAt: row.updated_at,
     steps: parseSteps(row.html),
   };
