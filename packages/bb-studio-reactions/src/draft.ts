@@ -44,5 +44,6 @@ export function composeReactionDraft(
       ? `${kept.trimEnd()}\n\n${trimmed}\n\n${quote}`
       : `${trimmed}\n\n${quote}`;
   }
-  return `${current}\n\n${trimmed}`;
+  // `addQuote` ends the quote with a newline; trim it so one blank line separates them.
+  return `${current.trimEnd()}\n\n${trimmed}`;
 }

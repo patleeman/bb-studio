@@ -27,6 +27,12 @@ describe("composeReactionDraft", () => {
     );
   });
 
+  it("leaves one blank line after a quote that ends with a newline", () => {
+    expect(composeReactionDraft("> selected text\n", "👍 Agree", true, "before")).toBe(
+      "> selected text\n\n👍 Agree",
+    );
+  });
+
   it("places the reaction first with quotePosition after", () => {
     expect(composeReactionDraft(quote, "👍 Agree", true, "after")).toBe(
       "👍 Agree\n\n> selected text",
