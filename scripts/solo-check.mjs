@@ -157,7 +157,7 @@ async function checkPlugin(pluginId, spec, ref, chromeTools) {
   const launcher = spawn(
     join(binDir, "bb-app"),
     ["--bundled", "--data-dir", dataDir, "--server-port", String(port), "--host-daemon-port", String(port + 1)],
-    { cwd: instanceDir, detached: true, stdio: ["ignore", log.fd, log.fd], env: soloEnv(null, { BB_TELEMETRY: "0" }) },
+    { cwd: instanceDir, detached: true, stdio: ["ignore", log.fd, log.fd], env: soloEnv(null, { BB_TELEMETRY: "0", BB_STUDIO_SPACES_DIR: join(instanceDir, "Spaces") }) },
   );
   launcher.unref();
   await log.close();

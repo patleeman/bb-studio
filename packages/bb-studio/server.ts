@@ -97,8 +97,9 @@ export default async function plugin(bb: BbPluginApi) {
     bb.events.on(event, () => command.changed());
   spaces.reconcileProjects((await bb.sdk.projects.list({ includePersonal: true })).map((project) => project.id));
   // A new space gets its own catch-all project under ~/Spaces (src/space-folders.ts).
+  // Staged and test BBs set BB_STUDIO_SPACES_DIR so they never write to the user's home.
   const folders = new SpaceFolders(db, spaces, {
-    root: join(homedir(), "Spaces"),
+    root: process.env.BB_STUDIO_SPACES_DIR || join(homedir(), "Spaces"),
     mkdir: async (path) => { await mkdir(path, { recursive: true }); },
     projects: async () => (await bb.sdk.projects.list({ includePersonal: true })).map((project) => ({ id: project.id, name: project.name, path: (project.sources.find((source) => source.isDefault) ?? project.sources[0])?.path ?? null })),
     createProject: async (name, path) => {
