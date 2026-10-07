@@ -9,7 +9,7 @@ import { BarTitle, ICON_BUTTON, Icon, ItemHeader, cn } from "@bb-studio/kit/app"
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../server";
-import { DESIGN_UPDATE_TYPE, REALTIME_CHANNEL, VIEWPORTS, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView } from "../src/shared";
+import { DESIGN_UPDATE_TYPE, REALTIME_CHANNEL, VIEWPORTS, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../src/shared";
 import { Canvas, type CanvasApi } from "./canvas";
 import { CommentPopover, DraftPopover, Pins, useComments, type Rect } from "./comments";
 import { PlayView } from "./play-view";
@@ -222,15 +222,17 @@ function Round({ designId, round, reloads, onPlay, layer }: { designId: string; 
 /** One option: a single frame, or a row of frames when its prototype declares steps. */
 function Option({ designId, screen, reloads, onPlay, layer }: { designId: string; screen: ScreenView; reloads: number; onPlay: Play; layer: Layer }) {
   if (!screen.steps.length) return <Frame designId={designId} screen={screen} step={null} reloads={reloads} onPlay={onPlay} layer={layer} />;
+  const deck = isDeck(screen);
   return (
     <div className="flex shrink-0 flex-col gap-4">
       <div className="flex items-center gap-3 text-2xl text-muted-foreground">
         <span className="font-semibold text-foreground">{screen.id}</span>
         <span aria-hidden>·</span>
         <span className="truncate">{screen.caption || screen.title}</span>
-        <span className="text-xl opacity-70">{screen.steps.length} steps</span>
+        <span className="text-xl opacity-70">{screen.steps.length} {deck ? "slides" : "steps"}</span>
       </div>
-      <div className="flex items-start gap-10">
+      {/* A deck reads as a grid of slides, four to a row; a flow's steps sit in one row. */}
+      <div className={deck ? "grid grid-cols-4 gap-10" : "flex items-start gap-10"}>
         {screen.steps.map((step, index) => <Frame key={step.id} designId={designId} screen={screen} step={step} index={index} reloads={reloads} onPlay={onPlay} layer={layer} />)}
       </div>
     </div>

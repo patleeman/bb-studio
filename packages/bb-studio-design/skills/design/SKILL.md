@@ -1,6 +1,6 @@
 ---
 name: design
-description: Use when the user asks you to design, prototype or mock up a UI — a screen, a flow, an app, a dashboard, a landing page — or refers to a Studio Design (a /plugins/design/designs/<id> link or an @design mention), or asks for another option, a revision or a change to one.
+description: Use when the user asks you to design, prototype or mock up a UI — a screen, a flow, an app, a dashboard, a landing page — or to make slides, a slide deck or a presentation, or refers to a Studio Design (a /plugins/design/designs/<id> link or an @design mention), or asks for another option, a revision or a change to one.
 ---
 
 # Studio Design
@@ -13,6 +13,33 @@ refer to options by id in chat.
 Tools: `design_ask`, `design_create`, `design_read`, `design_write_screen`,
 `design_edit_screen`, `design_list`, `design_comments`,
 `design_resolve_comments`.
+
+## Slide decks
+
+A deck is a design too. Make it in three steps:
+
+1. **Brief.** If the chat doesn't settle them, ask with `design_ask`: the
+   audience, the goal, roughly how many slides, and the source material
+   (notes, a doc, a page). Don't ask what you can read yourself.
+2. **Pick a look.** Round 1 holds 2–3 visual directions, each one screen at
+   viewport `slide` with two steps: the title slide and one typical content
+   slide, built from the user's real content. Make the directions genuinely
+   different (type, color, layout). Then ask the user to pick with
+   `design_ask`: one `choice` question whose options are the screen ids and
+   captions (`1a · Editorial serif`), with `other` for changes they want.
+3. **Build the deck.** Write the whole deck as one screen, `2a`, at viewport
+   `slide`, in the chosen direction. Each slide is a step:
+   `<meta name="bb-design-steps" content="title=Title; problem=The problem; plan=Our plan">`,
+   in order. Show only the slide named by `location.hash`, on load and on
+   `hashchange`, and default to the first. Also move with the arrow keys and
+   Space inside the deck, so presenting works when the deck has focus. The
+   canvas lays the slides out as a grid; Play presents them, with the arrow
+   keys and full screen. Call `design_ready` when it's done.
+
+Slides are 1920×1080. One idea per slide, large type (body at least 32px),
+generous margins, and the same grid on every slide. Put speaker notes in the
+chat, not on the slides. For later changes, edit the one slide with
+`design_edit_screen`; for a new look, start a new round.
 
 ## Comments
 
@@ -101,8 +128,8 @@ the open ones with `design_comments` first.
   meta tag, inline `<style>` and `<script>`. External fonts, images and
   scripts may load over https. There's no shared file between screens, so
   repeat shared CSS in each.
-- Pick the frame with `viewport`: `desktop` (1280×800), `tablet` (834×1112)
-  or `mobile` (390×844). Design for that size; the canvas shows it there.
+- Pick the frame with `viewport`: `desktop` (1280×800), `tablet` (834×1112),
+  `mobile` (390×844) or `slide` (1920×1080, for decks). Design for that size; the canvas shows it there.
 - Make prototypes work: real navigation between states, working form
   controls, and believable sample data that fits the product.
 - **Flows: one prototype, splayed by step.** For a multi-step flow, write

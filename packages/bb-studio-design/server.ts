@@ -48,7 +48,7 @@ const designViewSchema: z.ZodType<DesignView> = z.object({
       option: z.string(),
       title: z.string(),
       caption: z.string(),
-      viewport: z.enum(VIEWPORT_NAMES as ["desktop", "tablet", "mobile"]),
+      viewport: z.enum(VIEWPORT_NAMES),
       updatedAt: z.number(),
       steps: z.array(z.object({ id: z.string(), label: z.string() })),
     })),
@@ -369,8 +369,8 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.agents.registerTool({
     name: "design_create",
-    description: "Create an empty design in the current project and return its id and link. Follow the design skill before writing its first screen.",
-    instructions: "For UI design work (prototypes, screens, flows), use the design_* tools and follow the design skill.",
+    description: "Create an empty design in the current project and return its id and link. Designs hold UI prototypes or slide decks. Follow the design skill before writing its first screen.",
+    instructions: "For UI design work (prototypes, screens, flows) and for slides and slide decks, use the design_* tools and follow the design skill.",
     presentation: { label: { pending: "Creating a design", completed: "Created a design" } },
     parameters: z.object({ name: z.string().min(1).max(200) }),
     execute({ name }, ctx) {
@@ -421,14 +421,14 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.agents.registerTool({
     name: "design_write_screen",
-    description: "Create or replace one screen of a design. The screen id names its round and option: \"1a\" is round 1, option a. Start a new round with a new number; keep earlier rounds unchanged. Pass a complete, self-contained HTML document. For a multi-step prototype, declare its steps so the canvas splays them out side by side: <meta name=\"bb-design-steps\" content=\"welcome=Welcome; address=Delivery address\">, and open the prototype at the step named by location.hash (#address), on load and on hashchange. The user's open canvas updates live.",
+    description: "Create or replace one screen of a design. The screen id names its round and option: \"1a\" is round 1, option a. Start a new round with a new number; keep earlier rounds unchanged. Pass a complete, self-contained HTML document. For a slide deck, write the whole deck as one screen at viewport \"slide\" with one step per slide. For a multi-step prototype, declare its steps so the canvas splays them out side by side: <meta name=\"bb-design-steps\" content=\"welcome=Welcome; address=Delivery address\">, and open the prototype at the step named by location.hash (#address), on load and on hashchange. The user's open canvas updates live.",
     presentation: { label: { pending: "Writing a screen", completed: "Wrote a screen" } },
     parameters: z.object({
       designId: z.string().min(1),
       screenId: screenIdSchema,
       html: z.string().min(1).max(MAX_SCREEN_CHARS),
       caption: z.string().max(300).optional().describe("One line on what this option tries, shown above its frame."),
-      viewport: z.enum(VIEWPORT_NAMES as ["desktop", "tablet", "mobile"]).optional().describe("Frame size on the canvas. Defaults to desktop."),
+      viewport: z.enum(VIEWPORT_NAMES).optional().describe("Frame size on the canvas. Defaults to desktop. Use slide (1920×1080) for presentation slides and decks."),
       roundTitle: z.string().max(200).optional().describe("Sets the round's heading."),
       roundIntro: z.string().max(2000).optional().describe("Sets the round's short intro: what this round explores and how the options differ."),
     }),

@@ -10,7 +10,7 @@ import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
 import { fileSafeId, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { SCREEN_ID } from "../shared";
+import { SCREEN_ID, VIEWPORT_NAMES, type Viewport } from "../shared";
 import type { CommentRow, DesignRow, DesignStore, ScreenRow } from "./store";
 
 export const DESIGN_BACKUP_VERSION = 1;
@@ -39,7 +39,7 @@ const itemSchema = z.object({
     id: z.string().regex(SCREEN_ID),
     title: text(2000),
     caption: text(20_000),
-    viewport: z.enum(["desktop", "tablet", "mobile"]),
+    viewport: z.enum(VIEWPORT_NAMES),
     createdAt: time,
     updatedAt: time,
   })).max(26_000),
@@ -98,7 +98,7 @@ export function designBackupHandlers(deps: DesignBackupDeps): BackupHandlers {
             id: screen.id,
             title: screen.title,
             caption: screen.caption,
-            viewport: screen.viewport === "tablet" || screen.viewport === "mobile" ? screen.viewport : "desktop",
+            viewport: (VIEWPORT_NAMES as string[]).includes(screen.viewport) ? (screen.viewport as Viewport) : "desktop",
             createdAt: screen.created_at,
             updatedAt: screen.updated_at,
           })),

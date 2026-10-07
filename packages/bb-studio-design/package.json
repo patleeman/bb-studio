@@ -9,7 +9,7 @@
   },
   "bb": {
     "name": "Studio Design",
-    "description": "Part of BB Studio. Design UI prototypes with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work.",
+    "description": "Part of BB Studio. Design UI prototypes and slide decks with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work.",
     "branding": {
       "icon": "./assets/icon.svg",
       "experimental_icons": {

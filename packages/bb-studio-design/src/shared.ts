@@ -51,10 +51,20 @@ export const VIEWPORTS = {
   desktop: { width: 1280, height: 800 },
   tablet: { width: 834, height: 1112 },
   mobile: { width: 390, height: 844 },
+  /** A 16:9 presentation slide. */
+  slide: { width: 1920, height: 1080 },
 } as const;
 
 export type Viewport = keyof typeof VIEWPORTS;
-export const VIEWPORT_NAMES = Object.keys(VIEWPORTS) as Viewport[];
+export const VIEWPORT_NAMES = Object.keys(VIEWPORTS) as [Viewport, ...Viewport[]];
+
+/**
+ * A slide deck is one screen at the slide size whose steps are its slides,
+ * so the canvas lays the slides out and Play presents them.
+ */
+export function isDeck(screen: Pick<ScreenView, "viewport" | "steps">): boolean {
+  return screen.viewport === "slide" && screen.steps.length > 0;
+}
 
 /** One step of a prototype: its hash (`#welcome`) and its label. */
 export type ScreenStep = { id: string; label: string };

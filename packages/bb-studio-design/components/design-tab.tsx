@@ -3,7 +3,7 @@
 // without one, it lists the thread's designs.
 import { BarTitle, ICON_BUTTON, Icon, ItemDirectiveCard, ThreadItemsPanel, remember } from "@bb-studio/kit/app";
 import { useBbNavigate, type JsonValue, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { DESIGN_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, VIEWPORTS, isDesignId, screenUrl, type DesignView, type ScreenView } from "../src/shared";
+import { DESIGN_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, VIEWPORTS, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../src/shared";
 import { DesignBoard, useDesign } from "./design-view";
 
 /** The workbench tab's action id; reply cards open it with `{ designId }`. */
@@ -86,13 +86,14 @@ export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
   if (!design) return <ItemDirectiveCard state="loading" kind="design" icon={DESIGN_ICON} />;
   const screens = design.rounds.reduce((sum, round) => sum + round.screens.length, 0);
   const name = design.name.trim() || "Untitled design";
+  const deck = design.rounds[0]?.screens.find(isDeck);
   return (
     <ItemDirectiveCard
       state="ready"
       kind="design"
       icon={DESIGN_ICON}
       title={name}
-      details={`Design · ${design.rounds.length} ${design.rounds.length === 1 ? "round" : "rounds"} · ${screens} ${screens === 1 ? "screen" : "screens"}`}
+      details={deck ? `Deck · ${deck.steps.length} ${deck.steps.length === 1 ? "slide" : "slides"}` : `Design · ${design.rounds.length} ${design.rounds.length === 1 ? "round" : "rounds"} · ${screens} ${screens === 1 ? "screen" : "screens"}`}
       body={<DesignPreview design={design} />}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
