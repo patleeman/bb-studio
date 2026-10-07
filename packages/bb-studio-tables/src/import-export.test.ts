@@ -83,3 +83,28 @@ it("renames a table from Studio", async () => {
   await expect(rpc.callRpc("studio_rename", { id: table.id, title: "   " })).rejects.toThrow(/validation/);
   expect(((await rpc.callRpc("studio_rename", { id: "missing", title: "X" })) as { failed: unknown[] }).failed).toHaveLength(1);
 });
+
+it("caps a tables_query result and continues where it stopped", async () => {
+  const rpc = fixture();
+  const columns = Array.from({ length: 20 }, (_, n) => ({ id: `c${n}`, name: `C${n}`, type: "text" as const, options: [] }));
+  const rows = Array.from({ length: 60 }, () => Object.fromEntries(columns.map((column) => [column.id, "x".repeat(10_000)])));
+  const { table } = await rpc.callRpc("create", { title: "Wide", projectId: null, columns, rows }) as { table: Table };
+  const seen: string[] = [];
+  let offset = 0, expectedRevision: string | undefined;
+  for (let calls = 0; ; calls++) {
+    expect(calls).toBeLessThan(60);
+    const output = String(await rpc.callAgentTool("tables_query", { id: table.id, limit: 500, offset, ...(expectedRevision ? { expectedRevision } : {}) }));
+    expect(output.length).toBeLessThan(300_000);
+    const result = JSON.parse(output) as { rows: Table["rows"]; nextOffset: number | null; revision: string; truncated?: string };
+    expect(result.truncated).toMatch(/truncated/);
+    expect(String(result.rows[0]!.values.c0).length).toBeLessThan(10_000);
+    seen.push(...result.rows.map((row) => row.id));
+    expectedRevision = result.revision;
+    if (result.nextOffset === null) break;
+    offset = result.nextOffset;
+  }
+  expect(seen).toEqual(table.rows.map((row) => row.id));
+  const small = JSON.parse(String(await rpc.callAgentTool("tables_query", { id: table.id, filters: [{ columnId: "c0", op: "empty" }] })));
+  expect(small).toMatchObject({ rows: [], total: 0 });
+  expect(small.truncated).toBeUndefined();
+});

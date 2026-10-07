@@ -23,7 +23,9 @@ Queries return `{ rows, total, offset, nextOffset, revision }`. Agent queries
 accept `limit` (100 by default, up to 500) and `offset`. Continue with
 `offset: nextOffset` and `expectedRevision: revision` until `nextOffset` is null.
 Keep the same view, filters and sorts. If the table changes, the revision check
-asks you to restart the scan. The CLI uses `--limit`, `--offset`, and `--revision`.
+asks you to restart the scan. An agent page stays under about 200,000 characters:
+it cuts text cells over 2,000 characters and ends early when rows don't fit,
+noting both in `truncated`. The CLI uses `--limit`, `--offset`, and `--revision`.
 
 ## Staged preview
 

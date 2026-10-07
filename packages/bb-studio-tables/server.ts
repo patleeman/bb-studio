@@ -22,7 +22,7 @@ import {
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { MIGRATIONS, TableStore } from "./src/store";
-import { queryPage } from "./src/query";
+import { agentPage, queryPage } from "./src/query";
 
 const id = z.string().min(1).max(100);
 
@@ -278,9 +278,9 @@ export default function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "tables_query",
     description:
-      "Query table rows with filters and sorts. Returns rows, total, nextOffset and revision. Default limit 100, maximum 500. Continue with offset=nextOffset and expectedRevision=revision until nextOffset is null; keep filters/sorts unchanged. If the table changes, restart at offset 0.",
+      "Query table rows with filters and sorts. Returns rows, total, nextOffset and revision. Default limit 100, maximum 500. Continue with offset=nextOffset and expectedRevision=revision until nextOffset is null; keep filters/sorts unchanged. If the table changes, restart at offset 0. Large results return fewer rows and cut long text cells, noted in `truncated`.",
     parameters: tableQuerySchema,
-    execute: (input) => JSON.stringify(queryPage(store.require(input.id), input)),
+    execute: (input) => JSON.stringify(agentPage(store.require(input.id), input)),
   });
   bb.agents.registerTool({
     name: "tables_create",
