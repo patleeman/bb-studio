@@ -39,6 +39,38 @@ final class RefreshRaceTests: XCTestCase {
         XCTAssertTrue(store.viaStudio)
         XCTAssertEqual(store.items.map(\.itemId), ["p1"])
     }
+
+    @MainActor
+    func testSlowFirstLoadCannotOverwriteANewerRefresh() async {
+        let client = BBClient(baseURL: server)
+        let calls = LockedCounter()
+        client.transport = { method, path, _ in
+            if path.hasPrefix("/api/v1/threads/thr_race/timeline") {
+                if calls.next() == 1 {
+                    // The first page is slow and older.
+                    try await Task.sleep(for: .milliseconds(400))
+                    return (200, Data(#"{"rows":[{"id":"r1","kind":"conversation","role":"user","text":"hi"}],"maxSeq":1}"#.utf8))
+                }
+                return (200, Data(#"{"rows":[{"id":"r1","kind":"conversation","role":"user","text":"hi"},{"id":"r2","kind":"conversation","role":"assistant","text":"hello"}],"maxSeq":2}"#.utf8))
+            }
+            if method == "GET", path == "/api/v1/threads/thr_race" {
+                return (200, Data(#"{"id":"thr_race","projectId":"p","status":"idle","createdAt":1,"updatedAt":1}"#.utf8))
+            }
+            return (404, Data(#"{"error":{"message":"not here"}}"#.utf8))
+        }
+        let model = ThreadModel(threadId: "thr_race", client: client)
+        async let first: Void = model.load()
+        try? await Task.sleep(for: .milliseconds(50))
+        await model.refreshLatest()
+        await first
+        XCTAssertEqual(model.rows.map(\.id), ["r1", "r2"])
+    }
+}
+
+final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    func next() -> Int { lock.lock(); defer { lock.unlock() }; count += 1; return count }
 }
 
 final class LockedFlag: @unchecked Sendable {

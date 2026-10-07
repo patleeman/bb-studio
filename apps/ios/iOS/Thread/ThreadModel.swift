@@ -82,8 +82,25 @@ final class ThreadModel: ObservableObject {
     private var boundClient: BBClient?
     private weak var realtime: BBRealtime?
 
-    init(threadId: String) {
+    /// `client` is for tests; the app binds one in `attach`.
+    init(threadId: String, client: BBClient? = nil) {
         self.threadId = threadId
+        boundClient = client
+    }
+
+    /// The last timeline fetch in line. Fetches run one at a time, so a slow,
+    /// older page can't land on top of a newer one, and each delta asks from the
+    /// `maxSeq` the previous one left.
+    private var timelineTail: Task<Void, Never>?
+
+    private func inTimelineOrder<T>(_ work: @escaping @MainActor () async throws -> T) async throws -> T {
+        let previous = timelineTail
+        let task = Task { @MainActor in
+            await previous?.value
+            return try await work()
+        }
+        timelineTail = Task { _ = try? await task.value }
+        return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
     }
 
     func attach(_ app: AppModel) {
@@ -158,16 +175,19 @@ final class ThreadModel: ObservableObject {
         }
         do {
             async let thread = client.thread(threadId)
-            let page = try await client.timeline(threadId)
+            let page = try await inTimelineOrder { [self] in
+                let page = try await client.timeline(threadId)
+                rows = page.rows
+                shelf = Shelf(page)
+                olderCursor = page.timelinePage?.olderCursor
+                hasOlder = page.timelinePage?.hasOlderRows ?? false
+                maxSeq = page.maxSeq
+                windowStart = page.rows.first?.id
+                return page
+            }
             let fresh = try await thread
-            rows = page.rows
             loaded = true
             unreadFrom = Self.firstUnread(in: page.rows, thread: fresh)
-            shelf = Shelf(page)
-            olderCursor = page.timelinePage?.olderCursor
-            hasOlder = page.timelinePage?.hasOlderRows ?? false
-            maxSeq = page.maxSeq
-            windowStart = page.rows.first?.id
             self.thread = fresh
             error = nil
             cache()
@@ -215,13 +235,13 @@ final class ThreadModel: ObservableObject {
     private func refresh(_ changes: Set<String>?) async {
         guard let client else { return }
         func touched(_ kinds: String...) -> Bool { changes.map { !$0.isDisjoint(with: kinds) } ?? true }
-        if changes?.contains("history-rewritten") == true { maxSeq = nil }
+        let rewritten = changes?.contains("history-rewritten") == true
         do {
             let wantsThread = touched("status-changed", "title-changed", "archived-changed", "pin-state-changed")
             async let thread = wantsThread ? client.thread(threadId) : nil
             var grew = false
             if touched("events-appended", "history-rewritten", "status-changed") {
-                grew = try await refreshTimeline(client)
+                grew = try await inTimelineOrder { [self] in try await refreshTimeline(client, rewritten: rewritten) }
             }
             if let thread = try await thread { self.thread = thread }
             error = nil
@@ -237,7 +257,8 @@ final class ThreadModel: ObservableObject {
     }
 
     /// Updates the newest page, as a delta when BB still has the last one. Whether rows changed.
-    private func refreshTimeline(_ client: BBClient) async throws -> Bool {
+    private func refreshTimeline(_ client: BBClient, rewritten: Bool = false) async throws -> Bool {
+        if rewritten { maxSeq = nil }
         let page = try await client.timeline(threadId, after: maxSeq)
         shelf = Shelf(page)
         if let delta = page.delta {
@@ -339,15 +360,21 @@ final class ThreadModel: ObservableObject {
     /// Whether rows were added.
     @discardableResult
     func loadOlder() async -> Bool {
-        guard let client, let cursor = olderCursor, !loadingOlder else { return false }
+        guard let client, olderCursor != nil, !loadingOlder else { return false }
         loadingOlder = true
         defer { loadingOlder = false }
         do {
-            let page = try await client.timeline(threadId, before: cursor)
-            let known = Set(rows.map(\.id))
-            rows = page.rows.filter { !known.contains($0.id) } + rows
-            olderCursor = page.timelinePage?.olderCursor
-            hasOlder = page.timelinePage?.hasOlderRows ?? false
+            // In timeline order, so a full refresh can't swap the rows under the cursor mid-fetch.
+            let page = try await inTimelineOrder { [self] () async throws -> TimelinePage? in
+                guard let cursor = olderCursor else { return nil }
+                let page = try await client.timeline(threadId, before: cursor)
+                let known = Set(rows.map(\.id))
+                rows = page.rows.filter { !known.contains($0.id) } + rows
+                olderCursor = page.timelinePage?.olderCursor
+                hasOlder = page.timelinePage?.hasOlderRows ?? false
+                return page
+            }
+            guard let page else { return false }
             Task { await ThreadTitles.fetchUnknown(in: page.rows.compactMap(\.text), client: client) }
             return true
         } catch where BBClient.isCancellation(error) {
