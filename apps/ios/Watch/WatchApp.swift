@@ -55,13 +55,35 @@ struct WatchThreadView: View {
     @State private var interactions: [PendingInteraction] = []
     @State private var reply = ""
     @State private var status: String?
+    /// Why the thread couldn't load, when nothing has loaded.
+    @State private var loadError: String?
+    /// BB says the thread doesn't exist: deleted since the list or notification.
+    @State private var gone = false
     @Environment(\.scenePhase) private var scenePhase
     private let client = WatchModel.shared.client
 
     private static let quickReplies = ["Yes", "No", "Continue", "Looks good"]
 
     var body: some View {
+        if gone {
+            VStack(spacing: 6) {
+                Image(systemName: "questionmark.bubble").font(.title3).foregroundStyle(.secondary)
+                Text("This thread no longer exists.").font(.footnote).multilineTextAlignment(.center)
+            }
+            .navigationTitle(title)
+        } else {
+            threadList
+        }
+    }
+
+    private var threadList: some View {
         List {
+            if let loadError, rows.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(loadError).font(.footnote).foregroundStyle(.red)
+                    Button("Retry") { Task { await load() } }
+                }
+            }
             ForEach(rows) { row in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.isUser ? "You" : "Agent").font(.caption2).foregroundStyle(.secondary)
@@ -96,8 +118,9 @@ struct WatchThreadView: View {
         .task(id: scenePhase == .active) {
             guard scenePhase == .active else { return }
             await load()
+            guard !gone else { return }
             try? await client.markRead(threadId)
-            while !Task.isCancelled {
+            while !Task.isCancelled, !gone {
                 try? await Task.sleep(for: .seconds(thread?.isRunning == true ? 8 : 30))
                 guard !Task.isCancelled else { return }
                 await load()
@@ -108,10 +131,19 @@ struct WatchThreadView: View {
     private func load() async {
         async let page = client.timeline(threadId, segments: 3)
         async let detail = client.thread(threadId)
-        if let page = try? await page {
+        do {
+            let page = try await page
             rows = Array(page.rows.filter { $0.isConversation && !($0.text ?? "").isEmpty }.suffix(6))
-        }
-        thread = (try? await detail) ?? thread
+            loadError = nil
+        } catch where !BBClient.isCancellation(error) {
+            loadError = BBClient.describe(error, server: client.baseURL)
+        } catch {}
+        do {
+            thread = try await detail
+        } catch let error as BBError where error.status == 404 {
+            gone = true
+            return
+        } catch {}
         interactions = (try? await client.interactions(threadId))?.filter { $0.status == "pending" } ?? interactions
     }
 
