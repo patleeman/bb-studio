@@ -153,6 +153,11 @@ test("the model prompt carries bounded data and parses strict JSON", () => {
   assert.throws(() => parseModelVerdict("steer"));
 });
 
+test("the fallback model's decision is read even when braces follow it", () => {
+  assert.equal(parseModelVerdict('{"action":"steer"}\nIt narrows the task, so {steer} fits.').action, "steer");
+  assert.equal(parseModelVerdict('Context {draft} then {"action":"followup"}').action, "followup");
+});
+
 test("a rejected cached command token is refreshed and retried once", async () => {
   const dir = mkdtempSync(join(tmpdir(), "smart-queue-"));
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));

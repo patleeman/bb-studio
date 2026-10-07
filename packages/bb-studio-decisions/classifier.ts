@@ -143,10 +143,18 @@ const modelAnswer = z
 
 /** Small models add keys or rename `action`; only the chosen option matters. */
 export function parseModelVerdict(text: string | null): Verdict {
-  const json = /\{[\s\S]*\}/.exec(text ?? "")?.[0];
-  if (!json) throw new Error("The fallback model returned no JSON decision.");
-  const action = modelAnswer.parse(JSON.parse(json));
-  return { action, source: "model", confidence: null, note: null };
+  // The answer is a flat object; prose around it can hold other braces.
+  const objects = (text ?? "").match(/\{[^{}]*\}/g) ?? [];
+  if (!objects.length) throw new Error("The fallback model returned no JSON decision.");
+  let failure: unknown;
+  for (const json of objects) {
+    try {
+      return { action: modelAnswer.parse(JSON.parse(json)), source: "model", confidence: null, note: null };
+    } catch (error) {
+      failure ??= error;
+    }
+  }
+  throw failure;
 }
 
 export type ModelTarget = {
