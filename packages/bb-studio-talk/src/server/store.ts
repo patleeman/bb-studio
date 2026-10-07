@@ -50,6 +50,7 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS segments_order ON segments(recording_id, started_at, idx)`,
   `CREATE INDEX IF NOT EXISTS segments_pending ON segments(status, next_attempt_at)`,
   `CREATE INDEX IF NOT EXISTS recordings_updated ON recordings(updated_at)`,
+  `ALTER TABLE recordings ADD COLUMN notes_page_id TEXT`,
 ];
 
 interface RecordingRow {
@@ -68,6 +69,7 @@ interface RecordingRow {
   archived_at: number | null;
   meeting_notes: string | null;
   audio_removed_at: number | null;
+  notes_page_id: string | null;
 }
 
 interface SegmentRow {
@@ -240,6 +242,11 @@ export class TalkStore {
   saveMeetingNotes(id: string, notes: MeetingNotes): boolean {
     return this.db.prepare(`UPDATE recordings SET meeting_notes = ?, updated_at = ? WHERE id = ? AND status = 'done'`)
       .run(JSON.stringify(notes), this.now(), id).changes > 0;
+  }
+
+  /** The Studio Page made from this recording's notes. */
+  setNotesPage(id: string, pageId: string | null): boolean {
+    return this.db.prepare(`UPDATE recordings SET notes_page_id = ? WHERE id = ?`).run(pageId, id).changes > 0;
   }
 
   /** Idempotent: re-sending a stored segment (a retried upload) is a no-op. */
@@ -572,6 +579,7 @@ export class TalkStore {
       archived: row.archived_at !== null,
       audioRemoved: row.audio_removed_at !== null,
       meetingNotes: row.meeting_notes ? JSON.parse(row.meeting_notes) as MeetingNotes : null,
+      notesPageId: row.notes_page_id ?? null,
     };
   }
 }

@@ -621,6 +621,12 @@
                       "type": "null"
                     }
                   ]
+                },
+                "notesPageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -770,6 +776,12 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "notesPageId": {
+                "type": [
+                  "string",
+                  "null"
                 ]
               }
             },
@@ -1018,6 +1030,12 @@
                 "type": "null"
               }
             ]
+          },
+          "notesPageId": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1163,6 +1181,12 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "notesPageId": {
+            "type": [
+              "string",
+              "null"
             ]
           }
         },
@@ -1312,6 +1336,12 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "notesPageId": {
+            "type": [
+              "string",
+              "null"
             ]
           }
         },
@@ -1558,6 +1588,12 @@
                 "type": "null"
               }
             ]
+          },
+          "notesPageId": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1701,6 +1737,12 @@
                     "type": "null"
                   }
                 ]
+              },
+              "notesPageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -1728,6 +1770,188 @@
         },
         "required": [
           "recording"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "notes_status": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pagesAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pagesAvailable"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "notes_make": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recording": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "titleSource": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "auto",
+                  "user"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "dictation"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "paused",
+                  "interrupted",
+                  "finishing",
+                  "done"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "threadId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "endedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "segmentCount": {
+                "type": "number"
+              },
+              "pendingCount": {
+                "type": "number"
+              },
+              "failedCount": {
+                "type": "number"
+              },
+              "wordCount": {
+                "type": "number"
+              },
+              "preview": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "audioRemoved": {
+                "type": "boolean"
+              },
+              "meetingNotes": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "summary": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "notesPageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "titleSource",
+              "kind",
+              "status",
+              "projectId",
+              "threadId",
+              "createdAt",
+              "updatedAt",
+              "endedAt",
+              "durationMs",
+              "segmentCount",
+              "pendingCount",
+              "failedCount",
+              "wordCount",
+              "preview",
+              "archived",
+              "audioRemoved"
+            ],
+            "additionalProperties": false
+          },
+          "pageId": {
+            "type": "string"
+          },
+          "created": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "recording",
+          "pageId",
+          "created"
         ],
         "additionalProperties": false
       }
@@ -1911,6 +2135,12 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "notesPageId": {
+            "type": [
+              "string",
+              "null"
             ]
           }
         },

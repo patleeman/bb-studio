@@ -27,6 +27,7 @@ import { Transcriber } from "./src/server/transcriber";
 import { Summaries, generateRecordingSummary } from "./src/server/meetings";
 import { cleanTranscript } from "./src/server/cleanup";
 import { talkModels } from "./src/server/models";
+import { NotesMaker, PAGES_MISSING, generateNotes, notesPagePath, pagesClient } from "./src/server/notes";
 import { HOLD_KEY_OPTIONS } from "./src/shared/format";
 
 export type { TalkRpcContract } from "./src/shared/contract";
@@ -160,6 +161,15 @@ export default async function plugin(bb: BbPluginApi) {
       if (!lifetime.signal.aborted) bb.log.warn(`Talk could not summarize ${id}: ${String(error)}`);
     });
   }
+
+  // ── Notes pages ────────────────────────────────────────────────────────
+  const pages = pagesClient(bb.sdk.plugins);
+  const notes = new NotesMaker({
+    store,
+    pages,
+    generate: async (id, transcript) => generateNotes(bb, id, transcript, lifetime.signal, await models.get("summary")),
+    changed,
+  });
 
   // A crash between a segment's update and its settle leaves a recording
   // finishing with nothing left to transcribe; finish it now.
@@ -314,6 +324,11 @@ export default async function plugin(bb: BbPluginApi) {
       await meetingNotes(id, true);
       return { recording: mustGet(id) };
     },
+    notes_status: async () => ({ pagesAvailable: await pages.available() }),
+    notes_make: async ({ id }) => {
+      const result = await notes.run(id);
+      return { ...result, recording: mustGet(id) };
+    },
     dictation_cleanup: async ({ id }) => {
       const recording = mustGet(id);
       if (recording.kind !== "dictation") return { text: null };
@@ -441,6 +456,7 @@ export default async function plugin(bb: BbPluginApi) {
       const notes = recording.meetingNotes;
       return [`${recording.title} (${id})`, `Status: ${recording.status}`, `Link: /plugins/talk/recordings/${id}`,
         notes ? `Summary: ${notes.summary}` : "",
+        recording.notesPageId ? `Notes page: ${notesPagePath(recording.notesPageId)}` : "",
         `Transcript (${useCleaned ? "cleaned; original retained" : "original"}, ${offset}–${Math.min(offset + limit, transcript.length)} of ${transcript.length} characters):\n${transcript.slice(offset, offset + limit) || "(No transcript.)"}`].filter(Boolean).join("\n\n");
     },
   });
@@ -458,7 +474,20 @@ export default async function plugin(bb: BbPluginApi) {
       }).join("\n") : "No recordings match.";
     },
   });
-  bb.agents.configure(() => ({ tools: ["talk_list", "talk_read", "talk_search"], skills: [] }));
+  bb.agents.registerTool({
+    name: "talk_make_notes",
+    description: "Write a finished Talk recording's notes to a Studio Page: a short summary, decisions, and action items as a checklist the user can hand to agents. Running it again updates the same page. Needs Studio Pages.",
+    parameters: z.object({ id: z.string().min(1).max(100) }),
+    async execute({ id }) {
+      try {
+        const { pageId, created } = await notes.run(id);
+        return `${created ? "Made" : "Updated"} the notes page for ${mustGet(id).title} (page id ${pageId}): ${notesPagePath(pageId)}\nPut this line on its own in your reply so the user can open the page:\n::page{id="${pageId}"}`;
+      } catch (error) {
+        return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true };
+      }
+    },
+  });
+  bb.agents.configure(() => ({ tools: ["talk_list", "talk_read", "talk_search", "talk_make_notes"], skills: [] }));
 
   // ── `bb talk` ───────────────────────────────────────────────────────────
   const usage = [
@@ -466,6 +495,7 @@ export default async function plugin(bb: BbPluginApi) {
     "  bb talk list [--query <text>] [--json]",
     "  bb talk show <recording-id> [--json]",
     "  bb talk transcript <recording-id> [--cleaned] [--offset <chars>] [--limit <chars>]",
+    "  bb talk notes <recording-id> [--json]",
   ].join("\n");
   bb.cli.register({
     name: "talk",
@@ -478,6 +508,7 @@ export default async function plugin(bb: BbPluginApi) {
         summary: "Print a recording's transcript (paged by characters)",
         usage: "bb talk transcript <recording-id> [--cleaned] [--offset <chars>] [--limit <chars>]",
       },
+      { name: "notes", summary: "Make or update a recording's notes page in Studio Pages", usage: "bb talk notes <recording-id> [--json]" },
     ],
     async run(argv) {
       const json = argv.includes("--json");
@@ -523,6 +554,7 @@ export default async function plugin(bb: BbPluginApi) {
               `Status: ${recording.status}; ${formatLength(recording.durationMs)}; ${recording.wordCount} words`,
               `Segments: ${recording.segmentCount} (${recording.pendingCount} pending, ${recording.failedCount} failed)`,
               `Link: /plugins/talk/recordings/${recording.id}`,
+              ...(recording.notesPageId ? [`Notes: ${notesPagePath(recording.notesPageId)}`] : []),
             ].join("\n"),
           };
         }
@@ -537,6 +569,18 @@ export default async function plugin(bb: BbPluginApi) {
               ? `\n\n[${text.length - offset - limit} more characters: bb talk transcript ${id}${cleaned ? " --cleaned" : ""} --offset ${offset + limit}]`
               : "";
           return { exitCode: 0, stdout: page === "" ? "(No transcript.)" : page + more };
+        }
+        case "notes": {
+          if (!id) break;
+          if (!store.recording(id)) return missing(id);
+          try {
+            const { pageId, created } = await notes.run(id);
+            if (json) return { exitCode: 0, stdout: JSON.stringify({ pageId, created, path: notesPagePath(pageId) }) };
+            return { exitCode: 0, stdout: `${created ? "Made" : "Updated"} notes page ${pageId}: ${notesPagePath(pageId)}` };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { exitCode: 1, stderr: message === PAGES_MISSING ? `${message} Then run "bb talk notes ${id}" again.` : message };
+          }
         }
       }
       return { exitCode: 1, stderr: usage };

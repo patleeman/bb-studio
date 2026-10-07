@@ -15,6 +15,8 @@ public enum Talk {
     public static let segment_put = "segment_put"
     public static let recording_retry = "recording_retry"
     public static let meeting_regenerate = "meeting_regenerate"
+    public static let notes_status = "notes_status"
+    public static let notes_make = "notes_make"
     public static let dictation_cleanup = "dictation_cleanup"
     public static let recording_cleanup = "recording_cleanup"
     public static let recording_keep = "recording_keep"
@@ -48,6 +50,12 @@ public enum Talk {
   public typealias RecordingRetry = RecordingRetryOutput
 
   public typealias MeetingRegenerate = MeetingRegenerateOutput
+
+  public typealias NotesStatusInput = StudioJSONValue
+
+  public typealias NotesStatus = NotesStatusOutput
+
+  public typealias NotesMake = NotesMakeOutput
 
   public typealias DictationCleanup = DictationCleanupOutput
 
@@ -880,8 +888,9 @@ public enum Talk {
     public var archived: Bool?
     public var audioRemoved: Bool?
     public var meetingNotes: RecordingsListOutputRecordingsItemMeetingNotes?
+    public var notesPageId: String?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingsListOutputRecordingsItemTitleSource? = nil, kind: RecordingsListOutputRecordingsItemKind? = nil, status: RecordingsListOutputRecordingsItemStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingsListOutputRecordingsItemMeetingNotes? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingsListOutputRecordingsItemTitleSource? = nil, kind: RecordingsListOutputRecordingsItemKind? = nil, status: RecordingsListOutputRecordingsItemStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingsListOutputRecordingsItemMeetingNotes? = nil, notesPageId: String? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -901,6 +910,7 @@ public enum Talk {
       self.archived = archived
       self.audioRemoved = audioRemoved
       self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
     }
   }
 
@@ -1032,8 +1042,9 @@ public enum Talk {
     public var archived: Bool?
     public var audioRemoved: Bool?
     public var meetingNotes: RecordingGetOutputRecordingMeetingNotes?
+    public var notesPageId: String?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingGetOutputRecordingTitleSource? = nil, kind: RecordingGetOutputRecordingKind? = nil, status: RecordingGetOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingGetOutputRecordingMeetingNotes? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingGetOutputRecordingTitleSource? = nil, kind: RecordingGetOutputRecordingKind? = nil, status: RecordingGetOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingGetOutputRecordingMeetingNotes? = nil, notesPageId: String? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -1053,6 +1064,7 @@ public enum Talk {
       self.archived = archived
       self.audioRemoved = audioRemoved
       self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
     }
   }
 
@@ -1274,8 +1286,9 @@ public enum Talk {
     public var archived: Bool?
     public var audioRemoved: Bool?
     public var meetingNotes: RecordingCreateOutputMeetingNotes?
+    public var notesPageId: String?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingCreateOutputTitleSource? = nil, kind: RecordingCreateOutputKind? = nil, status: RecordingCreateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingCreateOutputMeetingNotes? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingCreateOutputTitleSource? = nil, kind: RecordingCreateOutputKind? = nil, status: RecordingCreateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingCreateOutputMeetingNotes? = nil, notesPageId: String? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -1295,6 +1308,7 @@ public enum Talk {
       self.archived = archived
       self.audioRemoved = audioRemoved
       self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
     }
   }
 
@@ -1420,8 +1434,9 @@ public enum Talk {
     public var archived: Bool?
     public var audioRemoved: Bool?
     public var meetingNotes: RecordingRenameOutputMeetingNotes?
+    public var notesPageId: String?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingRenameOutputTitleSource? = nil, kind: RecordingRenameOutputKind? = nil, status: RecordingRenameOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingRenameOutputMeetingNotes? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingRenameOutputTitleSource? = nil, kind: RecordingRenameOutputKind? = nil, status: RecordingRenameOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingRenameOutputMeetingNotes? = nil, notesPageId: String? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -1441,6 +1456,7 @@ public enum Talk {
       self.archived = archived
       self.audioRemoved = audioRemoved
       self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
     }
   }
 
@@ -1593,8 +1609,9 @@ public enum Talk {
     public var archived: Bool?
     public var audioRemoved: Bool?
     public var meetingNotes: RecordingStateOutputMeetingNotes?
+    public var notesPageId: String?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingStateOutputTitleSource? = nil, kind: RecordingStateOutputKind? = nil, status: RecordingStateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingStateOutputMeetingNotes? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingStateOutputTitleSource? = nil, kind: RecordingStateOutputKind? = nil, status: RecordingStateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingStateOutputMeetingNotes? = nil, notesPageId: String? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -1614,6 +1631,7 @@ public enum Talk {
       self.archived = archived
       self.audioRemoved = audioRemoved
       self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
     }
   }
 
@@ -1814,8 +1832,9 @@ public enum Talk {
     public var archived: Bool?
     public var audioRemoved: Bool?
     public var meetingNotes: RecordingRetryOutputMeetingNotes?
+    public var notesPageId: String?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingRetryOutputTitleSource? = nil, kind: RecordingRetryOutputKind? = nil, status: RecordingRetryOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingRetryOutputMeetingNotes? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingRetryOutputTitleSource? = nil, kind: RecordingRetryOutputKind? = nil, status: RecordingRetryOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingRetryOutputMeetingNotes? = nil, notesPageId: String? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -1835,6 +1854,7 @@ public enum Talk {
       self.archived = archived
       self.audioRemoved = audioRemoved
       self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
     }
   }
 
@@ -1958,8 +1978,9 @@ public enum Talk {
     public var archived: Bool?
     public var audioRemoved: Bool?
     public var meetingNotes: MeetingRegenerateOutputRecordingMeetingNotes?
+    public var notesPageId: String?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: MeetingRegenerateOutputRecordingTitleSource? = nil, kind: MeetingRegenerateOutputRecordingKind? = nil, status: MeetingRegenerateOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: MeetingRegenerateOutputRecordingMeetingNotes? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: MeetingRegenerateOutputRecordingTitleSource? = nil, kind: MeetingRegenerateOutputRecordingKind? = nil, status: MeetingRegenerateOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: MeetingRegenerateOutputRecordingMeetingNotes? = nil, notesPageId: String? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -1979,6 +2000,7 @@ public enum Talk {
       self.archived = archived
       self.audioRemoved = audioRemoved
       self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
     }
   }
 
@@ -1987,6 +2009,172 @@ public enum Talk {
 
     public init(recording: MeetingRegenerateOutputRecording? = nil) {
       self.recording = recording
+    }
+  }
+
+  public struct NotesStatusOutput: Sendable, Hashable, Codable {
+    public var pagesAvailable: Bool?
+
+    public init(pagesAvailable: Bool? = nil) {
+      self.pagesAvailable = pagesAvailable
+    }
+  }
+
+  public struct NotesMakeInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum NotesMakeOutputRecordingTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum NotesMakeOutputRecordingKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum NotesMakeOutputRecordingStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotesMakeOutputRecordingMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+
+    public init(summary: String? = nil) {
+      self.summary = summary
+    }
+  }
+
+  public struct NotesMakeOutputRecording: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: NotesMakeOutputRecordingTitleSource?
+    public var kind: NotesMakeOutputRecordingKind?
+    public var status: NotesMakeOutputRecordingStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: NotesMakeOutputRecordingMeetingNotes?
+    public var notesPageId: String?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: NotesMakeOutputRecordingTitleSource? = nil, kind: NotesMakeOutputRecordingKind? = nil, status: NotesMakeOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: NotesMakeOutputRecordingMeetingNotes? = nil, notesPageId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
+    }
+  }
+
+  public struct NotesMakeOutput: Sendable, Hashable, Codable {
+    public var recording: NotesMakeOutputRecording?
+    public var pageId: String?
+    public var created: Bool?
+
+    public init(recording: NotesMakeOutputRecording? = nil, pageId: String? = nil, created: Bool? = nil) {
+      self.recording = recording
+      self.pageId = pageId
+      self.created = created
     }
   }
 
@@ -2144,8 +2332,9 @@ public enum Talk {
     public var archived: Bool?
     public var audioRemoved: Bool?
     public var meetingNotes: RecordingKeepOutputMeetingNotes?
+    public var notesPageId: String?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingKeepOutputTitleSource? = nil, kind: RecordingKeepOutputKind? = nil, status: RecordingKeepOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingKeepOutputMeetingNotes? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingKeepOutputTitleSource? = nil, kind: RecordingKeepOutputKind? = nil, status: RecordingKeepOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: RecordingKeepOutputMeetingNotes? = nil, notesPageId: String? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -2165,6 +2354,7 @@ public enum Talk {
       self.archived = archived
       self.audioRemoved = audioRemoved
       self.meetingNotes = meetingNotes
+      self.notesPageId = notesPageId
     }
   }
 

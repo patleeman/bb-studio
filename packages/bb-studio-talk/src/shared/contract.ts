@@ -57,6 +57,8 @@ export const recordingSchema = z.object({
   /** A dictation's audio was deleted after the retention period; the transcript stays. */
   audioRemoved: z.boolean(),
   meetingNotes: meetingNotesSchema.nullable().optional(),
+  /** The Studio Page "Make notes" wrote for this recording. */
+  notesPageId: z.string().nullable().optional(),
 });
 export type Recording = z.infer<typeof recordingSchema>;
 
@@ -148,6 +150,16 @@ export const rpcContract = defineRpcContract({
   meeting_regenerate: {
     input: z.object({ id: recordingId }),
     output: z.object({ recording: recordingSchema }),
+  },
+  /** Whether Studio Pages is there to hold notes. */
+  notes_status: {
+    input: z.null(),
+    output: z.object({ pagesAvailable: z.boolean() }),
+  },
+  /** Writes the recording's notes page, or updates the one it has. */
+  notes_make: {
+    input: z.object({ id: recordingId }),
+    output: z.object({ recording: recordingSchema, pageId: z.string(), created: z.boolean() }),
   },
   /** A finished dictation's transcript, tidied for inserting; null keeps the raw text. */
   dictation_cleanup: {
