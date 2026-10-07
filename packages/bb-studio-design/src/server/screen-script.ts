@@ -179,8 +179,15 @@ const SCREEN_AGENT = String.raw`(() => {
   post({ type: "ready" });
 })();`;
 
-/** Prints backgrounds as designed, so Export PDF keeps them even with the dialog's "Background graphics" off. */
-const PRINT_STYLE = "<style data-bb-design-ui>@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }</style>";
+/**
+ * Prints backgrounds as designed, so Export PDF keeps them even with the
+ * dialog's "Background graphics" off. In a sandboxed frame Chrome prints an
+ * element's background only with print-color-adjust: exact, and never the
+ * body's when it passes to the page canvas; a background image on html keeps
+ * it on the body, which then fills the page. flow-root stops a heading's top
+ * margin from leaving an unpainted strip above the body.
+ */
+const PRINT_STYLE = "<style data-bb-design-ui>@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } html { background-image: linear-gradient(transparent, transparent) !important; } body { min-height: 100vh; box-sizing: border-box; display: flow-root; } }</style>";
 const SCRIPT = `${PRINT_STYLE}<script data-bb-design-ui>${SCREEN_AGENT}</script>`;
 
 /** The screen's HTML with the canvas script added before `</body>`, or at the end. */
