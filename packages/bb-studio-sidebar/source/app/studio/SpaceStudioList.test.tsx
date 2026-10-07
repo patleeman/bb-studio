@@ -1,15 +1,18 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { showsItem, SpaceNewMenu, SpaceStudioList } from "./SpaceStudioList.js";
 import type { SpaceItems } from "./studioSpaces.js";
 
-const rpc = vi.hoisted(() => ({ answer: (): unknown => ({ ok: true }) }));
+const rpc = vi.hoisted(() => ({ answer: (): unknown => ({ ok: true }), calls: [] as { method: string; input: unknown }[] }));
 vi.mock("@get-bb/plugin-sdk/app", async (actual) => ({
   ...(await actual<object>()),
-  useSdk: () => ({ plugins: { callRpc: () => Promise.resolve(rpc.answer()) } }),
+  useSdk: () => ({ plugins: { callRpc: ({ method, input }: { method: string; input: unknown }) => {
+    rpc.calls.push({ method, input });
+    return Promise.resolve(rpc.answer());
+  } } }),
 }));
 
 installTestPluginRuntime();
@@ -39,6 +42,32 @@ describe("SpaceStudioList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close Mockup" }));
     rerender(list(withOpen([{ ...mockup }])));
     expect(screen.queryByText("Mockup")).toBeNull();
+  });
+});
+
+describe("chip rename", () => {
+  // Chrome blurs an input as it's removed; ending the rename and that blur land in one batch here.
+  const renameWith = async (key: "Enter" | "Escape") => {
+    rpc.answer = () => ({ done: [] });
+    rpc.calls = [];
+    render(list(withOpen([mockup])));
+    fireEvent.contextMenu(screen.getByRole("link", { name: "Mockup" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Rename" }));
+    const input = await screen.findByRole("textbox", { name: "Rename Mockup" });
+    fireEvent.change(input, { target: { value: "Renamed" } });
+    act(() => {
+      fireEvent.keyDown(input, { key });
+      fireEvent.blur(input);
+    });
+    return rpc.calls.filter((call) => call.method === "rename");
+  };
+
+  it("saves once on Enter", async () => {
+    expect(await renameWith("Enter")).toHaveLength(1);
+  });
+
+  it("cancels on Escape without saving", async () => {
+    expect(await renameWith("Escape")).toHaveLength(0);
   });
 });
 

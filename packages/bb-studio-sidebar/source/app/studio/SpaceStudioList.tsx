@@ -143,9 +143,15 @@ function StudioItemChip({ item, onClose }: { item: OpenItem; onClose(): void }) 
   const active = showsItem(usePathname(), item.href);
   const link = useRef<HTMLAnchorElement>(null);
   const [renaming, setRenaming] = useState(false);
+  // Enter or Escape ends a rename; the blur that follows as the input goes must not save again.
+  const renameEnded = useRef(false);
+  const startRename = () => { renameEnded.current = false; setRenaming(true); };
+  const cancelRename = () => { renameEnded.current = true; setRenaming(false); };
   const call = (method: "archive" | "remove" | "rename", input: Record<string, unknown>) =>
     sdk.plugins.callRpc({ pluginId: "studio", method, input: input as never, outputSchema: resultsSchema, signal: AbortSignal.timeout(15_000) });
   const rename = (title: string) => {
+    if (renameEnded.current) return;
+    renameEnded.current = true;
     setRenaming(false);
     const next = title.trim();
     if (!next || next === item.title) return;
@@ -189,7 +195,7 @@ function StudioItemChip({ item, onClose }: { item: OpenItem; onClose(): void }) 
               onFocus={(event) => event.currentTarget.select()}
               onKeyDown={(event) => {
                 if (event.key === "Enter") { event.preventDefault(); rename(event.currentTarget.value); }
-                if (event.key === "Escape") { event.preventDefault(); setRenaming(false); }
+                if (event.key === "Escape") { event.preventDefault(); cancelRename(); }
               }}
               onBlur={(event) => rename(event.currentTarget.value)}
               className="h-full w-40 rounded-full border border-sidebar-ring bg-sidebar px-2 text-xs outline-none"
@@ -234,7 +240,7 @@ function StudioItemChip({ item, onClose }: { item: OpenItem; onClose(): void }) 
         <ContextMenuItem onSelect={() => copyText(item.id, "ID copied")}><Icon name="Copy" className="size-4" />Copy ID</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={pin}><Icon name={item.pinned ? "PinOff" : "Pin"} className="size-4" />{item.pinned ? "Unpin" : "Pin"}</ContextMenuItem>
-        <ContextMenuItem onSelect={() => setTimeout(() => setRenaming(true), 0)}><Icon name="Edit" className="size-4" />Rename</ContextMenuItem>
+        <ContextMenuItem onSelect={() => setTimeout(startRename, 0)}><Icon name="Edit" className="size-4" />Rename</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={onClose}><Icon name="X" className="size-4" />Close</ContextMenuItem>
         <ContextMenuItem onSelect={archive}><Icon name="Archive" className="size-4" />Archive</ContextMenuItem>
