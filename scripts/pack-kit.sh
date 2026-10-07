@@ -9,7 +9,7 @@ set -eu
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 tarball="$repo_dir/packages/bb-studio-kit.tgz"
 scratch_dir="$(mktemp -d "${TMPDIR:-/tmp}/bb-studio.XXXXXX")"
-trap 'rm -rf "$scratch_dir"' EXIT HUP INT TERM
+trap 'rm -rf "$scratch_dir" "$tarball.tmp.$$"' EXIT HUP INT TERM
 (cd "$repo_dir/packages/bb-studio-kit" && npm pack --silent --pack-destination "$scratch_dir" >/dev/null)
 packed="$(ls "$scratch_dir"/*.tgz)"
 if [ "${1:-}" = "--check" ]; then
@@ -19,4 +19,7 @@ if [ "${1:-}" = "--check" ]; then
   }
   exit 0
 fi
-mv "$packed" "$tarball"
+# Copy beside the tarball, then rename: a move from TMPDIR crosses
+# filesystems and an interrupted copy would leave a partial tarball.
+cp "$packed" "$tarball.tmp.$$"
+mv -f "$tarball.tmp.$$" "$tarball"
