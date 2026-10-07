@@ -1454,6 +1454,59 @@
               ]
             }
           },
+          "baseColumns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "number",
+                    "select",
+                    "multi-select",
+                    "date",
+                    "checkbox",
+                    "person",
+                    "bot",
+                    "url",
+                    "relation"
+                  ]
+                },
+                "options": {
+                  "default": [],
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 60,
+                  "maximum": 800
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "type"
+              ]
+            }
+          },
           "views": {
             "type": "array",
             "items": {

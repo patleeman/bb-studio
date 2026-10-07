@@ -45,6 +45,8 @@ export const tableUpdateSchema = z.object({
   title: title.optional(),
   projectId: id.nullable().optional(),
   columns: z.array(columnSchema).optional(),
+  /** The columns `columns` was edited from; columns and options added since are kept. */
+  baseColumns: z.array(columnSchema).optional(),
   views: z.array(viewSchema).optional(),
   archived: z.boolean().optional(),
 });

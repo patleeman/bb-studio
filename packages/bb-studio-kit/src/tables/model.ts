@@ -277,6 +277,26 @@ export function withOptions(columns: Column[], values: readonly Values[]): Colum
 }
 
 /**
+ * `next`, a column list edited from `base`, merged into `current`: columns
+ * and select options added since `base` stay, so a save from a stale copy
+ * can't drop what someone else just added. What `base` had and `next`
+ * leaves out is still removed.
+ */
+export function mergeColumns(current: Column[], base: Column[], next: Column[]): Column[] {
+  const known = new Map(base.map((column) => [column.id, column]));
+  const now = new Map(current.map((column) => [column.id, column]));
+  const merged = next.map((column) => {
+    const was = known.get(column.id);
+    const is = now.get(column.id);
+    if (!was || !is || is.type !== column.type || (column.type !== "select" && column.type !== "multi-select")) return column;
+    const added = is.options.filter((option) => !was.options.includes(option) && !column.options.includes(option));
+    return added.length ? { ...column, options: [...column.options, ...added].slice(0, 100) } : column;
+  });
+  const ids = new Set(next.map((column) => column.id));
+  return [...merged, ...current.filter((column) => !known.has(column.id) && !ids.has(column.id))];
+}
+
+/**
  * The table with new columns: values carried over to a changed type,
  * dropped with a removed column or option, and views cleared of columns
  * they can no longer use.

@@ -3,6 +3,7 @@ import {
   applyRowPatch,
   columnSchema,
   importGrid,
+  mergeColumns,
   parseCsv,
   validateValues,
   viewSchema,
@@ -35,7 +36,10 @@ type RecordRow = {
   updated_at: number;
 };
 
-export type TableChanges = Partial<Pick<Table, "title" | "projectId" | "columns" | "views" | "archived">>;
+export type TableChanges = Partial<Pick<Table, "title" | "projectId" | "columns" | "views" | "archived">> & {
+  /** The columns `columns` was edited from; columns and options added since are kept. */
+  baseColumns?: Column[];
+};
 
 function decode(row: RecordRow): Table {
   const data = JSON.parse(row.data) as { columns: Column[]; views: View[]; rows: Row[] };
@@ -140,7 +144,10 @@ export class TableStore {
   /** Changes a table's settings. New columns carry values over to a changed type and clean up the views. */
   update(id: string, changes: TableChanges): Table {
     let table = this.require(id);
-    if (changes.columns) table = { ...table, ...withColumns(table, checkedColumns(changes.columns)) };
+    if (changes.columns) {
+      const next = changes.baseColumns ? mergeColumns(table.columns, changes.baseColumns, changes.columns) : changes.columns;
+      table = { ...table, ...withColumns(table, checkedColumns(next)) };
+    }
     if (changes.views) table.views = viewsFor(changes.views, table.columns);
     // A removed column can take a table's only board or calendar view with it.
     if (!table.views.length) table.views = [defaultView()];

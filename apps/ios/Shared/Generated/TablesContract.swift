@@ -921,6 +921,70 @@ public enum Tables {
     }
   }
 
+  public enum UpdateInputBaseColumnsItemType: Sendable, Hashable, Codable {
+    case text
+    case number
+    case select
+    case multi_select
+    case date
+    case checkbox
+    case person
+    case bot
+    case url
+    case relation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "text": self = .text
+      case "number": self = .number
+      case "select": self = .select
+      case "multi-select": self = .multi_select
+      case "date": self = .date
+      case "checkbox": self = .checkbox
+      case "person": self = .person
+      case "bot": self = .bot
+      case "url": self = .url
+      case "relation": self = .relation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .text: try container.encode("text")
+      case .number: try container.encode("number")
+      case .select: try container.encode("select")
+      case .multi_select: try container.encode("multi-select")
+      case .date: try container.encode("date")
+      case .checkbox: try container.encode("checkbox")
+      case .person: try container.encode("person")
+      case .bot: try container.encode("bot")
+      case .url: try container.encode("url")
+      case .relation: try container.encode("relation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct UpdateInputBaseColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: UpdateInputBaseColumnsItemType?
+    public var options: [String]?
+    public var width: Int?
+
+    public init(id: String? = nil, name: String? = nil, type: UpdateInputBaseColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.options = options
+      self.width = width
+    }
+  }
+
   public enum UpdateInputViewsItemType: Sendable, Hashable, Codable {
     case table
     case board
@@ -1060,14 +1124,16 @@ public enum Tables {
     public var title: String?
     public var projectId: String?
     public var columns: [UpdateInputColumnsItem]?
+    public var baseColumns: [UpdateInputBaseColumnsItem]?
     public var views: [UpdateInputViewsItem]?
     public var archived: Bool?
 
-    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [UpdateInputColumnsItem]? = nil, views: [UpdateInputViewsItem]? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [UpdateInputColumnsItem]? = nil, baseColumns: [UpdateInputBaseColumnsItem]? = nil, views: [UpdateInputViewsItem]? = nil, archived: Bool? = nil) {
       self.id = id
       self.title = title
       self.projectId = projectId
       self.columns = columns
+      self.baseColumns = baseColumns
       self.views = views
       self.archived = archived
     }

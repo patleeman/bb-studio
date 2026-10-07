@@ -59,3 +59,26 @@ it("deletes the select column a table's only board view groups by", () => {
   expect(saved.views[0]!.type).toBe("table");
   db.close();
 });
+
+it("keeps a column or option added while the UI saved its stale column list", () => {
+  const { db, store } = open();
+  const table = store.create("Tasks", null, [
+    { id: "name", name: "Name", type: "text", options: [] },
+    { id: "state", name: "State", type: "select", options: ["Open"] },
+  ]);
+  const base = table.columns;
+  // An agent adds an option and, through an import, a column the UI hasn't seen.
+  const row = store.insert(table.id, { name: "Ship", state: "Blocked" });
+  store.importCsv(table.id, "Name,Owner\nDocs,Ada\n");
+  // The UI resizes a column from what it last loaded.
+  const saved = store.update(table.id, { columns: base.map((column) => (column.id === "name" ? { ...column, width: 240 } : column)), baseColumns: base });
+  expect(saved.columns.map((column) => column.name)).toEqual(["Name", "State", "Owner"]);
+  expect(saved.columns[0]!.width).toBe(240);
+  expect(saved.columns[1]!.options).toEqual(["Open", "Blocked"]);
+  expect(saved.rows.find((each) => each.id === row.id)!.values.state).toBe("Blocked");
+  expect(saved.rows.at(-1)!.values[saved.columns[2]!.id]).toBe("Ada");
+  // Removing what the UI did know still removes it.
+  const removed = store.update(table.id, { columns: [saved.columns[0]!, saved.columns[2]!], baseColumns: saved.columns });
+  expect(removed.columns.map((column) => column.name)).toEqual(["Name", "Owner"]);
+  db.close();
+});

@@ -8,6 +8,8 @@ import { invertPatch, isEmptyPatch } from "./sheet";
 export interface TableMeta {
   title?: string;
   columns?: Column[];
+  /** The columns `columns` was edited from, so the server keeps what others added since. */
+  baseColumns?: Column[];
   views?: View[];
 }
 
@@ -122,7 +124,8 @@ export function useTableState(source: Table, api: TableApi, onError: (error: unk
   /** Shows and saves `change`; `undoable` changes go on the undo stack. */
   const apply = useCallback(
     (raw: Change, undoable = true) => {
-      const change = withRowIds(raw);
+      const edited = withRowIds(raw);
+      const change = edited.meta?.columns ? { ...edited, meta: { ...edited.meta, baseColumns: current.current.columns } } : edited;
       let next: Table;
       try {
         next = applyChange(current.current, change);
