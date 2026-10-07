@@ -35,7 +35,7 @@ export function ExportPdfButton({ designId, screen }: { designId: string; screen
         className={ICON_BUTTON}
         onClick={() => setPrinting(true)}
       >
-        <Icon name={printing ? "Loading" : "Pdf01"} className={cn("size-4", printing && "animate-spin motion-reduce:animate-none")} />
+        <Icon name={printing ? "Loading" : "FileText"} className={cn("size-4", printing && "animate-spin motion-reduce:animate-none")} />
       </button>
       {printing ? (
         <iframe

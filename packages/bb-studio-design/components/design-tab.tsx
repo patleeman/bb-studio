@@ -86,14 +86,16 @@ export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
   if (!design) return <ItemDirectiveCard state="loading" kind="design" icon={DESIGN_ICON} />;
   const screens = design.rounds.reduce((sum, round) => sum + round.screens.length, 0);
   const name = design.name.trim() || "Untitled design";
-  const deck = design.rounds[0]?.screens.find(isDeck);
+  /** The newest round's decks: one is the deck itself; several are directions to pick from. */
+  const decks = design.rounds[0]?.screens.filter(isDeck) ?? [];
+  const deck = decks.length === 1 ? decks[0] : undefined;
   return (
     <ItemDirectiveCard
       state="ready"
       kind="design"
       icon={DESIGN_ICON}
       title={name}
-      details={deck ? `Deck · ${deck.steps.length} ${deck.steps.length === 1 ? "slide" : "slides"}` : `Design · ${design.rounds.length} ${design.rounds.length === 1 ? "round" : "rounds"} · ${screens} ${screens === 1 ? "screen" : "screens"}`}
+      details={deck ? `Deck · ${deck.steps.length} ${deck.steps.length === 1 ? "slide" : "slides"}` : decks.length ? `Deck · ${decks.length} directions to pick from` : `Design · ${design.rounds.length} ${design.rounds.length === 1 ? "round" : "rounds"} · ${screens} ${screens === 1 ? "screen" : "screens"}`}
       body={<DesignPreview design={design} />}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.

@@ -45,12 +45,12 @@ describe("design comments", () => {
 
 describe("the screen script", () => {
   it("goes before </body>, or at the end without one", () => {
-    expect(withScreenScript("<html><body><p>x</p></BODY></html>")).toMatch(/<p>x<\/p><script data-bb-design-ui>[\s\S]*<\/script><\/BODY><\/html>$/);
-    expect(withScreenScript("<p>x</p>")).toMatch(/^<p>x<\/p>\n<script data-bb-design-ui>/);
+    expect(withScreenScript("<html><body><p>x</p></BODY></html>")).toMatch(/<p>x<\/p><style data-bb-design-ui>[\s\S]*<\/style><script data-bb-design-ui>[\s\S]*<\/script><\/BODY><\/html>$/);
+    expect(withScreenScript("<p>x</p>")).toMatch(/^<p>x<\/p>\n<style data-bb-design-ui>@media print/);
   });
 
   it("is plain, parseable JavaScript", () => {
-    const script = withScreenScript("").replace(/^\n<script data-bb-design-ui>/, "").replace(/<\/script>$/, "");
+    const script = withScreenScript("").replace(/^\n<style data-bb-design-ui>[^<]*<\/style><script data-bb-design-ui>/, "").replace(/<\/script>$/, "");
     expect(() => new Function(script)).not.toThrow();
     expect(script).not.toMatch(/__name|require\(/);
   });

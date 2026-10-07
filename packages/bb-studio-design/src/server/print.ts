@@ -20,7 +20,7 @@ export function printPage(input: { title: string; width: number; height: number;
 <html><head><meta charset="utf-8"><title>${escapeHtml(input.title)}</title>
 <style>
   @page { size: ${width}px ${height}px; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #fff; }
+  html, body { margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .page { width: ${width}px; height: ${height}px; overflow: hidden; break-after: page; page-break-after: always; }
   .page:last-child { break-after: auto; page-break-after: auto; }
   iframe { display: block; border: 0; width: ${width}px; height: ${height}px; }

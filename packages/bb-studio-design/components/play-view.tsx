@@ -77,7 +77,7 @@ export function PlayView({ designId, screen, step = "", onClose }: { designId: s
               <Icon name="ChevronRight" className="size-4" />
             </button>
             <button type="button" aria-label="Full screen" title="Present full screen" className={ICON_BUTTON} onClick={() => void root.current?.requestFullscreen?.().catch(() => undefined)}>
-              <Icon name="FullScreen" className="size-4" />
+              <Icon name="Maximize2" className="size-4" />
             </button>
           </>
         ) : null}

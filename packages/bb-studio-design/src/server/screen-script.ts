@@ -58,31 +58,37 @@ const SCREEN_AGENT = String.raw`(() => {
     Object.assign(outline.style, { display: "block", left: (rect.x - 2) + "px", top: (rect.y - 2) + "px", width: (rect.width + 4) + "px", height: (rect.height + 4) + "px" });
   }
 
-  // Only elements that hold text alone can be edited in place; others take a comment.
+  // Text with simple inline formatting can be edited in place; anything else takes a comment.
+  // Keep INLINE in step with INLINE_TAGS in src/server/text-edit.ts.
+  const INLINE = /^(BR|EM|STRONG|B|I|U|S|SPAN|A|SMALL|MARK|CODE|SUB|SUP)$/;
+  const inlineOnly = (element) => Array.from(element.querySelectorAll("*")).every((child) => INLINE.test(child.tagName));
   function editable(element) {
-    if (!element || element.children.length || element.closest("script, style, textarea, select, [" + MARK + "]")) return null;
+    if (!element || element.closest("script, style, textarea, select, [" + MARK + "]")) return null;
+    // A click on formatted words (an <em> in a heading) edits the whole heading.
+    while (INLINE.test(element.tagName) && element.parentElement && element.parentElement !== document.body && inlineOnly(element.parentElement)) element = element.parentElement;
+    if (!inlineOnly(element)) return null;
     return (element.textContent || "").trim() ? element : null;
   }
 
-  function startEdit(element) {
+  function startEdit(element, event) {
     const before = element.innerHTML;
-    const original = element.innerText;
     showOutline(null);
-    element.setAttribute("contenteditable", "plaintext-only");
+    element.setAttribute("contenteditable", element.children.length ? "true" : "plaintext-only");
     element.focus();
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    getSelection().removeAllRanges();
-    getSelection().addRange(range);
+    // The caret goes where the user clicked; double-click selects a word as usual.
+    const caret = document.caretRangeFromPoint ? document.caretRangeFromPoint(event.clientX, event.clientY) : null;
+    if (caret && element.contains(caret.startContainer)) {
+      getSelection().removeAllRanges();
+      getSelection().addRange(caret);
+    }
     let finished = false;
     const finish = (save) => {
       if (finished) return;
       finished = true;
       element.removeAttribute("contenteditable");
       element.removeEventListener("keydown", onKey, true);
-      const text = element.innerText;
       if (!save) element.innerHTML = before;
-      else if (text.trim() !== original.trim()) post({ type: "text", before: before, text: text });
+      else if (element.innerHTML !== before) post({ type: "text", before: before, text: element.innerHTML });
     };
     const onKey = (event) => {
       event.stopPropagation();
@@ -103,7 +109,7 @@ const SCREEN_AGENT = String.raw`(() => {
       if (element?.isContentEditable) return;
       event.preventDefault();
       event.stopPropagation();
-      if (element) startEdit(element);
+      if (element) startEdit(element, event);
       else post({ type: "not-editable" });
       return;
     }
@@ -173,7 +179,9 @@ const SCREEN_AGENT = String.raw`(() => {
   post({ type: "ready" });
 })();`;
 
-const SCRIPT = `<script data-bb-design-ui>${SCREEN_AGENT}</script>`;
+/** Prints backgrounds as designed, so Export PDF keeps them even with the dialog's "Background graphics" off. */
+const PRINT_STYLE = "<style data-bb-design-ui>@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }</style>";
+const SCRIPT = `${PRINT_STYLE}<script data-bb-design-ui>${SCREEN_AGENT}</script>`;
 
 /** The screen's HTML with the canvas script added before `</body>`, or at the end. */
 export function withScreenScript(html: string): string {

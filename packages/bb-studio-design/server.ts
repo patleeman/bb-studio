@@ -106,10 +106,10 @@ export const rpcContract = defineRpcContract({
     }),
     output: z.object({ id: z.string(), sent: z.boolean() }),
   },
-  /** Text the user typed over an element's text right on the canvas (src/server/text-edit.ts). */
+  /** An element's text the user edited right on the canvas, as inner HTML before and after (src/server/text-edit.ts). */
   editText: {
     input: z.object({ designId: z.string(), screenId: z.string().regex(SCREEN_ID), before: z.string().min(1).max(MAX_EDIT_TEXT), after: z.string().max(MAX_EDIT_TEXT) }),
-    output: z.object({ ok: z.boolean(), reason: z.enum(["missing", "ambiguous"]).optional() }),
+    output: z.object({ ok: z.boolean(), reason: z.enum(["missing", "ambiguous", "markup"]).optional() }),
   },
   sendComment: {
     input: z.object({ id: z.string() }),

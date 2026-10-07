@@ -142,7 +142,7 @@ export function DesignBoard({ design, leftTools, inThread = false }: {
               Select
             </button>
             <button type="button" aria-pressed={comments.editing} title="Click text on a screen to type over it. Enter saves, Esc cancels." className={cn(MODE_BUTTON, comments.editing && MODE_ON)} onClick={() => comments.setEditing(true)}>
-              <Icon name="TextFont" className="size-3.5" /> Edit text
+              <Icon name="EditFile" className="size-3.5" /> Edit text
             </button>
             <button type="button" aria-pressed={comments.commenting} title="Click an element on a screen to comment on it" className={cn(MODE_BUTTON, comments.commenting && MODE_ON)} onClick={() => comments.setCommenting(true)}>
               <Icon name="MessageSquare" className="size-3.5" /> Comment
@@ -234,8 +234,8 @@ function Option({ designId, screen, reloads, onPlay, layer }: { designId: string
         <span className="truncate">{screen.caption || screen.title}</span>
         <span className="text-xl opacity-70">{screen.steps.length} {deck ? "slides" : "steps"}</span>
       </div>
-      {/* A deck reads as a grid of slides, four to a row; a flow's steps sit in one row. */}
-      <div className={deck ? "grid grid-cols-4 gap-10" : "flex items-start gap-10"}>
+      {/* A deck reads as a grid of slides, up to four to a row; a flow's steps sit in one row. */}
+      <div className={deck ? "grid gap-10" : "flex items-start gap-10"} style={deck ? { gridTemplateColumns: `repeat(${Math.min(4, screen.steps.length)}, max-content)` } : undefined}>
         {screen.steps.map((step, index) => <Frame key={step.id} designId={designId} screen={screen} step={step} index={index} reloads={reloads} onPlay={onPlay} layer={layer} />)}
       </div>
     </div>

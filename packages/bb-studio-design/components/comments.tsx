@@ -113,7 +113,11 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
           .then((result) => {
             if (result.ok) return;
             // The live text no longer matches the source exactly once; reload the frame to undo the typing.
-            toast.error(result.reason === "ambiguous" ? "That text appears more than once in the screen. Comment on it instead, and the agent will change it." : "That text is drawn by the screen's script, so it can't be edited here. Comment on it instead.");
+            toast.error({
+              ambiguous: "That text appears more than once in the screen. Comment on it instead, and the agent will change it.",
+              missing: "That text is drawn by the screen's script, so it can't be edited here. Comment on it instead.",
+              markup: "Only text and simple formatting can be edited here. Comment on it instead.",
+            }[result.reason ?? "missing"]);
             const frame = frames.current.get(key);
             if (frame) frame.src = frame.src;
           })
