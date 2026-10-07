@@ -27,6 +27,9 @@ describe("frame sizes", () => {
     expect(parseViewport("100x100")).toBeNull();
     expect(parseViewport("5000x800")).toBeNull();
     expect(parseViewport("huge")).toBeNull();
+    // Object.prototype keys are not presets: "constructor" would store and break backup restore.
+    for (const key of ["constructor", "__proto__", "hasownproperty"]) expect(parseViewport(key)).toBeNull();
+    expect(frameSize("constructor")).toEqual(VIEWPORTS.desktop);
     expect(frameSize("huge")).toEqual(VIEWPORTS.desktop);
   });
 });

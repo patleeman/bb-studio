@@ -83,7 +83,7 @@ export const VIEWPORT_PATTERN = new RegExp(`^(?:${VIEWPORT_NAMES.join("|")}|\\d{
 /** The viewport as stored, or null when it's neither a preset nor a size within the bounds. */
 export function parseViewport(value: string): Viewport | null {
   const text = value.trim().toLowerCase().replace("×", "x");
-  if (text in VIEWPORTS) return text as Preset;
+  if (Object.hasOwn(VIEWPORTS, text)) return text as Preset;
   const match = /^(\d{3,4})x(\d{3,4})$/.exec(text);
   if (!match) return null;
   const [width, height] = [Number(match[1]), Number(match[2])];
@@ -94,7 +94,7 @@ export function parseViewport(value: string): Viewport | null {
 export function frameSize(viewport: string): { width: number; height: number } {
   const parsed = parseViewport(viewport);
   if (!parsed) return VIEWPORTS.desktop;
-  if (parsed in VIEWPORTS) return VIEWPORTS[parsed as Preset];
+  if (Object.hasOwn(VIEWPORTS, parsed)) return VIEWPORTS[parsed as Preset];
   const [width, height] = parsed.split("x").map(Number) as [number, number];
   return { width, height };
 }
