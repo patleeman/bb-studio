@@ -6,9 +6,9 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { studioBackupSchemas } from "@bb-studio/kit/backup";
 import { z } from "zod";
+import { UPLOAD_CHUNK_BYTES } from "./backup-upload";
 
-/** Base64 of 4 MiB: one upload chunk. */
-export const UPLOAD_CHUNK_BYTES = 4 * 1024 * 1024;
+export { UPLOAD_CHUNK_BYTES };
 const uploadId = z.string().regex(/^up_[a-f0-9]{24}$/);
 const fileName = z.string().regex(/^bb-studio-backup-[0-9T-]+\.zip$/);
 

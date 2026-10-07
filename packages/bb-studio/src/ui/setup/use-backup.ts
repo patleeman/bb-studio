@@ -4,7 +4,8 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useState } from "react";
-import { UPLOAD_CHUNK_BYTES, type backupContract, type RestoreResult } from "../../backup-contract";
+import type { backupContract, RestoreResult } from "../../backup-contract";
+import { UPLOAD_CHUNK_BYTES } from "../../backup-upload";
 
 export type BackupState =
   | { step: "idle" }
