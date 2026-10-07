@@ -68,6 +68,17 @@ describe("apnsPayload", () => {
       kind: "turn-finished",
     });
   });
+
+  it("shortens long multi-byte bodies to fit APNs' 4 KB limit without splitting characters", () => {
+    const body = "日本語の結果😀".repeat(400);
+    const payload = apnsPayload({ to: "apns:x", title: "T", body, data: { threadId: "thr_1", kind: "turn-finished" } });
+    expect(Buffer.byteLength(payload)).toBeLessThanOrEqual(4096);
+    const parsed = JSON.parse(payload);
+    expect(parsed.aps.alert.body.endsWith("…")).toBe(true);
+    expect(body.startsWith(parsed.aps.alert.body.slice(0, -1))).toBe(true);
+    expect(parsed.aps.alert.body).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(parsed.threadId).toBe("thr_1");
+  });
 });
 
 describe("notificationCategory", () => {

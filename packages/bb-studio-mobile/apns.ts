@@ -108,14 +108,33 @@ export function notificationCategory(data: Record<string, unknown>): string | un
   }
 }
 
+/** APNs rejects alert payloads larger than this many bytes (PayloadTooLarge). */
+export const APNS_MAX_PAYLOAD_BYTES = 4096;
+
 /** Maps a BB push message onto an APNs payload. The app reads `threadId` on tap. */
 export function apnsPayload(message: ExpoMessage): string {
+  const body = message.body ?? "";
+  const full = renderPayload(message, body);
+  if (Buffer.byteLength(full) <= APNS_MAX_PAYLOAD_BYTES) return full;
+  // Shorten the body by whole code points so multi-byte text is never split.
+  const chars = Array.from(body);
+  let low = 0;
+  let high = chars.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (Buffer.byteLength(renderPayload(message, `${chars.slice(0, mid).join("")}…`)) <= APNS_MAX_PAYLOAD_BYTES) low = mid;
+    else high = mid - 1;
+  }
+  return renderPayload(message, `${chars.slice(0, low).join("")}…`);
+}
+
+function renderPayload(message: ExpoMessage, body: string): string {
   const data = message.data ?? {};
   const threadId = typeof data.threadId === "string" ? data.threadId : undefined;
   const category = notificationCategory(data);
   return JSON.stringify({
     aps: {
-      alert: { title: message.title ?? "BB", body: message.body ?? "" },
+      alert: { title: message.title ?? "BB", body },
       sound: message.sound ?? "default",
       ...(threadId ? { "thread-id": threadId } : {}),
       ...(category ? { category } : {}),
