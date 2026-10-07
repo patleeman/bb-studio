@@ -50,7 +50,9 @@ export type TextEdit = { ok: true; html: string } | { ok: false; reason: "missin
 export function applyTextEdit(html: string, before: string, after: string): TextEdit {
   if (!before.trim()) return { ok: false, reason: "missing" };
   if (!isInlineMarkup(after)) return { ok: false, reason: "markup" };
-  const matches = [...html.matchAll(sourcePattern(before))];
+  // Not inside a script, style or comment: text a script draws can look like markup in its source.
+  const hidden = [...html.matchAll(/<(script|style|textarea|title)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)|<!--[\s\S]*?(?:-->|$)/gi)].map((block) => [block.index!, block.index! + block[0].length] as const);
+  const matches = [...html.matchAll(sourcePattern(before))].filter((match) => !hidden.some(([from, to]) => match.index! > from && match.index! < to));
   if (!matches.length) return { ok: false, reason: "missing" };
   if (matches.length > 1) return { ok: false, reason: "ambiguous" };
   const match = matches[0]!;

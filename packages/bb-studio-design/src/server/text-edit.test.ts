@@ -22,6 +22,9 @@ describe("editing text on the canvas", () => {
     expect(applyTextEdit(`<p>Next</p><a>Next</a>`, "Next", "Go")).toEqual({ ok: false, reason: "ambiguous" });
     expect(applyTextEdit(`<p>Next</p>`, "Back", "Go")).toEqual({ ok: false, reason: "missing" });
     expect(applyTextEdit(`<img alt="Next"><p>Other</p>`, "Next", "Go")).toEqual({ ok: false, reason: "missing" });
+    // Text a script draws isn't in the markup; its source string must not be rewritten.
+    expect(applyTextEdit(`<div id=r></div><script>r.innerHTML = '<h1>Hello</h1>'</script>`, "Hello", "It's")).toEqual({ ok: false, reason: "missing" });
+    expect(applyTextEdit(`<h1>Hello</h1><script>r.innerHTML = '<h1>Hello</h1>'</script><!-- <b>Hello</b> -->`, "Hello", "Hi")).toEqual({ ok: true, html: `<h1>Hi</h1><script>r.innerHTML = '<h1>Hello</h1>'</script><!-- <b>Hello</b> -->` });
   });
 
   it("takes only text and inline formatting", () => {
