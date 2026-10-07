@@ -66,6 +66,8 @@ function queryArg(arg: string): string {
 import { HEALTH_REALTIME_CHANNEL, healthSchemas } from "@bb-studio/kit/health";
 import { HealthMonitor } from "./src/health";
 import { healthContract } from "./src/health-contract";
+import { formatSetup, SetupService } from "./src/setup";
+import { setupContract } from "./src/setup-contract";
 
 /** How often Studio re-checks plugin health on its own. */
 const HEALTH_INTERVAL_MS = 3 * 60_000;
@@ -986,6 +988,14 @@ export default async function plugin(bb: BbPluginApi) {
   });
   const healthTimer = setInterval(() => void health.check().catch((error) => bb.log.warn(`Plugin health check failed: ${errorText(error)}`)), HEALTH_INTERVAL_MS);
   bb.onDispose(() => { clearInterval(healthTimer); health.dispose(); });
+  // BB Studio setup: add-ons, retired plugins and what to run; see src/setup.ts.
+  const setup = new SetupService({ sdk: bb.sdk, health: (maxAgeMs) => (maxAgeMs ? health.summary(maxAgeMs) : health.check()) });
+  bb.rpc.register(setupContract, {
+    "setup.summary": ({ maxAgeMs }) => setup.summary(maxAgeMs),
+    "setup.install": ({ pluginIds }) => setup.install(pluginIds),
+    "setup.enable": ({ pluginId }) => setup.enable(pluginId),
+    "setup.remove": ({ pluginId }) => setup.remove(pluginId),
+  });
 
   bb.cli.register({
     name: "studio",
@@ -997,6 +1007,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "move", summary: "Move items or threads into a space, or items to a project", usage: "bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)" },
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
       { name: "health", summary: "Check every plugin for setup problems and failures", usage: "bb studio health [--json]" },
+      { name: "setup", summary: "Show which BB Studio add-ons are installed and working, and the commands to finish setup", usage: "bb studio setup [--json]" },
       { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
       { name: "retitle", summary: "Give threads a short title now and keep it current as they grow", usage: "bb studio retitle (<thread-id>… | --self | --recent <count>)" },
     ],
@@ -1010,11 +1021,12 @@ export default async function plugin(bb: BbPluginApi) {
       const SPECS: Record<string, CliSpec> = {
         list: { flags: ["--json", "--all"], options: ["--space", "--kind", "--tag", "--query"] },
         health: { flags: ["--json"] },
+        setup: { flags: ["--json"] },
         move: { options: ["--space", "--project"] },
         retitle: { flags: ["--self"], options: ["--recent"] },
       };
       const parsed = parseCliArgs(raw, SPECS[command ?? ""] ?? {});
-      const known = ["list", "tags", "spaces", "move", "providers", "health", "reindex", "retitle"].includes(command ?? "");
+      const known = ["list", "tags", "spaces", "move", "providers", "health", "setup", "reindex", "retitle"].includes(command ?? "");
       if (!parsed.ok && known) return usage(`${USAGE[command!] ?? `bb studio ${command}`}\n${parsed.error}`);
       const rest = parsed.ok ? parsed.positional : [];
       const flag = (name: string) => parsed.ok && parsed.flags.has(name);
@@ -1083,6 +1095,10 @@ export default async function plugin(bb: BbPluginApi) {
             ];
             return { exitCode: summary.problems.some((problem) => !problem.hidden) ? 1 : 0, stdout: `${lines.join("\n") || "No problems found."}\n` };
           }
+          case "setup": {
+            const summary = await setup.summary(0);
+            return { exitCode: 0, stdout: flag("--json") ? `${JSON.stringify(summary, null, 2)}\n` : formatSetup(summary) };
+          }
           case "reindex": {
             const count = await searchIndex.rebuild();
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
@@ -1113,7 +1129,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }
           default:
-            return usage("bb studio <list|tags|spaces|move|providers|reindex|retitle> …");
+            return usage("bb studio <list|tags|spaces|move|providers|health|setup|reindex|retitle> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

@@ -18,7 +18,8 @@ import { publishCommandDraft } from "./src/command/draft-recipients";
 import { ThreadSpaceLink } from "./src/ui/ThreadSpaceLink";
 import { ActivityPanel } from "./src/ui/HomePanel";
 import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
-import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter, SetupPage } from "./src/ui/health/HealthViews";
+import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
+import { SetupPage } from "./src/ui/setup/SetupPage";
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
