@@ -78,14 +78,7 @@
                               "caption": {
                                 "type": "string"
                               },
-                              "viewport": {
-                                "type": "string",
-                                "enum": [
-                                  "desktop",
-                                  "tablet",
-                                  "mobile"
-                                ]
-                              },
+                              "viewport": {},
                               "updatedAt": {
                                 "type": "number"
                               },
@@ -376,6 +369,57 @@
         "required": [
           "id",
           "sent"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "editText": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "designId": {
+            "type": "string"
+          },
+          "screenId": {
+            "type": "string",
+            "pattern": "^([1-9][0-9]{0,2})([a-z])$"
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "after": {
+            "type": "string",
+            "maxLength": 5000
+          }
+        },
+        "required": [
+          "designId",
+          "screenId",
+          "before",
+          "after"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "ambiguous",
+              "markup"
+            ]
+          }
+        },
+        "required": [
+          "ok"
         ],
         "additionalProperties": false
       }

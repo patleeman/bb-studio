@@ -5,6 +5,20 @@ import XCTest
 /// and By space's headingless Space lists.
 @MainActor
 final class StudioDesignTests: XCTestCase {
+    /// Viewports are a preset or a custom "WIDTHxHEIGHT"; screens decode them as plain strings.
+    func testDesignFrameSizesFollowPresetsAndCustomSizes() throws {
+        XCTAssertTrue(designFrameSize("mobile") == (390, 844))
+        XCTAssertTrue(designFrameSize("slide") == (1920, 1080))
+        XCTAssertTrue(designFrameSize("A4") == (794, 1123))
+        XCTAssertTrue(designFrameSize("1200x630") == (1200, 630))
+        XCTAssertTrue(designFrameSize("1200×630") == (1200, 630))
+        XCTAssertTrue(designFrameSize("100x630") == (1280, 800))
+        XCTAssertTrue(designFrameSize("wide") == (1280, 800))
+        XCTAssertTrue(designFrameSize(nil) == (1280, 800))
+        let screen = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","viewport":"story"}"#.utf8))
+        XCTAssertTrue(screen.size == (1080, 1920))
+    }
+
     func testDesignPathsAndLinksOpenTheDesign() {
         XCTAssertEqual(Route(href: "/plugins/design/designs/dsn_0123456789abcdef"), .design(id: "dsn_0123456789abcdef"))
         XCTAssertTrue(BBClient.isDesignId("dsn_0123456789abcdef"))

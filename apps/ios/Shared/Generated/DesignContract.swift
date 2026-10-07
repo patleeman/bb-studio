@@ -7,6 +7,7 @@ public enum Design {
     public static let renameDesign = "renameDesign"
     public static let deleteDesign = "deleteDesign"
     public static let addComment = "addComment"
+    public static let editText = "editText"
     public static let sendComment = "sendComment"
     public static let resolveComment = "resolveComment"
     public static let deleteComment = "deleteComment"
@@ -20,6 +21,8 @@ public enum Design {
 
   public typealias AddComment = AddCommentOutput
 
+  public typealias EditText = EditTextOutput
+
   public typealias SendComment = SendCommentOutput
 
   public typealias ResolveComment = ResolveCommentOutput
@@ -31,33 +34,6 @@ public enum Design {
 
     public init(id: String? = nil) {
       self.id = id
-    }
-  }
-
-  public enum GetDesignOutputDesignRoundsItemScreensItemViewport: Sendable, Hashable, Codable {
-    case desktop
-    case tablet
-    case mobile
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "desktop": self = .desktop
-      case "tablet": self = .tablet
-      case "mobile": self = .mobile
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .desktop: try container.encode("desktop")
-      case .tablet: try container.encode("tablet")
-      case .mobile: try container.encode("mobile")
-      case .unknown(let value): try container.encode(value)
-      }
     }
   }
 
@@ -77,11 +53,11 @@ public enum Design {
     public var option: String?
     public var title: String?
     public var caption: String?
-    public var viewport: GetDesignOutputDesignRoundsItemScreensItemViewport?
+    public var viewport: StudioJSONValue?
     public var updatedAt: Double?
     public var steps: [GetDesignOutputDesignRoundsItemScreensItemStepsItem]?
 
-    public init(id: String? = nil, round: Double? = nil, option: String? = nil, title: String? = nil, caption: String? = nil, viewport: GetDesignOutputDesignRoundsItemScreensItemViewport? = nil, updatedAt: Double? = nil, steps: [GetDesignOutputDesignRoundsItemScreensItemStepsItem]? = nil) {
+    public init(id: String? = nil, round: Double? = nil, option: String? = nil, title: String? = nil, caption: String? = nil, viewport: StudioJSONValue? = nil, updatedAt: Double? = nil, steps: [GetDesignOutputDesignRoundsItemScreensItemStepsItem]? = nil) {
       self.id = id
       self.round = round
       self.option = option
@@ -270,6 +246,57 @@ public enum Design {
     public init(id: String? = nil, sent: Bool? = nil) {
       self.id = id
       self.sent = sent
+    }
+  }
+
+  public struct EditTextInput: Sendable, Hashable, Codable {
+    public var designId: String?
+    public var screenId: String?
+    public var before: String?
+    public var after: String?
+
+    public init(designId: String? = nil, screenId: String? = nil, before: String? = nil, after: String? = nil) {
+      self.designId = designId
+      self.screenId = screenId
+      self.before = before
+      self.after = after
+    }
+  }
+
+  public enum EditTextOutputReason: Sendable, Hashable, Codable {
+    case missing
+    case ambiguous
+    case markup
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "missing": self = .missing
+      case "ambiguous": self = .ambiguous
+      case "markup": self = .markup
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .missing: try container.encode("missing")
+      case .ambiguous: try container.encode("ambiguous")
+      case .markup: try container.encode("markup")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct EditTextOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var reason: EditTextOutputReason?
+
+    public init(ok: Bool? = nil, reason: EditTextOutputReason? = nil) {
+      self.ok = ok
+      self.reason = reason
     }
   }
 

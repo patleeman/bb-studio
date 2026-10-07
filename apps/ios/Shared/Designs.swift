@@ -16,14 +16,28 @@ extension StudioDesign {
     public var screens: [DesignScreen] { (rounds ?? []).flatMap { $0.screens ?? [] } }
 }
 
+/// The plugin's `VIEWPORTS` presets (packages/bb-studio-design/src/shared.ts).
+let designViewports: [String: (width: Double, height: Double)] = [
+    "desktop": (1280, 800), "tablet": (834, 1112), "mobile": (390, 844),
+    "slide": (1920, 1080), "square": (1080, 1080), "story": (1080, 1920),
+    "a4": (794, 1123), "letter": (816, 1056), "email": (600, 900),
+]
+
+/// A frame's size from its viewport: a preset name, or a custom "WIDTHxHEIGHT"
+/// with sides from 200 to 4000. Anything else is desktop, as on the web.
+func designFrameSize(_ viewport: String?) -> (width: Double, height: Double) {
+    let text = (viewport ?? "").trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: "×", with: "x")
+    if let preset = designViewports[text] { return preset }
+    let sides = text.split(separator: "x").compactMap { Double($0) }
+    if sides.count == 2, sides.allSatisfy({ (200...4000).contains($0) }) { return (sides[0], sides[1]) }
+    return designViewports["desktop"]!
+}
+
 extension DesignScreen {
-    /// The width and height the screen was written for, as the plugin's `VIEWPORTS`.
+    /// The width and height the screen was written for.
     public var size: (width: Double, height: Double) {
-        switch viewport {
-        case .mobile: (390, 844)
-        case .tablet: (834, 1112)
-        default: (1280, 800)
-        }
+        if case .string(let text) = viewport { return designFrameSize(text) }
+        return designFrameSize(nil)
     }
 }
 
