@@ -30,11 +30,15 @@ it("round-trips CSV quotes, embedded CRLF, Unicode, formula text and empty cells
   const rpc = fixture();
   const table = await create(rpc);
   const source = '"Name","Notes","Empty"\r\n"Ada, \"\"A\"\"","line one\r\nline two",""\r\n"=SUM(1,2)","雪 🐈",""\r\n"+123","@literal",""\r\n';
+  // Export adds a byte-order mark and keeps formula-like text as text; import undoes both.
+  const exported = `\uFEFF"Name","Notes","Empty"\r\n"Ada, ""A""","line one\r\nline two",""\r\n"'=SUM(1,2)","雪 🐈",""\r\n"+123","'@literal",""\r\n`;
   expect(await rpc.callRpc("importCsv", { id: table.id, csv: source })).toEqual({ imported: 3 });
-  expect(await rpc.callRpc("exportCsv", { id: table.id })).toEqual({ csv: source });
+  expect(await rpc.callRpc("exportCsv", { id: table.id })).toEqual({ csv: exported });
   const copy = await create(rpc);
-  await rpc.callRpc("importCsv", { id: copy.id, csv: source });
-  expect(await rpc.callRpc("exportCsv", { id: copy.id })).toEqual({ csv: source });
+  await rpc.callRpc("importCsv", { id: copy.id, csv: exported });
+  expect(await rpc.callRpc("exportCsv", { id: copy.id })).toEqual({ csv: exported });
+  const { table: saved } = await rpc.callRpc("get", { id: copy.id }) as { table: Table };
+  expect(saved.rows.map((row) => Object.values(row.values)[0])).toEqual(['Ada, "A"', "=SUM(1,2)", "+123"]);
 });
 
 it("rejects malformed CSV atomically and treats header-only/blank records as no additions", async () => {
@@ -58,7 +62,7 @@ it("imports and exports all 1207 rows, including the final row beyond query page
   const table = await create(rpc);
   const source = '"Name","Notes"\r\n' + Array.from({ length: 1207 }, (_, i) => `"Row ${i}","${i === 1206 ? "last, row" : "x"}"\r\n`).join("");
   expect(await rpc.callRpc("importCsv", { id: table.id, csv: source })).toEqual({ imported: 1207 });
-  expect(await rpc.callRpc("exportCsv", { id: table.id })).toEqual({ csv: source });
+  expect(await rpc.callRpc("exportCsv", { id: table.id })).toEqual({ csv: `\uFEFF${source}` });
   const { table: saved } = await rpc.callRpc("get", { id: table.id }) as { table: Table };
   const page = queryPage(saved, { id: table.id, offset: 1200, limit: 100 });
   expect(page).toMatchObject({ total: 1207, nextOffset: null, rows: expect.arrayContaining([expect.objectContaining({ values: expect.objectContaining({ name: "Row 1206" }) })]) });
@@ -69,7 +73,7 @@ it("exports a table to Studio as CSV or Markdown", async () => {
   const table = await create(rpc);
   await rpc.callRpc("importCsv", { id: table.id, csv: '"Name"\r\n"Ada"\r\n' });
   const { files } = await rpc.callRpc("studio_export", { id: table.id, format: "csv" }) as { files: { name: string; mime: string; data: string }[] };
-  expect(files).toEqual([{ name: "CSV boundary.csv", mime: "text/csv", data: Buffer.from('"Name"\r\n"Ada"\r\n').toString("base64") }]);
+  expect(files).toEqual([{ name: "CSV boundary.csv", mime: "text/csv", data: Buffer.from('\uFEFF"Name"\r\n"Ada"\r\n').toString("base64") }]);
   const markdown = await rpc.callRpc("studio_export", { id: table.id, format: "markdown" }) as { files: { name: string }[] };
   expect(markdown.files[0]!.name).toBe("CSV boundary.md");
   await expect(rpc.callRpc("studio_export", { id: table.id, format: "pdf" })).rejects.toThrow(/Unsupported/);

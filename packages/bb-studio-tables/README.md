@@ -2,7 +2,7 @@
 
 Structured tables for BB Studio. Each table has typed columns, rows, and saved table, board, or calendar views, edited in a spreadsheet grid: arrow keys, Enter to edit, typing to replace, copy and paste with Excel or Sheets, fill a range by pasting, undo and redo, and drag to resize columns. Every view and row has a link (`/plugins/studio-tables/tables/<id>/view/<view>/row/<row>`).
 
-Pages embeds tables live, so edits in a page show in Tables and the other way round. Agents can list, create, and delete tables, inspect schemas, query rows, insert and delete rows, and update cells. CSV import matches headers to columns by name.
+Pages embeds tables live, so edits in a page show in Tables and the other way round. Agents can list, create, and delete tables, inspect schemas, query rows, insert and delete rows, and update cells. CSV import matches headers to columns by name. CSV export starts with a byte-order mark so Excel reads it as UTF-8, and text that starts with `=`, `+`, `-` or `@` gets a leading apostrophe so spreadsheets don't run it as a formula; import removes both, so a round trip keeps the table as it was.
 
 In a thread's workbench, the **Tables** tab lists the tables made or changed in that thread, then the project's recent ones. **New** makes a table in the thread's project and links it to the thread in Studio.
 

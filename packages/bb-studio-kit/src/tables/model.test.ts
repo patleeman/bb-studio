@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   csv,
+  guardFormula,
   importGrid,
+  unguardFormula,
   markdown,
   applyRowPatch,
   convertCell,
@@ -83,6 +85,17 @@ describe("table model", () => {
     expect(extra.columns.at(-1)).toMatchObject({ id: "notes", name: "Notes", type: "text" });
     expect(extra.rows).toEqual([{ count: 7, notes: "hi" }]);
     expect(markdown(table)).toContain("| Name | Count | State |");
+  });
+  it("exports formula-like text as text, with a byte-order mark, and imports it back unchanged", () => {
+    const values = ["=SUM(1,2)", "+cmd", "-x", "@literal", "\tTab", "'=quoted", "''@two", "-5", "+123", "1e5", "a=b", "'plain"];
+    const guarded = values.map(guardFormula);
+    expect(guarded).toEqual(["'=SUM(1,2)", "'+cmd", "'-x", "'@literal", "'\tTab", "''=quoted", "'''@two", "-5", "+123", "1e5", "a=b", "'plain"]);
+    expect(guarded.map(unguardFormula)).toEqual(values);
+    const formulas = { ...table, rows: [{ ...table.rows[0]!, values: { ...table.rows[0]!.values, name: '=HYPERLINK("x")' } }] };
+    const text = csv(formulas);
+    expect(text.startsWith('\uFEFF"Name"')).toBe(true);
+    expect(text).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(importGrid(table.columns, parseCsv(text), () => "new").rows[0]?.name).toBe('=HYPERLINK("x")');
   });
   it("keeps the table's own row order when nothing sorts", () => {
     const reordered = { ...table, rows: [table.rows[1]!, table.rows[0]!] };

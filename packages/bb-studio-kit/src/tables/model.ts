@@ -430,9 +430,23 @@ export function markdown(table: Table, rows = table.rows): string {
   ].join("\n");
 }
 
+/**
+ * Spreadsheets run a cell that starts with = + - @ (or a tab or CR) as a
+ * formula, so a CSV a table exports could run code when opened. Such text gets
+ * a leading apostrophe, which spreadsheets show as plain text and `parseCsv`
+ * removes again. Plain numbers like -5 stay as they are. Text that already
+ * starts with apostrophes before one of those gets one more, so it round-trips.
+ */
+const FORMULA_START = /^'*[=+\-@\t\r]/;
+const PLAIN_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+export const guardFormula = (value: string) => (FORMULA_START.test(value) && !PLAIN_NUMBER.test(value) ? `'${value}` : value);
+export const unguardFormula = (value: string) => (/^'+[=+\-@\t\r]/.test(value) && !PLAIN_NUMBER.test(value.slice(1)) ? value.slice(1) : value);
+
+/** A table as CSV for spreadsheets: a byte-order mark so Excel reads it as UTF-8, and formula-like text kept as text. */
 export function csv(table: Table, rows = table.rows): string {
-  const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
+  const quote = (value: string) => `"${guardFormula(value).replaceAll('"', '""')}"`;
   return (
+    "\uFEFF" +
     [
       table.columns.map((column) => quote(column.name)).join(","),
       ...rows.map((row) => table.columns.map((column) => quote(cellText(cellOf(row.values, column.id)))).join(",")),
@@ -470,7 +484,8 @@ export function parseDelimited(input: string, delimiter: "," | "\t" = ","): stri
   return records;
 }
 
-export const parseCsv = (input: string): string[][] => parseDelimited(input, ",");
+/** Parses CSV, as `csv` writes it or as spreadsheets save it: without the byte-order mark, and formula guards removed. */
+export const parseCsv = (input: string): string[][] => parseDelimited(input.replace(/^\uFEFF/, ""), ",").map((record) => record.map(unguardFormula));
 
 /** Cells as tab-separated text, quoting what spreadsheets would. */
 export function toTsv(grid: readonly (readonly string[])[]): string {
