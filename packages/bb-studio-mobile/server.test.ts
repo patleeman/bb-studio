@@ -3,7 +3,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import plugin from "./server.js";
-import { Http2ApnsSender, type ExpoMessage } from "./apns.js";
+import { DEVICE_TTL_MS, Http2ApnsSender, type ExpoMessage } from "./apns.js";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
@@ -136,6 +136,20 @@ describe("notify", () => {
       expect(requests[0]!.headers["apns-collapse-id"]).toBe("build-status");
       expect(requests[1]!.headers["apns-collapse-id"]).toMatch(/^[0-9a-f]{64}$/);
       expect(JSON.parse(requests[0]!.body)).not.toHaveProperty("collapseId");
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("does not send to devices unseen for longer than the device TTL", async () => {
+    const requests = recordingSession();
+    const host = await configuredHost();
+    try {
+      const fresh = "a".repeat(64);
+      const stale = "b".repeat(64);
+      await host.bb.storage.kv.set("devices", { ["apns:" + fresh]: Date.now(), ["apns:" + stale]: Date.now() - DEVICE_TTL_MS - 60_000 });
+      expect(await host.harness.behavior.callRpc("notify", {
+        title: "Result", body: "Done", kind: "turn-finished", threadId: "thr_a", projectId: "proj_demo",
+      })).toEqual({ ok: true, sent: 1 });
+      expect(requests.map((request) => request.headers[":path"])).toEqual([`/3/device/${fresh}`]);
     } finally { await host.harness.lifecycle.dispose(); }
   });
 });

@@ -18,6 +18,7 @@ import { z } from "zod";
 import {
   APNS_TOKEN_PREFIX,
   deliverApns,
+  DEVICE_TTL_MS,
   Http2ApnsSender,
   isGoneResult,
   notificationCategory,
@@ -400,7 +401,10 @@ export default async function plugin(bb: BbPluginApi) {
   bb.rpc.register(mobileContract, {
     async notify(input) {
       if (isQuietCompletion({ body: input.body, data: { kind: input.kind } })) return { ok: true as const, sent: 0 };
-      const devices = Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {});
+      // Devices unseen past the TTL are not sent to; the next delivery prunes them.
+      const now = Date.now();
+      const devices = Object.entries((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {})
+        .flatMap(([to, seen]) => (now - seen > DEVICE_TTL_MS ? [] : [to]));
       // Without a thread there is nothing to reply to, so leave out the kind that adds a reply box.
       const data = input.threadId
         ? { kind: input.kind, threadId: input.threadId, projectId: input.projectId, ...(input.path ? { path: input.path } : {}) }
