@@ -15,20 +15,19 @@ agent to save it.
 ![The compact Artifacts header](assets/compact-header.png)
 
 The live 390-pixel viewer shows the seeded Q3 HTML report. **Chat** stays
-visible while **Item actions** exposes related items, Open in split, and the
-artifact controls.
+visible while **Item actions** is open below it with Related, Open in split,
+Source, Copy, Download and the ⋯ menu.
 These compact captures run on stable BB 0.45.0 with the full suite installed
-from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+from pushed commit 306c841. They check viewport bounds, button hit targets,
 and the Related popover before capture.
 
 ![Live BB screenshot of the Studio Artifacts viewer](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`). It shows an
 HTML report, "Q3 usage report", saved twice from a staged thread's workspace.
-The viewer shows version 2 in its sandboxed frame, under Studio's shared item
-header, with Related, the artifact's thread ("Pick a database for the todo
-app", the staged thread that saved it), the Preview/Source toggle, Copy,
-Download and the ⋯ menu.
+The viewer shows version 2 (`HTML · 2.1 KB · v2`) in its sandboxed frame,
+under Studio's shared item header, with **Chat**, Related, Open in split, the
+Source toggle, Copy, Download and the ⋯ menu.
 
 ## What you get
 
