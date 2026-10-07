@@ -5,8 +5,9 @@
 // rows still point at the right items.
 //
 // Restore runs every write in one transaction; a dry run runs the same
-// transaction and rolls it back, so its counts are exactly what a real run
-// would do.
+// transaction and rolls it back, so its counts are what a real run would do,
+// except for links and activity that a real run's add-ons record for their
+// restored items first: those then count as already here.
 import { createHash } from "node:crypto";
 import { newId } from "@bb-studio/kit/ids";
 import type { RestoreTally } from "@bb-studio/kit/backup";

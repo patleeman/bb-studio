@@ -134,7 +134,10 @@ Restore runs in this order:
    none are duplicated. Each add-on checks every item first, writes its files
    (temporary file, then rename), and then makes all its database writes in
    one transaction. A dry run makes no writes. Studio's own section runs its
-   transaction and rolls it back, so the dry-run counts match a real run.
+   transaction and rolls it back, so its counts match a real run, with one
+   exception: a real run's add-ons record links and activity for the items
+   they restore, so Studio then finds a few rows already here that the dry
+   run counted as new.
 5. **Studio's data.** Tags and saved views are matched by id, then by name.
    Spaces are matched by id, then the default space, then by name; a missing
    space is created. A project joins its restored space, unless you have
