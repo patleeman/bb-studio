@@ -17,6 +17,8 @@ struct DesignView: View {
     @State private var chatting = false
     @State private var showingWeb = false
     @State private var listener: UUID?
+    /// Each signal starts a load; only the newest one may show its answer.
+    @State private var loads = 0
 
     var body: some View {
         Group {
@@ -189,14 +191,19 @@ struct DesignView: View {
     }
 
     private func load() async {
+        loads += 1
+        let load = loads
         do {
-            if let found = try await client.design(id) {
+            let found = try await client.design(id)
+            guard load == loads else { return }
+            if let found {
                 if found != design { design = found }
                 error = nil
             } else {
                 missing = true
             }
         } catch {
+            guard load == loads else { return }
             if design == nil { self.error = BBClient.describe(error, server: client.baseURL) }
         }
     }
