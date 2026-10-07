@@ -3,7 +3,7 @@
 A personal native iOS and watchOS app for BB and
 [BB Studio](https://github.com/patleeman/bb-studio): BB's threads, approvals,
 terminals and automations, plus the Studio suite of plugins (Studio, Pages,
-Talk, Draw, Artifacts, Tables, Design and item Chat). Everything else opens the BB web
+Talk, Draw, Artifacts, Tables and Design; item chat ships inside Studio). Everything else opens the BB web
 app in an in-app web view (the Web tab, and the safari button on every thread).
 
 Studio features need the matching plugins from the bb-studio marketplace on the
@@ -37,7 +37,7 @@ are unchanged, and old `bbgo://` links still open.
 | Talk recording summaries: generation and regeneration for voice notes, ideas, and meetings | `iOS/Talk/RecordingsView.swift` |
 | Related links, item threads, and comments with reply and resolve on Studio items | `iOS/Studio/RelatedSection.swift` |
 | Studio Tables: read-only list and grid views | `iOS/Studio/TableView.swift` |
-| Studio Design: a design's rounds, newest first, each a row of its live screens; tap one to play it full screen (Fit or Fill, start at a prototype step). Shows the reviewer's status and the comments; pinning new comments opens BB web | `iOS/Studio/DesignView.swift`, `iOS/Thread/ItemCard.swift`, `Shared/Designs.swift` |
+| Studio Design: a design's rounds, newest first, each a row of its live screens; tap one to play it full screen (Fit or Fill, start at a prototype step). Shows the reviewer's status and the comments; pinning new comments opens BB web. It reloads when the design plugin signals a change to this design, and after a socket reconnect, instead of polling | `iOS/Studio/DesignView.swift`, `iOS/Thread/ItemCard.swift`, `Shared/Designs.swift` |
 | Studio reply cards: `::page`, `::drawing`, `::table`, `::design`, `::recording` and `::artifact` lines show the item under its name, read-only, as BB web does: the page's text, the drawing, the first 20 rows, the newest round's first screens, the recording's summary and first transcript lines, or the artifact's image, page, PDF or text. The eye button hides or shows every card's preview; tap the name to open the item | `iOS/Thread/ItemCard.swift`, `iOS/Studio/ArtifactView.swift` |
 | Edit the whole page as one continuous Markdown text, styled as you type: headings stand out, checkboxes toggle on tap, and Return continues lists. Heading, list, checklist, link, and dictation controls sit above the keyboard. Edits autosave a moment after typing stops; the server rewrites only changed blocks through the live Yjs document, keeps blocks with comments intact, and asks for a reload if the page changed elsewhere. Empty pages open in the editor. Keep updated status and agent activity are visible on the page | `iOS/Pages/PageEditor.swift`, `iOS/Pages/PageTextView.swift`, `iOS/Pages/PageActivity.swift` |
 | Automations: create agent schedules; edit names, prompts and schedules; browse runs by project, run now, pause and resume | `iOS/Tools/AutomationsView.swift`, `iOS/Tools/AutomationEditor.swift` |
@@ -48,7 +48,7 @@ are unchanged, and old `bbgo://` links still open.
 | Send later: long-press Send for 30 minutes, 1 hour, 3 hours, tomorrow at 9, or a picked time | `iOS/Thread/SendLater.swift` |
 | Side chat: ask about one message in a hidden fork without derailing the thread | `MessageBubble` |
 | Host settings: keep the Mac awake, and how many threads run at once | `iOS/Tools/ServerControls.swift` |
-| Installed plugin status and errors in Settings → Plugins | `iOS/Tools/PluginStatusView.swift` |
+| Installed plugin status and errors in Settings → Plugins. Today (Studio), Pages (Studio Pages), Drawings (Studio Draw) and Automations show "Install <plugin> to use this." when their plugin is missing or not running, instead of BB's raw 404 or 503 text | `iOS/Tools/PluginStatusView.swift`, `Shared/BBClient.swift` |
 | Files & changes: a thread's uncommitted changes with diffs, a file browser, file search, and file previews (images, rendered Markdown, text) | `iOS/Thread/FilesView.swift` |
 | Pull request status and link for the workspace branch, when BB finds one | `iOS/Thread/FilesView.swift` |
 | Terminals: BB's persistent terminals, from a thread's ⋯ menu (its workspace). A full VT terminal (SwiftTerm) with a key bar for Esc, Ctrl, Tab and arrows; new shell or run a command; rename, restart, close, paste, copy output, text size. Reconnects replay only missed output, and the shell keeps running when you leave | `iOS/Terminal/`, `Shared/Terminals.swift` |
@@ -84,12 +84,12 @@ are unchanged, and old `bbgo://` links still open.
 | Work widget: thread attention and approvals, and running agents. Tap a thread or review link to open it | `Widgets/WorkWidget.swift` |
 | Spotlight indexes open threads and Studio pages, recordings, drawings, and artifacts; removed items leave search. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbstudio://thread/<id>`, `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `space/<id>` (or `space/all`), `new`, `dictate`, `voice[/<id>]`, `web`, `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
+| URL scheme `bbstudio://thread/<id>`, `reply/<id>` (opens the thread and its reply), `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`), `drawing[/<id>]` (also `drawings`), `artifact/<id>`, `design/<id>`, `recording/<id>`, `space/<id>` (or `space/all`), `new`, `capture`, `dictate`, `record`, `write`, `voice[/<id>]`, `web`, `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
 | A Live Activity while a Talk recording is in progress | `Widgets/ItemActivities.swift`, `iOS/App/LiveItems.swift` |
 | Shortcuts can select threads and pages; open a page, send to a thread, and start a Talk recording | `iOS/App/StudioIntents.swift` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
 | Haptics for sends, answers, errors, and swipe actions | |
-| Watch app: inbox, last messages, dictated or quick replies, and answering approvals and questions (relayed through the phone) | `Watch/` |
+| Watch app: inbox, last messages, dictated or quick replies, and answering approvals and questions (relayed through the phone). A thread that fails to load shows the error with Retry; a deleted thread says "This thread no longer exists." and stops polling | `Watch/` |
 | Watch complication: needs-you and running counts | `WatchWidgets/` |
 | APNs push relay for BB's push-notifications plugin, with notification categories | `packages/bb-studio-mobile/` |
 | Push registration replaces this install's prior subscription when APNs changes its token. Simulator and QA runs skip registration | `iOS/App/PushRegistration.swift` |
@@ -98,7 +98,7 @@ are unchanged, and old `bbgo://` links still open.
 
 The app talks to `https://patricks-megamac.tail5a01ec.ts.net`, which
 `tailscale serve` proxies to BB on `127.0.0.1:38886`. BB has no client auth,
-so the tailnet is the boundary. You can change the server in Settings.
+so the tailnet is the boundary. You can change the server in Settings. After a switch, the app registers its push token with the new server at once, without a relaunch.
 
 Queued messages and recorded audio belong to the server where they were created.
 Switching servers pauses that server's queued work until you switch back; sends

@@ -2,7 +2,7 @@
 
 > **Studio Decisions** is part of **[BB Studio](../../README.md)**. It works on its own and doesn't need the Studio collection.
 
-Studio Decisions is the one place BB Studio sets up its fast decision models:
+Studio Decisions (plugin ID `smart-decisions`) is the one place BB Studio sets up its fast decision models:
 **Jev**, TypeSafe's System One model, and a **fallback model** from a BB
 provider you already use. Enter the keys once here. Two things use them:
 
@@ -68,7 +68,14 @@ Two more settings cover gateways that need more than a static key:
   expiry (or for five minutes), and runs it again when the endpoint rejects
   the token. Set it instead of `customJevApiKey`.
 - `customJevHeaders` adds request headers, written as `name: value` pairs
-  separated by semicolons, such as `source: bb; org-id: 2`.
+  separated by semicolons, such as `source: bb; org-id: 2`. Header values can
+  be credentials, so an invalid entry is reported by its position and name,
+  never by its text. `Authorization`, `Content-Type`, `Content-Length` and
+  `Host` are set by the plugin and can't be overridden.
+
+Set a custom key or a key command, not both. A misconfigured provider is
+skipped and reported, so it never blocks the others `auto` can still use.
+Requests don't follow redirects, and a response over 64 KB is refused.
 
 Each provider bills its own usage. TypeSafe charges per input token. A
 Smart Queue decision sends at most about 25,000 characters, and usually far
@@ -77,8 +84,9 @@ less.
 ### What it handles
 
 Smart Queue acts only on messages you send yourself to a busy thread. It
-ignores messages from agents and other threads, plugin submissions, retries,
-scheduled messages, and hidden threads.
+ignores messages from agents and other threads, plugin submissions, and
+hidden threads (including its own fallback threads). A message it ignores
+goes through BB's normal queue.
 
 Smart Queue holds the message. The queued card shows *Smart Queue is deciding
 whether to steer or follow up*. Then either the message joins the turn, or the
@@ -116,7 +124,7 @@ Open **Settings → Plugins → Studio Decisions**, or use `bb plugin config sma
 | `jevProvider` | `auto` | `auto`, `typesafe`, `vercel`, `openrouter`, `opencode-zen`, or `custom`. |
 | `typesafeApiKey`, `vercelApiKey`, `openRouterApiKey`, `zenApiKey` | — | Provider keys (secret). See [Jev providers](#jev-providers). |
 | `typesafeModel` | `jev-latest` | Dropdown: `jev-latest`, `jev-preview`, or `jev-1.13.0` to pin that version. |
-| `customJevEndpoint`, `customJevApiKey`, `customJevModel` | — | Your own System One endpoint. |
+| `customJevEndpoint`, `customJevApiKey`, `customJevApiKeyCommand`, `customJevHeaders`, `customJevModel` | — | Your own System One endpoint. See [Jev providers](#jev-providers). |
 | `jevTimeoutMs` | `5000` | Deadline for each provider attempt, 250 to 15000 ms, for every caller. |
 | `steerConfidence` | `0.7` | Smart Queue's minimum Jev confidence to steer. |
 | `batchConfidence` | `0.5` | Smart Queue's minimum Jev confidence to send a follow-up in the same turn as the next one. `1` sends each on its own. |
@@ -143,9 +151,14 @@ bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning>]]
 
 Every command accepts `--json`.
 
-Studio's plugin health check (`bb studio health` and the sidebar footer)
-warns when no Jev provider is set up, when Jev failed in the last 30 minutes,
-or when the fallback model's provider is unavailable.
+Studio's [plugin health](../bb-studio/README.md#plugin-health) check
+(`bb studio health` and the sidebar footer) reports:
+
+- a Jev provider setting that is invalid,
+- no Jev provider set up (broken if the fallback model is off too, otherwise
+  degraded, because every decision then takes seconds),
+- Jev failing for Smart Queue within the last 30 minutes,
+- an unavailable provider for the fallback model.
 
 ## For other plugins
 
