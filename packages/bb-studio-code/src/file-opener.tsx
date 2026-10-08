@@ -1,8 +1,8 @@
-// "VS Code" in a file tab's "Open with" menu. BB renders the first opener for
-// an extension by default, so this never takes the file away: it keeps BB's
-// preview and adds a bar whose button opens the file, at its lines, in the
-// thread's VS Code tab.
-import { useState } from "react";
+// "VS Code" in a file tab's "Open with" menu, and the default for these
+// extensions (BB renders the first opener). Opening a file sends it, at its
+// lines, to the thread's VS Code tab; the tab keeps BB's preview under a bar
+// to open it again. Settings → Files can pin BB's preview instead.
+import { useEffect, useRef, useState } from "react";
 import { useBbNavigate, useRpc, type PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
@@ -41,6 +41,14 @@ export function VsCodeFileOpener({ path, source, experimental_lineRange, Origina
     }
   };
 
+  // Each open (a new line range object) goes to VS Code once.
+  const sent = useRef<unknown>(NOT_SENT);
+  useEffect(() => {
+    if (!openable || sent.current === experimental_lineRange) return;
+    sent.current = experimental_lineRange;
+    void open();
+  });
+
   return (
     <div className="flex h-full flex-col">
       {openable && (
@@ -58,3 +66,5 @@ export function VsCodeFileOpener({ path, source, experimental_lineRange, Origina
     </div>
   );
 }
+
+const NOT_SENT = Symbol("not sent");
