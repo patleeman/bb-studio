@@ -102,6 +102,11 @@ export const codeContract = defineRpcContract({
     input: z.object({ id }),
     output: z.object({ status: serverStatusSchema }),
   },
+  /** The thread's workspace if it has one; never makes one. */
+  threadWorkspace: {
+    input: z.object({ threadId: id }),
+    output: z.object({ workspace: workspaceSchema.nullable() }),
+  },
   /** The thread's worktree workspace, made the first time. */
   forThread: {
     input: z.object({ threadId: id }),

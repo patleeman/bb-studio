@@ -1,7 +1,9 @@
 // "VS Code" in a file tab's "Open with" menu, and the default for these
-// extensions (BB renders the first opener). Opening a file sends it, at its
-// lines, to the thread's VS Code tab; the tab keeps BB's preview under a bar
-// to open it again. Settings → Files can pin BB's preview instead.
+// extensions (BB renders the first opener). BB's preview always shows. When the
+// thread already has a VS Code workspace, opening a file also sends it, at its
+// lines, to that workspace's tab; otherwise "Open in VS Code" makes one, so a
+// glance at a file never creates a workspace or starts a server.
+// Settings → Files can pin BB's preview instead.
 import { useEffect, useRef, useState } from "react";
 import { useBbNavigate, useRpc, type PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
@@ -41,12 +43,15 @@ export function VsCodeFileOpener({ path, source, experimental_lineRange, Origina
     }
   };
 
-  // Each open (a new line range object) goes to VS Code once.
+  // Each open (a new line range object) goes to VS Code once, and only when
+  // the thread already has a workspace.
   const sent = useRef<unknown>(NOT_SENT);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
   useEffect(() => {
-    if (!openable || sent.current === experimental_lineRange) return;
+    if (!openable || !threadId || sent.current === experimental_lineRange) return;
     sent.current = experimental_lineRange;
-    void open();
+    void openIfWorkspace(rpc, threadId, () => { if (mounted.current) void open(); });
   });
 
   return (
@@ -68,3 +73,17 @@ export function VsCodeFileOpener({ path, source, experimental_lineRange, Origina
 }
 
 const NOT_SENT = Symbol("not sent");
+
+/**
+ * Sends a file to VS Code only when the thread already has a workspace, so
+ * opening a file never makes one or starts a server. Returns whether it did.
+ */
+export async function openIfWorkspace(
+  rpc: { call(method: "threadWorkspace", input: { threadId: string }): Promise<{ workspace: unknown }> },
+  threadId: string,
+  open: () => void,
+): Promise<boolean> {
+  const { workspace } = await rpc.call("threadWorkspace", { threadId }).catch(() => ({ workspace: null }));
+  if (workspace) open();
+  return Boolean(workspace);
+}

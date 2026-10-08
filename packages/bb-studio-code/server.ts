@@ -182,6 +182,7 @@ export default function plugin(bb: BbPluginApi) {
     },
     open: async ({ id }) => ({ status: await servers.open(must(id)) }),
     stop: ({ id }) => ({ status: servers.stop(must(id).id) }),
+    threadWorkspace: ({ threadId }) => ({ workspace: store.forThread(threadId) ?? null }),
     forThread: async ({ threadId }) => ({ workspace: await forThread(threadId) }),
     listDir: async ({ id, path }) => {
       const folders = safeFolders(must(id));
