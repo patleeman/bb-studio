@@ -1,6 +1,6 @@
 // Segment audio on disk beside the plugin database:
 // <dataDir>/plugins/talk/audio/<recordingId>/<segmentId>.<ext>
-import { mkdir, readFile, rename, rm, writeFile, open } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, rmdir, writeFile, open } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import type Database from "better-sqlite3";
@@ -34,9 +34,11 @@ export class AudioFiles {
   }
 
   /** Writes durably (temp file, fsync, rename) and returns the relative path. */
-  async write(recordingId: string, segmentId: string, mimeType: string, bytes: Uint8Array): Promise<string> {
+  async write(recordingId: string, segmentId: string, mimeType: string, bytes: Uint8Array, wanted: () => boolean = () => true): Promise<string> {
     const relativePath = join(recordingId, `${segmentId}.${extensionFor(mimeType)}`);
     const target = this.inside(relativePath);
+    // A late chunk for a deleted recording must not bring its directory back.
+    if (!wanted()) throw new Error(`No recording ${recordingId}.`);
     await mkdir(dirname(target), { recursive: true });
     const temp = `${target}.${randomUUID()}.tmp`;
     try {
@@ -51,6 +53,11 @@ export class AudioFiles {
     } finally {
       await rm(temp, { force: true });
     }
+    if (!wanted()) {
+      await this.remove(relativePath);
+      await this.removeEmptyDirectory(recordingId);
+      throw new Error(`No recording ${recordingId}.`);
+    }
     return relativePath;
   }
 
@@ -60,6 +67,11 @@ export class AudioFiles {
 
   async remove(relativePath: string): Promise<void> {
     await rm(this.inside(relativePath), { force: true });
+  }
+
+  /** Removes a recording's directory only if nothing is in it. */
+  async removeEmptyDirectory(recordingId: string): Promise<void> {
+    await rmdir(this.inside(recordingId)).catch(() => {});
   }
 
   async removeRecording(recordingId: string): Promise<void> {

@@ -21,7 +21,7 @@ import { audioResponse } from "./src/server/audio-response";
 import { audioArchive } from "./src/server/audio-archive";
 import { MENTION_TRANSCRIPT_CHARS, mentionContext, mentionSubtitle } from "./src/server/mentions";
 import { MIGRATIONS, TalkStore } from "./src/server/store";
-import { refuseWhileCapturing, registerStudio } from "./src/server/studio";
+import { deleteRecording, registerStudio } from "./src/server/studio";
 import { generateTitle } from "./src/server/titles";
 import { Transcriber } from "./src/server/transcriber";
 import { Summaries, generateRecordingSummary } from "./src/server/meetings";
@@ -286,7 +286,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (store.hasSegment(recording.id, segmentId)) return { stored: false };
       // Permanent: the client sets the piece aside instead of retrying.
       if (recording.audioRemoved) throw Object.assign(new Error("This recording's audio was deleted."), { code: "invalid_input" });
-      const file = await files.write(recording.id, segmentId, input.mimeType, bytes);
+      const file = await files.write(recording.id, segmentId, input.mimeType, bytes, () => store.recording(recording.id) !== null);
       let stored: boolean;
       try {
         stored = store.addSegment({
@@ -302,6 +302,7 @@ export default async function plugin(bb: BbPluginApi) {
       } catch (error) {
         // The recording was deleted while the audio was being written.
         await files.remove(file).catch(() => {});
+        await files.removeEmptyDirectory(recording.id);
         throw error;
       }
       // A straggler from an outbox that drained after the user stopped.
@@ -359,11 +360,7 @@ export default async function plugin(bb: BbPluginApi) {
       return mustGet(id);
     },
     recording_delete: async ({ id }) => {
-      refuseWhileCapturing(store.recording(id));
-      const deleted = store.delete(id);
-      await files.removeRecording(id);
-      if (deleted) changed(id);
-      return { deleted };
+      return { deleted: await deleteRecording({ store, removeAudio: (recordingId) => files.removeRecording(recordingId), changed }, id) };
     },
   });
 

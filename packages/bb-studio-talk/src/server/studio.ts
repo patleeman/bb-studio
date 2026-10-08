@@ -82,6 +82,24 @@ export function refuseWhileCapturing(recording: Recording | null): void {
   if (recording?.status === "recording") throw new Error("Stop the recording before deleting it.");
 }
 
+/**
+ * Deletes a recording and its audio. Listeners hear about it even if removing
+ * the audio fails after the row is gone; the error still reaches the caller.
+ */
+export async function deleteRecording(
+  deps: { store: Pick<TalkStore, "recording" | "delete">; removeAudio(id: string): Promise<void>; changed(id: string): void },
+  id: string,
+): Promise<boolean> {
+  refuseWhileCapturing(deps.store.recording(id));
+  const deleted = deps.store.delete(id);
+  try {
+    await deps.removeAudio(id);
+  } finally {
+    if (deleted) deps.changed(id);
+  }
+  return deleted;
+}
+
 /** Studio lists at most this many; past it, Studio keeps tags of items it didn't see. */
 const LIST_LIMIT = 10_000;
 
@@ -157,10 +175,8 @@ export function registerStudio(
       deps.changed(id);
     },
     delete: async (id: string) => {
-      refuseWhileCapturing(mustGet(id));
-      store.delete(id);
-      await deps.removeAudio(id);
-      deps.changed(id);
+      mustGet(id);
+      await deleteRecording(deps, id);
     },
   }, {
     find: (query) => store.list({ query, limit: 200 }),

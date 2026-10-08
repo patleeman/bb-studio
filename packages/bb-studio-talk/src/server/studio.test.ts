@@ -2,7 +2,7 @@ import { studioSchemas } from "@bb-studio/kit/contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { addSegment, memoryStore } from "../test/db";
-import { registerStudio, toStudioItem } from "./studio";
+import { deleteRecording, registerStudio, toStudioItem } from "./studio";
 
 function setup() {
   const { store } = memoryStore();
@@ -113,5 +113,17 @@ describe("the Talk Studio provider", () => {
     expect(toStudioItem(recording, "").badge).toEqual({ label: "Recording", tone: "live" });
     expect(toStudioItem({ ...recording, status: "done", failedCount: 2 }, "").badge).toEqual({ label: "2 failed", tone: "danger" });
     expect(toStudioItem({ ...recording, status: "done" }, "").badge).toBeNull();
+  });
+});
+
+describe("deleteRecording", () => {
+  it("tells listeners the recording is gone even when removing its audio fails", async () => {
+    const { store } = memoryStore();
+    store.create({ id: "rec_aaaaaaaa", kind: "recording", projectId: null, threadId: null });
+    store.setStatus("rec_aaaaaaaa", "paused");
+    const changed: string[] = [];
+    await expect(deleteRecording({ store, removeAudio: async () => { throw new Error("disk busy"); }, changed: (id) => void changed.push(id) }, "rec_aaaaaaaa")).rejects.toThrow("disk busy");
+    expect(store.recording("rec_aaaaaaaa")).toBeNull();
+    expect(changed).toEqual(["rec_aaaaaaaa"]);
   });
 });

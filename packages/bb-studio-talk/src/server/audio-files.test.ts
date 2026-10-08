@@ -17,3 +17,18 @@ test("concurrent retries of the same audio segment use independent temporary fil
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("a late chunk for a deleted recording leaves no file or directory behind", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "talk-audio-files-"));
+  try {
+    const files = new AudioFiles(directory);
+    await expect(files.write("rec_gone", "s-0", "audio/webm", Buffer.from("x"), () => false)).rejects.toThrow("No recording");
+    expect(await readdir(directory)).toEqual([]);
+    // Deleted while the bytes were being written.
+    let calls = 0;
+    await expect(files.write("rec_gone", "s-1", "audio/webm", Buffer.from("x"), () => ++calls < 2)).rejects.toThrow("No recording");
+    expect(await readdir(files.root)).toEqual([]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
