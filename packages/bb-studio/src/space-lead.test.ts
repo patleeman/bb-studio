@@ -301,3 +301,47 @@ it("hands off a worker in place: an added thread stays added", async () => {
   expect((x.spawn.mock.calls[1]![0] as unknown as { pluginMetadata: unknown }).pluginMetadata).toEqual({ handoffFrom: threadId });
   expect(await x.leads.get(x.kitchen.id)).toMatchObject({ leadThreadId: null });
 });
+
+it("promotes a lead to Chief of Staff: it leaves its space and lead role, and its heartbeat carries over", async () => {
+  const x = await setup();
+  const { leadThreadId } = await lead(x);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily", time: "08:30" });
+  const chief = await x.leads.setChief(leadThreadId);
+  expect(chief).toMatchObject({ threadId: leadThreadId, originSpaceId: x.garden.id, run: { enabled: true, cadence: "daily", time: "08:30" } });
+  expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: null, run: { enabled: false } });
+  expect((await x.leads.spaceOfThreads())[leadThreadId!]).toBeUndefined();
+  expect(x.automations.map((a) => a.name)).toEqual(["Studio chief of staff heartbeat"]);
+  await expect(x.leads.setLead(x.kitchen.id, leadThreadId)).rejects.toThrow(/Chief of Staff/);
+});
+
+it("demotes the Chief of Staff back to the space it came from, and a new one sends the old one home", async () => {
+  const x = await setup();
+  const first = await x.spawn({ projectId: "p" });
+  const second = await x.spawn({ projectId: "q" });
+  await x.leads.setChief(first.id);
+  await x.leads.setChief(second.id);
+  expect((await x.leads.spaceOfThreads())[first.id]).toBe(x.garden.id);
+  expect(await x.leads.setChief(null)).toMatchObject({ threadId: null });
+  expect((await x.leads.spaceOfThreads())[second.id]).toBe(x.kitchen.id);
+  await expect(x.leads.setChiefRun({ enabled: true, cadence: "daily" })).rejects.toThrow(/Chief of Staff/);
+});
+
+it("hands the Chief of Staff off to a successor that stays above every space", async () => {
+  const x = await setup();
+  const first = await x.spawn({ projectId: "p" });
+  await x.leads.setChief(first.id);
+  await x.leads.setChiefRun({ enabled: true, cadence: "hourly" });
+  const { threadId } = await x.leads.handoff(first.id, request);
+  expect(await x.leads.chief()).toMatchObject({ threadId, originSpaceId: x.garden.id, run: { enabled: true } });
+  expect((await x.leads.spaceOfThreads())[threadId]).toBeUndefined();
+  expect(x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_update").at(-1)![0].input).toMatchObject({ execution: { targetThreadId: threadId } });
+  expect(await x.leads.handoff(first.id, request)).toEqual({ threadId });
+});
+
+it("forgets a deleted Chief of Staff", async () => {
+  const x = await setup();
+  const first = await x.spawn({ projectId: "p" });
+  await x.leads.setChief(first.id);
+  x.threads.delete(first.id);
+  expect(await x.leads.chief()).toMatchObject({ threadId: null });
+});

@@ -27,7 +27,18 @@ weekdays, weekly, or a custom cron) through an automation named
 the lead thread being deleted, turns it off. Handing the lead off to a new
 thread keeps the successor the lead and moves the Heartbeat to it.
 
-## Dialogs
+## The Chief of Staff
+
+The Chief of Staff is one thread above every Space. The slot starts empty.
+Any thread from any Space can be promoted. Promoting it takes it out of its
+Space, so `space_of_threads` leaves it out and every Space's sidebar pins it
+at the top. If it led a Space, that Space loses its lead and its Heartbeat
+turns off. The Chief of Staff's own Heartbeat, an automation named
+`Studio chief of staff heartbeat`, starts from that schedule. It can't also
+be a Space's lead. Demoting it, or promoting another thread, returns it to
+the Space it came from, or to Personal if that Space is gone. A handoff
+keeps the successor Chief of Staff, and deleting the thread empties the slot.
+
 
 Other plugins (Studio Sidebar) open Studio's Space dialogs by window event:
 
@@ -50,7 +61,13 @@ Other plugins (Studio Sidebar) open Studio's Space dialogs by window event:
 - `createInSpace({ id, pluginId, kind })` → `{ href, title }`: a Studio item in
   the Space's folder.
 - `thread_handoff({ threadId, request })` → `{ threadId }`: continues a thread
-  on another provider; a lead's successor becomes the lead.
+  on another provider; a lead's successor becomes the lead, and the
+  Chief of Staff's successor becomes Chief of Staff.
+- `chief_of_staff({})` → `{ threadId, originSpaceId, run }`.
+- `chief_of_staff_set({ threadId })` promotes a thread, or demotes the current
+  one with `null`. Same output as `chief_of_staff`.
+- `chief_of_staff_set_run({ enabled, cadence, time?, cron? })` sets its
+  Heartbeat; turning it on needs a Chief of Staff.
 
 Deleting a Space turns its Heartbeat off and forgets its lead. If the
 Heartbeat can't be turned off, the Space stays and the delete fails.

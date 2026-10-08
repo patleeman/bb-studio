@@ -50,6 +50,9 @@ public enum Studio {
     public static let space_set_lead = "space_set_lead"
     public static let space_of_threads = "space_of_threads"
     public static let space_set_run = "space_set_run"
+    public static let chief_of_staff = "chief_of_staff"
+    public static let chief_of_staff_set = "chief_of_staff_set"
+    public static let chief_of_staff_set_run = "chief_of_staff_set_run"
     public static let thread_handoff = "thread_handoff"
     public static let saveView = "saveView"
     public static let deleteView = "deleteView"
@@ -193,6 +196,12 @@ public enum Studio {
   public typealias SpaceOfThreads = SpaceOfThreadsOutput
 
   public typealias SpaceSetRun = SpaceSetRunOutput
+
+  public typealias ChiefOfStaff = ChiefOfStaffOutput
+
+  public typealias ChiefOfStaffSet = ChiefOfStaffSetOutput
+
+  public typealias ChiefOfStaffSetRun = ChiefOfStaffSetRunOutput
 
   public typealias ThreadHandoff = ThreadHandoffOutput
 
@@ -3663,6 +3672,304 @@ public enum Studio {
       self.color = color
       self.leadThreadId = leadThreadId
       self.defaultProjectId = defaultProjectId
+      self.run = run
+    }
+  }
+
+  public struct ChiefOfStaffInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public enum ChiefOfStaffOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ChiefOfStaffOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: ChiefOfStaffOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: ChiefOfStaffOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct ChiefOfStaffOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var originSpaceId: String?
+    public var run: ChiefOfStaffOutputRun?
+
+    public init(threadId: String? = nil, originSpaceId: String? = nil, run: ChiefOfStaffOutputRun? = nil) {
+      self.threadId = threadId
+      self.originSpaceId = originSpaceId
+      self.run = run
+    }
+  }
+
+  public struct ChiefOfStaffSetInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public enum ChiefOfStaffSetOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ChiefOfStaffSetOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: ChiefOfStaffSetOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: ChiefOfStaffSetOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct ChiefOfStaffSetOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var originSpaceId: String?
+    public var run: ChiefOfStaffSetOutputRun?
+
+    public init(threadId: String? = nil, originSpaceId: String? = nil, run: ChiefOfStaffSetOutputRun? = nil) {
+      self.threadId = threadId
+      self.originSpaceId = originSpaceId
+      self.run = run
+    }
+  }
+
+  public enum ChiefOfStaffSetRunInputCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ChiefOfStaffSetRunInput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: ChiefOfStaffSetRunInputCadence?
+    public var cron: String?
+    public var time: String?
+
+    public init(enabled: Bool? = nil, cadence: ChiefOfStaffSetRunInputCadence? = nil, cron: String? = nil, time: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.cron = cron
+      self.time = time
+    }
+  }
+
+  public enum ChiefOfStaffSetRunOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ChiefOfStaffSetRunOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: ChiefOfStaffSetRunOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: ChiefOfStaffSetRunOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct ChiefOfStaffSetRunOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var originSpaceId: String?
+    public var run: ChiefOfStaffSetRunOutputRun?
+
+    public init(threadId: String? = nil, originSpaceId: String? = nil, run: ChiefOfStaffSetRunOutputRun? = nil) {
+      self.threadId = threadId
+      self.originSpaceId = originSpaceId
       self.run = run
     }
   }

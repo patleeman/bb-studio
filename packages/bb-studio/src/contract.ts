@@ -163,6 +163,14 @@ const spaceLead = z.object({
   run: spaceRunSchema.nullable(),
 });
 export type SpaceLeadView = z.infer<typeof spaceLead>;
+/** The user's Chief of Staff: one thread above every space, with its own heartbeat. */
+const chiefOfStaff = z.object({
+  threadId: z.string().nullable(),
+  /** The space it came from; demoting returns it there. */
+  originSpaceId: z.string().nullable(),
+  run: spaceRunSchema.nullable(),
+});
+export type ChiefOfStaffView = z.infer<typeof chiefOfStaff>;
 /** The full request from experimental_NewThreadComposer; Studio picks the project. */
 const newThreadRequest = conversationRequestSchema(z);
 export type NewThreadRequestInput = z.output<typeof newThreadRequest>;
@@ -282,7 +290,13 @@ export const rpcContract = defineRpcContract({
   space_of_threads: { input: z.object({}), output: z.object({ threads: z.record(z.string(), z.string()) }) },
   /** Turns the lead's heartbeat on or off; on needs a lead. */
   space_set_run: { input: spaceRunSchema.omit({ time: true }).extend({ spaceId, time: spaceRunSchema.shape.time.optional() }), output: spaceLead },
-  /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead. */
+  /** The Chief of Staff and its heartbeat. Clears a thread that was deleted. */
+  chief_of_staff: { input: z.object({}), output: chiefOfStaff },
+  /** Promotes a thread from any space, taking it out of its space and its lead role; null demotes it back to the space it came from. */
+  chief_of_staff_set: { input: z.object({ threadId: z.string().min(1).max(200).nullable() }), output: chiefOfStaff },
+  /** Turns the Chief of Staff's heartbeat on or off; on needs a Chief of Staff. */
+  chief_of_staff_set_run: { input: spaceRunSchema.omit({ time: true }).extend({ time: spaceRunSchema.shape.time.optional() }), output: chiefOfStaff },
+  /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and a Chief of Staff stays Chief of Staff. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** Saves a collection query by name, replacing a view with that name. */
   saveView: { input: z.object({ name: z.string().min(1).max(60), query: z.string().max(500) }), output: z.object({ view: savedView }) },

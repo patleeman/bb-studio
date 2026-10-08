@@ -289,8 +289,10 @@ export default async function plugin(bb: BbPluginApi) {
         updatedAt: thread.updatedAt ?? thread.createdAt ?? 0,
       }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
-  /** The one space a thread is in, which scopes what its agent sees by default. */
+  /** The one space a thread is in (every space for the Chief of Staff), which scopes what its agent sees by default. */
   const threadSpaces = (threadId: string, projectId: string | null) => {
+    // The Chief of Staff is above every space, so it sees them all.
+    if (spaceLeads.chiefThreadId() === threadId) return spaces.list();
     const space = spaces.get(spaces.ownerOfThread({ id: threadId, projectId }));
     return space ? [space] : [];
   };
@@ -558,6 +560,9 @@ export default async function plugin(bb: BbPluginApi) {
     thread_lines: async ({ threadIds }) => ({ lines: await threadLines.read(threadIds) }),
     space_of_threads: async () => ({ threads: await spaceLeads.spaceOfThreads() }),
     space_set_run: ({ spaceId, ...run }) => spaceLeads.setRun(spaceId, run),
+    chief_of_staff: () => spaceLeads.chief(),
+    chief_of_staff_set: ({ threadId }) => spaceLeads.setChief(threadId),
+    chief_of_staff_set_run: (run) => spaceLeads.setChiefRun(run),
     thread_handoff: ({ threadId, request }) => spaceLeads.handoff(threadId, request),
     saveView: ({ name, query }) => {
       const view = views.save(name, query);

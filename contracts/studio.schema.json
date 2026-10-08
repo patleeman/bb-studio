@@ -5058,6 +5058,282 @@
         "additionalProperties": false
       }
     },
+    "chief_of_staff": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "originSpaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "cadence": {
+                    "type": "string",
+                    "enum": [
+                      "hourly",
+                      "daily",
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
+                    ]
+                  },
+                  "time": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "cadence",
+                  "time"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "originSpaceId",
+          "run"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "chief_of_staff_set": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "originSpaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "cadence": {
+                    "type": "string",
+                    "enum": [
+                      "hourly",
+                      "daily",
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
+                    ]
+                  },
+                  "time": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "cadence",
+                  "time"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "originSpaceId",
+          "run"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "chief_of_staff_set_run": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "hourly",
+              "daily",
+              "weekdays",
+              "every5minutes",
+              "every15minutes",
+              "every30minutes",
+              "every2hours",
+              "every6hours",
+              "weekly",
+              "custom"
+            ]
+          },
+          "cron": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        },
+        "required": [
+          "enabled",
+          "cadence"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "originSpaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "cadence": {
+                    "type": "string",
+                    "enum": [
+                      "hourly",
+                      "daily",
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
+                    ]
+                  },
+                  "time": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "cadence",
+                  "time"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "originSpaceId",
+          "run"
+        ],
+        "additionalProperties": false
+      }
+    },
     "thread_handoff": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

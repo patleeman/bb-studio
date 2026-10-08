@@ -120,4 +120,7 @@ export const MIGRATIONS = [
   `CREATE TABLE thread_titles (
        thread_id TEXT PRIMARY KEY, title TEXT, prompts INTEGER NOT NULL, locked INTEGER NOT NULL, updated_at INTEGER NOT NULL
      );`,
+  `CREATE TABLE chief_of_staff (
+       id INTEGER PRIMARY KEY CHECK (id = 1), thread_id TEXT NOT NULL, origin_space_id TEXT, updated_at INTEGER NOT NULL
+     );`,
 ];
