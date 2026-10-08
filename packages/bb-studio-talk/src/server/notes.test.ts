@@ -113,17 +113,17 @@ describe("notesMarkdown", () => {
     expect(markdown).toContain("\\# &lt;b>Hi&lt;/b>");
   });
 
-  it("keeps checked and handed-off items when updating", () => {
+  it("keeps checked, handed-off and hand-added items when updating", () => {
     const existing = [
       "Notes from @[Weekly sync](item:talk:rec_aaaaaaaa), recorded Oct 7, 2026.",
       "## Action items",
       "- [x] Write the guided import spec",
       "- [ ] Call the vendor @[Call the vendor](thread:thr_123)",
-      "- [ ] Something the model dropped",
+      "- [ ] Something I added myself",
     ].join("\n");
     const markdown = notesMarkdown({ recording, notes: NOTES, truncated: false, existing });
     expect(markdown).toContain("- [x] Write the guided import spec\n- [ ] Email the beta list\n- [ ] Call the vendor @[Call the vendor](thread:thr_123)");
-    expect(markdown).not.toContain("Something the model dropped");
+    expect(markdown).toContain("- [ ] Something I added myself");
   });
 });
 

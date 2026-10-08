@@ -148,15 +148,12 @@ function itemKey(text: string): string {
 interface ExistingItem {
   line: string;
   key: string;
-  /** Checked off or handed to an agent: work the user has started. */
-  started: boolean;
 }
 
 function existingChecklist(markdown: string): ExistingItem[] {
   return [...markdown.matchAll(/^- \[([ xX])\] (.*)$/gm)].map((match) => ({
     line: match[0]!,
     key: itemKey(match[2]!),
-    started: match[1] !== " " || /\(thread:[^)]+\)/.test(match[2]!),
   }));
 }
 
@@ -177,7 +174,7 @@ export function isNotesPageFor(markdown: string, recordingId: string): boolean {
 /**
  * The page's Markdown. When updating, `existing` is the page as it is now:
  * an action item that comes back keeps its line (checked state and agent
- * hand-off included), and items the user checked off or handed off stay.
+ * hand-off included), and other items on the page (checked, handed off, or added by hand) stay.
  */
 export function notesMarkdown(input: {
   recording: Pick<Recording, "id" | "title" | "createdAt">;
@@ -195,7 +192,8 @@ export function notesMarkdown(input: {
     used.add(match);
     return match.line;
   });
-  for (const entry of previous) if (entry.started && !used.has(entry)) items.push(entry.line);
+  // Anything else on the page stays: checked, handed off, or added by hand.
+  for (const entry of previous) if (!used.has(entry)) items.push(entry.line);
   const lines = [notesHeader(input.recording), ""];
   if (input.truncated) {
     lines.push("> [!NOTE]", "> This recording is very long. These notes cover its first part; open the recording for the rest.", "");
