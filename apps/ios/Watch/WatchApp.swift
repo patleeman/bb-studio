@@ -1,5 +1,6 @@
 import SwiftUI
 import WatchKit
+import WidgetKit
 
 @main
 struct BBStudioWatchApp: App {
@@ -15,9 +16,18 @@ struct WatchInboxView: View {
     @ObservedObject private var model = WatchModel.shared
     @Environment(\.scenePhase) private var scenePhase
     private struct LoadKey: Hashable { let selection: UUID; let active: Bool }
+    @State private var showChief = false
 
     var body: some View {
         List {
+            if let chief = model.chiefId {
+                NavigationLink {
+                    WatchThreadView(threadId: chief, title: "Chief of Staff", talkFirst: true)
+                } label: {
+                    Label("Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
             if let error = model.error {
                 Text(error).font(.footnote).foregroundStyle(.red)
                 Button("Retry") { Task { await model.load() } }
@@ -44,12 +54,27 @@ struct WatchInboxView: View {
             await model.load()
         }
         .refreshable { await model.load() }
+        .navigationDestination(isPresented: $showChief) {
+            if let chief = model.chiefId {
+                WatchThreadView(threadId: chief, title: "Chief of Staff", talkFirst: true)
+            }
+        }
+        // The Chief of Staff complication.
+        .onOpenURL { url in
+            guard url.host() == "chief" else { return }
+            Task {
+                if model.chiefId == nil { await model.load() }
+                showChief = model.chiefId != nil
+            }
+        }
     }
 }
 
 struct WatchThreadView: View {
     let threadId: String
     let title: String
+    /// Puts the reply field first, for the Chief of Staff: tap it and speak.
+    var talkFirst = false
     @State private var rows: [TimelineRow] = []
     @State private var thread: ThreadEntry?
     @State private var interactions: [PendingInteraction] = []
@@ -78,6 +103,10 @@ struct WatchThreadView: View {
 
     private var threadList: some View {
         List {
+            if talkFirst {
+                TextField("Talk to chief…", text: $reply)
+                    .onSubmit { send(reply, clearsDraft: true) }
+            }
             if let loadError, rows.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(loadError).font(.footnote).foregroundStyle(.red)
@@ -104,8 +133,10 @@ struct WatchThreadView: View {
                 }
             }
             Section {
-                TextField("Reply", text: $reply)
-                    .onSubmit { send(reply, clearsDraft: true) }
+                if !talkFirst {
+                    TextField("Reply", text: $reply)
+                        .onSubmit { send(reply, clearsDraft: true) }
+                }
                 ForEach(Self.quickReplies, id: \.self) { text in
                     Button(text) { send(text) }
                 }
@@ -134,6 +165,10 @@ struct WatchThreadView: View {
         do {
             let page = try await page
             rows = Array(page.rows.filter { $0.isConversation && !($0.text ?? "").isEmpty }.suffix(6))
+            if talkFirst, let latest = rows.last(where: { !$0.isUser })?.text, latest != AppGroup.defaults.string(forKey: "chiefLatest") {
+                AppGroup.defaults.set(latest, forKey: "chiefLatest")
+                WidgetCenter.shared.reloadTimelines(ofKind: "BBGoChief")
+            }
             loadError = nil
         } catch where !BBClient.isCancellation(error) {
             loadError = BBClient.describe(error, server: client.baseURL)

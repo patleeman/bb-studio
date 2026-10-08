@@ -76,6 +76,72 @@ struct ComplicationView: View {
 }
 
 @main
+struct BBStudioWatchWidgets: WidgetBundle {
+    var body: some Widget {
+        BBStudioComplication()
+        ChiefComplication()
+    }
+}
+
+/// Opens the Chief of Staff, the Personal Space's lead, from the watch face.
+/// Shows its latest message once the watch app has opened the thread.
+struct ChiefEntry: TimelineEntry {
+    var date: Date
+    var latest: String?
+}
+
+struct ChiefProvider: TimelineProvider {
+    func placeholder(in context: Context) -> ChiefEntry { ChiefEntry(date: .now) }
+    func getSnapshot(in context: Context, completion: @escaping (ChiefEntry) -> Void) { completion(entry()) }
+    func getTimeline(in context: Context, completion: @escaping (Timeline<ChiefEntry>) -> Void) {
+        completion(Timeline(entries: [entry()], policy: .never))
+    }
+    private func entry() -> ChiefEntry { ChiefEntry(date: .now, latest: AppGroup.defaults.string(forKey: "chiefLatest")) }
+}
+
+struct ChiefComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "BBGoChief", provider: ChiefProvider()) { entry in
+            ChiefComplicationView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+                .widgetURL(URL(string: "bbstudio://chief"))
+        }
+        .configurationDisplayName("Chief of Staff")
+        .description("Talk to your chief of staff.")
+        .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryInline, .accessoryRectangular])
+    }
+}
+
+struct ChiefComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: ChiefEntry
+
+    var body: some View {
+        switch family {
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                Image(systemName: "person.crop.circle.badge.checkmark").font(.title3)
+            }
+            .widgetAccentable()
+        case .accessoryCorner:
+            Image(systemName: "person.crop.circle.badge.checkmark")
+                .font(.title3)
+                .widgetLabel { Text("Chief") }
+        case .accessoryInline:
+            Label("Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
+        default:
+            VStack(alignment: .leading, spacing: 2) {
+                Label("Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
+                    .font(.headline)
+                    .widgetAccentable()
+                Text(entry.latest ?? "Tap to talk").font(.caption).lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 struct BBStudioComplication: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "BBGoStatus", provider: StatusProvider()) { entry in

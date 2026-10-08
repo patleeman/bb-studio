@@ -165,6 +165,8 @@ final class WatchModel: ObservableObject {
 
     @Published private(set) var client: BBClient
     @Published var threads: [ThreadEntry] = []
+    /// The Chief of Staff: the Personal Space's lead, pinned above the list.
+    @Published var chiefId: String?
     @Published var error: String?
     @Published var loading = false
     private var loadGeneration = 0
@@ -191,7 +193,7 @@ final class WatchModel: ObservableObject {
         serverSelection = UUID()
         AppGroup.defaults.set(url.absoluteString, forKey: "serverURL")
         client = Self.makeClient(url, selection: serverSelection)
-        threads = []; error = nil; loading = false
+        threads = []; chiefId = nil; error = nil; loading = false
         WidgetCenter.shared.reloadAllTimelines()
     }
 
@@ -212,6 +214,9 @@ final class WatchModel: ObservableObject {
                 }
             guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             threads = loadedThreads
+            if let chief = try? await client.chiefOfStaffThreadId(), generation == loadGeneration {
+                chiefId = chief
+            }
             StatusSnapshot(ThreadSummary(threads), serverURL: client.baseURL).save()
             guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             error = nil
