@@ -129,6 +129,7 @@ export async function zipDirectory(dir: string, out: string, first?: string): Pr
     await write(end);
     await handle.sync();
     await handle.close();
+    if (await stat(out).catch(() => null)) throw new Error(`${out} already exists; a backup never overwrites another.`);
     await rename(temp, out);
     return { files: names.length, bytes: offset };
   } catch (error) {

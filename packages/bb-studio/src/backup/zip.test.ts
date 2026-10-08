@@ -68,3 +68,14 @@ it("refuses files that aren't archives, oversized archives and corrupted data", 
   await writeFile(corrupt, raw);
   await expect(extractEntries(corrupt, entries, join(root, "out"))).rejects.toThrow();
 });
+
+it("refuses to overwrite an existing backup", async () => {
+  const root = await temp();
+  const source = join(root, "src");
+  await mkdir(source);
+  await writeFile(join(source, "manifest.json"), "{}");
+  const out = join(root, "backup.zip");
+  await writeFile(out, "earlier backup");
+  await expect(zipDirectory(source, out, "manifest.json")).rejects.toThrow(/already exists/);
+  expect(await readFile(out, "utf8")).toBe("earlier backup");
+});

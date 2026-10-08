@@ -61,3 +61,13 @@ test("backs up with one click and offers the download again", async () => {
   expect(container.querySelector("a")?.getAttribute("href")).toBe("/dl");
   expect(container.textContent).toContain("bb studio backup");
 });
+
+test("after a restore with failures it offers to run again, and drops the offer once done", async () => {
+  const failed: RestoreResult = { ...plan, dryRun: false, failed: true };
+  const view = api({ step: "restored", fileName: "b.zip", result: failed, uploadId: "up_1" });
+  act(() => root.render(<BackupView api={view} />));
+  await act(async () => button("Restore again")!.click());
+  expect(view.confirm).toHaveBeenCalled();
+  act(() => root.render(<BackupView api={api({ step: "restored", fileName: "b.zip", result: { ...failed, failed: false }, uploadId: null })} />));
+  expect(button("Restore again")).toBeUndefined();
+});

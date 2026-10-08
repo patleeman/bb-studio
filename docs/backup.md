@@ -159,6 +159,13 @@ Recordings that were still recording or transcribing when the backup was made
 come back as finished. Pieces that were never transcribed are marked failed,
 so you can retry them. Restore never sends audio to be transcribed again.
 
+Backup file names include the millisecond and four random digits, and a backup
+never overwrites an existing file. On the Setup page, a restore runs only on
+the exact file whose dry run you just saw (Studio compares its SHA-256); if the
+file changed, check it again. If any section fails, the uploaded file stays so
+**Restore again** works without uploading it again; it is deleted once every
+section succeeds, on Done, or after a day. An empty file is refused.
+
 Only one backup or restore runs at a time. Session folders and abandoned
 uploads (older than a day) are cleaned up when Studio starts. The Setup page
 keeps your three newest backups on the server so you can download them again.

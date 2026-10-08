@@ -15,7 +15,7 @@ export type BackupState =
   | { step: "checking"; fileName: string }
   | { step: "planned"; fileName: string; uploadId: string; plan: RestoreResult }
   | { step: "restoring"; fileName: string; plan: RestoreResult }
-  | { step: "restored"; fileName: string; result: RestoreResult }
+  | { step: "restored"; fileName: string; result: RestoreResult; /** Set when something failed: the file stays on the server for another try. */ uploadId: string | null }
   | { step: "error"; message: string };
 
 export function backupHref(name: string): string {
@@ -68,17 +68,19 @@ export function useBackup() {
   }, [rpc]);
 
   const confirm = useCallback(async () => {
-    if (state.step !== "planned") return;
-    setState({ step: "restoring", fileName: state.fileName, plan: state.plan });
+    if (state.step !== "planned" && !(state.step === "restored" && state.uploadId)) return;
+    const { fileName, uploadId } = state;
+    setState({ step: "restoring", fileName, plan: state.step === "planned" ? state.plan : state.result });
     try {
-      setState({ step: "restored", fileName: state.fileName, result: await rpc.call("backup.restore", { uploadId: state.uploadId, dryRun: false }) });
+      const result = await rpc.call("backup.restore", { uploadId: uploadId!, dryRun: false });
+      setState({ step: "restored", fileName, result, uploadId: result.failed ? uploadId : null });
     } catch (cause) {
       setState({ step: "error", message: errorMessage(cause) });
     }
   }, [rpc, state]);
 
   const cancel = useCallback(() => {
-    if (state.step === "planned") void rpc.call("backup.discard", { uploadId: state.uploadId }).catch(() => {});
+    if (state.step === "planned" || (state.step === "restored" && state.uploadId)) void rpc.call("backup.discard", { uploadId: state.uploadId! }).catch(() => {});
     setState({ step: "idle" });
   }, [rpc, state]);
 

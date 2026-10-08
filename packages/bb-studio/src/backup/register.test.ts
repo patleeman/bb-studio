@@ -15,7 +15,11 @@ async function setup() {
   dirs.push(dir);
   const handlers: Record<string, (input: never) => Promise<unknown>> = {};
   const routes: Record<string, (context: unknown) => Promise<Response>> = {};
-  const restore = vi.fn(async (_file: string, options: { dryRun: boolean }) => ({ dryRun: options.dryRun, createdAt: "2026-10-07", sections: [], projects: { mapped: 0, unmapped: [] } }));
+  const outcome = { failed: false };
+  const restore = vi.fn(async (_file: string, options: { dryRun: boolean }) => ({
+    dryRun: options.dryRun, createdAt: "2026-10-07", projects: { mapped: 0, unmapped: [] },
+    sections: outcome.failed ? [{ pluginId: "pages", name: "Pages", status: "failed" as const, reason: "boom", report: null }] : [],
+  }));
   const service = { cleanup: async () => {}, restore, backup: vi.fn() } as unknown as BackupService;
   registerBackup({
     rpc: { register: (_contract: unknown, registered: typeof handlers) => Object.assign(handlers, registered) },
@@ -24,7 +28,7 @@ async function setup() {
     onDispose: () => {},
   } as never, service, dir);
   const call = <T>(method: string, input: unknown) => handlers[method]!(input as never) as Promise<T>;
-  return { dir, call, restore, routes };
+  return { dir, call, restore, routes, outcome };
 }
 
 it("takes an upload in ordered chunks, accepts a repeated chunk once and refuses gaps", async () => {
@@ -50,5 +54,41 @@ it("serves only backup files by their generated names", async () => {
   const context = (name: string) => ({ req: { query: () => name }, text: (body: string, status: number) => new Response(body, { status }) });
   expect((await routes["/backup"]!(context("../data.db"))).status).toBe(404);
   expect((await routes["/backup"]!(context(backupFileName(new Date(0))))).status).toBe(404);
-  expect(backupFileName(new Date(0))).toBe("bb-studio-backup-1970-01-01T00-00-00.zip");
+  expect(backupFileName(new Date(0), 0)).toBe("bb-studio-backup-1970-01-01T00-00-00-000-0000.zip");
+  expect(backupFileName(new Date(0), 42)).not.toBe(backupFileName(new Date(0), 43));
+  expect(backupFileName()).toMatch(/^bb-studio-backup-[0-9T-]+\.zip$/);
+});
+
+const b64 = (text: string) => Buffer.from(text).toString("base64");
+
+it("never returns an upload id for an empty chunk", async () => {
+  const { dir, call } = await setup();
+  await expect(call("backup.upload", { uploadId: null, offset: 0, data: "" })).rejects.toThrow(/empty/);
+  await expect(stat(join(dir, "backup-uploads"))).rejects.toThrow();
+});
+
+it("restores only the file the dry run showed", async () => {
+  const { call, restore } = await setup();
+  const { uploadId } = await call<{ uploadId: string }>("backup.upload", { uploadId: null, offset: 0, data: b64("abc") });
+  await expect(call("backup.restore", { uploadId, dryRun: false })).rejects.toThrow(/Check this file first/);
+  await call("backup.restore", { uploadId, dryRun: true });
+  await call("backup.upload", { uploadId, offset: 3, data: b64("def") });
+  await expect(call("backup.restore", { uploadId, dryRun: false })).rejects.toThrow(/Check this file first/);
+  expect(restore).toHaveBeenCalledTimes(1);
+  await call("backup.restore", { uploadId, dryRun: true });
+  await call("backup.restore", { uploadId, dryRun: false });
+  expect(restore).toHaveBeenCalledTimes(3);
+});
+
+it("keeps the uploaded file after a restore with failures, so it can run again", async () => {
+  const { dir, call, outcome } = await setup();
+  const { uploadId } = await call<{ uploadId: string }>("backup.upload", { uploadId: null, offset: 0, data: b64("abc") });
+  const path = join(dir, "backup-uploads", `${uploadId}.zip`);
+  await call("backup.restore", { uploadId, dryRun: true });
+  outcome.failed = true;
+  expect(await call("backup.restore", { uploadId, dryRun: false })).toMatchObject({ failed: true });
+  expect((await stat(path)).size).toBe(3);
+  outcome.failed = false;
+  expect(await call("backup.restore", { uploadId, dryRun: false })).toMatchObject({ failed: false });
+  await expect(stat(path)).rejects.toThrow();
 });

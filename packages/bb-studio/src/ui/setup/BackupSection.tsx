@@ -91,6 +91,12 @@ export function BackupView({ api }: { api: BackupApi }) {
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
           <p className="text-xs text-foreground">{state.result.failed ? "Restored, with problems:" : `Restored ${state.fileName}.`}</p>
           <Outcome result={state.result} />
+          {state.uploadId ? (
+            <div className="flex items-center gap-1.5">
+              <Button size="sm" onClick={() => void api.confirm()}>Restore again</Button>
+              <Button size="sm" variant="ghost" onClick={api.cancel}>Done</Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {state.step === "error" ? <p className="text-xs text-destructive">{state.message}</p> : null}
