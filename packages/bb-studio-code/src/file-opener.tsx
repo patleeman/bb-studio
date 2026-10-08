@@ -8,9 +8,9 @@ import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { CODE_TAB, type CodeContract } from "./shared";
 
-/** Text and code files worth editing in VS Code. */
+/** Text and code files worth editing in VS Code. Markdown stays in BB's preview, which renders it. */
 export const CODE_EXTENSIONS = [
-  "ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts", "json", "jsonc", "md", "mdx", "yaml", "yml", "toml",
+  "ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts", "json", "jsonc", "yaml", "yml", "toml",
   "css", "scss", "less", "html", "vue", "svelte", "py", "rb", "go", "rs", "java", "kt", "swift", "c", "h",
   "cc", "cpp", "hpp", "cs", "php", "sh", "bash", "zsh", "sql", "graphql", "xml", "txt", "lua", "dart", "ex", "exs",
 ];
