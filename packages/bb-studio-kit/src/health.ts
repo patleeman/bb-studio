@@ -26,7 +26,7 @@ export function healthSchemas(z: typeof Zod) {
     /** What it costs the user and what to do. */
     detail: z.string().max(1000).optional(),
     /** Where Fix goes, an in-app path. Omitted: the plugin's settings page. */
-    fix: z.object({ label: z.string().min(1).max(60), path: z.string().startsWith("/").max(500) }).optional(),
+    fix: z.object({ label: z.string().min(1).max(60), path: z.string().max(500).regex(/^\/(?![/\\])[^\\\s]*$/) }).optional(),
   });
   return {
     check,
