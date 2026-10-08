@@ -116,28 +116,65 @@ struct RouteDestination: View {
 private struct ChiefOfStaffTab: View {
     @EnvironmentObject private var model: AppModel
     @State private var path: [Route] = []
-    @State private var leadId: String?
-    @State private var loaded = false
+    @State private var lead = ChiefLead.loading
+    @State private var attempt = 0
+    private struct LoadKey: Hashable { let visible: Bool; let server: URL; let attempt: Int }
 
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if let leadId {
-                    ThreadView(threadId: leadId, hidesTabBar: false, answersActionButton: true).id(leadId)
-                } else if loaded {
+                switch lead {
+                case .thread(let id):
+                    ThreadView(threadId: id, hidesTabBar: false, answersActionButton: true).id("\(model.serverURL.absoluteString)|\(id)")
+                case .none:
                     ContentUnavailableView("No chief of staff",
                                            systemImage: "person.crop.circle.badge.questionmark",
                                            description: Text("Make a thread the Personal Space's lead to see it here."))
-                } else {
+                case .unavailable(let message):
+                    ContentUnavailableView {
+                        Label("Chief of Staff unavailable", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(message)
+                    } actions: {
+                        Button("Retry") { attempt += 1 }
+                    }
+                case .loading:
                     ProgressView()
                 }
             }
             .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
         }
-        .task(id: model.tab == .chief) {
+        .task(id: LoadKey(visible: model.tab == .chief, server: model.serverURL, attempt: attempt)) {
             guard model.tab == .chief else { return }
-            if let id = try? await model.client.chiefOfStaffThreadId() { leadId = id }
-            loaded = true
+            let client = model.client
+            // Another server's lead is never shown for this one.
+            if case .thread(let shown) = lead, client.cachedChiefOfStaffThreadId != shown { lead = .loading }
+            do {
+                lead = ChiefLead(try await client.chiefOfStaffThreadId())
+            } catch where BBClient.isCancellation(error) {
+                return
+            } catch {
+                guard client.baseURL == model.serverURL else { return }
+                // Offline or a server without Studio: keep what this server last said.
+                if case .thread = lead {
+                } else if let cached = client.cachedChiefOfStaffThreadId {
+                    lead = .thread(cached)
+                } else {
+                    lead = .unavailable(BBClient.describe(error, server: client.baseURL))
+                }
+            }
+            // An Action button press with nothing to talk to must not start recording later.
+            if case .thread = lead {} else { model.chiefTalkPending = false }
         }
     }
+}
+
+/// What the Chief of Staff tab shows for the selected server.
+enum ChiefLead: Equatable {
+    case loading
+    case thread(String)
+    case none
+    case unavailable(String)
+
+    init(_ threadId: String?) { self = threadId.map(ChiefLead.thread) ?? .none }
 }

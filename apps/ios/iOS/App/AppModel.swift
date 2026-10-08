@@ -127,6 +127,7 @@ final class AppModel: ObservableObject {
         studioKind = nil
         studioSpace = nil
         sheet = nil
+        chiefTalkPending = false
         realtime.stop()
         client = BBClient(baseURL: url)
         homeSpace = UserDefaults.standard.string(forKey: ServerScope.key("homeSpace", serverURL: url))
@@ -177,7 +178,7 @@ final class AppModel: ObservableObject {
     }
 
     /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://space/<id>`,
-    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://web`.
+    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://chief` (also the old `web`), `bbstudio://chief-talk`.
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
