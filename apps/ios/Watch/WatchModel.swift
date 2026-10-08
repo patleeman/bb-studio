@@ -214,8 +214,12 @@ final class WatchModel: ObservableObject {
                 }
             guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             threads = loadedThreads
-            if let chief = try? await client.chiefOfStaffThreadId(), generation == loadGeneration {
-                chiefId = chief
+            // Nil clears a lead that was removed; a failed lookup keeps the last answer.
+            do {
+                let chief = try await client.chiefOfStaffThreadId()
+                if generation == loadGeneration { chiefId = chief }
+            } catch where generation == loadGeneration && chiefId == nil {
+                chiefId = client.cachedChiefOfStaffThreadId
             }
             StatusSnapshot(ThreadSummary(threads), serverURL: client.baseURL).save()
             guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }

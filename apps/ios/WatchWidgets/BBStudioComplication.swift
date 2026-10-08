@@ -96,7 +96,7 @@ struct ChiefProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<ChiefEntry>) -> Void) {
         completion(Timeline(entries: [entry()], policy: .never))
     }
-    private func entry() -> ChiefEntry { ChiefEntry(date: .now, latest: AppGroup.defaults.string(forKey: "chiefLatest")) }
+    private func entry() -> ChiefEntry { ChiefEntry(date: .now, latest: AppGroup.defaults.string(forKey: ServerScope.key("chiefLatest"))) }
 }
 
 struct ChiefComplication: Widget {

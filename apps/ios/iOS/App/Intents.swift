@@ -181,8 +181,17 @@ struct TellChiefIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
         let client = BBClient()
-        guard let threadId = try await client.chiefOfStaffThreadId() else {
+        let leadId: String?
+        do {
+            leadId = try await client.chiefOfStaffThreadId()
+        } catch {
+            return .result(value: "", dialog: "I couldn't find your chief of staff. \(BBClient.describe(error, server: client.baseURL))")
+        }
+        guard let threadId = leadId else {
             return .result(value: "", dialog: "Your Personal Space has no lead yet. Pick one in BB Studio.")
+        }
+        guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .result(value: "", dialog: "There was nothing to send.")
         }
         let baseline = try await client.latestReply(threadId)?.id
         try await client.send(threadId, text: message)

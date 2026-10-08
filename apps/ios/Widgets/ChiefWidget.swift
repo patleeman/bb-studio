@@ -45,6 +45,8 @@ struct ChiefProvider: TimelineProvider {
             do {
                 guard let threadId = try await client.chiefOfStaffThreadId() else {
                     entry = ChiefEntry(date: .now)
+                    // Forget the old lead, so a later offline refresh doesn't bring it back.
+                    DiskCache.save(ChiefCache(threadId: nil, message: nil, running: false, approval: nil), as: "chief-widget", serverURL: client.baseURL)
                     throw CancellationError()
                 }
                 async let reply = client.latestReply(threadId)
@@ -96,15 +98,19 @@ struct ChiefDecisionIntent: AppIntent {
     @Parameter(title: "Thread") var threadId: String
     @Parameter(title: "Request") var interactionId: String
     @Parameter(title: "Decision") var decision: String
+    @Parameter(title: "Server") var server: String
 
     init() {}
-    init(threadId: String, interactionId: String, decision: String) {
+    init(threadId: String, interactionId: String, decision: String, serverURL: URL) {
+        self.server = ServerScope.namespace(serverURL)
         self.threadId = threadId
         self.interactionId = interactionId
         self.decision = decision
     }
 
     func perform() async throws -> some IntentResult {
+        // The widget may predate a server switch; never answer another server's request.
+        guard server == ServerScope.namespace(ServerScope.selectedURL) else { return .result() }
         try await BBClient().resolve(threadId: threadId, interactionId: interactionId, decision: decision)
         return .result()
     }
@@ -192,13 +198,13 @@ private struct ChiefWidgetView: View {
         if let threadId = entry.threadId {
             HStack(spacing: 6) {
                 if approval.canApprove {
-                    Button(intent: ChiefDecisionIntent(threadId: threadId, interactionId: approval.interactionId, decision: "allow_once")) {
+                    Button(intent: ChiefDecisionIntent(threadId: threadId, interactionId: approval.interactionId, decision: "allow_once", serverURL: entry.serverURL)) {
                         Text(approvalLabel("allow_once", subjectKind: approval.subjectKind)).frame(maxWidth: .infinity)
                     }
                     .tint(.green)
                 }
                 if approval.canDeny {
-                    Button(intent: ChiefDecisionIntent(threadId: threadId, interactionId: approval.interactionId, decision: "deny")) {
+                    Button(intent: ChiefDecisionIntent(threadId: threadId, interactionId: approval.interactionId, decision: "deny", serverURL: entry.serverURL)) {
                         Text(approvalLabel("deny", subjectKind: approval.subjectKind)).frame(maxWidth: .infinity)
                     }
                     .tint(.red)
