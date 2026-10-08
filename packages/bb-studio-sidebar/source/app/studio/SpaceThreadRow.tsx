@@ -12,7 +12,8 @@ export interface ThreadLine {
 }
 
 /** How a Space's lead or a pinned thread is told apart without a heading. */
-export type SpaceThreadMark = { kind: "lead"; label: string } | { kind: "pinned" };
+/** The Chief of Staff is badged like a lead, with its own label. */
+export type SpaceThreadMark = { kind: "lead" | "chief"; label: string } | { kind: "pinned" };
 
 /** By space only: the latest line of each thread whose line has loaded, and the lead's and pins' marks. */
 export const SpaceRowsContext = createContext<{
@@ -100,7 +101,7 @@ const MARK_TONE: Record<SpaceThreadState, string> = {
 /** A star for the lead or a pin, where other rows have their status dot. */
 function SpaceThreadMarkIcon({ mark, state }: { mark: SpaceThreadMark; state: SpaceThreadState }) {
   const status = SPACE_THREAD_DOT[state].label;
-  const label = [mark.kind === "lead" ? mark.label : "Pinned", status].filter(Boolean).join(" · ");
+  const label = [mark.kind === "pinned" ? "Pinned" : mark.label, status].filter(Boolean).join(" · ");
   return (
     // As wide as a dot, so the title lines up with the rows around it.
     <span
@@ -113,9 +114,9 @@ function SpaceThreadMarkIcon({ mark, state }: { mark: SpaceThreadMark; state: Sp
       className="relative mr-2 size-[7px] shrink-0"
     >
       <Icon
-        name={mark.kind === "lead" ? "Star" : "Pin"}
+        name={mark.kind === "pinned" ? "Pin" : "Star"}
         aria-hidden
-        className={cn("absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2", MARK_TONE[state], mark.kind === "lead" && "fill-current")}
+        className={cn("absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2", MARK_TONE[state], mark.kind !== "pinned" && "fill-current")}
       />
     </span>
   );

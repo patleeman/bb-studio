@@ -113,6 +113,35 @@ export function withPendingLeads(
   return next;
 }
 
+/**
+ * A Chief of Staff change sent to Studio but maybe not in a fetched
+ * `chief_of_staff` yet, laid over each load like pending lead changes.
+ */
+let pendingChief: PendingLead | null = null;
+
+/** Records a Chief of Staff change; call the returned function once Studio answers. */
+export function beginPendingChiefOfStaff(threadId: string | null): () => void {
+  const change: PendingLead = { threadId, settledAfterLoad: null };
+  pendingChief = change;
+  return () => { change.settledAfterLoad = spaceLoadSeq; };
+}
+
+/** `chiefOfStaff` with a pending change laid over it; pass the load that fetched it. */
+export function withPendingChiefOfStaff(chiefOfStaff: string | null, load?: number): string | null {
+  const change = pendingChief;
+  if (!change) return chiefOfStaff;
+  if (load !== undefined && change.settledAfterLoad !== null && load > change.settledAfterLoad) {
+    pendingChief = null;
+    return chiefOfStaff;
+  }
+  return change.threadId;
+}
+
+const chiefSchema = z.object({
+  threadId: z.string().nullable(),
+  run: z.object({ enabled: z.boolean(), cadence: z.string() }).passthrough().nullable().catch(null),
+}).passthrough();
+
 const spacesSchema = z.object({
   spaces: z.array(z.object({
     id: z.string(),
@@ -205,6 +234,10 @@ export type StudioSpacesState =
     heartbeats: Record<string, string | null>;
     /** Each Space's Studio items; empty until `threadsLoaded`. */
     items: Record<string, SpaceItems>;
+    /** The Chief of Staff thread, above every Space; null without one or with an older Studio. By space only. */
+    chiefOfStaff: string | null;
+    /** The Chief of Staff's heartbeat cadence while it's on. */
+    chiefOfStaffHeartbeat: string | null;
     threadsLoaded: boolean;
   };
 
@@ -241,15 +274,21 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
         let leads: Record<string, string | null> = {};
         let heartbeats: Record<string, string | null> = {};
         let items: Record<string, SpaceItems> = {};
+        let chiefOfStaff: string | null = null;
+        let chiefOfStaffHeartbeat: string | null = null;
         // Leads load in every mode: a lead can't be archived from any view.
         const leadsLoad = Promise.all(spaces.map((space) => call("space_lead", { spaceId: space.id }, leadSchema)
           .then((lead) => [space.id, lead] as const, () => [space.id, null] as const)));
         if (spaceMode) {
-          const [of, tree] = await Promise.all([
+          const [of, tree, chief] = await Promise.all([
             call("space_of_threads", {}, spaceOfSchema),
             // Items are a nicety: a failure leaves the lists empty, not the sidebar.
             call("spaceTree", {}, treeSchema).catch(() => ({ spaces: [] })),
+            // An older Studio has no Chief of Staff: no pin.
+            call("chief_of_staff", {}, chiefSchema).catch(() => null),
           ]);
+          chiefOfStaff = withPendingChiefOfStaff(chief?.threadId ?? null, loadSeq);
+          chiefOfStaffHeartbeat = chief?.threadId && chief.run?.enabled ? chief.run.cadence : null;
           spaceOf = withPendingSpaceMoves(of.threads, loadSeq);
           items = Object.fromEntries(tree.spaces.map((space) => [space.id, {
             open: space.open.map(({ pluginId, id, title, icon, kindIcon, href, pinned, kindLabel, updatedAt, preview }) => ({ pluginId, id, title, icon, kindIcon, href, pinned, kindLabel, updatedAt, preview })),
@@ -261,7 +300,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
         leads = withPendingLeads(Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null])), loadSeq);
         heartbeats = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId && lead.run?.enabled ? lead.run.cadence : null]));
         const list = spaces.map(({ id, name, color, icon, defaultProjectId, isDefault, projectIds }) => ({ id, name, color, icon, defaultProjectId, isDefault, projectIds }));
-        if (active) setState({ status: "ready", spaces: list, spaceOf, leads, heartbeats, items, threadsLoaded: spaceMode });
+        if (active) setState({ status: "ready", spaces: list, spaceOf, leads, heartbeats, items, chiefOfStaff, chiefOfStaffHeartbeat, threadsLoaded: spaceMode });
       } catch (error) {
         const message = errorMessage(error);
         // Keep the last good load through a passing failure.

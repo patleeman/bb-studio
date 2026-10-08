@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { beginPendingLead, beginPendingSpaceMove, startSpaceLoad, withPendingLeads, withPendingSpaceMoves } from "./studioSpaces.js";
+import { beginPendingChiefOfStaff, beginPendingLead, beginPendingSpaceMove, startSpaceLoad, withPendingChiefOfStaff, withPendingLeads, withPendingSpaceMoves } from "./studioSpaces.js";
 
 describe("pending Space moves", () => {
   it("stay over refetched data until a load that began after the move settled", () => {
@@ -51,5 +51,24 @@ describe("pending lead changes", () => {
     settle();
     startSpaceLoad();
     expect(withPendingLeads({ sp_c: null }, startSpaceLoad()).sp_c).toBeNull();
+  });
+});
+
+describe("pending Chief of Staff changes", () => {
+  it("stay over refetches until a load that began after the change settled", () => {
+    const settle = beginPendingChiefOfStaff("thr_chief");
+    expect(withPendingChiefOfStaff(null, startSpaceLoad())).toBe("thr_chief");
+    const straddling = startSpaceLoad();
+    settle();
+    expect(withPendingChiefOfStaff(null, straddling)).toBe("thr_chief");
+    expect(withPendingChiefOfStaff(null, startSpaceLoad())).toBeNull();
+    expect(withPendingChiefOfStaff("thr_other")).toBe("thr_other");
+  });
+
+  it("keeps a removal pending as no Chief of Staff", () => {
+    const settle = beginPendingChiefOfStaff(null);
+    expect(withPendingChiefOfStaff("thr_chief", startSpaceLoad())).toBeNull();
+    settle();
+    expect(withPendingChiefOfStaff(null, startSpaceLoad())).toBeNull();
   });
 });

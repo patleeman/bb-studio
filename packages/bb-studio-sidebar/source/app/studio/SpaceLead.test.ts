@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isSpaceLeadThread, leadSafeArchiveIds } from "./SpaceLead.js";
+import { chiefOfStaffOf, isSpaceLeadThread, leadSafeArchiveIds } from "./SpaceLead.js";
 import type { StudioSpacesState } from "./studioSpaces.js";
 
-const ready = (leads: Record<string, string | null>): StudioSpacesState => ({
-  status: "ready", spaces: [], spaceOf: {}, leads, heartbeats: {}, items: {}, threadsLoaded: false,
+const ready = (leads: Record<string, string | null>, chiefOfStaff: string | null = null): StudioSpacesState => ({
+  status: "ready", spaces: [], spaceOf: {}, leads, heartbeats: {}, items: {}, chiefOfStaff, chiefOfStaffHeartbeat: null, threadsLoaded: false,
 });
 
 describe("Space leads", () => {
@@ -12,6 +12,11 @@ describe("Space leads", () => {
     expect(isSpaceLeadThread(state, "thr_lead")).toBe(true);
     expect(isSpaceLeadThread(state, "thr_other")).toBe(false);
     expect(isSpaceLeadThread({ status: "loading" }, "thr_lead")).toBe(false);
+  });
+
+  it("reads the Chief of Staff only from a ready load", () => {
+    expect(chiefOfStaffOf(ready({}, "thr_chief"))).toBe("thr_chief");
+    expect(chiefOfStaffOf({ status: "unavailable", error: "no studio" })).toBeNull();
   });
 
   it("archives a group around its lead and the lead's ancestors", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildProjectThreadGroups, compareStandardThreads } from "../model/project-thread-groups.js";
 import { makeSidebarThread } from "../testing/fixtures.js";
-import { needsYouFirst } from "./SpaceModeSections.js";
+import { needsYouFirst, splitChiefOfStaff } from "./SpaceModeSections.js";
 
 describe("By space thread order", () => {
   it("puts threads that wait on you first: questions, then failures, then results", () => {
@@ -18,5 +18,22 @@ describe("By space thread order", () => {
     ], compareStandardThreads, new Set(), false);
     const ids = needsYouFirst(items).map((item) => (item.kind === "thread" ? item.node.thread.id : item.kind));
     expect(ids).toEqual(["thr_ask", "thr_failed", "thr_done", "thr_parent", "thr_busy", "thr_read"]);
+  });
+});
+
+describe("Chief of Staff", () => {
+  const thread = (id: string, parentThreadId: string | null = null) => makeSidebarThread({ id, projectId: "proj", parentThreadId });
+  const threads = [thread("thr_chief"), thread("thr_sub", "thr_chief"), thread("thr_deep", "thr_sub"), thread("thr_other")];
+  const ids = (list: readonly { id: string }[]) => list.map((candidate) => candidate.id);
+
+  it("takes the Chief of Staff and its sub-threads out of the Spaces", () => {
+    const { chief, rest } = splitChiefOfStaff(threads, "thr_chief");
+    expect(ids(chief)).toEqual(["thr_chief", "thr_sub", "thr_deep"]);
+    expect(ids(rest)).toEqual(["thr_other"]);
+  });
+
+  it("leaves every thread in the Spaces without a listed Chief of Staff", () => {
+    expect(ids(splitChiefOfStaff(threads, null).rest)).toHaveLength(4);
+    expect(splitChiefOfStaff(threads, "thr_gone").chief).toEqual([]);
   });
 });

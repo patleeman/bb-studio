@@ -60,7 +60,7 @@ import { useMoveThreadsToSpace } from "./MoveToSpace.js";
 import { SpaceNewMenu, SpaceStudioList } from "./SpaceStudioList.js";
 import { SpaceBrowseMenu } from "./SpaceBrowseMenu.js";
 import { HiddenThreadsMenuItem } from "./HiddenThreads.js";
-import { SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
+import { chiefOfStaffOf, SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
 import { setSpaceNewThreadTarget } from "./new-thread-space.js";
 import { SpaceRowsContext, type SpaceThreadMark } from "./SpaceThreadRow.js";
 import { handOffNewThreadSpace } from "./new-thread-space.js";
@@ -74,7 +74,7 @@ import {
   useFillSidebar,
   useSpaceSwitchGestures,
 } from "./SpaceSwitcher.js";
-import type { SpaceItems } from "./studioSpaces.js";
+import { useStudioSpaces, type SpaceItems } from "./studioSpaces.js";
 
 export interface SpaceModeSectionsProps
   extends BuiltInSectionRenderState, GroupedModePinnedProps {
@@ -115,6 +115,30 @@ export function needsYouFirst(items: readonly ProjectThreadItem[]): ProjectThrea
     Math.min(WAIT_RANK.idle, ...getProjectThreadItemDescendants([item]).map((thread) => WAIT_RANK[threadAttentionState(thread)]));
   const ranks = new Map(items.map((item) => [item, rank(item)]));
   return [...items].sort((left, right) => ranks.get(left)! - ranks.get(right)!);
+}
+
+/**
+ * The Chief of Staff and its sub-threads, at any depth, and every other
+ * thread. With no Chief of Staff, or one not listed, everything is `rest`.
+ */
+export function splitChiefOfStaff(
+  threads: readonly SidebarThread[],
+  chiefId: string | null,
+): { chief: SidebarThread[]; rest: SidebarThread[] } {
+  if (!chiefId || !threads.some((thread) => thread.id === chiefId)) return { chief: [], rest: [...threads] };
+  const byId = new Map(threads.map((thread) => [thread.id, thread]));
+  const under = (thread: SidebarThread) => {
+    const seen = new Set<string>();
+    for (let id: string | null = thread.id; id !== null && !seen.has(id); id = byId.get(id)?.parentThreadId ?? null) {
+      if (id === chiefId) return true;
+      seen.add(id);
+    }
+    return false;
+  };
+  const chief: SidebarThread[] = [];
+  const rest: SidebarThread[] = [];
+  for (const thread of threads) (under(thread) ? chief : rest).push(thread);
+  return { chief, rest };
 }
 
 /** "every5minutes" reads "every 5 minutes". */
@@ -160,6 +184,9 @@ export function SpaceModeSections({
   threadsSection,
 }: SpaceModeSectionsProps) {
   const groupThreadsByEnvironment = useAtomValue(sidebarGroupThreadsByEnvironmentAtom);
+  const studioState = useStudioSpaces();
+  const chiefId = chiefOfStaffOf(studioState);
+  const chiefHeartbeat = studioState.status === "ready" ? studioState.chiefOfStaffHeartbeat : null;
   const [storedSpaceId, setStoredSpaceId] = useAtom(sidebarCurrentSpaceAtom);
   const fallbackSpaceId = defaultSpaceId(spaces);
   const isAll = storedSpaceId === ALL_SPACES && spaces.length > 0;
@@ -202,12 +229,14 @@ export function SpaceModeSections({
     const thread = threads.find((candidate) => candidate.id === selectedThreadId);
     if (!thread) return;
     revealedFor.current = selectedThreadId;
+    // The Chief of Staff shows above every Space.
+    if (splitChiefOfStaff(threads, chiefId).chief.some((candidate) => candidate.id === thread.id)) return;
     const spaceId = resolveSpace(thread);
     if (!spaceId) return;
     if (isAll) {
       if (collapsedSpaces.has(spaceId)) toggleSpaceCollapsed(spaceId);
     } else if (spaceId !== currentSpace?.id) switchTo(spaceId);
-  }, [collapsedSpaces, currentSpace?.id, isAll, resolveSpace, selectedThreadId, switchTo, threads, toggleSpaceCollapsed]);
+  }, [chiefId, collapsedSpaces, currentSpace?.id, isAll, resolveSpace, selectedThreadId, switchTo, threads, toggleSpaceCollapsed]);
 
   const area = useRef<HTMLDivElement>(null);
   useFillSidebar(area);
@@ -218,9 +247,15 @@ export function SpaceModeSections({
 
   // With Spaces, a pinned thread sits at the top of its own Space instead of a Pinned section.
   const pinsInSpaces = spaces.length > 0;
+  // The Chief of Staff is in no Space: it's pinned above them all, the same in every one.
+  const { chief: chiefThreads, rest: spaceThreads } = useMemo(() => splitChiefOfStaff(threads, chiefId), [chiefId, threads]);
+  const chiefItems = useMemo(
+    () => buildProjectThreadGroups(chiefThreads, compareThreads, draftThreadIds, false),
+    [chiefThreads, compareThreads, draftThreadIds],
+  );
   const nonPinnedThreads = useMemo(
-    () => threads.filter((thread) => (pinsInSpaces || !effectivePinnedThreadIds.has(thread.id)) && isSidebarProjectThread(thread)),
-    [effectivePinnedThreadIds, pinsInSpaces, threads],
+    () => spaceThreads.filter((thread) => (pinsInSpaces || !effectivePinnedThreadIds.has(thread.id)) && isSidebarProjectThread(thread)),
+    [effectivePinnedThreadIds, pinsInSpaces, spaceThreads],
   );
   const pinnedIds = useMemo(() => pinsInSpaces ? pinnedThreads.map((thread) => thread.id) : [], [pinnedThreads, pinsInSpaces]);
   const { groups, loose } = useMemo(
@@ -254,10 +289,10 @@ export function SpaceModeSections({
   const lineIds = useMemo(() => {
     const open = shown.filter((candidate) => !isAll || !collapsedSpaces.has(candidate.space.id));
     return threadLineIds(
-      open.flatMap((candidate) => candidate.lead ? [candidate.lead] : []),
-      [...open.flatMap((candidate) => [...candidate.leadChildren, ...candidate.pinnedThreadsHere, ...candidate.threads]), ...pinnedThreads],
+      [...chiefThreads.filter((thread) => thread.id === chiefId), ...open.flatMap((candidate) => candidate.lead ? [candidate.lead] : [])],
+      [...chiefThreads.filter((thread) => thread.id !== chiefId), ...open.flatMap((candidate) => [...candidate.leadChildren, ...candidate.pinnedThreadsHere, ...candidate.threads]), ...pinnedThreads],
     );
-  }, [collapsedSpaces, isAll, pinnedThreads, shown]);
+  }, [chiefId, chiefThreads, collapsedSpaces, isAll, pinnedThreads, shown]);
   const lines = useThreadLines(lineIds, useMemo(() => threadLineStatusKey(threads, lineIds), [lineIds, threads]));
   // The lead and pinned threads are told apart by a mark in place of their dot, not a heading.
   const marks = useMemo(() => {
@@ -269,8 +304,9 @@ export function SpaceModeSections({
         found[candidate.lead.id] = { kind: "lead", label: heartbeat ? `Space lead · heartbeat ${cadenceLabel(heartbeat)}` : "Space lead" };
       }
     }
+    if (chiefId) found[chiefId] = { kind: "chief", label: chiefHeartbeat ? `Chief of Staff · heartbeat ${cadenceLabel(chiefHeartbeat)}` : "Chief of Staff" };
     return found;
-  }, [heartbeats, shown]);
+  }, [chiefHeartbeat, chiefId, heartbeats, shown]);
   const rows = useMemo(() => ({ lines, marks }), [lines, marks]);
 
   const showThreads = spaces.length === 0;
@@ -362,6 +398,11 @@ export function SpaceModeSections({
         <ThreadListVisibility groups={[]} order={[]} onOrderChange={noop} label="Spaces" selectedThreadId={selectedThreadId}>
           <SortableContext items={order} strategy={verticalListSortingStrategy}>
             <div className="space-y-4">
+            {chiefThreads.length ? (
+              <div data-chief-of-staff={chiefId ?? undefined}>
+                {tree({ rootItems: chiefItems, threads: chiefThreads })}
+              </div>
+            ) : null}
             {order.map((sectionId) => {
               const consumeClickSuppression = threadDnd?.consumeClickSuppression ?? (() => false);
               const builtInSection = renderBuiltInSidebarSection({
