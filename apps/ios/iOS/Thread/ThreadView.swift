@@ -215,6 +215,7 @@ struct ThreadView: View {
             if let item = unreadItem() { position.scrollTo(id: item, anchor: .top) }
         }
         .onDisappear { model.detach() }
+        .modifier(TalkLifecycle(talk: talk, dictating: dictating))
         .onAppear {
             talk.send = { [model] text in
                 Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
@@ -608,6 +609,8 @@ struct ThreadView: View {
     private func takeActionButton() {
         guard answersActionButton, app.chiefTalkPending else { return }
         app.chiefTalkPending = false
+        // Dictation and voice chat own the microphone while they're open.
+        guard !dictating, app.sheet == nil else { return }
         talk.toggleHandsFree()
     }
 

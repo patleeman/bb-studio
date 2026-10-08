@@ -1,3 +1,5 @@
+import AVFoundation
+import Combine
 import SwiftUI
 
 /// Hold the composer's mic to talk; let go to send. Slide left before letting
@@ -15,11 +17,24 @@ final class HoldToTalk: ObservableObject {
     private let recorder = TalkRecorder(client: AppModel.shared.client)
     private var starting: Task<Void, Never>?
     private var watching: Task<Void, Never>?
+    private var interruptions: AnyCancellable?
+    /// Set once the recorder's start has returned, so a stale failure isn't mistaken for this one.
+    private var startReturned = false
     private let threadId: String
     /// Sends the transcript; the thread puts it back in the field if that fails.
     var send: (String) -> Void = { _ in }
 
-    init(threadId: String) { self.threadId = threadId }
+    init(threadId: String) {
+        self.threadId = threadId
+        // A call or Siri takes the microphone: stop without sending, as the system won't give it back on release.
+        interruptions = NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
+                    .flatMap(AVAudioSession.InterruptionType.init(rawValue:))
+                if type == .began { MainActor.assumeIsolated { self?.cancel() } }
+            }
+    }
 
     var isActive: Bool { state != .idle && state != .sending }
 
@@ -28,11 +43,22 @@ final class HoldToTalk: ObservableObject {
         state = handsFree ? .handsFree : .recording
         error = nil
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        starting = Task { await recorder.start(kind: "dictation", threadId: threadId) }
+        startReturned = false
+        starting = Task { [weak self] in
+            guard let self else { return }
+            await recorder.start(kind: "dictation", threadId: threadId)
+            startReturned = true
+        }
         watching = Task { [weak self] in
             while let self, !Task.isCancelled, self.isActive {
                 self.startedAt = self.recorder.startedAt
                 self.level = self.recorder.level
+                // No microphone (permission, storage, the session): say so now, not when the hand lets go.
+                if self.startReturned, case .failed(let message) = self.recorder.phase {
+                    self.error = message
+                    self.cancel()
+                    return
+                }
                 try? await Task.sleep(for: .milliseconds(100))
             }
         }
@@ -90,6 +116,23 @@ final class HoldToTalk: ObservableObject {
         state = .idle
         startedAt = nil
         level = 0
+    }
+}
+
+/// No hidden recording: leaving the thread or the app, or opening dictation or
+/// voice chat, ends a talk unsent.
+struct TalkLifecycle: ViewModifier {
+    @ObservedObject var talk: HoldToTalk
+    let dictating: Bool
+    @EnvironmentObject private var app: AppModel
+    @Environment(\.scenePhase) private var scenePhase
+
+    func body(content: Content) -> some View {
+        content
+            .onDisappear { talk.cancel() }
+            .onChange(of: scenePhase) { _, phase in if phase == .background { talk.cancel() } }
+            .onChange(of: dictating) { _, on in if on { talk.cancel() } }
+            .onChange(of: app.sheet?.id) { _, id in if id != nil { talk.cancel() } }
     }
 }
 
