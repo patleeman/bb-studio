@@ -1,7 +1,8 @@
 // File helpers behind the Studio backup contract (../backup.ts). An add-on
 // gets a writer or reader for its own section folder and never a path from
 // the caller: the folder is `<BB data>/plugins/studio/backup-sessions/<session>/<pluginId>/`.
-import { copyFile, link, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { constants, copyFile, link, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { z as Zod } from "zod";
@@ -37,10 +38,31 @@ export function sectionPath(root: string, rel: string): string {
   return target;
 }
 
-/** A file-name-safe form of an item id, for `items/<id>.json`. */
-export function fileSafeId(id: string): string {
+function checkedId(id: string): void {
   if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(id) || id.includes("..")) throw new Error(`Item id can't be a backup file name: ${id}`);
+}
+
+/**
+ * A file-name-safe form of an item id, for `items/<id>.json`. Lowercase ids
+ * without ":" are used as they are. Others are lowercased, ":" becomes "_",
+ * and a hash of the exact id follows "~", so ids that differ only in case or
+ * in ":" vs "_" never share a name, even on a case-insensitive filesystem.
+ */
+export function fileSafeId(id: string): string {
+  checkedId(id);
+  if (!/[A-Z:]/.test(id)) return id;
+  return `${id.replace(/:/g, "_").toLowerCase()}~${createHash("sha256").update(id).digest("hex").slice(0, 8)}`;
+}
+
+/** The name backups made before the hash suffix gave an id. */
+export function legacyFileSafeId(id: string): string {
+  checkedId(id);
   return id.replace(/:/g, "_");
+}
+
+/** Whether a stored file name (no extension) belongs to `id`, in either naming. */
+export function fileSafeIdMatches(id: string, name: string): boolean {
+  return name === fileSafeId(id) || name === legacyFileSafeId(id);
 }
 
 /** Writes an add-on's section. Counts what it wrote. */
@@ -69,7 +91,11 @@ export class BackupWriter {
   async copy(rel: string, source: string): Promise<void> {
     const target = sectionPath(this.dir, rel);
     await mkdir(dirname(target), { recursive: true });
-    await link(source, target).catch(() => copyFile(source, target));
+    await link(source, target).catch((error: NodeJS.ErrnoException) => {
+      // Never overwrite a file a backup already holds, as bytesAt doesn't.
+      if (error.code === "EEXIST") throw error;
+      return copyFile(source, target, constants.COPYFILE_EXCL);
+    });
     this.files += 1;
     this.bytes += (await stat(target)).size;
   }

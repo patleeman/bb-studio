@@ -10,7 +10,7 @@
 // recovery-copy keys (they only dedupe this BB's own editor drafts).
 // Drawings keep no versions, so there is no history to save.
 import { readFileSync, statSync } from "node:fs";
-import { fileSafeId, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
+import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
 import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -92,7 +92,7 @@ function readItem(reader: BackupReader, name: string): { item: DrawBackupItem; d
   const parsed = itemSchema.safeParse(raw);
   if (!parsed.success) throw new Error(`Not a valid drawing: ${parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join(".") || "item"}: ${issue.message}`).join("; ")}`);
   const item = parsed.data;
-  if (`${fileSafeId(item.id)}.json` !== name) throw new Error("The file name doesn't match the drawing id.");
+  if (!name.endsWith(".json") || !fileSafeIdMatches(item.id, name.slice(0, -5))) throw new Error("The file name doesn't match the drawing id.");
   const files: Record<string, unknown> = { ...item.inlineFiles };
   const prefix = `files/${fileSafeId(item.id)}/`;
   for (const [fileId, entry] of Object.entries(item.files)) {

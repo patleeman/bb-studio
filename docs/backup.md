@@ -80,7 +80,11 @@ its add-on reads. A reader refuses a newer layout and says to update first.
 Inside a section, an add-on writes one JSON file per item at
 `items/<item id>.json`. Large data goes in separate files beside it, such as a
 page's Yjs state, audio, images, artifact versions and screen HTML. JSON never
-carries large binaries as base64. Section layouts:
+carries large binaries as base64. In file names, `<id>` is `fileSafeId(id)`: a lowercase id without `:` as it is;
+any other id is lowercased, `:` becomes `_`, and `~` plus 8 hex characters of
+a hash of the exact id follows, so ids never share a file name, even on a
+case-insensitive filesystem. Restore also accepts the older names (no hash).
+Section layouts:
 
 - `pages/`: `items/<id>.json`, `files/<id>/state.bin`, `files/<id>/page.md`, `files/<id>/snapshots/<snapshot id>.bin`, `files/<id>/attachments/<file id>`.
 - `talk/`: `items/<id>.json`, `audio/<id>/<segment file>`.

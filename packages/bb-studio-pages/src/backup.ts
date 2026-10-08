@@ -17,7 +17,7 @@
 // run picks it up once it's closed.
 import { readFileSync } from "node:fs";
 import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
-import { fileSafeId, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
+import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
 import type Database from "better-sqlite3";
 import * as Y from "yjs";
 import { z } from "zod";
@@ -175,7 +175,7 @@ export function pagesBackup({ db, hub, publish }: PagesBackupDeps): BackupHandle
         }
         const item = parsed.data;
         try {
-          if (fileSafeId(item.id) !== fileId) throw new Error("Its file name doesn't match its id.");
+          if (!fileSafeIdMatches(item.id, fileId)) throw new Error("Its file name doesn't match its id.");
           await checkBinaries(reader, item);
         } catch (error) {
           tally.record("failed", item, errorText(error));

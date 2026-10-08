@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { mapProject, restoreDecision, RestoreTally, studioBackupSchemas } from "./backup";
-import { backupSectionDir, BackupReader, fileSafeId, runBackup, runRestore, sectionPath } from "./server/backup";
+import { backupSectionDir, BackupReader, BackupWriter, fileSafeId, fileSafeIdMatches, legacyFileSafeId, runBackup, runRestore, sectionPath } from "./server/backup";
 
 const dirs: string[] = [];
 async function temp(): Promise<string> {
@@ -104,4 +104,31 @@ it("maps projects by own keys only", async () => {
   const { mapProject } = await import("./backup");
   expect(mapProject({ proj_a: "proj_b" }, "constructor")).toEqual({ projectId: null, unmapped: true });
   expect(mapProject({ proj_a: "proj_b" }, "proj_a")).toEqual({ projectId: "proj_b", unmapped: false });
+});
+
+describe("fileSafeId", () => {
+  it("keeps plain ids and separates ids that used to collide", () => {
+    expect(fileSafeId("pg_1a")).toBe("pg_1a");
+    const names = [fileSafeId("a:b"), fileSafeId("a_b"), fileSafeId("Ab"), fileSafeId("ab"), fileSafeId("aB")];
+    expect(new Set(names.map((name) => name.toLowerCase())).size).toBe(5);
+  });
+
+  it("still matches the names older backups used", () => {
+    expect(legacyFileSafeId("a:b")).toBe("a_b");
+    expect(fileSafeIdMatches("a:b", "a_b")).toBe(true);
+    expect(fileSafeIdMatches("a:b", fileSafeId("a:b"))).toBe(true);
+    expect(fileSafeIdMatches("a:b", "x")).toBe(false);
+  });
+});
+
+describe("BackupWriter.copy", () => {
+  it("refuses to overwrite an existing file", async () => {
+    const root = await temp();
+    const source = join(root, "src.bin");
+    await writeFile(source, "one");
+    const writer = new BackupWriter(join(root, "sec"));
+    await writer.copy("a/b.bin", source);
+    await expect(writer.copy("a/b.bin", source)).rejects.toThrow();
+    expect(writer.files).toBe(1);
+  });
 });

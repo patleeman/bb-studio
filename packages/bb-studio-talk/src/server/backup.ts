@@ -13,7 +13,7 @@ import { copyFile, mkdir, open, readdir, rename, rm } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 import type Database from "better-sqlite3";
 import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
-import { fileSafeId, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
+import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
 import { z } from "zod";
 import { meetingNotesSchema, recordingKindSchema, recordingStatusSchema, segmentStatusSchema } from "../shared/contract";
 import { extensionFor, type AudioFiles } from "./audio-files";
@@ -263,7 +263,7 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
           const parsed = backupItemSchema.safeParse(await reader.json(`items/${fileName}`));
           if (!parsed.success) throw new Error(`Not a valid recording: ${parsed.error.issues[0]?.message ?? "invalid"} at ${parsed.error.issues[0]?.path.join(".") ?? ""}`);
           item = parsed.data;
-          if (`${fileSafeId(item.id)}.json` !== fileName) throw new Error("The file name doesn't match the recording id.");
+          if (!fileName.endsWith(".json") || !fileSafeIdMatches(item.id, fileName.slice(0, -5))) throw new Error("The file name doesn't match the recording id.");
           if (seen.has(item.id)) throw new Error("This recording appears twice in the backup.");
           if (new Set(item.segments.map((segment) => segment.id)).size !== item.segments.length) throw new Error("A segment appears twice.");
         } catch (error) {
