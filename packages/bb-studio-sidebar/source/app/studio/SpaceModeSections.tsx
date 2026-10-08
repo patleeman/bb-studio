@@ -399,9 +399,14 @@ export function SpaceModeSections({
           <SortableContext items={order} strategy={verticalListSortingStrategy}>
             <div className="space-y-4">
             {chiefThreads.length ? (
-              <div data-chief-of-staff={chiefId ?? undefined}>
+              <section data-chief-of-staff={chiefId ?? undefined} aria-label="Chief of Staff" className="mt-2">
+                {/* Labelled like a Space heading, so it reads as its own section above them. */}
+                <div className="flex items-center gap-1.5 px-2 pb-1 text-[13px] font-semibold text-sidebar-foreground">
+                  <Icon name="UserRound" aria-hidden="true" className="size-3.5" />
+                  Chief of Staff
+                </div>
                 {tree({ rootItems: chiefItems, threads: chiefThreads })}
-              </div>
+              </section>
             ) : null}
             {order.map((sectionId) => {
               const consumeClickSuppression = threadDnd?.consumeClickSuppression ?? (() => false);
@@ -500,10 +505,11 @@ function SpaceDndScope({ threadDnd, children }: { threadDnd: SectionThreadDndSta
   );
 }
 
-/** A Space section, its heading a drop target for threads moving in. */
+/** A Space section, ruled off above, its heading a drop target for threads moving in. */
 function SpaceDropArea({ spaceId, children }: { spaceId: string; children: ReactNode }) {
   const { setNodeRef } = useDroppable({ id: spaceHeadingDropId(spaceId) });
-  return <div ref={setNodeRef} data-space-drop={spaceId}>{children}</div>;
+  // A rule above each Space sets it apart from the one before.
+  return <div ref={setNodeRef} data-space-drop={spaceId} className="border-t border-sidebar-border pt-2">{children}</div>;
 }
 
 const COMMAND_PLUGIN_ID = "studio";
