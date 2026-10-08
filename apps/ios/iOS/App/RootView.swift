@@ -158,6 +158,8 @@ private struct PushToTalkBar: View {
     /// Started by the Action button: records until the next press or a tap.
     @State private var handsFree = false
     @State private var captureOnly = false
+    /// Slid left while holding: letting go discards instead of sending.
+    @State private var cancelling = false
     @State private var starting: Task<Void, Never>?
     @State private var status: String?
 
@@ -167,8 +169,9 @@ private struct PushToTalkBar: View {
                 Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
             }
             HStack(spacing: 10) {
-                Image(systemName: holding ? (captureOnly ? "tray.and.arrow.down.fill" : "waveform") : "mic.fill")
-                    .symbolEffect(.variableColor.iterative, isActive: holding && !captureOnly)
+            HStack(spacing: 10) {
+                Image(systemName: !holding ? "mic.fill" : cancelling ? "xmark" : captureOnly ? "tray.and.arrow.down.fill" : "waveform")
+                    .symbolEffect(.variableColor.iterative, isActive: holding && !captureOnly && !cancelling)
                 Text(label).font(.headline)
                 if holding, let startedAt = recorder.startedAt {
                     Text(startedAt, style: .timer).monospacedDigit().foregroundStyle(.secondary)
@@ -176,29 +179,44 @@ private struct PushToTalkBar: View {
             }
             .frame(maxWidth: .infinity, minHeight: 52)
             .foregroundStyle(holding ? .white : .primary)
-            .background(holding ? (captureOnly ? Color.orange : Color.red) : Color(.secondarySystemFill), in: .capsule)
+            .background(!holding ? Color(.secondarySystemFill) : cancelling ? Color.gray : captureOnly ? Color.orange : Color.red, in: .capsule)
             .scaleEffect(holding ? 1.03 : 1)
             .animation(.snappy, value: holding)
             .animation(.snappy, value: captureOnly)
+            .animation(.snappy, value: cancelling)
             .contentShape(.capsule)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in
                         if handsFree { return }
                         if !holding { press() }
-                        let up = drag.translation.height < -60
-                        if up != captureOnly {
+                        let left = drag.translation.width < -80
+                        let up = !left && drag.translation.height < -60
+                        if up != captureOnly || left != cancelling {
                             captureOnly = up
+                            cancelling = left
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         }
                     }
                     .onEnded { _ in
-                        if handsFree { handsFree = false; release() } else { release() }
+                        handsFree = false
+                        if cancelling { cancel() } else { release() }
                     }
             )
             .disabled(recorder.phase == .finishing)
             .accessibilityLabel("Push to talk")
-            .accessibilityHint("Hold to talk to your chief of staff. Slide up before letting go to save a capture instead.")
+            .accessibilityHint("Hold to talk to your chief of staff. Slide up before letting go to save a capture instead, or left to cancel.")
+            if handsFree {
+                Button { cancel() } label: {
+                    Image(systemName: "xmark").font(.headline).frame(width: 52, height: 52)
+                }
+                .buttonStyle(.plain)
+                .background(Color(.secondarySystemFill), in: .circle)
+                .accessibilityLabel("Cancel")
+                .transition(.scale.combined(with: .opacity))
+            }
+            }
+            .animation(.snappy, value: handsFree)
         }
         .padding(.horizontal)
         .padding(.bottom, 8)
@@ -223,7 +241,8 @@ private struct PushToTalkBar: View {
         if recorder.phase == .finishing { return "Transcribing…" }
         if handsFree { return "Listening · tap to send" }
         if !holding { return "Hold to talk" }
-        return captureOnly ? "Release to capture" : "Release to send · slide up to capture"
+        if cancelling { return "Release to cancel" }
+        return captureOnly ? "Release to capture" : "Release to send · ↑ capture · ← cancel"
     }
 
     private func press() {
@@ -232,6 +251,20 @@ private struct PushToTalkBar: View {
         status = nil
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         starting = Task { await recorder.start(kind: "dictation", threadId: threadId) }
+    }
+
+    /// Stops without sending. The audio still reaches Talk, as when closing dictation.
+    private func cancel() {
+        holding = false
+        handsFree = false
+        captureOnly = false
+        cancelling = false
+        let started = starting
+        Task {
+            await started?.value
+            _ = await recorder.cancel()
+            status = "Cancelled"
+        }
     }
 
     private func release() {
