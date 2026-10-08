@@ -79,3 +79,12 @@ describe("trackReactionReplies", () => {
     fresh.dispose();
   });
 });
+
+describe("replies for a new session", () => {
+  it("offers none until an answer is known, then follows it", async () => {
+    const { repliesForSession } = await import("./reactions");
+    expect(repliesForSession(undefined)).toBeNull();
+    expect(repliesForSession(null)).toBeNull();
+    expect(repliesForSession(["👍 Yes"])).toEqual(["👍 Yes"]);
+  });
+});

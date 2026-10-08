@@ -10,7 +10,7 @@ import { z } from "zod";
 import { rpcContract } from "./src/contract";
 import { EXPLORE_USAGE, registerExplore } from "./src/register";
 import { isExploreWorker } from "./src/worker";
-import { trackReactionReplies } from "./src/reactions";
+import { repliesForSession, trackReactionReplies } from "./src/reactions";
 import { DEFAULT_REPLIES, nextInstructions } from "./src/prompt";
 
 /** How often the Next row rereads Studio Reactions' saved replies. */
@@ -69,9 +69,8 @@ export default async function plugin(bb: BbPluginApi) {
     if (isExploreWorker(context.pluginMetadata)) return { tools: [], skills: [] };
     // Recheck for the next session; this one uses the latest answer.
     void replies.refresh();
-    // Nothing known yet (first moments after startup): offer the defaults rather than "turned off".
-    const known = replies.current();
-    return explore.configure(enabled, nextEnabled ? nextInstructions({ explore: enabled, replies: known === undefined ? DEFAULT_REPLIES : known }) : null);
+    // Nothing known yet (no successful check and no saved answer): no replies, as Reactions' default.
+    return explore.configure(enabled, nextEnabled ? nextInstructions({ explore: enabled, replies: repliesForSession(replies.current()) }) : null);
   });
 
   bb.cli.register({

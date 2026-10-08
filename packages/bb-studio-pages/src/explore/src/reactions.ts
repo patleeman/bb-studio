@@ -49,6 +49,15 @@ export async function reactionReplies(sdk: RepliesSdk, defaults: readonly string
   return (await checkReactionReplies(sdk, defaults, timeoutMs)) ?? null;
 }
 
+/**
+ * The replies a new session gets. Until a check has succeeded (and with no
+ * saved answer), offer none: smart reactions are off by default, and the Next
+ * row's replies follow that setting.
+ */
+export function repliesForSession(known: readonly string[] | null | undefined): readonly string[] | null {
+  return known ?? null;
+}
+
 /** Where the last known answer survives a restart (the plugin's kv storage). */
 export interface RepliesMemory {
   get<T>(key: string): Promise<T | undefined>;
