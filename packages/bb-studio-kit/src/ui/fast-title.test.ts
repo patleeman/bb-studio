@@ -15,7 +15,12 @@ describe("fast titles", () => {
         <button id="a" title="Reload"><span id="a-icon"></span></button>
         <button id="b" title="Close"></button>
       </div>
-      <button id="host" title="Host button"></button>`;
+      <button id="host" title="Host button"></button>
+      <div data-bb-plugin-root>
+        <div id="pane" title="Release notes.md">
+          <div data-bb-plugin-root><p id="page-text">Page body</p><iframe id="frame" title="Embedded view"></iframe></div>
+        </div>
+      </div>`;
   });
   afterEach(() => {
     document.dispatchEvent(new MouseEvent("pointerdown"));
@@ -54,5 +59,18 @@ describe("fast titles", () => {
     vi.advanceTimersByTime(FAST_TITLE_DELAY_MS);
     expect(tip()).toBeNull();
     expect(host.getAttribute("title")).toBe("Host button");
+  });
+
+  it("ignores a title on a wrapper around another plugin surface", () => {
+    over(document.getElementById("page-text")!);
+    vi.advanceTimersByTime(FAST_TITLE_DELAY_MS);
+    expect(tip()).toBeNull();
+    expect(document.getElementById("pane")!.getAttribute("title")).toBe("Release notes.md");
+  });
+
+  it("never shows an iframe's title", () => {
+    over(document.getElementById("frame")!);
+    vi.advanceTimersByTime(FAST_TITLE_DELAY_MS);
+    expect(tip()).toBeNull();
   });
 });

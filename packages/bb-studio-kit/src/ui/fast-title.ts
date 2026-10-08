@@ -95,7 +95,11 @@ function titled(node: EventTarget | null): HTMLElement | null {
   if (!(node instanceof Element)) return null;
   const el = node.closest("[title]");
   if (!(el instanceof HTMLElement) || !el.getAttribute("title")) return null;
-  return el.closest(SCOPE) ? el : null;
+  // Only titles inside the hovered surface: a host wrapper around a whole
+  // view would otherwise pop its name up over everything in it. An iframe's
+  // title names the frame for screen readers; browsers never show it.
+  const root = node.closest(SCOPE);
+  return root?.contains(el) && !(el instanceof HTMLIFrameElement) ? el : null;
 }
 
 function createTip(doc: Document): HTMLDivElement {

@@ -44,6 +44,13 @@ export function ThreadItemsPanel({
   const rpc = useRpc<Provider>();
   const sdk = useSdk();
   const [openId, setOpenId] = useState(initialId);
+  // BB keeps this tab mounted when another tab of the same kind opens with a
+  // different item, so a new item to open replaces the one on screen.
+  const [openedWith, setOpenedWith] = useState(initialId);
+  if (openedWith !== initialId) {
+    setOpenedWith(initialId);
+    setOpenId(initialId);
+  }
   const [kind, setKind] = useState<Kind | null>(null);
   const [items, setItems] = useState<Item[] | null>(null);
   const [linked, setLinked] = useState<Set<string>>(new Set());
