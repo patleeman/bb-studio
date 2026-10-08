@@ -71,6 +71,8 @@ final class AppModel: ObservableObject {
     @Published var tab: Tab = .inbox
     @Published var path: [Route] = []
     @Published var studioPath: [Route] = []
+    /// Set by the Action button until the Chief of Staff tab starts or stops talking.
+    @Published var chiefTalkPending = false
     /// The Studio tab's kind filter; nil for everything.
     @Published var studioKind: String?
     /// The Studio tab's space filter; nil for every space.
@@ -204,6 +206,7 @@ final class AppModel: ObservableObject {
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "chief", "web": tab = .chief
+        case "chief-talk": toggleChiefTalk()
         case "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
         default: tab = .inbox
@@ -304,6 +307,12 @@ final class AppModel: ObservableObject {
 
     func startDictation(threadId: String? = nil) {
         sheet = .dictation(threadId: threadId, autoStart: true)
+    }
+
+    func toggleChiefTalk() {
+        sheet = nil
+        tab = .chief
+        chiefTalkPending = true
     }
 
     func startVoiceChat(threadId: String? = nil) {

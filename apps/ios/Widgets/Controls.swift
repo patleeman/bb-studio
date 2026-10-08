@@ -14,6 +14,18 @@ struct CaptureControl: ControlWidget {
     }
 }
 
+struct ChiefTalkControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "nyc.plee.bbgo.chief-talk") {
+            ControlWidgetButton(action: OpenURLIntent(URL(string: "bbstudio://chief-talk")!)) {
+                Label("Talk to Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
+            }
+        }
+        .displayName("Talk to Chief of Staff")
+        .description("Press to start talking, press again to send.")
+    }
+}
+
 struct DictateControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "nyc.plee.bbgo.dictate") {

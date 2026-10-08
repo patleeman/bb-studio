@@ -155,6 +155,8 @@ private struct PushToTalkBar: View {
     @EnvironmentObject private var model: AppModel
     @StateObject private var recorder = TalkRecorder(client: AppModel.shared.client)
     @State private var holding = false
+    /// Started by the Action button: records until the next press or a tap.
+    @State private var handsFree = false
     @State private var captureOnly = false
     @State private var starting: Task<Void, Never>?
     @State private var status: String?
@@ -182,6 +184,7 @@ private struct PushToTalkBar: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in
+                        if handsFree { return }
                         if !holding { press() }
                         let up = drag.translation.height < -60
                         if up != captureOnly {
@@ -189,7 +192,9 @@ private struct PushToTalkBar: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         }
                     }
-                    .onEnded { _ in release() }
+                    .onEnded { _ in
+                        if handsFree { handsFree = false; release() } else { release() }
+                    }
             )
             .disabled(recorder.phase == .finishing)
             .accessibilityLabel("Push to talk")
@@ -198,10 +203,25 @@ private struct PushToTalkBar: View {
         .padding(.horizontal)
         .padding(.bottom, 8)
         .background(.bar)
+        .onAppear(perform: takeActionButton)
+        .onChange(of: model.chiefTalkPending) { takeActionButton() }
+    }
+
+    private func takeActionButton() {
+        guard model.chiefTalkPending else { return }
+        model.chiefTalkPending = false
+        if handsFree || holding {
+            handsFree = false
+            release()
+        } else if recorder.phase != .finishing {
+            press()
+            handsFree = true
+        }
     }
 
     private var label: String {
         if recorder.phase == .finishing { return "Transcribing…" }
+        if handsFree { return "Listening · tap to send" }
         if !holding { return "Hold to talk" }
         return captureOnly ? "Release to capture" : "Release to send · slide up to capture"
     }

@@ -160,6 +160,18 @@ struct CaptureIntent: AppIntent {
     }
 }
 
+struct TalkToChiefIntent: AppIntent {
+    static let title: LocalizedStringResource = "Talk to Chief of Staff"
+    static let description = IntentDescription("Start talking to your Personal Space's lead; run it again to send.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.toggleChiefTalk()
+        return .result()
+    }
+}
+
 struct WriteIntent: AppIntent {
     static let title: LocalizedStringResource = "Write in BB Studio"
     static let description = IntentDescription("Open a blank note to save as a page or start a thread.")
@@ -175,6 +187,9 @@ struct WriteIntent: AppIntent {
 struct BBShortcuts: AppShortcutsProvider {
     // Symbol names must be literals here; they match StudioKind and Symbols.
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: TalkToChiefIntent(), phrases: ["Talk to my chief of staff in \(.applicationName)"], shortTitle: "Chief of Staff",
+            systemImageName: "person.crop.circle.badge.checkmark")
         AppShortcut(intent: CaptureIntent(), phrases: ["Capture in \(.applicationName)"], shortTitle: "Capture", systemImageName: "square.and.arrow.down")
         AppShortcut(intent: OpenPageIntent(), phrases: ["Open a page in \(.applicationName)"], shortTitle: "Open page", systemImageName: "doc.richtext")
         AppShortcut(intent: SendToThreadIntent(), phrases: ["Send to a thread in \(.applicationName)"], shortTitle: "Send to thread", systemImageName: "paperplane")

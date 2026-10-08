@@ -9,6 +9,7 @@ struct BBStudioWidgets: WidgetBundle {
         StatusWidget()
         WorkWidget()
         CaptureControl()
+        ChiefTalkControl()
         DictateControl()
         VoiceControl()
         NewThreadControl()
