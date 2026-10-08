@@ -42,20 +42,27 @@ function clickAppLink(path: string): boolean {
   link.href = path;
   link.hidden = true;
   let routed = false;
+  let seen: Event | null = null;
+  // Runs before BB's listener, so it sees the click even if BB stops it.
+  const see = (event: Event) => { seen = event; };
   // Runs after BB's listener: keep the browser from loading the page itself.
   const settle = (event: Event) => {
     routed = event.defaultPrevented;
     event.preventDefault();
   };
+  window.addEventListener("click", see, { capture: true, once: true });
   window.addEventListener("click", settle, { once: true });
   root.append(link);
   try {
     link.click();
   } finally {
     link.remove();
+    window.removeEventListener("click", see, true);
     window.removeEventListener("click", settle);
   }
-  return routed;
+  // BB's handler may stop propagation, so `settle` never ran; it still routed
+  // the click if it prevented the default.
+  return routed || (seen as Event | null)?.defaultPrevented === true;
 }
 
 /** Announces a URL change to BB's browser router, outside its navigation. */

@@ -99,3 +99,9 @@ describe("runBackup and runRestore", () => {
     expect(await readFile(join(dir, "items", "a.json"), "utf8")).toBe("{}");
   });
 });
+
+it("maps projects by own keys only", async () => {
+  const { mapProject } = await import("./backup");
+  expect(mapProject({ proj_a: "proj_b" }, "constructor")).toEqual({ projectId: null, unmapped: true });
+  expect(mapProject({ proj_a: "proj_b" }, "proj_a")).toEqual({ projectId: "proj_b", unmapped: false });
+});

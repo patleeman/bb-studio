@@ -116,7 +116,8 @@ export function restoreDecision(local: number | null | undefined, incoming: numb
 /** This BB's project for a backed-up item's project; unknown projects become global. */
 export function mapProject(projects: Readonly<Record<string, string | null>>, projectId: string | null | undefined): { projectId: string | null; unmapped: boolean } {
   if (!projectId) return { projectId: null, unmapped: false };
-  const mapped = projects[projectId];
+  // Own keys only: a crafted id like "constructor" must not map to a prototype member.
+  const mapped = Object.hasOwn(projects, projectId) ? projects[projectId] : null;
   return mapped ? { projectId: mapped, unmapped: false } : { projectId: null, unmapped: true };
 }
 

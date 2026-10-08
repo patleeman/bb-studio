@@ -84,3 +84,20 @@ describe("openAppPath", () => {
     expect(window.location.pathname).toBe("/");
   });
 });
+
+describe("openAppPath when BB stops propagation", () => {
+  it("does not navigate a second time", () => {
+    const root = document.createElement("div");
+    root.dataset.bbPluginRoot = "";
+    root.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); });
+    document.body.append(root);
+    const popped = vi.fn();
+    window.addEventListener("popstate", popped);
+    const before = window.location.pathname;
+    openAppPath("/plugins/studio/studio/page");
+    window.removeEventListener("popstate", popped);
+    document.body.replaceChildren();
+    expect(popped).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe(before);
+  });
+});
