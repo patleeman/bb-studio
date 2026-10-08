@@ -17,6 +17,23 @@ if [ "${1:-}" = "--check" ]; then
     echo "packages/bb-studio-kit.tgz is stale: run scripts/refresh-locks.sh for every plugin" >&2
     exit 1
   }
+  # Each plugin's npm lock pins the tarball's hash; BB's npm install fails on a
+  # stale one, so a repack without refreshed locks breaks every Git install.
+  node -e '
+    const fs = require("node:fs"), path = require("node:path"), crypto = require("node:crypto");
+    const [packages, tarball] = process.argv.slice(1);
+    const want = "sha512-" + crypto.createHash("sha512").update(fs.readFileSync(tarball)).digest("base64");
+    const stale = fs.readdirSync(packages).filter((name) => {
+      const lock = path.join(packages, name, "package-lock.json");
+      if (!fs.existsSync(lock)) return false;
+      const kit = JSON.parse(fs.readFileSync(lock, "utf8")).packages?.["node_modules/@bb-studio/kit"];
+      return kit && kit.integrity !== want;
+    });
+    if (stale.length) {
+      console.error(`npm locks pin an older kit: ${stale.join(", ")}. Run scripts/refresh-locks.sh ${stale.join(" ")}`);
+      process.exit(1);
+    }
+  ' "$repo_dir/packages" "$tarball"
   exit 0
 fi
 # Copy beside the tarball, then rename: a move from TMPDIR crosses
