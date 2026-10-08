@@ -123,7 +123,7 @@ private struct ChiefOfStaffTab: View {
         NavigationStack(path: $path) {
             Group {
                 if let leadId {
-                    ThreadView(threadId: leadId).id(leadId)
+                    ThreadView(threadId: leadId, hidesTabBar: false).id(leadId)
                 } else if loaded {
                     ContentUnavailableView("No chief of staff",
                                            systemImage: "person.crop.circle.badge.questionmark",

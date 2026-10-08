@@ -55,7 +55,12 @@ struct ThreadView: View {
 
     private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("artifacts") }
 
-    init(threadId: String) {
+    /// Hides the tab bar on iPhone, for a thread pushed from a list; a tab's
+    /// own thread keeps it.
+    private let hidesTabBar: Bool
+
+    init(threadId: String, hidesTabBar: Bool = true) {
+        self.hidesTabBar = hidesTabBar
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
         _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
     }
@@ -270,7 +275,7 @@ struct ThreadView: View {
         })
         .navigationTitle(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(sizeClass == .compact ? .hidden : .automatic, for: .tabBar)
+        .toolbar(sizeClass == .compact && hidesTabBar ? .hidden : .automatic, for: .tabBar)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if model.thread?.isRunning == true {
