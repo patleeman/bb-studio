@@ -352,6 +352,34 @@ describe("stopping and restarts", () => {
     service.dispose();
   });
 
+  it("keeps the page when Stop lands while it is being written, so the next click reuses it", async () => {
+    const { service, store, pages, deps, outputs } = setup({ manual: true });
+    const real = deps.pages.create;
+    const gate = deferred<void>();
+    let entered = false;
+    deps.pages.create = async (input) => {
+      if (input.title !== "Explore") {
+        entered = true;
+        await gate.promise;
+      }
+      return real(input);
+    };
+    const { explainer } = service.explore(click);
+    await flush();
+    await flush();
+    outputs[0]!.resolve(DOC);
+    for (let i = 0; i < 20 && !entered; i += 1) await flush();
+    expect(entered).toBe(true);
+    service.stop(explainer.id);
+    gate.resolve();
+    await settle(service, explainer.id);
+    const row = store.explainer(explainer.id)!;
+    expect(row.page_id).toEqual(expect.any(String));
+    expect(store.latestJob(explainer.id)!.status).toBe("cancelled");
+    expect(service.explore(click).started).toBe(false);
+    expect(pages.list().filter((page) => page.title === "How the job queue works")).toHaveLength(1);
+  });
+
   it("marks jobs that were running at shutdown interrupted", async () => {
     const first = setup({ manual: true });
     const { explainer } = first.service.explore(click);

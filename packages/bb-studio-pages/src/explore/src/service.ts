@@ -280,7 +280,15 @@ export class ExploreService {
       const markdown = `${cleaned.markdown}\n\n---\n\n*Explored from [this thread](${threadHref(current.thread_id)}) by Explore.*`;
       const projectId = context.projectId ?? current.project_id;
       const pageId = await this.save(current, projectId, markdown, kind === "regenerate");
-      if (signal.aborted) throw new Stopped();
+      if (signal.aborted) {
+        // Stopped while the page was being written: it exists now, so keep it
+        // for the next click rather than writing a second one.
+        if (this.store.linkPage(current.id, pageId, projectId)) {
+          const linked = this.store.explainer(current.id);
+          if (linked) this.deps.changed(linked);
+        }
+        throw new Stopped();
+      }
       const saved = this.store.saved(current.id, {
         pageId,
         projectId,

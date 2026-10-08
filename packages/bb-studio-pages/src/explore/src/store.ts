@@ -240,6 +240,17 @@ export class ExploreStore {
     return this.explainer(id)!;
   }
 
+  /** Attaches a page written by a job that was stopped meanwhile, unless the explainer has one. A running job keeps its status. */
+  linkPage(id: string, pageId: string, projectId: string | null): boolean {
+    const result = this.db
+      .prepare(
+        `UPDATE explore_explainers SET page_id = ?, project_id = COALESCE(?, project_id), status = CASE WHEN status = 'generating' THEN status ELSE 'ready' END,
+           error = NULL, generated_at = COALESCE(generated_at, ?), updated_at = ? WHERE id = ? AND page_id IS NULL`,
+      )
+      .run(pageId, projectId, this.now(), this.now(), id);
+    return result.changes > 0;
+  }
+
   /** The page was deleted: forget it so the next click writes a new one. A running job keeps its status. */
   forgetPage(id: string): void {
     this.db
