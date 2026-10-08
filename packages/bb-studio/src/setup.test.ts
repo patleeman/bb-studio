@@ -203,3 +203,18 @@ describe("SetupService install", () => {
     expect(overlapped).toBe(false);
   });
 });
+
+describe("turning on a retired plugin", () => {
+  it("tells a turned-off Studio Chat the exact command and allows turning it on, nothing else retired", async () => {
+    const chat = plugin("studio-chat", { enabled: false, version: "0.2.0" });
+    const { sdk, calls } = fakeSdk([...allInstalled(), chat, plugin("float")]);
+    const service = new SetupService({ sdk, health: async () => health() });
+    const summary = await service.summary(0);
+    expect(summary.retired.find((entry) => entry.id === "studio-chat")!.blocker).toContain("`bb plugin enable studio-chat`");
+    await service.enable("studio-chat");
+    expect(calls).toContain("enable studio-chat");
+    await expect(service.enable("float")).rejects.toThrow(/isn't a BB Studio add-on/);
+    chat.enabled = true;
+    expect((await service.enable("studio-chat")).failures[0]!.error).toMatch(/isn't turned off/);
+  });
+});

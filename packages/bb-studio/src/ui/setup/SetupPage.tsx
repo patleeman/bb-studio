@@ -4,6 +4,7 @@
 // action. See src/setup.ts.
 import { Button, cn, Icon } from "@bb-studio/kit/ui";
 import { useState } from "react";
+import { TURN_ON_BEFORE_REMOVE } from "../../setup-addons";
 import type { AddOnEntry, AddOnStatus, RetiredEntry } from "../../setup-contract";
 import { ProblemRow } from "../health/HealthViews";
 import { useHealth, type HealthApi } from "../health/use-health";
@@ -106,7 +107,12 @@ function RetiredRow({ entry, setup }: { entry: RetiredEntry; setup: SetupApi }) 
             <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Cancel</Button>
           </>
         ) : (
+          <>
+          {!entry.enabled && TURN_ON_BEFORE_REMOVE.has(entry.id) ? (
+            <Button size="sm" variant="outline" disabled={Boolean(setup.busy)} onClick={() => void setup.enable(entry.id)}>{setup.busy === entry.id ? "Turning on…" : "Turn on"}</Button>
+          ) : null}
           <Button size="sm" variant="outline" disabled={Boolean(entry.blocker) || Boolean(setup.busy)} onClick={() => setConfirming(true)}>Remove…</Button>
+          </>
         )}
       </div>
       <CommandLine command={entry.removeCommand} />

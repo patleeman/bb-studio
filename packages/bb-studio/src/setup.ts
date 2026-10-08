@@ -6,7 +6,7 @@
 import { legacyChatContract } from "@bb-studio/kit/chat-contract";
 import type { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
-import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
+import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE, TURN_ON_BEFORE_REMOVE } from "./setup-addons";
 import type { AddOnEntry, AddOnStatus, RetiredEntry, SetupActionResult, SetupSummary } from "./setup-contract";
 
 export interface SetupPluginEntry {
@@ -101,7 +101,7 @@ export const CHAT_BRIDGE_VERSION = "0.2.0";
 async function chatBlocker(plugin: SetupPluginEntry, { sdk }: { sdk: SetupSdk }): Promise<string | null> {
   const migrate = "Run `bb studio-chat migrate` and wait for Migration complete.";
   if (compareVersions(plugin.version, CHAT_BRIDGE_VERSION) < 0) return `It's version ${plugin.version}, from before the upgrade bridge. Update it first so it can copy your chat links into Studio, then: ${migrate}`;
-  if (!plugin.enabled) return `It's turned off, so it can't copy your chat links into Studio. Turn it on, then: ${migrate}`;
+  if (!plugin.enabled) return `It's turned off, so it can't copy your chat links into Studio. Turn it on with \`${enableCommand(plugin.id)}\`, then: ${migrate}`;
   try {
     await sdk.plugins.callRpc({ pluginId: plugin.id, method: "viewing", input: { path: "/" }, outputSchema: legacyChatContract.viewing.output, signal: AbortSignal.timeout(30_000) });
     return null;
@@ -165,6 +165,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
 ];
 
 const RETIRED_IDS = new Set(RETIRED.map((plugin) => plugin.id));
+
 const ADDON_IDS = new Set(ADDONS.map((addOn) => addOn.id));
 
 /** One pass: BB's plugin list and marketplaces, joined with a health result. */
@@ -273,9 +274,13 @@ export class SetupService {
   }
 
   async enable(pluginId: string): Promise<SetupActionResult> {
-    if (!ADDON_IDS.has(pluginId)) throw new Error(`${pluginId} isn't a BB Studio add-on.`);
+    const retired = TURN_ON_BEFORE_REMOVE.has(pluginId);
+    if (!ADDON_IDS.has(pluginId) && !retired) throw new Error(`${pluginId} isn't a BB Studio add-on.`);
     return this.serial(async () => {
       try {
+        if (retired && (await this.deps.sdk.plugins.list()).plugins.find((plugin) => plugin.id === pluginId)?.enabled !== false) {
+          throw new Error(`${pluginId} is only turned on here to remove it, and it isn't turned off.`);
+        }
         await this.deps.sdk.plugins.enable({ pluginId });
         return this.after([]);
       } catch (error) {

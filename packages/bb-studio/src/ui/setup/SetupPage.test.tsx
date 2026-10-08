@@ -68,3 +68,10 @@ test("removing a retired plugin asks first, and a blocked one can't be removed",
   await act(async () => button("Remove")!.click());
   expect(setup.remove).toHaveBeenCalledWith("float");
 });
+
+test("a turned-off Studio Chat can be turned on from the page", async () => {
+  setup.summary!.retired[1]!.enabled = false;
+  act(() => root.render(<SetupPage />));
+  await act(async () => button("Turn on")!.click());
+  expect(setup.enable).toHaveBeenCalledWith("studio-chat");
+});

@@ -27,3 +27,6 @@ export const ADDONS: readonly AddOn[] = [
   { id: "design", displayName: "Studio Design", description: "Part of BB Studio. Design UI prototypes and slide decks with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work." },
   { id: "studio-code", displayName: "Studio Code", description: "Part of BB Studio. VS Code workspaces in your Spaces: open one or more folders in a full editor, run by a local code-server." },
 ];
+
+/** Retired plugins that must be turned on before they can be removed (the bridge has to run to copy chat links). */
+export const TURN_ON_BEFORE_REMOVE: ReadonlySet<string> = new Set(["studio-chat"]);
