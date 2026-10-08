@@ -59,7 +59,7 @@ enum Sheet: Identifiable, Hashable {
 }
 
 enum Tab: Hashable {
-    case inbox, studio, web, settings
+    case inbox, studio, chief, settings
 }
 
 @MainActor
@@ -203,7 +203,7 @@ final class AppModel: ObservableObject {
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
-        case "web": tab = .web
+        case "chief", "web": tab = .chief
         case "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
         default: tab = .inbox

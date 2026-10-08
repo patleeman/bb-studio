@@ -15,13 +15,9 @@ struct RootView: View {
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)
 
-            NavigationStack {
-                WebTab()
-                    .navigationTitle("BB Web")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .tabItem { Label("Web", systemImage: "globe") }
-            .tag(Tab.web)
+            ChiefOfStaffTab()
+                .tabItem { Label("Chief of Staff", systemImage: "person.crop.circle.badge.checkmark") }
+                .tag(Tab.chief)
 
             NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gear") }
@@ -116,27 +112,35 @@ struct RouteDestination: View {
     }
 }
 
-/// BB Web keeps its own socket and re-renders on every change, even on another
-/// tab, so it unloads once it has been out of sight for a while.
-private struct WebTab: View {
+/// The Personal Space's lead thread, the agent to go to first.
+private struct ChiefOfStaffTab: View {
     @EnvironmentObject private var model: AppModel
-    @State private var mounted = false
+    @State private var path: [Route] = []
+    @State private var leadId: String?
+    @State private var loaded = false
 
     var body: some View {
-        Group {
-            if mounted {
-                WebView(url: model.serverURL).ignoresSafeArea(edges: .bottom)
-            } else {
-                Color.clear
+        NavigationStack(path: $path) {
+            Group {
+                if let leadId {
+                    ThreadView(threadId: leadId).id(leadId)
+                } else if loaded {
+                    ContentUnavailableView("No chief of staff",
+                                           systemImage: "person.crop.circle.badge.questionmark",
+                                           description: Text("Make a thread the Personal Space's lead to see it here."))
+                } else {
+                    ProgressView()
+                }
             }
+            .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
         }
-        .task(id: model.tab == .web) {
-            guard model.tab != .web else {
-                mounted = true
-                return
+        .task(id: model.tab == .chief) {
+            guard model.tab == .chief else { return }
+            if let personal = try? await model.client.studioSpaces().first(where: \.isDefault),
+               let lead = try? await model.client.spaceLead(personal.id) {
+                leadId = lead.threadId
             }
-            try? await Task.sleep(for: .seconds(120))
-            if !Task.isCancelled { mounted = false }
+            loaded = true
         }
     }
 }
