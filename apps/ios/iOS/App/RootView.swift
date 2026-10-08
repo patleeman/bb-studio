@@ -133,6 +133,9 @@ private struct ChiefOfStaffTab: View {
                 }
             }
             .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let leadId, path.isEmpty { PushToTalkBar(threadId: leadId) }
+            }
         }
         .task(id: model.tab == .chief) {
             guard model.tab == .chief else { return }
@@ -141,6 +144,101 @@ private struct ChiefOfStaffTab: View {
                 leadId = lead.threadId
             }
             loaded = true
+        }
+    }
+}
+
+/// Hold to talk; let go to send the transcript to the thread. Slide up before
+/// letting go to keep it as a Talk recording only, a quick capture.
+private struct PushToTalkBar: View {
+    let threadId: String
+    @EnvironmentObject private var model: AppModel
+    @StateObject private var recorder = TalkRecorder(client: AppModel.shared.client)
+    @State private var holding = false
+    @State private var captureOnly = false
+    @State private var starting: Task<Void, Never>?
+    @State private var status: String?
+
+    var body: some View {
+        VStack(spacing: 6) {
+            if let status {
+                Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+            }
+            HStack(spacing: 10) {
+                Image(systemName: holding ? (captureOnly ? "tray.and.arrow.down.fill" : "waveform") : "mic.fill")
+                    .symbolEffect(.variableColor.iterative, isActive: holding && !captureOnly)
+                Text(label).font(.headline)
+                if holding, let startedAt = recorder.startedAt {
+                    Text(startedAt, style: .timer).monospacedDigit().foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .foregroundStyle(holding ? .white : .primary)
+            .background(holding ? (captureOnly ? Color.orange : Color.red) : Color(.secondarySystemFill), in: .capsule)
+            .scaleEffect(holding ? 1.03 : 1)
+            .animation(.snappy, value: holding)
+            .animation(.snappy, value: captureOnly)
+            .contentShape(.capsule)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        if !holding { press() }
+                        let up = drag.translation.height < -60
+                        if up != captureOnly {
+                            captureOnly = up
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }
+                    }
+                    .onEnded { _ in release() }
+            )
+            .disabled(recorder.phase == .finishing)
+            .accessibilityLabel("Push to talk")
+            .accessibilityHint("Hold to talk to your chief of staff. Slide up before letting go to save a capture instead.")
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 8)
+        .background(.bar)
+    }
+
+    private var label: String {
+        if recorder.phase == .finishing { return "Transcribing…" }
+        if !holding { return "Hold to talk" }
+        return captureOnly ? "Release to capture" : "Release to send · slide up to capture"
+    }
+
+    private func press() {
+        holding = true
+        captureOnly = false
+        status = nil
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        starting = Task { await recorder.start(kind: "dictation", threadId: threadId) }
+    }
+
+    private func release() {
+        let capture = captureOnly
+        holding = false
+        captureOnly = false
+        let started = starting
+        Task {
+            await started?.value
+            guard recorder.phase == .recording else {
+                if case .failed(let message) = recorder.phase { status = message }
+                return
+            }
+            let spoken = (await recorder.finish() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if case .failed(let message) = recorder.phase { status = message; return }
+            guard !spoken.isEmpty else { return }
+            if capture {
+                status = "Captured to Talk: \(spoken)"
+            } else {
+                do {
+                    _ = try await model.client.send(threadId, text: spoken)
+                    status = nil
+                } catch {
+                    status = BBClient.describe(error, server: model.client.baseURL)
+                }
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
 }
