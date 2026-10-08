@@ -238,6 +238,12 @@ of that thread at the end of the item, labelled with the thread's state:
 open the thread. Check the item off yourself after reviewing; the agent is
 told not to.
 
+## Backup and restore
+
+Pages takes part in `bb studio backup` and `bb studio restore` (see [docs/backup.md](../../docs/backup.md)). A backup holds each page's content with its comments, the Markdown copy, saved versions and uploaded files, plus its title, icon, place in the tree, template and refresh settings, and whether it is archived. Page request history, page chats and checklist hand-offs are left out, because they point at BB threads that won't exist on another BB.
+
+Restoring adds missing pages and updates older ones. A page that is newer on this BB is kept, and a second restore changes nothing. Versions and files are only added, never removed. A page that is open in an editor or has unsaved changes is not overwritten: it is reported as failed with a reason, and restoring again after you close it picks it up. A page whose parent is missing becomes top-level.
+
 ## Explore
 
 Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page, opened in the thread's panel (its **Explore** tab), or on its own page when the thread panel isn't available. Agents can write an explainer themselves with the `explore_explain` tool. Explore keeps its explainers in its own `explore.db` next to Pages' database. The CLI is `bb pages explore list|open|regenerate|stats`.
