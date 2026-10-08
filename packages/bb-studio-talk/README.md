@@ -337,6 +337,14 @@ DOM, defined in [src/client/fields.ts](src/client/fields.ts):
 - **Notes pages.** They need Studio Pages and Studio Decisions. Updating
   notes replaces the page's text with fresh notes; restore an earlier version
   from the page's history to get your edits back.
+- **Backup and restore.** BB Studio backups include every recording: its
+  title, transcript, summary, segment audio (hard-linked when possible) and the
+  id of its notes page. Restoring is safe to repeat and never overwrites a copy
+  that is newer here or a recording still being recorded or transcribed. A
+  restored recording comes back finished, with pieces that were not
+  transcribed marked failed so **Retry** can pick them up. It does not keep the
+  BB thread it was started from. The notes page reconnects when Studio Pages
+  restores the same page; otherwise **Update notes** finds or makes it again.
 - **Personal project threads.** Titling runs hidden agent threads in BB's
   Personal project.
 

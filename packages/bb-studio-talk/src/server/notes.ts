@@ -140,6 +140,11 @@ export function checklistItemText(line: string): string {
     .toLowerCase();
 }
 
+/** The same key for an item as the model wrote it and as the page stores it (escapes undone). */
+function itemKey(text: string): string {
+  return checklistItemText(text.replace(/\\(.)/g, "$1").replace(/&lt;/g, "<"));
+}
+
 interface ExistingItem {
   line: string;
   key: string;
@@ -150,7 +155,7 @@ interface ExistingItem {
 function existingChecklist(markdown: string): ExistingItem[] {
   return [...markdown.matchAll(/^- \[([ xX])\] (.*)$/gm)].map((match) => ({
     line: match[0]!,
-    key: checklistItemText(match[2]!.replace(/\\(.)/g, "$1")),
+    key: itemKey(match[2]!),
     started: match[1] !== " " || /\(thread:[^)]+\)/.test(match[2]!),
   }));
 }
@@ -185,7 +190,7 @@ export function notesMarkdown(input: {
   const used = new Set<ExistingItem>();
   const items = notes.actionItems.map((item) => {
     const line = `- [ ] ${inline(item)}`;
-    const match = previous.find((entry) => !used.has(entry) && entry.key === checklistItemText(item));
+    const match = previous.find((entry) => !used.has(entry) && entry.key === itemKey(item));
     if (!match) return line;
     used.add(match);
     return match.line;
@@ -330,8 +335,16 @@ export class NotesMaker {
     const blocked = notesBlocker(recording);
     if (blocked) throw new Error(blocked);
     if (!(await pages.available())) throw new PagesUnavailableError();
-    const { notes, truncated } = await this.deps.generate(id, store.transcript(id));
-    const current = store.recording(id) ?? recording!;
+    const transcript = store.transcript(id);
+    const { notes, truncated } = await this.deps.generate(id, transcript);
+    // The recording can be deleted or resumed while the model works; notes
+    // from the old transcript would be wrong, and a page for a deleted
+    // recording would be orphaned.
+    const current = store.recording(id);
+    const changedBlocker = notesBlocker(current);
+    if (changedBlocker) throw new Error(changedBlocker);
+    if (store.transcript(id) !== transcript) throw new Error("The recording changed while the notes were being made. Try again.");
+    if (!current) throw new Error("Recording not found.");
     let pageId = current.notesPageId ?? null;
     try {
       if (pageId && !(await pages.exists(pageId))) pageId = null;

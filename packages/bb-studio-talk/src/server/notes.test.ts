@@ -127,7 +127,36 @@ describe("notesMarkdown", () => {
   });
 });
 
+describe("notes update matching", () => {
+  it("keeps a checked item whose text has characters the page stores escaped", () => {
+    const recording = { id: "rec_aaaaaaaa", title: "Weekly sync", createdAt: 0 };
+    const notes = { summary: "S", decisions: [], actionItems: ["Fix a<b bug in C:\\temp"] };
+    const first = notesMarkdown({ recording, notes, truncated: false });
+    const checked = first.replace("- [ ]", "- [x]");
+    const second = notesMarkdown({ recording, notes, truncated: false, existing: checked });
+    expect(second.match(/^- \[.\] /gm)).toEqual(["- [x] "]);
+  });
+});
+
 describe("NotesMaker", () => {
+  it("does not make a page for a recording deleted or resumed while the model worked", async () => {
+    const { store, id } = finishedRecording();
+    const { client, pages } = fakePages();
+    const maker = new NotesMaker({
+      store, pages: client, changed: () => {},
+      generate: async () => { store.delete(id); return { notes: NOTES, truncated: false }; },
+    });
+    await expect(maker.run(id)).rejects.toThrow("Recording not found");
+    expect(pages.size).toBe(0);
+    const second = finishedRecording();
+    const resumed = new NotesMaker({
+      store: second.store, pages: client, changed: () => {},
+      generate: async () => { addSegment(second.store, second.id, "sessionb", 0, 200); second.store.markTranscribed(second.id, "sessionb-0", "More words."); return { notes: NOTES, truncated: false }; },
+    });
+    await expect(resumed.run(second.id)).rejects.toThrow("changed while");
+    expect(pages.size).toBe(0);
+  });
+
   it("makes one page for concurrent requests and updates it on re-runs", async () => {
     const { store, id } = finishedRecording();
     const { client, pages } = fakePages();
