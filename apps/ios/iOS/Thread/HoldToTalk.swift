@@ -3,8 +3,8 @@ import Combine
 import SwiftUI
 
 /// Hold the composer's mic to talk; let go to send. Slide left before letting
-/// go to cancel. The Action button starts the same recording hands-free, and
-/// the next press or a tap on the mic sends it.
+/// go to cancel, which deletes the recording. The Action button starts the
+/// same recording hands-free, and the next press or a tap on the mic sends it.
 @MainActor
 final class HoldToTalk: ObservableObject {
     enum State: Equatable { case idle, recording, cancelling, handsFree, sending }
@@ -84,6 +84,7 @@ final class HoldToTalk: ObservableObject {
             defer { stop() }
             guard recorder.phase == .recording else {
                 if case .failed(let message) = recorder.phase { error = message }
+                await recorder.discard()
                 return
             }
             let spoken = (await recorder.finish() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -94,14 +95,17 @@ final class HoldToTalk: ObservableObject {
         }
     }
 
-    /// Stops without sending. The audio still reaches Talk, as when closing dictation.
+    /// Stops without sending and deletes the recording: its audio stays off
+    /// the phone and off Talk. Dictation and voice chat still keep theirs.
     func cancel() {
         guard isActive else { return }
         state = .sending
         let started = starting
         Task {
+            // A start still in flight sees the discard and throws away what it made.
+            if started != nil { await recorder.discard() }
             await started?.value
-            _ = await recorder.cancel()
+            await recorder.discard()
             stop()
         }
     }

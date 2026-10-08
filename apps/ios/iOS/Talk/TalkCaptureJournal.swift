@@ -77,6 +77,10 @@ final class TalkCaptureJournal: @unchecked Sendable {
         }
         try FileManager.default.removeItem(at: folder(session))
     }
+    /// Removes a session and all its audio. Only for a recording the user threw away.
+    func discard(_ session: Session) {
+        try? FileManager.default.removeItem(at: folder(session))
+    }
     func hasUnqueuedAudio(recordingId: String, serverURL: URL) -> Bool {
         sessions().contains { session in
             guard session.recordingId == recordingId, session.serverURL == serverURL else { return false }

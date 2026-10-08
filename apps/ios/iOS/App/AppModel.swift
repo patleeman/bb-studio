@@ -173,7 +173,11 @@ final class AppModel: ObservableObject {
 
     private func flushOutboxOnConnect() {
         _ = realtime.listen { event in
-            if case .connected = event { Outbox.shared.flush() }
+            if case .connected = event {
+                Outbox.shared.flush()
+                // Uploads, finishes and deletions of discarded talks waiting for this server.
+                TalkOutbox.shared.kick()
+            }
         }
     }
 

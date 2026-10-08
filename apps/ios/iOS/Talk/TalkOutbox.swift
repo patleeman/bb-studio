@@ -65,6 +65,11 @@ final class TalkOutbox: ObservableObject {
     }
 
     func add(_ segment: CapturedSegment, recordingId: String, sessionId: String, serverURL: URL) throws {
+        // A late segment from a discarded push-to-talk: keep nothing.
+        if discarded.contains(Finish(recordingId: recordingId, serverURL: serverURL)) {
+            captureJournal.discardEmpty(segment.url)
+            return
+        }
         if entries().contains(where: { $0.1.recordingId == recordingId && $0.1.sessionId == sessionId && $0.1.index == segment.index && $0.1.serverURL == serverURL }) {
             try captureJournal.acknowledged(segment.url)
             return
@@ -113,6 +118,8 @@ final class TalkOutbox: ObservableObject {
     /// are excluded when the user retries recovery later.
     func recoverCaptures() {
         recoveryError = nil
+        // Discarded recordings go before anything else can queue them again.
+        for discard in discarded { purge(discard) }
         reconcileStaging()
         for session in captureJournal.sessions() where !activeSessions.contains(session.sessionId) {
             do {
@@ -208,6 +215,10 @@ final class TalkOutbox: ObservableObject {
             let name = String(metadata.lastPathComponent.dropLast(".metadata.pending".count))
             let audio = audioURL(name, entry: stagedEntry)
             let staged = directory.appendingPathComponent("\(name).audio.pending")
+            if isDiscarded(stagedEntry) {
+                for file in [staged, audio, metadata] { try? FileManager.default.removeItem(at: file) }
+                continue
+            }
             do {
                 if let existing = entries().first(where: { $0.1.sessionId == stagedEntry.sessionId && $0.1.index == stagedEntry.index && $0.1.recordingId == stagedEntry.recordingId && $0.1.serverURL == stagedEntry.serverURL }) {
                     // Identity is known and the durable queue has another copy.
@@ -241,6 +252,7 @@ final class TalkOutbox: ObservableObject {
     }
 
     private func block(_ name: String, entry: Entry, reason: String) {
+        if isDiscarded(entry) { return remove(name) }
         var blocked = entry
         blocked.failure = reason
         try? JSONEncoder().encode(blocked).write(to: directory.appendingPathComponent("\(name).json"), options: .atomic)
@@ -297,8 +309,93 @@ final class TalkOutbox: ObservableObject {
         return !finishing.contains(finish)
     }
 
+    // MARK: Discarded recordings
+
+    /// Recordings the user threw away (push-to-talk's cancel), per server, until
+    /// that server confirms `recording_delete`. Their audio never uploads again.
+    private var discarded: Set<Finish> {
+        get {
+            defaults.data(forKey: "talkDiscardByServer")
+                .flatMap { try? JSONDecoder().decode(Set<Finish>.self, from: $0) } ?? []
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: "talkDiscardByServer")
+            }
+        }
+    }
+
+    /// Recordings still waiting for their server to delete them.
+    func pendingDeletions(serverURL: URL) -> [String] {
+        discarded.filter { $0.serverURL == serverURL }.map(\.recordingId).sorted()
+    }
+
+    private func isDiscarded(_ entry: Entry) -> Bool {
+        guard let serverURL = entry.serverURL else { return false }
+        return discarded.contains(Finish(recordingId: entry.recordingId, serverURL: serverURL))
+    }
+
+    /// Removes every local trace of a recording and remembers to delete it on
+    /// the server it was recorded to. The deletion is persisted first, so a
+    /// crash part-way through never lets recovery upload it again.
+    func discard(_ recordingId: String, serverURL: URL) {
+        let item = Finish(recordingId: recordingId, serverURL: serverURL)
+        discarded.insert(item)
+        finishing.remove(item)
+        let removed = purge(item)
+        recoveryFiles = recoveryFiles.filter { file in
+            ![file, file.deletingLastPathComponent()].contains { removed.contains($0.standardizedFileURL.path) }
+        }
+        updateCounts()
+        kick()
+    }
+
+    /// Returns the files and capture folders it removed.
+    @discardableResult
+    private func purge(_ item: Finish) -> Set<String> {
+        var removed: Set<String> = []
+        for session in captureJournal.sessions() where session.recordingId == item.recordingId && session.serverURL == item.serverURL {
+            removed.insert(captureJournal.directory.appendingPathComponent(session.sessionId).standardizedFileURL.path)
+            captureJournal.discard(session)
+            activeSessions.remove(session.sessionId)
+        }
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for metadata in files where metadata.lastPathComponent.hasSuffix(".metadata.pending") {
+            guard let data = try? Data(contentsOf: metadata), let entry = try? JSONDecoder().decode(Entry.self, from: data),
+                  entry.recordingId == item.recordingId, entry.serverURL == item.serverURL else { continue }
+            let name = String(metadata.lastPathComponent.dropLast(".metadata.pending".count))
+            for file in [directory.appendingPathComponent("\(name).audio.pending"), audioURL(name, entry: entry), metadata] {
+                try? FileManager.default.removeItem(at: file)
+                removed.insert(file.standardizedFileURL.path)
+            }
+        }
+        for (name, entry) in entries() where entry.recordingId == item.recordingId && entry.serverURL == item.serverURL {
+            removed.insert(audioURL(name, entry: entry).standardizedFileURL.path)
+            remove(name)
+        }
+        return removed
+    }
+
+    /// Deletes this server's discarded recordings. Offline or failing, they
+    /// stay pending for the next launch or reconnect.
+    func deleteDiscarded(using client: BBClient) async {
+        for item in discarded where item.serverURL == client.baseURL {
+            purge(item)
+            do {
+                // Talk refuses to delete a recording that is still capturing.
+                try await client.setRecordingState(item.recordingId, "paused")
+                try await client.deleteRecording(item.recordingId)
+                discarded.remove(item)
+            } catch let error as BBError where error.status == 404 || error.message.hasPrefix("No recording") {
+                discarded.remove(item)
+            } catch {
+                return
+            }
+        }
+    }
+
     func kick() {
-        guard automaticUploads, running == nil, pending > 0 || !finishing.isEmpty else { return }
+        guard automaticUploads, running == nil, pending > 0 || !finishing.isEmpty || !discarded.isEmpty else { return }
         running = Task {
             await run()
             running = nil
@@ -309,10 +406,12 @@ final class TalkOutbox: ObservableObject {
         var backoff: Double = 2
         while true {
             let client = currentClient()
+            await deleteDiscarded(using: client)
             await upload(&backoff, using: client)
             await markFinished(using: client)
             let selected = currentClient().baseURL
-            if !entries().contains(where: { $0.1.serverURL == selected && $0.1.failure == nil }) && !finishing.contains(where: { $0.serverURL == selected && canFinish($0.recordingId, serverURL: selected) }) { return }
+            if !entries().contains(where: { $0.1.serverURL == selected && $0.1.failure == nil }) && !finishing.contains(where: { $0.serverURL == selected && canFinish($0.recordingId, serverURL: selected) })
+                && !discarded.contains(where: { $0.serverURL == selected }) { return }
             try? await Task.sleep(for: .seconds(backoff))
             backoff = min(backoff * 2, 30)
         }
@@ -341,7 +440,7 @@ final class TalkOutbox: ObservableObject {
 
     private func upload(_ backoff: inout Double, using client: BBClient) async {
         while currentClient().baseURL == client.baseURL,
-              let (name, entry) = entries().first(where: { $0.1.serverURL == client.baseURL && $0.1.failure == nil }) {
+              let (name, entry) = entries().first(where: { $0.1.serverURL == client.baseURL && $0.1.failure == nil && !isDiscarded($0.1) }) {
             guard let audio = try? Data(contentsOf: audioURL(name, entry: entry)) else {
                 block(name, entry: entry, reason: "An audio file is missing. This recording has not been finalized.")
                 return

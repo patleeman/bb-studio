@@ -28,6 +28,10 @@ final class TalkRecorder: ObservableObject {
     @Published private(set) var starting = false
     /// Closed while starting, so the start stops before it turns the microphone on.
     private var abandoned = false
+    /// Discarded while starting: the start throws away whatever it made.
+    private var discardRequested = false
+    /// This start's recording, not yet handed to the outbox to finish: `discard()` may delete it.
+    private var ownsRecording = false
 
     private let client: BBClient
     private let outbox = TalkOutbox.shared
@@ -47,7 +51,18 @@ final class TalkRecorder: ObservableObject {
         guard !starting, !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
         starting = true
         abandoned = false
-        defer { starting = false }
+        discardRequested = false
+        recordingId = nil
+        ownsRecording = false
+        await begin(kind: kind, threadId: threadId, projectId: projectId)
+        starting = false
+        if discardRequested {
+            discardRequested = false
+            await discard()
+        }
+    }
+
+    private func begin(kind: String, threadId: String?, projectId: String?) async {
         transcript = ""
         captureSession = nil
         stoppedSegments = nil
@@ -63,6 +78,12 @@ final class TalkRecorder: ObservableObject {
             try session.setActive(true)
 
             let recording = try await client.createRecording(kind: kind, threadId: threadId, projectId: projectId)
+            if discardRequested {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                recordingId = recording.id
+                ownsRecording = true
+                return
+            }
             if abandoned || Task.isCancelled {
                 // Talk discards a recording that finishes with no audio.
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -70,6 +91,7 @@ final class TalkRecorder: ObservableObject {
                 return
             }
             recordingId = recording.id
+            ownsRecording = true
             let sessionId = Self.clientId()
             let captureSession = try outbox.beginCapture(recordingId: recording.id, sessionId: sessionId, serverURL: client.baseURL)
             self.captureSession = captureSession
@@ -126,6 +148,7 @@ final class TalkRecorder: ObservableObject {
         let segments = stopCapture()
         guard await saveHandoff(segments) else { return nil }
         let stats = capture.stats()
+        ownsRecording = false
         outbox.finishWhenSent(id, serverURL: client.baseURL)
         guard await outbox.waitForFinish(id, serverURL: client.baseURL, until: Date().addingTimeInterval(120)) else {
             phase = .failed("Still uploading. The transcript will show up in Studio once the audio reaches BB.")
@@ -171,9 +194,36 @@ final class TalkRecorder: ObservableObject {
         needsRecovery = true
         let segments = stopCapture()
         guard await saveHandoff(segments) else { return false }
+        ownsRecording = false
         outbox.finishWhenSent(id, serverURL: client.baseURL)
         phase = .idle
         return true
+    }
+
+    /// Push-to-talk's cancel: stops and releases the microphone like `cancel()`,
+    /// but keeps nothing. Local audio is removed, nothing more uploads, and
+    /// the recording is deleted on the server it was recorded to (later, if
+    /// that server can't be reached now).
+    func discard() async {
+        if starting {
+            abandoned = true
+            discardRequested = true
+            return
+        }
+        // Late segments from the capture's last cut go nowhere.
+        handoff = nil
+        if phase == .recording || phase == .finishing { _ = stopCapture() }
+        else { heartbeatTask?.cancel() }
+        needsRecovery = false
+        phase = .idle
+        startedAt = nil
+        level = 0
+        captureSession = nil
+        guard ownsRecording, let id = recordingId else { return }
+        ownsRecording = false
+        recordingId = nil
+        outbox.discard(id, serverURL: client.baseURL)
+        await outbox.deleteDiscarded(using: client)
     }
 
     /// Always releases the microphone, including when enqueueing failed.

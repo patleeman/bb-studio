@@ -191,6 +191,126 @@ final class TalkRecoveryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: unrelated), Data([3, 4]))
     }
 
+    // MARK: Push-to-talk discard
+
+    func testDiscardRemovesQueuedSegmentsStagingAndLiveCaptureForOnlyThatRecording() throws {
+        let f = try Fixture(); defer { f.clean() }
+        let outbox = f.outbox()
+        let session = try outbox.beginCapture(recordingId: "rec_a", sessionId: "session_a", serverURL: f.origin)
+        let first = try f.journal.open(session, index: 0, startedAt: 1)
+        try Data(repeating: 1, count: 3200).write(to: first)
+        try outbox.add(CapturedSegment(url: first, index: 0, startedAt: 1, durationMs: 100), recordingId: "rec_a", sessionId: "session_a", serverURL: f.origin)
+        let unsent = try f.journal.open(session, index: 1, startedAt: 2)
+        try Data(repeating: 2, count: 3200).write(to: unsent)
+        // An interrupted commit for the same recording, and another recording's queued audio.
+        try JSONEncoder().encode(f.entry("rec_a", session: "session_a", index: 2)).write(to: f.outboxDirectory.appendingPathComponent("staged.metadata.pending"))
+        try Data([1]).write(to: f.outboxDirectory.appendingPathComponent("staged.audio.pending"))
+        let other = try outbox.beginCapture(recordingId: "rec_b", sessionId: "session_b", serverURL: f.origin)
+        let kept = try f.journal.open(other, index: 0, startedAt: 1)
+        try Data(repeating: 3, count: 3200).write(to: kept)
+        try outbox.add(CapturedSegment(url: kept, index: 0, startedAt: 1, durationMs: 100), recordingId: "rec_b", sessionId: "session_b", serverURL: f.origin)
+        XCTAssertEqual(outbox.pending, 2)
+
+        outbox.discard("rec_a", serverURL: f.origin)
+        XCTAssertEqual(outbox.pending, 1)
+        XCTAssertEqual(f.journal.sessions(), [other])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: unsent.path))
+        let left = try FileManager.default.contentsOfDirectory(atPath: f.outboxDirectory.path).filter { $0 != "Captures" }
+        XCTAssertFalse(left.contains { $0.hasPrefix("staged") })
+        XCTAssertEqual(outbox.pendingDeletions(serverURL: f.origin), ["rec_a"])
+
+        // A segment the capture cuts after the discard is dropped, not queued.
+        let late = f.root.appendingPathComponent("late.pcm")
+        try Data(repeating: 4, count: 3200).write(to: late)
+        try outbox.add(CapturedSegment(url: late, index: 3, startedAt: 3, durationMs: 100), recordingId: "rec_a", sessionId: "session_a", serverURL: f.origin)
+        XCTAssertEqual(outbox.pending, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: late.path))
+    }
+
+    func testRecoveryDoesNotResurrectADiscardedRecording() throws {
+        let f = try Fixture(); defer { f.clean() }
+        // A crash after the discard was recorded but before its files were removed.
+        let session = try f.begin()
+        let raw = try f.journal.open(session, index: 0, startedAt: 1)
+        try Data(repeating: 1, count: 32_000).write(to: raw)
+        try FileManager.default.createDirectory(at: f.outboxDirectory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(f.entry("rec_a", session: "older", index: 0)).write(to: f.outboxDirectory.appendingPathComponent("queued.json"))
+        try Data([1]).write(to: f.outboxDirectory.appendingPathComponent("queued.wav"))
+        try JSONEncoder().encode(f.entry("rec_a", session: "older", index: 1)).write(to: f.outboxDirectory.appendingPathComponent("staged.metadata.pending"))
+        try Data([1]).write(to: f.outboxDirectory.appendingPathComponent("staged.audio.pending"))
+        let discarded: JSONValue = [["recordingId": "rec_a", "serverURL": .string(f.origin.absoluteString)]]
+        f.defaults.set(try JSONEncoder().encode(discarded), forKey: "talkDiscardByServer")
+
+        let restarted = f.outbox()
+        XCTAssertEqual(restarted.pending, 0)
+        XCTAssertTrue(f.journal.sessions().isEmpty)
+        XCTAssertTrue(restarted.recoveryFiles.isEmpty)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: f.outboxDirectory.path).filter { $0 != "Captures" }, [])
+        XCTAssertEqual(restarted.pendingDeletions(serverURL: f.origin), ["rec_a"])
+        XCTAssertTrue(restarted.canFinish("rec_other", serverURL: f.origin))
+    }
+
+    func testDiscardIsDeletedOnlyOnItsOwnServerAndRetriedAfterFailure() async throws {
+        let f = try Fixture(); defer { f.clean() }
+        let other = URL(string: "https://other.invalid")!
+        let outbox = f.outbox()
+        outbox.discard("rec_a", serverURL: f.origin)
+        outbox.discard("rec_b", serverURL: other)
+
+        // Another server never sees rec_a.
+        let otherCalls = Calls()
+        await outbox.deleteDiscarded(using: f.client(other, calls: otherCalls, ok: true))
+        XCTAssertEqual(otherCalls.methods, ["recording_state:rec_b", "recording_delete:rec_b"])
+        XCTAssertEqual(outbox.pendingDeletions(serverURL: other), [])
+        XCTAssertEqual(outbox.pendingDeletions(serverURL: f.origin), ["rec_a"])
+
+        // Offline: it stays pending, including across a relaunch.
+        let failing = Calls()
+        await outbox.deleteDiscarded(using: f.client(f.origin, calls: failing, ok: false))
+        XCTAssertEqual(failing.methods, ["recording_state:rec_a"])
+        let relaunched = f.outbox()
+        XCTAssertEqual(relaunched.pendingDeletions(serverURL: f.origin), ["rec_a"])
+
+        let calls = Calls()
+        await relaunched.deleteDiscarded(using: f.client(f.origin, calls: calls, ok: true))
+        XCTAssertEqual(calls.methods, ["recording_state:rec_a", "recording_delete:rec_a"])
+        XCTAssertEqual(relaunched.pendingDeletions(serverURL: f.origin), [])
+    }
+
+    func testDiscardOfARecordingTalkNoLongerHasIsDone() async throws {
+        let f = try Fixture(); defer { f.clean() }
+        let outbox = f.outbox()
+        outbox.discard("rec_gone", serverURL: f.origin)
+        let client = BBClient(baseURL: f.origin)
+        client.transport = { _, _, _ in (500, Data(#"{"ok":false,"error":{"message":"No recording rec_gone."}}"#.utf8)) }
+        await outbox.deleteDiscarded(using: client)
+        XCTAssertEqual(outbox.pendingDeletions(serverURL: f.origin), [])
+    }
+
+    func testDiscardWhileStartingLeavesNothingBehind() async throws {
+        let f = try Fixture(); defer { f.clean() }
+        let outbox = f.outbox()
+        // The start had created the recording and begun capture when the discard landed.
+        let session = try outbox.beginCapture(recordingId: "rec_a", sessionId: "session_a", serverURL: f.origin)
+        _ = try f.journal.open(session, index: 0, startedAt: 1)
+        outbox.discard("rec_a", serverURL: f.origin)
+        XCTAssertTrue(f.journal.sessions().isEmpty)
+        XCTAssertTrue(f.journal.audioFiles().isEmpty)
+        outbox.recoverCaptures()
+        XCTAssertEqual(outbox.pending, 0)
+        XCTAssertTrue(outbox.recoveryFiles.isEmpty)
+        let calls = Calls()
+        await outbox.deleteDiscarded(using: f.client(f.origin, calls: calls, ok: true))
+        XCTAssertEqual(calls.methods, ["recording_state:rec_a", "recording_delete:rec_a"])
+    }
+
+    private final class Calls: @unchecked Sendable {
+        private let lock = NSLock()
+        private var list: [String] = []
+        var methods: [String] { lock.withLock { list } }
+        func add(_ method: String) { lock.withLock { list.append(method) } }
+    }
+
     @MainActor private final class Fixture {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("Journal-\(UUID())")
         let suite = "Journal-\(UUID())"
@@ -203,6 +323,23 @@ final class TalkRecoveryTests: XCTestCase {
         func begin() throws -> TalkCaptureJournal.Session {
             let session = TalkCaptureJournal.Session(recordingId: "rec_a", sessionId: "session_a", serverURL: origin)
             try journal.begin(session); return session
+        }
+        func entry(_ recordingId: String, session: String, index: Int) -> JSONValue {
+            ["recordingId": .string(recordingId), "sessionId": .string(session), "index": .from(index), "startedAt": 0,
+             "durationMs": 1000, "serverURL": .string(origin.absoluteString), "mimeType": "audio/wav"]
+        }
+        fileprivate func client(_ url: URL, calls: Calls, ok: Bool) -> BBClient {
+            let client = BBClient(baseURL: url)
+            client.transport = { _, path, body in
+                let id = body.flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) }?["id"]?.stringValue ?? ""
+                calls.add("\(path.split(separator: "/").last ?? ""):\(id)")
+                guard ok else { throw URLError(.notConnectedToInternet) }
+                if path.hasSuffix("recording_state") {
+                    return (200, Data(#"{"ok":true,"result":{"id":"\#(id)","title":"","kind":"dictation","status":"paused","createdAt":0,"durationMs":0,"segmentCount":0,"pendingCount":0,"failedCount":0,"preview":""}}"#.utf8))
+                }
+                return (200, Data(#"{"ok":true,"result":{"deleted":true}}"#.utf8))
+            }
+            return client
         }
         func outbox(journal: TalkCaptureJournal? = nil) -> TalkOutbox {
             // Automatic transport is disabled; tests exercise real files only.
