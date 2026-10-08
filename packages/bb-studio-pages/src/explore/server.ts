@@ -59,7 +59,7 @@ export default async function plugin(bb: BbPluginApi) {
   // The Next row's quick replies follow Studio Reactions' smart reactions
   // setting. Settings are read asynchronously and `configure` is synchronous,
   // so keep the answer fresh.
-  const replies = trackReactionReplies(bb.sdk, DEFAULT_REPLIES);
+  const replies = trackReactionReplies(bb.sdk, DEFAULT_REPLIES, undefined, bb.storage.kv);
   bb.onDispose(() => replies.dispose());
 
   bb.rpc.register(rpcContract, explore.rpc);
@@ -69,7 +69,9 @@ export default async function plugin(bb: BbPluginApi) {
     if (isExploreWorker(context.pluginMetadata)) return { tools: [], skills: [] };
     // Recheck for the next session; this one uses the latest answer.
     void replies.refresh();
-    return explore.configure(enabled, nextEnabled ? nextInstructions({ explore: enabled, replies: replies.current() }) : null);
+    // Nothing known yet (first moments after startup): offer the defaults rather than "turned off".
+    const known = replies.current();
+    return explore.configure(enabled, nextEnabled ? nextInstructions({ explore: enabled, replies: known === undefined ? DEFAULT_REPLIES : known }) : null);
   });
 
   bb.cli.register({
