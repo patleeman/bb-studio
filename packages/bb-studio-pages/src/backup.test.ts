@@ -157,6 +157,21 @@ it("doesn't overwrite a page open in an editor", async () => {
   expect(evicted).toHaveLength(1);
 });
 
+it("refuses a restored parent that would put a page below itself", async () => {
+  const { db, parent, child } = await seed();
+  const { dir } = await backup(db);
+  const target = open("target");
+  await restore(dir, target.db);
+  // Since the backup, the parent moved under the child; the child is older than the backup.
+  target.db.prepare("UPDATE pages SET parent_id = ?, updated_at = 2000 WHERE id = ?").run(child, parent);
+  target.db.prepare("UPDATE pages SET parent_id = NULL, updated_at = 10 WHERE id = ?").run(child);
+  const report = await restore(dir, target.db);
+  expect(report).toMatchObject({ updated: 1, kept: 1, failed: 0 });
+  expect(target.store.meta(child)!.parent_id).toBeNull();
+  expect(target.store.meta(parent)!.parent_id).toBe(child);
+  expect(report.notes.join("\n")).toMatch(/keeps its current place/);
+});
+
 it("fails a page whose content file is corrupt", async () => {
   const { db, parent } = await seed();
   const { dir } = await backup(db);

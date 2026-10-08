@@ -203,9 +203,27 @@ export function pagesBackup({ db, hub, publish }: PagesBackupDeps): BackupHandle
       for (const plan of planned) {
         if (plan.decision === "update" && hub?.activity(plan.item.id) === "editing") blocked.add(plan.item.id);
       }
-      // A page whose parent won't be here becomes top-level.
-      const parentOf = (item: PageBackupItem) =>
-        item.parentId && (restoredIds.has(item.parentId) || exists.get(item.parentId)) ? item.parentId : null;
+      // A page whose parent won't be here becomes top-level. A parent that
+      // would make the page its own ancestor (the local tree moved since the
+      // backup) is refused: the page keeps its local parent, or goes top-level.
+      const parentRow = db.prepare("SELECT parent_id FROM pages WHERE id = ?");
+      const localParent = db.prepare("SELECT parent_id FROM pages WHERE id = ?");
+      const makesCycle = (pageId: string, parentId: string) => {
+        const seen = new Set<string>();
+        for (let at: string | null = parentId; at && !seen.has(at); ) {
+          if (at === pageId) return true;
+          seen.add(at);
+          at = ((parentRow.get(at) as { parent_id: string | null } | undefined)?.parent_id) ?? null;
+        }
+        return false;
+      };
+      const parentOf = (item: PageBackupItem) => {
+        if (!item.parentId || !(restoredIds.has(item.parentId) || exists.get(item.parentId))) return null;
+        if (!makesCycle(item.id, item.parentId)) return item.parentId;
+        tally.note(`"${item.title || item.id}" keeps its current place: its parent in the backup is now below it.`);
+        const current = (localParent.get(item.id) as { parent_id: string | null } | undefined)?.parent_id ?? null;
+        return current && !makesCycle(item.id, current) ? current : null;
+      };
 
       const insertPage = db.prepare(`INSERT INTO pages (id, project_id, parent_id, title, icon, position, state, markdown, created_at, updated_at, updated_by,
           archived_at, refresh_bot_id, refresh_cron, refresh_instructions, refresh_last_at, template)
