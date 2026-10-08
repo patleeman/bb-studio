@@ -112,7 +112,7 @@ struct RouteDestination: View {
     }
 }
 
-/// The Personal Space's lead thread, the agent to go to first.
+/// Studio's Chief of Staff thread, the agent to go to first.
 private struct ChiefOfStaffTab: View {
     @EnvironmentObject private var model: AppModel
     @State private var path: [Route] = []
@@ -129,7 +129,7 @@ private struct ChiefOfStaffTab: View {
                 case .none:
                     ContentUnavailableView("No chief of staff",
                                            systemImage: "person.crop.circle.badge.questionmark",
-                                           description: Text("Make a thread the Personal Space's lead to see it here."))
+                                           description: Text("No Chief of Staff is set. Open a thread, then choose Space > Make Chief of Staff from its menu."))
                 case .unavailable(let message):
                     ContentUnavailableView {
                         Label("Chief of Staff unavailable", systemImage: "exclamationmark.triangle")

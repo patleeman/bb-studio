@@ -157,6 +157,8 @@ final class ThreadSpacesModel: ObservableObject {
     @Published private(set) var spaces: [StudioSpace] = []
     @Published private(set) var spaceOf: [String: String] = [:]
     @Published private(set) var leadOfSpace: [String: String] = [:]
+    /// Studio's Chief of Staff thread; nil when none is set or Studio is too old to have the slot.
+    @Published private(set) var chiefThreadId: String?
 
     /// Without both the Spaces and where each thread is, the menu stays hidden: a
     /// Studio without `space_of_threads` would show every thread in the default Space.
@@ -173,9 +175,11 @@ final class ThreadSpacesModel: ObservableObject {
                 spaces = []
                 spaceOf = [:]
                 leadOfSpace = [:]
+                chiefThreadId = nil
             }
             return
         }
+        if let chief = try? await client.chiefOfStaffThreadId() { chiefThreadId = chief } else { chiefThreadId = nil }
         if let id = space(of: threadId, projectId: nil)?.id, let lead = try? await client.spaceLead(id) {
             leadOfSpace[id] = lead.threadId
         }
@@ -216,6 +220,19 @@ final class ThreadSpacesModel: ObservableObject {
         }
         await load(threadIdToReload, client: client)
     }
+
+    func setChief(_ threadId: String?, reload threadIdToReload: String, client: BBClient) async throws {
+        let previous = chiefThreadId
+        chiefThreadId = threadId
+        do {
+            try await client.setChiefOfStaff(threadId)
+        } catch {
+            if chiefThreadId == threadId { chiefThreadId = previous }
+            await load(threadIdToReload, client: client)
+            throw error
+        }
+        await load(threadIdToReload, client: client)
+    }
 }
 
 /// A submenu that opens the thread's Space, moves it to another, or makes it the Space's lead.
@@ -241,6 +258,11 @@ struct ThreadSpacesMenu: View {
                     Button { setLead(isLead ? nil : threadId, of: current) } label: {
                         Label(isLead ? "Remove as Space Lead" : "Make Space Lead", systemImage: isLead ? "star.slash" : "star")
                     }
+                    let isChief = model.chiefThreadId == threadId
+                    Button { setChief(isChief ? nil : threadId) } label: {
+                        Label(isChief ? "Remove as Chief of Staff" : "Make Chief of Staff",
+                              systemImage: isChief ? "person.crop.circle.badge.xmark" : "person.crop.circle.badge.checkmark")
+                    }
                     if model.spaces.count > 1 {
                         Section("Move to Space") {
                             ForEach(model.spaces) { space in
@@ -262,6 +284,16 @@ struct ThreadSpacesMenu: View {
         Task {
             do {
                 try await model.move(threadId, to: space, client: client)
+            } catch {
+                failed(BBClient.describe(error, server: client.baseURL))
+            }
+        }
+    }
+
+    private func setChief(_ chief: String?) {
+        Task {
+            do {
+                try await model.setChief(chief, reload: threadId, client: client)
             } catch {
                 failed(BBClient.describe(error, server: client.baseURL))
             }

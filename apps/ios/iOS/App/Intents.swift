@@ -162,7 +162,7 @@ struct CaptureIntent: AppIntent {
 
 struct TalkToChiefIntent: AppIntent {
     static let title: LocalizedStringResource = "Talk to Chief of Staff"
-    static let description = IntentDescription("Start talking to your Personal Space's lead; run it again to send.")
+    static let description = IntentDescription("Start talking to your Chief of Staff; run it again to send.")
     static let openAppWhenRun = true
 
     @MainActor
@@ -174,7 +174,7 @@ struct TalkToChiefIntent: AppIntent {
 
 struct TellChiefIntent: AppIntent {
     static let title: LocalizedStringResource = "Tell Chief of Staff"
-    static let description = IntentDescription("Send a message to your Personal Space's lead and hear the reply.")
+    static let description = IntentDescription("Send a message to your Chief of Staff and hear the reply.")
 
     @Parameter(title: "Message", requestValueDialog: "What should I tell your chief of staff?")
     var message: String
@@ -188,7 +188,7 @@ struct TellChiefIntent: AppIntent {
             return .result(value: "", dialog: "I couldn't find your chief of staff. \(BBClient.describe(error, server: client.baseURL))")
         }
         guard let threadId = leadId else {
-            return .result(value: "", dialog: "Your Personal Space has no lead yet. Pick one in BB Studio.")
+            return .result(value: "", dialog: "No Chief of Staff is set yet. Pick one from a thread's menu in BB Studio.")
         }
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .result(value: "", dialog: "There was nothing to send.")

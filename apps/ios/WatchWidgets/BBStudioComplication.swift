@@ -83,7 +83,7 @@ struct BBStudioWatchWidgets: WidgetBundle {
     }
 }
 
-/// Opens the Chief of Staff, the Personal Space's lead, from the watch face.
+/// Opens the Chief of Staff, Studio's Chief of Staff slot, from the watch face.
 /// Shows its latest message once the watch app has opened the thread.
 struct ChiefEntry: TimelineEntry {
     var date: Date

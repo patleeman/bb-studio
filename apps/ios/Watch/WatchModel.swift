@@ -165,7 +165,7 @@ final class WatchModel: ObservableObject {
 
     @Published private(set) var client: BBClient
     @Published var threads: [ThreadEntry] = []
-    /// The Chief of Staff: the Personal Space's lead, pinned above the list.
+    /// The Chief of Staff: Studio's Chief of Staff slot, pinned above the list.
     @Published var chiefId: String?
     @Published var error: String?
     @Published var loading = false

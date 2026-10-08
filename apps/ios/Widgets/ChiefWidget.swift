@@ -2,7 +2,7 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-/// The Chief of Staff, the Personal Space's lead: its latest message, a mic,
+/// The Chief of Staff, Studio's slot above every Space: its latest message, a mic,
 /// and Approve and Deny when it is waiting on an approval.
 struct ChiefEntry: TimelineEntry {
     var serverURL: URL = ServerScope.selectedURL
@@ -136,7 +136,7 @@ private struct ChiefWidgetView: View {
     private var talkURL: URL { AppLink.scoped(URL(string: "bbstudio://chief-talk")!, serverURL: entry.serverURL) }
     private var openURL: URL { AppLink.scoped(URL(string: "bbstudio://chief")!, serverURL: entry.serverURL) }
     private var message: String {
-        if entry.threadId == nil && entry.message == nil { return "Make a thread the Personal Space's lead to see it here." }
+        if entry.threadId == nil && entry.message == nil { return "No Chief of Staff is set. Pick one from a thread's menu in BB Studio." }
         return entry.message ?? "No messages yet."
     }
 
