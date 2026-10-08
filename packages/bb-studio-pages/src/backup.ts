@@ -134,18 +134,28 @@ export function pagesBackup({ db, hub, publish }: PagesBackupDeps): BackupHandle
         if (row.state?.byteLength) await writer.bytesAt(`${dir(pageId)}/state.bin`, row.state);
         if (row.markdown) await writer.bytesAt(`${dir(pageId)}/page.md`, Buffer.from(row.markdown, "utf8"));
         row.state = null;
+        // Writing is async, so a version or file can be deleted meanwhile: leave
+        // it out of the item rather than fail the whole backup.
+        const savedSnapshots = new Set<string>();
         for (const snap of snapshots) {
-          const state = db.prepare("SELECT state FROM snapshots WHERE id = ?").get(snap.id) as { state: Buffer };
+          const state = db.prepare("SELECT state FROM snapshots WHERE id = ?").get(snap.id) as { state: Buffer } | undefined;
+          if (!state) continue;
           await writer.bytesAt(`${dir(pageId)}/snapshots/${fileSafeId(snap.id)}.bin`, state.state);
+          savedSnapshots.add(snap.id);
         }
+        const savedFiles = new Set<string>();
         for (const file of files) {
-          const data = db.prepare("SELECT data FROM files WHERE id = ?").get(file.id) as { data: Buffer };
+          const data = db.prepare("SELECT data FROM files WHERE id = ?").get(file.id) as { data: Buffer } | undefined;
+          if (!data) continue;
           await writer.bytesAt(`${dir(pageId)}/attachments/${fileSafeId(file.id)}`, data.data);
+          savedFiles.add(file.id);
         }
+        item.snapshots = item.snapshots.filter((snap) => savedSnapshots.has(snap.id));
+        item.files = item.files.filter((file) => savedFiles.has(file.id));
         await writer.json(`items/${fileSafeId(pageId)}.json`, item);
         counts.pages += 1;
-        counts.versions += snapshots.length;
-        counts.files += files.length;
+        counts.versions += item.snapshots.length;
+        counts.files += item.files.length;
       }
       return { counts, notes: [EXCLUDED_NOTE] };
     },

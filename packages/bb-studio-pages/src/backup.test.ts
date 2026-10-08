@@ -167,3 +167,24 @@ it("fails a page whose content file is corrupt", async () => {
   expect(report.problems[0]!.reason).toMatch(/valid page document/);
   expect(target.store.meta(parent)).toBeNull();
 });
+
+it("backs up the rest when a version or file is deleted while the backup is writing", async () => {
+  const { db } = await seed();
+  const handlers = pagesBackup({ db });
+  const dir = join(root, "racing");
+  const racing = {
+    ...handlers,
+    backup: (writer: Parameters<typeof handlers.backup>[0]) => {
+      const proxy = Object.create(writer) as typeof writer;
+      proxy.bytesAt = async (path, bytes) => {
+        if (path.endsWith("/state.bin")) db.prepare("DELETE FROM snapshots").run(), db.prepare("DELETE FROM files").run();
+        return writer.bytesAt(path, bytes);
+      };
+      return handlers.backup(proxy);
+    },
+  };
+  const result = await runBackup(dir, racing);
+  expect(result.counts).toEqual({ pages: 2, versions: 0, files: 0 });
+  const target = open("target");
+  expect(await restore(dir, target.db)).toMatchObject({ created: 2, failed: 0 });
+});
