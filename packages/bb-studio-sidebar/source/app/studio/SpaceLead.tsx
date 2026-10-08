@@ -4,6 +4,10 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Icon } from "@/components/ui/icon";
+import { ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger } from "@/components/ui/context-menu";
+import { DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
+import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
 import { ActionMenuItem } from "../ui/action-menu-items.js";
 import type { SidebarThread } from "../model/sidebar-thread.js";
 import { beginPendingChiefOfStaff, beginPendingLead, STUDIO_CHANGED_EVENT, studioSpacesAtom, withPendingChiefOfStaff, withPendingLeads, type StudioSpacesState } from "./studioSpaces.js";
@@ -59,9 +63,10 @@ export function chiefOfStaffOf(state: StudioSpacesState): string | null {
 }
 
 /**
- * Make Space lead or Remove as Space lead, then Make Chief of Staff or
- * Remove as Chief of Staff, in a thread's menu while By space shows. The
- * Chief of Staff leads no Space, so it has no lead item.
+ * Promote ▸ in a thread's menu while By space shows: Space lead and Chief of
+ * Staff, the role the thread holds checked; choosing a checked role removes
+ * it. The Chief of Staff leads no Space, so Space lead is off for it. The
+ * phone drawer has no submenus, so it lists the two items flat.
  */
 export function SpaceLeadItem({ thread, surface }: {
   thread: SidebarThread;
@@ -69,24 +74,60 @@ export function SpaceLeadItem({ thread, surface }: {
 }) {
   const state = useContext(SpaceLeadContext);
   const chief = chiefOfStaffOf(useAtomValue(studioSpacesAtom));
+  const compact = useIsCompactViewport();
+  const setLead = useSetLead();
+  const setChief = useSetChief();
   if (!state) return null;
+  const spaceId = state.spaceIdOf(thread);
+  const isChief = chief === thread.id;
+  const isLead = spaceId !== null && state.leads[spaceId] === thread.id;
+  const toggleLead = () => { if (spaceId) setLead(spaceId, isLead ? null : thread.id); };
+  const toggleChief = () => setChief(isChief ? null : thread.id);
+
+  if (surface === "dropdown" && compact) {
+    return (
+      <>
+        {isChief || !spaceId ? null : (
+          <ActionMenuItem surface={surface} icon={isLead ? "Minus" : "Star"} onSelect={toggleLead}>
+            {isLead ? "Remove as Space lead" : "Make Space lead"}
+          </ActionMenuItem>
+        )}
+        <ActionMenuItem surface={surface} icon={isChief ? "Minus" : "Star"} onSelect={toggleChief}>
+          {isChief ? "Remove as Chief of Staff" : "Make Chief of Staff"}
+        </ActionMenuItem>
+      </>
+    );
+  }
+
+  const Sub = surface === "context" ? ContextMenuSub : DropdownMenuSub;
+  const SubTrigger = surface === "context" ? ContextMenuSubTrigger : DropdownMenuSubTrigger;
+  const SubContent = surface === "context" ? ContextMenuSubContent : DropdownMenuSubContent;
+  const Item = surface === "context" ? ContextMenuItem : DropdownMenuItem;
+  const role = (label: string, checked: boolean, onSelect: () => void, disabled = false) => (
+    <Item aria-checked={checked} disabled={disabled} className="flex items-center gap-2" onSelect={onSelect}>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {checked ? <Icon name="Check" className="ml-auto" aria-hidden="true" /> : null}
+    </Item>
+  );
   return (
-    <>
-      {chief === thread.id ? null : <MakeLeadItem state={state} thread={thread} surface={surface} />}
-      <ChiefOfStaffItem thread={thread} isChief={chief === thread.id} surface={surface} />
-    </>
+    <Sub>
+      <SubTrigger>
+        <Icon name="Star" aria-hidden="true" />
+        Promote
+      </SubTrigger>
+      <SubContent className="min-w-44">
+        {role("Space lead", isLead, toggleLead, isChief || !spaceId)}
+        {role("Chief of Staff", isChief, toggleChief)}
+      </SubContent>
+    </Sub>
   );
 }
 
-function ChiefOfStaffItem({ thread, isChief, surface }: {
-  thread: SidebarThread;
-  isChief: boolean;
-  surface: "context" | "dropdown";
-}) {
+/** Sets or clears the Chief of Staff, shown at once and kept over refetches that started before Studio answered. */
+function useSetChief() {
   const sdk = useSdk();
   const setSpaces = useSetAtom(studioSpacesAtom);
-  const setChief = (threadId: string | null) => {
-    // Shown at once, and kept over refetches that started before Studio answered.
+  return (threadId: string | null) => {
     const settle = beginPendingChiefOfStaff(threadId);
     setSpaces((current) => current.status === "ready" ? { ...current, chiefOfStaff: withPendingChiefOfStaff(current.chiefOfStaff) } : current);
     void sdk.plugins.callRpc({
@@ -107,25 +148,13 @@ function ChiefOfStaffItem({ thread, isChief, surface }: {
       },
     );
   };
-  return (
-    <ActionMenuItem surface={surface} icon={isChief ? "Minus" : "Star"} onSelect={() => setChief(isChief ? null : thread.id)}>
-      {isChief ? "Remove as Chief of Staff" : "Make Chief of Staff"}
-    </ActionMenuItem>
-  );
 }
 
-function MakeLeadItem({ state, thread, surface }: {
-  state: SpaceLeadState;
-  thread: SidebarThread;
-  surface: "context" | "dropdown";
-}) {
+/** Sets or clears a Space's lead, shown at once and kept over refetches that started before Studio answered. */
+function useSetLead() {
   const sdk = useSdk();
   const setSpaces = useSetAtom(studioSpacesAtom);
-  const spaceId = state.spaceIdOf(thread);
-  if (!spaceId) return null;
-  const isLead = state.leads[spaceId] === thread.id;
-  const setLead = (threadId: string | null) => {
-    // Shown at once, and kept over refetches that started before Studio answered.
+  return (spaceId: string, threadId: string | null) => {
     const settle = beginPendingLead(spaceId, threadId);
     setSpaces((current) => current.status === "ready" ? { ...current, leads: withPendingLeads(current.leads) } : current);
     void sdk.plugins.callRpc({
@@ -146,9 +175,4 @@ function MakeLeadItem({ state, thread, surface }: {
       },
     );
   };
-  return (
-    <ActionMenuItem surface={surface} icon={isLead ? "Minus" : "Star"} onSelect={() => setLead(isLead ? null : thread.id)}>
-      {isLead ? "Remove as Space lead" : "Make Space lead"}
-    </ActionMenuItem>
-  );
 }

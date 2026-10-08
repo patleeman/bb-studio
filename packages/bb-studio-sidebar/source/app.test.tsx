@@ -318,9 +318,10 @@ describe("thread-list plugin", () => {
     // The item on screen is highlighted like the selected thread.
     await waitFor(() => expect(alpha().querySelector('[data-space-studio-item="pages:pg_1"]')?.hasAttribute("data-active")).toBe(true));
     expect(within(alpha()).getByRole("link", { name: "Launch plan" }).getAttribute("aria-current")).toBe("page");
-    // Any thread can become the lead.
+    // Any thread can become the lead, from Promote ▸.
     fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_parent"]')!);
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Make Space lead" }));
+    fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Promote" }), { key: "ArrowRight" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Space lead" }));
     expect(studioCalls).toContainEqual({ method: "space_set_lead", input: { spaceId: "sp_alpha", threadId: "thr_parent" } });
     await waitFor(() => expect(document.querySelector("[data-space-lead=thr_parent]")).not.toBeNull());
     // The dots switch Spaces; Beta's needs you, and that thread comes first, above Later's unread result.
