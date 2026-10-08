@@ -141,19 +141,22 @@ export function checklistItemText(line: string): string {
 }
 
 /** The same key for an item as the model wrote it and as the page stores it (escapes undone). */
-function itemKey(text: string): string {
+export function itemKey(text: string): string {
   return checklistItemText(text.replace(/\\(.)/g, "$1").replace(/&lt;/g, "<"));
 }
 
 interface ExistingItem {
   line: string;
   key: string;
+  /** Checked off or handed to an agent. */
+  started: boolean;
 }
 
 function existingChecklist(markdown: string): ExistingItem[] {
   return [...markdown.matchAll(/^- \[([ xX])\] (.*)$/gm)].map((match) => ({
     line: match[0]!,
     key: itemKey(match[2]!),
+    started: match[1] !== " " || /\(thread:[^)]+\)/.test(match[2]!),
   }));
 }
 
@@ -181,6 +184,8 @@ export function notesMarkdown(input: {
   notes: RecordingNotes;
   truncated: boolean;
   existing?: string;
+  /** Keys of the action items the previous run wrote; null or absent keeps every unmatched item. */
+  previousItems?: readonly string[] | null;
 }): string {
   const { notes } = input;
   const previous = input.existing ? existingChecklist(input.existing) : [];
@@ -192,8 +197,14 @@ export function notesMarkdown(input: {
     used.add(match);
     return match.line;
   });
-  // Anything else on the page stays: checked, handed off, or added by hand.
-  for (const entry of previous) if (!used.has(entry)) items.push(entry.line);
+  // Items the model wrote last time and the user hasn't touched are stale now;
+  // everything else stays: checked, handed off, or added by hand.
+  const generated = input.previousItems ? new Set(input.previousItems) : null;
+  for (const entry of previous) {
+    if (used.has(entry)) continue;
+    if (generated?.has(entry.key) && !entry.started) continue;
+    items.push(entry.line);
+  }
   const lines = [notesHeader(input.recording), ""];
   if (input.truncated) {
     lines.push("> [!NOTE]", "> This recording is very long. These notes cover its first part; open the recording for the rest.", "");
@@ -308,7 +319,7 @@ export class NotesMaker {
 
   constructor(
     private readonly deps: {
-      store: Pick<TalkStore, "recording" | "transcript" | "setNotesPage">;
+      store: Pick<TalkStore, "recording" | "transcript" | "setNotesPage" | "notesItems">;
       pages: PagesClient;
       generate(id: string, transcript: string): Promise<{ notes: RecordingNotes; truncated: boolean }>;
       changed(id: string): void;
@@ -343,18 +354,19 @@ export class NotesMaker {
     if (changedBlocker) throw new Error(changedBlocker);
     if (store.transcript(id) !== transcript) throw new Error("The recording changed while the notes were being made. Try again.");
     if (!current) throw new Error("Recording not found.");
+    const keys = notes.actionItems.map(itemKey);
     let pageId = current.notesPageId ?? null;
     try {
       if (pageId && !(await pages.exists(pageId))) pageId = null;
       if (!pageId) pageId = await this.findPage(id);
       if (pageId) {
-        const markdown = notesMarkdown({ recording: current, notes, truncated, existing: await pages.markdown(pageId) });
+        const markdown = notesMarkdown({ recording: current, notes, truncated, existing: await pages.markdown(pageId), previousItems: store.notesItems(id) });
         await pages.replace(pageId, markdown);
-        this.save(id, pageId);
+        this.save(id, pageId, keys);
         return { pageId, created: false };
       }
       const created = await pages.create({ projectId: current.projectId, title: notesTitle(current.title), markdown: notesMarkdown({ recording: current, notes, truncated }) });
-      this.save(id, created);
+      this.save(id, created, keys);
       return { pageId: created, created: true };
     } catch (error) {
       if (!(await pages.available())) throw new PagesUnavailableError();
@@ -369,7 +381,7 @@ export class NotesMaker {
     return null;
   }
 
-  private save(id: string, pageId: string): void {
-    if (this.deps.store.setNotesPage(id, pageId)) this.deps.changed(id);
+  private save(id: string, pageId: string, items: string[]): void {
+    if (this.deps.store.setNotesPage(id, pageId, items)) this.deps.changed(id);
   }
 }

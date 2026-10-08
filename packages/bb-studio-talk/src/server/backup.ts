@@ -60,6 +60,8 @@ export const backupItemSchema = z.object({
   meetingNotes: meetingNotesSchema.nullable(),
   /** The Studio Page made from this recording; it reconnects when Pages restores the same page. */
   notesPageId: z.string().min(1).max(200).nullable(),
+  /** Keys of the action items the last notes run wrote (older backups have none). */
+  notesItems: z.array(z.string().max(2000)).max(200).nullable().default(null),
   segments: z.array(segmentSchema),
 });
 export type TalkBackupItem = z.infer<typeof backupItemSchema>;
@@ -81,6 +83,7 @@ interface RecordingRow {
   meeting_notes: string | null;
   audio_removed_at: number | null;
   notes_page_id: string | null;
+  notes_items: string | null;
 }
 
 interface SegmentRow {
@@ -191,6 +194,7 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
           audioRemovedAt: row.audio_removed_at,
           meetingNotes: row.meeting_notes ? (JSON.parse(row.meeting_notes) as TalkBackupItem["meetingNotes"]) : null,
           notesPageId: row.notes_page_id,
+          notesItems: row.notes_items ? (JSON.parse(row.notes_items) as string[]) : null,
           segments: [],
         };
         for (const segment of segments) {
@@ -321,16 +325,16 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
         const upsert = db.prepare(
           `INSERT INTO recordings
              (id, title, title_source, title_chars, kind, status, project_id, thread_id, created_at, updated_at,
-              ended_at, heartbeat_at, archived_at, meeting_notes, audio_removed_at, notes_page_id)
+              ended_at, heartbeat_at, archived_at, meeting_notes, audio_removed_at, notes_page_id, notes_items)
            VALUES (@id, @title, @titleSource, @titleChars, @kind, @status, @projectId, NULL, @createdAt, @updatedAt,
-              @endedAt, @heartbeatAt, @archivedAt, @meetingNotes, @audioRemovedAt, @notesPageId)
+              @endedAt, @heartbeatAt, @archivedAt, @meetingNotes, @audioRemovedAt, @notesPageId, @notesItems)
            ON CONFLICT(id) DO UPDATE SET
              title = excluded.title, title_source = excluded.title_source, title_chars = excluded.title_chars,
              kind = excluded.kind, status = excluded.status, project_id = excluded.project_id, thread_id = NULL,
              created_at = excluded.created_at, updated_at = excluded.updated_at, ended_at = excluded.ended_at,
              heartbeat_at = excluded.heartbeat_at, archived_at = excluded.archived_at,
              meeting_notes = excluded.meeting_notes, audio_removed_at = excluded.audio_removed_at,
-             notes_page_id = excluded.notes_page_id`,
+             notes_page_id = excluded.notes_page_id, notes_items = excluded.notes_items`,
         );
         const insertSegment = db.prepare(
           `INSERT INTO segments
@@ -341,7 +345,7 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
         );
         const write = db.transaction((items: Planned[]) => {
           for (const { item } of items) {
-            upsert.run({ ...item, meetingNotes: item.meetingNotes ? JSON.stringify(item.meetingNotes) : null });
+            upsert.run({ ...item, meetingNotes: item.meetingNotes ? JSON.stringify(item.meetingNotes) : null, notesItems: item.notesItems ? JSON.stringify(item.notesItems) : null });
             deleteSegments.run(item.id);
             for (const segment of item.segments) {
               insertSegment.run({

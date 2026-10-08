@@ -51,6 +51,7 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS segments_pending ON segments(status, next_attempt_at)`,
   `CREATE INDEX IF NOT EXISTS recordings_updated ON recordings(updated_at)`,
   `ALTER TABLE recordings ADD COLUMN notes_page_id TEXT`,
+  `ALTER TABLE recordings ADD COLUMN notes_items TEXT`,
 ];
 
 interface RecordingRow {
@@ -70,6 +71,7 @@ interface RecordingRow {
   meeting_notes: string | null;
   audio_removed_at: number | null;
   notes_page_id: string | null;
+  notes_items: string | null;
 }
 
 interface SegmentRow {
@@ -245,8 +247,22 @@ export class TalkStore {
   }
 
   /** The Studio Page made from this recording's notes. */
-  setNotesPage(id: string, pageId: string | null): boolean {
-    return this.db.prepare(`UPDATE recordings SET notes_page_id = ? WHERE id = ?`).run(pageId, id).changes > 0;
+  setNotesPage(id: string, pageId: string | null, items?: string[]): boolean {
+    return this.db
+      .prepare(`UPDATE recordings SET notes_page_id = ?, notes_items = CASE WHEN ? IS NULL THEN notes_items ELSE ? END WHERE id = ?`)
+      .run(pageId, items ? JSON.stringify(items) : null, items ? JSON.stringify(items) : null, id).changes > 0;
+  }
+
+  /** Keys of the action items the last notes run wrote; null for notes made before Talk kept them. */
+  notesItems(id: string): string[] | null {
+    const raw = this.row(id)?.notes_items;
+    if (!raw) return null;
+    try {
+      const value: unknown = JSON.parse(raw);
+      return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Idempotent: re-sending a stored segment (a retried upload) is a no-op. */

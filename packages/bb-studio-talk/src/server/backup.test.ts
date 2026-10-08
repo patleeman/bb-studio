@@ -67,7 +67,7 @@ async function seeded() {
   source.store.markTranscribed(REC, second, "Ship it");
   source.store.setStatus(REC, "finishing");
   source.store.saveMeetingNotes(REC, { summary: "We shipped." });
-  source.store.setNotesPage(REC, "page_notes1");
+  source.store.setNotesPage(REC, "page_notes1", ["email the list"]);
   source.store.create({ id: LIVE, kind: "dictation", projectId: null, threadId: null });
   const done = await source.segment(LIVE, "s2", 0, "live-one");
   await source.segment(LIVE, "s2", 1, "live-two");
@@ -100,6 +100,7 @@ describe("Talk backup and restore", () => {
       meetingNotes: { summary: "We shipped." },
       notesPageId: "page_notes1",
     });
+    expect(target.store.notesItems(REC)).toEqual(["email the list"]);
     expect(target.store.transcript(REC)).toBe("Hello team Ship it");
     const entry = target.store.segmentFile(REC, "s1-1")!;
     expect((await target.files.read(entry.file)).toString()).toBe("audio-two");

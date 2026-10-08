@@ -127,6 +127,43 @@ describe("notesMarkdown", () => {
   });
 });
 
+describe("notes update and the previous generation", () => {
+  const recording = { id: "rec_aaaaaaaa", title: "Weekly sync", createdAt: 0 };
+  const header = "Notes from @[Weekly sync](item:talk:rec_aaaaaaaa), recorded Jan 1, 1970.";
+  const page = (...items: string[]) => [header, "## Action items", ...items].join("\n");
+  const reworded = { summary: "S", decisions: [], actionItems: ["Send the beta list an email"] };
+
+  it("drops unchecked items the model wrote last time, but keeps hand-added and checked ones", () => {
+    const existing = page("- [ ] Email the beta list", "- [x] Write the spec", "- [ ] Water the plants");
+    const markdown = notesMarkdown({ recording, notes: reworded, truncated: false, existing, previousItems: ["email the beta list", "write the spec"] });
+    expect(markdown).toContain("- [ ] Send the beta list an email");
+    expect(markdown).not.toContain("Email the beta list");
+    expect(markdown).toContain("- [x] Write the spec");
+    expect(markdown).toContain("- [ ] Water the plants");
+  });
+
+  it("keeps every unmatched item for notes made before the set was stored", () => {
+    const existing = page("- [ ] Email the beta list", "- [ ] Water the plants");
+    const markdown = notesMarkdown({ recording, notes: reworded, truncated: false, existing, previousItems: null });
+    expect(markdown).toContain("- [ ] Email the beta list");
+    expect(markdown).toContain("- [ ] Water the plants");
+  });
+
+  it("does not pile up reworded items across runs", async () => {
+    const { store, id } = finishedRecording();
+    const { client } = fakePages();
+    let round = 0;
+    const wordings = [["Email the beta list"], ["Send the beta list an email"], ["Mail the beta list"]];
+    const maker = new NotesMaker({ store, pages: client, changed: () => {}, generate: async () => ({ notes: { ...NOTES, actionItems: wordings[round++]! }, truncated: false }) });
+    await maker.run(id);
+    const { pageId } = await maker.run(id);
+    await maker.run(id);
+    const lines = (await client.markdown(pageId)).split("\n").filter((line) => line.startsWith("- [ ]"));
+    expect(lines).toEqual(["- [ ] Mail the beta list"]);
+    expect(store.notesItems(id)).toEqual(["mail the beta list"]);
+  });
+});
+
 describe("notes update matching", () => {
   it("keeps a checked item whose text has characters the page stores escaped", () => {
     const recording = { id: "rec_aaaaaaaa", title: "Weekly sync", createdAt: 0 };
