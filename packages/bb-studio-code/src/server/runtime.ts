@@ -272,11 +272,15 @@ export class CodeServers {
     const dir = join(this.options.root, "code-server", asset);
     const bin = join(dir, "bin", "code-server");
     const marker = (await readFile(join(dir, INSTALL_MARKER), "utf8").catch(() => "")).trim();
-    if (existsSync(bin) && marker === expected) return bin;
+    if (existsSync(bin) && marker === expected) {
+      await hideLetterpress(dir);
+      return bin;
+    }
     check();
     this.set(id, { status: pending("installing"), child: null, file: null, stopping: false });
     this.installing ??= this.download(asset, dir, expected).finally(() => { this.installing = null; });
     await this.installing;
+    await hideLetterpress(dir);
     return bin;
   }
 
@@ -303,6 +307,16 @@ export class CodeServers {
       await rm(staging, { recursive: true, force: true });
     }
   }
+}
+
+const NO_LETTERPRESS = "\n/* studio-code: no empty-editor logo */.monaco-workbench .editor-group-watermark .letterpress{display:none!important}\n";
+
+/** Hides VS Code's big logo in an empty editor; no setting turns it off. Runs once per install. */
+async function hideLetterpress(dir: string): Promise<void> {
+  const file = join(dir, "lib", "vscode", "out", "vs", "code", "browser", "workbench", "workbench.css");
+  const css = await readFile(file, "utf8").catch(() => null);
+  if (css === null || css.includes(NO_LETTERPRESS)) return;
+  await writeFile(file, css + NO_LETTERPRESS);
 }
 
 /**
