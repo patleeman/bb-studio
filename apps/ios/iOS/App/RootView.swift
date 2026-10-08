@@ -139,10 +139,7 @@ private struct ChiefOfStaffTab: View {
         }
         .task(id: model.tab == .chief) {
             guard model.tab == .chief else { return }
-            if let personal = try? await model.client.studioSpaces().first(where: \.isDefault),
-               let lead = try? await model.client.spaceLead(personal.id) {
-                leadId = lead.threadId
-            }
+            if let id = try? await model.client.chiefOfStaffThreadId() { leadId = id }
             loaded = true
         }
     }

@@ -172,6 +172,29 @@ struct TalkToChiefIntent: AppIntent {
     }
 }
 
+struct TellChiefIntent: AppIntent {
+    static let title: LocalizedStringResource = "Tell Chief of Staff"
+    static let description = IntentDescription("Send a message to your Personal Space's lead and hear the reply.")
+
+    @Parameter(title: "Message", requestValueDialog: "What should I tell your chief of staff?")
+    var message: String
+
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        let client = BBClient()
+        guard let threadId = try await client.chiefOfStaffThreadId() else {
+            return .result(value: "", dialog: "Your Personal Space has no lead yet. Pick one in BB Studio.")
+        }
+        let baseline = try await client.latestReply(threadId)?.id
+        try await client.send(threadId, text: message)
+        guard let reply = try await client.waitForReply(threadId, after: baseline, timeout: .seconds(25)) else {
+            return .result(value: "", dialog: "Sent. Your chief of staff is still working, and you'll get a notification when it's done.")
+        }
+        let spoken = VoiceChatEngine.speakable(reply)
+        let dialog = spoken.count > 700 ? String(spoken.prefix(700)) + "… The rest is in the app." : spoken
+        return .result(value: reply, dialog: IntentDialog(stringLiteral: dialog))
+    }
+}
+
 struct WriteIntent: AppIntent {
     static let title: LocalizedStringResource = "Write in BB Studio"
     static let description = IntentDescription("Open a blank note to save as a page or start a thread.")
@@ -191,7 +214,11 @@ struct BBShortcuts: AppShortcutsProvider {
             intent: TalkToChiefIntent(), phrases: ["Talk to my chief of staff in \(.applicationName)"], shortTitle: "Chief of Staff",
             systemImageName: "person.crop.circle.badge.checkmark")
         AppShortcut(intent: CaptureIntent(), phrases: ["Capture in \(.applicationName)"], shortTitle: "Capture", systemImageName: "square.and.arrow.down")
-        AppShortcut(intent: OpenPageIntent(), phrases: ["Open a page in \(.applicationName)"], shortTitle: "Open page", systemImageName: "doc.richtext")
+        // At the limit of ten: Open page stays in the Shortcuts app's action list.
+        AppShortcut(
+            intent: TellChiefIntent(),
+            phrases: ["Tell my chief of staff in \(.applicationName)", "Ask my chief of staff in \(.applicationName)"],
+            shortTitle: "Tell Chief of Staff", systemImageName: "bubble.left.and.text.bubble.right")
         AppShortcut(intent: SendToThreadIntent(), phrases: ["Send to a thread in \(.applicationName)"], shortTitle: "Send to thread", systemImageName: "paperplane")
         AppShortcut(intent: StartRecordingIntent(), phrases: ["Start recording in \(.applicationName)"], shortTitle: "Record", systemImageName: "record.circle")
         AppShortcut(

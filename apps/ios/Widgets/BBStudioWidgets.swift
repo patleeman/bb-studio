@@ -7,6 +7,7 @@ struct BBStudioWidgets: WidgetBundle {
     var body: some Widget {
         RecordingLiveActivity()
         StatusWidget()
+        ChiefWidget()
         WorkWidget()
         CaptureControl()
         ChiefTalkControl()
