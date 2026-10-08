@@ -111,6 +111,23 @@ describe("Talk backup and restore", () => {
     expect(report.notes.join(" ")).toMatch(/still recording/);
   });
 
+  it("leaves out a recording deleted while its audio was being copied", async () => {
+    const source = await seeded();
+    const dir = join(await temp(), "talk");
+    await mkdir(dir);
+    class Deleting extends BackupWriter {
+      override async copy(...args: Parameters<BackupWriter["copy"]>) {
+        if (args[0].includes(`/${REC}/`)) source.store.delete(REC);
+        return super.copy(...args);
+      }
+    }
+    const result = await source.handlers.backup(new Deleting(dir));
+    expect(result.counts.recordings).toBe(1);
+    expect(result.counts.audioFiles).toBe(2);
+    expect(await readdir(join(dir, "items"))).toEqual([`${LIVE}.json`]);
+    expect(result.notes?.join(" ")).toMatch(/deleted while the backup ran/);
+  });
+
   it("changes nothing when the same backup is restored again", async () => {
     const source = await seeded();
     const { reader } = await backupOf(source);

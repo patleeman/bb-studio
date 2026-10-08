@@ -158,6 +158,7 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
       let missingAudio = 0;
       let removedAudio = 0;
       let skipped = 0;
+      let vanished = 0;
       const ids = (db.prepare(`SELECT id FROM recordings ORDER BY created_at, id`).all() as { id: string }[]).map((row) => row.id);
       // One recording at a time, so memory holds one recording's transcript.
       for (const id of ids) {
@@ -223,6 +224,13 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
             audio,
           });
         }
+        // Deleted while its audio was being copied: saving it would restore a recording without audio.
+        if (!recordingRow.get(id)) {
+          vanished += 1;
+          missingAudio -= item.segments.filter((segment) => segment.audio === null && row.audio_removed_at === null).length;
+          counts.audioFiles -= item.segments.filter((segment) => segment.audio !== null).length;
+          continue;
+        }
         await writer.json(`items/${name}.json`, item);
         counts.recordings += 1;
         counts.segments += item.segments.length;
@@ -238,6 +246,7 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
       if (threadLinks) notes.push(`Not saved: the BB thread ${threadLinks} recording(s) were started from. They restore without the thread link.`);
       if (removedAudio) notes.push(`${removedAudio} dictation(s) had their audio removed already; only their transcripts are saved.`);
       if (missingAudio) notes.push(`${missingAudio} audio file(s) were missing on disk and weren't saved; their transcripts are.`);
+      if (vanished) notes.push(`${vanished} recording(s) were deleted while the backup ran and were left out.`);
       if (skipped) notes.push(`${skipped} recording(s) with an unusable id were skipped.`);
       if (counts.notesPages) notes.push("Notes pages are linked by page id; restore Studio Pages too to reconnect them.");
       return { counts, notes };
