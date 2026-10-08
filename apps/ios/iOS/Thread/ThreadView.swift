@@ -5,6 +5,7 @@ struct ThreadView: View {
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     @StateObject private var model: ThreadModel
+    @StateObject private var talk: HoldToTalk
     @StateObject private var spaces = ThreadSpacesModel()
     @State private var draft = ""
     @State private var mentions: [Mention] = []
@@ -58,9 +59,13 @@ struct ThreadView: View {
     /// Hides the tab bar on iPhone, for a thread pushed from a list; a tab's
     /// own thread keeps it.
     private let hidesTabBar: Bool
+    /// The Chief of Staff's thread: the Action button talks to it.
+    private let answersActionButton: Bool
 
-    init(threadId: String, hidesTabBar: Bool = true) {
+    init(threadId: String, hidesTabBar: Bool = true, answersActionButton: Bool = false) {
         self.hidesTabBar = hidesTabBar
+        self.answersActionButton = answersActionButton
+        _talk = StateObject(wrappedValue: HoldToTalk(threadId: threadId))
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
         _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
     }
@@ -210,6 +215,16 @@ struct ThreadView: View {
             if let item = unreadItem() { position.scrollTo(id: item, anchor: .top) }
         }
         .onDisappear { model.detach() }
+        .onAppear {
+            talk.send = { [model] text in
+                Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
+            }
+            takeActionButton()
+        }
+        .onChange(of: app.chiefTalkPending) { _, _ in takeActionButton() }
+        .onChange(of: talk.error) { _, error in
+            if let error { app.flash(error) }
+        }
         .focusedSceneValue(\.thread, actions)
         .sensoryFeedback(.success, trigger: model.confirmations)
         .sensoryFeedback(.warning, trigger: model.interactions.count) { old, new in new > old }
@@ -590,6 +605,12 @@ struct ThreadView: View {
         !(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachments.isEmpty) && !model.sending
     }
 
+    private func takeActionButton() {
+        guard answersActionButton, app.chiefTalkPending else { return }
+        app.chiefTalkPending = false
+        talk.toggleHandsFree()
+    }
+
     /// Clears the field right away and puts the text back if sending fails.
     private func send() {
         if editing { return saveEdit() }
@@ -738,7 +759,7 @@ struct ThreadView: View {
             }
             ComposerBar(
                 text: $draft, focused: $composerFocused, attachments: $attachments,
-                dictate: { dictating = true }, expand: draftIsLong ? { editingFull = true } : nil
+                dictate: { dictating = true }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil
             ) {
                 Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
                     .accessibilityLabel("Model & permissions")

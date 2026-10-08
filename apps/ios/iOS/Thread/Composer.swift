@@ -86,6 +86,8 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var placeholder = "Message"
     var maxLines = 6
     let dictate: () -> Void
+    /// Hold the mic to talk and send; tapping it still dictates.
+    var talk: HoldToTalk?
     /// Opens the draft on a whole screen; shown only when set.
     var expand: (() -> Void)?
     @ViewBuilder let settings: () -> Settings
@@ -99,6 +101,9 @@ struct ComposerBar<Settings: View, Send: View>: View {
                 attachments += images.compactMap { PendingAttachment.image($0, name: "pasted.jpg") }
             }
             .padding(.top, 4)
+            .overlay {
+                if let talk { TalkOverlay(talk: talk) }
+            }
             .overlay(alignment: .topTrailing) {
                 if let expand {
                     Button(action: expand) {
@@ -114,17 +119,36 @@ struct ComposerBar<Settings: View, Send: View>: View {
                 AttachmentMenu(items: $attachments, symbol: "plus")
                 settings()
                 Spacer(minLength: 4)
-                Button(action: dictate) {
-                    Image(systemName: "mic").font(.title3).frame(width: 36, height: 36)
+                if let talk {
+                    HoldToTalkMic(talk: talk, tap: dictate)
+                } else {
+                    Button(action: dictate) {
+                        Image(systemName: "mic").font(.title3).frame(width: 36, height: 36)
+                    }
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Dictate")
                 }
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Dictate")
                 send()
             }
             .padding(.horizontal, 6)
             .padding(.bottom, 6)
         }
         .background(.fill.tertiary, in: .rect(cornerRadius: 22))
+    }
+}
+
+/// Covers the field while talking, so the draft underneath stays put.
+private struct TalkOverlay: View {
+    @ObservedObject var talk: HoldToTalk
+
+    var body: some View {
+        if talk.state != .idle {
+            HoldToTalkStatus(talk: talk, cancel: talk.cancel)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .background(.background.secondary, in: .rect(cornerRadius: 16))
+                .padding(.horizontal, 4)
+                .transition(.opacity)
+        }
     }
 }
 
