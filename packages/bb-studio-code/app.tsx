@@ -10,6 +10,7 @@
 //     opens the workspace in the workbench.
 //   - experimental_threadHeaderAction: a "VS Code" chip in the thread header
 //     once the thread has a workspace or has edited files.
+//   - fileOpener "VS Code": BB's file preview with an "Open in VS Code" bar.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { WorkspaceCard } from "./src/card";
@@ -17,6 +18,7 @@ import { CodePanel } from "./src/panel";
 import { CODE_ICON, CODE_TAB, PANEL_PATH } from "./src/shared";
 import { ThreadCodePanel } from "./src/thread-tab";
 import { ThreadCodeChip } from "./src/thread-chip";
+import { CODE_EXTENSIONS, VsCodeFileOpener } from "./src/file-opener";
 
 export default definePluginApp((app) => {
   app.slots.navPanel({
@@ -40,5 +42,6 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "workspace", component: WorkspaceCard });
   // A quiet "VS Code" chip in a thread's header once it has a workspace or
   // has edited files: one click to the exact workspace.
+  app.slots.fileOpener({ id: "vscode", title: "VS Code", extensions: CODE_EXTENSIONS, component: VsCodeFileOpener });
   app.slots.experimental_threadHeaderAction({ id: "code-chip", title: "VS Code", component: ThreadCodeChip });
 });
