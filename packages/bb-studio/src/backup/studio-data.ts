@@ -1,6 +1,6 @@
 // Studio's own section of a backup (docs/backup.md): tags and which items
 // have them, saved views, Spaces with their projects, threads, leads and
-// check-in settings, and the item services (links, item chats, comments,
+// check-in settings, the Chief of Staff, and the item services (links, item chats, comments,
 // versions, activity). Items keep their add-on ids across a restore, so these
 // rows still point at the right items.
 //
@@ -14,6 +14,7 @@ import type { RestoreTally } from "@bb-studio/kit/backup";
 import type { BackupHandlers } from "@bb-studio/kit/server";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { CHIEF } from "../space-lead";
 import { PERSONAL_PROJECT_ID } from "../spaces";
 
 const text = z.string().max(100_000);
@@ -24,6 +25,7 @@ const nullable = <T extends z.ZodType>(schema: T) => schema.nullable();
 const tagRow = z.object({ id, name: z.string().min(1).max(100), color: z.string().max(50), created_at: time });
 const itemTagRow = z.object({ plugin_id: id, item_id: id, tag_id: id, created_at: time });
 const viewRow = z.object({ id, name: z.string().min(1).max(60), query: z.string().max(500), position: z.number(), created_at: time });
+const runRow = z.object({ cadence: z.string().max(50), time: z.string().max(50), cron: nullable(z.string().max(200)) });
 const spaceRow = z.object({
   id, name: z.string().min(1).max(100), color: z.string().max(50), icon: nullable(z.string().max(50)), description: z.string().max(500),
   default_project_id: nullable(id), page_id: nullable(id), page_template: nullable(z.number().int()), is_default: z.number().int(),
@@ -31,8 +33,9 @@ const spaceRow = z.object({
   projects: z.array(z.object({ project_id: id, created_at: time })),
   threads: z.array(z.object({ thread_id: id, added_at: time })),
   lead: nullable(z.object({ lead_thread_id: nullable(id), created_at: time, updated_at: time })),
-  run: nullable(z.object({ cadence: z.string().max(50), time: z.string().max(50), cron: nullable(z.string().max(200)) })),
+  run: nullable(runRow),
 });
+const chiefRow = z.object({ thread_id: id, origin_space_id: nullable(id), updated_at: time, run: nullable(runRow) });
 const linkRow = z.object({ from_plugin: id, from_id: id, to_plugin: id, to_id: id, kind: z.string().max(50), source: z.string().max(300) });
 const threadRow = z.object({ thread_id: id, plugin_id: id, item_id: id, role: z.string().max(50), state: z.string().max(50), created_at: time, updated_at: time, metadata: text });
 const commentRow = z.object({ id, plugin_id: id, item_id: id, parent_id: nullable(id), anchor: nullable(text), actor: text, body: text, created_at: time, resolved_at: nullable(time) });
@@ -49,6 +52,7 @@ const FILES = {
   comments: ["comments.json", z.array(commentRow)],
   versions: ["versions.json", z.array(versionRow)],
   activity: ["activity.json", z.array(activityRow)],
+  chief: ["chief-of-staff.json", z.array(chiefRow).max(1)],
 } as const;
 
 type Data = { [K in keyof typeof FILES]: z.infer<(typeof FILES)[K][1]> };
@@ -56,8 +60,9 @@ type Data = { [K in keyof typeof FILES]: z.infer<(typeof FILES)[K][1]> };
 export const STUDIO_EXCLUDED = [
   "Open tabs, saved thread titles and the search index: they're rebuilt on the new BB.",
   "Space folders under ~/Spaces: a space makes its folder again when it next needs one.",
-  "Item chats, space threads and space leads point at BB threads; they're restored only when that thread exists on this BB.",
-  "Space check-ins come back switched off; turn them on again from the space.",
+  "Item chats, space threads, space leads and the Chief of Staff point at BB threads; they're restored only when that thread exists on this BB.",
+  "A Chief of Staff in the backup is restored only when this BB has none.",
+  "Space and Chief of Staff check-ins come back switched off; turn them on again.",
 ];
 
 class DryRun extends Error {}
@@ -91,6 +96,8 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
         comments: all("SELECT * FROM item_comments ORDER BY created_at, id"),
         versions: all("SELECT * FROM item_versions ORDER BY created_at, id"),
         activity: all("SELECT plugin_id, item_id, actor, verb, at, summary FROM item_activity ORDER BY id"),
+        chief: all<{ thread_id: string; origin_space_id: string | null; updated_at: number }>("SELECT thread_id, origin_space_id, updated_at FROM chief_of_staff")
+          .map((row) => ({ ...row, run: (db.prepare("SELECT cadence, time, cron FROM space_runs WHERE space_id = ?").get(CHIEF) as Data["chief"][number]["run"] | undefined) ?? null })),
       };
       for (const key of Object.keys(FILES) as (keyof Data)[]) await writer.json(FILES[key][0], data[key]);
       const blobs = db.prepare("SELECT sha256 FROM item_blobs WHERE sha256 IN (SELECT sha256 FROM item_versions) ORDER BY sha256").all() as { sha256: string }[];
@@ -125,6 +132,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
       const threadIds = new Set([
         ...data.threads.map((row) => row.thread_id),
         ...data.spaces.flatMap((space) => [...space.threads.map((row) => row.thread_id), ...(space.lead?.lead_thread_id ? [space.lead.lead_thread_id] : [])]),
+        ...data.chief.map((row) => row.thread_id),
       ]);
       const existing = new Set<string>();
       for (const threadId of threadIds) if (await deps.threadExists(threadId).catch(() => false)) existing.add(threadId);
@@ -184,6 +192,7 @@ function apply(
   type LocalSpace = { id: string; name: string; is_default: number; updated_at: number; default_project_id: string | null };
   const spaceById = db.prepare("SELECT id, name, is_default, updated_at, default_project_id FROM spaces WHERE id = ?");
   const defaultSpace = () => db.prepare("SELECT id FROM spaces WHERE is_default = 1").get() as { id: string } | undefined;
+  const restoredSpaces = new Map<string, string>();
   for (const space of data.spaces) {
     const item = { id: space.id, title: space.name };
     let local = spaceById.get(space.id) as LocalSpace | undefined;
@@ -205,6 +214,7 @@ function apply(
         tally.record("updated");
       } else tally.decided(space.updated_at === local.updated_at ? "unchanged" : "keep", item);
     }
+    restoredSpaces.set(space.id, spaceId);
     // A project joins the restored space unless the user has put it in another space here.
     for (const project of space.projects) {
       if (project.project_id === PERSONAL_PROJECT_ID) continue;
@@ -228,6 +238,27 @@ function apply(
     const lead = space.lead?.lead_thread_id;
     if (space.lead && lead && threads.has(lead)) counted(db.prepare("INSERT OR IGNORE INTO space_leads (space_id, lead_thread_id, created_at, updated_at) VALUES (?, ?, ?, ?)").run(spaceId, lead, space.lead.created_at, space.lead.updated_at).changes);
     if (space.run) counted(db.prepare("INSERT OR IGNORE INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 0, ?, ?, ?, NULL, NULL)").run(spaceId, space.run.cadence, space.run.time, space.run.cron).changes);
+  }
+
+  // The Chief of Staff, only into an empty slot. It is above every space, and its heartbeat comes back off.
+  for (const chief of data.chief) {
+    const item = { id: chief.thread_id, title: "Chief of Staff" };
+    if (!threads.has(chief.thread_id)) continue;
+    const local = db.prepare("SELECT thread_id FROM chief_of_staff WHERE id = 1").get() as { thread_id: string } | undefined;
+    if (local) {
+      if (local.thread_id === chief.thread_id) tally.record("unchanged", item);
+      else tally.record("kept", item, "This BB already has a Chief of Staff; it stayed.");
+      continue;
+    }
+    if (db.prepare("SELECT 1 FROM space_leads WHERE lead_thread_id = ?").get(chief.thread_id)) {
+      tally.record("kept", item, "That thread leads a space here; it stayed the lead.");
+      continue;
+    }
+    const origin = chief.origin_space_id ? restoredSpaces.get(chief.origin_space_id) ?? (db.prepare("SELECT id FROM spaces WHERE id = ?").get(chief.origin_space_id) as { id: string } | undefined)?.id ?? null : null;
+    db.prepare("DELETE FROM space_threads WHERE thread_id = ?").run(chief.thread_id);
+    db.prepare("INSERT INTO chief_of_staff (id, thread_id, origin_space_id, updated_at) VALUES (1, ?, ?, ?)").run(chief.thread_id, origin, chief.updated_at);
+    if (chief.run) db.prepare("INSERT OR IGNORE INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 0, ?, ?, ?, NULL, NULL)").run(CHIEF, chief.run.cadence, chief.run.time, chief.run.cron);
+    tally.record("created", item);
   }
 
   const link = db.prepare("INSERT OR IGNORE INTO item_links VALUES (?, ?, ?, ?, ?, ?)");

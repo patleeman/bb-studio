@@ -30,7 +30,7 @@ use the CLI.
 | `artifacts/` | Studio Artifacts | Each artifact with every version's bytes. |
 | `studio-tables/` | Studio Tables | Each table: its columns, views and rows. |
 | `design/` | Studio Design | Each design with its rounds, screens (as HTML files) and comments. |
-| `studio/` | Studio | Tags and which items have them, saved views, Spaces with their projects, threads, leads and check-in settings, item links, item chats, comments, versions and activity. |
+| `studio/` | Studio | Tags and which items have them, saved views, Spaces with their projects, threads, leads and check-in settings, the Chief of Staff, item links, item chats, comments, versions and activity. |
 
 ## What isn't
 
@@ -145,8 +145,9 @@ Restore runs in this order:
 5. **Studio's data.** Tags and saved views are matched by id, then by name.
    Spaces are matched by id, then the default space, then by name; a missing
    space is created. A project joins its restored space, unless you have
-   already put it in another space here. Item chats, space threads and leads
-   are restored only when their BB thread exists here. Check-ins come back
+   already put it in another space here. Item chats, space threads, leads and
+   the Chief of Staff are restored only when their BB thread exists here. The
+   Chief of Staff is restored only when this BB has none. Check-ins come back
    switched off. The search index is rebuilt afterwards.
 
 If an add-on isn't installed on the BB you restore to, its section is skipped

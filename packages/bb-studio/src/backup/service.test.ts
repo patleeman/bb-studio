@@ -187,3 +187,35 @@ it("refuses files that aren't Studio backups or come from a newer Studio", async
   await expect(service.restore(join(dir, "missing.zip"), { dryRun: true })).rejects.toThrow(/No backup file/);
   expect(await readFile(join(dir, "none.zip"))).toBeTruthy();
 });
+
+it("restores the Chief of Staff into an empty slot, with its origin space and its heartbeat off", async () => {
+  const sourceDir = await temp();
+  const sourceDb = studioDb();
+  const launch = new SpaceStore(sourceDb).create({ name: "Launch" });
+  sourceDb.prepare("INSERT INTO chief_of_staff (id, thread_id, origin_space_id, updated_at) VALUES (1, 'thr_chief', ?, 5)").run(launch.id);
+  sourceDb.prepare("INSERT INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES ('chief-of-staff', 1, 'daily', '08:30', NULL, 'a1', 'p')").run();
+  const service = (dir: string, db: Database.Database, exists: boolean) => new BackupService({
+    dataDir: dir, sdk: bb({ dataDir: dir, projects: [], addOns: {}, installed: [] }), bbVersion: async () => null,
+    studioData: studioDataBackup(db, { threadExists: async () => exists }),
+  });
+  const file = join(sourceDir, "backup.zip");
+  await service(sourceDir, sourceDb, true).backup(file);
+
+  const targetDb = studioDb();
+  new SpaceStore(targetDb);
+  await service(await temp(), targetDb, true).restore(file, { dryRun: false });
+  const restoredLaunch = new SpaceStore(targetDb).find("Launch")!;
+  expect(targetDb.prepare("SELECT thread_id, origin_space_id FROM chief_of_staff").get()).toEqual({ thread_id: "thr_chief", origin_space_id: restoredLaunch.id });
+  expect(targetDb.prepare("SELECT enabled, cadence, time, automation_id FROM space_runs WHERE space_id = 'chief-of-staff'").get()).toEqual({ enabled: 0, cadence: "daily", time: "08:30", automation_id: null });
+
+  const missingDb = studioDb();
+  new SpaceStore(missingDb);
+  await service(await temp(), missingDb, false).restore(file, { dryRun: false });
+  expect(missingDb.prepare("SELECT * FROM chief_of_staff").get()).toBeUndefined();
+
+  const takenDb = studioDb();
+  new SpaceStore(takenDb);
+  takenDb.prepare("INSERT INTO chief_of_staff (id, thread_id, origin_space_id, updated_at) VALUES (1, 'thr_local', NULL, 9)").run();
+  await service(await temp(), takenDb, true).restore(file, { dryRun: false });
+  expect(takenDb.prepare("SELECT thread_id FROM chief_of_staff").get()).toEqual({ thread_id: "thr_local" });
+});
