@@ -3,7 +3,7 @@
 import { HEALTH_REALTIME_CHANNEL } from "@bb-studio/kit/health";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SetupActionResult, setupContract, SetupSummary } from "../../setup-contract";
 
 const FRESH_MS = 60_000;
@@ -18,9 +18,16 @@ export function useSetup() {
   /** What's running now: "check", "install-all", or a plugin id. */
   const [busy, setBusy] = useState<string | null>(null);
 
+  /** Counts summaries applied; a load that started before the latest one is stale and dropped. */
+  const applied = useRef(0);
+
   const load = useCallback(async (maxAgeMs: number) => {
+    const started = applied.current;
     try {
-      setSummary(await rpc.call("setup.summary", { maxAgeMs }));
+      const fresh = await rpc.call("setup.summary", { maxAgeMs });
+      if (applied.current !== started) return;
+      applied.current++;
+      setSummary(fresh);
       setError(null);
     } catch (cause) {
       setError(errorMessage(cause));
@@ -33,6 +40,7 @@ export function useSetup() {
     setBusy(key);
     try {
       const result = await work();
+      applied.current++;
       setSummary(result.summary);
       setFailures((current) => {
         const next = { ...current };

@@ -25,3 +25,12 @@ it("rejects unknown flags instead of treating them as query text or refs", () =>
 it("rejects an option given twice", () => {
   expect(parseCliArgs(["--space", "A", "--space", "B"], list)).toEqual({ ok: false, error: "--space was given twice." });
 });
+
+it("lists every `bb studio` command in the usage line for an unknown one", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(new URL("../server.ts", import.meta.url), "utf8");
+  const names = [...source.matchAll(/\{ name: "(\w+)", summary: .*?usage: "bb studio /g)].map((match) => match[1]!);
+  const line = /usage\("bb studio <([a-z|]+)> …"\)/.exec(source)?.[1]?.split("|");
+  expect(names.length).toBeGreaterThan(8);
+  expect(line?.slice().sort()).toEqual(names.slice().sort());
+});

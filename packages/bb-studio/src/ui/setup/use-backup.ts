@@ -48,8 +48,8 @@ export function useBackup() {
   /** Uploads the file and shows what restoring it would change. */
   const plan = useCallback(async (file: File) => {
     setState({ step: "uploading", fileName: file.name, progress: 0 });
+    let uploadId: string | null = null;
     try {
-      let uploadId: string | null = null;
       for (let offset = 0; offset < file.size || offset === 0; offset += UPLOAD_CHUNK_BYTES) {
         const chunk = new Uint8Array(await file.slice(offset, offset + UPLOAD_CHUNK_BYTES).arrayBuffer());
         const sent: { uploadId: string } = await rpc.call("backup.upload", { uploadId, offset, data: base64(chunk) });
@@ -61,6 +61,8 @@ export function useBackup() {
       const result = await rpc.call("backup.restore", { uploadId: uploadId!, dryRun: true });
       setState({ step: "planned", fileName: file.name, uploadId: uploadId!, plan: result });
     } catch (cause) {
+      // A half-sent or unreadable file would sit on the server until Studio restarts.
+      if (uploadId) void rpc.call("backup.discard", { uploadId }).catch(() => {});
       setState({ step: "error", message: errorMessage(cause) });
     }
   }, [rpc]);

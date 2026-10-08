@@ -1181,7 +1181,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }
           default:
-            return usage("bb studio <list|tags|spaces|move|providers|health|setup|reindex|retitle> …");
+            return usage("bb studio <list|tags|spaces|move|providers|health|setup|reindex|backup|restore|retitle> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

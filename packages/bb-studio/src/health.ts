@@ -124,6 +124,7 @@ export class HealthMonitor {
   /** Changes to the hidden list, one at a time, so a check can't undo a Hide made while it ran. */
   private hiding: Promise<unknown> = Promise.resolve();
   private confirming: ReturnType<typeof setTimeout> | undefined;
+  private disposed = false;
 
   constructor(private readonly deps: {
     sdk: HealthSdk;
@@ -172,14 +173,14 @@ export class HealthMonitor {
     const previous = this.latest;
     const before = new Set(previous?.problems.map((problem) => problem.key));
     next.problems = next.problems.map((problem) => ({ ...problem, lasting: before.has(problem.key) }));
-    if (next.problems.some((problem) => !problem.lasting) && !this.confirming) {
+    if (!this.disposed && next.problems.some((problem) => !problem.lasting) && !this.confirming) {
       this.confirming = setTimeout(() => {
         this.confirming = undefined;
         void this.check().catch(() => {});
       }, CONFIRM_MS);
     }
     this.latest = next;
-    if (!previous || fingerprint(previous) !== fingerprint(next)) this.deps.changed(next);
+    if (!this.disposed && (!previous || fingerprint(previous) !== fingerprint(next))) this.deps.changed(next);
     return next;
   }
 
@@ -200,6 +201,8 @@ export class HealthMonitor {
   }
 
   dispose(): void {
+    // A check still running finishes without scheduling another or telling the app.
+    this.disposed = true;
     clearTimeout(this.confirming);
   }
 

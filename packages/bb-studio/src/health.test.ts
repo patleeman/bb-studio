@@ -137,6 +137,25 @@ describe("HealthMonitor", () => {
     }
   });
 
+  it("schedules no recheck and announces nothing when a check ends after dispose", async () => {
+    vi.useFakeTimers();
+    try {
+      const { instance, sdk, changed } = monitor({ a: [broken] });
+      const answer = sdk.plugins.callRpc;
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      sdk.plugins.callRpc = (async (args: Parameters<typeof answer>[0]) => { await gate; return answer(args); }) as typeof answer;
+      const running = instance.check();
+      instance.dispose();
+      release();
+      await running;
+      expect(changed).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("turns a plugin off", async () => {
     const { instance, sdk } = monitor({ a: [broken] });
     await instance.disable("a");

@@ -180,3 +180,26 @@ describe("formatSetup", () => {
     expect(text).not.toContain("Retired plugins");
   });
 });
+
+describe("SetupService install", () => {
+  it("skips an add-on that is already installed and installs one at a time", async () => {
+    const plugins = [plugin("studio")];
+    const { sdk, raw, calls } = fakeSdk(plugins);
+    let active = 0;
+    let overlapped = false;
+    raw.plugins.catalog.install.mockImplementation(async ({ entryId }: { entryId: string }) => {
+      active++;
+      overlapped ||= active > 1;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      plugins.push(plugin(entryId));
+      calls.push(`install ${entryId}`);
+      active--;
+    });
+    const service = new SetupService({ sdk, health: async () => health() });
+    const [first, second] = await Promise.all([service.install(["studio", "pages"]), service.install(["pages", "talk"])]);
+    expect(first.failures).toEqual([]);
+    expect(second.failures).toEqual([]);
+    expect(calls).toEqual(["install pages", "install talk"]);
+    expect(overlapped).toBe(false);
+  });
+});

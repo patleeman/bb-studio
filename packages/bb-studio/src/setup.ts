@@ -232,6 +232,15 @@ export async function installAddOn(sdk: SetupSdk, pluginId: string): Promise<voi
 
 /** Runs the Setup page's actions, then reports the new state. */
 export class SetupService {
+  /** Installs, turn-ons and removes run one at a time, so two clicks (or two windows) can't race BB. */
+  private queue: Promise<unknown> = Promise.resolve();
+
+  private serial<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(work, work);
+    this.queue = run.catch(() => {});
+    return run;
+  }
+
   constructor(private readonly deps: {
     sdk: SetupSdk;
     /** A health result at most this old, or a fresh check with 0. */
@@ -246,32 +255,42 @@ export class SetupService {
     return { summary: await this.summary(0), failures };
   }
 
-  async install(pluginIds: readonly string[]): Promise<SetupActionResult> {
-    const failures: SetupActionResult["failures"] = [];
-    // One at a time: BB installs from the same repository for each.
-    for (const id of pluginIds) {
-      try {
-        await installAddOn(this.deps.sdk, id);
-      } catch (error) {
-        failures.push({ id, error: message(error) });
+  install(pluginIds: readonly string[]): Promise<SetupActionResult> {
+    return this.serial(async () => {
+      const failures: SetupActionResult["failures"] = [];
+      // One at a time: BB installs from the same repository for each.
+      for (const id of new Set(pluginIds)) {
+        try {
+          // Installed meanwhile (another window, the CLI): nothing left to do.
+          if (ADDON_IDS.has(id) && (await this.deps.sdk.plugins.list()).plugins.some((plugin) => plugin.id === id)) continue;
+          await installAddOn(this.deps.sdk, id);
+        } catch (error) {
+          failures.push({ id, error: message(error) });
+        }
       }
-    }
-    return this.after(failures);
+      return this.after(failures);
+    });
   }
 
   async enable(pluginId: string): Promise<SetupActionResult> {
     if (!ADDON_IDS.has(pluginId)) throw new Error(`${pluginId} isn't a BB Studio add-on.`);
-    try {
-      await this.deps.sdk.plugins.enable({ pluginId });
-      return this.after([]);
-    } catch (error) {
-      return this.after([{ id: pluginId, error: message(error) }]);
-    }
+    return this.serial(async () => {
+      try {
+        await this.deps.sdk.plugins.enable({ pluginId });
+        return this.after([]);
+      } catch (error) {
+        return this.after([{ id: pluginId, error: message(error) }]);
+      }
+    });
   }
 
   /** Removes a retired plugin, only once nothing blocks it. */
   async remove(pluginId: string): Promise<SetupActionResult> {
     if (!RETIRED_IDS.has(pluginId)) throw new Error(`${pluginId} isn't a retired BB Studio plugin.`);
+    return this.serial(() => this.removeNow(pluginId));
+  }
+
+  private async removeNow(pluginId: string): Promise<SetupActionResult> {
     const current = (await this.summary(60_000)).retired.find((entry) => entry.id === pluginId);
     if (!current) return this.after([]);
     if (current.blocker) return this.after([{ id: pluginId, error: current.blocker }]);
