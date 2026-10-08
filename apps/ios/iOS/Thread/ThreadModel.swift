@@ -8,6 +8,8 @@ final class ThreadModel: ObservableObject {
     @Published var rows: [TimelineRow] = []
     /// False until the first page arrives from the cache or the server.
     @Published var loaded = false
+    /// Bumped when the server's first page replaces rows drawn from the cache.
+    @Published private(set) var replacedCache = 0
     @Published var hasOlder = false
     /// Loading every earlier page, for find in thread.
     @Published var loadingAll = false
@@ -175,7 +177,9 @@ final class ThreadModel: ObservableObject {
 
     func load() async {
         guard let client else { return }
+        var fromCache = false
         if rows.isEmpty, let snapshot = DiskCache.load(Snapshot.self, key: "thread-\(threadId)", serverURL: serverURL) {
+            fromCache = true
             thread = snapshot.thread
             rows = snapshot.rows
             loaded = true
@@ -194,6 +198,7 @@ final class ThreadModel: ObservableObject {
             }
             let fresh = try await thread
             loaded = true
+            if fromCache { replacedCache += 1 }
             unreadFrom = Self.firstUnread(in: page.rows, thread: fresh)
             self.thread = fresh
             error = nil

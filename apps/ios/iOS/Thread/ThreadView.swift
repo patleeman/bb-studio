@@ -27,6 +27,8 @@ struct ThreadView: View {
     @State private var atTop = false
     /// How far the timeline is scrolled past its last row, or negative short of it.
     @State private var pastEnd: CGFloat = 0
+    /// Rebuilds the timeline so it opens at the bottom of the server's rows.
+    @State private var timelineKey = 0
     @State private var scrollPhase = ScrollPhase.idle
     @State private var selecting: SelectionText?
     @State private var selectedExcerpt = ""
@@ -222,7 +224,7 @@ struct ThreadView: View {
             // Built once the first page is in, so it opens at the bottom of real
             // content rather than growing from empty.
             if model.loaded {
-                timeline
+                timeline.id(timelineKey)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -237,6 +239,13 @@ struct ThreadView: View {
             }
         }
         .animation(.snappy, value: finding)
+        // The cached rows go in at the bottom first; the server's page then
+        // swaps them, usually for fewer, and the lazy stack is left past its
+        // new end, blank until something redraws it. Start again at the bottom
+        // unless the reader has scrolled up into the cached rows.
+        .onChange(of: model.replacedCache) { _, _ in
+            if atBottom || pastEnd > Self.pastEndSlack { timelineKey += 1 }
+        }
         .overlay(alignment: .bottomTrailing) { jumpButton }
         .animation(.snappy, value: atBottom)
         .safeAreaInset(edge: .bottom) { composer }
