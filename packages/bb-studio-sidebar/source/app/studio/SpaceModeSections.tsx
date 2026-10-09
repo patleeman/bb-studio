@@ -399,14 +399,9 @@ export function SpaceModeSections({
           <SortableContext items={order} strategy={verticalListSortingStrategy}>
             <div className="space-y-5">
             {chiefThreads.length ? (
-              <section data-chief-of-staff={chiefId ?? undefined} aria-label="Chief of Staff" className="mt-1 flex items-start gap-0.5 pl-1.5">
-                {/* A row with a small avatar: your assistant, above the Spaces rather than another section. */}
-                <span aria-hidden="true" className="mt-2 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-                  <Icon name="UserRound" className="size-3" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  {tree({ rootItems: chiefItems, threads: chiefThreads })}
-                </div>
+              <section data-chief-of-staff={chiefId ?? undefined} aria-label="Chief of Staff">
+                {/* Above the Spaces rather than in one; its row's mark is an avatar. */}
+                {tree({ rootItems: chiefItems, threads: chiefThreads })}
               </section>
             ) : null}
             {order.map((sectionId) => {
