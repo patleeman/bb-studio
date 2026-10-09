@@ -179,6 +179,10 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
     );
 
   const url = status?.state === "running" ? status.url : null;
+  // A visible view starts VS Code itself, so until it's up (or the user
+  // stopped it, or it failed for good) it's on its way: a spinner, not a button.
+  const waiting = !status || status.state === "installing" || status.state === "starting" || status.state === "running"
+    || (embed && !userStopped && (status.state === "stopped" || (status.state === "failed" && !retried)));
   const password = status?.state === "running" ? status.password : null;
   const showFolders = embed && (editing || !workspace.folders.length);
   const reference = { title: workspace.title, href: workspaceHref(id) };
@@ -231,9 +235,16 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
           <EditorFrame key={`${url}#${frameLoad}`} id={id} url={url} password={password} label={`VS Code: ${workspace.title}`} />
         ) : workspace.folders.length ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-            <p role={status?.state === "failed" ? "alert" : "status"} className="text-sm text-muted-foreground">{STATUS_TEXT[status?.state ?? "stopped"]}</p>
-            {status?.error && <pre className="max-w-xl whitespace-pre-wrap text-left text-xs text-destructive">{status.error}</pre>}
-            {(status?.state === "stopped" || status?.state === "failed") && (
+            {waiting ? (
+              <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Icon name="Loading" className="size-4 animate-spin motion-reduce:animate-none" />
+                {status?.state === "installing" ? STATUS_TEXT.installing : STATUS_TEXT.starting}
+              </p>
+            ) : (
+              <p role={status?.state === "failed" ? "alert" : "status"} className="text-sm text-muted-foreground">{STATUS_TEXT[status?.state ?? "stopped"]}</p>
+            )}
+            {!waiting && status?.error && <pre className="max-w-xl whitespace-pre-wrap text-left text-xs text-destructive">{status.error}</pre>}
+            {!waiting && (status?.state === "stopped" || status?.state === "failed") && (
               <button type="button" className={BAR_BUTTON} onClick={open}>
                 <Icon name="Play" className="size-4" /> Open in VS Code
               </button>
