@@ -282,12 +282,12 @@ export const rpcContract = defineRpcContract({
   },
   /** Files in a thread's worktree that git doesn't ignore, relative to it. */
   spaceFiles: {
-    input: z.object({ threadId: z.string().min(1).max(200) }),
+    input: z.object({ id: spaceId, threadId: z.string().min(1).max(200) }),
     output: z.object({ root: z.string(), files: z.array(z.string()), truncated: z.boolean() }),
   },
   /** A file's text from a thread's worktree, or why it can't be shown. */
   spaceFile: {
-    input: z.object({ threadId: z.string().min(1).max(200), path: z.string().min(1).max(4096) }),
+    input: z.object({ id: spaceId, threadId: z.string().min(1).max(200), path: z.string().min(1).max(4096) }),
     output: z.object({ text: z.string().nullable(), reason: z.string().nullable() }),
   },
   /** Open threads to pick from when adding one to a space. */

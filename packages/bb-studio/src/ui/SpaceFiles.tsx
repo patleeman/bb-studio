@@ -85,23 +85,23 @@ export function SpaceFiles({ space, threadId: wanted = null, canOpenCode = false
     setFile(null);
     setOpen(new Set());
     setError("");
-    rpc.call("spaceFiles", { threadId }).then(
+    rpc.call("spaceFiles", { id: space.id, threadId }).then(
       (result) => live && setListing({ threadId, files: result.files, truncated: result.truncated }),
       (cause) => live && setError(errorMessage(cause)),
     );
     return () => { live = false; };
-  }, [rpc, threadId]);
+  }, [rpc, space.id, threadId]);
 
   useEffect(() => {
     if (!file || !threadId) return;
     let live = true;
     setText(null);
-    rpc.call("spaceFile", { threadId, path: file }).then(
+    rpc.call("spaceFile", { id: space.id, threadId, path: file }).then(
       (result) => live && setText(result),
       (cause) => live && setText({ text: null, reason: errorMessage(cause) }),
     );
     return () => { live = false; };
-  }, [rpc, threadId, file]);
+  }, [rpc, space.id, threadId, file]);
 
   const tree = useMemo(() => fileTree(listing?.files ?? []), [listing]);
   const current = worktrees?.find((each) => each.threadId === threadId);

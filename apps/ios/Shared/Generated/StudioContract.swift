@@ -3271,9 +3271,11 @@ public enum Studio {
   }
 
   public struct SpaceFilesInput: Sendable, Hashable, Codable {
+    public var id: String?
     public var threadId: String?
 
-    public init(threadId: String? = nil) {
+    public init(id: String? = nil, threadId: String? = nil) {
+      self.id = id
       self.threadId = threadId
     }
   }
@@ -3291,10 +3293,12 @@ public enum Studio {
   }
 
   public struct SpaceFileInput: Sendable, Hashable, Codable {
+    public var id: String?
     public var threadId: String?
     public var path: String?
 
-    public init(threadId: String? = nil, path: String? = nil) {
+    public init(id: String? = nil, threadId: String? = nil, path: String? = nil) {
+      self.id = id
       self.threadId = threadId
       self.path = path
     }

@@ -31,7 +31,7 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
-import { listFiles, readFile, worktrees } from "./src/space-files";
+import { listFiles, readFile, requireThreadInSpace, worktrees } from "./src/space-files";
 import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
 import { SpaceFolders } from "./src/space-folders";
 import { planMove } from "./src/move-items";
@@ -583,8 +583,14 @@ export default async function plugin(bb: BbPluginApi) {
       const threads = (await recentThreads()).filter((thread) => spaces.ownerOfThread(thread) === id);
       return { worktrees: await worktrees(bb, threads) };
     },
-    spaceFiles: ({ threadId }) => listFiles(bb, threadId),
-    spaceFile: ({ threadId, path }) => readFile(bb, threadId, path),
+    spaceFiles: async ({ id, threadId }) => {
+      await requireThreadInSpace(bb, (thread) => spaces.ownerOfThread(thread), id, threadId);
+      return listFiles(bb, threadId);
+    },
+    spaceFile: async ({ id, threadId, path }) => {
+      await requireThreadInSpace(bb, (thread) => spaces.ownerOfThread(thread), id, threadId);
+      return readFile(bb, threadId, path);
+    },
     recentThreads: async () => ({ threads: await recentThreads() }),
     pendingThreadSpaces: ({ projectId, ids }) => {
       if (ids.length) pendingSpaces.set(projectId, { ids, at: Date.now() });

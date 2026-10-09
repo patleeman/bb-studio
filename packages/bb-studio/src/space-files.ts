@@ -62,3 +62,16 @@ export async function readFile(bb: Sdk, threadId: string, path: string): Promise
   if (bytes.includes(0)) return { text: null, reason: "This file isn't text." };
   return { text: bytes.toString("utf8"), reason: null };
 }
+
+/** Only a thread that belongs to the space may have its worktree read through it. */
+export async function requireThreadInSpace(
+  bb: Sdk,
+  ownerOf: (thread: { id: string; projectId: string | null }) => string,
+  spaceId: string,
+  threadId: string,
+): Promise<void> {
+  const thread = (await bb.sdk.threads.get({ threadId }).catch(() => null)) as { projectId?: string | null } | null;
+  if (!thread || ownerOf({ id: threadId, projectId: thread.projectId ?? null }) !== spaceId) {
+    throw new Error("That thread isn't in this space.");
+  }
+}
