@@ -345,3 +345,13 @@ it("forgets a deleted Chief of Staff", async () => {
   x.threads.delete(first.id);
   expect(await x.leads.chief()).toMatchObject({ threadId: null });
 });
+
+it("keeps an archived Chief of Staff and its heartbeat, as it keeps an archived lead", async () => {
+  const x = await setup();
+  const first = await x.spawn({ projectId: "p" });
+  await x.leads.setChief(first.id);
+  await x.leads.setChiefRun({ enabled: true, cadence: "every2hours", time: "07:15" });
+  await x.archive({ threadId: first.id });
+  expect(await x.leads.chief()).toMatchObject({ threadId: first.id, run: { enabled: true, cadence: "every2hours", time: "07:15" } });
+  expect(await x.leads.setChiefRun({ enabled: false, cadence: "every2hours" })).toMatchObject({ run: { enabled: false } });
+});

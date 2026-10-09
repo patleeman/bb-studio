@@ -14,6 +14,54 @@ const RUN_LABELS: Record<Cadence, string> = {
 };
 const SELECT = "w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:opacity-50";
 
+type Run = { enabled: boolean; cadence: Cadence; time?: string | null; cron?: string | null } | null;
+export type HeartbeatForm = ReturnType<typeof useHeartbeatForm>;
+
+/** The heartbeat's cadence, time and cron, reset whenever the saved run changes. */
+export function useHeartbeatForm(run: Run) {
+  const [cadence, setCadence] = useState<Cadence | "off">("off");
+  const [time, setTime] = useState("09:00");
+  const [cron, setCron] = useState("");
+  useEffect(() => {
+    setCadence(run?.enabled ? run.cadence : "off");
+    setTime(run?.time ?? "09:00");
+    setCron(run?.cron ?? "");
+  }, [run?.enabled, run?.cadence, run?.time, run?.cron]);
+  /** The run RPC's input: off keeps the saved cadence. */
+  const input = () => {
+    const enabled = cadence !== "off";
+    return { enabled, cadence: enabled ? cadence : run?.cadence ?? "daily", time, ...(cadence === "custom" ? { cron: cron.trim() } : {}) };
+  };
+  return { cadence, setCadence, time, setTime, cron, setCron, input };
+}
+
+/** Cadence select plus time or cron. `needs` explains why it's off, when it must be. */
+export function HeartbeatFields({ form, disabled, needs }: { form: HeartbeatForm; disabled: boolean; needs: string | null }) {
+  const { cadence, setCadence, time, setTime, cron, setCron } = form;
+  const on = needs === null;
+  return (
+    <>
+      <label className="block space-y-1">
+        <span className="font-medium">Heartbeat</span>
+        <select aria-label="Heartbeat" className={SELECT} disabled={disabled || !on} value={on ? cadence : "off"} onChange={(event) => setCadence(event.target.value as Cadence | "off")}>
+          <option value="off">Off</option>
+          {(Object.keys(RUN_LABELS) as Cadence[]).map((value) => <option key={value} value={value}>{RUN_LABELS[value]}</option>)}
+        </select>
+        {needs ? <span className="block text-xs text-muted-foreground">{needs}</span> : null}
+      </label>
+      {on && cadence !== "off" && cadence !== "custom" ? (
+        <label className="flex items-center justify-between gap-3">
+          <span>Time (minute for hourly cadences)</span>
+          <input type="time" value={time} onChange={(event) => setTime(event.target.value)} className="rounded-md border border-border bg-background px-2 py-1" />
+        </label>
+      ) : null}
+      {on && cadence === "custom" ? (
+        <Input aria-label="Cron expression" placeholder="*/15 9-17 * * 1-5" value={cron} onChange={(event) => setCron(event.target.value)} />
+      ) : null}
+    </>
+  );
+}
+
 export function SpaceHeartbeatDialog({ space, onClose }: { space: SpaceView; onClose(): void }) {
   const call = useCall();
   const lead = useSpaceLead(space.id);
@@ -21,17 +69,10 @@ export function SpaceHeartbeatDialog({ space, onClose }: { space: SpaceView; onC
   const recent = useLive<{ threads: SpaceThreadView[] }>("recentThreads", null, { pollMs: 0 });
   const threads = (recent.data?.threads ?? []).filter((thread) => spaceOf(thread.id) === space.id);
   const leadId = lead.data?.leadThreadId ?? null;
-  const [cadence, setCadence] = useState<Cadence | "off">("off");
-  const [time, setTime] = useState("09:00");
-  const [cron, setCron] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = lead.data?.run ?? null;
-  useEffect(() => {
-    setCadence(run?.enabled ? run.cadence : "off");
-    setTime(run?.time ?? "09:00");
-    setCron(run?.cron ?? "");
-  }, [run?.enabled, run?.cadence, run?.time, run?.cron]);
+  const form = useHeartbeatForm(run);
 
   const perform = async (method: string, input: unknown) => {
     setBusy(true);
@@ -49,11 +90,7 @@ export function SpaceHeartbeatDialog({ space, onClose }: { space: SpaceView; onC
   };
   const setLead = (threadId: string) => void perform("space_set_lead", { spaceId: space.id, threadId: threadId || null });
   const save = async () => {
-    const enabled = cadence !== "off";
-    const ok = await perform("space_set_run", {
-      spaceId: space.id, enabled, cadence: enabled ? cadence : run?.cadence ?? "daily", time,
-      ...(cadence === "custom" ? { cron: cron.trim() } : {}),
-    });
+    const ok = await perform("space_set_run", { spaceId: space.id, ...form.input() });
     if (ok) onClose();
   };
 
@@ -73,23 +110,7 @@ export function SpaceHeartbeatDialog({ space, onClose }: { space: SpaceView; onC
               {threads.map((thread) => <option key={thread.id} value={thread.id}>{thread.title}</option>)}
             </select>
           </label>
-          <label className="block space-y-1">
-            <span className="font-medium">Heartbeat</span>
-            <select aria-label="Heartbeat" className={SELECT} disabled={busy || !leadId} value={leadId ? cadence : "off"} onChange={(event) => setCadence(event.target.value as Cadence | "off")}>
-              <option value="off">Off</option>
-              {(Object.keys(RUN_LABELS) as Cadence[]).map((value) => <option key={value} value={value}>{RUN_LABELS[value]}</option>)}
-            </select>
-            {!leadId ? <span className="block text-xs text-muted-foreground">Pick a lead to turn the heartbeat on.</span> : null}
-          </label>
-          {leadId && cadence !== "off" && cadence !== "custom" ? (
-            <label className="flex items-center justify-between gap-3">
-              <span>Time (minute for hourly cadences)</span>
-              <input type="time" value={time} onChange={(event) => setTime(event.target.value)} className="rounded-md border border-border bg-background px-2 py-1" />
-            </label>
-          ) : null}
-          {leadId && cadence === "custom" ? (
-            <Input aria-label="Cron expression" placeholder="*/15 9-17 * * 1-5" value={cron} onChange={(event) => setCron(event.target.value)} />
-          ) : null}
+          <HeartbeatFields form={form} disabled={busy} needs={leadId ? null : "Pick a lead to turn the heartbeat on."} />
           {error ? <p role="alert" className="text-destructive">{error}</p> : null}
         </div>
         <DialogFooter>

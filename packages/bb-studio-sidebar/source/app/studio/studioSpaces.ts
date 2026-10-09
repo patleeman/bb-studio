@@ -279,16 +279,14 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
         // Leads load in every mode: a lead can't be archived from any view.
         const leadsLoad = Promise.all(spaces.map((space) => call("space_lead", { spaceId: space.id }, leadSchema)
           .then((lead) => [space.id, lead] as const, () => [space.id, null] as const)));
+        // So does the Chief of Staff, for the same reason. An older Studio has none.
+        const chiefLoad = call("chief_of_staff", {}, chiefSchema).catch(() => null);
         if (spaceMode) {
-          const [of, tree, chief] = await Promise.all([
+          const [of, tree] = await Promise.all([
             call("space_of_threads", {}, spaceOfSchema),
             // Items are a nicety: a failure leaves the lists empty, not the sidebar.
             call("spaceTree", {}, treeSchema).catch(() => ({ spaces: [] })),
-            // An older Studio has no Chief of Staff: no pin.
-            call("chief_of_staff", {}, chiefSchema).catch(() => null),
           ]);
-          chiefOfStaff = withPendingChiefOfStaff(chief?.threadId ?? null, loadSeq);
-          chiefOfStaffHeartbeat = chief?.threadId && chief.run?.enabled ? chief.run.cadence : null;
           spaceOf = withPendingSpaceMoves(of.threads, loadSeq);
           items = Object.fromEntries(tree.spaces.map((space) => [space.id, {
             open: space.open.map(({ pluginId, id, title, icon, kindIcon, href, pinned, kindLabel, updatedAt, preview }) => ({ pluginId, id, title, icon, kindIcon, href, pinned, kindLabel, updatedAt, preview })),
@@ -296,6 +294,9 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
             count: space.itemCount,
           }]));
         }
+        const chief = await chiefLoad;
+        chiefOfStaff = withPendingChiefOfStaff(chief?.threadId ?? null, loadSeq);
+        chiefOfStaffHeartbeat = chief?.threadId && chief.run?.enabled ? chief.run.cadence : null;
         const leadRows = await leadsLoad;
         leads = withPendingLeads(Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId ?? null])), loadSeq);
         heartbeats = Object.fromEntries(leadRows.map(([id, lead]) => [id, lead?.leadThreadId && lead.run?.enabled ? lead.run.cadence : null]));

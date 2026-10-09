@@ -7,7 +7,8 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
-import { SPACE_CHANGED_EVENT, SPACE_DIALOG_EVENT } from "../ids";
+import { CHIEF_DIALOG_EVENT, SPACE_CHANGED_EVENT, SPACE_DIALOG_EVENT } from "../ids";
+import { ChiefHeartbeatDialog } from "./ChiefHeartbeat";
 import { SpaceHeartbeatDialog } from "./SpaceHeartbeat";
 import { AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceProjectsDialog } from "./Spaces";
 
@@ -37,6 +38,17 @@ export function ManageSpace() {
     return () => window.removeEventListener(SPACE_DIALOG_EVENT, show);
   }, [load]);
 
+  const [chiefOpen, setChiefOpen] = useState(false);
+  useEffect(() => {
+    const show = (event: Event) => {
+      event.preventDefault();
+      setChiefOpen(true);
+    };
+    window.addEventListener(CHIEF_DIALOG_EVENT, show);
+    return () => window.removeEventListener(CHIEF_DIALOG_EVENT, show);
+  }, []);
+
+  if (chiefOpen) return <ChiefHeartbeatDialog onClose={() => setChiefOpen(false)} />;
   if (!open || !space) return null;
   const close = () => setOpen(null);
   const changed = () => {

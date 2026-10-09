@@ -21,14 +21,15 @@ export interface SpaceLeadState {
 export const SpaceLeadContext = createContext<SpaceLeadState | null>(null);
 
 /**
- * Whether the thread leads any Space, in every organization mode: Studio's
- * leads load with its Spaces whatever the sidebar shows.
+ * Whether the thread leads any Space or is the Chief of Staff, in every
+ * organization mode: Studio's leads and Chief of Staff load with its Spaces
+ * whatever the sidebar shows. Either can't be archived until it's demoted.
  */
 export function isSpaceLeadThread(state: StudioSpacesState, threadId: string): boolean {
-  return state.status === "ready" && Object.values(state.leads).includes(threadId);
+  return state.status === "ready" && (state.chiefOfStaff === threadId || Object.values(state.leads).includes(threadId));
 }
 
-/** Whether the thread leads its Space. A lead can't be archived until it's demoted. */
+/** Whether the thread leads its Space or is the Chief of Staff. It can't be archived until it's demoted. */
 export function useIsSpaceLead(thread: SidebarThread): boolean {
   return isSpaceLeadThread(useAtomValue(studioSpacesAtom), thread.id);
 }
@@ -55,6 +56,15 @@ export function leadSafeArchiveIds(
     const parent = byId.get(id)?.parentThreadId ?? null;
     return parent === null || !take.has(parent);
   });
+}
+
+/** Window event that opens Studio's Chief of Staff heartbeat dialog. */
+export const CHIEF_DIALOG_EVENT = "studio:chief-dialog";
+
+/** Opens Studio's Chief of Staff heartbeat dialog; tells the user when Studio didn't. */
+export function openChiefHeartbeat() {
+  const event = new Event(CHIEF_DIALOG_EVENT, { cancelable: true });
+  if (window.dispatchEvent(event)) toast.error("Open Studio to set the Chief of Staff's heartbeat.");
 }
 
 /** The Chief of Staff thread while By space shows it, else null. */
@@ -95,6 +105,11 @@ export function SpaceLeadItem({ thread, surface }: {
         <ActionMenuItem surface={surface} icon={isChief ? "Minus" : "Star"} onSelect={toggleChief}>
           {isChief ? "Remove as Chief of Staff" : "Make Chief of Staff"}
         </ActionMenuItem>
+        {isChief ? (
+          <ActionMenuItem surface={surface} icon="Clock" onSelect={openChiefHeartbeat}>
+            Heartbeat…
+          </ActionMenuItem>
+        ) : null}
       </>
     );
   }
@@ -110,6 +125,7 @@ export function SpaceLeadItem({ thread, surface }: {
     </Item>
   );
   return (
+    <>
     <Sub>
       <SubTrigger>
         <Icon name="Star" aria-hidden="true" />
@@ -120,6 +136,13 @@ export function SpaceLeadItem({ thread, surface }: {
         {role("Chief of Staff", isChief, toggleChief)}
       </SubContent>
     </Sub>
+    {isChief ? (
+      <Item className="flex items-center gap-2" onSelect={openChiefHeartbeat}>
+        <Icon name="Clock" aria-hidden="true" />
+        Heartbeat…
+      </Item>
+    ) : null}
+    </>
   );
 }
 

@@ -19,5 +19,12 @@ export const NEW_SPACE_EVENT = "studio:new-space";
  */
 export const SPACE_DIALOG_EVENT = "studio:space-dialog";
 
+/**
+ * Window event that opens the Chief of Staff's heartbeat dialog from anywhere,
+ * such as the Chief of Staff row's menu in Studio Sidebar; no detail. Dispatch
+ * it cancelable: Studio cancels it when it opens the dialog.
+ */
+export const CHIEF_DIALOG_EVENT = "studio:chief-dialog";
+
 /** Window event after a space dialog changes the space; detail `{ spaceId }`. */
 export const SPACE_CHANGED_EVENT = "studio:space-changed";

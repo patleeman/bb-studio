@@ -38,6 +38,10 @@ turns off. The Chief of Staff's own Heartbeat, an automation named
 be a Space's lead. Demoting it, or promoting another thread, returns it to
 the Space it came from, or to Personal if that Space is gone. A handoff
 keeps the successor Chief of Staff, and deleting the thread empties the slot.
+Archiving it doesn't: like a Space lead, Studio keeps an archived Chief of
+Staff and its Heartbeat, and Studio Sidebar won't archive it (alone or with
+its project) until it's demoted. Its row menu has Heartbeat… to set the
+schedule.
 
 
 Other plugins (Studio Sidebar) open Studio's Space dialogs by window event:
@@ -46,6 +50,8 @@ Other plugins (Studio Sidebar) open Studio's Space dialogs by window event:
 - `studio:space-dialog` with detail `{ spaceId, dialog }`, where dialog is
   `edit`, `delete`, `threads`, `projects` or `heartbeat` (lead and
   Heartbeat). Studio cancels the event when it opens one.
+- `studio:chief-dialog` (no detail): the Chief of Staff's Heartbeat, saved
+  with `chief_of_staff_set_run`. Studio cancels the event when it opens it.
 - Studio sends `studio:space-changed` with `{ spaceId }` after a dialog
   changes a Space.
 
