@@ -18,6 +18,8 @@ commands, and separators resize with the mouse or arrow keys. Closing a tab
 keeps the item. The workspace remembers the layout locally across visits and
 refreshes. Old list addresses, such as a kind's (`/plugins/studio/studio/page`),
 open the new tab page on that kind.
+Right-click a tab for Close, Close others, Close tabs to the right, Close all in
+the pane, splits, moves to another pane, its own page, and Copy link.
 Each tab row carries the active item's tools, such as Chat, beside its tabs.
 With one pane, the tab row takes BB's title bar, so the item sits under a
 single bar. Open items live here, not in the sidebar; a Space's Browse menu
@@ -28,6 +30,8 @@ pane picker shows one pane at a time while preserving the desktop arrangement.
 ![Studio's new tab page: the item list as a tab in the workspace](assets/workspace-new-tab.png)
 
 ![Studio workspace with one pane, its tabs and the page's tools in BB's title bar](assets/workspace-single.png)
+
+![A Studio tab's right-click menu: close, close others, close to the right, split, move, open and copy link](assets/workspace-tab-menu.png)
 
 ![Studio workspace with a page and recording in separate panes](assets/workspace.png)
 
