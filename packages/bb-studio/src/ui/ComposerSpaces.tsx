@@ -12,7 +12,7 @@ import {
 } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
-import { useBbNavigate, useComposer, useComposerView, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useComposer, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
@@ -132,10 +132,9 @@ export function ComposerSpaces() {
 }
 
 function SpacePicker() {
-  const view = useComposerView();
   const composer = useComposer();
   const rpc = useRpc<typeof rpcContract>();
-  const projectId = view.scope.kind === "new-thread" ? view.scope.projectId : null;
+  const projectId = composer.scope.kind === "new-thread" ? composer.scope.projectId : null;
   const { all } = useSpaces(null);
   const [picked, setPicked] = useState<string[]>(() => (projectId ? savedPick(projectId) : []));
 
@@ -170,7 +169,7 @@ function SpacePicker() {
   useEffect(() => {
     if (!projectId) return;
     // The server adds the thread with the first message; start fresh.
-    return composer.experimental_onSubmitted(() => {
+    return composer.onSubmitted(() => {
       savePick(projectId, []);
       setPicked([]);
     });

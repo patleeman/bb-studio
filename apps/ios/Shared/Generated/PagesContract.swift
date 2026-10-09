@@ -2382,30 +2382,6 @@ public enum Pages {
     }
   }
 
-  public enum WorkInputRequestServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public enum WorkInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
     case client_preference
     case explicit
@@ -2548,13 +2524,13 @@ public enum Pages {
     public var model: String?
     public var reasoningLevel: WorkInputRequestReasoningLevel?
     public var permissionMode: WorkInputRequestPermissionMode?
-    public var serviceTier: WorkInputRequestServiceTier?
+    public var serviceTier: String?
     public var executionInputSources: WorkInputRequestExecutionInputSources?
     public var environment: [String: StudioJSONValue]?
     public var input: [[String: StudioJSONValue]]?
     public var sendAt: Int?
 
-    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: WorkInputRequestReasoningLevel? = nil, permissionMode: WorkInputRequestPermissionMode? = nil, serviceTier: WorkInputRequestServiceTier? = nil, executionInputSources: WorkInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: WorkInputRequestReasoningLevel? = nil, permissionMode: WorkInputRequestPermissionMode? = nil, serviceTier: String? = nil, executionInputSources: WorkInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
       self.projectId = projectId
       self.providerId = providerId
       self.model = model

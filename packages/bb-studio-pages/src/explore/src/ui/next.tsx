@@ -59,7 +59,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
       return;
     }
     logClick(kind, item);
-    composer.updateText((current) => appendDraft(current, text));
+    composer.replace((current) => ({ text: appendDraft(current.text, text), mentions: current.mentions }));
     composer.focus();
   };
 

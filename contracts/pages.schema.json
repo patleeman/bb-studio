@@ -3510,10 +3510,7 @@
               },
               "serviceTier": {
                 "type": "string",
-                "enum": [
-                  "default",
-                  "fast"
-                ]
+                "minLength": 1
               },
               "executionInputSources": {
                 "type": "object",

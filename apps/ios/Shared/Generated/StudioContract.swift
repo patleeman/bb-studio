@@ -593,30 +593,6 @@ public enum Studio {
     }
   }
 
-  public enum CommandSpawnInputRequestServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public enum CommandSpawnInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
     case client_preference
     case explicit
@@ -759,13 +735,13 @@ public enum Studio {
     public var model: String?
     public var reasoningLevel: CommandSpawnInputRequestReasoningLevel?
     public var permissionMode: CommandSpawnInputRequestPermissionMode?
-    public var serviceTier: CommandSpawnInputRequestServiceTier?
+    public var serviceTier: String?
     public var executionInputSources: CommandSpawnInputRequestExecutionInputSources?
     public var environment: [String: StudioJSONValue]?
     public var input: [[String: StudioJSONValue]]?
     public var sendAt: Int?
 
-    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: CommandSpawnInputRequestReasoningLevel? = nil, permissionMode: CommandSpawnInputRequestPermissionMode? = nil, serviceTier: CommandSpawnInputRequestServiceTier? = nil, executionInputSources: CommandSpawnInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: CommandSpawnInputRequestReasoningLevel? = nil, permissionMode: CommandSpawnInputRequestPermissionMode? = nil, serviceTier: String? = nil, executionInputSources: CommandSpawnInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
       self.projectId = projectId
       self.providerId = providerId
       self.model = model
@@ -4122,30 +4098,6 @@ public enum Studio {
     }
   }
 
-  public enum ThreadHandoffInputRequestServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public enum ThreadHandoffInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
     case client_preference
     case explicit
@@ -4288,13 +4240,13 @@ public enum Studio {
     public var model: String?
     public var reasoningLevel: ThreadHandoffInputRequestReasoningLevel?
     public var permissionMode: ThreadHandoffInputRequestPermissionMode?
-    public var serviceTier: ThreadHandoffInputRequestServiceTier?
+    public var serviceTier: String?
     public var executionInputSources: ThreadHandoffInputRequestExecutionInputSources?
     public var environment: [String: StudioJSONValue]?
     public var input: [[String: StudioJSONValue]]?
     public var sendAt: Int?
 
-    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: ThreadHandoffInputRequestReasoningLevel? = nil, permissionMode: ThreadHandoffInputRequestPermissionMode? = nil, serviceTier: ThreadHandoffInputRequestServiceTier? = nil, executionInputSources: ThreadHandoffInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: ThreadHandoffInputRequestReasoningLevel? = nil, permissionMode: ThreadHandoffInputRequestPermissionMode? = nil, serviceTier: String? = nil, executionInputSources: ThreadHandoffInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
       self.projectId = projectId
       self.providerId = providerId
       self.model = model
@@ -6267,30 +6219,6 @@ public enum Studio {
     }
   }
 
-  public enum ChatStartInputRequestServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public enum ChatStartInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
     case client_preference
     case explicit
@@ -6433,13 +6361,13 @@ public enum Studio {
     public var model: String?
     public var reasoningLevel: ChatStartInputRequestReasoningLevel?
     public var permissionMode: ChatStartInputRequestPermissionMode?
-    public var serviceTier: ChatStartInputRequestServiceTier?
+    public var serviceTier: String?
     public var executionInputSources: ChatStartInputRequestExecutionInputSources?
     public var environment: [String: StudioJSONValue]?
     public var input: [[String: StudioJSONValue]]?
     public var sendAt: Int?
 
-    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: ChatStartInputRequestReasoningLevel? = nil, permissionMode: ChatStartInputRequestPermissionMode? = nil, serviceTier: ChatStartInputRequestServiceTier? = nil, executionInputSources: ChatStartInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: ChatStartInputRequestReasoningLevel? = nil, permissionMode: ChatStartInputRequestPermissionMode? = nil, serviceTier: String? = nil, executionInputSources: ChatStartInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
       self.projectId = projectId
       self.providerId = providerId
       self.model = model

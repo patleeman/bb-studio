@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendQuote,
   composeReactionDraft,
   parseQuotePosition,
 } from "./draft";
@@ -40,7 +41,7 @@ describe("composeReactionDraft", () => {
   });
 
   it("keeps the reaction next to its quote after an existing draft with quotePosition after", () => {
-    // `addQuote` appends the quote below what the user already typed.
+    // `appendQuote` appends the quote below what the user already typed.
     expect(
       composeReactionDraft("my notes\n> selected text\n", "👍 Agree", true, "after", "my notes"),
     ).toBe("my notes\n\n👍 Agree\n\n> selected text\n");
@@ -61,5 +62,15 @@ describe("composeReactionDraft", () => {
 
   it("keeps the draft unchanged for an empty reaction", () => {
     expect(composeReactionDraft(quote, "   ", true, "before")).toBe(quote);
+  });
+});
+
+describe("appendQuote", () => {
+  it("quotes each line below the existing draft", () => {
+    expect(appendQuote("my notes", "line one\nline two")).toBe("my notes\n> line one\n> line two\n");
+  });
+
+  it("quotes into an empty draft", () => {
+    expect(appendQuote("", " selected text ")).toBe("> selected text\n");
   });
 });

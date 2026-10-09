@@ -38,8 +38,6 @@ function scopeThread(scope: PluginComposerScope): string | null {
     case "thread":
     case "queued-message":
       return scope.threadId;
-    case "side-chat":
-      return scope.childThreadId;
     default:
       return null;
   }

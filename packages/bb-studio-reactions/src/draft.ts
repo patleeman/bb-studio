@@ -44,6 +44,12 @@ export function composeReactionDraft(
       ? `${kept.trimEnd()}\n\n${trimmed}\n\n${quote}`
       : `${trimmed}\n\n${quote}`;
   }
-  // `addQuote` ends the quote with a newline; trim it so one blank line separates them.
+  // `appendQuote` ends the quote with a newline; trim it so one blank line separates them.
   return `${current.trimEnd()}\n\n${trimmed}`;
+}
+
+/** Append `selected` to `draft` as a Markdown quote block ending in a newline. */
+export function appendQuote(draft: string, selected: string): string {
+  const quote = selected.trim().split("\n").map((line) => `> ${line}`.trimEnd()).join("\n");
+  return `${draft.length > 0 ? `${draft.trimEnd()}\n` : ""}${quote}\n`;
 }

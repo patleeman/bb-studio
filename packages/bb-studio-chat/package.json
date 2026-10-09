@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Upgrade bridge for retired Studio Chat: transfers saved conversation links to Studio and forwards old clients and mentions.",
   "engines": {
-    "bb": ">=0.44",
-    "bbPluginSdk": ">=0.5.29"
+    "bb": ">=0.45",
+    "bbPluginSdk": ">=0.6.15"
   },
   "bb": {
     "name": "Studio Chat",
@@ -27,7 +27,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.5.29",
+    "@get-bb/plugin-sdk": "0.6.15",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

@@ -18,7 +18,7 @@ export function ComposerBridge() {
     const onReference = (event: Event) => {
       const recording = parseRecordingReference((event as CustomEvent<{ recording?: unknown }>).detail?.recording);
       if (!recording) return;
-      current.current.insertMention({ provider: "recordings", id: recording.id, label: recording.title });
+      current.current.insert({ provider: "recordings", id: recording.id, label: recording.title });
       event.preventDefault();
       event.stopPropagation();
     };

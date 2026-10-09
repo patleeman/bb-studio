@@ -30,6 +30,7 @@ import { menuSettings, needsMenuReload, type MenuSettings } from "./src/settings
 import { mountActionDecoration } from "./src/action-decoration";
 import { ComposerBridge, composerFor } from "@bb-studio/kit/composer";
 import {
+  appendQuote,
   composeReactionDraft,
   type QuotePosition,
 } from "./src/draft";
@@ -78,15 +79,15 @@ function draftReaction(
     quoteSelection &&
     selectedText !== null &&
     selectedText.trim().length > 0;
-  const draftBeforeQuote = composer.text;
-  if (quoted) {
-    // `addQuote` appends the quote block to the draft; composeReactionDraft
-    // then slots the reaction text in before or after it.
-    composer.addQuote(selectedText);
-  }
-  composer.updateText((current) =>
-    composeReactionDraft(current, itemText, quoted, quotePosition, draftBeforeQuote),
-  );
+  composer.replace((current) => {
+    const draftBeforeQuote = current.text;
+    // The stable composer has no quote helper, so append the quote block here;
+    // composeReactionDraft then slots the reaction text in before or after it.
+    const withQuote = quoted ? appendQuote(draftBeforeQuote, selectedText) : draftBeforeQuote;
+    const text = composeReactionDraft(withQuote, itemText, quoted, quotePosition, draftBeforeQuote);
+    // The user's draft stays a prefix, so its mentions keep their offsets.
+    return { text, mentions: current.mentions.filter((mention) => mention.to <= text.length) };
+  });
   composer.focus();
 }
 

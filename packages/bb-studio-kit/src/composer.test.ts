@@ -4,10 +4,7 @@ import { pickComposer } from "./composer";
 const main = { name: "main", scope: { kind: "new-thread", projectId: null } } as const;
 const floated = { name: "floated", scope: { kind: "thread", threadId: "thr_a" } } as const;
 const other = { name: "other", scope: { kind: "thread", threadId: "thr_b" } } as const;
-const side = {
-  name: "side",
-  scope: { kind: "side-chat", projectId: "p", parentThreadId: "thr_b", tabId: "t", childThreadId: "thr_c" },
-} as const;
+const queued = { name: "queued", scope: { kind: "queued-message", threadId: "thr_c", queuedMessageId: "q" } } as const;
 
 describe("pickComposer", () => {
   it("drafts into the composer for the message's thread, not the newest one", () => {
@@ -15,8 +12,8 @@ describe("pickComposer", () => {
     expect(pickComposer([floated, other], "thr_a")).toBe(floated);
   });
 
-  it("matches a side chat by its child thread", () => {
-    expect(pickComposer([side, other], "thr_c")).toBe(side);
+  it("matches a queued-message composer by its thread", () => {
+    expect(pickComposer([queued, other], "thr_c")).toBe(queued);
   });
 
   it("falls back to a new-thread composer, but never another thread's", () => {

@@ -100,37 +100,13 @@ public enum Decisions {
     }
   }
 
-  public enum ModelAskInputModelSelectionServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelAskInputModelSelection: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelAskInputModelSelectionReasoningLevel?
-    public var serviceTier: ModelAskInputModelSelectionServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelAskInputModelSelectionReasoningLevel? = nil, serviceTier: ModelAskInputModelSelectionServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelAskInputModelSelectionReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel
@@ -198,38 +174,14 @@ public enum Decisions {
     }
   }
 
-  public enum FallbackSuggestOutputServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct FallbackSuggestOutput: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: FallbackSuggestOutputReasoningLevel?
-    public var serviceTier: FallbackSuggestOutputServiceTier?
+    public var serviceTier: String?
     public var mode: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: FallbackSuggestOutputReasoningLevel? = nil, serviceTier: FallbackSuggestOutputServiceTier? = nil, mode: String? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: FallbackSuggestOutputReasoningLevel? = nil, serviceTier: String? = nil, mode: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel

@@ -9,8 +9,7 @@ const view = vi.hoisted(() => ({ text: "" }));
 const rpc = vi.hoisted(() => ({ call: vi.fn(async (method: string) => method === "spaces" ? { spaces: [{ id: "spc_launch", name: "Launch", icon: null }] } : { ok: true }) }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => ({}),
-  useComposer: () => ({ experimental_onSubmitted: () => () => {} }),
-  useComposerView: () => ({ scope: { kind: "new-thread", projectId: "proj_1" }, draft: { text: view.text, isEmpty: !view.text, attachmentCount: 0 } }),
+  useComposer: () => ({ scope: { kind: "new-thread", projectId: "proj_1" }, draft: { text: view.text, mentions: [], attachments: [] }, onSubmitted: () => () => {} }),
   useRealtime: () => {},
   useRpc: () => rpc,
 }));

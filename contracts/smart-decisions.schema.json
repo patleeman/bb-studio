@@ -269,10 +269,8 @@
               },
               "serviceTier": {
                 "type": "string",
-                "enum": [
-                  "default",
-                  "fast"
-                ]
+                "minLength": 1,
+                "maxLength": 100
               }
             },
             "required": [
@@ -416,10 +414,8 @@
               },
               "serviceTier": {
                 "type": "string",
-                "enum": [
-                  "default",
-                  "fast"
-                ]
+                "minLength": 1,
+                "maxLength": 100
               },
               "mode": {
                 "type": "string",
@@ -502,10 +498,8 @@
               },
               "serviceTier": {
                 "type": "string",
-                "enum": [
-                  "default",
-                  "fast"
-                ]
+                "minLength": 1,
+                "maxLength": 100
               },
               "mode": {
                 "type": "string",
@@ -586,10 +580,8 @@
               },
               "serviceTier": {
                 "type": "string",
-                "enum": [
-                  "default",
-                  "fast"
-                ]
+                "minLength": 1,
+                "maxLength": 100
               },
               "mode": {
                 "type": "string",
@@ -650,10 +642,8 @@
               },
               "serviceTier": {
                 "type": "string",
-                "enum": [
-                  "default",
-                  "fast"
-                ]
+                "minLength": 1,
+                "maxLength": 100
               },
               "mode": {
                 "type": "string",

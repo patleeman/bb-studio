@@ -15,7 +15,7 @@ export function conversationRequestSchema(z: typeof Zod) {
     model: z.string(),
     reasoningLevel: z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]),
     permissionMode: z.enum(["accept-edits", "auto", "full"]),
-    serviceTier: z.enum(["default", "fast"]).optional(),
+    serviceTier: z.string().min(1).optional(),
     executionInputSources: z.object({
       model: z.enum(["client-preference", "explicit"]).optional(),
       permissionMode: z.enum(["client-preference", "explicit"]).optional(),

@@ -10,7 +10,7 @@ id is `thread-list-plus`.
 
 Install the plugin in BB, then choose **Studio Sidebar** in **Settings →
 Appearance → Sidebar → Thread list provider**. The bundled Thread List plugin
-stays installed. It needs BB 0.44 or newer and Plugin SDK 0.5.29 or newer.
+stays installed. It needs BB 0.45 or newer and Plugin SDK 0.6.15 or newer.
 
 ## Features
 

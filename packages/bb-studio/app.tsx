@@ -14,7 +14,6 @@ import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { StudioPanel } from "./src/ui/StudioPanel";
 import { ComposerSpaces } from "./src/ui/ComposerSpaces";
-import { publishCommandDraft } from "./src/command/draft-recipients";
 import { ThreadSpaceLink } from "./src/ui/ThreadSpaceLink";
 import { ActivityPanel } from "./src/ui/HomePanel";
 import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
@@ -49,8 +48,6 @@ export default definePluginApp((app) => {
   // new thread joins under its composer.
   app.slots.experimental_threadHeaderAction({ id: "space-link", title: "Space", component: ThreadSpaceLink });
   app.composer.customize({ id: "thread-spaces", scopes: ["new-thread"], actions: [{ id: "spaces", component: ComposerSpaces }] });
-  // The Space Command view's "To" follows the mentions in its draft.
-  app.composer.customize({ id: "command-recipients", scopes: ["new-thread"], richText: { onDraftChange: publishCommandDraft } });
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));
   app.slots.experimental_appOverlay({ id: "health-watch", component: HealthWatch });

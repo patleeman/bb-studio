@@ -42,7 +42,7 @@ export const modelSelectionSchema = z.object({
   providerId: z.string().trim().min(1).max(100),
   model: id,
   reasoningLevel: z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]).nullable(),
-  serviceTier: z.enum(["default", "fast"]).optional(),
+  serviceTier: z.string().trim().min(1).max(100).optional(),
 }).strict();
 export type ModelSelection = z.infer<typeof modelSelectionSchema>;
 const failure = z.object({ ok: z.literal(false), unavailable: z.boolean(), error: z.string() });

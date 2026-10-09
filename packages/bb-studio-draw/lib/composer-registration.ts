@@ -13,8 +13,8 @@ export function createExcalidrawComposerCustomization(
         label: "Drawing",
         icon: DRAW_ICON,
         description: "Attach a drawing to this conversation as an image",
-        disabled: (view) => view.scope.kind !== "thread",
-        run: ({ view }) => run(view.scope),
+        disabled: (composer) => composer.scope.kind !== "thread",
+        run: ({ composer }) => run(composer.scope),
       },
     ],
   };

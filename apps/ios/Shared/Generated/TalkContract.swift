@@ -107,37 +107,13 @@ public enum Talk {
     }
   }
 
-  public enum ModelsGetOutputCleanupServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelsGetOutputCleanup: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelsGetOutputCleanupReasoningLevel?
-    public var serviceTier: ModelsGetOutputCleanupServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsGetOutputCleanupReasoningLevel? = nil, serviceTier: ModelsGetOutputCleanupServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsGetOutputCleanupReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel
@@ -187,37 +163,13 @@ public enum Talk {
     }
   }
 
-  public enum ModelsGetOutputTitleServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelsGetOutputTitle: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelsGetOutputTitleReasoningLevel?
-    public var serviceTier: ModelsGetOutputTitleServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsGetOutputTitleReasoningLevel? = nil, serviceTier: ModelsGetOutputTitleServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsGetOutputTitleReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel
@@ -267,37 +219,13 @@ public enum Talk {
     }
   }
 
-  public enum ModelsGetOutputSummaryServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelsGetOutputSummary: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelsGetOutputSummaryReasoningLevel?
-    public var serviceTier: ModelsGetOutputSummaryServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsGetOutputSummaryReasoningLevel? = nil, serviceTier: ModelsGetOutputSummaryServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsGetOutputSummaryReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel
@@ -386,37 +314,13 @@ public enum Talk {
     }
   }
 
-  public enum ModelsSetInputSelectionServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelsSetInputSelection: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelsSetInputSelectionReasoningLevel?
-    public var serviceTier: ModelsSetInputSelectionServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSetInputSelectionReasoningLevel? = nil, serviceTier: ModelsSetInputSelectionServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSetInputSelectionReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel
@@ -476,37 +380,13 @@ public enum Talk {
     }
   }
 
-  public enum ModelsSetOutputCleanupServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelsSetOutputCleanup: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelsSetOutputCleanupReasoningLevel?
-    public var serviceTier: ModelsSetOutputCleanupServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSetOutputCleanupReasoningLevel? = nil, serviceTier: ModelsSetOutputCleanupServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSetOutputCleanupReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel
@@ -556,37 +436,13 @@ public enum Talk {
     }
   }
 
-  public enum ModelsSetOutputTitleServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelsSetOutputTitle: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelsSetOutputTitleReasoningLevel?
-    public var serviceTier: ModelsSetOutputTitleServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSetOutputTitleReasoningLevel? = nil, serviceTier: ModelsSetOutputTitleServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSetOutputTitleReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel
@@ -636,37 +492,13 @@ public enum Talk {
     }
   }
 
-  public enum ModelsSetOutputSummaryServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelsSetOutputSummary: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelsSetOutputSummaryReasoningLevel?
-    public var serviceTier: ModelsSetOutputSummaryServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSetOutputSummaryReasoningLevel? = nil, serviceTier: ModelsSetOutputSummaryServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSetOutputSummaryReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel
@@ -728,37 +560,13 @@ public enum Talk {
     }
   }
 
-  public enum ModelsSuggestOutputServiceTier: Sendable, Hashable, Codable {
-    case `default`
-    case fast
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "default": self = .`default`
-      case "fast": self = .fast
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`default`: try container.encode("default")
-      case .fast: try container.encode("fast")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct ModelsSuggestOutput: Sendable, Hashable, Codable {
     public var providerId: String?
     public var model: String?
     public var reasoningLevel: ModelsSuggestOutputReasoningLevel?
-    public var serviceTier: ModelsSuggestOutputServiceTier?
+    public var serviceTier: String?
 
-    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSuggestOutputReasoningLevel? = nil, serviceTier: ModelsSuggestOutputServiceTier? = nil) {
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: ModelsSuggestOutputReasoningLevel? = nil, serviceTier: String? = nil) {
       self.providerId = providerId
       self.model = model
       self.reasoningLevel = reasoningLevel

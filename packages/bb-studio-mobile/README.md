@@ -10,7 +10,7 @@ Plugin ID: `mobile`. It:
 - tells the app to remove notifications for threads you have read, answered,
   archived, or deleted.
 
-It needs BB 0.44 or newer and Plugin SDK 0.5.29 or newer. For wiring and
+It needs BB 0.45 or newer and Plugin SDK 0.6.15 or newer. For wiring and
 settings, see [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md).
 
 ## Notifications
