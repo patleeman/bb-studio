@@ -20,6 +20,7 @@ import { browseFolders, sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
 import { CodeServers } from "./src/server/runtime";
+import { followWorktree, missingWorktreeMessage } from "./src/server/worktree-sync";
 import { ThreadWatcher } from "./src/server/watch";
 import { MIGRATIONS, WorkspaceStore } from "./src/server/store";
 import { CHANNEL, CODE_ICON, KIND_ID, PANEL_PATH, PLUGIN_ID, codeContract, workspaceHref, type Workspace } from "./src/shared";
@@ -155,9 +156,31 @@ export default function plugin(bb: BbPluginApi) {
   /** The thread's worktree workspace, made the first time. */
   const forThread = async (threadId: string) => {
     const existing = store.forThread(threadId);
-    if (existing) return existing;
-    const folder = await threadFolder(threadId);
-    const workspace = store.create({ title: folder.title, projectId: folder.projectId, folders: await checkFolders([folder.path]), threadId });
+    const folder = await threadFolder(threadId).catch((cause) => {
+      // Without a current worktree to compare, keep the workspace the thread has.
+      if (existing) return null;
+      throw cause;
+    });
+    const checked = async (path: string) => {
+      try {
+        return await checkFolders([path]);
+      } catch (cause) {
+        if (!(await stat(path).catch(() => null))) throw new Error(missingWorktreeMessage(path));
+        throw cause;
+      }
+    };
+    if (existing) {
+      if (!folder) return existing;
+      const next = followWorktree(existing.folders, folder.path);
+      if (next.length === existing.folders.length && next.every((each, i) => each === existing.folders[i])) return existing;
+      await checked(folder.path);
+      const moved = store.update(existing.id, { folders: next });
+      await servers.sync(moved);
+      changes.changed(moved.id);
+      return moved;
+    }
+    if (!folder) throw new Error("This thread has no worktree or folder yet.");
+    const workspace = store.create({ title: folder.title, projectId: folder.projectId, folders: await checked(folder.path), threadId });
     changes.changed(workspace.id);
     link(workspace.id, threadId, "created");
     return workspace;
