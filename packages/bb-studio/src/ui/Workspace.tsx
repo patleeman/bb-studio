@@ -149,7 +149,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
       </div>
       {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink-0 items-center" />)}
       <button className={BUTTON} aria-label="Browse Studio items" title="Browse Studio items" onClick={() => openAppPath(studioPath("collection"))}><Icon name="Plus" className="size-4" /></button>
-      {active && <DropdownMenu><DropdownMenuTrigger asChild><button className={BUTTON} aria-label="Arrange active tab"><Icon name="MoreHorizontal" className="size-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end">
+      {active && <DropdownMenu><DropdownMenuTrigger asChild><button className={BUTTON} aria-label="Arrange active tab" title="Split or move"><Icon name="Columns2" className="size-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end">
         {(["left", "right", "top", "bottom"] as const).map(edge => <DropdownMenuItem key={edge} disabled={pane.tabs.length < 2 || panes(snapshot().layout).length >= 8} onSelect={() => move(active, pane.id, edge)}>Split {edge}</DropdownMenuItem>)}
         {panes(snapshot().layout).filter(other => other.id !== pane.id).map((other, index) => <DropdownMenuItem key={other.id} onSelect={() => move(active, other.id, "tab")}>Move to pane {index + 1}</DropdownMenuItem>)}
         <DropdownMenuItem onSelect={() => update(current => closeTab(current, active.href))}>Close tab</DropdownMenuItem>

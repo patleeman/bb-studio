@@ -46,6 +46,11 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.evaluate(`document.querySelector('[aria-label="Close Weekly product sync"]').click()`);
         await sleep(250);
         if (await client.evaluate(`document.querySelectorAll('[data-studio-workspace] [data-workspace-pane]').length`) !== 1) throw new Error("Closing the last tab did not collapse the pane");
+        // One pane: its tab row, with the item's tools, takes BB's title bar.
+        await sleep(500);
+        const single = await client.evaluate(`(() => { const row = document.querySelector('[data-testid="app-page-header-content-row"] [data-studio-workspace-tabs]'); return { row: !!row, tools: !!row?.querySelector('[data-studio-workspace-bar]:not([hidden]) [data-studio-item-header]'), label: [...document.querySelectorAll('[data-testid="app-page-header-content-row"] > div:first-child')].some(element => element.checkVisibility() && element.innerText.trim() === 'Studio') }; })()`);
+        if (!single.row || !single.tools || single.label) throw new Error(`A single pane's tab row did not take the title bar: ${JSON.stringify(single)}`);
+        await client.capture(new URL('../../../packages/bb-studio/assets/workspace-single.png', import.meta.url).pathname);
         // Restore the two-editor arrangement for the screenshot.
         await client.evaluate(`document.querySelector('[aria-label="Browse Studio items"]').click()`);
         await openRow("Weekly product sync");
@@ -53,7 +58,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...split, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
         await sleep(500);
         await assertLayout();
-        const misplaced = await client.evaluate(`document.querySelectorAll('header:not([data-studio-workspace-toolbar]) [data-studio-bar-slot] [data-studio-bar]').length`);
+        const misplaced = await client.evaluate(`[...document.querySelectorAll('[data-studio-item-header]')].filter(element => element.checkVisibility() && !element.closest('[data-studio-workspace-bar]')).length`);
         if (misplaced) throw new Error("Workspace editor tools escaped into the shared app header");
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
         await sleep(500);
