@@ -227,6 +227,16 @@ it("restores the Chief of Staff as the default space's lead, from new backups an
   expect(oldDb.prepare("SELECT space_id FROM space_threads WHERE thread_id = 'thr_old'").get()).toEqual({ space_id: oldTop });
   expect(oldDb.prepare("SELECT enabled, cadence FROM space_runs WHERE space_id = ?").get(oldTop)).toEqual({ enabled: 0, cadence: "hourly" });
 
+  // An older backup also saved the default space's own lead; the Chief of Staff wins over it.
+  const both = join(sourceDir, "both.zip");
+  await writeFile(both, zipFiles(await Promise.all(files.map(async (entry) => entry.name.endsWith("/spaces.json")
+    ? { name: entry.name, bytes: Buffer.from(JSON.stringify(JSON.parse(entry.bytes.toString()).map((space: Record<string, unknown>) => ({ ...space, lead: { lead_thread_id: "thr_space_lead", created_at: 1, updated_at: 1 } })))) }
+    : entry))));
+  const bothDb = studioDb();
+  new SpaceStore(bothDb);
+  await service(await temp(), bothDb, true).restore(both, { dryRun: false });
+  expect(leadOf(bothDb)).toEqual({ lead_thread_id: "thr_old" });
+
   const missingDb = studioDb();
   new SpaceStore(missingDb);
   await service(await temp(), missingDb, false).restore(old, { dryRun: false });

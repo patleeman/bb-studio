@@ -192,6 +192,28 @@ function apply(
   type LocalSpace = { id: string; name: string; is_default: number; updated_at: number; default_project_id: string | null };
   const spaceById = db.prepare("SELECT id, name, is_default, updated_at, default_project_id FROM spaces WHERE id = ?");
   const defaultSpace = () => db.prepare("SELECT id FROM spaces WHERE is_default = 1").get() as { id: string } | undefined;
+  // An older backup's Chief of Staff becomes the default space's lead, only into an empty slot.
+  // It goes first: it wins over the default space's own lead in the same backup, as in the migration.
+  const top = (db.prepare("SELECT id FROM spaces WHERE is_default = 1").get() as { id: string } | undefined)?.id;
+  for (const chief of data.chief) {
+    const item = { id: chief.thread_id, title: "Chief of Staff" };
+    if (!top || !threads.has(chief.thread_id)) continue;
+    const local = (db.prepare("SELECT lead_thread_id FROM space_leads WHERE space_id = ?").get(top) as { lead_thread_id: string | null } | undefined)?.lead_thread_id;
+    if (local) {
+      if (local === chief.thread_id) tally.record("unchanged", item);
+      else tally.record("kept", item, "This BB already has a Chief of Staff; it stayed.");
+      continue;
+    }
+    if (db.prepare("SELECT 1 FROM space_leads WHERE lead_thread_id = ?").get(chief.thread_id)) {
+      tally.record("kept", item, "That thread leads a space here; it stayed the lead.");
+      continue;
+    }
+    db.prepare("INSERT INTO space_threads (thread_id, space_id, added_at) VALUES (?, ?, ?) ON CONFLICT (thread_id) DO UPDATE SET space_id = excluded.space_id").run(chief.thread_id, top, chief.updated_at);
+    db.prepare("INSERT INTO space_leads (space_id, lead_thread_id, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (space_id) DO UPDATE SET lead_thread_id = excluded.lead_thread_id, updated_at = excluded.updated_at").run(top, chief.thread_id, chief.updated_at, chief.updated_at);
+    if (chief.run) db.prepare("INSERT OR IGNORE INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 0, ?, ?, ?, NULL, NULL)").run(top, chief.run.cadence, chief.run.time, chief.run.cron);
+    tally.record("created", item);
+  }
+
   const restoredSpaces = new Map<string, string>();
   for (const space of data.spaces) {
     const item = { id: space.id, title: space.name };
@@ -238,27 +260,6 @@ function apply(
     const lead = space.lead?.lead_thread_id;
     if (space.lead && lead && threads.has(lead)) counted(db.prepare("INSERT INTO space_leads (space_id, lead_thread_id, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (space_id) DO UPDATE SET lead_thread_id = excluded.lead_thread_id, updated_at = excluded.updated_at WHERE space_leads.lead_thread_id IS NULL").run(spaceId, lead, space.lead.created_at, space.lead.updated_at).changes);
     if (space.run) counted(db.prepare("INSERT OR IGNORE INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 0, ?, ?, ?, NULL, NULL)").run(spaceId, space.run.cadence, space.run.time, space.run.cron).changes);
-  }
-
-  // An older backup's Chief of Staff becomes the default space's lead, only into an empty slot.
-  const top = (db.prepare("SELECT id FROM spaces WHERE is_default = 1").get() as { id: string } | undefined)?.id;
-  for (const chief of data.chief) {
-    const item = { id: chief.thread_id, title: "Chief of Staff" };
-    if (!top || !threads.has(chief.thread_id)) continue;
-    const local = (db.prepare("SELECT lead_thread_id FROM space_leads WHERE space_id = ?").get(top) as { lead_thread_id: string | null } | undefined)?.lead_thread_id;
-    if (local) {
-      if (local === chief.thread_id) tally.record("unchanged", item);
-      else tally.record("kept", item, "This BB already has a Chief of Staff; it stayed.");
-      continue;
-    }
-    if (db.prepare("SELECT 1 FROM space_leads WHERE lead_thread_id = ?").get(chief.thread_id)) {
-      tally.record("kept", item, "That thread leads a space here; it stayed the lead.");
-      continue;
-    }
-    db.prepare("INSERT INTO space_threads (thread_id, space_id, added_at) VALUES (?, ?, ?) ON CONFLICT (thread_id) DO UPDATE SET space_id = excluded.space_id").run(chief.thread_id, top, chief.updated_at);
-    db.prepare("INSERT INTO space_leads (space_id, lead_thread_id, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (space_id) DO UPDATE SET lead_thread_id = excluded.lead_thread_id, updated_at = excluded.updated_at").run(top, chief.thread_id, chief.updated_at, chief.updated_at);
-    if (chief.run) db.prepare("INSERT OR IGNORE INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 0, ?, ?, ?, NULL, NULL)").run(top, chief.run.cadence, chief.run.time, chief.run.cron);
-    tally.record("created", item);
   }
 
   const link = db.prepare("INSERT OR IGNORE INTO item_links VALUES (?, ?, ?, ?, ?, ?)");
