@@ -33,6 +33,8 @@ const KIND: StudioKind = {
   actions: [],
   create: { mode: "rpc" },
   canArchive: true,
+  // Folders, not documents: a Space shows its files in Studio's Files view instead.
+  background: true,
   capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: false, templates: false },
   mentionProviderId: "workspace",
   blurb: "VS Code on one or more folders.",

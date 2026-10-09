@@ -275,6 +275,21 @@ export const rpcContract = defineRpcContract({
   createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string(), title: z.string().optional() }) },
   /** The project a space's new items go in, made first if the space has none: for items an add-on makes in the browser. */
   spaceProject: { input: z.object({ id: spaceId }), output: z.object({ projectId: z.string() }) },
+  /** Worktrees of a space's newest threads, newest first, for its Files view. */
+  spaceWorktrees: {
+    input: z.object({ id: spaceId }),
+    output: z.object({ worktrees: z.array(z.object({ threadId: z.string(), title: z.string(), updatedAt: z.number(), path: z.string() })) }),
+  },
+  /** Files in a thread's worktree that git doesn't ignore, relative to it. */
+  spaceFiles: {
+    input: z.object({ threadId: z.string().min(1).max(200) }),
+    output: z.object({ root: z.string(), files: z.array(z.string()), truncated: z.boolean() }),
+  },
+  /** A file's text from a thread's worktree, or why it can't be shown. */
+  spaceFile: {
+    input: z.object({ threadId: z.string().min(1).max(200), path: z.string().min(1).max(4096) }),
+    output: z.object({ text: z.string().nullable(), reason: z.string().nullable() }),
+  },
   /** Open threads to pick from when adding one to a space. */
   recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
   /** A space's lead and heartbeat. Clears a lead thread that was deleted, and turns its heartbeat off. */

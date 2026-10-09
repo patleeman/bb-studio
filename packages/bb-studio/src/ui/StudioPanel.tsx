@@ -39,6 +39,7 @@ import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { QueryBar } from "./QueryBar";
 import { FilterToolbar } from "./FilterToolbar";
 import { SpaceGlyph } from "./Spaces";
+import { SpaceFiles } from "./SpaceFiles";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
 const REFETCH_DEBOUNCE_MS = 300;
@@ -397,8 +398,21 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     () => (data?.spaces ?? []).map((each) => ({ id: each.id, name: each.name, glyph: <SpaceGlyph space={each} className="w-3.5 text-center text-xs leading-none" /> })),
     [data?.spaces],
   );
+  // One space in the query: its documents, or its files.
+  const [showFiles, setShowFiles] = useState(false);
+  const fileSpace = filteredSpaces.length === 1 ? filteredSpaces[0]! : null;
+  const spaceViews = fileSpace ? (
+    <div role="tablist" aria-label={`${fileSpace.name} views`} className="mb-3 inline-flex rounded-md border border-border p-0.5 text-sm">
+      {([["Items", false], ["Files", true]] as const).map(([label, files]) => (
+        <button key={label} type="button" role="tab" aria-selected={showFiles === files} onClick={() => setShowFiles(files)} className={`rounded px-3 py-1 ${showFiles === files ? "bg-state-active font-medium" : "text-muted-foreground hover:bg-state-hover"}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  ) : null;
   const notice = (
     <>
+      {spaceViews}
       {searchText ? <SearchFreshness {...freshness} /> : null}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -495,6 +509,18 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         : searchText || query.filters.length
           ? "Nothing matches."
           : "No items yet.";
+
+  if (fileSpace && showFiles) {
+    return (
+      <PageColumn className="pt-6">
+        <h1 className="mb-3 flex items-center gap-2 text-xl font-semibold">
+          <SpaceGlyph space={fileSpace} className="w-5 text-center" /> {fileSpace.name}
+        </h1>
+        {spaceViews}
+        <SpaceFiles space={fileSpace} />
+      </PageColumn>
+    );
+  }
 
   return (
     <>
