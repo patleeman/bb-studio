@@ -154,6 +154,14 @@ it("makes an existing thread the lead, adds it to the space, and clears a delete
   expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: null });
 });
 
+it("refuses an archived thread as a lead", async () => {
+  const x = await setup();
+  const thread = await x.spawn({ projectId: "p" });
+  x.threads.set(thread.id, { ...x.threads.get(thread.id)!, archivedAt: 5 });
+  await expect(x.leads.setLead(x.garden.id, thread.id)).rejects.toThrow("archived");
+  expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: null });
+});
+
 it("clearing the lead turns the heartbeat off; a new lead takes it over", async () => {
   const x = await setup();
   await lead(x);

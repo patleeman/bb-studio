@@ -112,6 +112,7 @@ export class SpaceLeads {
         if (!top && this.chiefThreadId() === threadId) throw new Error("That thread is your Chief of Staff. Demote it before making it a space's lead.");
         const thread = await this.thread(threadId);
         if (!thread) throw new Error("That thread no longer exists.");
+        if (thread.archivedAt != null) throw new Error("That thread is archived. Unarchive it before making it a lead.");
         // A Chief of Staff can't also lead a space: that space loses its lead, and its schedule carries over.
         const led = top ? (this.deps.db.prepare("SELECT space_id FROM space_leads WHERE lead_thread_id = ? AND space_id <> ?").get(threadId, spaceId) as { space_id: string } | undefined)?.space_id ?? null : null;
         const ledRun = led ? this.runs.get(led) : null;
