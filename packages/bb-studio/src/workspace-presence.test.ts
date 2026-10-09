@@ -71,4 +71,26 @@ describe("Studio workspace for agents", () => {
       await expect(silent).resolves.toBe(false);
     } finally { vi.useRealTimers(); }
   });
+
+  it("delivers to the next window when the likeliest one never answers, and forgets it", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const presence = new WorkspacePresence(() => now);
+      presence.report(report("live", false));
+      now = 1000;
+      // Crashed while focused: its last report even passes the check already.
+      presence.report(report("crashed", true, { panes: [{ id: "p", focused: true, active: null, tabs: [] }] }));
+      const sent: string[] = [];
+      const notOpen = (each: WorkspaceReport) => !each.panes.some((pane) => pane.tabs.some((tab) => tab.href === page.href));
+      const delivered = presence.deliver((client) => {
+        sent.push(client);
+        if (client === "live") queueMicrotask(() => presence.report(report("live", false, { panes: [{ id: "p", focused: true, active: null, tabs: [recording] }] })));
+      }, notOpen, 3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      await expect(delivered).resolves.toBe("live");
+      expect(sent).toEqual(["crashed", "live"]);
+      expect(presence.candidates().map((each) => each.client)).toEqual(["live"]);
+    } finally { vi.useRealTimers(); }
+  });
 });

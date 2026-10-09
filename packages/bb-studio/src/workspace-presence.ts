@@ -44,12 +44,12 @@ export class WorkspacePresence {
 
   /**
    * Whether `client` reports a workspace that passes `check` within
-   * `timeoutMs`, counting its latest report; false if it never does, such as
-   * a window that has closed.
+   * `timeoutMs`, counting its latest report unless `fresh`; false if it never
+   * does, such as a window that has closed.
    */
-  waitFor(client: string, check: (report: WorkspaceReport) => boolean, timeoutMs: number): Promise<boolean> {
+  waitFor(client: string, check: (report: WorkspaceReport) => boolean, timeoutMs: number, fresh = false): Promise<boolean> {
     const latest = this.reports.get(client);
-    if (latest && check(latest)) return Promise.resolve(true);
+    if (!fresh && latest && check(latest)) return Promise.resolve(true);
     return new Promise((resolve) => {
       const done = (passed: boolean) => { clearTimeout(timer); this.waiters.delete(waiter); resolve(passed); };
       const waiter = (report: WorkspaceReport) => { if (report.client === client && check(report)) done(true); };
@@ -60,9 +60,35 @@ export class WorkspacePresence {
 
   /** The window the user is most likely in: the one recently focused, else the last to report. */
   current(): (WorkspaceReport & { at: number }) | null {
+    return this.candidates()[0] ?? null;
+  }
+
+  /** Every window, most likely first. */
+  candidates(): (WorkspaceReport & { at: number })[] {
     const now = this.now();
     const all = [...this.reports.values()].sort((a, b) => b.at - a.at);
-    return all.find((each) => each.focused && now - each.at <= FOCUS_FRESH_MS) ?? all[0] ?? null;
+    const focused = all.find((each) => each.focused && now - each.at <= FOCUS_FRESH_MS);
+    return focused ? [focused, ...all.filter((each) => each !== focused)] : all;
+  }
+
+  /** Drops a window that stopped answering, such as one that crashed before it could say it was closing. */
+  forget(client: string): void {
+    this.reports.delete(client);
+  }
+
+  /**
+   * Sends `command` to the likeliest window until one confirms with `check`,
+   * forgetting each that doesn't; the window that did, or null.
+   */
+  async deliver(send: (client: string) => void, check: (report: WorkspaceReport) => boolean, timeoutMs: number, tries = 3): Promise<string | null> {
+    for (const { client } of this.candidates().slice(0, tries)) {
+      // A live window reports after every command; an earlier report proves nothing.
+      const answered = this.waitFor(client, check, timeoutMs, true);
+      send(client);
+      if (await answered) return client;
+      this.forget(client);
+    }
+    return null;
   }
 }
 

@@ -1028,11 +1028,14 @@ export default async function plugin(bb: BbPluginApi) {
       if (matched.map((item) => tabs.open(item)).some(Boolean)) tabsChanged();
       const lines: string[] = [];
       if (opened.length) {
-        sendToWorkspace({ client: current.client, action: "open", items: opened, placement: placement === "down" ? "bottom" : placement, show });
-        const confirmed = await workspace.waitFor(current.client, (report) => opened.every((item) => openHrefs(report).has(item.href)), CONFIRM_MS);
+        const confirmed = await workspace.deliver(
+          (client) => sendToWorkspace({ client, action: "open", items: opened, placement: placement === "down" ? "bottom" : placement, show }),
+          (report) => opened.every((item) => openHrefs(report).has(item.href)),
+          CONFIRM_MS,
+        );
         lines.push(confirmed
           ? `Opened ${opened.map((item) => item.title).join(", ")} in the user's Studio workspace${placement === "tab" ? "" : `, split ${placement}`}.`
-          : `Sent ${opened.map((item) => item.title).join(", ")} to the user's BB window, but it didn't confirm; it may have closed. Don't assume they're open.`);
+          : `Sent ${opened.map((item) => item.title).join(", ")} to the user's BB windows, but none confirmed; BB may be closed. Don't assume they're open.`);
       }
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
       return lines.join("\n") || "Nothing to open.";
@@ -1051,10 +1054,14 @@ export default async function plugin(bb: BbPluginApi) {
       if (!current) return "No BB window has Studio's workspace open.";
       // The last report can lag a tab just opened, so every one is sent.
       const closing = [...new Set(hrefs.map((href) => href.trim()))];
-      const wasOpen = openHrefs(current);
-      sendToWorkspace({ client: current.client, action: "close", hrefs: closing });
-      const confirmed = await workspace.waitFor(current.client, (report) => closing.every((href) => !openHrefs(report).has(href)), CONFIRM_MS);
-      if (!confirmed) return "Sent the close to the user's BB window, but it didn't confirm; it may have closed.";
+      const before = new Map(workspace.candidates().map((report) => [report.client, openHrefs(report)]));
+      const confirmed = await workspace.deliver(
+        (client) => sendToWorkspace({ client, action: "close", hrefs: closing }),
+        (report) => closing.every((href) => !openHrefs(report).has(href)),
+        CONFIRM_MS,
+      );
+      if (!confirmed) return "Sent the close to the user's BB windows, but none confirmed; BB may be closed.";
+      const wasOpen = before.get(confirmed) ?? new Set<string>();
       const closed = closing.filter((href) => wasOpen.has(href));
       return closed.length === closing.length ? `Closed ${closed.length} tab${closed.length === 1 ? "" : "s"}.` : `Closed what was open. Not open: ${closing.filter((href) => !wasOpen.has(href)).join(", ")}`;
     },
