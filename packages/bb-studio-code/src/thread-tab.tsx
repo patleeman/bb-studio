@@ -1,7 +1,6 @@
 // VS Code beside a conversation: the thread's own worktree, so the user sees
-// the agent's changes. A reply card opens the workspace it names, and Back
-// returns to the worktree. Other workspaces live on the Workspaces page, not
-// in this tab.
+// the agent's changes, or the workspace a reply card names. The tab is VS
+// Code alone, with no bar; other workspaces live on the Workspaces page.
 import { useEffect, useState } from "react";
 import { useBbNavigate, useRpc, type JsonValue } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON } from "@bb-studio/kit/app";

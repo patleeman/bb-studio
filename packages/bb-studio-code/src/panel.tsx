@@ -84,7 +84,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
   id: string;
   backLabel: string;
   onBack(): void;
-  /** A thread's narrow side panel: no item chat. */
+  /** A thread's side panel: VS Code alone, with no bar. */
   compact?: boolean;
 }) {
   const rpc = useRpc<CodeContract>();
@@ -173,7 +173,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
   if (!workspace)
     return (
       <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-        <ItemHeader backLabel={backLabel} onBack={onBack} />
+        {compact ? null : <ItemHeader backLabel={backLabel} onBack={onBack} />}
         <p role={loadError ? "alert" : "status"} className={`p-6 text-sm ${loadError ? "text-destructive" : "text-muted-foreground"}`}>{loadError || "Loading workspace…"}</p>
       </div>
     );
@@ -188,12 +188,12 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
   const reference = { title: workspace.title, href: workspaceHref(id) };
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-      <ItemHeader
+      {/* Beside a thread the tab is VS Code alone; the Workspaces page keeps the bar and its controls. */}
+      {compact ? null : <ItemHeader
         backLabel={backLabel}
         onBack={onBack}
         leading={<BarTitle title={workspace.title} label="Workspace name" placeholder="Untitled workspace" onRename={(title) => { if (title) void update({ title }); }} />}
         item={reference}
-        chatAction={compact ? null : undefined}
         trailing={
           <>
             {embed && (
@@ -226,8 +226,8 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
             <ItemMenu reference={reference} item={{ pluginId: PLUGIN_ID, id }} projectId={workspace.projectId} onMoved={() => setVersion((n) => n + 1)} />
           </>
         }
-      />
-      {showFolders && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
+      />}
+      {showFolders && !compact && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
       <div ref={body} className="relative min-h-0 flex-1">
         {!embed ? (
           <FileBrowser workspace={workspace} />
