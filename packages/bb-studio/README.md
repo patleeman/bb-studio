@@ -13,7 +13,7 @@ Studio opens on its workspace: items in tabs, without a conversation. The
 Studio item list shows only as its new tab page: **+** opens it, and an item
 opened from it takes its place, as in a browser. Items opened from the
 sidebar or Studio search open as tabs too. Drag tabs or sidebar items to a pane's edge to split; drag onto
-a tab bar to move or reorder. The tab arrangement menu offers split and move
+a tab bar to move or reorder. A tab's right-click menu offers split and move
 commands, and separators resize with the mouse or arrow keys. Closing a tab
 keeps the item. The workspace remembers the layout locally across visits and
 refreshes. Old list addresses, such as a kind's (`/plugins/studio/studio/page`),

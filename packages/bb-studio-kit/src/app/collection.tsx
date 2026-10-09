@@ -740,7 +740,8 @@ export function CollectionPage({
       <StudioBar>
         <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center"><BarCrumb current>{title}</BarCrumb></nav>
         <div className="flex shrink-0 items-center gap-0.5">
-          {displayMenu}
+          {/* A host with its own filter row keeps sort and group there, by the count. */}
+          {filter ? null : displayMenu}
           {headerActions}
           {newButton(cn(BAR_BUTTON, "text-foreground"))}
         </div>
@@ -851,7 +852,10 @@ export function CollectionPage({
             ) : filter ? (
               <>
                 {filter.toolbar}
-                {items !== null && shown.length ? <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{plural(shown.length, "item")}</span> : null}
+                <span className="ml-auto flex shrink-0 items-center gap-1 pl-2">
+                  {items !== null && shown.length ? <span className="text-xs text-muted-foreground">{plural(shown.length, "item")}</span> : null}
+                  {displayMenu}
+                </span>
               </>
             ) : (
               <>

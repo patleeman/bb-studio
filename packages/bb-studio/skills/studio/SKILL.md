@@ -116,7 +116,7 @@ A Space’s Command view opens from its sidebar heading. It shows ordinary threa
 Studio opens on its Workspace. The item list shows only as its new tab page: **+**
 opens it, and an item opened from it replaces it. Sidebar,
 collection and search opens use the Workspace tabs for participating add-ons. No thread is required. Drag items or tabs onto a tab bar, or
-to an edge to split; the arrangement menu offers split and move actions. Tabs and
+to an edge to split; a tab's right-click menu offers split and move actions. Tabs and
 pane sizes restore locally. Closing a tab does not delete its saved item. Conversation-side views keep their existing behavior.
 
 ### What the user has open

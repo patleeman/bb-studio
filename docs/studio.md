@@ -81,7 +81,7 @@ collection and quick-search item opens use the workspace when the add-on support
 Existing thread panel actions continue to open beside their conversation.
 
 Drag a sidebar item or a tab onto a tab bar to add or move it. Drop at a pane's edge
-to split left, right, above or below. The tab's arrangement menu provides the same
+to split left, right, above or below. The tab's right-click menu provides the same
 split and move actions without dragging; separators support arrow-key resizing.
 Arrow keys, Home and End select tabs, and Delete closes the focused tab. Closing a
 view never deletes its item. Layout and tab selection are stored locally in the

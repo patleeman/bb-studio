@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon, StudioBar, usePathname, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { toast } from "sonner";
 import type { rpcContract } from "../contract";
 import { WORKSPACE_CHANNEL } from "../ids";
@@ -201,7 +201,6 @@ function TabMenu({ pane, tab, index }: { pane: Pane; tab: Tab; index: number }) 
 /** `titleBar`: the only pane, whose tab row takes BB's title bar instead of a row of its own. */
 function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: string; instance: string; titleBar: boolean }) {
   const [drop, setDrop] = useState<WorkspacePlacement | null>(null);
-  const active = pane.tabs.find(tab => tab.href === pane.active);
   const paneElement = useRef<HTMLElement>(null);
   const dropElement = useRef<HTMLDivElement>(null);
   const drag = useDragging();
@@ -247,11 +246,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
       <button className={BUTTON} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
       </div>
       {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink-0 items-center" />)}
-      {active && <DropdownMenu><DropdownMenuTrigger asChild><button className={BUTTON} aria-label="Arrange active tab" title="Split or move"><Icon name="Columns2" className="size-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end">
-        {(["left", "right", "top", "bottom"] as const).map(edge => <DropdownMenuItem key={edge} disabled={pane.tabs.length < 2 || panes(snapshot().layout).length >= 8} onSelect={() => move(active, pane.id, edge)}>Split {edge}</DropdownMenuItem>)}
-        {panes(snapshot().layout).filter(other => other.id !== pane.id).map((other, index) => <DropdownMenuItem key={other.id} onSelect={() => move(active, other.id, "tab")}>Move to pane {index + 1}</DropdownMenuItem>)}
-        <DropdownMenuItem onSelect={() => update(current => closeTab(current, active.href))}>Close tab</DropdownMenuItem>
-      </DropdownMenuContent></DropdownMenu>}
+
     </div>
   );
   return <section ref={paneElement} aria-label="Studio pane" data-workspace-pane={pane.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
