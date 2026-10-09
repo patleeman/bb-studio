@@ -397,14 +397,14 @@ export function SpaceModeSections({
       <div ref={area} data-sidebar-space-area="" className="flex min-w-0 flex-col">
         <ThreadListVisibility groups={[]} order={[]} onOrderChange={noop} label="Spaces" selectedThreadId={selectedThreadId}>
           <SortableContext items={order} strategy={verticalListSortingStrategy}>
-            <div className="space-y-7">
+            <div className="space-y-5">
             {chiefThreads.length ? (
-              <section data-chief-of-staff={chiefId ?? undefined} aria-label="Chief of Staff" className="mt-2 flex items-start gap-1 pl-1.5">
-                {/* One larger row with an avatar: your assistant, above the Spaces rather than another section. */}
-                <span aria-hidden="true" className="mt-1.5 grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30">
-                  <Icon name="UserRound" className="size-4" />
+              <section data-chief-of-staff={chiefId ?? undefined} aria-label="Chief of Staff" className="mt-1 flex items-start gap-0.5 pl-1.5">
+                {/* A row with a small avatar: your assistant, above the Spaces rather than another section. */}
+                <span aria-hidden="true" className="mt-2 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
+                  <Icon name="UserRound" className="size-3" />
                 </span>
-                <div className="min-w-0 flex-1 [&_[data-sidebar-rename-anchor]]:text-[14px] [&_[data-sidebar-rename-anchor]]:font-semibold">
+                <div className="min-w-0 flex-1">
                   {tree({ rootItems: chiefItems, threads: chiefThreads })}
                 </div>
               </section>
@@ -509,8 +509,8 @@ function SpaceDndScope({ threadDnd, children }: { threadDnd: SectionThreadDndSta
 /** A Space section, its heading a drop target for threads moving in. */
 function SpaceDropArea({ spaceId, children }: { spaceId: string; children: ReactNode }) {
   const { setNodeRef } = useDroppable({ id: spaceHeadingDropId(spaceId) });
-  // Whitespace between Spaces (space-y above) and a larger heading set each one apart; no rules or boxes.
-  return <div ref={setNodeRef} data-space-drop={spaceId} className="[&_[data-sidebar-sticky-tier=label]]:text-[14px]">{children}</div>;
+  // Whitespace between Spaces (space-y above) and the tiled emoji set each one apart; no rules or boxes.
+  return <div ref={setNodeRef} data-space-drop={spaceId}>{children}</div>;
 }
 
 const COMMAND_PLUGIN_ID = "studio";

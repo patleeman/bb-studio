@@ -109,8 +109,8 @@ export function useFillSidebar(element: RefObject<HTMLElement | null>): void {
 /** A Space heading's mark: its emoji or colour dot on a small tinted square. */
 export function SpaceHeadingMark({ space }: { space: StudioSpace }) {
   return (
-    <span aria-hidden="true" className="mr-1 grid size-6 shrink-0 place-items-center rounded-md bg-sidebar-accent ring-1 ring-sidebar-border/60">
-      <SpaceMark space={space} size="md" />
+    <span aria-hidden="true" className="mr-0.5 grid size-5 shrink-0 place-items-center rounded bg-sidebar-accent/70">
+      <SpaceMark space={space} />
     </span>
   );
 }
