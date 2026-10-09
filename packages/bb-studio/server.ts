@@ -1020,7 +1020,10 @@ export default async function plugin(bb: BbPluginApi) {
       if (!current) return "No BB window has Studio's workspace, so nothing was opened. The user may not have BB open.";
       const { found, missing } = await resolveItems(refs);
       const { items } = await hub.overview();
-      const opened = found.flatMap((ref) => items.filter((item) => item.pluginId === ref.pluginId && item.id === ref.id)).map((item) => ({ href: item.href, title: untitled(item.title) }));
+      const matched = found.flatMap((ref) => items.filter((item) => item.pluginId === ref.pluginId && item.id === ref.id));
+      const opened = matched.map((item) => ({ href: item.href, title: untitled(item.title) }));
+      // The sidebar's Studio list shows them too, as it does items the user opens.
+      if (matched.map((item) => tabs.open(item)).some(Boolean)) tabsChanged();
       if (opened.length) sendToWorkspace({ client: current.client, action: "open", items: opened, placement: placement === "down" ? "bottom" : placement, show });
       const lines = opened.length ? [`Opened ${opened.map((item) => item.title).join(", ")} in the user's Studio workspace${placement === "tab" ? "" : `, split ${placement}`}.`] : [];
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
