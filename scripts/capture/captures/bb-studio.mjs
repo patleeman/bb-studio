@@ -36,7 +36,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...destination, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
         await sleep(500);
         const assertLayout = async () => {
-          const result = await client.evaluate(`(() => { const workspace = document.querySelector('[data-studio-workspace]'); return { panes: workspace.querySelectorAll('[data-workspace-pane]').length, tabs: workspace.querySelectorAll('[role="tab"]').length, page: workspace.innerText.includes('Launch checklist'), recording: workspace.innerText.includes('Weekly product sync') }; })()`);
+          const result = await client.evaluate(`(() => { const workspace = document.querySelector('[data-studio-workspace]'); return { panes: workspace.querySelectorAll('[data-workspace-pane]').length, tabs: document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]').length, page: workspace.innerText.includes('Launch checklist'), recording: workspace.innerText.includes('Weekly product sync') }; })()`);
           if (result.panes !== 2 || result.tabs !== 2 || !result.page || !result.recording) { await client.capture("/tmp/studio-workspace-failure.png"); throw new Error(`Workspace lost an editor: ${JSON.stringify(result)}`); }
         };
         await assertLayout();
@@ -58,6 +58,17 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...split, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
         await sleep(500);
         await assertLayout();
+        // Mid-drag, a drop layer covers each editor, so editors in iframes can't swallow the drop.
+        const over = await client.evaluate(`(() => { const rect = [...document.querySelectorAll('[data-workspace-pane]')].filter(element => element.checkVisibility())[0].querySelector('[data-studio-workspace-drop]').getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.bottom - 40 }; })()`);
+        const item = { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 };
+        await client.command("Input.dispatchDragEvent", { type: "dragEnter", ...over, data: item });
+        await client.command("Input.dispatchDragEvent", { type: "dragOver", ...over, data: item });
+        await sleep(100);
+        const covered = await client.evaluate(`document.elementFromPoint(${over.x}, ${over.y})?.hasAttribute('data-studio-workspace-drop-layer') ?? false`);
+        await client.command("Input.dispatchDragEvent", { type: "dragCancel", ...over, data: item });
+        await sleep(100);
+        if (!covered) throw new Error("No drop layer covered the editor during a drag");
+        if (await client.evaluate(`document.querySelectorAll('[data-studio-workspace-drop-layer]').length`)) throw new Error("The drop layer outlived the drag");
         const misplaced = await client.evaluate(`[...document.querySelectorAll('[data-studio-item-header]')].filter(element => element.checkVisibility() && !element.closest('[data-studio-workspace-bar]')).length`);
         if (misplaced) throw new Error("Workspace editor tools escaped into the shared app header");
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });

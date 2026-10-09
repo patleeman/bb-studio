@@ -180,7 +180,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
       {pane.tabs.map((tab, index) => <div key={tab.href} role="tabpanel" id={`view-${instance}-${pane.id}-${index}`} aria-labelledby={`tab-${instance}-${pane.id}-${index}`} hidden={pane.active !== tab.href} style={{ display: pane.active === tab.href ? "flex" : "none" }} className="min-h-0 min-w-0 flex-1 flex-col"><EditorSlot tab={tab} instance={instance} /></div>)}
       {!pane.tabs.length && <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"><p>Open an item from the sidebar, or drop one here.</p><button className="rounded border px-3 py-2 text-foreground hover:bg-state-hover" onClick={() => openAppPath(studioPath("collection"))}>Browse Studio</button></div>}
       {drag && <div data-studio-workspace-drop-layer="" className="absolute inset-0 z-30"
-        onDragOver={event => { if (own || !accepts(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDrop(place(event)); }}
+        onDragOver={event => { if (own || !accepts(event)) return; event.preventDefault(); setDrop(place(event)); }}
         onDragLeave={() => setDrop(null)}
         onDrop={event => { setDrop(null); const item = own ? null : dragged(event); if (item) { event.preventDefault(); move(item, pane.id, place(event)); } }} />}
       {drop && <div className="pointer-events-none absolute z-20 flex items-center justify-center border-2 border-primary bg-primary/10 text-sm font-medium" style={{ inset: 0, ...(drop === "left" ? { right: "50%" } : drop === "right" ? { left: "50%" } : drop === "top" ? { bottom: "50%" } : drop === "bottom" ? { top: "50%" } : {}) }}>{drop === "tab" ? "Open as tab" : `Split ${drop}`}</div>}

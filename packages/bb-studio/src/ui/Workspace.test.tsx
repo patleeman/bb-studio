@@ -31,7 +31,7 @@ it("keeps editor drafts while switching tabs, splitting and returning to the wor
   // An editor consumes its own drop events, and one in an iframe never sees
   // them: while a Studio item is dragged, a drop layer covers each editor.
   target.addEventListener("drop", event => event.stopPropagation());
-  const transfer = { types: ["application/x-bb-studio-item"], getData: () => JSON.stringify({ href: page, title: "One" }), dropEffect: "none" };
+  const transfer = { types: ["application/x-bb-studio-item"], getData: () => JSON.stringify({ href: page, title: "One" }) };
   const drag = (type: string, at: EventTarget) => { const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 95, clientY: 50 }); Object.defineProperty(event, "dataTransfer", { value: transfer }); at.dispatchEvent(event); };
   await act(() => { drag("dragenter", target); });
   const layer = body.querySelector<HTMLElement>("[data-studio-workspace-drop-layer]")!;
