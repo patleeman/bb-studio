@@ -119,3 +119,20 @@ it("passes the decoded sub-path of an encoded route", () => {
   mount(<Main subPath={`item/${ref}`} />);
   expect(seen.at(-1)).toBe(`item/${ref}`);
 });
+
+it("renders into Studio's slot with owner context and keeps editor identity through tab movement", async () => {
+  const { publishWorkspaceAnchor } = await import("./workspace");
+  let mounts = 0;
+  function Editor() { useEffect(() => { mounts++; }, []); return <textarea defaultValue="Notes" />; }
+  mount(<RetainedPanels path="pages" render={() => <Editor />} />);
+  const first = document.createElement("div"), second = document.createElement("div");
+  document.body.append(first, second); elements.push(first, second);
+  let dispose = () => {};
+  act(() => { dispose = publishWorkspaceAnchor({ id: "workspace:one", path: "/plugins/pages/pages/one", element: first }); });
+  const editor = first.querySelector("textarea")!;
+  expect(editor).not.toBeNull(); editor.value = "Unsaved draft";
+  await act(() => { dispose(); dispose = publishWorkspaceAnchor({ id: "workspace:one", path: "/plugins/pages/pages/one", element: second }); });
+  expect(second.querySelector("textarea")).toBe(editor);
+  expect(editor.value).toBe("Unsaved draft"); expect(mounts).toBe(1);
+  act(dispose);
+});

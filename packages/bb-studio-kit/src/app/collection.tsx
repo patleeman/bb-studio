@@ -653,6 +653,7 @@ export function CollectionPage({
           gridColumns,
         )}
         style={gridTemplate}
+        draggable={!chosen.length}
         {...studioItemProps({ href: item.href, title: untitled(item.title), icon: kind?.icon })}
         {...(chosen.length ? { [STUDIO_ITEM_CLICKS_OFF]: "" } : {})}
         onContextMenu={(event) => {

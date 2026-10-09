@@ -110,3 +110,12 @@ A Space’s Command view opens from its sidebar heading. It shows ordinary threa
 
 - Each thread in the Space has a one-letter alias (`a`, `b`, … then `a2`), shown on its pane; the owner types `@b` to address that thread. A thread keeps its alias while it is in the Space, shown or not, and a letter freed by a thread that left isn't reused until the other letters are taken.
 - A message that addresses nobody goes to the lead. Its agent-only context lists the Space's threads with their aliases and asks the lead to forward it with `bb thread tell <threadId>` when it is clearly meant for one of them, then say in one line where it went, or else handle it itself. Attached files are copied into every listed thread's project, so the same relative paths work after forwarding. Pasted images can't be forwarded through `bb thread tell`; the lead says so and asks the owner to send them to that thread.
+
+## Item workspace
+
+Sidebar, collection and search opens use Studio's independent Workspace tabs for
+participating add-ons. No thread is required. Drag items or tabs onto a tab bar, or
+to an edge to split; the arrangement menu offers split and move actions. Tabs and
+pane sizes restore locally. Closing a tab does not delete its saved item. The
+collection's Workspace button returns to the layout, and the workspace's + browses
+the collection. Conversation-side views keep their existing behavior.

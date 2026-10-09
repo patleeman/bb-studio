@@ -7,6 +7,16 @@ recordings and dictations, drawings, and saved artifacts. Search across all of t
 kind, project and tag, and hand any of them to an agent. Spaces gather projects and
 threads into one place, each with an optional lead thread.
 
+## Workspace
+
+Open items from the sidebar, collection or Studio search into tabs without a
+conversation. Drag tabs or sidebar items to a pane's edge to split; drag onto
+a tab bar to move or reorder. The tab arrangement menu offers split and move
+commands, and separators resize with the mouse or arrow keys. Closing a tab
+keeps the item. The workspace remembers the layout locally across visits and
+refreshes. Use **Workspace** in the collection to return, or **+** to browse.
+Conversation-side item views continue to work independently.
+
 ## Staged preview
 
 ![Live BB screenshot of the Studio collection](assets/staged-preview.png)

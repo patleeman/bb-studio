@@ -67,3 +67,25 @@ Studio's Setup page (`/plugins/studio/studio/setup`) and `bb studio setup` are t
 The RPCs are `setup.summary`, `setup.install`, `setup.enable` and `setup.remove` (`src/setup-contract.ts`).
 
 Backup and restore (`bb studio backup|restore` and the Setup page) are described in [backup.md](backup.md).
+
+## Independent workspace
+
+Studio's **Workspace** opens items in persistent tabs without a thread. The collection's
+Workspace button returns to it; its plus button returns to the collection. Sidebar,
+collection and quick-search item opens use the workspace when the add-on supports it.
+Existing thread panel actions continue to open beside their conversation.
+
+Drag a sidebar item or a tab onto a tab bar to add or move it. Drop at a pane's edge
+to split left, right, above or below. The tab's arrangement menu provides the same
+split and move actions without dragging; separators support arrow-key resizing.
+Arrow keys, Home and End select tabs, and Delete closes the focused tab. Closing a
+view never deletes its item. Layout and tab selection are stored locally in the
+client; the server still keeps the shared sidebar item list. Up to eight panes fit
+in one workspace. Narrow screens can scroll the arrangement horizontally.
+
+`workspace.ts` in the kit owns a versioned cross-bundle registry of editor providers
+and destination elements. Each add-on's `RetainedPanels` renders through its own
+React tree into the destination, preserving SDK identity and editor state. Studio
+owns only the layout. Missing providers show an unavailable state; without Studio's
+workspace opener, navigation falls back to the add-on's ordinary page. The existing
+BB tab bars, thread panes and split drop targets are unchanged.

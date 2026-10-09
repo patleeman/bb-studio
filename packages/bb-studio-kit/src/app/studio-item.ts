@@ -3,6 +3,7 @@
 // marks; every plugin bundles its own kit, so they're plain data attributes
 // on the element you click to open the item. Links to a plugin view or a
 // thread count without a mark.
+import { openWorkspaceItem } from "./workspace";
 import type { OpenTarget } from "./move";
 
 /** An item as its opener knows it: where it opens, and how a tab labels it. */
@@ -85,6 +86,7 @@ export const targetHref = (target: OpenTarget): string =>
  * take it: splits are off, or the screen is too small.
  */
 export function openPathInSplit(anchor: HTMLAnchorElement | null, path: string): boolean {
+  if (openWorkspaceItem({ href: path }, "right")) return true;
   if (!anchor) return false;
   const href = anchor.getAttribute("href");
   anchor.setAttribute("href", path);

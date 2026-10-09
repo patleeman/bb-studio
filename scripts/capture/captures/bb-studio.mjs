@@ -1,5 +1,56 @@
 export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
   {
+    id: "studio-workspace",
+    packageDir: "bb-studio",
+    fileName: "workspace.png",
+    showSidebar: true,
+    setup: async client => {
+      const pages = await seedPages();
+      const recording = await seedTalkRecording(projectId, { transcribe: false });
+      const cleanup = async () => { await pages.cleanup(); await talkRpc("recording_delete", { id: recording }); };
+      try {
+        await client.navigate("/plugins/studio/studio/collection");
+        await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem('studio:query:all', ''); localStorage.setItem('studio:collection:view', 'list')`);
+        await client.navigate("/plugins/studio/studio/collection");
+        const openRow = async title => {
+          const selector = `[role="row"][aria-label="${title}"]`;
+          await client.waitForSelector(selector);
+          await client.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+          await client.waitForSelector('[data-studio-workspace]');
+        };
+        await openRow("Offline mode launch");
+        await client.waitForText("Launch checklist");
+        // Browse inside BB (no reload), then open a second kind of editor.
+        await client.evaluate(`document.querySelector('[aria-label="Browse Studio items"]').click()`);
+        await openRow("Weekly product sync");
+        await client.waitForText("Weekly product sync");
+        const href = `/plugins/talk/recordings/${recording}`;
+        const destination = await client.evaluate(`(() => { const rect = document.querySelector('[data-workspace-pane]').getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
+        for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...destination, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
+        await sleep(500);
+        const assertLayout = async () => {
+          const result = await client.evaluate(`(() => { const workspace = document.querySelector('[data-studio-workspace]'); return { panes: workspace.querySelectorAll('[data-workspace-pane]').length, tabs: workspace.querySelectorAll('[role="tab"]').length, page: workspace.innerText.includes('Launch checklist'), recording: workspace.innerText.includes('Weekly product sync') }; })()`);
+          if (result.panes !== 2 || result.tabs !== 2 || !result.page || !result.recording) throw new Error(`Workspace lost an editor: ${JSON.stringify(result)}`);
+        };
+        await assertLayout();
+        await client.navigate("/plugins/studio/studio/workspace");
+        await client.waitForText("Launch checklist");
+        await assertLayout();
+        await client.evaluate(`document.querySelector('[aria-label="Close Weekly product sync"]').click()`);
+        await sleep(250);
+        if (await client.evaluate(`document.querySelectorAll('[data-studio-workspace] [data-workspace-pane]').length`) !== 1) throw new Error("Closing the last tab did not collapse the pane");
+        // Restore the two-editor arrangement for the screenshot.
+        await client.evaluate(`document.querySelector('[aria-label="Browse Studio items"]').click()`);
+        await openRow("Weekly product sync");
+        const split = await client.evaluate(`(() => { const rect = document.querySelector('[data-workspace-pane]').getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
+        for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...split, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
+        await sleep(500);
+        await assertLayout();
+        return cleanup;
+      } catch (error) { await cleanup(); throw error; }
+    },
+  },
+  {
     id: "studio-sidebar-new-menu",
     packageDir: "bb-studio",
     fileName: "sidebar-new-menu.png",

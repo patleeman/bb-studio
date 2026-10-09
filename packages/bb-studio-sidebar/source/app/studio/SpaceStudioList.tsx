@@ -1,6 +1,6 @@
 import { errorMessage } from "@bb-studio/kit/format";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createStudioItem, openAppPath, openPathInSplit, usePathname } from "@bb-studio/kit/app";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createStudioItem, closeWorkspaceItem, workspaceActivePath, subscribeWorkspace, WORKSPACE_PATH, openAppPath, openPathInSplit, usePathname } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
@@ -140,7 +140,9 @@ export function showsItem(pathname: string, href: string): boolean {
 function StudioItemChip({ item, onClose }: { item: OpenItem; onClose(): void }) {
   const sdk = useSdk();
   // On screen: highlighted like the selected thread's row.
-  const active = showsItem(usePathname(), item.href);
+  const route = usePathname();
+  const workspacePath = useSyncExternalStore(subscribeWorkspace, workspaceActivePath, () => null);
+  const active = showsItem(route === WORKSPACE_PATH ? workspacePath ?? route : route, item.href);
   const link = useRef<HTMLAnchorElement>(null);
   const [renaming, setRenaming] = useState(false);
   // Enter or Escape ends a rename; the blur that follows as the input goes must not save again.
@@ -298,6 +300,7 @@ export function SpaceStudioList({ spaceName, items }: {
   }, [items]);
   const open = (items?.open ?? []).filter((item) => !closed.has(key(item)));
   const close = (item: SpaceItems["open"][number]) => {
+    closeWorkspaceItem(item.href);
     setClosed((current) => new Set(current).add(key(item)));
     void sdk.plugins.callRpc({ pluginId: "studio", method: "closeTabs", input: { items: [{ pluginId: item.pluginId, id: item.id }] } as never, outputSchema: z.object({ ok: z.boolean() }), signal: AbortSignal.timeout(15_000) })
       .catch(() => setClosed((current) => { const next = new Set(current); next.delete(key(item)); return next; }));

@@ -3,6 +3,7 @@
 // link inside a plugin slot itself, as it does for links in chat, so opening
 // another plugin's page clicks such a link. Changing the URL behind BB's back
 // skips its own navigation, which left add-on panels blank in the desktop app.
+import { openWorkspaceItem } from "./workspace";
 import { STUDIO_PANEL_PATH, STUDIO_PLUGIN_ID } from "../contract";
 
 interface RouterState {
@@ -26,8 +27,9 @@ export function panelHref(pluginId: string, path: string, subPath = ""): string 
  * BB's links can't replace the current entry, so `replace` points it at the
  * same path first: back then skips the page being left.
  */
-export function openAppPath(path: string, options: { replace?: boolean } = {}): void {
+export function openAppPath(path: string, options: { replace?: boolean; standalone?: boolean } = {}): void {
   if (!path.startsWith("/")) return;
+  if (!options.standalone && openWorkspaceItem({ href: path })) return;
   if (options.replace) window.history.replaceState(window.history.state, "", path);
   if (clickAppLink(path)) return;
   rewriteHistory(path, options);

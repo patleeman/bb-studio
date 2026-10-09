@@ -24,6 +24,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { rpcContract, TabView } from "../contract";
 import { TABS_CHANNEL } from "../ids";
 import { itemAtPath } from "../tabs";
+import { closeWorkspaceTabs, useWorkspace } from "./Workspace";
+import { panes } from "./workspace-state";
 import { SidebarItemRow } from "./SidebarItemRow";
 import { SidebarCreateMenu } from "./SidebarCreateMenu";
 import { useBySpace } from "./space/SidebarSpacesSection";
@@ -68,6 +70,8 @@ function useTabs(enabled: boolean) {
 export function SidebarTabs() {
   const hosted = useSidebarHosted();
   const path = usePathname();
+  const workspace = useWorkspace();
+  const workspacePath = path.endsWith("/studio/workspace") ? panes(workspace.layout).find(pane => pane.id === workspace.focused)?.active : null;
   const { tabs, setTabs, error, refetch, rpc } = useTabs(hosted);
   const navigated = useSidebarNavigated();
   const bySpace = useBySpace();
@@ -94,16 +98,17 @@ export function SidebarTabs() {
     );
   }, [hosted, path, tabs, rpc, setTabs]);
 
-  const active = tabs ? itemAtPath(tabs, path) : null;
+  const active = tabs ? itemAtPath(tabs, workspacePath ?? path) : null;
   const open = (tab: TabView) => {
     openAppPath(tab.href);
     navigated();
   };
   const close = (closing: readonly TabView[]) => {
     if (!tabs || !closing.length) return;
+    closeWorkspaceTabs(closing.map(tab => tab.href));
     const gone = new Set(closing.map((tab) => `${tab.pluginId}:${tab.id}`));
     const left = tabs.filter((tab) => !gone.has(`${tab.pluginId}:${tab.id}`));
-    if (active && gone.has(`${active.pluginId}:${active.id}`)) {
+    if (!workspacePath && active && gone.has(`${active.pluginId}:${active.id}`)) {
       // The next tab, or the one before when it was last.
       const index = tabs.indexOf(active);
       const next = tabs.slice(index + 1).find((tab) => !gone.has(`${tab.pluginId}:${tab.id}`)) ?? [...tabs.slice(0, index)].reverse().find((tab) => !gone.has(`${tab.pluginId}:${tab.id}`));
@@ -129,7 +134,7 @@ export function SidebarTabs() {
     <SidebarPortal id="tabs" title="Studio" order={0}>
       <SidebarSection
         title="Studio"
-        actions={[{ label: "Open Studio", icon: "studio/studio", onClick: () => (openAppPath(studioPath()), navigated()) }]}
+        actions={[{ label: "Open Studio", icon: "studio/studio", onClick: () => (openAppPath(studioPath("workspace")), navigated()) }]}
         trailing={<SidebarCreateMenu onNavigate={navigated} />}
         menu={
           <>

@@ -6,6 +6,7 @@ import { useRef, type ReactNode } from "react";
 import { STUDIO_PLUGIN_ID } from "../contract";
 import { z } from "zod";
 import { openAppPath } from "./nav";
+import { openWorkspaceItem } from "./workspace";
 import { openPathInSplit } from "./studio-item";
 
 /** What opens: a thread, or an in-app path such as an item's href. */
@@ -37,6 +38,7 @@ export function useOpenTarget(): { open(target: OpenTarget, place: OpenPlace): v
       else navigate.toThread(target.threadId);
       return;
     }
+    if (openWorkspaceItem({ href: target.path, title: target.title }, place === "split" ? "right" : "tab")) return;
     if (place === "split" && openPathInSplit(link.current, target.path)) {
       // The sidebar lists what the main view shows; a split's item is listed too.
       void sdk.plugins.callRpc({ pluginId: STUDIO_PLUGIN_ID, method: "visitTab", input: { path: target.path } as never, outputSchema: z.unknown() }).catch(() => {});

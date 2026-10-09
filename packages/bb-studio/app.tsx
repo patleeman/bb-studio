@@ -1,3 +1,4 @@
+import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
 import { ItemGestures } from "./src/ui/ItemGestures";
 import { ConversationPage } from "./src/chat/ui/ConversationComposer";
@@ -22,6 +23,7 @@ import { SetupPage } from "./src/ui/setup/SetupPage";
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
+  if (path === "workspace") return <StudioWorkspace />;
   if (path.startsWith("command/")) return <CommandPage subPath={path.slice("command/".length)} />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
   // "collection" is the old address of the landing page.
@@ -29,6 +31,7 @@ function StudioRoot({ subPath }: { subPath: string }) {
 }
 
 export default definePluginApp((app) => {
+  app.slots.experimental_appOverlay({ id: "workspace-bridge", component: WorkspaceBridge });
   app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
   // Right-click and Mod-click on Studio items and threads anywhere on screen.
   app.slots.experimental_appOverlay({ id: "item-gestures", component: ItemGestures });

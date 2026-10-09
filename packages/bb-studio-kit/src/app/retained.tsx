@@ -8,6 +8,7 @@ import { experimental_usePluginId } from "@get-bb/plugin-sdk/app";
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { panelHref } from "./nav";
+import { registerWorkspaceProvider, subscribeWorkspace, workspaceRevision, workspaceAnchors } from "./workspace";
 
 /** A main pane showing a retained panel's route. */
 interface MainAnchor {
@@ -175,12 +176,14 @@ export function RetainedPanels({ path, render }: { path: string; render(subPath:
   useLayoutEffect(() => {
     const key = `${pluginId}/${path}`;
     panels.add(key);
+    const dispose = pluginId === "studio" ? () => {} : registerWorkspaceProvider(root);
     changed();
-    return () => { panels.delete(key); changed(); };
+    return () => { dispose(); panels.delete(key); changed(); };
   }, [pluginId, path]);
-  const current = useRevision();
-  const anchors = [...mains.values()].filter(anchor => anchor.element.isConnected && (viewPath(anchor.path) === root || viewPath(anchor.path).startsWith(`${root}/`)));
-  const [snapshot, setSnapshot] = useState<{ revision: number; root: string; views: PanelView[] }>({ revision: -1, root, views: [] });
+  const sharedRevision = useSyncExternalStore(subscribeWorkspace, workspaceRevision, () => 0);
+  const current = `${useRevision()}:${sharedRevision}`;
+  const anchors = [...mains.values(), ...workspaceAnchors(root)].filter(anchor => anchor.element.isConnected && (viewPath(anchor.path) === root || viewPath(anchor.path).startsWith(`${root}/`)));
+  const [snapshot, setSnapshot] = useState<{ revision: string; root: string; views: PanelView[] }>({ revision: "", root, views: [] });
   const views = snapshot.revision === current && snapshot.root === root ? snapshot.views
     : placePanels(snapshot.root === root ? snapshot.views : [], anchors, parking.current);
   if (views !== snapshot.views) setSnapshot({ revision: current, root, views });

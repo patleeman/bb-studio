@@ -105,3 +105,5 @@ export {
 export { Icon } from "../ui/icon";
 export { Tooltip } from "../ui/tooltip";
 export { cn } from "../ui/utils";
+
+export { WORKSPACE_PATH, WORKSPACE_DRAG, setWorkspaceActive, workspaceActivePath, registerWorkspaceCloser, closeWorkspaceItem, workspaceItemPath, canOpenWorkspaceItem, openWorkspaceItem, registerWorkspaceOpener, publishWorkspaceAnchor, subscribeWorkspace, workspaceRevision, type WorkspaceItem, type WorkspacePlacement } from "./workspace";

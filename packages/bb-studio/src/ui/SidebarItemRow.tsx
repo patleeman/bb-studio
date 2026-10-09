@@ -1,7 +1,7 @@
 // A Studio item's row in the sidebar, drawn as BB draws a thread's: the whole
 // row highlights on hover, and its buttons show at the right end, × to close
 // (open tabs only) and ⋯ for the same menu right-click opens.
-import { Icon, SIDEBAR_ROW, cn, openPathInSplit } from "@bb-studio/kit/app";
+import { Icon, SIDEBAR_ROW, cn, openWorkspaceItem, WORKSPACE_DRAG, openPathInSplit } from "@bb-studio/kit/app";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { useId, useRef, useState, type MouseEvent } from "react";
 import { toast } from "sonner";
@@ -66,6 +66,8 @@ export function SidebarItemRow({
         >
           <a
             ref={link}
+            draggable
+            onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify({ href, title })); event.dataTransfer.effectAllowed = "copyMove"; }}
             href={href}
             aria-current={selected ? "page" : undefined}
             className={cn(
@@ -115,7 +117,7 @@ export function SidebarItemRow({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent id={menuId} aria-label={`${title} options`}>
-        <ContextMenuItem onSelect={() => openPathInSplit(link.current, href) || onOpen()}>
+        <ContextMenuItem onSelect={() => openWorkspaceItem({ href, title }, "right") || openPathInSplit(link.current, href) || onOpen()}>
           <Icon name="Columns2" />
           Open in split
         </ContextMenuItem>
