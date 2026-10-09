@@ -30,7 +30,8 @@ import { SetupPage } from "./src/ui/setup/SetupPage";
 function ToWorkspace({ path }: { path: string }) {
   const pathname = usePathname();
   useEffect(() => {
-    if (pathname.replace(/\/+$/, "") !== `${WORKSPACE_PATH}/${path}`) return;
+    // Either side may be percent-encoded; compare them decoded.
+    if (decodeSegment(pathname.replace(/\/+$/, "")) !== decodeSegment(`${WORKSPACE_PATH}/${path}`)) return;
     if (path !== "workspace") openCollection(path === "collection" ? null : decodeSegment(path));
     openAppPath(WORKSPACE_PATH, { standalone: true, replace: true });
   }, [pathname, path]);
