@@ -25,12 +25,15 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
             await sleep(50);
           }
         };
-        const fresh = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map(tab => tab.textContent.trim())`);
+        const fresh = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map(tab => tab.lastElementChild?.textContent.trim())`);
         if (fresh.length !== 1 || fresh[0] !== "Studio") throw new Error(`The workspace didn't open on the new tab page: ${JSON.stringify(fresh)}`);
+        await client.waitForSelector('[data-studio-workspace] [role="row"][aria-label="Offline mode launch"]');
+        await sleep(500);
+        await client.capture(new URL('../../../packages/bb-studio/assets/workspace-new-tab.png', import.meta.url).pathname);
         await openRow("Offline mode launch");
         await client.waitForText("Launch checklist");
         // The item took the new tab page's place.
-        const replaced = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map(tab => tab.textContent.trim())`);
+        const replaced = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map(tab => tab.lastElementChild?.textContent.trim())`);
         if (replaced.join() !== "Offline mode launch") throw new Error(`Opening an item didn't replace the new tab page: ${JSON.stringify(replaced)}`);
         // Browse inside BB (no reload), then open a second kind of editor.
         await client.evaluate(`document.querySelector('[aria-label="Browse Studio items"]').click()`);

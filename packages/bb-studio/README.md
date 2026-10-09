@@ -25,6 +25,8 @@ opens any of its items as a tab.
 Conversation-side item views continue to work independently. At phone widths, a
 pane picker shows one pane at a time while preserving the desktop arrangement.
 
+![Studio's new tab page: the item list as the workspace's only tab](assets/workspace-new-tab.png)
+
 ![Studio workspace with one pane, its tabs and the page's tools in BB's title bar](assets/workspace-single.png)
 
 ![Studio workspace with a page and recording in separate panes](assets/workspace.png)
