@@ -16,4 +16,4 @@ Edit reactions as emoji and label pairs in the plugin's settings page, up to 8. 
 
 ## Requirements
 
-Requires BB 0.44 or later. It needs no account, API key, or outside service.
+Requires BB 0.45 or later. It needs no account, API key, or outside service.
