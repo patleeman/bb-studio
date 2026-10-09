@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { Icon, StudioBarSlot, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioPath, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
+import { Icon, StudioBar, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioPath, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import type { rpcContract } from "../contract";
 import { closeTab, emptyWorkspace, mapLayout, openItem, panes, parseWorkspace, type Layout, type Pane, type Tab, type Workspace } from "./workspace-state";
@@ -84,6 +84,7 @@ function move(item: WorkspaceItem, pane: string, placement: WorkspacePlacement, 
 function select(pane: string, href: string) {
   update(current => ({ focused: pane, layout: mapLayout(current.layout, node => node.kind === "pane" && node.id === pane ? { ...node, active: href } : node) }));
 }
+const barSlot = (instance: string, href: string) => `${instance}${href}`;
 function EditorSlot({ tab, instance }: { tab: Tab; instance: string }) {
   const element = useRef<HTMLDivElement>(null);
   useSyncExternalStore(subscribeWorkspace, workspaceRevision, () => 0);
@@ -92,13 +93,14 @@ function EditorSlot({ tab, instance }: { tab: Tab; instance: string }) {
     if (!element.current) return;
     return publishWorkspaceAnchor({ id: `workspace:${instance}:${tab.href}`, path: tab.href, element: element.current });
   }, [tab.href, instance]);
-  return <div data-studio-workspace-frame="" className="flex min-h-0 min-w-0 flex-1 flex-col">
-    <header data-studio-workspace-toolbar="" className="flex h-11 shrink-0 items-center border-b px-2"><StudioBarSlot /></header>
+  // The item's tools go to its slot in the tab row (barSlot), not a bar of its own.
+  return <div data-studio-workspace-frame={barSlot(instance, tab.href)} className="flex min-h-0 min-w-0 flex-1 flex-col">
     {!available && <div className="p-6 text-sm text-muted-foreground">This item's plugin is unavailable. Enable it to reopen this tab. <button className="underline" onClick={() => openAppPath(tab.href, { standalone: true })}>Open item page</button></div>}
     <div ref={element} data-studio-workspace-editor={tab.href} className="flex min-h-0 min-w-0 flex-1 flex-col" />
   </div>;
 }
-function TabPane({ pane, focused, instance }: { pane: Pane; focused: string; instance: string }) {
+/** `titleBar`: the only pane, whose tab row takes BB's title bar instead of a row of its own. */
+function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: string; instance: string; titleBar: boolean }) {
   const [drop, setDrop] = useState<WorkspacePlacement | null>(null);
   const active = pane.tabs.find(tab => tab.href === pane.active);
   const paneElement = useRef<HTMLElement>(null);
@@ -124,8 +126,8 @@ function TabPane({ pane, focused, instance }: { pane: Pane; focused: string; ins
     document.addEventListener("dragend", end);
     return () => { element.removeEventListener("pointerdown", focus, true); body.removeEventListener("dragover", over, true); body.removeEventListener("drop", receive, true); body.removeEventListener("dragleave", leave); document.removeEventListener("dragend", end); };
   }, [pane.id]);
-  return <section ref={paneElement} aria-label="Studio pane" data-workspace-pane={pane.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-    <div className="flex h-10 shrink-0 items-center gap-1 border-b bg-background pl-1.5 pr-1"
+  const tabRow = (
+    <div data-studio-workspace-tabs="" className={`flex shrink-0 items-center gap-1 ${titleBar ? "h-full min-w-0 flex-1" : "h-10 border-b bg-background pl-1.5 pr-1"}`}
       onDragOver={event => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); } }}
       onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab"); } }}>
       <div role="tablist" aria-label="Studio items" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
@@ -145,6 +147,7 @@ function TabPane({ pane, focused, instance }: { pane: Pane; focused: string; ins
           <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
         </div>)}
       </div>
+      {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink-0 items-center" />)}
       <button className={BUTTON} aria-label="Browse Studio items" title="Browse Studio items" onClick={() => openAppPath(studioPath("collection"))}><Icon name="Plus" className="size-4" /></button>
       {active && <DropdownMenu><DropdownMenuTrigger asChild><button className={BUTTON} aria-label="Arrange active tab"><Icon name="MoreHorizontal" className="size-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end">
         {(["left", "right", "top", "bottom"] as const).map(edge => <DropdownMenuItem key={edge} disabled={pane.tabs.length < 2 || panes(snapshot().layout).length >= 8} onSelect={() => move(active, pane.id, edge)}>Split {edge}</DropdownMenuItem>)}
@@ -152,6 +155,9 @@ function TabPane({ pane, focused, instance }: { pane: Pane; focused: string; ins
         <DropdownMenuItem onSelect={() => update(current => closeTab(current, active.href))}>Close tab</DropdownMenuItem>
       </DropdownMenuContent></DropdownMenu>}
     </div>
+  );
+  return <section ref={paneElement} aria-label="Studio pane" data-workspace-pane={pane.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    {titleBar ? <StudioBar>{tabRow}</StudioBar> : tabRow}
     <div ref={dropElement} data-studio-workspace-drop="" className="relative flex min-h-0 flex-1 flex-col">
       {pane.tabs.map((tab, index) => <div key={tab.href} role="tabpanel" id={`view-${instance}-${pane.id}-${index}`} aria-labelledby={`tab-${instance}-${pane.id}-${index}`} hidden={pane.active !== tab.href} style={{ display: pane.active === tab.href ? "flex" : "none" }} className="min-h-0 min-w-0 flex-1 flex-col"><EditorSlot tab={tab} instance={instance} /></div>)}
       {!pane.tabs.length && <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"><p>Open an item from the sidebar, or drop one here.</p><button className="rounded border px-3 py-2 text-foreground hover:bg-state-hover" onClick={() => openAppPath(studioPath("collection"))}>Browse Studio</button></div>}
@@ -159,17 +165,17 @@ function TabPane({ pane, focused, instance }: { pane: Pane; focused: string; ins
     </div>
   </section>;
 }
-function LayoutView({ node, focused, compact, instance }: { node: Layout; focused: string; compact: boolean; instance: string }) {
+function LayoutView({ node, root, focused, compact, instance }: { node: Layout; root: Layout; focused: string; compact: boolean; instance: string }) {
   const container = useRef<HTMLDivElement>(null);
-  if (node.kind === "pane") return <TabPane pane={node} focused={focused} instance={instance} />;
+  if (node.kind === "pane") return <TabPane pane={node} focused={focused} instance={instance} titleBar={node === root} />;
   const resize = (ratio: number) => update(current => ({ ...current, layout: mapLayout(current.layout, each => each.id === node.id && each.kind === "split" ? { ...each, ratio: Math.max(.2, Math.min(.8, ratio)) } : each) }));
   return <div ref={container} className="flex h-full min-h-0 min-w-0 flex-1" style={{ flexDirection: node.axis }}>
-    <div className="flex min-h-0 min-w-0" style={{ flex: compact ? "1 1 0%" : `${node.ratio} 1 0%`, display: compact && !panes(node.first).some(pane => pane.id === focused) ? "none" : undefined }}><LayoutView node={node.first} focused={focused} compact={compact} instance={instance} /></div>
+    <div className="flex min-h-0 min-w-0" style={{ flex: compact ? "1 1 0%" : `${node.ratio} 1 0%`, display: compact && !panes(node.first).some(pane => pane.id === focused) ? "none" : undefined }}><LayoutView node={node.first} root={root} focused={focused} compact={compact} instance={instance} /></div>
     <div hidden={compact} style={{ display: compact ? "none" : undefined }} role="separator" aria-label="Resize Studio panes" aria-orientation={node.axis === "row" ? "vertical" : "horizontal"} aria-valuenow={Math.round(node.ratio * 100)} aria-valuemin={20} aria-valuemax={80} tabIndex={0}
       className={`relative z-10 shrink-0 touch-none bg-border transition-colors after:absolute after:content-[''] hover:bg-primary focus:bg-primary focus:outline-none ${node.axis === "row" ? "w-px cursor-col-resize after:inset-y-0 after:-inset-x-1" : "h-px cursor-row-resize after:inset-x-0 after:-inset-y-1"}`}
       onKeyDown={event => { if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(event.key)) { event.preventDefault(); resize(node.ratio + (["ArrowLeft", "ArrowUp"].includes(event.key) ? -.05 : .05)); } }}
       onPointerDown={event => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={event => { if (!event.currentTarget.hasPointerCapture(event.pointerId) || !container.current) return; const rect = container.current.getBoundingClientRect(); resize(node.axis === "row" ? (event.clientX - rect.left) / rect.width : (event.clientY - rect.top) / rect.height); }} onPointerUp={event => event.currentTarget.releasePointerCapture(event.pointerId)} />
-    <div className="flex min-h-0 min-w-0" style={{ flex: compact ? "1 1 0%" : `${1 - node.ratio} 1 0%`, display: compact && !panes(node.second).some(pane => pane.id === focused) ? "none" : undefined }}><LayoutView node={node.second} focused={focused} compact={compact} instance={instance} /></div>
+    <div className="flex min-h-0 min-w-0" style={{ flex: compact ? "1 1 0%" : `${1 - node.ratio} 1 0%`, display: compact && !panes(node.second).some(pane => pane.id === focused) ? "none" : undefined }}><LayoutView node={node.second} root={root} focused={focused} compact={compact} instance={instance} /></div>
   </div>;
 }
 export function StudioWorkspace() {
@@ -185,6 +191,6 @@ export function StudioWorkspace() {
   }, []);
   return <div data-studio-workspace="" className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     {compact && panes(workspace.layout).length > 1 && <label className="flex items-center gap-2 border-b px-3 py-2 text-sm">Pane<select aria-label="Studio pane" className="min-w-0 flex-1 rounded border bg-background p-1" value={workspace.focused} onChange={event => update(current => ({ ...current, focused: event.target.value }))}>{panes(workspace.layout).map((pane, index) => <option key={pane.id} value={pane.id}>{index + 1}. {pane.tabs.find(tab => tab.href === pane.active)?.title ?? "Empty pane"}</option>)}</select></label>}
-    <LayoutView node={workspace.layout} focused={workspace.focused} compact={compact} instance={instance} />
+    <LayoutView node={workspace.layout} root={workspace.layout} focused={workspace.focused} compact={compact} instance={instance} />
   </div>;
 }

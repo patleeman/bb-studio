@@ -89,6 +89,8 @@ const BAR_CSS = `
 
 /** Marks the title bar around a filled slot for BAR_CSS, until the returned cleanup. */
 function markTitleBar(slot: HTMLElement) {
+  // The workspace's tab row lends this slot; the row, not the item, owns the title bar.
+  if (slot.hasAttribute("data-studio-workspace-bar")) return () => {};
   const row = slot.closest<HTMLElement>('[data-testid="app-page-header-content-row"]');
   const drag = row ? [...row.children].find((child): child is HTMLElement => child.matches('div[class~="[app-region:no-drag]"]') && child.contains(slot)) : undefined;
   const root = slot.parentElement?.matches("[data-bb-plugin-root]") ? slot.parentElement : null;
@@ -111,9 +113,12 @@ export function StudioBarSlot() {
 /** The title bar slot of the pane this element is in, if its panel lends one. */
 function paneSlot(from: HTMLElement): HTMLElement | null {
   for (let element = from.parentElement, depth = 0; element && depth < 24; element = element.parentElement, depth++) {
-    // Workspace editors each keep their own tools; inactive tabs must never
-    // compete for the outer Studio title bar.
-    if (element.hasAttribute("data-studio-workspace-editor")) return element.closest("[data-studio-workspace-frame]")?.querySelector<HTMLElement>(":scope > header [data-studio-bar-slot]") ?? null;
+    // Workspace editors each keep their own tools, in their tab's slot in the
+    // tab row; inactive tabs must never compete for the outer Studio title bar.
+    if (element.hasAttribute("data-studio-workspace-editor")) {
+      const frame = element.closest("[data-studio-workspace-frame]")?.getAttribute("data-studio-workspace-frame");
+      return frame ? [...document.querySelectorAll<HTMLElement>("[data-studio-workspace-bar]")].find(slot => slot.getAttribute("data-studio-workspace-bar") === frame) ?? null : null;
+    }
     const slot = element.querySelector<HTMLElement>(":scope > header [data-studio-bar-slot]");
     if (slot) return slot;
   }
@@ -128,7 +133,7 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>): HTMLElement | 
     const find = () => (anchor.current ? paneSlot(anchor.current) : null);
     // A retained view set aside leaves its pane; its bar must leave that title bar too.
     const owns = (slot: HTMLElement) => {
-      if (anchor.current?.closest("[data-studio-workspace-editor]") && paneSlot(anchor.current) !== slot) return false;
+      if (anchor.current?.closest("[data-studio-workspace-editor]")) return paneSlot(anchor.current) === slot;
       const pane = slot.closest("header")?.parentElement;
       return !!pane && !!anchor.current && pane.contains(anchor.current);
     };
@@ -246,8 +251,10 @@ export function ItemHeader({
   useLayoutEffect(() => slot ? markTitleBar(slot) : undefined, [slot]);
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
   useLayoutEffect(() => {
-    const measured = slot ?? anchor.current;
-    const measure = () => setCompact((measured?.getBoundingClientRect().width || window.innerWidth) < 520);
+    // A workspace slot sits beside the tabs, so the pane's width decides.
+    const pane = slot?.closest<HTMLElement>("[data-workspace-pane]");
+    const measured = pane ?? slot ?? anchor.current;
+    const measure = () => setCompact((measured?.getBoundingClientRect().width || window.innerWidth) < (pane ? 720 : 520));
     measure();
     const observer = typeof ResizeObserver === "undefined" || !measured ? null : new ResizeObserver(measure);
     if (measured) observer?.observe(measured);
@@ -267,7 +274,8 @@ export function ItemHeader({
   const tools = relatedRef && studio || moved || trailing;
   const bar = (
     <div data-studio-bar="" data-studio-item-header="" className="flex h-full min-w-0 flex-1 items-center gap-2">
-      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
+      {/* In the workspace the tab names the item. */}
+      <nav aria-label="Breadcrumb" hidden={!!slot?.hasAttribute("data-studio-workspace-bar")} className="flex min-w-0 flex-1 items-center gap-0.5">
         <BarCrumb onClick={onBack} title={`Back to ${backLabel}`}>{backLabel}</BarCrumb>
         {leading ? <BarSeparator /> : null}
         {leading}
