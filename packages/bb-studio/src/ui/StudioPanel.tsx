@@ -135,8 +135,13 @@ function useStoredQuery(key: string): [Query, (query: Query) => void] {
     if (key !== QUERY_KEY) return;
     const onQuery = (event: Event) => setStored({ key, query: parseQuery((event as CustomEvent<string>).detail) });
     window.addEventListener(QUERY_EVENT, onQuery);
+    // A query stored between the first render and now, with its event already gone.
+    setStored((current) => {
+      const latest = read();
+      return current.key === key && formatQuery(latest) === formatQuery(current.query) ? current : { key, query: latest };
+    });
     return () => window.removeEventListener(QUERY_EVENT, onQuery);
-  }, [key]);
+  }, [key, read]);
   return [query, set];
 }
 
