@@ -98,7 +98,7 @@ const MARK_TONE: Record<SpaceThreadState, string> = {
   idle: "text-subtle-foreground",
 };
 
-/** A star for the lead, a pin, or the Chief of Staff's avatar, where other rows have their status dot. */
+/** A star for the lead, a person for the Chief of Staff, or a pin, where other rows have their status dot. */
 function SpaceThreadMarkIcon({ mark, state }: { mark: SpaceThreadMark; state: SpaceThreadState }) {
   const status = SPACE_THREAD_DOT[state].label;
   const label = [mark.kind === "pinned" ? "Pinned" : mark.label, status].filter(Boolean).join(" · ");
@@ -113,16 +113,11 @@ function SpaceThreadMarkIcon({ mark, state }: { mark: SpaceThreadMark; state: Sp
       title={label}
       className="relative mr-2 size-[7px] shrink-0"
     >
-      {mark.kind === "chief" ? (
-        // The Chief of Staff's avatar sits where the dot does, tinted by its state.
-        <span className={cn("absolute top-1/2 left-1/2 grid size-4 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-current/15", MARK_TONE[state] === "text-subtle-foreground" ? "text-primary" : MARK_TONE[state])}>
-          <Icon name="UserRound" aria-hidden className="size-2.5" />
-        </span>
-      ) : <Icon
-        name={mark.kind === "pinned" ? "Pin" : "Star"}
+      <Icon
+        name={mark.kind === "pinned" ? "Pin" : mark.kind === "chief" ? "UserRound" : "Star"}
         aria-hidden
-        className={cn("absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2", MARK_TONE[state], mark.kind !== "pinned" && "fill-current")}
-      />}
+        className={cn("absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2", MARK_TONE[state], mark.kind === "lead" && "fill-current")}
+      />
     </span>
   );
 }
