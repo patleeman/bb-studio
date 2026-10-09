@@ -10,7 +10,7 @@ import { DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenu
 import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
 import { ActionMenuItem } from "../ui/action-menu-items.js";
 import type { SidebarThread } from "../model/sidebar-thread.js";
-import { beginPendingChiefOfStaff, beginPendingLead, STUDIO_CHANGED_EVENT, studioSpacesAtom, withPendingChiefOfStaff, withPendingLeads, type StudioSpacesState } from "./studioSpaces.js";
+import { beginPendingLead, STUDIO_CHANGED_EVENT, studioSpacesAtom, withPendingLeads, type StudioSpacesState } from "./studioSpaces.js";
 
 /** By space only: which Space each thread is in, and each Space's lead. */
 export interface SpaceLeadState {
@@ -21,12 +21,13 @@ export interface SpaceLeadState {
 export const SpaceLeadContext = createContext<SpaceLeadState | null>(null);
 
 /**
- * Whether the thread leads any Space or is the Chief of Staff, in every
- * organization mode: Studio's leads and Chief of Staff load with its Spaces
- * whatever the sidebar shows. Either can't be archived until it's demoted.
+ * Whether the thread leads any Space, the Chief of Staff (the default
+ * Space's lead) included, in every organization mode: Studio's leads load
+ * with its Spaces whatever the sidebar shows. A lead can't be archived until
+ * it's removed.
  */
 export function isSpaceLeadThread(state: StudioSpacesState, threadId: string): boolean {
-  return state.status === "ready" && (state.chiefOfStaff === threadId || Object.values(state.leads).includes(threadId));
+  return state.status === "ready" && Object.values(state.leads).includes(threadId);
 }
 
 /** Whether the thread leads its Space or is the Chief of Staff. It can't be archived until it's demoted. */
@@ -67,37 +68,43 @@ export function openChiefHeartbeat() {
   if (window.dispatchEvent(event)) toast.error("Open Studio to set the Chief of Staff's heartbeat.");
 }
 
-/** The Chief of Staff thread while By space shows it, else null. */
+/** The Chief of Staff: the lead of the default Space, the top level. Null until Studio's Spaces load. */
 export function chiefOfStaffOf(state: StudioSpacesState): string | null {
-  return state.status === "ready" ? state.chiefOfStaff : null;
+  if (state.status !== "ready") return null;
+  const top = state.spaces.find((space) => space.isDefault);
+  return top ? state.leads[top.id] ?? null : null;
 }
 
 /**
  * Promote ▸ in a thread's menu while By space shows: Space lead and Chief of
  * Staff, the role the thread holds checked; choosing a checked role removes
- * it. The Chief of Staff leads no Space, so Space lead is off for it. The
- * phone drawer has no submenus, so it lists the two items flat.
+ * it. Chief of Staff is the top level's (the default Space's) lead; Space
+ * lead is for the other Spaces, so it's off for a top-level thread and for
+ * the Chief of Staff. Removing the Chief of Staff leaves it a top-level
+ * thread. The phone drawer has no submenus, so it lists the items flat.
  */
 export function SpaceLeadItem({ thread, surface }: {
   thread: SidebarThread;
   surface: "context" | "dropdown";
 }) {
   const state = useContext(SpaceLeadContext);
-  const chief = chiefOfStaffOf(useAtomValue(studioSpacesAtom));
+  const spaces = useAtomValue(studioSpacesAtom);
+  const topId = spaces.status === "ready" ? spaces.spaces.find((space) => space.isDefault)?.id ?? null : null;
   const compact = useIsCompactViewport();
   const setLead = useSetLead();
-  const setChief = useSetChief();
   if (!state) return null;
   const spaceId = state.spaceIdOf(thread);
-  const isChief = chief === thread.id;
-  const isLead = spaceId !== null && state.leads[spaceId] === thread.id;
-  const toggleLead = () => { if (spaceId) setLead(spaceId, isLead ? null : thread.id); };
-  const toggleChief = () => setChief(isChief ? null : thread.id);
+  const isChief = topId !== null && state.leads[topId] === thread.id;
+  // Space lead is for the other Spaces; the top level's lead is the Chief of Staff.
+  const leadSpaceId = spaceId !== null && spaceId !== topId ? spaceId : null;
+  const isLead = leadSpaceId !== null && state.leads[leadSpaceId] === thread.id;
+  const toggleLead = () => { if (leadSpaceId) setLead(leadSpaceId, isLead ? null : thread.id); };
+  const toggleChief = () => { if (topId) setLead(topId, isChief ? null : thread.id); };
 
   if (surface === "dropdown" && compact) {
     return (
       <>
-        {isChief || !spaceId ? null : (
+        {isChief || !leadSpaceId ? null : (
           <ActionMenuItem surface={surface} icon={isLead ? "Minus" : "Star"} onSelect={toggleLead}>
             {isLead ? "Remove as Space lead" : "Make Space lead"}
           </ActionMenuItem>
@@ -132,8 +139,8 @@ export function SpaceLeadItem({ thread, surface }: {
         Promote
       </SubTrigger>
       <SubContent className="min-w-44">
-        {role("Space lead", isLead, toggleLead, isChief || !spaceId)}
-        {role("Chief of Staff", isChief, toggleChief)}
+        {role("Space lead", isLead, toggleLead, isChief || !leadSpaceId)}
+        {role("Chief of Staff", isChief, toggleChief, !topId)}
       </SubContent>
     </Sub>
     {isChief ? (
@@ -144,33 +151,6 @@ export function SpaceLeadItem({ thread, surface }: {
     ) : null}
     </>
   );
-}
-
-/** Sets or clears the Chief of Staff, shown at once and kept over refetches that started before Studio answered. */
-function useSetChief() {
-  const sdk = useSdk();
-  const setSpaces = useSetAtom(studioSpacesAtom);
-  return (threadId: string | null) => {
-    const settle = beginPendingChiefOfStaff(threadId);
-    setSpaces((current) => current.status === "ready" ? { ...current, chiefOfStaff: withPendingChiefOfStaff(current.chiefOfStaff) } : current);
-    void sdk.plugins.callRpc({
-      pluginId: "studio",
-      method: "chief_of_staff_set",
-      input: { threadId } as never,
-      outputSchema: z.unknown(),
-      signal: AbortSignal.timeout(15_000),
-    }).then(
-      () => {
-        settle();
-        window.dispatchEvent(new Event(STUDIO_CHANGED_EVENT));
-      },
-      (cause: unknown) => {
-        settle();
-        window.dispatchEvent(new Event(STUDIO_CHANGED_EVENT));
-        toast.error(`Couldn't change the Chief of Staff: ${errorMessage(cause)}`);
-      },
-    );
-  };
 }
 
 /** Sets or clears a Space's lead, shown at once and kept over refetches that started before Studio answered. */

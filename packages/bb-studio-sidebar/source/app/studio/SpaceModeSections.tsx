@@ -117,28 +117,16 @@ export function needsYouFirst(items: readonly ProjectThreadItem[]): ProjectThrea
   return [...items].sort((left, right) => ranks.get(left)! - ranks.get(right)!);
 }
 
-/**
- * The Chief of Staff and its sub-threads, at any depth, and every other
- * thread. With no Chief of Staff, or one not listed, everything is `rest`.
- */
-export function splitChiefOfStaff(
-  threads: readonly SidebarThread[],
-  chiefId: string | null,
-): { chief: SidebarThread[]; rest: SidebarThread[] } {
-  if (!chiefId || !threads.some((thread) => thread.id === chiefId)) return { chief: [], rest: [...threads] };
-  const byId = new Map(threads.map((thread) => [thread.id, thread]));
-  const under = (thread: SidebarThread) => {
-    const seen = new Set<string>();
-    for (let id: string | null = thread.id; id !== null && !seen.has(id); id = byId.get(id)?.parentThreadId ?? null) {
-      if (id === chiefId) return true;
-      seen.add(id);
-    }
-    return false;
-  };
-  const chief: SidebarThread[] = [];
-  const rest: SidebarThread[] = [];
-  for (const thread of threads) (under(thread) ? chief : rest).push(thread);
-  return { chief, rest };
+/** Whether `thread` is the Chief of Staff or one of its sub-threads, at any depth. */
+export function chiefUnder(threads: readonly SidebarThread[], chiefId: string | null, thread: SidebarThread): boolean {
+  if (!chiefId) return false;
+  const byId = new Map(threads.map((candidate) => [candidate.id, candidate]));
+  const seen = new Set<string>();
+  for (let id: string | null = thread.id; id !== null && !seen.has(id); id = byId.get(id)?.parentThreadId ?? null) {
+    if (id === chiefId) return true;
+    seen.add(id);
+  }
+  return false;
 }
 
 /** "every5minutes" reads "every 5 minutes". */
@@ -147,9 +135,12 @@ function cadenceLabel(cadence: string): string {
 }
 
 /**
- * By space: one Space at a time, Arc-style, or All of them stacked. A Space
- * shows its lead on top, its open Studio items and its threads; threads in no
- * Space belong to the default Space. Dots pinned to the bottom switch between
+ * By space: one Space at a time, Arc-style, or All of them stacked. The
+ * default Space is the top level and shows first with no heading: its lead,
+ * the Chief of Staff, with its workers nested, then every unfiled thread. The
+ * Chief of Staff also stays at the top of every other Space's view. Other
+ * Spaces show their lead on top, their open Studio items and their threads;
+ * threads in no Space belong to the default Space. Dots pinned to the bottom switch between
  * All and each Space, as do ⌃⌥← / ⌃⌥→ and a horizontal swipe over the list.
  * Thread rows get two lines: a status dot, the title and its age, then the
  * thread's latest line from Studio.
@@ -186,7 +177,6 @@ export function SpaceModeSections({
   const groupThreadsByEnvironment = useAtomValue(sidebarGroupThreadsByEnvironmentAtom);
   const studioState = useStudioSpaces();
   const chiefId = chiefOfStaffOf(studioState);
-  const chiefHeartbeat = studioState.status === "ready" ? studioState.chiefOfStaffHeartbeat : null;
   const [storedSpaceId, setStoredSpaceId] = useAtom(sidebarCurrentSpaceAtom);
   const fallbackSpaceId = defaultSpaceId(spaces);
   const isAll = storedSpaceId === ALL_SPACES && spaces.length > 0;
@@ -229,14 +219,14 @@ export function SpaceModeSections({
     const thread = threads.find((candidate) => candidate.id === selectedThreadId);
     if (!thread) return;
     revealedFor.current = selectedThreadId;
-    // The Chief of Staff shows above every Space.
-    if (splitChiefOfStaff(threads, chiefId).chief.some((candidate) => candidate.id === thread.id)) return;
     const spaceId = resolveSpace(thread);
+    // The Chief of Staff and its workers show in every view.
+    if (spaceId === fallbackSpaceId && chiefUnder(threads, chiefId, thread)) return;
     if (!spaceId) return;
     if (isAll) {
       if (collapsedSpaces.has(spaceId)) toggleSpaceCollapsed(spaceId);
     } else if (spaceId !== currentSpace?.id) switchTo(spaceId);
-  }, [chiefId, collapsedSpaces, currentSpace?.id, isAll, resolveSpace, selectedThreadId, switchTo, threads, toggleSpaceCollapsed]);
+  }, [chiefId, collapsedSpaces, currentSpace?.id, fallbackSpaceId, isAll, resolveSpace, selectedThreadId, switchTo, threads, toggleSpaceCollapsed]);
 
   const area = useRef<HTMLDivElement>(null);
   useFillSidebar(area);
@@ -247,24 +237,16 @@ export function SpaceModeSections({
 
   // With Spaces, a pinned thread sits at the top of its own Space instead of a Pinned section.
   const pinsInSpaces = spaces.length > 0;
-  // The Chief of Staff is in no Space: it's pinned above them all, the same in every one.
-  const { chief: chiefThreads, rest: spaceThreads } = useMemo(() => splitChiefOfStaff(threads, chiefId), [chiefId, threads]);
-  const chiefItems = useMemo(
-    () => buildProjectThreadGroups(chiefThreads, compareThreads, draftThreadIds, false),
-    [chiefThreads, compareThreads, draftThreadIds],
-  );
   const nonPinnedThreads = useMemo(
-    () => spaceThreads.filter((thread) => (pinsInSpaces || !effectivePinnedThreadIds.has(thread.id)) && isSidebarProjectThread(thread)),
-    [effectivePinnedThreadIds, pinsInSpaces, spaceThreads],
+    () => threads.filter((thread) => (pinsInSpaces || !effectivePinnedThreadIds.has(thread.id)) && isSidebarProjectThread(thread)),
+    [effectivePinnedThreadIds, pinsInSpaces, threads],
   );
   const pinnedIds = useMemo(() => pinsInSpaces ? pinnedThreads.map((thread) => thread.id) : [], [pinnedThreads, pinsInSpaces]);
   const { groups, loose } = useMemo(
     () => buildSpaceThreadGroups(nonPinnedThreads, spaces, spaceOf, leads, pinnedIds),
     [leads, nonPinnedThreads, pinnedIds, spaceOf, spaces],
   );
-  // The Spaces on show: the current one, or every one in All.
-  const shown = useMemo(() => groups
-    .filter((candidate) => isAll || candidate.space.id === currentSpace?.id)
+  const built = useMemo(() => groups
     .map((found) => {
       const sectionId = spaceSectionKey(found.space.id);
       const item = buildGroupSectionItem(found.space.id, sectionId, found.space.name, found.threads, compareThreads, draftThreadIds, groupThreadsByEnvironment);
@@ -282,31 +264,37 @@ export function SpaceModeSections({
       );
       const all = [...leadThreads, ...pinnedThreadsHere, ...found.threads];
       return { ...found, sectionId, item, leadThreads, leadItems, pinnedThreadsHere, pinnedItems, all, activity: getCollapsedChildActivity(all, draftThreadIds) };
-    }), [compareThreads, currentSpace?.id, draftThreadIds, groupThreadsByEnvironment, groups, isAll]);
+    }), [compareThreads, draftThreadIds, groupThreadsByEnvironment, groups]);
+  // The Spaces on show: the current one, or every one in All.
+  const shown = useMemo(() => built.filter((candidate) => isAll || candidate.space.id === currentSpace?.id), [built, currentSpace?.id, isAll]);
+  // The top level's lead, the Chief of Staff, with its workers: pinned above another Space shown alone.
+  const top = built.find((candidate) => candidate.space.isDefault) ?? null;
+  const pinnedChief = top?.lead && !shown.includes(top) ? top : null;
   const shownBySection = useMemo(() => new Map(shown.map((candidate) => [candidate.sectionId as SidebarSectionId, candidate])), [shown]);
 
   // Latest lines for the threads on show: leads first, then by recency.
   const lineIds = useMemo(() => {
     const open = shown.filter((candidate) => !isAll || !collapsedSpaces.has(candidate.space.id));
     return threadLineIds(
-      [...chiefThreads.filter((thread) => thread.id === chiefId), ...open.flatMap((candidate) => candidate.lead ? [candidate.lead] : [])],
-      [...chiefThreads.filter((thread) => thread.id !== chiefId), ...open.flatMap((candidate) => [...candidate.leadChildren, ...candidate.pinnedThreadsHere, ...candidate.threads]), ...pinnedThreads],
+      [...(pinnedChief?.lead ? [pinnedChief.lead] : []), ...open.flatMap((candidate) => candidate.lead ? [candidate.lead] : [])],
+      [...(pinnedChief?.leadChildren ?? []), ...open.flatMap((candidate) => [...candidate.leadChildren, ...candidate.pinnedThreadsHere, ...candidate.threads]), ...pinnedThreads],
     );
-  }, [chiefId, chiefThreads, collapsedSpaces, isAll, pinnedThreads, shown]);
+  }, [collapsedSpaces, isAll, pinnedChief, pinnedThreads, shown]);
   const lines = useThreadLines(lineIds, useMemo(() => threadLineStatusKey(threads, lineIds), [lineIds, threads]));
   // The lead and pinned threads are told apart by a mark in place of their dot, not a heading.
   const marks = useMemo(() => {
     const found: Record<string, SpaceThreadMark> = {};
     for (const candidate of shown) {
       for (const thread of candidate.pinned) found[thread.id] = { kind: "pinned" };
-      if (candidate.lead) {
-        const heartbeat = heartbeats[candidate.space.id] ?? null;
-        found[candidate.lead.id] = { kind: "lead", label: heartbeat ? `Space lead · heartbeat ${cadenceLabel(heartbeat)}` : "Space lead" };
-      }
     }
-    if (chiefId) found[chiefId] = { kind: "chief", label: chiefHeartbeat ? `Chief of Staff · heartbeat ${cadenceLabel(chiefHeartbeat)}` : "Chief of Staff" };
+    for (const candidate of pinnedChief ? [...shown, pinnedChief] : shown) {
+      if (!candidate.lead) continue;
+      const heartbeat = heartbeats[candidate.space.id] ?? null;
+      const role = candidate.space.isDefault ? "Chief of Staff" : "Space lead";
+      found[candidate.lead.id] = { kind: candidate.space.isDefault ? "chief" : "lead", label: heartbeat ? `${role} · heartbeat ${cadenceLabel(heartbeat)}` : role };
+    }
     return found;
-  }, [chiefHeartbeat, chiefId, heartbeats, shown]);
+  }, [heartbeats, pinnedChief, shown]);
   const rows = useMemo(() => ({ lines, marks }), [lines, marks]);
 
   const showThreads = spaces.length === 0;
@@ -398,10 +386,10 @@ export function SpaceModeSections({
         <ThreadListVisibility groups={[]} order={[]} onOrderChange={noop} label="Spaces" selectedThreadId={selectedThreadId}>
           <SortableContext items={order} strategy={verticalListSortingStrategy}>
             <div className="space-y-5">
-            {chiefThreads.length ? (
-              <section data-chief-of-staff={chiefId ?? undefined} aria-label="Chief of Staff">
-                {/* Above the Spaces rather than in one; its row's mark is an avatar. */}
-                {tree({ rootItems: chiefItems, threads: chiefThreads })}
+            {pinnedChief?.lead ? (
+              <section data-chief-of-staff={pinnedChief.lead.id} aria-label="Chief of Staff">
+                {/* The top level's lead stays on top of every Space; its row's mark is an avatar. */}
+                {tree({ rootItems: pinnedChief.leadItems, threads: pinnedChief.leadThreads })}
               </section>
             ) : null}
             {order.map((sectionId) => {
@@ -429,6 +417,32 @@ export function SpaceModeSections({
                 handOffNewThreadSpace(group.space.id, group.space.defaultProjectId);
                 onCreateThreadInProject(group.space.defaultProjectId);
               };
+              const body = (
+                <>
+                  {/* Open Studio items as chips, then the lead, pins and threads, told apart by their marks. */}
+                  <SpaceStudioList spaceName={group.space.name} items={items[group.space.id]} />
+                  {group.lead ? (
+                    <div data-space-lead={group.lead.id} {...(group.space.isDefault ? { "data-chief-of-staff": group.lead.id } : {})}>
+                      {tree({ rootItems: group.leadItems, threads: group.leadThreads })}
+                    </div>
+                  ) : null}
+                  {group.pinned.length ? (
+                    <div data-space-pinned="">
+                      {tree({ rootItems: group.pinnedItems, threads: group.pinnedThreadsHere })}
+                    </div>
+                  ) : null}
+                  {/* No placeholder when there are none: the whole Space still takes dropped threads. */}
+                  {group.threads.length ? tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId }) : null}
+                </>
+              );
+              // The top level has no heading: it's where everything lives until it's filed into a Space.
+              if (group.space.isDefault) return (
+                <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>
+                  <SpaceDropArea spaceId={group.space.id}>
+                    <section data-space-top-level="" aria-label="Home">{body}</section>
+                  </SpaceDropArea>
+                </ThreadListVisibilityGroupScope>
+              );
               return (
                 <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>
                   <SpaceDropArea spaceId={group.space.id}>
@@ -453,20 +467,7 @@ export function SpaceModeSections({
                       </>
                     )}
                   >
-                    {/* Open Studio items as chips, then the lead, pins and threads, told apart by their marks. */}
-                    <SpaceStudioList spaceName={group.space.name} items={items[group.space.id]} />
-                    {group.lead ? (
-                      <div data-space-lead={group.lead.id}>
-                        {tree({ rootItems: group.leadItems, threads: group.leadThreads })}
-                      </div>
-                    ) : null}
-                    {group.pinned.length ? (
-                      <div data-space-pinned="">
-                        {tree({ rootItems: group.pinnedItems, threads: group.pinnedThreadsHere })}
-                      </div>
-                    ) : null}
-                    {/* No placeholder when there are none: the whole Space still takes dropped threads. */}
-                    {group.threads.length ? tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId }) : null}
+                    {body}
                   </SpaceSidebarSection>
                   </SpaceDropArea>
                 </ThreadListVisibilityGroupScope>

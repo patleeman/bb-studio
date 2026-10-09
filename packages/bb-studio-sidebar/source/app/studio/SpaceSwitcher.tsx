@@ -126,7 +126,8 @@ export function SpaceMark({ space, size = "sm" }: { space: StudioSpace; size?: "
 }
 
 /**
- * Arc-style dots at the bottom of the list: All first, then one per Space in
+ * Arc-style dots at the bottom of the list: All first, then Home for the top
+ * level (the default Space), then one per other Space in
  * Studio's order, the current one highlighted, a small dot on any with a thread that needs
  * the user, and + for a new Space.
  */
@@ -186,7 +187,7 @@ export function SpaceSwitcher({ spaces, currentId, attention, onSelect }: {
   );
 }
 
-/** One Space's dot; a thread dragged onto it moves into the Space. */
+/** One Space's dot, or Home for the default Space; a thread dragged onto it moves into the Space. */
 function SpaceDot({ space, current, needsYou, onSelect }: {
   space: StudioSpace;
   current: boolean;
@@ -194,13 +195,14 @@ function SpaceDot({ space, current, needsYou, onSelect }: {
   onSelect(spaceId: string): void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: spaceDotDropId(space.id) });
+  const name = space.isDefault ? "Home" : space.name;
   return (
     <span ref={setNodeRef} className="inline-flex">
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
-            aria-label={needsYou ? `${space.name}, needs you` : space.name}
+            aria-label={needsYou ? `${name}, needs you` : name}
             aria-current={current ? "true" : undefined}
             data-space-id={space.id}
             data-drop-target={isOver ? "" : undefined}
@@ -211,11 +213,11 @@ function SpaceDot({ space, current, needsYou, onSelect }: {
                 : current ? "bg-sidebar-accent" : "opacity-60 hover:bg-sidebar-accent/60 hover:opacity-100",
             )}
           >
-            <SpaceMark space={space} size="md" />
+            {space.isDefault ? <Icon name="Home" className="size-3.5" /> : <SpaceMark space={space} size="md" />}
             {needsYou ? <span data-space-needs-you="" aria-hidden="true" className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" /> : null}
           </button>
         </TooltipTrigger>
-        <TooltipContent side="top">{isOver ? `Move to ${space.name}` : space.name}</TooltipContent>
+        <TooltipContent side="top">{isOver ? `Move to ${name}` : name}</TooltipContent>
       </Tooltip>
     </span>
   );

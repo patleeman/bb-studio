@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { CHIEF_DIALOG_EVENT, chiefOfStaffOf, isSpaceLeadThread, leadSafeArchiveIds, openChiefHeartbeat } from "./SpaceLead.js";
 import type { StudioSpacesState } from "./studioSpaces.js";
 
+const top = { id: "sp_top", name: "Personal", color: "#000", icon: null, defaultProjectId: null, isDefault: true, projectIds: [] };
 const ready = (leads: Record<string, string | null>, chiefOfStaff: string | null = null): StudioSpacesState => ({
-  status: "ready", spaces: [], spaceOf: {}, leads, heartbeats: {}, items: {}, chiefOfStaff, chiefOfStaffHeartbeat: null, threadsLoaded: false,
+  status: "ready", spaces: [top], spaceOf: {}, leads: { ...leads, [top.id]: chiefOfStaff }, heartbeats: {}, items: {}, threadsLoaded: false,
 });
 
 describe("Space leads", () => {
@@ -15,7 +16,7 @@ describe("Space leads", () => {
     expect(isSpaceLeadThread({ status: "loading" }, "thr_lead")).toBe(false);
   });
 
-  it("reads the Chief of Staff only from a ready load", () => {
+  it("reads the Chief of Staff, the default Space's lead, only from a ready load", () => {
     expect(chiefOfStaffOf(ready({}, "thr_chief"))).toBe("thr_chief");
     expect(chiefOfStaffOf({ status: "unavailable", error: "no studio" })).toBeNull();
   });

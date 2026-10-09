@@ -221,7 +221,7 @@ describe("thread-list plugin", () => {
     expect(await screen.findByRole("menuitem", { name: "Archive" })).not.toBeNull();
   });
 
-  it("shows one Space at a time, with its lead on top and dots to switch", async () => {
+  it("shows the top level with no heading, its Chief of Staff on top, then one Space at a time with dots to switch", async () => {
     localStorage.removeItem("bb-studio:sidebar-organization");
     const threads = [
       ...THREADS,
@@ -233,7 +233,7 @@ describe("thread-list plugin", () => {
     const studio: Record<string, (input: unknown) => unknown> = {
       spaces: () => ({ spaces: [
         { id: "sp_alpha", name: "Alpha", color: "#f00", icon: "🚀", isDefault: true, defaultProjectId: "proj_web", projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
-        { id: "sp_beta", name: "Beta", color: "#00f", icon: null, isDefault: false, defaultProjectId: null, projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
+        { id: "sp_beta", name: "Beta", color: "#00f", icon: null, isDefault: false, defaultProjectId: "proj_app", projectIds: [], threadIds: [], itemKeys: [], pageId: null, description: "" },
       ] }),
       space_of_threads: () => ({ threads: { thr_parent: "sp_alpha", thr_lead: "sp_alpha", thr_busy: "sp_alpha", thr_ask: "sp_beta", thr_later: "sp_beta", thr_personal: "sp_gone" } }),
       thread_lines: () => ({ lines: {
@@ -259,17 +259,16 @@ describe("thread-list plugin", () => {
         },
       } },
     });
-    // The default Space shows first; threads in no Space are its.
-    await screen.findByTitle("Alpha");
+    // The default Space is the top level and shows first, with no heading; threads in no Space are its.
+    await waitFor(() => expect(document.querySelector("[data-space-top-level] [data-space-lead=thr_lead]")).not.toBeNull());
     // A pinned thread sits in its Space, under the lead, not in a Pinned section.
-    expect(sectionHeaders()).toEqual(["Alpha"]);
+    expect(sectionHeaders()).toEqual([]);
     expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("space");
-    const alpha = () => screen.getByTitle("Alpha").closest("[data-sidebar-sticky-group]") as HTMLElement;
-    expect(alpha().querySelector("[data-sidebar-space-mark]")?.textContent).toBe("🚀");
+    const alpha = () => document.querySelector("[data-space-top-level]") as HTMLElement;
     const lead = alpha().querySelector("[data-space-lead=thr_lead]") as HTMLElement;
-    // No Lead heading: a star in place of the dot marks the lead, its heartbeat in the label.
-    expect(lead.querySelector("[data-space-thread-mark=lead]")?.getAttribute("aria-label")).toBe("Space lead · heartbeat hourly");
-    expect(Array.from(alpha().querySelectorAll("[data-space-thread-mark]"), (el) => el.getAttribute("data-space-thread-mark"))).toEqual(["lead", "pinned"]);
+    // The top level's lead is the Chief of Staff: a person in place of the dot, its heartbeat in the label.
+    expect(lead.querySelector("[data-space-thread-mark=chief]")?.getAttribute("aria-label")).toBe("Chief of Staff · heartbeat hourly");
+    expect(Array.from(alpha().querySelectorAll("[data-space-thread-mark]"), (el) => el.getAttribute("data-space-thread-mark"))).toEqual(["chief", "pinned"]);
     expect(Array.from(alpha().querySelectorAll("[data-sidebar-thread-id]"), (el) => el.getAttribute("data-sidebar-thread-id")).slice(0, 2)).toEqual(["thr_lead", "thr_pinned"]);
     expect(within(alpha()).getByText("Personal thread")).not.toBeNull();
     expect(threadIds()).not.toContain("thr_later");
@@ -287,27 +286,6 @@ describe("thread-list plugin", () => {
     expect(row("thr_parent").querySelector("[data-space-thread-pill=unread]")?.textContent).toBe("Done");
     expect(row("thr_busy").querySelector("[data-space-thread-time]")?.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
     expect(row("thr_parent").querySelector("[data-sidebar-thread-trailing-indicator]")).toBeNull();
-    // The heading is plain: ⋯ has the Space's actions.
-    expect(screen.queryByRole("button", { name: "Open Alpha" })).toBeNull();
-    const dialogs: unknown[] = [];
-    const onDialog = (event: Event) => dialogs.push((event as CustomEvent).detail);
-    window.addEventListener("studio:space-dialog", onDialog);
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Alpha actions" }), { button: 0, ctrlKey: false });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit Space" }));
-    window.removeEventListener("studio:space-dialog", onDialog);
-    expect(dialogs).toEqual([{ spaceId: "sp_alpha", dialog: "edit" }]);
-    // With Studio installed, ⋯ opens the Space's Command view.
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Alpha actions" }), { button: 0, ctrlKey: false });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Command view" }));
-    expect(window.location.pathname).toBe("/plugins/studio/studio/command/sp_alpha");
-    // So does the button beside ⋯ on the heading.
-    window.history.pushState(null, "", "/");
-    fireEvent.click(screen.getByRole("button", { name: "Command view for Alpha" }));
-    expect(window.location.pathname).toBe("/plugins/studio/studio/command/sp_alpha");
-    // The Space heading's + offers a thread first, then Studio items.
-    fireEvent.pointerDown(screen.getByRole("button", { name: "New in Alpha" }), { button: 0, ctrlKey: false });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Thread" }));
-    expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_web", focusPrompt: true } });
     // An item opens in the main area (in place here, where BB can't split).
     // Open items are chips above the lead.
     const chips = within(alpha()).getByRole("group", { name: "Alpha Studio items" });
@@ -318,10 +296,11 @@ describe("thread-list plugin", () => {
     // The item on screen is highlighted like the selected thread.
     await waitFor(() => expect(alpha().querySelector('[data-space-studio-item="pages:pg_1"]')?.hasAttribute("data-active")).toBe(true));
     expect(within(alpha()).getByRole("link", { name: "Launch plan" }).getAttribute("aria-current")).toBe("page");
-    // Any thread can become the lead, from Promote ▸.
+    // Any top-level thread can become the Chief of Staff, the top level's lead, from Promote ▸; Space lead is for other Spaces.
     fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_parent"]')!);
     fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Promote" }), { key: "ArrowRight" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Space lead" }));
+    expect((await screen.findByRole("menuitem", { name: "Space lead" })).hasAttribute("data-disabled")).toBe(true);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Chief of Staff" }));
     expect(studioCalls).toContainEqual({ method: "space_set_lead", input: { spaceId: "sp_alpha", threadId: "thr_parent" } });
     await waitFor(() => expect(document.querySelector("[data-space-lead=thr_parent]")).not.toBeNull());
     // The dots switch Spaces; Beta's needs you, and that thread comes first, above Later's unread result.
@@ -329,14 +308,38 @@ describe("thread-list plugin", () => {
     fireEvent.click(within(switcher).getByRole("button", { name: "Beta, needs you" }));
     await screen.findByTitle("Beta");
     expect(sectionHeaders()).toEqual(["Beta"]);
+    // The Chief of Staff stays on top of every Space, without the other top-level threads.
+    expect(document.querySelector("[data-chief-of-staff=thr_parent] [data-space-thread-mark=chief]")).not.toBeNull();
+    expect(threadIds()).not.toContain("thr_personal");
     await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "currentSpace", value: "sp_beta" } }));
-    expect(threadIds().filter((id) => id !== "thr_pinned")).toEqual(["thr_ask", "thr_later"]);
+    expect(threadIds().filter((id) => !["thr_pinned", "thr_parent", "thr_child"].includes(id))).toEqual(["thr_ask", "thr_later"]);
     expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.parentElement?.querySelector("[data-sidebar-needs-you]")).not.toBeNull();
     expect(document.querySelectorAll("[data-sidebar-needs-you]")).toHaveLength(1);
     expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.closest("[data-sidebar-rename-row]")?.querySelector("[data-space-thread-pill=needs-you]")?.textContent).toBe("Needs you");
     // Beta has no open Studio items, so it shows no Studio rows, and no headings at all.
     expect(screen.queryByRole("group", { name: "Beta Studio items" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^(Expand|Collapse) (Lead|Studio|Threads)$/ })).toBeNull();
+    // The heading is plain: ⋯ has the Space's actions.
+    expect(screen.queryByRole("button", { name: "Open Beta" })).toBeNull();
+    const dialogs: unknown[] = [];
+    const onDialog = (event: Event) => dialogs.push((event as CustomEvent).detail);
+    window.addEventListener("studio:space-dialog", onDialog);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Beta actions" }), { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit Space" }));
+    window.removeEventListener("studio:space-dialog", onDialog);
+    expect(dialogs).toEqual([{ spaceId: "sp_beta", dialog: "edit" }]);
+    // With Studio installed, ⋯ opens the Space's Command view.
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Beta actions" }), { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Command view" }));
+    expect(window.location.pathname).toBe("/plugins/studio/studio/command/sp_beta");
+    // So does the button beside ⋯ on the heading.
+    window.history.pushState(null, "", "/");
+    fireEvent.click(screen.getByRole("button", { name: "Command view for Beta" }));
+    expect(window.location.pathname).toBe("/plugins/studio/studio/command/sp_beta");
+    // The Space heading's + offers a thread first, then Studio items.
+    fireEvent.pointerDown(screen.getByRole("button", { name: "New in Beta" }), { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Thread" }));
+    expect(inspection.sidebarActionCalls).toContainEqual({ method: "openNewThread", options: { projectId: "proj_app", focusPrompt: true } });
     const created: Event[] = [];
     const onNew = (event: Event) => created.push(event);
     window.addEventListener("studio:new-space", onNew);
@@ -346,7 +349,8 @@ describe("thread-list plugin", () => {
     await waitFor(() => expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')!.closest("[data-sidebar-rename-row]")!.querySelector("[data-space-thread-line]")?.className).toContain("text-warning"));
     // ⌃⌥← / ⌃⌥→ step through All and the Spaces; All stacks every Space.
     fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
-    await waitFor(() => expect(sectionHeaders()).toEqual(["Alpha", "Beta"]));
+    await waitFor(() => expect(sectionHeaders()).toEqual(["Beta"]));
+    expect(alpha()).not.toBeNull();
     await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "currentSpace", value: "all" } }));
     expect(within(switcher).getByRole("button", { name: "All Spaces" }).getAttribute("aria-current")).toBe("true");
     const beta = () => screen.getByTitle("Beta").closest("[data-sidebar-sticky-group]") as HTMLElement;
@@ -358,7 +362,8 @@ describe("thread-list plugin", () => {
     fireEvent.click(screen.getByRole("button", { name: "Expand Beta section" }));
     await within(beta()).findByText("Asks you");
     fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
-    await waitFor(() => expect(sectionHeaders()).toEqual(["Alpha"]));
+    await waitFor(() => expect(sectionHeaders()).toEqual([]));
+    expect(within(switcher).getByRole("button", { name: "Home" }).getAttribute("aria-current")).toBe("true");
   });
 
   it("shows no empty placeholder under a Space whose only thread is its lead", async () => {
@@ -381,9 +386,8 @@ describe("thread-list plugin", () => {
           (pluginId === "studio" && studio[method] ? studio[method]!(input) : {}) as never,
       } },
     });
-    await screen.findByTitle("Solo");
     await waitFor(() => expect(document.querySelector("[data-space-lead=thr_only_lead]")).not.toBeNull());
-    const solo = screen.getByTitle("Solo").closest("[data-sidebar-sticky-group]") as HTMLElement;
+    const solo = document.querySelector("[data-space-top-level]") as HTMLElement;
     expect(within(solo).queryByText("No threads")).toBeNull();
     expect(within(solo).queryByText("Nothing here yet")).toBeNull();
   });
