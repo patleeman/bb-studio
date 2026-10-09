@@ -65,7 +65,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.command("Input.dispatchDragEvent", { type: "dragOver", ...over, data: item });
         await sleep(100);
         const covered = await client.evaluate(`document.elementFromPoint(${over.x}, ${over.y})?.hasAttribute('data-studio-workspace-drop-layer') ?? false`);
+        // A cancelled drag may say nothing to the page; the next pointer move ends it.
         await client.command("Input.dispatchDragEvent", { type: "dragCancel", ...over, data: item });
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: over.x + 5, y: over.y, buttons: 0 });
         await sleep(100);
         if (!covered) throw new Error("No drop layer covered the editor during a drag");
         if (await client.evaluate(`document.querySelectorAll('[data-studio-workspace-drop-layer]').length`)) throw new Error("The drop layer outlived the drag");
