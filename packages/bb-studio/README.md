@@ -19,8 +19,10 @@ keeps the item. The workspace remembers the layout locally across visits and
 refreshes. Old list addresses, such as a kind's (`/plugins/studio/studio/page`),
 open the new tab page on that kind.
 Right-click a tab for Close, Close others, Close tabs to the right, Close all in
-the pane, splits, moves to another pane, its own page, and Copy link. The tab
-row shows only the item's own tools; Chat and Related aren't offered there.
+the pane, splits, moves to another pane, Rename, its own page, and Copy link.
+Double-click a tab, or press F2 on it, to rename its item. The tab row shows
+the item's own tools and status, such as a page saving or a recording paused;
+the tab names the item, so its title isn't repeated, and Chat isn't offered.
 Each tab row carries the active item's tools, such as Chat, beside its tabs.
 With one pane, the tab row takes BB's title bar, so the item sits under a
 single bar. Open items live here, not in the sidebar; a Space's Browse menu

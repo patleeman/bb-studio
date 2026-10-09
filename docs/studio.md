@@ -8,7 +8,7 @@ A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accep
 
 A kind can set `hasOwnChat: true` when it owns its conversation UI. Studio Chat then skips automatic chat discovery for that kind, while explicit item mentions remain available. Its header can pass `chatAction` to `ItemHeader` to supply its primary Chat button, or `null` to omit one. Wrap its nav panel with `retainPanel` and render `RetainedPanels` for the same path from an `experimental_appOverlay`, so an editor stays alive when the user navigates away and back.
 
-The shared item header keeps Chat visible in compact panes and gathers secondary controls under **Item actions**. It measures its own pane, so phone screens and narrow splits behave the same way. Closing the disclosure or widening the pane keeps its controls mounted and preserves their state. In a workspace tab row it shows only the view's own tools: no Chat and no Open in split, since the workspace splits tabs itself.
+The shared item header keeps Chat visible in compact panes and gathers secondary controls under **Item actions**. It measures its own pane, so phone screens and narrow splits behave the same way. Closing the disclosure or widening the pane keeps its controls mounted and preserves their state. In a workspace tab row it shows only the view's own tools and status: no Chat and no Open in split, since the workspace splits tabs itself. `BarCrumb`, `BarSeparator` and `BarTitle` render nothing there, because the tab names the item and renames it (double-click, F2 or **Rename**, through the hub's `rename`); tabs refresh their titles and icons when Studio announces changes.
 
 | Method | Input | Output |
 |---|---|---|

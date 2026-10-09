@@ -6,11 +6,16 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_Icon: () => null,
   experimental_usePluginId: () => "pages",
   useRpc: () => rpc,
-  useRealtime: (_channel: string, handler: (payload: unknown) => void) => { realtime.handler = handler; },
+  useRealtime: (channel: string, handler: (payload: unknown) => void) => { if (channel === "studio-workspace") realtime.handler = handler; },
 }));
 const realtime = vi.hoisted(() => ({ handler: (_payload: unknown) => {} }));
 const reports: { method: string; input: any }[] = [];
-const rpc = { call: async (method: string, input: unknown) => { reports.push({ method, input }); return { tab: null }; } };
+const rpc = { call: async (method: string, input: unknown) => {
+  reports.push({ method, input });
+  if (method === "itemAt") return { item: { pluginId: "pages", id: "one" }, kind: null };
+  if (method === "rename") return { done: ["one"], failed: [] };
+  return { tab: null };
+} };
 import { RetainedPanels, openWorkspaceItem } from "@bb-studio/kit/app";
 import { closeWorkspaceTabs, StudioWorkspace, WorkspaceBridge } from "./Workspace";
 const page = "/plugins/pages/pages/one", other = "/plugins/pages/pages/two";
@@ -110,4 +115,20 @@ it("reports its tabs for agents and opens and closes tabs an agent sends to this
   expect(tabsIn(pane(0))).toEqual(["One"]);
   expect(tabsIn(pane(1))).toEqual(["Three", "Two", "Four"]);
   closeWorkspaceTabs([third, other, fourth]);
+});
+
+it("renames an item from its tab with a double-click", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  closeWorkspaceTabs([page, other, "/plugins/pages/pages/three", "/plugins/pages/pages/four"]);
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  cleanup = () => { act(() => root.unmount()); host.remove(); };
+  await act(() => root.render(<><WorkspaceBridge /><RetainedPanels path="pages" render={subPath => <textarea aria-label={subPath} />} /><StudioWorkspace /></>));
+  await act(() => { openWorkspaceItem({ href: page, title: "One" }); });
+  await act(() => { host.querySelector('[role="tab"]')!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })); });
+  const input = host.querySelector<HTMLInputElement>('input[aria-label="Rename One"]')!;
+  input.value = "Launch plan";
+  await act(async () => { input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(reports.find(each => each.method === "rename")?.input).toEqual({ pluginId: "pages", id: "one", title: "Launch plan" });
+  expect(host.querySelector('[role="tab"]')!.textContent).toBe("Launch plan");
 });

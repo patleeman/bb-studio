@@ -4,7 +4,7 @@
 // the item's tools on the right: icon buttons, one labelled action (Chat),
 // and a menu. Where there is no title bar the same bar sits at the top of
 // the view.
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { mentionPrompt } from "../contract";
@@ -177,9 +177,17 @@ export function StudioBar({ children, className }: { children: ReactNode; classN
   return <div ref={anchor} className={cn("flex h-11 shrink-0 items-center border-b border-border bg-background px-2", className)}>{bar}</div>;
 }
 
+/**
+ * In a workspace tab row the tab names the item and renames it, so a view's
+ * crumbs, separators and title field render nothing there; its status stays.
+ */
+const InTabRow = createContext(false);
+
 /** The parent crumb, then the item's own crumbs or title, separated like BB's breadcrumbs. */
 export function BarCrumb({ children, onClick, current = false, title }: { children: ReactNode; onClick?(): void; current?: boolean; title?: string }) {
+  const inTabRow = useContext(InTabRow);
   const className = cn("flex h-7 min-w-0 shrink items-center gap-1.5 truncate rounded-md px-1.5 text-sm", current ? "font-medium text-foreground" : "text-muted-foreground", onClick && "hover:bg-state-hover hover:text-foreground");
+  if (inTabRow) return null;
   return onClick
     ? <button type="button" title={title} className={className} onClick={onClick}>{children}</button>
     : <span title={title} aria-current={current ? "page" : undefined} className={className}>{children}</span>;
@@ -193,6 +201,7 @@ export function BarTitle({ title, placeholder = "Untitled", label = "Name", disa
   disabled?: boolean;
   onRename(title: string): void;
 }) {
+  if (useContext(InTabRow)) return null;
   return (
     <input
       aria-label={label}
@@ -218,6 +227,7 @@ export function BarTitle({ title, placeholder = "Untitled", label = "Name", disa
 }
 
 export function BarSeparator() {
+  if (useContext(InTabRow)) return null;
   return <span aria-hidden className="shrink-0 text-sm text-muted-foreground/50">/</span>;
 }
 
@@ -301,7 +311,7 @@ export function ItemHeader({
   );
   if (slot) return <>
     <span ref={anchor} hidden />
-    {createPortal(bar, slot)}
+    {createPortal(<InTabRow.Provider value={inWorkspace}>{bar}</InTabRow.Provider>, slot)}
   </>;
   return (
     <div ref={anchor} className={cn("flex h-11 shrink-0 items-center border-b border-border bg-background px-2", className)}>

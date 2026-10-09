@@ -4,7 +4,8 @@ import { Icon, StudioBar, usePathname, registerWorkspaceCloser, setWorkspaceActi
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { toast } from "sonner";
 import type { rpcContract } from "../contract";
-import { WORKSPACE_CHANNEL } from "../ids";
+import { TABS_CHANNEL, WORKSPACE_CHANNEL } from "../ids";
+import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import type { WorkspaceCommand } from "../workspace-presence";
 import { BROWSE, closeTab, emptyWorkspace, mapLayout, openItem, panes, parseWorkspace, type Layout, type Pane, type Tab, type Workspace } from "./workspace-state";
 
@@ -97,6 +98,19 @@ export function WorkspaceBridge() {
     };
   }, [rpc, pathname]);
   useRealtime(WORKSPACE_CHANNEL, runCommand);
+  // Titles and icons change elsewhere, such as a page's title field; tabs follow.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(refreshTimer.current), []);
+  const refreshTitles = () => {
+    clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => void rpc.call("tabs", null).then(({ tabs }) => {
+      const byHref = new Map(tabs.map(tab => [tab.href, tab]));
+      const stale = panes(snapshot().layout).some(pane => pane.tabs.some(tab => { const fresh = byHref.get(tab.href); return fresh && (fresh.title !== tab.title || fresh.icon !== (tab.icon ?? null) || fresh.kindIcon !== tab.kindIcon); }));
+      if (stale) update(current => ({ ...current, layout: mapLayout(current.layout, node => node.kind === "pane" ? { ...node, tabs: node.tabs.map(tab => { const fresh = byHref.get(tab.href); return fresh ? { ...tab, title: fresh.title, icon: fresh.icon, kindIcon: fresh.kindIcon } : tab; }) } : node) }));
+    }, () => {}), REPORT_DELAY_MS);
+  };
+  useRealtime(STUDIO_REALTIME_CHANNEL, refreshTitles);
+  useRealtime(TABS_CHANNEL, refreshTitles);
   useEffect(() => registerWorkspaceCloser(href => closeWorkspaceTabs([href])), []);
   useEffect(() => {
     const publish = () => { const current = snapshot(); setWorkspaceActive(panes(current.layout).find(pane => pane.id === current.focused)?.active ?? null); };
@@ -190,7 +204,35 @@ function EditorSlot({ tab, instance }: { tab: Tab; instance: string }) {
   </div>;
 }
 /** A tab's right-click menu: the usual tab actions, then where it goes. */
-function TabMenu({ pane, tab, index }: { pane: Pane; tab: Tab; index: number }) {
+/** Renames the item a tab shows, through Studio's add-on hub, and the tab with it. */
+async function renameTab(rpc: ReturnType<typeof useRpc<typeof rpcContract>>, href: string, title: string) {
+  const { item } = await rpc.call("itemAt", { path: href });
+  if (!item) throw new Error("this item can't be found");
+  const { failed } = await rpc.call("rename", { pluginId: item.pluginId, id: item.id, title });
+  if (failed[0]) throw new Error(failed[0].error);
+  update(current => ({ ...current, layout: mapLayout(current.layout, node => node.kind === "pane" ? { ...node, tabs: node.tabs.map(each => each.href === href ? { ...each, title } : each) } : node) }));
+}
+/** A tab's title as a field while it's renamed: Enter or leaving saves, Escape cancels. */
+function TabRename({ tab, onDone }: { tab: Tab; onDone(): void }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const ended = useRef(false);
+  const save = (value: string) => {
+    if (ended.current) return;
+    ended.current = true;
+    onDone();
+    const title = value.trim();
+    if (title && title !== tab.title) void renameTab(rpc, tab.href, title).catch((cause: unknown) => toast.error(`Couldn't rename: ${cause instanceof Error ? cause.message : String(cause)}`));
+  };
+  return <input autoFocus defaultValue={tab.title} aria-label={`Rename ${tab.title}`} maxLength={200}
+    className="h-full w-44 min-w-0 rounded-md bg-background px-2 text-[13px] outline outline-1 outline-ring"
+    onFocus={event => event.currentTarget.select()}
+    onKeyDown={event => {
+      if (event.key === "Enter") { event.preventDefault(); save(event.currentTarget.value); }
+      if (event.key === "Escape") { event.preventDefault(); ended.current = true; onDone(); }
+    }}
+    onBlur={event => save(event.currentTarget.value)} />;
+}
+function TabMenu({ pane, tab, index, onRename }: { pane: Pane; tab: Tab; index: number; onRename(): void }) {
   const close = (hrefs: string[]) => closeWorkspaceTabs(hrefs);
   const others = pane.tabs.filter(each => each.href !== tab.href).map(each => each.href);
   const right = pane.tabs.slice(index + 1).map(each => each.href);
@@ -209,6 +251,7 @@ function TabMenu({ pane, tab, index }: { pane: Pane; tab: Tab; index: number }) 
     {elsewhere.map(other => <ContextMenuItem key={other.id} onSelect={() => move(tab, other.id, "tab")}>Move to pane {panes(snapshot().layout).indexOf(other) + 1}</ContextMenuItem>)}
     {item ? <>
       <ContextMenuSeparator />
+      <ContextMenuItem onSelect={() => setTimeout(onRename, 0)}>Rename</ContextMenuItem>
       <ContextMenuItem onSelect={() => openAppPath(tab.href, { standalone: true })}>Open on its own page</ContextMenuItem>
       <ContextMenuItem onSelect={() => void copy()}>Copy link</ContextMenuItem>
     </> : null}
@@ -217,6 +260,7 @@ function TabMenu({ pane, tab, index }: { pane: Pane; tab: Tab; index: number }) 
 /** `titleBar`: the only pane, whose tab row takes BB's title bar instead of a row of its own. */
 function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: string; instance: string; titleBar: boolean }) {
   const [drop, setDrop] = useState<WorkspacePlacement | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const paneElement = useRef<HTMLElement>(null);
   const dropElement = useRef<HTMLDivElement>(null);
   const drag = useDragging();
@@ -246,18 +290,19 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
         {pane.tabs.map((tab, index) => <ContextMenu key={tab.href}><ContextMenuTrigger asChild><div onDragEnd={() => setDragging(null)} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md outline-none transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; setDragging({ source: tab.href }); }}
           onDragOver={event => { if (accepts(event)) event.preventDefault(); }}
           onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab", tab.href); } }}>
-          <button role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${instance}-${pane.id}-${index}`} id={`tab-${instance}-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
+          {renaming === tab.href ? <TabRename tab={tab} onDone={() => setRenaming(null)} /> : <button role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${instance}-${pane.id}-${index}`} id={`tab-${instance}-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
             className="flex h-full min-w-0 items-center gap-1.5 rounded-md pl-2 pr-0.5 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            onClick={() => select(pane.id, tab.href)} onKeyDown={event => {
+            onClick={() => select(pane.id, tab.href)} onDoubleClick={() => { if (tab.href !== BROWSE.href) setRenaming(tab.href); }} onKeyDown={event => {
+              if (event.key === "F2" && tab.href !== BROWSE.href) { event.preventDefault(); setRenaming(tab.href); return; }
               const next = event.key === "ArrowRight" ? (index + 1) % pane.tabs.length : event.key === "ArrowLeft" ? (index + pane.tabs.length - 1) % pane.tabs.length : event.key === "Home" ? 0 : event.key === "End" ? pane.tabs.length - 1 : null;
               if (next !== null) { event.preventDefault(); select(pane.id, pane.tabs[next]!.href); document.getElementById(`tab-${instance}-${pane.id}-${next}`)?.focus(); }
               if (event.key === "Delete") { event.preventDefault(); update(current => closeTab(current, tab.href)); }
             }}>
             {tab.icon ? <span aria-hidden className="w-3.5 shrink-0 text-center text-xs leading-none">{tab.icon}</span> : <Icon name={tab.kindIcon ?? "File"} className="size-3.5 shrink-0 opacity-70" />}
             <span className="truncate">{tab.title}</span>
-          </button>
+          </button>}
           <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
-        </div></ContextMenuTrigger><TabMenu pane={pane} tab={tab} index={index} /></ContextMenu>)}
+        </div></ContextMenuTrigger><TabMenu pane={pane} tab={tab} index={index} onRename={() => setRenaming(tab.href)} /></ContextMenu>)}
       </div>
       <button className={BUTTON} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
       </div>

@@ -2,7 +2,7 @@
 import { act, useEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ItemHeader, OpenInSplitButton, StudioBar, StudioBarSlot } from "./item-header";
+import { BarCrumb, BarSeparator, ItemHeader, OpenInSplitButton, StudioBar, StudioBarSlot } from "./item-header";
 
 const state = vi.hoisted(() => ({ launch: null as ((mode: string) => void) | null, split: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toCompose: () => {} }) }));
@@ -185,5 +185,15 @@ it("uses its workspace tab's slot in the tab row, never the app's slot", async (
   // No way back from a tab; the view's own crumbs stay.
   expect(bar.querySelector('[title="Back to Studio"]')).toBeNull();
   expect(bar.querySelector("nav")!.textContent).toBe("Release notes");
+  await act(async () => root.unmount()); pane.remove();
+});
+
+it("leaves a view's crumbs to the tab, keeping its status", async () => {
+  const pane = document.createElement("div");
+  pane.innerHTML = '<nav><div data-studio-workspace-bar="one"></div></nav><section data-studio-workspace-frame="one"><main data-studio-workspace-editor></main></section>';
+  document.body.append(pane);
+  const root = createRoot(pane.querySelector("main")!);
+  await act(async () => { root.render(<ItemHeader backLabel="Studio" onBack={() => {}} leading={<><BarCrumb onClick={() => {}}>Parent</BarCrumb><BarSeparator /><BarCrumb current>Release notes</BarCrumb><span>Paused</span></>} />); await settle(); });
+  expect(pane.querySelector("[data-studio-workspace-bar] nav")!.textContent).toBe("Paused");
   await act(async () => root.unmount()); pane.remove();
 });
