@@ -62,21 +62,18 @@ public struct SpaceLead: Hashable, Sendable {
 
     init(_ output: Studio.SpaceLeadOutput) {
         let run = output.run
-        let cadence: String? = switch run?.cadence {
-        case .hourly: "hourly"
-        case .daily: "daily"
-        case .weekdays: "weekdays"
-        case .every5minutes: "every5minutes"
-        case .every15minutes: "every15minutes"
-        case .every30minutes: "every30minutes"
-        case .every2hours: "every2hours"
-        case .every6hours: "every6hours"
-        case .weekly: "weekly"
-        case .custom: "custom"
-        case .unknown(let value): value
-        case nil: nil
-        }
-        self.init(threadId: output.leadThreadId, heartbeat: run?.enabled == true ? cadence : nil, time: run?.time, cron: run?.cron)
+        self.init(threadId: output.leadThreadId, enabled: run?.enabled, cadence: run?.cadence, time: run?.time, cron: run?.cron)
+    }
+
+    /// From any of Studio's run shapes; the heartbeat is nil unless it's enabled.
+    init<Cadence: Encodable>(threadId: String?, enabled: Bool?, cadence: Cadence?, time: String?, cron: String?) {
+        self.init(threadId: threadId, heartbeat: enabled == true ? Self.cadenceId(cadence) : nil, time: time, cron: cron)
+    }
+
+    /// The wire id of a generated cadence enum (`hourly`, `every15minutes`, or whatever a newer Studio sent).
+    static func cadenceId<Cadence: Encodable>(_ cadence: Cadence?) -> String? {
+        guard let cadence, let data = try? JSONEncoder().encode(cadence) else { return nil }
+        return try? JSONDecoder().decode(String.self, from: data)
     }
 
     /// The heartbeat choices, in Studio's order, with their labels.

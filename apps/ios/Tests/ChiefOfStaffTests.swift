@@ -63,4 +63,54 @@ final class ChiefOfStaffTests: XCTestCase {
         XCTAssertEqual(ChiefLead(nil), .none)
         XCTAssertEqual(ChiefLead("thr_1"), .thread("thr_1"))
     }
+
+    func testChiefOfStaffReadsHeartbeat() async throws {
+        let client = BBClient(baseURL: a)
+        client.transport = { _, path, _ in
+            XCTAssertTrue(path.hasSuffix("chief_of_staff"), path)
+            return (200, Data(#"{"ok":true,"result":{"threadId":"thr_c","originSpaceId":null,"run":{"enabled":true,"cadence":"every15minutes","time":"09:30"}}}"#.utf8))
+        }
+        let chief = try await client.chiefOfStaff()
+        XCTAssertEqual(chief, SpaceLead(threadId: "thr_c", heartbeat: "every15minutes", time: "09:30"))
+        XCTAssertEqual(client.cachedChiefOfStaffThreadId, "thr_c")
+    }
+
+    func testChiefOfStaffMissingOnOlderStudio() async throws {
+        let client = BBClient(baseURL: b)
+        client.transport = { _, _, _ in (404, Data(#"{"ok":false,"error":{"code":"unknown_method","message":"no"}}"#.utf8)) }
+        let chief = try await client.chiefOfStaff()
+        XCTAssertNil(chief)
+    }
+
+    func testSetChiefHeartbeatSendsRunAndReadsAnswer() async throws {
+        let client = BBClient(baseURL: a)
+        client.transport = { _, path, body in
+            XCTAssertTrue(path.hasSuffix("chief_of_staff_set_run"), path)
+            let sent = String(decoding: body ?? Data(), as: UTF8.self)
+            XCTAssertTrue(sent.contains(#""enabled":false"#), sent)
+            XCTAssertTrue(sent.contains(#""cadence":"daily""#), sent)
+            XCTAssertFalse(sent.contains("cron"), sent)
+            return (200, Data(#"{"ok":true,"result":{"threadId":"thr_c","originSpaceId":null,"run":{"enabled":false,"cadence":"daily","time":"08:00"}}}"#.utf8))
+        }
+        let chief = try await client.setChiefOfStaffHeartbeat(enabled: false, cadence: "daily", time: "08:00", cron: nil)
+        XCTAssertEqual(chief.threadId, "thr_c")
+        XCTAssertNil(chief.heartbeat)
+    }
+
+    func testCadenceIdKeepsUnknownValues() {
+        XCTAssertEqual(SpaceLead.cadenceId(Studio.ChiefOfStaffOutputRunCadence.every2hours), "every2hours")
+        XCTAssertEqual(SpaceLead.cadenceId(Studio.ChiefOfStaffOutputRunCadence.unknown("every10minutes")), "every10minutes")
+        XCTAssertNil(SpaceLead.cadenceId(Optional<Studio.ChiefOfStaffOutputRunCadence>.none))
+    }
+
+    func testHeartbeatTimeRoundTrips() {
+        let date = HeartbeatFields.date("07:05")
+        XCTAssertEqual(date.map(HeartbeatFields.text), "07:05")
+        XCTAssertNil(HeartbeatFields.date("bad"))
+    }
+
+    @MainActor func testChiefMenuLabelSaysAboveEverySpace() {
+        XCTAssertEqual(ThreadSpacesModel.chiefLabel, "Chief of Staff · above every Space")
+        XCTAssertFalse(ThreadSpacesModel().isChief("thr_x"))
+    }
 }

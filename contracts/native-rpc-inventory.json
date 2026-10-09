@@ -260,6 +260,18 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/ChiefOfStaff.swift",
+      "plugin": "studio",
+      "method": "chief_of_staff",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/ChiefOfStaff.swift",
+      "plugin": "studio",
+      "method": "chief_of_staff_set_run",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/Designs.swift",
       "plugin": "design",
       "method": "getDesign",

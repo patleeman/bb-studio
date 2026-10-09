@@ -44,6 +44,7 @@ struct ThreadView: View {
     @State private var confirmingCompact = false
     @State private var confirmingClearContext = false
     @State private var showingContext = false
+    @State private var editingChiefHeartbeat = false
     @State private var renaming = false
     @State private var openingFile: OpenFile?
     @State private var newTitle = ""
@@ -122,6 +123,7 @@ struct ThreadView: View {
                 composerFocused = true
             }
         }
+        .sheet(isPresented: $editingChiefHeartbeat) { ChiefHeartbeatSheet() }
         .sheet(isPresented: $showingContext) { ThreadContextView(threadId: model.threadId) }
         .alert("Rename thread", isPresented: $renaming) {
             TextField("Title", text: $newTitle)
@@ -328,7 +330,8 @@ struct ThreadView: View {
                     }
                     ThreadSpacesMenu(
                         model: spaces, threadId: model.threadId, projectId: model.thread?.projectId,
-                        isChild: model.thread?.parentThreadId != nil
+                        isChild: model.thread?.parentThreadId != nil,
+                        editHeartbeat: { editingChiefHeartbeat = true }
                     ) { model.error = $0 }
                     if let sourcePage {
                         Button { app.push(.page(id: sourcePage.id)) } label: {

@@ -31,4 +31,28 @@ extension BBClient {
     public var cachedChiefOfStaffThreadId: String? {
         AppGroup.defaults.string(forKey: ServerScope.key("chiefThreadId", serverURL: baseURL))
     }
+
+    /// The Chief of Staff and its heartbeat, as a `SpaceLead` so the Space lead's
+    /// heartbeat UI can show it. Nil when Studio is absent or too old for the slot.
+    public func chiefOfStaff() async throws -> SpaceLead? {
+        do {
+            let output: Studio.ChiefOfStaffOutput = try await rpc("studio", Studio.Method.chief_of_staff, .object([:]))
+            AppGroup.defaults.set(output.threadId, forKey: ServerScope.key("chiefThreadId", serverURL: baseURL))
+            let run = output.run
+            return SpaceLead(threadId: output.threadId, enabled: run?.enabled, cadence: run?.cadence, time: run?.time, cron: run?.cron)
+        } catch where Self.isMissingRPC(error) {
+            return nil
+        }
+    }
+
+    /// Turns the Chief of Staff's heartbeat on or off; on needs a Chief of Staff.
+    @discardableResult
+    public func setChiefOfStaffHeartbeat(enabled: Bool, cadence: String, time: String?, cron: String?) async throws -> SpaceLead {
+        let output: Studio.ChiefOfStaffSetRunOutput = try await rpc("studio", Studio.Method.chief_of_staff_set_run, .object(omittingNil: [
+            "enabled": .bool(enabled), "cadence": .string(cadence),
+            "time": time.map(JSONValue.string), "cron": cron.map(JSONValue.string),
+        ]))
+        let run = output.run
+        return SpaceLead(threadId: output.threadId, enabled: run?.enabled, cadence: run?.cadence, time: run?.time, cron: run?.cron)
+    }
 }

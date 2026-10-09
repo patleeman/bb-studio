@@ -118,6 +118,7 @@ private struct ChiefOfStaffTab: View {
     @State private var path: [Route] = []
     @State private var lead = ChiefLead.loading
     @State private var attempt = 0
+    @State private var editingHeartbeat = false
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let attempt: Int }
 
     var body: some View {
@@ -143,6 +144,15 @@ private struct ChiefOfStaffTab: View {
                 }
             }
             .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+            .toolbar {
+                if case .thread = lead {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { editingHeartbeat = true } label: { Label("Heartbeat", systemImage: "waveform.path.ecg") }
+                            .accessibilityHint("Sets how often the Chief of Staff wakes")
+                    }
+                }
+            }
+            .sheet(isPresented: $editingHeartbeat) { ChiefHeartbeatSheet() }
         }
         .task(id: LoadKey(visible: model.tab == .chief, server: model.serverURL, attempt: attempt)) {
             guard model.tab == .chief else { return }

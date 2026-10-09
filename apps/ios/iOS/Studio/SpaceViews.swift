@@ -221,6 +221,11 @@ final class ThreadSpacesModel: ObservableObject {
         await load(threadIdToReload, client: client)
     }
 
+    /// What the ⋯ > Space menu says for the Chief of Staff, which is in no Space.
+    static let chiefLabel = "Chief of Staff · above every Space"
+
+    func isChief(_ threadId: String) -> Bool { chiefThreadId == threadId }
+
     func setChief(_ threadId: String?, reload threadIdToReload: String, client: BBClient) async throws {
         let previous = chiefThreadId
         chiefThreadId = threadId
@@ -242,13 +247,15 @@ struct ThreadSpacesMenu: View {
     var projectId: String?
     /// Child threads stay with their root's Space.
     var isChild = false
+    /// Opens the Chief of Staff heartbeat sheet; the menu can't present one itself.
+    var editHeartbeat: (() -> Void)?
     var failed: (String) -> Void
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
 
     var body: some View {
-        if let current = model.space(of: threadId, projectId: projectId) {
+        if !isChief, let current = model.space(of: threadId, projectId: projectId) {
             Menu {
                 Button { operation.complete(on: app) { app.openSpace(current.id) } } label: {
                     Label("Open \(current.name)", systemImage: "arrow.up.right")
@@ -258,10 +265,8 @@ struct ThreadSpacesMenu: View {
                     Button { setLead(isLead ? nil : threadId, of: current) } label: {
                         Label(isLead ? "Remove as Space Lead" : "Make Space Lead", systemImage: isLead ? "star.slash" : "star")
                     }
-                    let isChief = model.chiefThreadId == threadId
-                    Button { setChief(isChief ? nil : threadId) } label: {
-                        Label(isChief ? "Remove as Chief of Staff" : "Make Chief of Staff",
-                              systemImage: isChief ? "person.crop.circle.badge.xmark" : "person.crop.circle.badge.checkmark")
+                    Button { setChief(threadId) } label: {
+                        Label("Make Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
                     }
                     if model.spaces.count > 1 {
                         Section("Move to Space") {
@@ -277,8 +282,22 @@ struct ThreadSpacesMenu: View {
             } label: {
                 Label("Space: \(current.label)", systemImage: "square.stack.3d.up")
             }
+        } else if isChief {
+            // The Chief of Staff sits above every Space, so it isn't in one and can't move or lead.
+            Menu {
+                if let editHeartbeat {
+                    Button(action: editHeartbeat) { Label("Heartbeat…", systemImage: "waveform.path.ecg") }
+                }
+                Button { setChief(nil) } label: {
+                    Label("Remove as Chief of Staff", systemImage: "person.crop.circle.badge.xmark")
+                }
+            } label: {
+                Label(ThreadSpacesModel.chiefLabel, systemImage: "person.crop.circle.badge.checkmark")
+            }
         }
     }
+
+    private var isChief: Bool { model.isChief(threadId) }
 
     private func move(to space: StudioSpace) {
         Task {
