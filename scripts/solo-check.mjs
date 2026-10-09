@@ -49,8 +49,8 @@ const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise,
  * every check must be ok.
  */
 const PLUGINS = {
-  // Alone, Studio shows its collection with no add-ons to fill it.
-  studio: { cli: ["studio", "list", "--all"], surface: "/plugins/studio/studio", labels: ["No add-ons installed"] },
+  // Alone, Studio's collection, opened as the workspace's new tab, has no add-ons to fill it.
+  studio: { cli: ["studio", "list", "--all"], surface: "/plugins/studio/studio/collection", labels: ["No add-ons installed"] },
   pages: { cli: ["pages", "list", "--all"], surface: "/plugins/pages/pages", labels: ["No pages yet"] },
   talk: { cli: ["talk", "list"], surface: "/plugins/talk/recordings", labels: ["Dictations", "No recordings yet"] },
   excalidraw: { cli: ["excalidraw", "list"], surface: "/plugins/excalidraw/drawings", labels: ["No drawings yet"] },
