@@ -14,9 +14,9 @@ import { cn } from "../ui/utils";
 import { useOpenTarget } from "./move";
 import { useHomeThread, useItemChat, type ItemChatRef } from "./item-chat";
 import { BAR_BUTTON, ICON_BUTTON } from "./pieces";
-import { useStudioChatPresent, useStudioPresent } from "./presence";
-import { RelatedPanel, type RelatedRef } from "./related-panel";
+import { useStudioChatPresent } from "./presence";
 
+export interface RelatedRef { pluginId: string; id: string }
 export type ItemThread = { title: string; href: string; ref?: RelatedRef };
 
 export function openNewItemThread(navigate: ReturnType<typeof useBbNavigate>, item: ItemThread) {
@@ -254,7 +254,7 @@ export function ItemHeader({
     // A workspace slot sits beside the tabs, so the pane's width decides.
     const pane = slot?.closest<HTMLElement>("[data-workspace-pane]");
     const measured = pane ?? slot ?? anchor.current;
-    const measure = () => setCompact((measured?.getBoundingClientRect().width || window.innerWidth) < (pane ? 720 : 520));
+    const measure = () => setCompact((measured?.getBoundingClientRect().width || window.innerWidth) < (pane ? 480 : 520));
     measure();
     const observer = typeof ResizeObserver === "undefined" || !measured ? null : new ResizeObserver(measure);
     if (measured) observer?.observe(measured);
@@ -265,13 +265,16 @@ export function ItemHeader({
   const moved = item ?? thread;
   // Studio Chat owns item links and conversation creation across item views.
   const studioChat = useStudioChatPresent();
-  const studio = useStudioPresent();
   const chatItem = thread ?? item;
   const path = chatItem?.href.split(/[?#]/)[0]?.split("/") ?? [];
   const relatedRef = chatItem?.ref ?? (path[1] === "plugins" && path[2] && path[4]
     ? { pluginId: path[2], id: decodeURIComponent(path[4]) }
     : null);
-  const tools = relatedRef && studio || moved || trailing;
+  // In the workspace's tab row only the item's own tools show: the workspace
+  // splits tabs itself, and Chat isn't offered there.
+  const inWorkspace = !!slot?.hasAttribute("data-studio-workspace-bar");
+  const splitHere = !inWorkspace && moved;
+  const tools = splitHere || trailing;
   const bar = (
     <div data-studio-bar="" data-studio-item-header="" className="flex h-full min-w-0 flex-1 items-center gap-2">
       {/* In the workspace the tab names the item. */}
@@ -280,16 +283,15 @@ export function ItemHeader({
         {leading ? <BarSeparator /> : null}
         {leading}
       </nav>
-      {chatAction !== null && (chatAction || thread || relatedRef) || tools ? <div className="flex shrink-0 items-center gap-0.5">
-        {chatAction}
-        {chatAction === undefined && thread && studioChat === false ? <button type="button" className={BAR_BUTTON} onClick={newThread}>
+      {!inWorkspace && chatAction !== null && (chatAction || thread || relatedRef) || tools ? <div className="flex shrink-0 items-center gap-0.5">
+        {inWorkspace ? null : chatAction}
+        {!inWorkspace && chatAction === undefined && thread && studioChat === false ? <button type="button" className={BAR_BUTTON} onClick={newThread}>
           <Icon name="MessageSquare" /> Chat
         </button> : null}
-        {chatAction === undefined && relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
+        {!inWorkspace && chatAction === undefined && relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
         {tools ? <ItemActions compact={compact}>
-          {relatedRef && studio ? <RelatedPanel ref={relatedRef} /> : null}
-          {moved ? <OpenInSplitButton item={moved} /> : null}
-          {trailing && ((relatedRef && studio) || moved) && !compact ? <span aria-hidden className="mx-1 h-4 w-px bg-border" /> : null}
+          {splitHere ? <OpenInSplitButton item={splitHere} /> : null}
+          {trailing && splitHere && !compact ? <span aria-hidden className="mx-1 h-4 w-px bg-border" /> : null}
           {trailing}
         </ItemActions> : null}
       </div> : null}

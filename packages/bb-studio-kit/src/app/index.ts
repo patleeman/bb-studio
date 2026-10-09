@@ -16,7 +16,7 @@ export { AddOnCollection, type ProviderCall } from "./add-on";
 export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
 export { ThreadItemsPanel } from "./thread-items";
 export { BarCrumb, BarSeparator, BarTitle, ChatButton, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, OpenInSplitButton, openNewItemThread, type ChatMenuItem, type ItemThread } from "./item-header";
-export { type RelatedRef } from "./related-panel";
+export { type RelatedRef } from "./item-header";
 export { CopyReferenceMenuItem, ItemDeleteConfirm, ItemMenu } from "./item-menu";
 export { ITEM_LINK_PILLS, ItemLinkText, ItemLinkTextarea } from "./item-links";
 export { itemReferenceFrom } from "./item-reference";

@@ -16,7 +16,6 @@ vi.mock("./item-chat", () => ({
 }));
 vi.mock("./presence", () => ({ useStudioChatPresent: () => true, useStudioPresent: () => true }));
 vi.mock("./move", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
-vi.mock("./related-panel", () => ({ RelatedPanel: () => null }));
 vi.mock("../ui/icon", () => ({ Icon: () => null }));
 
 function Dialog({ mode, close }: { mode: string; close(): void }) {
