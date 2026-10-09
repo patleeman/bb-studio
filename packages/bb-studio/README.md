@@ -15,7 +15,16 @@ a tab bar to move or reorder. The tab arrangement menu offers split and move
 commands, and separators resize with the mouse or arrow keys. Closing a tab
 keeps the item. The workspace remembers the layout locally across visits and
 refreshes. Use **Workspace** in the collection to return, or **+** to browse.
-Conversation-side item views continue to work independently.
+Conversation-side item views continue to work independently. At phone widths, a
+pane picker shows one pane at a time while preserving the desktop arrangement.
+
+![Studio workspace with a page and recording in separate panes](assets/workspace.png)
+
+![Studio workspace on a phone, with a pane picker](assets/workspace-mobile.png)
+
+These staged captures check item opening, drag-to-split, layout restoration,
+closing and reopening tabs, local editor toolbars, and title sizing after a
+viewport change.
 
 ## Staged preview
 

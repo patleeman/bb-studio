@@ -16,7 +16,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           const selector = `[role="row"][aria-label="${title}"]`;
           await client.waitForSelector(selector);
           await client.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
-          await client.waitForSelector('[data-studio-workspace]');
+          // Retained workspaces still exist in hidden parking while browsing.
+          // Wait for the actual visible pane before measuring a drag destination.
+          const started = Date.now();
+          while (!(await client.evaluate(`Boolean([...document.querySelectorAll('[data-studio-workspace]')].find(element => element.checkVisibility()))`))) {
+            if (Date.now() - started > 15000) throw new Error("Workspace did not become visible after opening an item");
+            await sleep(50);
+          }
         };
         await openRow("Offline mode launch");
         await client.waitForText("Launch checklist");
@@ -26,7 +32,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForText("Weekly product sync");
         const href = `/plugins/talk/recordings/${recording}`;
         await client.waitForSelector(`[data-studio-workspace-editor="${href}"] [aria-label="Recording position"]`);
-        const destination = await client.evaluate(`(() => { const rect = document.querySelector('[data-workspace-pane]').getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
+        const destination = await client.evaluate(`(() => { const rect = [...document.querySelectorAll('[data-workspace-pane]')].find(element => element.checkVisibility()).getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...destination, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
         await sleep(500);
         const assertLayout = async () => {
@@ -43,7 +49,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         // Restore the two-editor arrangement for the screenshot.
         await client.evaluate(`document.querySelector('[aria-label="Browse Studio items"]').click()`);
         await openRow("Weekly product sync");
-        const split = await client.evaluate(`(() => { const rect = document.querySelector('[data-workspace-pane]').getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
+        const split = await client.evaluate(`(() => { const rect = [...document.querySelectorAll('[data-workspace-pane]')].find(element => element.checkVisibility()).getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...split, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
         await sleep(500);
         await assertLayout();
