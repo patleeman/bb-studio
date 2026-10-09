@@ -141,18 +141,18 @@ function TabMenu({ pane, tab, index }: { pane: Pane; tab: Tab; index: number }) 
   const item = tab.href !== BROWSE.href;
   const copy = () => navigator.clipboard.writeText(`[${tab.title}](${tab.href})`).then(() => toast.success("Link copied"), () => toast.error("Couldn't copy the link"));
   return <ContextMenuContent className="w-56" aria-label={`${tab.title} tab actions`}>
-    <ContextMenuItem onSelect={() => close([tab.href])}><Icon name="X" className="size-4" />Close</ContextMenuItem>
+    <ContextMenuItem onSelect={() => close([tab.href])}>Close</ContextMenuItem>
     <ContextMenuItem disabled={!others.length} onSelect={() => close(others)}>Close others</ContextMenuItem>
     <ContextMenuItem disabled={!right.length} onSelect={() => close(right)}>Close tabs to the right</ContextMenuItem>
     <ContextMenuItem onSelect={() => close(pane.tabs.map(each => each.href))}>Close all in this pane</ContextMenuItem>
     <ContextMenuSeparator />
-    <ContextMenuItem disabled={!splittable} onSelect={() => move(tab, pane.id, "right")}><Icon name="Columns2" className="size-4" />Split right</ContextMenuItem>
-    <ContextMenuItem disabled={!splittable} onSelect={() => move(tab, pane.id, "bottom")}><Icon name="Rows2" className="size-4" />Split down</ContextMenuItem>
+    <ContextMenuItem disabled={!splittable} onSelect={() => move(tab, pane.id, "right")}>Split right</ContextMenuItem>
+    <ContextMenuItem disabled={!splittable} onSelect={() => move(tab, pane.id, "bottom")}>Split down</ContextMenuItem>
     {elsewhere.map(other => <ContextMenuItem key={other.id} onSelect={() => move(tab, other.id, "tab")}>Move to pane {panes(snapshot().layout).indexOf(other) + 1}</ContextMenuItem>)}
     {item ? <>
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => openAppPath(tab.href, { standalone: true })}><Icon name="ExternalLink" className="size-4" />Open on its own page</ContextMenuItem>
-      <ContextMenuItem onSelect={() => void copy()}><Icon name="studio/link" fallback="Copy" className="size-4" />Copy link</ContextMenuItem>
+      <ContextMenuItem onSelect={() => openAppPath(tab.href, { standalone: true })}>Open on its own page</ContextMenuItem>
+      <ContextMenuItem onSelect={() => void copy()}>Copy link</ContextMenuItem>
     </> : null}
   </ContextMenuContent>;
 }
