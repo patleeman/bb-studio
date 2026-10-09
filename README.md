@@ -36,7 +36,7 @@ above; install `mobile` for push notifications. See its
 
 ## Install
 
-Requires BB 0.44 or later. Paste this prompt into a BB thread and your agent
+Requires BB 0.45 or later. Paste this prompt into a BB thread and your agent
 sets it up:
 
 ```text
