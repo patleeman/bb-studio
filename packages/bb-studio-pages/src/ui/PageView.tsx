@@ -69,14 +69,24 @@ function TitleField(props: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement
   const ref = useRef<HTMLTextAreaElement>(null);
   const fit = useCallback(() => {
     const field = ref.current;
-    if (!field) return;
+    // A background workspace tab has no layout. Measuring it would collapse
+    // the title to zero until another window resize.
+    if (!field || !field.getClientRects().length) return;
     field.style.height = "auto";
     field.style.height = `${field.scrollHeight}px`;
   }, []);
   useEffect(fit, [fit, props.value]);
   useEffect(() => {
     window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+    let width = -1;
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(entries => {
+      const next = entries[0]?.contentRect.width ?? 0;
+      if (next === width) return;
+      width = next;
+      fit();
+    });
+    if (ref.current?.parentElement) observer?.observe(ref.current.parentElement);
+    return () => { window.removeEventListener("resize", fit); observer?.disconnect(); };
   }, [fit]);
   return (
     <textarea

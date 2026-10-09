@@ -68,11 +68,12 @@ export function openItem(state: Workspace, item: WorkspaceItem, placement: Works
 /** Local storage is untrusted, and old/duplicate layouts should never mount editors twice. */
 export function parseWorkspace(value: unknown): Workspace {
   const seen = new Set<string>(), ids = new Set<string>();
+  let paneCount = 0;
   function parse(value: any, depth = 0): Layout {
-    if (!value || depth > 6 || typeof value.id !== "string" || ids.has(value.id)) throw new Error("Invalid pane");
+    if (!value || depth > 7 || typeof value.id !== "string" || ids.has(value.id)) throw new Error("Invalid pane");
     ids.add(value.id);
     if (value.kind === "split" && ["row", "column"].includes(value.axis)) return { kind: "split", id: value.id, axis: value.axis, ratio: Number.isFinite(value.ratio) ? Math.min(.8, Math.max(.2, value.ratio)) : .5, first: parse(value.first, depth + 1), second: parse(value.second, depth + 1) };
-    if (value.kind !== "pane" || !Array.isArray(value.tabs) || value.tabs.length > 100) throw new Error("Invalid tabs");
+    if (++paneCount > 8 || value.kind !== "pane" || !Array.isArray(value.tabs) || value.tabs.length > 100) throw new Error("Invalid tabs");
     const tabs: Tab[] = [];
     for (const tab of value.tabs) {
       if (typeof tab?.href !== "string" || typeof tab.title !== "string") continue;

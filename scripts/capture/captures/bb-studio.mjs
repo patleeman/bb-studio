@@ -57,6 +57,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.capture(new URL('../../../packages/bb-studio/assets/workspace-mobile.png', import.meta.url).pathname);
         await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await sleep(500);
+        const title = await client.evaluate(`(() => { const title = document.querySelector('[data-studio-workspace] [aria-label="Page title"]'); return { value: title?.value, height: title?.getBoundingClientRect().height }; })()`);
+        if (title.value !== "Offline mode launch" || title.height < 20) throw new Error(`The page title did not survive pane hiding: ${JSON.stringify(title)}`);
         return cleanup;
       } catch (error) { await cleanup(); throw error; }
     },

@@ -37,3 +37,10 @@ describe("Studio workspace", () => {
     expect(openItem(state, { href: "https://elsewhere.test", title: "Bad" })).toBe(state);
   });
 });
+
+it("restores the maximum nested eight-pane arrangement", () => {
+  let state = emptyWorkspace();
+  for (let index = 0; index < 8; index++) state = openItem(state, { href: `/plugins/pages/pages/page_${index}`, title: `Page ${index}` }, "right");
+  expect(panes(state.layout)).toHaveLength(8);
+  expect(parseWorkspace(JSON.parse(JSON.stringify(state)))).toEqual(state);
+});
