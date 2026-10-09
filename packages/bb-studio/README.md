@@ -15,8 +15,14 @@ a tab bar to move or reorder. The tab arrangement menu offers split and move
 commands, and separators resize with the mouse or arrow keys. Closing a tab
 keeps the item. The workspace remembers the layout locally across visits and
 refreshes. Use **Workspace** in the collection to return, or **+** to browse.
+Each tab row carries the active item's tools, such as Chat, beside its tabs.
+With one pane, the tab row takes BB's title bar, so the item sits under a
+single bar. Open items live here, not in the sidebar; a Space's Browse menu
+opens any of its items as a tab.
 Conversation-side item views continue to work independently. At phone widths, a
 pane picker shows one pane at a time while preserving the desktop arrangement.
+
+![Studio workspace with one pane, its tabs and the page's tools in BB's title bar](assets/workspace-single.png)
 
 ![Studio workspace with a page and recording in separate panes](assets/workspace.png)
 
