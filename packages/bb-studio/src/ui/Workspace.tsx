@@ -76,10 +76,14 @@ export function WorkspaceBridge() {
     // Drags from the sidebar, another window or a tab all pass here first.
     const enter = (event: globalThis.DragEvent) => { if (accepts(event) && !dragging) setDragging({ source: null }); };
     const end = () => setDragging(null);
-    const leave = (event: globalThis.DragEvent) => { if (!event.relatedTarget && (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight)) end(); };
+    // Leaving for nothing: out of the window, into a frame, or cancelled. A
+    // drag that comes back enters again; a pointer moving means it's over.
+    const leave = (event: globalThis.DragEvent) => { if (!event.relatedTarget) end(); };
+    const moved = () => { if (dragging) end(); };
     document.addEventListener("dragenter", enter, true);
     document.addEventListener("dragleave", leave, true);
     document.addEventListener("dragend", end, true);
+    document.addEventListener("pointermove", moved, true);
     // Bubbling, so a pane's drop layer handles the drop before it goes.
     window.addEventListener("drop", end);
     return () => {
@@ -87,6 +91,7 @@ export function WorkspaceBridge() {
       document.removeEventListener("dragenter", enter, true);
       document.removeEventListener("dragleave", leave, true);
       document.removeEventListener("dragend", end, true);
+      document.removeEventListener("pointermove", moved, true);
       window.removeEventListener("drop", end);
     };
   }, []);
