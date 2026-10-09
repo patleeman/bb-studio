@@ -9,7 +9,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 }));
 const rpc = { call: async () => ({ tab: null }) };
 import { RetainedPanels, openWorkspaceItem } from "@bb-studio/kit/app";
-import { StudioWorkspace, WorkspaceBridge } from "./Workspace";
+import { closeWorkspaceTabs, StudioWorkspace, WorkspaceBridge } from "./Workspace";
 const page = "/plugins/pages/pages/one", other = "/plugins/pages/pages/two";
 let cleanup = () => {};
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -52,4 +52,29 @@ it("keeps editor drafts while switching tabs, splitting and returning to the wor
   await act(() => close.click());
   expect(host.querySelectorAll('[data-workspace-pane]')).toHaveLength(1);
   expect(host.querySelectorAll('[role="tab"]')).toHaveLength(1);
+});
+it("closes others and the tabs to the right from a tab's context menu", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+  const third = "/plugins/pages/pages/three";
+  // The workspace outlives a test; start from no tabs.
+  closeWorkspaceTabs([page, other, third]);
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  cleanup = () => { act(() => root.unmount()); host.remove(); document.body.innerHTML = ""; };
+  await act(() => root.render(<><WorkspaceBridge /><RetainedPanels path="pages" render={subPath => <textarea aria-label={subPath} />} /><StudioWorkspace /></>));
+  await act(() => { for (const [href, title] of [[page, "One"], [other, "Two"], [third, "Three"]] as const) openWorkspaceItem({ href, title }); });
+  const titles = () => [...host.querySelectorAll('[role="tab"]')].map(tab => tab.textContent);
+  expect(titles()).toEqual(["One", "Two", "Three"]);
+  const menu = async (title: string, action: string) => {
+    const tab = [...host.querySelectorAll<HTMLElement>("[data-studio-workspace-tab]")].find(each => each.textContent === title)!;
+    await act(() => { tab.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 })); });
+    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(each => each.textContent === action)!;
+    expect(item).toBeDefined();
+    await act(() => { item.click(); });
+  };
+  await menu("Two", "Close tabs to the right");
+  expect(titles()).toEqual(["One", "Two"]);
+  await menu("Two", "Close others");
+  expect(titles()).toEqual(["Two"]);
 });

@@ -73,6 +73,15 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...split, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
         await sleep(500);
         await assertLayout();
+        // A tab's right-click menu has the usual tab actions and where it can go.
+        await client.openContextMenu(`[data-studio-workspace-tab="${href}"]`);
+        const menu = await client.evaluate(`[...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map(each => each.innerText.trim())`);
+        for (const label of ["Close", "Close others", "Close tabs to the right", "Close all in this pane", "Split right", "Split down", "Move to pane 1", "Open on its own page", "Copy link"]) {
+          if (!menu.includes(label)) throw new Error(`The tab menu has no ${label}: ${JSON.stringify(menu)}`);
+        }
+        await client.capture(new URL('../../../packages/bb-studio/assets/workspace-tab-menu.png', import.meta.url).pathname);
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+        await sleep(250);
         // Mid-drag, a drop layer covers each editor, so editors in iframes can't swallow the drop.
         const over = await client.evaluate(`(() => { const rect = [...document.querySelectorAll('[data-workspace-pane]')].filter(element => element.checkVisibility())[0].querySelector('[data-studio-workspace-drop]').getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.bottom - 40 }; })()`);
         const item = { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 };

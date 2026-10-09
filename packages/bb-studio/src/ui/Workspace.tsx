@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon, StudioBar, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
+import { toast } from "sonner";
 import type { rpcContract } from "../contract";
 import { BROWSE, closeTab, emptyWorkspace, mapLayout, openItem, panes, parseWorkspace, type Layout, type Pane, type Tab, type Workspace } from "./workspace-state";
 
@@ -130,6 +131,31 @@ function EditorSlot({ tab, instance }: { tab: Tab; instance: string }) {
     <div ref={element} data-studio-workspace-editor={tab.href} className="flex min-h-0 min-w-0 flex-1 flex-col" />
   </div>;
 }
+/** A tab's right-click menu: the usual tab actions, then where it goes. */
+function TabMenu({ pane, tab, index }: { pane: Pane; tab: Tab; index: number }) {
+  const close = (hrefs: string[]) => closeWorkspaceTabs(hrefs);
+  const others = pane.tabs.filter(each => each.href !== tab.href).map(each => each.href);
+  const right = pane.tabs.slice(index + 1).map(each => each.href);
+  const elsewhere = panes(snapshot().layout).filter(other => other.id !== pane.id);
+  const splittable = pane.tabs.length > 1 && panes(snapshot().layout).length < 8;
+  const item = tab.href !== BROWSE.href;
+  const copy = () => navigator.clipboard.writeText(`[${tab.title}](${tab.href})`).then(() => toast.success("Link copied"), () => toast.error("Couldn't copy the link"));
+  return <ContextMenuContent className="w-56" aria-label={`${tab.title} tab actions`}>
+    <ContextMenuItem onSelect={() => close([tab.href])}><Icon name="X" className="size-4" />Close</ContextMenuItem>
+    <ContextMenuItem disabled={!others.length} onSelect={() => close(others)}>Close others</ContextMenuItem>
+    <ContextMenuItem disabled={!right.length} onSelect={() => close(right)}>Close tabs to the right</ContextMenuItem>
+    <ContextMenuItem onSelect={() => close(pane.tabs.map(each => each.href))}>Close all in this pane</ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem disabled={!splittable} onSelect={() => move(tab, pane.id, "right")}><Icon name="Columns2" className="size-4" />Split right</ContextMenuItem>
+    <ContextMenuItem disabled={!splittable} onSelect={() => move(tab, pane.id, "bottom")}><Icon name="Rows2" className="size-4" />Split down</ContextMenuItem>
+    {elsewhere.map(other => <ContextMenuItem key={other.id} onSelect={() => move(tab, other.id, "tab")}>Move to pane {panes(snapshot().layout).indexOf(other) + 1}</ContextMenuItem>)}
+    {item ? <>
+      <ContextMenuSeparator />
+      <ContextMenuItem onSelect={() => openAppPath(tab.href, { standalone: true })}><Icon name="ExternalLink" className="size-4" />Open on its own page</ContextMenuItem>
+      <ContextMenuItem onSelect={() => void copy()}><Icon name="studio/link" fallback="Copy" className="size-4" />Copy link</ContextMenuItem>
+    </> : null}
+  </ContextMenuContent>;
+}
 /** `titleBar`: the only pane, whose tab row takes BB's title bar instead of a row of its own. */
 function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: string; instance: string; titleBar: boolean }) {
   const [drop, setDrop] = useState<WorkspacePlacement | null>(null);
@@ -158,7 +184,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
       onDragOver={event => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); } }}
       onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab"); } }}>
       <div role="tablist" aria-label="Studio items" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
-        {pane.tabs.map((tab, index) => <div key={tab.href} onDragEnd={() => setDragging(null)} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; setDragging({ source: tab.href }); }}
+        {pane.tabs.map((tab, index) => <ContextMenu key={tab.href}><ContextMenuTrigger asChild><div onDragEnd={() => setDragging(null)} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; setDragging({ source: tab.href }); }}
           onDragOver={event => { if (accepts(event)) event.preventDefault(); }}
           onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab", tab.href); } }}>
           <button role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${instance}-${pane.id}-${index}`} id={`tab-${instance}-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
@@ -172,7 +198,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
             <span className="truncate">{tab.title}</span>
           </button>
           <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
-        </div>)}
+        </div></ContextMenuTrigger><TabMenu pane={pane} tab={tab} index={index} /></ContextMenu>)}
       </div>
       {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink-0 items-center" />)}
       <button className={BUTTON} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
