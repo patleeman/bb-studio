@@ -6200,6 +6200,100 @@
         "additionalProperties": false
       }
     },
+    "workspaceReport": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "focused": {
+            "type": "boolean"
+          },
+          "showing": {
+            "type": "boolean"
+          },
+          "panes": {
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "focused": {
+                  "type": "boolean"
+                },
+                "active": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tabs": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "href": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "title": {
+                        "type": "string",
+                        "maxLength": 300
+                      }
+                    },
+                    "required": [
+                      "href",
+                      "title"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "focused",
+                "active",
+                "tabs"
+              ]
+            }
+          }
+        },
+        "required": [
+          "client",
+          "focused",
+          "showing",
+          "panes"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "pinTab": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -65,6 +65,7 @@ public enum Studio {
     public static let tabs = "tabs"
     public static let visitTab = "visitTab"
     public static let closeTabs = "closeTabs"
+    public static let workspaceReport = "workspaceReport"
     public static let pinTab = "pinTab"
     public static let setSidebar = "setSidebar"
     public static let itemAt = "itemAt"
@@ -233,6 +234,8 @@ public enum Studio {
   public typealias VisitTab = VisitTabOutput
 
   public typealias CloseTabs = CloseTabsOutput
+
+  public typealias WorkspaceReport = WorkspaceReportOutput
 
   public typealias PinTab = PinTabOutput
 
@@ -4535,6 +4538,52 @@ public enum Studio {
   }
 
   public struct CloseTabsOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct WorkspaceReportInputPanesItemTabsItem: Sendable, Hashable, Codable {
+    public var href: String?
+    public var title: String?
+
+    public init(href: String? = nil, title: String? = nil) {
+      self.href = href
+      self.title = title
+    }
+  }
+
+  public struct WorkspaceReportInputPanesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var focused: Bool?
+    public var active: String?
+    public var tabs: [WorkspaceReportInputPanesItemTabsItem]?
+
+    public init(id: String? = nil, focused: Bool? = nil, active: String? = nil, tabs: [WorkspaceReportInputPanesItemTabsItem]? = nil) {
+      self.id = id
+      self.focused = focused
+      self.active = active
+      self.tabs = tabs
+    }
+  }
+
+  public struct WorkspaceReportInput: Sendable, Hashable, Codable {
+    public var client: String?
+    public var focused: Bool?
+    public var showing: Bool?
+    public var panes: [WorkspaceReportInputPanesItem]?
+
+    public init(client: String? = nil, focused: Bool? = nil, showing: Bool? = nil, panes: [WorkspaceReportInputPanesItem]? = nil) {
+      self.client = client
+      self.focused = focused
+      self.showing = showing
+      self.panes = panes
+    }
+  }
+
+  public struct WorkspaceReportOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {
