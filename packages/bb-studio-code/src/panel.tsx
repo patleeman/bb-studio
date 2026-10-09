@@ -18,7 +18,7 @@ export function CodePanel({ subPath }: { subPath: string }) {
       panelPath={PANEL_PATH}
       channel={CHANNEL}
       isItemId={isWorkspaceId}
-      renderItem={(id, { backLabel, onBack }) => <WorkspaceView key={id} id={id} backLabel={backLabel} onBack={onBack} />}
+      renderItem={(id, back) => <WorkspaceView key={id} id={id} back={back} />}
     />
   );
 }
@@ -80,12 +80,10 @@ const STATUS_TEXT: Record<ServerStatus["state"], string> = {
   failed: "VS Code couldn't start.",
 };
 
-export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
+export function WorkspaceView({ id, back = null }: {
   id: string;
-  backLabel: string;
-  onBack(): void;
-  /** A thread's side panel: VS Code alone, with no bar. */
-  compact?: boolean;
+  /** The bar's way back. None beside a thread: the tab is VS Code alone, with no bar. */
+  back?: { backLabel: string; onBack(): void } | null;
 }) {
   const rpc = useRpc<CodeContract>();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -173,7 +171,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
   if (!workspace)
     return (
       <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-        {compact ? null : <ItemHeader backLabel={backLabel} onBack={onBack} />}
+        {back ? <ItemHeader {...back} /> : null}
         <p role={loadError ? "alert" : "status"} className={`p-6 text-sm ${loadError ? "text-destructive" : "text-muted-foreground"}`}>{loadError || "Loading workspace…"}</p>
       </div>
     );
@@ -188,10 +186,8 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
   const reference = { title: workspace.title, href: workspaceHref(id) };
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-      {/* Beside a thread the tab is VS Code alone; the Workspaces page keeps the bar and its controls. */}
-      {compact ? null : <ItemHeader
-        backLabel={backLabel}
-        onBack={onBack}
+      {back && <ItemHeader
+        {...back}
         leading={<BarTitle title={workspace.title} label="Workspace name" placeholder="Untitled workspace" onRename={(title) => { if (title) void update({ title }); }} />}
         item={reference}
         trailing={
@@ -228,7 +224,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
         }
       />}
       {/* Without the bar, sharing still has to be visible and easy to stop. */}
-      {compact && workspace.share ? (
+      {!back && workspace.share ? (
         <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
           <Icon name="Eye" className="size-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">Agents can see your open file, selection and errors.</span>
@@ -237,7 +233,7 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
           </button>
         </div>
       ) : null}
-      {showFolders && !compact && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
+      {showFolders && back && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
       <div ref={body} className="relative min-h-0 flex-1">
         {!embed ? (
           <FileBrowser workspace={workspace} />

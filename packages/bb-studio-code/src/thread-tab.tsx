@@ -2,11 +2,11 @@
 // the agent's changes, or the workspace a reply card names. The tab is VS
 // Code alone, with no bar; other workspaces live on the Workspaces page.
 import { useEffect, useState } from "react";
-import { useBbNavigate, useRpc, type JsonValue } from "@get-bb/plugin-sdk/app";
+import { useRpc, type JsonValue } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { WorkspaceView } from "./panel";
-import { PANEL_PATH, type CodeContract } from "./shared";
+import type { CodeContract } from "./shared";
 
 export function ThreadCodePanel({ threadId, params }: { threadId: string; params: JsonValue | null }) {
   const fields = params && typeof params === "object" && !Array.isArray(params) ? params : null;
@@ -14,7 +14,6 @@ export function ThreadCodePanel({ threadId, params }: { threadId: string; params
   // Each open from the header is a new request, even for the same workspace.
   const at = typeof fields?.at === "number" ? fields.at : null;
   const rpc = useRpc<CodeContract>();
-  const navigate = useBbNavigate();
   const [worktreeId, setWorktreeId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(asked);
   const [error, setError] = useState("");
@@ -31,9 +30,7 @@ export function ThreadCodePanel({ threadId, params }: { threadId: string; params
   }, [rpc, threadId, attempt]);
 
   const shown = openId ?? worktreeId;
-  if (shown && shown !== worktreeId)
-    return <WorkspaceView key={shown} id={shown} backLabel={worktreeId ? "This thread" : "Workspaces"} onBack={() => (worktreeId ? setOpenId(null) : navigate.toPluginPanel(PANEL_PATH))} compact />;
-  if (shown) return <WorkspaceView key={shown} id={shown} backLabel="Workspaces" onBack={() => navigate.toPluginPanel(PANEL_PATH)} compact />;
+  if (shown) return <WorkspaceView key={shown} id={shown} />;
   if (error)
     return (
       <div className="flex flex-col items-start gap-2 p-4 text-sm text-muted-foreground">
