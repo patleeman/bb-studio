@@ -163,10 +163,10 @@ const spaceLead = z.object({
   run: spaceRunSchema.nullable(),
 });
 export type SpaceLeadView = z.infer<typeof spaceLead>;
-/** The user's Chief of Staff: one thread above every space, with its own heartbeat. */
+/** The user's Chief of Staff: the default space's lead (the top level), with its heartbeat. Same data as space_lead for the default space. */
 const chiefOfStaff = z.object({
   threadId: z.string().nullable(),
-  /** The space it came from; demoting returns it there. */
+  /** Deprecated: always null. The Chief of Staff is in the default space, and removing it leaves it there. */
   originSpaceId: z.string().nullable(),
   run: spaceRunSchema.nullable(),
 });
@@ -305,9 +305,9 @@ export const rpcContract = defineRpcContract({
   space_of_threads: { input: z.object({}), output: z.object({ threads: z.record(z.string(), z.string()) }) },
   /** Turns the lead's heartbeat on or off; on needs a lead. */
   space_set_run: { input: spaceRunSchema.omit({ time: true }).extend({ spaceId, time: spaceRunSchema.shape.time.optional() }), output: spaceLead },
-  /** The Chief of Staff and its heartbeat. Clears a thread that was deleted. */
+  /** The Chief of Staff (the default space's lead) and its heartbeat. Clears a thread that was deleted. */
   chief_of_staff: { input: z.object({}), output: chiefOfStaff },
-  /** Promotes a thread from any space, taking it out of its space and its lead role; null demotes it back to the space it came from. */
+  /** Makes a thread the default space's lead, moving it to the top level and out of any other lead role; null leaves it an ordinary top-level thread. */
   chief_of_staff_set: { input: z.object({ threadId: z.string().min(1).max(200).nullable() }), output: chiefOfStaff },
   /** Turns the Chief of Staff's heartbeat on or off; on needs a Chief of Staff. */
   chief_of_staff_set_run: { input: spaceRunSchema.omit({ time: true }).extend({ time: spaceRunSchema.shape.time.optional() }), output: chiefOfStaff },

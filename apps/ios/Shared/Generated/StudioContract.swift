@@ -44,6 +44,9 @@ public enum Studio {
     public static let moveToSpace = "moveToSpace"
     public static let createInSpace = "createInSpace"
     public static let spaceProject = "spaceProject"
+    public static let spaceWorktrees = "spaceWorktrees"
+    public static let spaceFiles = "spaceFiles"
+    public static let spaceFile = "spaceFile"
     public static let recentThreads = "recentThreads"
     public static let space_lead = "space_lead"
     public static let thread_lines = "thread_lines"
@@ -182,6 +185,12 @@ public enum Studio {
   public typealias CreateInSpace = CreateInSpaceOutput
 
   public typealias SpaceProject = SpaceProjectOutput
+
+  public typealias SpaceWorktrees = SpaceWorktreesOutput
+
+  public typealias SpaceFiles = SpaceFilesOutput
+
+  public typealias SpaceFile = SpaceFileOutput
 
   public typealias RecentThreadsInput = StudioJSONValue
 
@@ -3252,6 +3261,76 @@ public enum Studio {
 
     public init(projectId: String? = nil) {
       self.projectId = projectId
+    }
+  }
+
+  public struct SpaceWorktreesInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct SpaceWorktreesOutputWorktreesItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var updatedAt: Double?
+    public var path: String?
+
+    public init(threadId: String? = nil, title: String? = nil, updatedAt: Double? = nil, path: String? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.updatedAt = updatedAt
+      self.path = path
+    }
+  }
+
+  public struct SpaceWorktreesOutput: Sendable, Hashable, Codable {
+    public var worktrees: [SpaceWorktreesOutputWorktreesItem]?
+
+    public init(worktrees: [SpaceWorktreesOutputWorktreesItem]? = nil) {
+      self.worktrees = worktrees
+    }
+  }
+
+  public struct SpaceFilesInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct SpaceFilesOutput: Sendable, Hashable, Codable {
+    public var root: String?
+    public var files: [String]?
+    public var truncated: Bool?
+
+    public init(root: String? = nil, files: [String]? = nil, truncated: Bool? = nil) {
+      self.root = root
+      self.files = files
+      self.truncated = truncated
+    }
+  }
+
+  public struct SpaceFileInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var path: String?
+
+    public init(threadId: String? = nil, path: String? = nil) {
+      self.threadId = threadId
+      self.path = path
+    }
+  }
+
+  public struct SpaceFileOutput: Sendable, Hashable, Codable {
+    public var text: String?
+    public var reason: String?
+
+    public init(text: String? = nil, reason: String? = nil) {
+      self.text = text
+      self.reason = reason
     }
   }
 

@@ -302,38 +302,51 @@ it("hands off a worker in place: an added thread stays added", async () => {
   expect(await x.leads.get(x.kitchen.id)).toMatchObject({ leadThreadId: null });
 });
 
-it("promotes a lead to Chief of Staff: it leaves its space and lead role, and its heartbeat carries over", async () => {
+const top = (x: Awaited<ReturnType<typeof setup>>) => x.spaces.list().find((space) => space.isDefault)!.id;
+
+it("promotes a lead to Chief of Staff: it leads the top level, leaves its old space's lead role, and its heartbeat carries over", async () => {
   const x = await setup();
   const { leadThreadId } = await lead(x);
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily", time: "08:30" });
   const chief = await x.leads.setChief(leadThreadId);
-  expect(chief).toMatchObject({ threadId: leadThreadId, originSpaceId: x.garden.id, run: { enabled: true, cadence: "daily", time: "08:30" } });
+  expect(chief).toMatchObject({ threadId: leadThreadId, originSpaceId: null, run: { enabled: true, cadence: "daily", time: "08:30" } });
+  expect(await x.leads.get(top(x))).toMatchObject({ leadThreadId, run: { enabled: true } });
   expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: null, run: { enabled: false } });
-  expect((await x.leads.spaceOfThreads())[leadThreadId!]).toBeUndefined();
-  expect(x.automations.map((a) => a.name)).toEqual(["Studio chief of staff heartbeat"]);
+  expect((await x.leads.spaceOfThreads())[leadThreadId!]).toBe(top(x));
+  expect(x.automations.map((a) => a.name)).toEqual([`Studio space heartbeat ${top(x)}`]);
+  const update = x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_update").at(-1)![0] as unknown as { input: { execution: { prompt: string } } };
+  expect(update.input.execution.prompt).toMatch(/Chief of Staff/);
   await expect(x.leads.setLead(x.kitchen.id, leadThreadId)).rejects.toThrow(/Chief of Staff/);
 });
 
-it("demotes the Chief of Staff back to the space it came from, and a new one sends the old one home", async () => {
+it("making a space's lead the default space's lead through setLead also clears its old lead role", async () => {
+  const x = await setup();
+  const { leadThreadId } = await lead(x);
+  await x.leads.setLead(top(x), leadThreadId);
+  expect(await x.leads.chief()).toMatchObject({ threadId: leadThreadId });
+  expect(await x.leads.get(x.garden.id)).toMatchObject({ leadThreadId: null });
+});
+
+it("removing the Chief of Staff leaves it a top-level thread, and a new one leaves the old one there too", async () => {
   const x = await setup();
   const first = await x.spawn({ projectId: "p" });
   const second = await x.spawn({ projectId: "q" });
   await x.leads.setChief(first.id);
   await x.leads.setChief(second.id);
-  expect((await x.leads.spaceOfThreads())[first.id]).toBe(x.garden.id);
+  expect((await x.leads.spaceOfThreads())[first.id]).toBe(top(x));
   expect(await x.leads.setChief(null)).toMatchObject({ threadId: null });
-  expect((await x.leads.spaceOfThreads())[second.id]).toBe(x.kitchen.id);
+  expect((await x.leads.spaceOfThreads())[second.id]).toBe(top(x));
   await expect(x.leads.setChiefRun({ enabled: true, cadence: "daily" })).rejects.toThrow(/Chief of Staff/);
 });
 
-it("hands the Chief of Staff off to a successor that stays above every space", async () => {
+it("hands the Chief of Staff off to a successor that stays the top level's lead", async () => {
   const x = await setup();
   const first = await x.spawn({ projectId: "p" });
   await x.leads.setChief(first.id);
   await x.leads.setChiefRun({ enabled: true, cadence: "hourly" });
   const { threadId } = await x.leads.handoff(first.id, request);
-  expect(await x.leads.chief()).toMatchObject({ threadId, originSpaceId: x.garden.id, run: { enabled: true } });
-  expect((await x.leads.spaceOfThreads())[threadId]).toBeUndefined();
+  expect(await x.leads.chief()).toMatchObject({ threadId, run: { enabled: true } });
+  expect((await x.leads.spaceOfThreads())[threadId]).toBe(top(x));
   expect(x.callRpc.mock.calls.filter(([arg]) => arg.method === "automations_update").at(-1)![0].input).toMatchObject({ execution: { targetThreadId: threadId } });
   expect(await x.leads.handoff(first.id, request)).toEqual({ threadId });
 });
@@ -344,6 +357,40 @@ it("forgets a deleted Chief of Staff", async () => {
   await x.leads.setChief(first.id);
   x.threads.delete(first.id);
   expect(await x.leads.chief()).toMatchObject({ threadId: null });
+});
+
+const LEGACY = MIGRATIONS.length - 1;
+
+it("migrates the old Chief of Staff into the default space's lead, over an old lead, with no run (live data shape)", async () => {
+  const x = await setup(MIGRATIONS.slice(0, LEGACY));
+  const old = await x.spawn({ projectId: "p" });
+  const chief = await x.spawn({ projectId: "p" });
+  x.db.prepare("INSERT INTO space_leads (space_id, lead_thread_id, created_at, updated_at) VALUES (?, ?, 1, 1)").run(top(x), old.id);
+  x.db.prepare("INSERT INTO chief_of_staff (id, thread_id, origin_space_id, updated_at) VALUES (1, ?, ?, 5)").run(chief.id, top(x));
+  x.bb.storage.migrate(x.db, MIGRATIONS);
+  expect(await x.leads.chief()).toEqual({ threadId: chief.id, originSpaceId: null, run: null });
+  expect(x.spaces.threads.explicit(chief.id)).toBe(top(x));
+  expect((await x.leads.spaceOfThreads())[old.id]).toBe(x.garden.id);
+  expect(x.db.prepare("SELECT name FROM sqlite_master WHERE name = 'chief_of_staff'").get()).toBeUndefined();
+  await x.leads.runs.repair(() => null);
+  expect(x.callRpc).not.toHaveBeenCalled();
+});
+
+it("migrates an enabled Chief of Staff heartbeat and re-provisions it on the default space at startup", async () => {
+  const x = await setup(MIGRATIONS.slice(0, LEGACY));
+  const chief = await x.spawn({ projectId: "p" });
+  x.automations.push({ id: "old", name: "Studio chief of staff heartbeat" });
+  x.db.prepare("INSERT INTO chief_of_staff (id, thread_id, origin_space_id, updated_at) VALUES (1, ?, NULL, 5)").run(chief.id);
+  x.db.prepare("INSERT INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES ('chief-of-staff', 1, 'hourly', '09:00', NULL, 'old', 'p')").run();
+  x.bb.storage.migrate(x.db, MIGRATIONS);
+  expect(x.leads.runs.get(top(x))).toEqual({ enabled: true, cadence: "hourly", time: "09:00" });
+  expect(x.leads.runs.get("chief-of-staff")).toBeNull();
+  await x.leads.runs.repair(() => x.leads.chiefThreadId());
+  expect(x.automations.map((a) => a.name)).toEqual([`Studio space heartbeat ${top(x)}`]);
+  expect(await x.leads.chief()).toMatchObject({ threadId: chief.id, run: { enabled: true, cadence: "hourly" } });
+  x.callRpc.mockClear();
+  await x.leads.runs.repair(() => x.leads.chiefThreadId());
+  expect(x.callRpc).not.toHaveBeenCalled();
 });
 
 it("keeps an archived Chief of Staff and its heartbeat, as it keeps an archived lead", async () => {

@@ -123,4 +123,25 @@ export const MIGRATIONS = [
   `CREATE TABLE chief_of_staff (
        id INTEGER PRIMARY KEY CHECK (id = 1), thread_id TEXT NOT NULL, origin_space_id TEXT, updated_at INTEGER NOT NULL
      );`,
+  // The Chief of Staff becomes the default space's lead (docs/spaces.md): it wins over
+  // that space's old lead, which stays an ordinary thread. Its heartbeat settings move to
+  // the default space; the old automations are retired and an enabled heartbeat is
+  // provisioned again at startup (SpaceRuns.repair).
+  `CREATE TABLE space_retired_automations (automation_id TEXT PRIMARY KEY, automation_project_id TEXT);
+   INSERT OR IGNORE INTO space_retired_automations (automation_id, automation_project_id)
+     SELECT automation_id, automation_project_id FROM space_runs WHERE automation_id IS NOT NULL
+       AND (space_id = 'chief-of-staff' OR (space_id IN (SELECT id FROM spaces WHERE is_default = 1) AND EXISTS (SELECT 1 FROM chief_of_staff)));
+   DELETE FROM space_runs WHERE space_id IN (SELECT id FROM spaces WHERE is_default = 1) AND EXISTS (SELECT 1 FROM chief_of_staff);
+   INSERT INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id)
+     SELECT s.id, r.enabled, r.cadence, r.time, r.cron, NULL, NULL FROM space_runs r, spaces s
+     WHERE r.space_id = 'chief-of-staff' AND s.is_default = 1 AND EXISTS (SELECT 1 FROM chief_of_staff);
+   DELETE FROM space_runs WHERE space_id = 'chief-of-staff';
+   DELETE FROM space_leads WHERE lead_thread_id IN (SELECT thread_id FROM chief_of_staff);
+   INSERT INTO space_leads (space_id, lead_thread_id, created_at, updated_at)
+     SELECT s.id, c.thread_id, c.updated_at, c.updated_at FROM chief_of_staff c, spaces s WHERE s.is_default = 1
+     ON CONFLICT (space_id) DO UPDATE SET lead_thread_id = excluded.lead_thread_id, updated_at = excluded.updated_at;
+   INSERT INTO space_threads (thread_id, space_id, added_at)
+     SELECT c.thread_id, s.id, c.updated_at FROM chief_of_staff c, spaces s WHERE s.is_default = 1
+     ON CONFLICT (thread_id) DO UPDATE SET space_id = excluded.space_id;
+   DROP TABLE chief_of_staff;`,
 ];

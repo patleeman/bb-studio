@@ -15,7 +15,7 @@ heartbeat, handoff), `src/ui/ManageSpace.tsx` and `src/ui/SpaceHeartbeat.tsx`
 
 A thread is in exactly one Space: the one it was added to (`space_threads`),
 otherwise the one that owns its project (`space_projects`), otherwise
-Personal. Adding a thread to a Space moves it there.
+Personal, the top level. Adding a thread to a Space moves it there.
 
 ## The lead and its Heartbeat
 
@@ -27,22 +27,32 @@ weekdays, weekly, or a custom cron) through an automation named
 the lead thread being deleted, turns it off. Handing the lead off to a new
 thread keeps the successor the lead and moves the Heartbeat to it.
 
-## The Chief of Staff
+## The top level and the Chief of Staff
 
-The Chief of Staff is one thread above every Space. The slot starts empty.
-Any thread from any Space can be promoted. Promoting it takes it out of its
-Space, so `space_of_threads` leaves it out and every Space's sidebar pins it
-at the top. If it led a Space, that Space loses its lead and its Heartbeat
-turns off. The Chief of Staff's own Heartbeat, an automation named
-`Studio chief of staff heartbeat`, starts from that schedule. It can't also
-be a Space's lead. Demoting it, or promoting another thread, returns it to
-the Space it came from, or to Personal if that Space is gone. A handoff
-keeps the successor Chief of Staff, and deleting the thread empties the slot.
-Archiving it doesn't: like a Space lead, Studio keeps an archived Chief of
-Staff and its Heartbeat, and Studio Sidebar won't archive it (alone or with
-its project) until it's demoted. Its row menu has Heartbeat… to set the
-schedule.
+The default Space (Personal) is the top level: everything lives there until
+it's filed into a Space. Every level can have a lead, and the top level's
+lead is the Chief of Staff. Workers live with whoever started them, so the
+Chief of Staff's workers sit at the top level too.
 
+The slot starts empty. Making a thread the Chief of Staff makes it the
+default Space's lead (`space_set_lead` on that Space, or `chief_of_staff_set`)
+and adds it to the default Space if it was elsewhere. The Chief of Staff
+sees every Space by default, and it can't also lead another Space: if it led
+one, that Space loses its lead and its Heartbeat turns off, and the Chief of
+Staff's Heartbeat starts from that schedule when it had none. Its Heartbeat
+is the default Space's (`Studio space heartbeat <spaceId>`) with the Chief of
+Staff's prompt. Removing it leaves the thread an ordinary top-level thread. A
+handoff keeps the successor Chief of Staff, and deleting the thread empties
+the slot. Archiving it doesn't: like any lead, Studio keeps an archived Chief
+of Staff and its Heartbeat, and Studio Sidebar won't archive it until it's
+removed. Its row menu has Heartbeat… to set the schedule.
+
+Studio used to keep the Chief of Staff in its own slot above every Space. A
+migration moves it into the default Space's lead (it wins over an older
+Personal lead, which stays a thread), adds the thread to the default Space,
+and moves its Heartbeat settings there. At startup Studio deletes the old
+`Studio chief of staff heartbeat` automation and provisions the Space one if
+the Heartbeat was on.
 
 Other plugins (Studio Sidebar) open Studio's Space dialogs by window event:
 
@@ -67,13 +77,14 @@ Other plugins (Studio Sidebar) open Studio's Space dialogs by window event:
 - `createInSpace({ id, pluginId, kind })` → `{ href, title }`: a Studio item in
   the Space's folder.
 - `thread_handoff({ threadId, request })` → `{ threadId }`: continues a thread
-  on another provider; a lead's successor becomes the lead, and the
-  Chief of Staff's successor becomes Chief of Staff.
-- `chief_of_staff({})` → `{ threadId, originSpaceId, run }`.
-- `chief_of_staff_set({ threadId })` promotes a thread, or demotes the current
-  one with `null`. Same output as `chief_of_staff`.
-- `chief_of_staff_set_run({ enabled, cadence, time?, cron? })` sets its
-  Heartbeat; turning it on needs a Chief of Staff.
+  on another provider; a lead's successor becomes the lead, including the
+  Chief of Staff's.
+- `chief_of_staff({})` → `{ threadId, originSpaceId, run }`: the default
+  Space's lead and Heartbeat. `originSpaceId` is deprecated and always null.
+- `chief_of_staff_set({ threadId })` makes a thread the default Space's lead,
+  or clears it with `null`. Same output as `chief_of_staff`.
+- `chief_of_staff_set_run({ enabled, cadence, time?, cron? })` sets the
+  default Space's Heartbeat; turning it on needs a Chief of Staff.
 
 Deleting a Space turns its Heartbeat off and forgets its lead. If the
 Heartbeat can't be turned off, the Space stays and the delete fails.

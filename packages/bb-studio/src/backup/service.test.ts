@@ -188,34 +188,54 @@ it("refuses files that aren't Studio backups or come from a newer Studio", async
   expect(await readFile(join(dir, "none.zip"))).toBeTruthy();
 });
 
-it("restores the Chief of Staff into an empty slot, with its origin space and its heartbeat off", async () => {
+it("restores the Chief of Staff as the default space's lead, from new backups and old chief-of-staff.json, only into an empty slot", async () => {
   const sourceDir = await temp();
   const sourceDb = studioDb();
-  const launch = new SpaceStore(sourceDb).create({ name: "Launch" });
-  sourceDb.prepare("INSERT INTO chief_of_staff (id, thread_id, origin_space_id, updated_at) VALUES (1, 'thr_chief', ?, 5)").run(launch.id);
-  sourceDb.prepare("INSERT INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES ('chief-of-staff', 1, 'daily', '08:30', NULL, 'a1', 'p')").run();
+  const top = new SpaceStore(sourceDb).list().find((space) => space.isDefault)!.id;
+  sourceDb.prepare("INSERT INTO space_leads (space_id, lead_thread_id, created_at, updated_at) VALUES (?, 'thr_chief', 1, 5)").run(top);
+  sourceDb.prepare("INSERT INTO space_runs (space_id, enabled, cadence, time, cron, automation_id, automation_project_id) VALUES (?, 1, 'daily', '08:30', NULL, 'a1', 'p')").run(top);
   const service = (dir: string, db: Database.Database, exists: boolean) => new BackupService({
     dataDir: dir, sdk: bb({ dataDir: dir, projects: [], addOns: {}, installed: [] }), bbVersion: async () => null,
     studioData: studioDataBackup(db, { threadExists: async () => exists }),
   });
   const file = join(sourceDir, "backup.zip");
   await service(sourceDir, sourceDb, true).backup(file);
+  const leadOf = (db: Database.Database) => db.prepare("SELECT l.lead_thread_id FROM space_leads l JOIN spaces s ON s.id = l.space_id WHERE s.is_default = 1").get();
 
+  // A new backup: the default space's lead, restored even over an empty lead row, heartbeat off.
   const targetDb = studioDb();
-  new SpaceStore(targetDb);
+  const targetTop = new SpaceStore(targetDb).list().find((space) => space.isDefault)!.id;
+  targetDb.prepare("INSERT INTO space_leads (space_id, lead_thread_id, created_at, updated_at) VALUES (?, NULL, 1, 1)").run(targetTop);
   await service(await temp(), targetDb, true).restore(file, { dryRun: false });
-  const restoredLaunch = new SpaceStore(targetDb).find("Launch")!;
-  expect(targetDb.prepare("SELECT thread_id, origin_space_id FROM chief_of_staff").get()).toEqual({ thread_id: "thr_chief", origin_space_id: restoredLaunch.id });
-  expect(targetDb.prepare("SELECT enabled, cadence, time, automation_id FROM space_runs WHERE space_id = 'chief-of-staff'").get()).toEqual({ enabled: 0, cadence: "daily", time: "08:30", automation_id: null });
+  expect(leadOf(targetDb)).toEqual({ lead_thread_id: "thr_chief" });
+  expect(targetDb.prepare("SELECT enabled, cadence, time, automation_id FROM space_runs WHERE space_id = ?").get(targetTop)).toEqual({ enabled: 0, cadence: "daily", time: "08:30", automation_id: null });
+
+  // An older backup: no lead in spaces.json, the Chief of Staff in chief-of-staff.json.
+  const files = await Promise.all((await readZip(file)).map(async (entry) => {
+    let bytes = await readEntry(file, entry);
+    if (entry.name.endsWith("/spaces.json")) bytes = Buffer.from(JSON.stringify(JSON.parse(bytes.toString()).map((space: Record<string, unknown>) => ({ ...space, lead: null, run: null }))));
+    if (entry.name.endsWith("/chief-of-staff.json")) bytes = Buffer.from(JSON.stringify([{ thread_id: "thr_old", origin_space_id: null, updated_at: 5, run: { cadence: "hourly", time: "09:00", cron: null } }]));
+    return { name: entry.name, bytes };
+  }));
+  expect(files.some((entry) => entry.name.endsWith("/chief-of-staff.json"))).toBe(true);
+  const old = join(sourceDir, "old.zip");
+  await writeFile(old, zipFiles(files));
+  const oldDb = studioDb();
+  const oldTop = new SpaceStore(oldDb).list().find((space) => space.isDefault)!.id;
+  await service(await temp(), oldDb, true).restore(old, { dryRun: false });
+  expect(leadOf(oldDb)).toEqual({ lead_thread_id: "thr_old" });
+  expect(oldDb.prepare("SELECT space_id FROM space_threads WHERE thread_id = 'thr_old'").get()).toEqual({ space_id: oldTop });
+  expect(oldDb.prepare("SELECT enabled, cadence FROM space_runs WHERE space_id = ?").get(oldTop)).toEqual({ enabled: 0, cadence: "hourly" });
 
   const missingDb = studioDb();
   new SpaceStore(missingDb);
-  await service(await temp(), missingDb, false).restore(file, { dryRun: false });
-  expect(missingDb.prepare("SELECT * FROM chief_of_staff").get()).toBeUndefined();
+  await service(await temp(), missingDb, false).restore(old, { dryRun: false });
+  expect(leadOf(missingDb)).toBeUndefined();
 
   const takenDb = studioDb();
-  new SpaceStore(takenDb);
-  takenDb.prepare("INSERT INTO chief_of_staff (id, thread_id, origin_space_id, updated_at) VALUES (1, 'thr_local', NULL, 9)").run();
+  const takenTop = new SpaceStore(takenDb).list().find((space) => space.isDefault)!.id;
+  takenDb.prepare("INSERT INTO space_leads (space_id, lead_thread_id, created_at, updated_at) VALUES (?, 'thr_local', 1, 9)").run(takenTop);
+  await service(await temp(), takenDb, true).restore(old, { dryRun: false });
   await service(await temp(), takenDb, true).restore(file, { dryRun: false });
-  expect(takenDb.prepare("SELECT thread_id FROM chief_of_staff").get()).toEqual({ thread_id: "thr_local" });
+  expect(leadOf(takenDb)).toEqual({ lead_thread_id: "thr_local" });
 });

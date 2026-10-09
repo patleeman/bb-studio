@@ -3,9 +3,9 @@
 // wakes the lead on a schedule; a handoff keeps its successor the lead. Each
 // thread is in at most one space (src/space-threads.ts).
 //
-// The Chief of Staff is one thread above every space: promoting a thread takes
-// it out of its space and its lead role, and demoting returns it to the space
-// it came from. It has its own heartbeat, stored as the CHIEF run.
+// The default space is the top level, where everything lives until it's filed
+// into a space; its lead is the Chief of Staff. It sees every space, can't also
+// lead another one, and its heartbeat uses CHIEF_HEARTBEAT.
 //
 // Threads and automations live in other plugins, so nothing here shares a
 // transaction with them: each external result is saved before the next call,
@@ -23,9 +23,7 @@ type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
 type Listed = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
 export const LEAD_ROLE = "space-lead";
 export const HEARTBEAT = "Heartbeat: check on this space's threads and items. Steer only the workers you started; for threads the user started, read and report but don't steer them. Reply only when something changed or needs the user; otherwise finish without a final assistant message.";
-export const CHIEF_HEARTBEAT = "Heartbeat: you are the user's Chief of Staff, above every space. Check on the spaces and their leads; hand work to a space's lead rather than doing it yourself. Steer only the workers and leads' work you started; read and report on threads the user started. Reply only when something changed or needs the user; otherwise finish without a final assistant message.";
-/** The Chief of Staff's key in space_runs and the serial queue; never a space id. */
-export const CHIEF = "chief-of-staff";
+export const CHIEF_HEARTBEAT = "Heartbeat: you are the user's Chief of Staff, the lead of the top level above every space. Check on the spaces and their leads; hand work to a space's lead rather than doing it yourself. Steer only the workers and leads' work you started; read and report on threads the user started. Reply only when something changed or needs the user; otherwise finish without a final assistant message.";
 const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
 const SNAPSHOT_MS = 60_000;
@@ -47,7 +45,7 @@ export class SpaceLeads {
   private snapshot: { at: number; fingerprint: string; threads: Promise<Record<string, string>> } | null = null;
 
   constructor(private readonly deps: SpaceLeadDeps) {
-    this.runs = new SpaceRuns(deps.db, deps.sdk, deps.changed);
+    this.runs = new SpaceRuns(deps.db, deps.sdk, deps.changed, (spaceId) => this.deps.spaces.get(spaceId)?.isDefault === true);
   }
 
   // Reads, lead, run and handoff for one space share a queue: a stale read
@@ -107,13 +105,24 @@ export class SpaceLeads {
   setLead(spaceId: string, threadId: string | null): Promise<SpaceLeadView> {
     this.space(spaceId);
     return this.serial(spaceId, async () => {
-      const run = this.runs.get(spaceId);
+      let run = this.runs.get(spaceId);
       if (threadId) {
-        if (this.chiefThreadId() === threadId) throw new Error("That thread is your Chief of Staff. Demote it before making it a space's lead.");
+        if (this.storedLead(spaceId) === threadId) return this.read(spaceId);
+        const top = this.deps.spaces.get(spaceId)!.isDefault;
+        if (!top && this.chiefThreadId() === threadId) throw new Error("That thread is your Chief of Staff. Demote it before making it a space's lead.");
         const thread = await this.thread(threadId);
         if (!thread) throw new Error("That thread no longer exists.");
+        // A Chief of Staff can't also lead a space: that space loses its lead, and its schedule carries over.
+        const led = top ? (this.deps.db.prepare("SELECT space_id FROM space_leads WHERE lead_thread_id = ? AND space_id <> ?").get(threadId, spaceId) as { space_id: string } | undefined)?.space_id ?? null : null;
+        const ledRun = led ? this.runs.get(led) : null;
+        if (!run && ledRun) run = { ...ledRun };
         // Move the heartbeat first: if it can't target the new thread, the old lead stays.
         if (run?.enabled) await this.runs.set(spaceId, threadId, run);
+        if (led) await this.serial(led, async () => {
+          const ledNow = this.runs.get(led);
+          if (ledNow?.enabled) await this.runs.set(led, null, { ...ledNow, enabled: false });
+          if (this.storedLead(led) === threadId) this.saveLead(led, null);
+        });
         if (this.spaceOf({ id: threadId, projectId: thread.projectId ?? null }) !== spaceId) this.join(spaceId, threadId);
         this.saveLead(spaceId, threadId);
       } else {
@@ -152,91 +161,37 @@ export class SpaceLeads {
     });
   }
 
-  /** The Chief of Staff's thread id as stored; may be a deleted thread until read. */
+  private defaultSpaceId(): string {
+    return this.deps.spaces.list().find((space) => space.isDefault)!.id;
+  }
+
+  /** The Chief of Staff (the default space's lead) as stored; may be a deleted thread until read. */
   chiefThreadId(): string | null {
-    return (this.deps.db.prepare("SELECT thread_id FROM chief_of_staff WHERE id = 1").get() as { thread_id: string } | undefined)?.thread_id ?? null;
+    return this.storedLead(this.defaultSpaceId());
   }
 
-  private chiefRow() {
-    return this.deps.db.prepare("SELECT thread_id, origin_space_id FROM chief_of_staff WHERE id = 1").get() as { thread_id: string; origin_space_id: string | null } | undefined;
+  private chiefView(view: SpaceLeadView): ChiefOfStaffView {
+    return { threadId: view.leadThreadId, originSpaceId: null, run: view.run };
   }
 
-  private saveChief(threadId: string | null, originSpaceId: string | null = null) {
-    if (!threadId) this.deps.db.prepare("DELETE FROM chief_of_staff WHERE id = 1").run();
-    else this.deps.db
-      .prepare("INSERT INTO chief_of_staff (id, thread_id, origin_space_id, updated_at) VALUES (1, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET thread_id = excluded.thread_id, origin_space_id = excluded.origin_space_id, updated_at = excluded.updated_at")
-      .run(threadId, originSpaceId, Date.now());
-  }
-
-  /** Forgets a Chief of Staff thread that was deleted and turns its heartbeat off. Transport errors keep it. */
-  private async readChief(): Promise<ChiefOfStaffView> {
-    let row = this.chiefRow();
-    if (row && !(await this.thread(row.thread_id))) {
-      this.saveChief(null);
-      row = undefined;
-      const run = this.runs.get(CHIEF);
-      if (run?.enabled) await this.runs.set(CHIEF, null, { ...run, enabled: false }).catch(() => {});
-      this.threadsChanged();
-    }
-    return { threadId: row?.thread_id ?? null, originSpaceId: row?.origin_space_id ?? null, run: this.runs.get(CHIEF) };
-  }
-
-  chief(): Promise<ChiefOfStaffView> {
-    return this.serial(CHIEF, () => this.readChief());
-  }
-
-  /** Back into the space it came from, or the default space if that one is gone. */
-  private returnToSpace(threadId: string, originSpaceId: string | null) {
-    const home = (originSpaceId && this.deps.spaces.get(originSpaceId)) || this.deps.spaces.list().find((space) => space.isDefault);
-    if (home) this.join(home.id, threadId);
+  /** The default space's lead, in the Chief of Staff shape the older RPCs return. */
+  async chief(): Promise<ChiefOfStaffView> {
+    return this.chiefView(await this.get(this.defaultSpaceId()));
   }
 
   /**
-   * Promotes a thread from any space: it leaves its space and, if it led one,
-   * that space loses its lead and heartbeat. The Chief of Staff's heartbeat
-   * moves to it, or starts from the old lead's schedule. A previous Chief of
-   * Staff goes back to its space. Null demotes the current one.
+   * Makes a thread the default space's lead: it moves to the top level and, if
+   * it led a space, that space loses its lead and heartbeat. Null leaves the
+   * old Chief of Staff an ordinary top-level thread.
    */
-  setChief(threadId: string | null): Promise<ChiefOfStaffView> {
-    return this.serial(CHIEF, async () => {
-      const current = this.chiefRow();
-      if (current?.thread_id === threadId) return this.readChief();
-      let run = this.runs.get(CHIEF);
-      if (threadId) {
-        const thread = await this.thread(threadId);
-        if (!thread) throw new Error("That thread no longer exists.");
-        const origin = this.spaceOf({ id: threadId, projectId: thread.projectId ?? null });
-        const led = (this.deps.db.prepare("SELECT space_id FROM space_leads WHERE lead_thread_id = ?").get(threadId) as { space_id: string } | undefined)?.space_id ?? null;
-        const ledRun = led ? this.runs.get(led) : null;
-        if (!run && ledRun) run = { ...ledRun };
-        // Move the heartbeat first: if it can't target the new thread, nothing else changes.
-        if (run?.enabled) await this.runs.set(CHIEF, threadId, run);
-        if (led) await this.serial(led, async () => {
-          const ledNow = this.runs.get(led);
-          if (ledNow?.enabled) await this.runs.set(led, null, { ...ledNow, enabled: false });
-          if (this.storedLead(led) === threadId) this.saveLead(led, null);
-        });
-        if (current) this.returnToSpace(current.thread_id, current.origin_space_id);
-        this.deps.spaces.threads.forget(threadId);
-        this.saveChief(threadId, origin);
-      } else if (current) {
-        if (run?.enabled) await this.runs.set(CHIEF, null, { ...run, enabled: false });
-        this.returnToSpace(current.thread_id, current.origin_space_id);
-        this.saveChief(null);
-      }
-      this.threadsChanged();
-      this.deps.changed();
-      return this.readChief();
-    });
+  async setChief(threadId: string | null): Promise<ChiefOfStaffView> {
+    return this.chiefView(await this.setLead(this.defaultSpaceId(), threadId));
   }
 
-  setChiefRun(input: { enabled: boolean; cadence: SpaceRun["cadence"]; time?: string; cron?: string }): Promise<ChiefOfStaffView> {
-    return this.serial(CHIEF, async () => {
-      const current = await this.readChief();
-      if (input.enabled && !current.threadId) throw new Error("Pick your Chief of Staff before turning on its heartbeat.");
-      await this.runs.set(CHIEF, current.threadId, { enabled: input.enabled, cadence: input.cadence, time: input.time ?? current.run?.time ?? "09:00", cron: input.cron ?? current.run?.cron });
-      return this.readChief();
-    });
+  async setChiefRun(input: { enabled: boolean; cadence: SpaceRun["cadence"]; time?: string; cron?: string }): Promise<ChiefOfStaffView> {
+    const spaceId = this.defaultSpaceId();
+    if (input.enabled && !(await this.get(spaceId)).leadThreadId) throw new Error("Pick your Chief of Staff before turning on its heartbeat.");
+    return this.chiefView(await this.setRun(spaceId, input));
   }
 
   /** Where a thread is: its space's id. */
@@ -261,7 +216,7 @@ export class SpaceLeads {
 
   /** The one space each open thread (and each thread added to a space) is in. Cached until membership changes. */
   spaceOfThreads(): Promise<Record<string, string>> {
-    const fingerprint = `${this.deps.spaces.threads.fingerprint()}|${this.chiefThreadId() ?? ""}`;
+    const fingerprint = this.deps.spaces.threads.fingerprint();
     if (this.snapshot && this.snapshot.fingerprint === fingerprint && Date.now() - this.snapshot.at < SNAPSHOT_MS) return this.snapshot.threads;
     const threads = (async () => {
       const result: Record<string, string> = {};
@@ -274,9 +229,6 @@ export class SpaceLeads {
         if (owner) result[thread.id] = owner;
       }
       for (const [threadId, spaceId] of owners) result[threadId] = spaceId;
-      // The Chief of Staff is above every space.
-      const chief = this.chiefThreadId();
-      if (chief) delete result[chief];
       return result;
     })();
     const snapshot = { at: Date.now(), fingerprint, threads };
@@ -288,10 +240,6 @@ export class SpaceLeads {
   handoff(threadId: string, request: NewThreadRequestInput): Promise<{ threadId: string }> {
     const db = this.deps.db;
     const ledSpace = (db.prepare("SELECT space_id FROM space_leads WHERE lead_thread_id = ? UNION SELECT space_id FROM space_thread_handoffs WHERE old_thread_id = ? AND lead = 1 AND space_id IS NOT NULL").get(threadId, threadId) as { space_id: string } | undefined)?.space_id ?? null;
-    const before = db.prepare("SELECT new_thread_id FROM space_thread_handoffs WHERE old_thread_id = ?").get(threadId) as { new_thread_id: string } | undefined;
-    const chiefNow = this.chiefThreadId();
-    // The Chief of Staff, or its successor on a retry, stays Chief of Staff.
-    if (chiefNow && (chiefNow === threadId || chiefNow === before?.new_thread_id)) return this.serial(CHIEF, () => this.chiefHandoff(threadId, request));
     return this.serial(ledSpace ?? `thread:${threadId}`, async () => {
       const previous = db.prepare("SELECT new_thread_id, archived FROM space_thread_handoffs WHERE old_thread_id = ?").get(threadId) as { new_thread_id: string; archived: number } | undefined;
       const old = await this.deps.sdk.threads.get({ threadId });
@@ -308,7 +256,8 @@ export class SpaceLeads {
           `Continue the work from /threads/${encodeURIComponent(threadId)} (${threadTitle(old)}). Read that thread with bb thread if you need more context.`,
           `Latest response (excerpt):\n${(output ?? "No response yet.").slice(-12_000)}`,
           space ? `This thread is in the space ${space.name} (${space.id}).` : "",
-          ledSpace && space ? `You are now this space's lead. Steer the workers you start (read but don't steer threads the user started), and report in this thread.` : "",
+          ledSpace && space?.isDefault ? "You are now the user's Chief of Staff, the lead of the top level above every space. Hand work to each space's lead, steer the workers you start (read but don't steer threads the user started), and report in this thread." : "",
+          ledSpace && space && !space.isDefault ? `You are now this space's lead. Steer the workers you start (read but don't steer threads the user started), and report in this thread.` : "",
         ].filter(Boolean).join("\n\n");
         const next = await this.deps.sdk.threads.spawn({
           ...request,
@@ -337,45 +286,6 @@ export class SpaceLeads {
       return { threadId: newId };
     });
   }
-
-  private async chiefHandoff(threadId: string, request: NewThreadRequestInput): Promise<{ threadId: string }> {
-    const db = this.deps.db;
-    const previous = db.prepare("SELECT new_thread_id, archived FROM space_thread_handoffs WHERE old_thread_id = ?").get(threadId) as { new_thread_id: string; archived: number } | undefined;
-    const old = await this.deps.sdk.threads.get({ threadId });
-    let newId = previous?.new_thread_id;
-    if (!newId) {
-      const { output } = await this.deps.sdk.threads.output({ threadId });
-      const summary = [
-        `Continue the work from /threads/${encodeURIComponent(threadId)} (${threadTitle(old)}). Read that thread with bb thread if you need more context.`,
-        `Latest response (excerpt):\n${(output ?? "No response yet.").slice(-12_000)}`,
-        "You are now the user's Chief of Staff, above every space. Hand work to each space's lead, steer the workers you start (read but don't steer threads the user started), and report in this thread.",
-      ].join("\n\n");
-      const next = await this.deps.sdk.threads.spawn({
-        ...request,
-        projectId: old.projectId,
-        title: old.title ?? "Chief of Staff",
-        pluginMetadata: { role: CHIEF, handoffFrom: threadId },
-        input: [{ type: "text", text: summary, mentions: [], visibility: "agent-only" }, ...request.input],
-      });
-      newId = next.id;
-      db.prepare("INSERT INTO space_thread_handoffs (old_thread_id, new_thread_id, space_id, lead) VALUES (?, ?, NULL, 0)").run(threadId, newId);
-    }
-    const row = this.chiefRow();
-    if (row && (row.thread_id === threadId || row.thread_id === newId)) {
-      this.deps.spaces.threads.forget(newId);
-      this.saveChief(newId, row.origin_space_id);
-      await this.deps.sdk.threads.unpin({ threadId: newId }).catch(() => {});
-      const run = this.runs.get(CHIEF);
-      if (run?.enabled) await this.runs.set(CHIEF, newId, run);
-    }
-    if (!previous?.archived) {
-      await this.deps.sdk.threads.archive({ threadId });
-      db.prepare("UPDATE space_thread_handoffs SET archived = 1 WHERE old_thread_id = ?").run(threadId);
-    }
-    this.threadsChanged();
-    this.deps.changed();
-    return { threadId: newId };
-  }
 }
 
 type RunRow = Omit<SpaceRun, "cron"> & { cron: string | null; space_id: string; enabled: number | boolean; automation_id: string | null; automation_project_id: string | null };
@@ -384,7 +294,27 @@ const automation = z.object({ id: z.string(), name: z.string() });
 /** Automations owns the schedule; this table keeps its settings and identity. */
 export class SpaceRuns {
   private pending = new Map<string, Promise<void>>();
-  constructor(private db: Database.Database, private sdk: Sdk, private changed: () => void) {}
+  constructor(private db: Database.Database, private sdk: Sdk, private changed: () => void, private isTopLevel: (spaceId: string) => boolean = () => false) {}
+
+  /**
+   * Finishes the Chief of Staff migration (src/migrations.ts) and any heartbeat
+   * left on without an automation: deletes retired automations and provisions
+   * enabled heartbeats again. Safe to run at every startup; a failure keeps the
+   * rows so the next startup retries.
+   */
+  async repair(leadOf: (spaceId: string) => string | null): Promise<void> {
+    const retired = this.db.prepare("SELECT automation_id, automation_project_id FROM space_retired_automations").all() as { automation_id: string; automation_project_id: string | null }[];
+    for (const row of retired) {
+      await this.call("automations_delete", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+      this.db.prepare("DELETE FROM space_retired_automations WHERE automation_id = ?").run(row.automation_id);
+    }
+    const orphaned = this.db.prepare("SELECT space_id FROM space_runs WHERE enabled = 1 AND automation_id IS NULL").all() as { space_id: string }[];
+    for (const { space_id: spaceId } of orphaned) {
+      const run = this.get(spaceId)!;
+      const lead = leadOf(spaceId);
+      await this.set(spaceId, lead, lead ? run : { ...run, enabled: false });
+    }
+  }
 
   private row(spaceId: string) {
     return this.db.prepare("SELECT space_id, enabled, cadence, time, cron, automation_id, automation_project_id FROM space_runs WHERE space_id = ?").get(spaceId) as RunRow | undefined;
@@ -428,9 +358,9 @@ export class SpaceRuns {
     const execution = {
       mode: "agent", providerId: thread.providerId, model: defaults.model, reasoningLevel: defaults.reasoningLevel ?? "medium",
       permissionMode: defaults.permissionMode ?? "accept-edits", environment: { type: "project-default" }, targetThreadId: leadThreadId,
-      prompt: spaceId === CHIEF ? CHIEF_HEARTBEAT : `${HEARTBEAT}\nSpace: ${spaceId}.`,
+      prompt: this.isTopLevel(spaceId) ? CHIEF_HEARTBEAT : `${HEARTBEAT}\nSpace: ${spaceId}.`,
     };
-    const name = spaceId === CHIEF ? "Studio chief of staff heartbeat" : `Studio space heartbeat ${spaceId}`;
+    const name = `Studio space heartbeat ${spaceId}`;
     let automationId = row?.automation_id ?? null;
     if (automationId && row?.automation_project_id !== thread.projectId) {
       await this.call("automations_delete", { projectId: row?.automation_project_id, automationId }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });

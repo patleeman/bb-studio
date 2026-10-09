@@ -292,7 +292,7 @@ export default async function plugin(bb: BbPluginApi) {
       .sort((a, b) => b.updatedAt - a.updatedAt);
   /** The one space a thread is in (every space for the Chief of Staff), which scopes what its agent sees by default. */
   const threadSpaces = (threadId: string, projectId: string | null) => {
-    // The Chief of Staff is above every space, so it sees them all.
+    // The Chief of Staff leads the top level, so it sees every space.
     if (spaceLeads.chiefThreadId() === threadId) return spaces.list();
     const space = spaces.get(spaces.ownerOfThread({ id: threadId, projectId }));
     return space ? [space] : [];
@@ -327,6 +327,9 @@ export default async function plugin(bb: BbPluginApi) {
   };
   // Each space's optional lead thread and its heartbeat (src/space-lead.ts).
   const spaceLeads = new SpaceLeads({ db, sdk: bb.sdk, spaces, changed: tagsChanged });
+  // Retires the old Chief of Staff automation and turns migrated heartbeats back on; retried next startup.
+  void spaceLeads.runs.repair((spaceId) => (db.prepare("SELECT lead_thread_id FROM space_leads WHERE space_id = ?").get(spaceId) as { lead_thread_id: string | null } | undefined)?.lead_thread_id ?? null)
+    .catch((error) => console.warn("[studio] heartbeat repair failed; retrying next startup", error));
   const threadLines = createThreadLines(bb.sdk);
   /** A thread's space can change without a membership write; sidebars refetch space_of_threads. */
   const threadsMoved = () => { spaceLeads.threadsChanged(); tagsChanged(); };
