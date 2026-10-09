@@ -1,18 +1,13 @@
-// VS Code beside a conversation. The tab opens the thread's own worktree, so
-// the user sees the agent's changes; Back lists the other workspaces, and a
-// reply card opens the one it names.
-import { useEffect, useState, type ReactNode } from "react";
-import { useRpc, type JsonValue } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, ThreadItemsPanel } from "@bb-studio/kit/app";
+// VS Code beside a conversation: the thread's own worktree, so the user sees
+// the agent's changes. A reply card opens the workspace it names, and Back
+// returns to the worktree. Other workspaces live on the Workspaces page, not
+// in this tab.
+import { useEffect, useState } from "react";
+import { useBbNavigate, useRpc, type JsonValue } from "@get-bb/plugin-sdk/app";
+import { BAR_BUTTON } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { WorkspaceView } from "./panel";
-import { CHANNEL, KIND_ID, PLUGIN_ID, type CodeContract } from "./shared";
-
-/** Tells the tab whether a workspace is open in its list, while it's mounted. */
-function Opened({ onChange, children }: { onChange(open: boolean): void; children: ReactNode }) {
-  useEffect(() => { onChange(true); return () => onChange(false); }, [onChange]);
-  return <>{children}</>;
-}
+import { PANEL_PATH, type CodeContract } from "./shared";
 
 export function ThreadCodePanel({ threadId, params }: { threadId: string; params: JsonValue | null }) {
   const fields = params && typeof params === "object" && !Array.isArray(params) ? params : null;
@@ -20,51 +15,32 @@ export function ThreadCodePanel({ threadId, params }: { threadId: string; params
   // Each open from the header is a new request, even for the same workspace.
   const at = typeof fields?.at === "number" ? fields.at : null;
   const rpc = useRpc<CodeContract>();
+  const navigate = useBbNavigate();
+  const [worktreeId, setWorktreeId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(asked);
-  const [listing, setListing] = useState(false);
   const [error, setError] = useState("");
-  // A workspace opened from the list takes the whole tab: the note goes.
-  const [itemOpen, setItemOpen] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => setOpenId(asked), [asked, at]);
   useEffect(() => {
-    if (!asked && at === null) return;
-    setOpenId(asked);
-    setListing(false);
-    setError("");
-  }, [asked, at]);
-  useEffect(() => {
-    if (openId || listing) return;
     let live = true;
+    setError("");
     rpc.call("forThread", { threadId }).then(
-      ({ workspace }) => { if (live) setOpenId(workspace.id); },
+      ({ workspace }) => { if (live) setWorktreeId(workspace.id); },
       (cause) => { if (live) setError(errorMessage(cause)); },
     );
     return () => { live = false; };
-  }, [rpc, threadId, openId, listing]);
+  }, [rpc, threadId, attempt]);
 
-  if (listing || error)
+  const shown = openId ?? worktreeId;
+  if (shown && shown !== worktreeId)
+    return <WorkspaceView key={shown} id={shown} backLabel={worktreeId ? "This thread" : "Workspaces"} onBack={() => (worktreeId ? setOpenId(null) : navigate.toPluginPanel(PANEL_PATH))} compact />;
+  if (shown) return <WorkspaceView key={shown} id={shown} backLabel="Workspaces" onBack={() => navigate.toPluginPanel(PANEL_PATH)} compact />;
+  if (error)
     return (
-      <div className="flex h-full flex-col">
-        {error && !listing && !itemOpen && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-sm text-muted-foreground">
-            <span className="min-w-0 flex-1">{error}</span>
-            <button type="button" className={BAR_BUTTON} onClick={() => { setError(""); setListing(false); }}>Try again</button>
-          </div>
-        )}
-        <div className="min-h-0 flex-1">
-          <ThreadItemsPanel
-            threadId={threadId}
-            pluginId={PLUGIN_ID}
-            kind={KIND_ID}
-            channel={CHANNEL}
-            renderItem={(id, { backLabel, onBack }) => (
-              <Opened key={id} onChange={setItemOpen}>
-                <WorkspaceView id={id} backLabel={backLabel} onBack={onBack} compact />
-              </Opened>
-            )}
-          />
-        </div>
+      <div className="flex flex-col items-start gap-2 p-4 text-sm text-muted-foreground">
+        <p role="alert">{error}</p>
+        <button type="button" className={BAR_BUTTON} onClick={() => setAttempt((n) => n + 1)}>Try again</button>
       </div>
     );
-  if (!openId) return <p role="status" className="p-4 text-sm text-muted-foreground">Opening this thread's worktree…</p>;
-  return <WorkspaceView key={openId} id={openId} backLabel="Workspaces" onBack={() => { setOpenId(null); setListing(true); }} compact />;
+  return <p role="status" className="p-4 text-sm text-muted-foreground">Opening this thread's worktree…</p>;
 }
