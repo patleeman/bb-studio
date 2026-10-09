@@ -4,7 +4,7 @@ import { makeSidebarThread } from "../testing/fixtures.js";
 import { buildGroupSectionItem } from "../list/ProjectList.js";
 import { collectSectionThreadDndLookup, resolveSectionThreadDropDecision } from "../dnd/useSectionThreadDnd.js";
 import { getSidebarThreadRowDroppableId } from "../rows/sidebarThreadRowDroppable.js";
-import { chiefUnder, needsYouFirst, withLeadRows } from "./SpaceModeSections.js";
+import { chiefUnder, ignoringLeadDrags, needsYouFirst, withLeadRows } from "./SpaceModeSections.js";
 
 describe("By space thread order", () => {
   it("puts threads that wait on you first: questions, then failures, then results", () => {
@@ -55,5 +55,20 @@ describe("Dropping on a lead row", () => {
   it("knows nothing of the lead without its rows", () => {
     const bare = collectSectionThreadDndLookup([section], "chronological");
     expect(resolveSectionThreadDropDecision(bare, "thr_other", getSidebarThreadRowDroppableId("thr_lead"))).toBeNull();
+  });
+});
+
+describe("Dragging a lead", () => {
+  it("is ignored from start to end, while other drags go through", () => {
+    const seen: string[] = [];
+    const props = ignoringLeadDrags({
+      onDragStart: (event: { active: { id: unknown } }) => seen.push(`start ${String(event.active.id)}`),
+      onDragEnd: (event: { active: { id: unknown } }) => seen.push(`end ${String(event.active.id)}`),
+    } as never, (id) => id === "thr_lead") as { onDragStart(e: unknown): void; onDragEnd(e: unknown): void };
+    for (const id of ["thr_lead", "thr_other"]) {
+      props.onDragStart({ active: { id } });
+      props.onDragEnd({ active: { id } });
+    }
+    expect(seen).toEqual(["start thr_other", "end thr_other"]);
   });
 });

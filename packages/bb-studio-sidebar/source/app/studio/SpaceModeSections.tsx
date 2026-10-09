@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import { DndContext, useDroppable } from "@dnd-kit/core";
+import { DndContext, useDroppable, type DragCancelEvent, type DragEndEvent, type DragMoveEvent, type DragOverEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { openAppPath } from "@bb-studio/kit/app";
 import { useSdk } from "@get-bb/plugin-sdk/app";
@@ -349,6 +349,7 @@ export function SpaceModeSections({
       },
     };
   }, [moveThreads, resolveSpace, spaces, threads]);
+  const leadIds = useMemo(() => new Set(built.flatMap((candidate) => candidate.lead ? [candidate.lead.id] : [])), [built]);
   // Threads still nest by dropping one onto another; sections don't reorder.
   const threadDnd = useGroupedModeThreadDnd({
     collapsedThreadIds,
@@ -391,7 +392,7 @@ export function SpaceModeSections({
   return (
     <SpaceLeadContext.Provider value={leadState}>
       <SpaceRowsContext.Provider value={rows}>
-      <SpaceDndScope threadDnd={threadDnd}>
+      <SpaceDndScope threadDnd={threadDnd} leadIds={leadIds}>
       <div ref={area} data-sidebar-space-area="" className="flex min-w-0 flex-col">
         <ThreadListVisibility groups={[]} order={[]} onOrderChange={noop} label="Spaces" selectedThreadId={selectedThreadId}>
           <SortableContext items={order} strategy={verticalListSortingStrategy}>
@@ -491,14 +492,40 @@ export function SpaceModeSections({
 }
 
 /**
+ * Drag handlers that ignore a lead's row: dropping it on another thread would
+ * nest it, and it would stop leading its Space from the top. Everything else
+ * passes through. Moving a lead between Spaces stays in its menu.
+ */
+export function ignoringLeadDrags<P extends { onDragStart?: (event: DragStartEvent) => void; onDragMove?: (event: DragMoveEvent) => void; onDragOver?: (event: DragOverEvent) => void; onDragEnd?: (event: DragEndEvent) => void; onDragCancel?: (event: DragCancelEvent) => void }>(
+  props: P,
+  isLead: (threadId: string) => boolean,
+): P {
+  let ignoring = false;
+  const guard = <E extends { active: { id: unknown } }>(handler: ((event: E) => void) | undefined, start = false, end = false) => handler && ((event: E) => {
+    if (start) ignoring = typeof event.active.id === "string" && isLead(event.active.id);
+    if (!ignoring) handler(event);
+    if (end) ignoring = false;
+  });
+  return {
+    ...props,
+    onDragStart: guard(props.onDragStart, true),
+    onDragMove: guard(props.onDragMove),
+    onDragOver: guard(props.onDragOver),
+    onDragEnd: guard(props.onDragEnd, false, true),
+    onDragCancel: props.onDragCancel && (() => { if (!ignoring) props.onDragCancel!(undefined as never); ignoring = false; }),
+  };
+}
+
+/**
  * The threads' drag and drop around the whole By space area, so the Space
  * dots below the list take drops too.
  */
-function SpaceDndScope({ threadDnd, children }: { threadDnd: SectionThreadDndState | null; children: ReactNode }) {
-  if (!threadDnd) return <>{children}</>;
+function SpaceDndScope({ threadDnd, leadIds, children }: { threadDnd: SectionThreadDndState | null; leadIds: ReadonlySet<string>; children: ReactNode }) {
+  const dndProps = useMemo(() => threadDnd && ignoringLeadDrags(threadDnd.dndContextProps, (id) => leadIds.has(id)), [leadIds, threadDnd]);
+  if (!threadDnd || !dndProps) return <>{children}</>;
   return (
     <SectionThreadDndProvider value={threadDnd}>
-      <DndContext {...threadDnd.dndContextProps}>
+      <DndContext {...dndProps}>
         {children}
         <SectionThreadDragOverlayPortal activeThread={threadDnd.activeThread} />
       </DndContext>
