@@ -221,7 +221,7 @@ describe("thread-list plugin", () => {
     expect(await screen.findByRole("menuitem", { name: "Archive" })).not.toBeNull();
   });
 
-  it("shows the top level with no heading, its Chief of Staff on top, then one Space at a time with dots to switch", async () => {
+  it("shows the top level headed Home, its Chief of Staff on top, then one Space at a time with dots to switch", async () => {
     localStorage.removeItem("bb-studio:sidebar-organization");
     const threads = [
       ...THREADS,
@@ -259,10 +259,10 @@ describe("thread-list plugin", () => {
         },
       } },
     });
-    // The default Space is the top level and shows first, with no heading; threads in no Space are its.
+    // The default Space is the top level and shows first, headed Home; threads in no Space are its.
     await waitFor(() => expect(document.querySelector("[data-space-top-level] [data-space-lead=thr_lead]")).not.toBeNull());
     // A pinned thread sits in its Space, under the lead, not in a Pinned section.
-    expect(sectionHeaders()).toEqual([]);
+    expect(sectionHeaders()).toEqual(["Home"]);
     expect(localStorage.getItem("bb-studio:sidebar-organization")).toBe("space");
     const alpha = () => document.querySelector("[data-space-top-level]") as HTMLElement;
     const lead = alpha().querySelector("[data-space-lead=thr_lead]") as HTMLElement;
@@ -307,7 +307,7 @@ describe("thread-list plugin", () => {
     const switcher = screen.getByRole("navigation", { name: "Spaces" });
     fireEvent.click(within(switcher).getByRole("button", { name: "Beta, needs you" }));
     await screen.findByTitle("Beta");
-    expect(sectionHeaders()).toEqual(["Beta"]);
+    await waitFor(() => expect(sectionHeaders()).toEqual(["Beta"]));
     // The Chief of Staff stays on top of every Space, without the other top-level threads.
     expect(document.querySelector("[data-chief-of-staff=thr_parent] [data-space-thread-mark=chief]")).not.toBeNull();
     expect(threadIds()).not.toContain("thr_personal");
@@ -349,7 +349,7 @@ describe("thread-list plugin", () => {
     await waitFor(() => expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')!.closest("[data-sidebar-rename-row]")!.querySelector("[data-space-thread-line]")?.className).toContain("text-warning"));
     // ⌃⌥← / ⌃⌥→ step through All and the Spaces; All stacks every Space.
     fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
-    await waitFor(() => expect(sectionHeaders()).toEqual(["Beta"]));
+    await waitFor(() => expect(sectionHeaders()).toEqual(["Home", "Beta"]));
     expect(alpha()).not.toBeNull();
     await waitFor(() => expect(rpcCalls).toContainEqual({ method: "setPreference", input: { key: "currentSpace", value: "all" } }));
     expect(within(switcher).getByRole("button", { name: "All Spaces" }).getAttribute("aria-current")).toBe("true");
@@ -362,7 +362,7 @@ describe("thread-list plugin", () => {
     fireEvent.click(screen.getByRole("button", { name: "Expand Beta section" }));
     await within(beta()).findByText("Asks you");
     fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true, altKey: true });
-    await waitFor(() => expect(sectionHeaders()).toEqual([]));
+    await waitFor(() => expect(sectionHeaders()).toEqual(["Home"]));
     expect(within(switcher).getByRole("button", { name: "Home" }).getAttribute("aria-current")).toBe("true");
   });
 

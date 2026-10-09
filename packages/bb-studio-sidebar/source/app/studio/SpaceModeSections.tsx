@@ -436,19 +436,12 @@ export function SpaceModeSections({
                   {group.threads.length ? tree({ rootItems: group.item.group.items, threads: group.threads, dndParentKey: sectionId }) : null}
                 </>
               );
-              // The top level has no heading: it's where everything lives until it's filed into a Space.
-              if (group.space.isDefault) return (
-                <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>
-                  <SpaceDropArea spaceId={group.space.id}>
-                    <section data-space-top-level="" aria-label="Home">{body}</section>
-                  </SpaceDropArea>
-                </ThreadListVisibilityGroupScope>
-              );
               return (
                 <ThreadListVisibilityGroupScope key={sectionId} id={sectionId}>
-                  <SpaceDropArea spaceId={group.space.id}>
+                  <SpaceDropArea spaceId={group.space.id} topLevel={group.space.isDefault}>
                   <SpaceSidebarSection
-                    space={group.space}
+                    // The top level is headed Home, with the house mark the switcher uses.
+                    space={group.space.isDefault ? { ...group.space, name: "Home" } : group.space}
                     sectionId={group.sectionId}
                     onNewThread={newThread}
                     activity={group.activity}
@@ -504,10 +497,10 @@ function SpaceDndScope({ threadDnd, children }: { threadDnd: SectionThreadDndSta
 }
 
 /** A Space section, its heading a drop target for threads moving in. */
-function SpaceDropArea({ spaceId, children }: { spaceId: string; children: ReactNode }) {
+function SpaceDropArea({ spaceId, topLevel = false, children }: { spaceId: string; topLevel?: boolean; children: ReactNode }) {
   const { setNodeRef } = useDroppable({ id: spaceHeadingDropId(spaceId) });
   // Whitespace between Spaces (space-y above) and the tiled emoji set each one apart; no rules or boxes.
-  return <div ref={setNodeRef} data-space-drop={spaceId}>{children}</div>;
+  return <div ref={setNodeRef} data-space-drop={spaceId} data-space-top-level={topLevel ? "" : undefined}>{children}</div>;
 }
 
 const COMMAND_PLUGIN_ID = "studio";
