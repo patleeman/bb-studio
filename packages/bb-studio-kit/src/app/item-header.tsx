@@ -111,6 +111,9 @@ export function StudioBarSlot() {
 /** The title bar slot of the pane this element is in, if its panel lends one. */
 function paneSlot(from: HTMLElement): HTMLElement | null {
   for (let element = from.parentElement, depth = 0; element && depth < 24; element = element.parentElement, depth++) {
+    // Workspace editors each keep their own tools; inactive tabs must never
+    // compete for the outer Studio title bar.
+    if (element.hasAttribute("data-studio-workspace-editor")) return null;
     const slot = element.querySelector<HTMLElement>(":scope > header [data-studio-bar-slot]");
     if (slot) return slot;
   }
@@ -125,6 +128,7 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>): HTMLElement | 
     const find = () => (anchor.current ? paneSlot(anchor.current) : null);
     // A retained view set aside leaves its pane; its bar must leave that title bar too.
     const owns = (slot: HTMLElement) => {
+      if (anchor.current?.closest("[data-studio-workspace-editor]")) return false;
       const pane = slot.closest("header")?.parentElement;
       return !!pane && !!anchor.current && pane.contains(anchor.current);
     };

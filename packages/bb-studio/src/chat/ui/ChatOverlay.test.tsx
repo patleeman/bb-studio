@@ -9,6 +9,7 @@ import { chooseThreadPath, itemDraftPath, quoteDraftPath, quoteDrafts } from "./
 
 const state = vi.hoisted(() => ({
   path: "/plugins/pages/pages/main",
+  active: null as string | null,
   rpc: { call: vi.fn() },
   host: null as ItemChatHost | null,
   open: vi.fn(),
@@ -20,6 +21,9 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 }));
 vi.mock("@bb-studio/kit/app", () => ({
   usePathname: () => state.path,
+  workspaceActivePath: () => state.active,
+  subscribeWorkspace: () => () => {},
+  WORKSPACE_PATH: "/plugins/studio/studio/workspace",
   useOpenTarget: () => ({ open: state.open, anchor: null }),
   itemChatChanged: () => {},
   setItemChatHost: (host: ItemChatHost) => { state.host = host; return () => { state.host = null; }; },
@@ -46,6 +50,7 @@ beforeEach(async () => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
   state.path = main.href;
+  state.active = null;
   state.rpc.call.mockImplementation(async (method, input) => {
     if (method === "chat.viewing") return { item: main };
     if (method === "chat.subject") return { item: input.id === companion.id ? companion : main };
@@ -130,4 +135,11 @@ describe("item Chat actions", () => {
     expect(state.error).toHaveBeenCalledWith("Close other BB tabs");
     expect(state.open).not.toHaveBeenCalled();
   });
+});
+
+it("uses the focused workspace item as chat context", async () => {
+  state.path = "/plugins/studio/studio/workspace";
+  state.active = companion.href;
+  await render();
+  expect(state.rpc.call).toHaveBeenCalledWith("chat.viewing", { path: companion.href });
 });

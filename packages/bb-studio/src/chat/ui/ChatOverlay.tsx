@@ -4,12 +4,15 @@ import {
   setItemChatHost,
   useOpenTarget,
   usePathname,
+  workspaceActivePath,
+  subscribeWorkspace,
+  WORKSPACE_PATH,
   type HomeThread,
   type ItemChatHost,
   type ItemChatRef,
 } from "@bb-studio/kit/app";
 import { errorMessage, type ItemQuote } from "@bb-studio/kit/format";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useSyncExternalStore, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, Viewed } from "../contract";
 import { ref as itemRefSchema } from "../schemas";
@@ -140,7 +143,9 @@ function useHomeThreads(
  */
 export function ChatOverlay() {
   const rpc = useRpc<typeof rpcContract>();
-  const viewed = useViewing(rpc, usePathname());
+  const path = usePathname();
+  const active = useSyncExternalStore(subscribeWorkspace, workspaceActivePath, () => null);
+  const viewed = useViewing(rpc, path === WORKSPACE_PATH ? active ?? path : path);
   const { open, anchor } = useOpenTarget();
   const reportError = useCallback((cause: unknown) => toast.error(errorMessage(cause)), []);
   useHomeThreads(rpc, viewed, {

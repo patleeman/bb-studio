@@ -161,3 +161,15 @@ describe("Studio bar in BB's title bar", () => {
     pane.remove(); parking.remove();
   });
 });
+
+it("keeps workspace editor toolbars inside each editor instead of sharing the app header", async () => {
+  const pane = document.createElement("div");
+  pane.innerHTML = '<header><div data-studio-bar-slot></div></header><main data-studio-workspace-editor></main>';
+  document.body.append(pane);
+  const root = createRoot(pane.querySelector("main")!);
+  await act(async () => { root.render(<StudioBar>Page tools</StudioBar>); await settle(); });
+  expect(pane.querySelector("header")!.textContent).toBe("");
+  expect(pane.querySelector("main [data-studio-bar]")!.textContent).toBe("Page tools");
+  await act(async () => root.unmount());
+  pane.remove();
+});
