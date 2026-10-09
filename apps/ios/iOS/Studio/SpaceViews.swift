@@ -221,8 +221,8 @@ final class ThreadSpacesModel: ObservableObject {
         await load(threadIdToReload, client: client)
     }
 
-    /// What the ⋯ > Space menu says for the Chief of Staff, which is in no Space.
-    static let chiefLabel = "Chief of Staff · above every Space"
+    /// What the ⋯ > Space menu says for the Chief of Staff, the lead of the top level (the default Space).
+    static let chiefLabel = "Chief of Staff · top level"
 
     func isChief(_ threadId: String) -> Bool { chiefThreadId == threadId }
 
@@ -261,9 +261,12 @@ struct ThreadSpacesMenu: View {
                     Label("Open \(current.name)", systemImage: "arrow.up.right")
                 }
                 if !isChild {
-                    let isLead = model.leadOfSpace[current.id] == threadId
-                    Button { setLead(isLead ? nil : threadId, of: current) } label: {
-                        Label(isLead ? "Remove as Space Lead" : "Make Space Lead", systemImage: isLead ? "star.slash" : "star")
+                    // The top level's lead is the Chief of Staff, so Space Lead is for the other Spaces.
+                    if !current.isDefault {
+                        let isLead = model.leadOfSpace[current.id] == threadId
+                        Button { setLead(isLead ? nil : threadId, of: current) } label: {
+                            Label(isLead ? "Remove as Space Lead" : "Make Space Lead", systemImage: isLead ? "star.slash" : "star")
+                        }
                     }
                     Button { setChief(threadId) } label: {
                         Label("Make Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
@@ -283,7 +286,7 @@ struct ThreadSpacesMenu: View {
                 Label("Space: \(current.label)", systemImage: "square.stack.3d.up")
             }
         } else if isChief {
-            // The Chief of Staff sits above every Space, so it isn't in one and can't move or lead.
+            // The Chief of Staff leads the top level: it stays there and can't move or lead another Space.
             Menu {
                 if let editHeartbeat {
                     Button(action: editHeartbeat) { Label("Heartbeat…", systemImage: "waveform.path.ecg") }

@@ -109,8 +109,8 @@ final class ChiefOfStaffTests: XCTestCase {
         XCTAssertNil(HeartbeatFields.date("bad"))
     }
 
-    @MainActor func testChiefMenuLabelSaysAboveEverySpace() {
-        XCTAssertEqual(ThreadSpacesModel.chiefLabel, "Chief of Staff · above every Space")
+    @MainActor func testChiefMenuLabelSaysTopLevel() {
+        XCTAssertEqual(ThreadSpacesModel.chiefLabel, "Chief of Staff · top level")
         XCTAssertFalse(ThreadSpacesModel().isChief("thr_x"))
     }
 }
