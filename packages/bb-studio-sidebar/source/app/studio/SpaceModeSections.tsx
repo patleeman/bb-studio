@@ -57,7 +57,7 @@ import {
   type StudioSpace,
 } from "./space-groups.js";
 import { useMoveThreadsToSpace } from "./MoveToSpace.js";
-import { SpaceNewMenu, SpaceStudioList } from "./SpaceStudioList.js";
+import { SpaceNewMenu } from "./SpaceStudioList.js";
 import { SpaceBrowseMenu } from "./SpaceBrowseMenu.js";
 import { HiddenThreadsMenuItem } from "./HiddenThreads.js";
 import { chiefOfStaffOf, SpaceLeadContext, type SpaceLeadState } from "./SpaceLead.js";
@@ -430,8 +430,7 @@ export function SpaceModeSections({
               };
               const body = (
                 <>
-                  {/* Open Studio items as chips, then the lead, pins and threads, told apart by their marks. */}
-                  <SpaceStudioList spaceName={group.space.name} items={items[group.space.id]} />
+                  {/* The lead, pins and threads, told apart by their marks. Open Studio items live in Studio's tabs. */}
                   {group.lead ? (
                     <div data-space-lead={group.lead.id} {...(group.space.isDefault ? { "data-chief-of-staff": group.lead.id } : {})}>
                       {/* Takes drops, so a thread dragged onto the lead nests under it as its worker. */}

@@ -286,16 +286,8 @@ describe("thread-list plugin", () => {
     expect(row("thr_parent").querySelector("[data-space-thread-pill=unread]")?.textContent).toBe("Done");
     expect(row("thr_busy").querySelector("[data-space-thread-time]")?.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
     expect(row("thr_parent").querySelector("[data-sidebar-thread-trailing-indicator]")).toBeNull();
-    // An item opens in the main area (in place here, where BB can't split).
-    // Open items are chips above the lead.
-    const chips = within(alpha()).getByRole("group", { name: "Alpha Studio items" });
-    expect(chips.compareDocumentPosition(alpha().querySelector("[data-space-lead]")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(chips).getByRole("button", { name: "Close Launch plan" })).not.toBeNull();
-    fireEvent.click(within(alpha()).getByRole("link", { name: "Launch plan" }));
-    expect(window.location.pathname).toBe("/plugins/pages/pages/pg_1");
-    // The item on screen is highlighted like the selected thread.
-    await waitFor(() => expect(alpha().querySelector('[data-space-studio-item="pages:pg_1"]')?.hasAttribute("data-active")).toBe(true));
-    expect(within(alpha()).getByRole("link", { name: "Launch plan" }).getAttribute("aria-current")).toBe("page");
+    // Open Studio items live in Studio's tabs, not as chips in the sidebar.
+    expect(screen.queryByRole("group", { name: "Alpha Studio items" })).toBeNull();
     // Any top-level thread can become the Chief of Staff, the top level's lead, from Promote ▸; Space lead is for other Spaces.
     fireEvent.contextMenu(document.querySelector('[data-sidebar-thread-id="thr_parent"]')!);
     fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Promote" }), { key: "ArrowRight" });
@@ -316,8 +308,7 @@ describe("thread-list plugin", () => {
     expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.parentElement?.querySelector("[data-sidebar-needs-you]")).not.toBeNull();
     expect(document.querySelectorAll("[data-sidebar-needs-you]")).toHaveLength(1);
     expect(document.querySelector('[data-sidebar-thread-id="thr_ask"]')?.closest("[data-sidebar-rename-row]")?.querySelector("[data-space-thread-pill=needs-you]")?.textContent).toBe("Needs you");
-    // Beta has no open Studio items, so it shows no Studio rows, and no headings at all.
-    expect(screen.queryByRole("group", { name: "Beta Studio items" })).toBeNull();
+    // No headings at all.
     expect(screen.queryByRole("button", { name: /^(Expand|Collapse) (Lead|Studio|Threads)$/ })).toBeNull();
     // The heading is plain: ⋯ has the Space's actions.
     expect(screen.queryByRole("button", { name: "Open Beta" })).toBeNull();

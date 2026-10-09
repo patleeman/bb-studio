@@ -41,7 +41,7 @@ export const ARCHIVED_MENU_LIMIT = 10;
 
 const terms = (query: string) => query.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
-/** The Space's unopened Studio items whose titles match every search term. */
+/** The Space's Studio items whose titles match every search term. */
 export function searchStudioItems(items: readonly SpaceBrowseItem[], query: string): SpaceBrowseItem[] {
   const words = terms(query);
   return words.length ? items.filter((item) => words.every((word) => item.title.toLowerCase().includes(word))) : [...items];

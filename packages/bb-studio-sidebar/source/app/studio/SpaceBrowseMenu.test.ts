@@ -56,11 +56,11 @@ describe("Browse's Studio items", () => {
   const item = (id: string, title: string) => ({ pluginId: "pages", id, title, icon: null, kindIcon: "FileText", href: `/plugins/pages/pages/${id}`, updatedAt: 0 });
   const plan = item("plan", "Launch plan"), notes = item("notes", "Release notes"), open = item("open", "Launch checklist");
 
-  it("lists the Space's items that aren't open, matching every search word", () => {
+  it("lists every one of the Space's items, open or not, matching every search word", () => {
     const browsable = browsableItems({ open: [{ ...open, pinned: false, kindLabel: "Page", preview: null }], all: [plan, notes, open], count: 3 });
-    expect(browsable.map((each) => each.id)).toEqual(["plan", "notes"]);
-    expect(searchStudioItems(browsable, "").map((each) => each.id)).toEqual(["plan", "notes"]);
+    expect(browsable.map((each) => each.id)).toEqual(["plan", "notes", "open"]);
     expect(searchStudioItems(browsable, "launch PLAN").map((each) => each.id)).toEqual(["plan"]);
-    expect(searchStudioItems(browsable, "checklist")).toEqual([]);
+    expect(searchStudioItems(browsable, "checklist").map((each) => each.id)).toEqual(["open"]);
+    expect(searchStudioItems(browsable, "nothing")).toEqual([]);
   });
 });
