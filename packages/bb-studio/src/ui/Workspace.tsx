@@ -22,6 +22,13 @@ export const useWorkspace = () => useSyncExternalStore(subscribe, snapshot, snap
 export function closeWorkspaceTabs(hrefs: readonly string[]) {
   update(current => hrefs.reduce((next, href) => closeTab(next, href), current));
 }
+// While a Studio item is dragged anywhere, each pane lays a drop layer over its
+// editor: an editor in an iframe, or one that handles drags itself, would
+// otherwise swallow them. `source` is the tab being dragged, if it is one.
+let dragging: { source: string | null } | null = null;
+const dragListeners = new Set<() => void>();
+function setDragging(next: typeof dragging) { if (next?.source !== dragging?.source || !next !== !dragging) { dragging = next; dragListeners.forEach(listener => listener()); } }
+const useDragging = () => useSyncExternalStore(listener => { dragListeners.add(listener); return () => { dragListeners.delete(listener); }; }, () => dragging, () => null);
 const BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 
 /** Installed once by Studio; without Studio, add-ons keep their ordinary pages. */
@@ -66,7 +73,22 @@ export function WorkspaceBridge() {
       event.dataTransfer.effectAllowed = "copyMove";
     };
     document.addEventListener("dragstart", drag);
-    return () => document.removeEventListener("dragstart", drag);
+    // Drags from the sidebar, another window or a tab all pass here first.
+    const enter = (event: globalThis.DragEvent) => { if (accepts(event) && !dragging) setDragging({ source: null }); };
+    const end = () => setDragging(null);
+    const leave = (event: globalThis.DragEvent) => { if (!event.relatedTarget && (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight)) end(); };
+    document.addEventListener("dragenter", enter, true);
+    document.addEventListener("dragleave", leave, true);
+    document.addEventListener("dragend", end, true);
+    // Bubbling, so a pane's drop layer handles the drop before it goes.
+    window.addEventListener("drop", end);
+    return () => {
+      document.removeEventListener("dragstart", drag);
+      document.removeEventListener("dragenter", enter, true);
+      document.removeEventListener("dragleave", leave, true);
+      document.removeEventListener("dragend", end, true);
+      window.removeEventListener("drop", end);
+    };
   }, []);
   return null;
 }
@@ -105,7 +127,11 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
   const active = pane.tabs.find(tab => tab.href === pane.active);
   const paneElement = useRef<HTMLElement>(null);
   const dropElement = useRef<HTMLDivElement>(null);
-  const place = (event: globalThis.DragEvent): WorkspacePlacement => {
+  const drag = useDragging();
+  // A pane's only tab can't split its own pane or move into it.
+  const own = !!drag?.source && pane.tabs.length === 1 && pane.tabs[0]!.href === drag.source;
+  useEffect(() => { if (!drag) setDrop(null); }, [drag]);
+  const place = (event: Pick<globalThis.DragEvent, "clientX" | "clientY">): WorkspacePlacement => {
     const rect = dropElement.current!.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width, y = (event.clientY - rect.top) / rect.height;
     return x < .22 ? "left" : x > .78 ? "right" : y < .22 ? "top" : y > .78 ? "bottom" : "tab";
@@ -113,25 +139,17 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
   // Native capture crosses the add-on's portal boundary; React handlers in
   // Studio's tree cannot reliably receive events from another plugin's tree.
   useEffect(() => {
-    const element = paneElement.current!, body = dropElement.current!;
+    const element = paneElement.current!;
     const focus = () => { if (snapshot().focused !== pane.id) update(current => ({ ...current, focused: pane.id })); };
-    const over = (event: globalThis.DragEvent) => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); setDrop(place(event)); } };
-    const leave = (event: globalThis.DragEvent) => { if (!body.contains(event.relatedTarget as Node | null)) setDrop(null); };
-    const end = () => setDrop(null);
-    const receive = (event: globalThis.DragEvent) => { end(); const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, place(event)); } };
     element.addEventListener("pointerdown", focus, true);
-    body.addEventListener("dragover", over, true);
-    body.addEventListener("drop", receive, true);
-    body.addEventListener("dragleave", leave);
-    document.addEventListener("dragend", end);
-    return () => { element.removeEventListener("pointerdown", focus, true); body.removeEventListener("dragover", over, true); body.removeEventListener("drop", receive, true); body.removeEventListener("dragleave", leave); document.removeEventListener("dragend", end); };
+    return () => element.removeEventListener("pointerdown", focus, true);
   }, [pane.id]);
   const tabRow = (
     <div data-studio-workspace-tabs="" className={`flex shrink-0 items-center gap-1 ${titleBar ? "h-full min-w-0 flex-1" : "h-10 border-b bg-background pl-1.5 pr-1"}`}
       onDragOver={event => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); } }}
       onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab"); } }}>
       <div role="tablist" aria-label="Studio items" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
-        {pane.tabs.map((tab, index) => <div key={tab.href} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; }}
+        {pane.tabs.map((tab, index) => <div key={tab.href} onDragEnd={() => setDragging(null)} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; setDragging({ source: tab.href }); }}
           onDragOver={event => { if (accepts(event)) event.preventDefault(); }}
           onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab", tab.href); } }}>
           <button role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${instance}-${pane.id}-${index}`} id={`tab-${instance}-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
@@ -161,6 +179,10 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
     <div ref={dropElement} data-studio-workspace-drop="" className="relative flex min-h-0 flex-1 flex-col">
       {pane.tabs.map((tab, index) => <div key={tab.href} role="tabpanel" id={`view-${instance}-${pane.id}-${index}`} aria-labelledby={`tab-${instance}-${pane.id}-${index}`} hidden={pane.active !== tab.href} style={{ display: pane.active === tab.href ? "flex" : "none" }} className="min-h-0 min-w-0 flex-1 flex-col"><EditorSlot tab={tab} instance={instance} /></div>)}
       {!pane.tabs.length && <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"><p>Open an item from the sidebar, or drop one here.</p><button className="rounded border px-3 py-2 text-foreground hover:bg-state-hover" onClick={() => openAppPath(studioPath("collection"))}>Browse Studio</button></div>}
+      {drag && <div data-studio-workspace-drop-layer="" className="absolute inset-0 z-30"
+        onDragOver={event => { if (own || !accepts(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDrop(place(event)); }}
+        onDragLeave={() => setDrop(null)}
+        onDrop={event => { setDrop(null); const item = own ? null : dragged(event); if (item) { event.preventDefault(); move(item, pane.id, place(event)); } }} />}
       {drop && <div className="pointer-events-none absolute z-20 flex items-center justify-center border-2 border-primary bg-primary/10 text-sm font-medium" style={{ inset: 0, ...(drop === "left" ? { right: "50%" } : drop === "right" ? { left: "50%" } : drop === "top" ? { bottom: "50%" } : drop === "bottom" ? { top: "50%" } : {}) }}>{drop === "tab" ? "Open as tab" : `Split ${drop}`}</div>}
     </div>
   </section>;

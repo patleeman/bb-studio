@@ -28,12 +28,18 @@ it("keeps editor drafts while switching tabs, splitting and returning to the wor
   const target = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="two"]')!;
   const body = target.closest<HTMLElement>('[data-studio-workspace-drop]')!;
   vi.spyOn(body, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100, x: 0, y: 0, toJSON() {} });
-  // An editor consumes its own drop events; native workspace capture must
-  // receive Studio items first, despite the editor being in a different tree.
+  // An editor consumes its own drop events, and one in an iframe never sees
+  // them: while a Studio item is dragged, a drop layer covers each editor.
   target.addEventListener("drop", event => event.stopPropagation());
-  const drop = new MouseEvent("drop", { bubbles: true, cancelable: true, clientX: 95, clientY: 50 });
-  Object.defineProperty(drop, "dataTransfer", { value: { types: ["application/x-bb-studio-item"], getData: () => JSON.stringify({ href: page, title: "One" }) } });
-  await act(() => { target.dispatchEvent(drop); });
+  const transfer = { types: ["application/x-bb-studio-item"], getData: () => JSON.stringify({ href: page, title: "One" }), dropEffect: "none" };
+  const drag = (type: string, at: EventTarget) => { const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 95, clientY: 50 }); Object.defineProperty(event, "dataTransfer", { value: transfer }); at.dispatchEvent(event); };
+  await act(() => { drag("dragenter", target); });
+  const layer = body.querySelector<HTMLElement>("[data-studio-workspace-drop-layer]")!;
+  expect(layer).not.toBeNull();
+  await act(() => { drag("dragover", layer); });
+  expect(body.textContent).toContain("Split right");
+  await act(() => { drag("drop", layer); });
+  expect(host.querySelector("[data-studio-workspace-drop-layer]")).toBeNull();
   expect(host.querySelectorAll('[data-workspace-pane]')).toHaveLength(2);
   expect(host.querySelector('textarea[aria-label="one"]')).toBe(editor);
   expect(editor.value).toBe("Keep my draft");
