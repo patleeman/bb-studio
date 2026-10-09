@@ -1,13 +1,12 @@
 // The Studio collection: every add-on's items in one list, filtered by one
-// query (src/query.ts) from search and the filter menus above it. The
-// panel's sub-path can start the query on a kind, so
-// /plugins/studio/studio/recording links to recordings. openSpaceItems lists
-// a space's items here.
+// query (src/query.ts) from search and the filter menus above it. It is the
+// workspace's new tab page, never a page of its own: openCollection starts it
+// on a kind, so /plugins/studio/studio/recording opens it on recordings, and
+// openSpaceItems on a space's items.
 import { showBrowse } from "./Workspace";
 import {
   CollectionPage,
   createStudioItem,
-  OpenInSplitButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -20,7 +19,6 @@ import {
   itemKey,
   PageColumn,
   openAppPath,
-  panelHref,
   useProjects,
   type ActionResults,
   type CollectionHandlers,
@@ -61,6 +59,20 @@ export function openCollectionQuery(navigate: ReturnType<typeof useBbNavigate>, 
   // The workspace's new tab page shows it.
   showBrowse();
   navigate.toPluginPanel("studio", { subPath: "" });
+}
+
+/** Opens the new tab page, on `kind`'s items when given, from an old address that showed the list. */
+export function openCollection(kind: string | null): void {
+  if (kind) {
+    const query = { filters: [{ field: "kind" as const, value: kind }], text: "" };
+    try {
+      localStorage.setItem(QUERY_KEY, formatQuery(query));
+    } catch {
+      // Storage can be refused; an open collection still hears the event.
+    }
+    window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: formatQuery(query) }));
+  }
+  showBrowse();
 }
 
 /** Opens the Studio collection on a space's items. */
@@ -245,8 +257,8 @@ async function perPlugin(items: CollectionItem[], work: (pluginId: string, ids: 
   return { done: results.flatMap((result) => result.done), failed: results.flatMap((result) => result.failed) };
 }
 
-/** `embedded`: the workspace's new tab page, which keeps its kind in the query instead of the address. */
-export function StudioPanel({ subPath, embedded = false }: { subPath: string; embedded?: boolean }) {
+/** The workspace's new tab page. */
+export function StudioPanel() {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const context = useBbContext();
@@ -262,19 +274,10 @@ export function StudioPanel({ subPath, embedded = false }: { subPath: string; em
     () => providers.filter((provider) => provider.state === "ready").flatMap((provider) => provider.kinds.map((kind) => ({ ...kind, pluginId: provider.pluginId }))),
     [providers],
   );
-  const requested = decodeSegment(subPath.split("/").filter(Boolean)[0] ?? "") || "all";
   const [query, setQuery] = useStoredQuery(QUERY_KEY);
   const setKind = useCallback((next: string) => {
-    if (!embedded) return navigate.toPluginPanel("studio", { subPath: next === "all" ? "collection" : encodeURIComponent(next) });
     setQuery({ ...query, filters: [...query.filters.filter((filter) => filter.field !== "kind"), ...(next === "all" ? [] : [{ field: "kind" as const, value: next }])] });
-  }, [embedded, navigate, query, setQuery]);
-  // A link to a kind starts the query on it.
-  const seededKind = useRef<string | null>(null);
-  useEffect(() => {
-    if (!data || !kinds.some((each) => each.id === requested) || seededKind.current === requested) return;
-    seededKind.current = requested;
-    setQuery({ ...query, filters: [...query.filters.filter((filter) => filter.field !== "kind"), { field: "kind", value: requested }] });
-  }, [data, kinds, requested, query, setQuery]);
+  }, [query, setQuery]);
   const vocabulary = useMemo<QueryVocabulary>(
     () => ({ kinds, projects: projects.map((project) => ({ id: project.id, name: project.name })), tags: data?.tags ?? [], spaces: data?.spaces ?? [] }),
     [kinds, projects, data?.tags, data?.spaces],
@@ -468,10 +471,6 @@ export function StudioPanel({ subPath, embedded = false }: { subPath: string; em
 
   const headerActions = (
     <>
-    {embedded ? null : <>
-      <button type="button" className="rounded px-3 py-1.5 text-sm hover:bg-state-hover" onClick={() => navigate.toPluginPanel("studio", { subPath: "" })}>Workspace</button>
-      <OpenInSplitButton item={{ href: panelHref("studio", "studio", subPath), title: "Studio" }} />
-    </>}
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -602,13 +601,4 @@ export function StudioPanel({ subPath, embedded = false }: { subPath: string; em
 /** An itemless space: its threads and projects are in the sidebar. */
 function spaceEmpty(spaces: readonly SpaceView[]): string {
   return `No items in ${spaces.length === 1 ? "this space" : "these spaces"} yet.`;
-}
-
-/** A path segment, or "" for a malformed one like `100%`. */
-function decodeSegment(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return "";
-  }
 }

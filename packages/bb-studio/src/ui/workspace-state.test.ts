@@ -28,21 +28,20 @@ describe("Studio workspace", () => {
     expect(panes(state.layout)[0]!.active).toBe(page.href);
     state = closeTab(closeTab(state, page.href), recording.href);
     expect(panes(state.layout)).toHaveLength(1);
-    // Nothing left: the new tab page.
-    expect(panes(state.layout)[0]!.tabs).toEqual([BROWSE]);
+    expect(panes(state.layout)[0]!.tabs).toEqual([]);
   });
   it("restores splits, tab order and active selection; rejects corrupt storage", () => {
     const state = openItem(openItem(emptyWorkspace(), page), recording, "bottom");
     expect(parseWorkspace(JSON.parse(JSON.stringify(state)))).toEqual(state);
-    expect(panes(parseWorkspace({ layout: { kind: "split" } }).layout)[0]!.tabs).toEqual([BROWSE]);
+    expect(panes(parseWorkspace({ layout: { kind: "split" } }).layout)[0]!.tabs).toEqual([]);
     expect(openItem(state, { href: "https://elsewhere.test", title: "Bad" })).toBe(state);
   });
-  it("opens on the new tab page, and an item opened from it takes its place", () => {
+  it("opens empty, and an item opened from the new tab page takes its place", () => {
     let state = emptyWorkspace();
-    expect(panes(state.layout)[0]!.tabs).toEqual([BROWSE]);
-    state = openItem(state, page);
+    expect(panes(state.layout)[0]!.tabs).toEqual([]);
+    state = openItem(openItem(state, BROWSE, "tab", state.focused), page);
     expect(panes(state.layout)[0]!.tabs).toEqual([page]);
-    // "+" opens it again beside the open items; the next item replaces it.
+    // "+" opens it beside the open items; the next item replaces it.
     state = openItem(state, BROWSE, "tab", state.focused);
     expect(panes(state.layout)[0]!.tabs).toEqual([page, BROWSE]);
     state = openItem(state, recording);
@@ -55,9 +54,8 @@ describe("Studio workspace", () => {
 });
 
 it("restores the maximum nested eight-pane arrangement", () => {
-  // The first page takes the new tab page's place; the rest split.
-  let state = openItem(emptyWorkspace(), { href: "/plugins/pages/pages/page_0", title: "Page 0" });
-  for (let index = 1; index < 8; index++) state = openItem(state, { href: `/plugins/pages/pages/page_${index}`, title: `Page ${index}` }, "right");
+  let state = emptyWorkspace();
+  for (let index = 0; index < 8; index++) state = openItem(state, { href: `/plugins/pages/pages/page_${index}`, title: `Page ${index}` }, "right");
   expect(panes(state.layout)).toHaveLength(8);
   expect(parseWorkspace(JSON.parse(JSON.stringify(state)))).toEqual(state);
 });

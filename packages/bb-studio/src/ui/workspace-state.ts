@@ -9,17 +9,11 @@ let sequence = 0;
 const id = () => `pane-${Date.now().toString(36)}-${++sequence}`;
 export const emptyPane = (): Pane => ({ kind: "pane", id: id(), tabs: [], active: null });
 /**
- * The new tab page: Studio's item list, as a tab. "+" opens it, an empty
- * workspace shows it, and an item opened from it takes its place.
+ * The new tab page: Studio's item list, as a tab, and the only place the list
+ * shows. "+" opens it, and an item opened from it takes its place.
  */
-export const BROWSE: Tab = { href: "/plugins/studio/studio/browse", title: "Studio", kindIcon: "studio/studio" };
-export function emptyWorkspace(): Workspace { const layout: Pane = { ...emptyPane(), tabs: [BROWSE], active: BROWSE.href }; return { layout, focused: layout.id }; }
-/** A workspace with no tabs left shows the new tab page. */
-function withBrowse(state: Workspace): Workspace {
-  if (panes(state.layout).some(pane => pane.tabs.length)) return state;
-  const pane = panes(state.layout)[0]!;
-  return { layout: { ...pane, tabs: [BROWSE], active: BROWSE.href }, focused: pane.id };
-}
+export const BROWSE: Tab = { href: "/plugins/studio/studio/browse", title: "New tab", kindIcon: "studio/studio" };
+export function emptyWorkspace(): Workspace { const layout = emptyPane(); return { layout, focused: layout.id }; }
 export function panes(layout: Layout): Pane[] { return layout.kind === "pane" ? [layout] : [...panes(layout.first), ...panes(layout.second)]; }
 export function mapLayout(layout: Layout, fn: (node: Layout) => Layout): Layout {
   return fn(layout.kind === "pane" ? layout : { ...layout, first: mapLayout(layout.first, fn), second: mapLayout(layout.second, fn) });
@@ -37,7 +31,7 @@ function remove(layout: Layout, href: string): Layout {
 }
 export function closeTab(state: Workspace, href: string): Workspace {
   const layout = remove(state.layout, href);
-  return withBrowse({ layout, focused: panes(layout).some(pane => pane.id === state.focused) ? state.focused : panes(layout)[0]!.id });
+  return { layout, focused: panes(layout).some(pane => pane.id === state.focused) ? state.focused : panes(layout)[0]!.id };
 }
 export function openItem(state: Workspace, item: WorkspaceItem, placement: WorkspacePlacement = "tab", destination?: string, before?: string): Workspace {
   const href = workspaceItemPath(item.href);
@@ -97,13 +91,14 @@ export function parseWorkspace(value: unknown): Workspace {
       if (typeof tab?.href !== "string" || typeof tab.title !== "string") continue;
       const href = workspaceItemPath(tab.href);
       if (!href || seen.has(href)) continue;
-      seen.add(href); tabs.push({ href, title: tab.title.slice(0, 300), ...(typeof tab.icon === "string" && tab.icon.length <= 16 ? { icon: tab.icon } : {}), ...(typeof tab.kindIcon === "string" && tab.kindIcon.length <= 64 ? { kindIcon: tab.kindIcon } : {}) });
+      seen.add(href); if (href === BROWSE.href) { tabs.push(BROWSE); continue; }
+      tabs.push({ href, title: tab.title.slice(0, 300), ...(typeof tab.icon === "string" && tab.icon.length <= 16 ? { icon: tab.icon } : {}), ...(typeof tab.kindIcon === "string" && tab.kindIcon.length <= 64 ? { kindIcon: tab.kindIcon } : {}) });
     }
     return { kind: "pane", id: value.id, tabs, active: tabs.some(tab => tab.href === value.active) ? value.active : tabs[0]?.href ?? null };
   }
   try {
     const record = value as Workspace;
     const layout = parse(record.layout);
-    return withBrowse({ layout, focused: panes(layout).some(pane => pane.id === record.focused) ? record.focused : panes(layout)[0]!.id });
+    return { layout, focused: panes(layout).some(pane => pane.id === record.focused) ? record.focused : panes(layout)[0]!.id };
   } catch { return emptyWorkspace(); }
 }

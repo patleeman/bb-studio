@@ -171,12 +171,11 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
             {tab.icon ? <span aria-hidden className="w-3.5 shrink-0 text-center text-xs leading-none">{tab.icon}</span> : <Icon name={tab.kindIcon ?? "File"} className="size-3.5 shrink-0 opacity-70" />}
             <span className="truncate">{tab.title}</span>
           </button>
-          {/* Closing the last tab would only reopen the new tab page. */}
-          {tab.href === BROWSE.href && panes(snapshot().layout).every(each => each.tabs.length === (each.id === pane.id ? 1 : 0)) ? <span className="w-1" /> : <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>}
+          <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
         </div>)}
       </div>
       {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink-0 items-center" />)}
-      <button className={BUTTON} aria-label="Browse Studio items" title="Browse Studio items" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
+      <button className={BUTTON} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
       {active && <DropdownMenu><DropdownMenuTrigger asChild><button className={BUTTON} aria-label="Arrange active tab" title="Split or move"><Icon name="Columns2" className="size-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end">
         {(["left", "right", "top", "bottom"] as const).map(edge => <DropdownMenuItem key={edge} disabled={pane.tabs.length < 2 || panes(snapshot().layout).length >= 8} onSelect={() => move(active, pane.id, edge)}>Split {edge}</DropdownMenuItem>)}
         {panes(snapshot().layout).filter(other => other.id !== pane.id).map((other, index) => <DropdownMenuItem key={other.id} onSelect={() => move(active, other.id, "tab")}>Move to pane {index + 1}</DropdownMenuItem>)}
@@ -188,7 +187,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
     {titleBar ? <StudioBar>{tabRow}</StudioBar> : tabRow}
     <div ref={dropElement} data-studio-workspace-drop="" className="relative flex min-h-0 flex-1 flex-col">
       {pane.tabs.map((tab, index) => <div key={tab.href} role="tabpanel" id={`view-${instance}-${pane.id}-${index}`} aria-labelledby={`tab-${instance}-${pane.id}-${index}`} hidden={pane.active !== tab.href} style={{ display: pane.active === tab.href ? "flex" : "none" }} className="min-h-0 min-w-0 flex-1 flex-col"><EditorSlot tab={tab} instance={instance} /></div>)}
-      {!pane.tabs.length && <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"><p>Open an item from the sidebar, or drop one here.</p><button className="rounded border px-3 py-2 text-foreground hover:bg-state-hover" onClick={() => showBrowse(pane.id)}>Browse Studio</button></div>}
+      {!pane.tabs.length && <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"><p>No open tabs. Open an item from the sidebar, or drop one here.</p><button className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-foreground hover:bg-state-hover" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" />New tab</button></div>}
       {drag && <div data-studio-workspace-drop-layer="" className="absolute inset-0 z-30"
         onDragOver={event => { if (own || !accepts(event)) return; event.preventDefault(); setDrop(place(event)); }}
         onDragLeave={() => setDrop(null)}

@@ -9,15 +9,15 @@ threads into one place, each with an optional lead thread.
 
 ## Workspace
 
-Studio opens on its workspace: items in tabs, without a conversation. Its new
-tab page is the Studio item list. A new workspace shows it, **+** opens it, and
-an item opened from it takes its place, as in a browser. Items opened from the
+Studio opens on its workspace: items in tabs, without a conversation. The
+Studio item list shows only as its new tab page: **+** opens it, and an item
+opened from it takes its place, as in a browser. Items opened from the
 sidebar or Studio search open as tabs too. Drag tabs or sidebar items to a pane's edge to split; drag onto
 a tab bar to move or reorder. The tab arrangement menu offers split and move
 commands, and separators resize with the mouse or arrow keys. Closing a tab
 keeps the item. The workspace remembers the layout locally across visits and
-refreshes. The item list still has a page of its own at a kind's address, such
-as `/plugins/studio/studio/pages`, with **Workspace** to return.
+refreshes. Old list addresses, such as a kind's (`/plugins/studio/studio/page`),
+open the new tab page on that kind.
 Each tab row carries the active item's tools, such as Chat, beside its tabs.
 With one pane, the tab row takes BB's title bar, so the item sits under a
 single bar. Open items live here, not in the sidebar; a Space's Browse menu
@@ -25,7 +25,7 @@ opens any of its items as a tab.
 Conversation-side item views continue to work independently. At phone widths, a
 pane picker shows one pane at a time while preserving the desktop arrangement.
 
-![Studio's new tab page: the item list as the workspace's only tab](assets/workspace-new-tab.png)
+![Studio's new tab page: the item list as a tab in the workspace](assets/workspace-new-tab.png)
 
 ![Studio workspace with one pane, its tabs and the page's tools in BB's title bar](assets/workspace-single.png)
 

@@ -72,10 +72,11 @@ Backup and restore (`bb studio backup|restore` and the Setup page) are described
 
 Studio opens on its **Workspace** (`/plugins/studio/studio`; the old `/workspace`
 address redirects), which keeps items in persistent tabs without a thread. Its new
-tab page is the collection, the tab `/plugins/studio/studio/browse`: an empty
-workspace shows it, the plus button opens it, and an item opened from it takes its
-place. A kind's address, such as `/plugins/studio/studio/pages`, still shows the
-collection on its own page, whose Workspace button returns. Sidebar,
+tab page is the collection, the tab `/plugins/studio/studio/browse`, and the only
+place it shows: the plus button opens it, and an item opened from it takes its
+place. An empty workspace says so and offers a new tab. Old collection addresses
+(`/collection`, a kind's such as `/plugins/studio/studio/page`) redirect to the
+workspace and open the new tab page, filtered to the kind. Sidebar,
 collection and quick-search item opens use the workspace when the add-on supports it.
 Existing thread panel actions continue to open beside their conversation.
 

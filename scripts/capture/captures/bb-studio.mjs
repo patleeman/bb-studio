@@ -25,9 +25,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
             await sleep(50);
           }
         };
-        const fresh = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map(tab => tab.lastElementChild?.textContent.trim())`);
-        if (fresh.length !== 1 || fresh[0] !== "Studio") throw new Error(`The workspace didn't open on the new tab page: ${JSON.stringify(fresh)}`);
+        // Studio opens on its workspace; the item list shows only as a new tab.
+        const fresh = await client.evaluate(`({ tabs: document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]').length, rows: document.querySelectorAll('[data-studio-workspace] [role="row"]').length, empty: document.querySelector('[data-studio-workspace]').innerText.includes('No open tabs') })`);
+        if (fresh.tabs || fresh.rows || !fresh.empty) throw new Error(`The workspace didn't open empty: ${JSON.stringify(fresh)}`);
+        // An old list address opens the new tab page in the workspace.
+        await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('[data-studio-workspace] [role="row"][aria-label="Offline mode launch"]');
+        if (!(await client.evaluate(`location.pathname`)).endsWith("/plugins/studio/studio")) throw new Error("The collection's old address didn't move to the workspace");
         await sleep(500);
         await client.capture(new URL('../../../packages/bb-studio/assets/workspace-new-tab.png', import.meta.url).pathname);
         await openRow("Offline mode launch");
@@ -36,7 +40,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         const replaced = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map(tab => tab.lastElementChild?.textContent.trim())`);
         if (replaced.join() !== "Offline mode launch") throw new Error(`Opening an item didn't replace the new tab page: ${JSON.stringify(replaced)}`);
         // Browse inside BB (no reload), then open a second kind of editor.
-        await client.evaluate(`document.querySelector('[aria-label="Browse Studio items"]').click()`);
+        await client.evaluate(`document.querySelector('[aria-label="New tab"]').click()`);
         await openRow("Weekly product sync");
         await client.waitForText("Weekly product sync");
         const href = `/plugins/talk/recordings/${recording}`;
@@ -63,7 +67,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         if (!single.row || !single.tools || single.label) throw new Error(`A single pane's tab row did not take the title bar: ${JSON.stringify(single)}`);
         await client.capture(new URL('../../../packages/bb-studio/assets/workspace-single.png', import.meta.url).pathname);
         // Restore the two-editor arrangement for the screenshot.
-        await client.evaluate(`document.querySelector('[aria-label="Browse Studio items"]').click()`);
+        await client.evaluate(`document.querySelector('[aria-label="New tab"]').click()`);
         await openRow("Weekly product sync");
         const split = await client.evaluate(`(() => { const rect = [...document.querySelectorAll('[data-workspace-pane]')].find(element => element.checkVisibility()).getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...split, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });

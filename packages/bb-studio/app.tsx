@@ -14,7 +14,7 @@ import { ManageSpace } from "./src/ui/ManageSpace";
 import { NewSpace } from "./src/ui/NewSpace";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { SidebarTabs } from "./src/ui/SidebarTabs";
-import { StudioPanel } from "./src/ui/StudioPanel";
+import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { ComposerSpaces } from "./src/ui/ComposerSpaces";
 import { ThreadSpaceLink } from "./src/ui/ThreadSpaceLink";
 import { ActivityPanel } from "./src/ui/HomePanel";
@@ -22,23 +22,39 @@ import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 
-/** The workspace's old address; retained, so it checks each time it's shown. */
-function ToWorkspace() {
+/**
+ * An old address that showed the item list (`collection`, a kind such as
+ * `page`) or the workspace: the workspace, with the list as a new tab
+ * except for `workspace`. Retained, so it checks each time it's shown.
+ */
+function ToWorkspace({ path }: { path: string }) {
   const pathname = usePathname();
-  useEffect(() => { if (pathname.replace(/\/+$/, "").endsWith("/studio/workspace")) openAppPath(WORKSPACE_PATH, { standalone: true, replace: true }); }, [pathname]);
+  useEffect(() => {
+    if (pathname.replace(/\/+$/, "") !== `${WORKSPACE_PATH}/${path}`) return;
+    if (path !== "workspace") openCollection(path === "collection" ? null : decodeSegment(path));
+    openAppPath(WORKSPACE_PATH, { standalone: true, replace: true });
+  }, [pathname, path]);
   return null;
+}
+
+/** A path segment, or "" for a malformed one like `100%`. */
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return "";
+  }
 }
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
-  // Studio opens on its tabbed workspace; the item list is its new tab page.
+  // Studio opens on its tabbed workspace; the item list is only its new tab page.
   if (path === "") return <StudioWorkspace />;
-  if (path === "workspace") return <ToWorkspace />;
-  if (path === "browse") return <StudioPanel subPath="" embedded />;
+  if (path === "browse") return <StudioPanel />;
   if (path.startsWith("command/")) return <CommandPage subPath={path.slice("command/".length)} />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
-  // "collection" and a kind's name show the item list on its own page.
-  return path === "activity" ? <ActivityPanel /> : <StudioPanel subPath={path} />;
+  if (path === "activity") return <ActivityPanel />;
+  return <ToWorkspace path={path} />;
 }
 
 export default definePluginApp((app) => {
