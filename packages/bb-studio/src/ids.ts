@@ -5,6 +5,9 @@
 /** Realtime channel for the sidebar's tabs; payload `{}`. */
 export const TABS_CHANNEL = "studio-tabs";
 
+/** Realtime channel for agents' commands to one window's workspace; payload a WorkspaceCommand (src/workspace-presence.ts). */
+export const WORKSPACE_CHANNEL = "studio-workspace";
+
 /** Window event that opens or closes Studio search; no detail. */
 export const QUICK_OPEN_EVENT = "bb-studio:quick-open";
 

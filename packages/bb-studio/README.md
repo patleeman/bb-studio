@@ -19,7 +19,8 @@ keeps the item. The workspace remembers the layout locally across visits and
 refreshes. Old list addresses, such as a kind's (`/plugins/studio/studio/page`),
 open the new tab page on that kind.
 Right-click a tab for Close, Close others, Close tabs to the right, Close all in
-the pane, splits, moves to another pane, its own page, and Copy link.
+the pane, splits, moves to another pane, its own page, and Copy link. The tab
+row shows only the item's own tools; Chat and Related aren't offered there.
 Each tab row carries the active item's tools, such as Chat, beside its tabs.
 With one pane, the tab row takes BB's title bar, so the item sits under a
 single bar. Open items live here, not in the sidebar; a Space's Browse menu
@@ -159,7 +160,10 @@ open in the background, so it's as you left it when you come back.
   Studio's settings. Titles come from the fallback model in Studio Decisions.
 - **For agents**: the `studio_list_items`, `studio_list_spaces`,
   `studio_tag_items`, `studio_delete_items`, `studio_space_items` and
-  `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill.
+  `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill. With
+  `studio_workspace`, `studio_open_items` and `studio_close_tabs` an agent sees
+  the tabs you have open in the BB window you're using, opens items beside
+  them, and closes tabs.
 
 ```sh
 bb studio list [query…] [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--space <name>] [--json]

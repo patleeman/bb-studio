@@ -6,8 +6,11 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_Icon: () => null,
   experimental_usePluginId: () => "pages",
   useRpc: () => rpc,
+  useRealtime: (_channel: string, handler: (payload: unknown) => void) => { realtime.handler = handler; },
 }));
-const rpc = { call: async () => ({ tab: null }) };
+const realtime = vi.hoisted(() => ({ handler: (_payload: unknown) => {} }));
+const reports: { method: string; input: any }[] = [];
+const rpc = { call: async (method: string, input: unknown) => { reports.push({ method, input }); return { tab: null }; } };
 import { RetainedPanels, openWorkspaceItem } from "@bb-studio/kit/app";
 import { closeWorkspaceTabs, StudioWorkspace, WorkspaceBridge } from "./Workspace";
 const page = "/plugins/pages/pages/one", other = "/plugins/pages/pages/two";
@@ -77,4 +80,24 @@ it("closes others and the tabs to the right from a tab's context menu", async ()
   expect(titles()).toEqual(["One", "Two"]);
   await menu("Two", "Close others");
   expect(titles()).toEqual(["Two"]);
+});
+
+it("reports its tabs for agents and opens and closes tabs an agent sends to this window", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  closeWorkspaceTabs([page, other, "/plugins/pages/pages/three"]);
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  cleanup = () => { act(() => root.unmount()); host.remove(); };
+  await act(() => root.render(<><WorkspaceBridge /><RetainedPanels path="pages" render={subPath => <textarea aria-label={subPath} />} /><StudioWorkspace /></>));
+  await act(async () => { openWorkspaceItem({ href: page, title: "One" }); await new Promise(resolve => setTimeout(resolve, 350)); });
+  const report = reports.filter(each => each.method === "workspaceReport").at(-1)!.input;
+  expect(report.panes[0].tabs).toEqual([{ href: page, title: "One" }]);
+  expect(report.panes[0].active).toBe(page);
+  // Commands for another window change nothing; this window's split and close.
+  await act(() => { realtime.handler({ client: "elsewhere", action: "open", items: [{ href: other, title: "Two" }], placement: "tab", show: false }); });
+  expect(host.querySelectorAll('[role="tab"]')).toHaveLength(1);
+  await act(() => { realtime.handler({ client: report.client, action: "open", items: [{ href: other, title: "Two" }], placement: "right", show: false }); });
+  expect(host.querySelectorAll("[data-workspace-pane]")).toHaveLength(2);
+  await act(() => { realtime.handler({ client: report.client, action: "close", hrefs: [other] }); });
+  expect([...host.querySelectorAll('[role="tab"]')].map(tab => tab.textContent)).toEqual(["One"]);
 });

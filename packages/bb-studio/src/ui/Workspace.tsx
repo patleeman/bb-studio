@@ -1,9 +1,11 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useRpc } from "@get-bb/plugin-sdk/app";
-import { Icon, StudioBar, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
+import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { Icon, StudioBar, usePathname, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { toast } from "sonner";
 import type { rpcContract } from "../contract";
+import { WORKSPACE_CHANNEL } from "../ids";
+import type { WorkspaceCommand } from "../workspace-presence";
 import { BROWSE, closeTab, emptyWorkspace, mapLayout, openItem, panes, parseWorkspace, type Layout, type Pane, type Tab, type Workspace } from "./workspace-state";
 
 const STORAGE = "bb:studio-workspace:v1";
@@ -36,9 +38,49 @@ function setDragging(next: typeof dragging) { if (next?.source !== dragging?.sou
 const useDragging = () => useSyncExternalStore(listener => { dragListeners.add(listener); return () => { dragListeners.delete(listener); }; }, () => dragging, () => null);
 const BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 
+/** This window, to agents: its workspace reports as it, and takes commands sent to it. */
+const CLIENT = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" && globalThis.isSecureContext ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+const REPORT_DELAY_MS = 300;
+
+/** Applies an agent's command for this window: open items as tabs, or close tabs. */
+function runCommand(value: unknown) {
+  const command = value as Partial<WorkspaceCommand> | null;
+  if (!command || command.client !== CLIENT) return;
+  if (command.action === "close" && Array.isArray(command.hrefs)) return closeWorkspaceTabs(command.hrefs.filter((href): href is string => typeof href === "string"));
+  if (command.action !== "open" || !Array.isArray(command.items)) return;
+  const items: WorkspaceItem[] = command.items.filter(item => typeof item?.href === "string" && canOpenWorkspaceItem(item.href)).map(item => ({ href: item.href, title: typeof item.title === "string" ? item.title : undefined }));
+  // The first item makes the split; the rest join it as tabs.
+  items.forEach((item, index) => update(current => openItem(current, item, index === 0 && (command.placement === "right" || command.placement === "bottom") ? command.placement : "tab")));
+  if (items.length && command.show !== false) openAppPath(WORKSPACE_PATH, { standalone: true });
+}
+
 /** Installed once by Studio; without Studio, add-ons keep their ordinary pages. */
 export function WorkspaceBridge() {
   const rpc = useRpc<typeof rpcContract>();
+  const pathname = usePathname();
+  // Tells Studio what this window has open, so agents can see it.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const send = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const current = snapshot();
+        void rpc.call("workspaceReport", {
+          client: CLIENT,
+          focused: document.hasFocus(),
+          showing: window.location.pathname.replace(/\/+$/, "") === WORKSPACE_PATH,
+          panes: panes(current.layout).map(pane => ({ id: pane.id, focused: pane.id === current.focused, active: pane.active, tabs: pane.tabs.map(tab => ({ href: tab.href, title: tab.title.slice(0, 300) })) })),
+        }).catch(() => {});
+      }, REPORT_DELAY_MS);
+    };
+    send();
+    const unsubscribe = subscribe(send);
+    window.addEventListener("focus", send);
+    window.addEventListener("blur", send);
+    document.addEventListener("visibilitychange", send);
+    return () => { clearTimeout(timer); unsubscribe(); window.removeEventListener("focus", send); window.removeEventListener("blur", send); document.removeEventListener("visibilitychange", send); };
+  }, [rpc, pathname]);
+  useRealtime(WORKSPACE_CHANNEL, runCommand);
   useEffect(() => registerWorkspaceCloser(href => closeWorkspaceTabs([href])), []);
   useEffect(() => {
     const publish = () => { const current = snapshot(); setWorkspaceActive(panes(current.layout).find(pane => pane.id === current.focused)?.active ?? null); };

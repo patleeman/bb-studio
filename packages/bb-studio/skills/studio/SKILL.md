@@ -118,3 +118,18 @@ opens it, and an item opened from it replaces it. Sidebar,
 collection and search opens use the Workspace tabs for participating add-ons. No thread is required. Drag items or tabs onto a tab bar, or
 to an edge to split; the arrangement menu offers split and move actions. Tabs and
 pane sizes restore locally. Closing a tab does not delete its saved item. Conversation-side views keep their existing behavior.
+
+### What the user has open
+
+- `studio_workspace` lists the workspace's panes and tabs in the BB window the
+  user is using, marks the tab in front of each pane and the focused pane, and
+  says whether they're looking at it. Call it when they say "this", "what I'm
+  looking at" or "my tabs" and no item is attached.
+- `studio_open_items` opens items (the links `studio_list_items` shows) as
+  tabs there and brings the workspace on screen. `placement: "right"` or
+  `"down"` splits the focused pane, so a draft can sit beside what they're
+  reading; `show: false` only adds the tabs.
+- `studio_close_tabs` closes tabs by link. The items stay.
+
+Open only what the user asked to see or what you made for them, and close
+only tabs they asked you to close or that you opened.

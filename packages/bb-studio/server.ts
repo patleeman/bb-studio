@@ -30,6 +30,8 @@ import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
+import { formatWorkspace, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
+import { WORKSPACE_CHANNEL } from "./src/ids";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { listFiles, readFile, requireThreadInSpace, worktrees } from "./src/space-files";
 import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
@@ -112,6 +114,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
+  const workspace = new WorkspacePresence();
   const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
   bb.onDispose(() => searchIndex.dispose());
   const contentSearch = async (query: string) => {
@@ -639,6 +642,10 @@ export default async function plugin(bb: BbPluginApi) {
       if (tabs.open(item)) tabsChanged();
       return { tab: tabViews(await tabData()).find((each) => each.pluginId === item.pluginId && each.id === item.id) ?? null };
     },
+    workspaceReport: (report) => {
+      workspace.report(report);
+      return { ok: true };
+    },
     closeTabs: ({ items }) => {
       let closed = false;
       for (const item of items) closed = tabs.close(item) || closed;
@@ -984,6 +991,59 @@ export default async function plugin(bb: BbPluginApi) {
       if (thisThread) lines.push(thisThread === "add" ? "This thread is in the space." : "This thread is out of the space.");
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
       if (items.length) lines.push(...(await moveItemsReport(items, { spaceId: space.id }, `Space ${space.name}`)));
+      return lines.join("\n");
+    },
+  });
+
+  const sendToWorkspace = (command: WorkspaceCommand) => bb.realtime.publish(WORKSPACE_CHANNEL, command);
+  bb.agents.registerTool({
+    name: "studio_workspace",
+    description:
+      "See what the user has open in BB Studio's workspace, the tabbed view of their pages, recordings, drawings and other items: each pane's tabs, which tab is in front, and whether they're looking at it. Use it when the user says \"this\", \"what I'm looking at\" or \"my tabs\". Open or close tabs with studio_open_items and studio_close_tabs.",
+    parameters: z.object({}),
+    async execute() {
+      return formatWorkspace(workspace.current(), Date.now());
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "studio_open_items",
+    description:
+      "Open BB Studio items as tabs in the user's Studio workspace, in the BB window they're using, and show it to them. Pass items as the links studio_list_items shows. Open beside what they're looking at with placement right or down. Only open what the user asked to see, or what you made for them to look at.",
+    parameters: z.object({
+      items: z.array(z.string().max(500)).min(1).max(20).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
+      placement: z.enum(["tab", "right", "down"]).optional().describe("tab (default) adds tabs to the focused pane; right or down splits it and opens them there"),
+      show: z.boolean().optional().describe("Bring the workspace on screen (default true); false only adds the tabs"),
+    }),
+    async execute({ items: refs, placement = "tab", show = true }) {
+      const current = workspace.current();
+      if (!current) return "No BB window has Studio's workspace, so nothing was opened. The user may not have BB open.";
+      const { found, missing } = await resolveItems(refs);
+      const { items } = await hub.overview();
+      const opened = found.flatMap((ref) => items.filter((item) => item.pluginId === ref.pluginId && item.id === ref.id)).map((item) => ({ href: item.href, title: untitled(item.title) }));
+      if (opened.length) sendToWorkspace({ client: current.client, action: "open", items: opened, placement: placement === "down" ? "bottom" : placement, show });
+      const lines = opened.length ? [`Opened ${opened.map((item) => item.title).join(", ")} in the user's Studio workspace${placement === "tab" ? "" : `, split ${placement}`}.`] : [];
+      if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
+      return lines.join("\n") || "Nothing to open.";
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "studio_close_tabs",
+    description:
+      "Close tabs in the user's Studio workspace. Closing a tab keeps the item. Pass the links studio_workspace shows. Close only tabs the user asked to close, or ones you opened for them.",
+    parameters: z.object({
+      items: z.array(z.string().max(2000)).min(1).max(100).describe("Tab links, e.g. /plugins/pages/pages/pg_x"),
+    }),
+    async execute({ items: hrefs }) {
+      const current = workspace.current();
+      if (!current) return "No BB window has Studio's workspace open.";
+      const open = new Set(current.panes.flatMap((pane) => pane.tabs.map((tab) => tab.href)));
+      const closing = hrefs.map((href) => href.trim()).filter((href) => open.has(href));
+      const notOpen = hrefs.filter((href) => !open.has(href.trim()));
+      if (closing.length) sendToWorkspace({ client: current.client, action: "close", hrefs: closing });
+      const lines = closing.length ? [`Closed ${closing.length} tab${closing.length === 1 ? "" : "s"}.`] : [];
+      if (notOpen.length) lines.push(`Not open: ${notOpen.join(", ")}`);
       return lines.join("\n");
     },
   });

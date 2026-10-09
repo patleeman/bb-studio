@@ -8,7 +8,7 @@ A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accep
 
 A kind can set `hasOwnChat: true` when it owns its conversation UI. Studio Chat then skips automatic chat discovery for that kind, while explicit item mentions remain available. Its header can pass `chatAction` to `ItemHeader` to supply its primary Chat button, or `null` to omit one. Wrap its nav panel with `retainPanel` and render `RetainedPanels` for the same path from an `experimental_appOverlay`, so an editor stays alive when the user navigates away and back.
 
-The shared item header keeps Chat visible in compact panes and gathers secondary controls under **Item actions**. It measures its own pane, so phone screens and narrow splits behave the same way. Closing the disclosure or widening the pane keeps its controls mounted and preserves their state. Related items use a popover that stays within the viewport. Its links are ordinary Studio item and thread links: they open in the main view, or in a split with ⌘/Ctrl-click, and right-click gives the shared item menu.
+The shared item header keeps Chat visible in compact panes and gathers secondary controls under **Item actions**. It measures its own pane, so phone screens and narrow splits behave the same way. Closing the disclosure or widening the pane keeps its controls mounted and preserves their state. In a workspace tab row it shows only the view's own tools: no Chat and no Open in split, since the workspace splits tabs itself.
 
 | Method | Input | Output |
 |---|---|---|
@@ -94,3 +94,13 @@ React tree into the destination, preserving SDK identity and editor state. Studi
 owns only the layout. Missing providers show an unavailable state; without Studio's
 workspace opener, navigation falls back to the add-on's ordinary page. The existing
 BB tab bars, thread panes and split drop targets are unchanged.
+
+### Agents and the workspace
+
+Each BB window's `WorkspaceBridge` reports its panes and tabs to Studio's
+server (`workspaceReport`, kept in memory by `src/workspace-presence.ts`) when
+they change and when the window gains or loses focus. `studio_workspace`
+formats the report of the focused window, else the last to report.
+`studio_open_items` and `studio_close_tabs` publish a command on the
+`studio-workspace` realtime channel addressed to that window, which opens or
+closes the tabs; other windows ignore it.

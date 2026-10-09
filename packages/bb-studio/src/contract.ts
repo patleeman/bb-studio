@@ -326,6 +326,21 @@ export const rpcContract = defineRpcContract({
   /** Opens a tab for the item whose view is at `path`, if any. */
   visitTab: { input: z.object({ path: z.string().min(1).max(2000) }), output: z.object({ tab: tab.nullable() }) },
   closeTabs: { input: z.object({ items: z.array(itemRef).min(1).max(100) }), output: z.object({ ok: z.boolean() }) },
+  /** A window's workspace, so agents can see what the user has open (src/workspace-presence.ts). */
+  workspaceReport: {
+    input: z.object({
+      client: z.string().min(1).max(100),
+      focused: z.boolean(),
+      showing: z.boolean(),
+      panes: z.array(z.object({
+        id: z.string().min(1).max(100),
+        focused: z.boolean(),
+        active: z.string().max(2000).nullable(),
+        tabs: z.array(z.object({ href: z.string().min(1).max(2000), title: z.string().max(300) })).max(100),
+      })).max(8),
+    }),
+    output: z.object({ ok: z.boolean() }),
+  },
   /** Pins or unpins an item's tab; pinning opens it if it isn't open. */
   pinTab: { input: z.object({ pluginId, id: z.string().min(1).max(200), pinned: z.boolean() }), output: z.object({ ok: z.boolean() }) },
   setSidebar: { input: z.object({ visible: z.boolean() }), output: sidebar },
