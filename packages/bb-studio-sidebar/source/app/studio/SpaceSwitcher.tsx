@@ -106,6 +106,15 @@ export function useFillSidebar(element: RefObject<HTMLElement | null>): void {
 }
 
 /** A Space's emoji, or a dot in its colour. */
+/** A Space heading's mark: its emoji or colour dot on a small tinted square. */
+export function SpaceHeadingMark({ space }: { space: StudioSpace }) {
+  return (
+    <span aria-hidden="true" className="mr-1 grid size-6 shrink-0 place-items-center rounded-md bg-sidebar-accent ring-1 ring-sidebar-border/60">
+      <SpaceMark space={space} size="md" />
+    </span>
+  );
+}
+
 export function SpaceMark({ space, size = "sm" }: { space: StudioSpace; size?: "sm" | "md" }) {
   return (
     <span data-sidebar-space-mark="" aria-hidden="true" className="inline-flex size-4 shrink-0 items-center justify-center">

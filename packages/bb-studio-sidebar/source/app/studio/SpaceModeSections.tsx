@@ -69,7 +69,7 @@ import {
   ALL_SPACES,
   neighbourSpaceId,
   openSpaceDialog,
-  SpaceMark,
+  SpaceHeadingMark,
   SpaceSwitcher,
   useFillSidebar,
   useSpaceSwitchGestures,
@@ -397,15 +397,16 @@ export function SpaceModeSections({
       <div ref={area} data-sidebar-space-area="" className="flex min-w-0 flex-col">
         <ThreadListVisibility groups={[]} order={[]} onOrderChange={noop} label="Spaces" selectedThreadId={selectedThreadId}>
           <SortableContext items={order} strategy={verticalListSortingStrategy}>
-            <div className="space-y-4">
+            <div className="space-y-7">
             {chiefThreads.length ? (
-              <section data-chief-of-staff={chiefId ?? undefined} aria-label="Chief of Staff" className="mt-2">
-                {/* Labelled like a Space heading, so it reads as its own section above them. */}
-                <div className="flex items-center gap-1.5 px-2 pb-1 text-[13px] font-semibold text-sidebar-foreground">
-                  <Icon name="UserRound" aria-hidden="true" className="size-3.5" />
-                  Chief of Staff
+              <section data-chief-of-staff={chiefId ?? undefined} aria-label="Chief of Staff" className="mt-2 flex items-start gap-1 pl-1.5">
+                {/* One larger row with an avatar: your assistant, above the Spaces rather than another section. */}
+                <span aria-hidden="true" className="mt-1.5 grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30">
+                  <Icon name="UserRound" className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1 [&_[data-sidebar-rename-anchor]]:text-[14px] [&_[data-sidebar-rename-anchor]]:font-semibold">
+                  {tree({ rootItems: chiefItems, threads: chiefThreads })}
                 </div>
-                {tree({ rootItems: chiefItems, threads: chiefThreads })}
               </section>
             ) : null}
             {order.map((sectionId) => {
@@ -505,11 +506,11 @@ function SpaceDndScope({ threadDnd, children }: { threadDnd: SectionThreadDndSta
   );
 }
 
-/** A Space section, ruled off above, its heading a drop target for threads moving in. */
+/** A Space section, its heading a drop target for threads moving in. */
 function SpaceDropArea({ spaceId, children }: { spaceId: string; children: ReactNode }) {
   const { setNodeRef } = useDroppable({ id: spaceHeadingDropId(spaceId) });
-  // A rule above each Space sets it apart from the one before.
-  return <div ref={setNodeRef} data-space-drop={spaceId} className="border-t border-sidebar-border pt-2">{children}</div>;
+  // Whitespace between Spaces (space-y above) and a larger heading set each one apart; no rules or boxes.
+  return <div ref={setNodeRef} data-space-drop={spaceId} className="[&_[data-sidebar-sticky-tier=label]]:text-[14px]">{children}</div>;
 }
 
 const COMMAND_PLUGIN_ID = "studio";
@@ -609,10 +610,10 @@ function SpaceSidebarSection({
       label={space.name}
       labelMark={needsYou ? (
         <span className="relative inline-flex">
-          <SpaceMark space={space} />
-          <span data-space-needs-you="" role="img" aria-label="Needs you" className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-warning" />
+          <SpaceHeadingMark space={space} />
+          <span data-space-needs-you="" role="img" aria-label="Needs you" className="absolute -top-0.5 right-0.5 size-2 rounded-full bg-warning ring-2 ring-sidebar" />
         </span>
-      ) : <SpaceMark space={space} />}
+      ) : <SpaceHeadingMark space={space} />}
       collapseControl={collapse}
       disabled
       dropParentKey={sectionId}
