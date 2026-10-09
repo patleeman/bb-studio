@@ -41,6 +41,10 @@ const BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rounded-
 /** This window, to agents: its workspace reports as it, and takes commands sent to it. */
 const CLIENT = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" && globalThis.isSecureContext ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 const REPORT_DELAY_MS = 300;
+/** While visible, a window re-reports this often, so a closed window's report goes stale. */
+const HEARTBEAT_MS = 30_000;
+/** Reports this window's workspace soon; the bridge sets it. */
+let reportSoon = () => {};
 
 /** Applies an agent's command for this window: open items as tabs, or close tabs. */
 function runCommand(value: unknown) {
@@ -49,9 +53,14 @@ function runCommand(value: unknown) {
   if (command.action === "close" && Array.isArray(command.hrefs)) return closeWorkspaceTabs(command.hrefs.filter((href): href is string => typeof href === "string"));
   if (command.action !== "open" || !Array.isArray(command.items)) return;
   const items: WorkspaceItem[] = command.items.filter(item => typeof item?.href === "string" && canOpenWorkspaceItem(item.href)).map(item => ({ href: item.href, title: typeof item.title === "string" ? item.title : undefined }));
-  // The first item makes the split; the rest join it as tabs.
-  items.forEach((item, index) => update(current => openItem(current, item, index === 0 && (command.placement === "right" || command.placement === "bottom") ? command.placement : "tab")));
+  // The first item makes the split, or lands where it's already open; the
+  // rest join that pane, even if they're open elsewhere.
+  items.forEach((item, index) => update(current => index === 0
+    ? openItem(current, item, command.placement === "right" || command.placement === "bottom" ? command.placement : "tab")
+    : openItem(current, item, "tab", current.focused)));
   if (items.length && command.show !== false) openAppPath(WORKSPACE_PATH, { standalone: true });
+  // A command that changed nothing still answers, so the agent hears back.
+  reportSoon();
 }
 
 /** Installed once by Studio; without Studio, add-ons keep their ordinary pages. */
@@ -61,24 +70,31 @@ export function WorkspaceBridge() {
   // Tells Studio what this window has open, so agents can see it.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const send = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const current = snapshot();
-        void rpc.call("workspaceReport", {
-          client: CLIENT,
-          focused: document.hasFocus(),
-          showing: window.location.pathname.replace(/\/+$/, "") === WORKSPACE_PATH,
-          panes: panes(current.layout).map(pane => ({ id: pane.id, focused: pane.id === current.focused, active: pane.active, tabs: pane.tabs.map(tab => ({ href: tab.href, title: tab.title.slice(0, 300) })) })),
-        }).catch(() => {});
-      }, REPORT_DELAY_MS);
+    const report = (focused: boolean) => {
+      const current = snapshot();
+      void rpc.call("workspaceReport", {
+        client: CLIENT,
+        focused,
+        showing: window.location.pathname.replace(/\/+$/, "") === WORKSPACE_PATH,
+        panes: panes(current.layout).map(pane => ({ id: pane.id, focused: pane.id === current.focused, active: pane.active, tabs: pane.tabs.map(tab => ({ href: tab.href, title: tab.title.slice(0, 300) })) })),
+      }).catch(() => {});
     };
+    const send = () => { clearTimeout(timer); timer = setTimeout(() => report(document.hasFocus()), REPORT_DELAY_MS); };
+    // Best effort as the window goes, so agents stop sending it commands.
+    const leaving = () => { clearTimeout(timer); report(false); };
+    const heartbeat = setInterval(() => { if (document.visibilityState === "visible") send(); }, HEARTBEAT_MS);
+    reportSoon = send;
     send();
     const unsubscribe = subscribe(send);
     window.addEventListener("focus", send);
     window.addEventListener("blur", send);
+    window.addEventListener("pagehide", leaving);
     document.addEventListener("visibilitychange", send);
-    return () => { clearTimeout(timer); unsubscribe(); window.removeEventListener("focus", send); window.removeEventListener("blur", send); document.removeEventListener("visibilitychange", send); };
+    return () => {
+      clearTimeout(timer); clearInterval(heartbeat); unsubscribe();
+      if (reportSoon === send) reportSoon = () => {};
+      window.removeEventListener("focus", send); window.removeEventListener("blur", send); window.removeEventListener("pagehide", leaving); document.removeEventListener("visibilitychange", send);
+    };
   }, [rpc, pathname]);
   useRealtime(WORKSPACE_CHANNEL, runCommand);
   useEffect(() => registerWorkspaceCloser(href => closeWorkspaceTabs([href])), []);
@@ -288,7 +304,7 @@ export function StudioWorkspace() {
   }, []);
   return <div data-studio-workspace="" className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     {/* The tab names what a view's breadcrumb would, so tab rows leave it out. */}
-    <style>{'[data-studio-workspace-bar] nav[aria-label="Breadcrumb"] { display: none; }'}</style>
+    <style>{'[data-studio-workspace-bar] nav[aria-label="Breadcrumb"]:not([data-studio-item-crumbs]) { display: none; }'}</style>
     {compact && panes(workspace.layout).length > 1 && <label className="flex items-center gap-2 border-b px-3 py-2 text-sm">Pane<select aria-label="Studio pane" className="min-w-0 flex-1 rounded border bg-background p-1" value={workspace.focused} onChange={event => update(current => ({ ...current, focused: event.target.value }))}>{panes(workspace.layout).map((pane, index) => <option key={pane.id} value={pane.id}>{index + 1}. {pane.tabs.find(tab => tab.href === pane.active)?.title ?? "Empty pane"}</option>)}</select></label>}
     <LayoutView node={workspace.layout} root={workspace.layout} focused={workspace.focused} compact={compact} instance={instance} />
   </div>;

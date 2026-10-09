@@ -251,8 +251,9 @@ export function ItemHeader({
   useLayoutEffect(() => slot ? markTitleBar(slot) : undefined, [slot]);
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
   useLayoutEffect(() => {
-    // A workspace slot sits beside the tabs, so the pane's width decides.
-    const pane = slot?.closest<HTMLElement>("[data-workspace-pane]");
+    // A workspace slot sits beside the tabs, so the pane's width decides; the
+    // view's own place finds it when a single pane's row is in BB's title bar.
+    const pane = slot?.hasAttribute("data-studio-workspace-bar") ? anchor.current?.closest<HTMLElement>("[data-workspace-pane]") ?? slot.closest<HTMLElement>("[data-workspace-pane]") : null;
     const measured = pane ?? slot ?? anchor.current;
     const measure = () => setCompact((measured?.getBoundingClientRect().width || window.innerWidth) < (pane ? 480 : 520));
     measure();
@@ -277,10 +278,11 @@ export function ItemHeader({
   const tools = splitHere || trailing;
   const bar = (
     <div data-studio-bar="" data-studio-item-header="" className="flex h-full min-w-0 flex-1 items-center gap-2">
-      {/* In the workspace the tab names the item. */}
-      <nav aria-label="Breadcrumb" hidden={!!slot?.hasAttribute("data-studio-workspace-bar")} className="flex min-w-0 flex-1 items-center gap-0.5">
-        <BarCrumb onClick={onBack} title={`Back to ${backLabel}`}>{backLabel}</BarCrumb>
-        {leading ? <BarSeparator /> : null}
+      {/* In the workspace a tab has nowhere to go back to; the view's own crumbs,
+          renames and status stay. */}
+      <nav aria-label="Breadcrumb" data-studio-item-crumbs="" className="flex min-w-0 flex-1 items-center gap-0.5">
+        {inWorkspace ? null : <BarCrumb onClick={onBack} title={`Back to ${backLabel}`}>{backLabel}</BarCrumb>}
+        {leading && !inWorkspace ? <BarSeparator /> : null}
         {leading}
       </nav>
       {!inWorkspace && chatAction !== null && (chatAction || thread || relatedRef) || tools ? <div className="flex shrink-0 items-center gap-0.5">

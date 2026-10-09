@@ -182,6 +182,8 @@ it("uses its workspace tab's slot in the tab row, never the app's slot", async (
   expect(pane.querySelector(":scope > header")!.textContent).toBe("");
   const bar = pane.querySelector("[data-studio-workspace-bar]")!;
   expect(bar.textContent).toContain("Page tools");
-  expect(bar.querySelector("nav")!.hidden).toBe(true);
+  // No way back from a tab; the view's own crumbs stay.
+  expect(bar.querySelector('[title="Back to Studio"]')).toBeNull();
+  expect(bar.querySelector("nav")!.textContent).toBe("Release notes");
   await act(async () => root.unmount()); pane.remove();
 });
