@@ -619,10 +619,12 @@ index 0915245..4fef2e5 100644
 +    value.startsWith("machine:") ||
 +    value.startsWith("space:")
 diff --git a/source/app/model/thread-activity.ts b/source/app/model/thread-activity.ts
-index d7acf98..51e80d8 100644
+index d7acf98..7810528 100644
 --- a/source/app/model/thread-activity.ts
 +++ b/source/app/model/thread-activity.ts
-@@ -269,0 +270,15 @@ export function isUnreadDoneThread(thread: ThreadStatusShape): boolean {
+@@ -18 +17,0 @@ const RUNNING_RUNTIME_STATUSES: Record<
+-  "host-reconnecting": true,
+@@ -269,0 +269,15 @@ export function isUnreadDoneThread(thread: ThreadStatusShape): boolean {
 +
 +export type ThreadAttentionState = "needs-you" | "working" | "error" | "unread" | "idle";
 +
