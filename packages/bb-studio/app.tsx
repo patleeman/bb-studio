@@ -25,17 +25,23 @@ import { SetupPage } from "./src/ui/setup/SetupPage";
 /**
  * An old address that showed the item list (`collection`, a kind such as
  * `page`) or the workspace: the workspace, with the list as a new tab
- * except for `workspace`. Retained, so it checks each time it's shown.
+ * except for `workspace`. Retained, so it checks each time it's shown. In a
+ * pane of its own, such as a restored BB split, it offers the move instead.
  */
 function ToWorkspace({ path }: { path: string }) {
   const pathname = usePathname();
-  useEffect(() => {
-    // Either side may be percent-encoded; compare them decoded.
-    if (decodeSegment(pathname.replace(/\/+$/, "")) !== decodeSegment(`${WORKSPACE_PATH}/${path}`)) return;
+  const go = (replace: boolean) => {
     if (path !== "workspace") openCollection(path === "collection" ? null : decodeSegment(path));
-    openAppPath(WORKSPACE_PATH, { standalone: true, replace: true });
-  }, [pathname, path]);
-  return null;
+    openAppPath(WORKSPACE_PATH, { standalone: true, replace });
+  };
+  // Either side may be percent-encoded; compare them decoded.
+  const here = decodeSegment(pathname.replace(/\/+$/, "")) === decodeSegment(`${WORKSPACE_PATH}/${path}`);
+  useEffect(() => { if (here) go(true); }, [here]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (here) return null;
+  return <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+    <p>Studio's item list now opens as a new tab in Studio.</p>
+    <button type="button" className="rounded-md border px-3 py-1.5 text-foreground hover:bg-state-hover" onClick={() => go(false)}>Open in Studio</button>
+  </div>;
 }
 
 /** A path segment, or "" for a malformed one like `100%`. */
