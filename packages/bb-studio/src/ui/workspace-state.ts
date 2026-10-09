@@ -1,5 +1,6 @@
 import { workspaceItemPath, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
-export interface Tab { href: string; title: string }
+/** `icon` is the item's emoji, else `kindIcon` names its kind's icon; both arrive once the item is visited. */
+export interface Tab { href: string; title: string; icon?: string | null; kindIcon?: string }
 export interface Pane { kind: "pane"; id: string; tabs: Tab[]; active: string | null }
 export interface Split { kind: "split"; id: string; axis: "row" | "column"; ratio: number; first: Layout; second: Layout }
 export type Layout = Pane | Split;
@@ -31,7 +32,8 @@ export function openItem(state: Workspace, item: WorkspaceItem, placement: Works
   const href = workspaceItemPath(item.href);
   if (!href) return state;
   const existing = panes(state.layout).find(pane => pane.tabs.some(tab => tab.href === href));
-  const tab: Tab = { href, title: item.title || existing?.tabs.find(tab => tab.href === href)?.title || href.split("/").pop()!.replace(/_/g, " ") };
+  const previous = existing?.tabs.find(tab => tab.href === href);
+  const tab: Tab = { ...previous, href, title: item.title || previous?.title || href.split("/").pop()!.replace(/_/g, " ") };
   // Ordinary opening deduplicates; an explicit destination moves/reorders.
   if (existing && placement === "tab" && destination === undefined) {
     return { focused: existing.id, layout: mapLayout(state.layout, node => node.kind === "pane" && node.id === existing.id ? { ...node, active: href, tabs: node.tabs.map(each => each.href === href ? tab : each) } : node) };
@@ -79,7 +81,7 @@ export function parseWorkspace(value: unknown): Workspace {
       if (typeof tab?.href !== "string" || typeof tab.title !== "string") continue;
       const href = workspaceItemPath(tab.href);
       if (!href || seen.has(href)) continue;
-      seen.add(href); tabs.push({ href, title: tab.title.slice(0, 300) });
+      seen.add(href); tabs.push({ href, title: tab.title.slice(0, 300), ...(typeof tab.icon === "string" && tab.icon.length <= 16 ? { icon: tab.icon } : {}), ...(typeof tab.kindIcon === "string" && tab.kindIcon.length <= 64 ? { kindIcon: tab.kindIcon } : {}) });
     }
     return { kind: "pane", id: value.id, tabs, active: tabs.some(tab => tab.href === value.active) ? value.active : tabs[0]?.href ?? null };
   }

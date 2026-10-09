@@ -22,7 +22,7 @@ export const useWorkspace = () => useSyncExternalStore(subscribe, snapshot, snap
 export function closeWorkspaceTabs(hrefs: readonly string[]) {
   update(current => hrefs.reduce((next, href) => closeTab(next, href), current));
 }
-const BUTTON = "inline-flex size-8 shrink-0 items-center justify-center rounded hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+const BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 
 /** Installed once by Studio; without Studio, add-ons keep their ordinary pages. */
 export function WorkspaceBridge() {
@@ -39,7 +39,7 @@ export function WorkspaceBridge() {
     // The server's item title takes precedence over IDs and stale link labels.
     void rpc.call("visitTab", { path: item.href }).then(({ tab }) => {
       if (!tab) return;
-      update(current => ({ ...current, layout: mapLayout(current.layout, node => node.kind === "pane" ? { ...node, tabs: node.tabs.map(each => each.href === item.href ? { ...each, title: tab.title } : each) } : node) }));
+      update(current => ({ ...current, layout: mapLayout(current.layout, node => node.kind === "pane" ? { ...node, tabs: node.tabs.map(each => each.href === item.href ? { ...each, title: tab.title, icon: tab.icon, kindIcon: tab.kindIcon } : each) } : node) }));
     }, () => {});
   }), [rpc]);
   useEffect(() => {
@@ -125,21 +125,24 @@ function TabPane({ pane, focused, instance }: { pane: Pane; focused: string; ins
     return () => { element.removeEventListener("pointerdown", focus, true); body.removeEventListener("dragover", over, true); body.removeEventListener("drop", receive, true); body.removeEventListener("dragleave", leave); document.removeEventListener("dragend", end); };
   }, [pane.id]);
   return <section ref={paneElement} aria-label="Studio pane" data-workspace-pane={pane.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-    <div className={`flex min-h-9 shrink-0 items-center border-b ${focused === pane.id ? "bg-state-hover" : "bg-background"}`}
+    <div className="flex h-10 shrink-0 items-center gap-1 border-b bg-background pl-1.5 pr-1"
       onDragOver={event => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); } }}
       onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab"); } }}>
-      <div role="tablist" aria-label="Studio items" className="flex min-w-0 flex-1 overflow-x-auto">
-        {pane.tabs.map((tab, index) => <div key={tab.href} className="flex shrink-0 items-center border-r" data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; }}
+      <div role="tablist" aria-label="Studio items" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+        {pane.tabs.map((tab, index) => <div key={tab.href} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; }}
           onDragOver={event => { if (accepts(event)) event.preventDefault(); }}
           onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab", tab.href); } }}>
           <button role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${instance}-${pane.id}-${index}`} id={`tab-${instance}-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
-            className={`h-9 max-w-52 truncate px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${pane.active === tab.href ? "bg-background text-foreground" : "text-muted-foreground hover:bg-state-hover"}`}
+            className="flex h-full min-w-0 items-center gap-1.5 rounded-md pl-2 pr-0.5 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
             onClick={() => select(pane.id, tab.href)} onKeyDown={event => {
               const next = event.key === "ArrowRight" ? (index + 1) % pane.tabs.length : event.key === "ArrowLeft" ? (index + pane.tabs.length - 1) % pane.tabs.length : event.key === "Home" ? 0 : event.key === "End" ? pane.tabs.length - 1 : null;
               if (next !== null) { event.preventDefault(); select(pane.id, pane.tabs[next]!.href); document.getElementById(`tab-${instance}-${pane.id}-${next}`)?.focus(); }
               if (event.key === "Delete") { event.preventDefault(); update(current => closeTab(current, tab.href)); }
-            }}>{tab.title}</button>
-          <button className={BUTTON} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3.5" /></button>
+            }}>
+            {tab.icon ? <span aria-hidden className="w-3.5 shrink-0 text-center text-xs leading-none">{tab.icon}</span> : <Icon name={tab.kindIcon ?? "File"} className="size-3.5 shrink-0 opacity-70" />}
+            <span className="truncate">{tab.title}</span>
+          </button>
+          <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
         </div>)}
       </div>
       <button className={BUTTON} aria-label="Browse Studio items" title="Browse Studio items" onClick={() => openAppPath(studioPath("collection"))}><Icon name="Plus" className="size-4" /></button>
@@ -163,7 +166,7 @@ function LayoutView({ node, focused, compact, instance }: { node: Layout; focuse
   return <div ref={container} className="flex h-full min-h-0 min-w-0 flex-1" style={{ flexDirection: node.axis }}>
     <div className="flex min-h-0 min-w-0" style={{ flex: compact ? "1 1 0%" : `${node.ratio} 1 0%`, display: compact && !panes(node.first).some(pane => pane.id === focused) ? "none" : undefined }}><LayoutView node={node.first} focused={focused} compact={compact} instance={instance} /></div>
     <div hidden={compact} style={{ display: compact ? "none" : undefined }} role="separator" aria-label="Resize Studio panes" aria-orientation={node.axis === "row" ? "vertical" : "horizontal"} aria-valuenow={Math.round(node.ratio * 100)} aria-valuemin={20} aria-valuemax={80} tabIndex={0}
-      className={`shrink-0 touch-none bg-border hover:bg-primary focus:bg-primary ${node.axis === "row" ? "w-1 cursor-col-resize" : "h-1 cursor-row-resize"}`}
+      className={`relative z-10 shrink-0 touch-none bg-border transition-colors after:absolute after:content-[''] hover:bg-primary focus:bg-primary focus:outline-none ${node.axis === "row" ? "w-px cursor-col-resize after:inset-y-0 after:-inset-x-1" : "h-px cursor-row-resize after:inset-x-0 after:-inset-y-1"}`}
       onKeyDown={event => { if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(event.key)) { event.preventDefault(); resize(node.ratio + (["ArrowLeft", "ArrowUp"].includes(event.key) ? -.05 : .05)); } }}
       onPointerDown={event => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={event => { if (!event.currentTarget.hasPointerCapture(event.pointerId) || !container.current) return; const rect = container.current.getBoundingClientRect(); resize(node.axis === "row" ? (event.clientX - rect.left) / rect.width : (event.clientY - rect.top) / rect.height); }} onPointerUp={event => event.currentTarget.releasePointerCapture(event.pointerId)} />
     <div className="flex min-h-0 min-w-0" style={{ flex: compact ? "1 1 0%" : `${1 - node.ratio} 1 0%`, display: compact && !panes(node.second).some(pane => pane.id === focused) ? "none" : undefined }}><LayoutView node={node.second} focused={focused} compact={compact} instance={instance} /></div>
