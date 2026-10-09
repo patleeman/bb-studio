@@ -227,6 +227,16 @@ export function WorkspaceView({ id, backLabel, onBack, compact = false }: {
           </>
         }
       />}
+      {/* Without the bar, sharing still has to be visible and easy to stop. */}
+      {compact && workspace.share ? (
+        <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
+          <Icon name="Eye" className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">Agents can see your open file, selection and errors.</span>
+          <button type="button" className="shrink-0 rounded px-1.5 py-0.5 font-medium text-foreground hover:bg-state-hover" onClick={() => void update({ share: false })}>
+            Stop sharing
+          </button>
+        </div>
+      ) : null}
       {showFolders && !compact && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
       <div ref={body} className="relative min-h-0 flex-1">
         {!embed ? (
