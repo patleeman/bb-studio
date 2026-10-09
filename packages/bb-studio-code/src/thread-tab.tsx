@@ -15,14 +15,22 @@ function Opened({ onChange, children }: { onChange(open: boolean): void; childre
 }
 
 export function ThreadCodePanel({ threadId, params }: { threadId: string; params: JsonValue | null }) {
-  const asked = params && typeof params === "object" && !Array.isArray(params) && typeof params.workspaceId === "string" ? params.workspaceId : null;
+  const fields = params && typeof params === "object" && !Array.isArray(params) ? params : null;
+  const asked = typeof fields?.workspaceId === "string" ? fields.workspaceId : null;
+  // Each open from the header is a new request, even for the same workspace.
+  const at = typeof fields?.at === "number" ? fields.at : null;
   const rpc = useRpc<CodeContract>();
   const [openId, setOpenId] = useState<string | null>(asked);
   const [listing, setListing] = useState(false);
   const [error, setError] = useState("");
   // A workspace opened from the list takes the whole tab: the note goes.
   const [itemOpen, setItemOpen] = useState(false);
-  useEffect(() => { if (asked) { setOpenId(asked); setListing(false); } }, [asked]);
+  useEffect(() => {
+    if (!asked && at === null) return;
+    setOpenId(asked);
+    setListing(false);
+    setError("");
+  }, [asked, at]);
   useEffect(() => {
     if (openId || listing) return;
     let live = true;

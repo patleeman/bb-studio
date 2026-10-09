@@ -28,8 +28,9 @@ export function ThreadCodeChip({ threadId }: PluginThreadHeaderActionProps) {
     if (message?.type !== "thread" || message.threadId === threadId) load();
   });
   const open = useCallback(() => {
-    const params = chip?.workspaceId ? { workspaceId: chip.workspaceId } : null;
-    if (!navigate.openThreadPanel({ actionId: CODE_TAB, title: "VS Code", ...(params ? { params } : {}) }) && chip?.workspaceId)
+    // `at` makes an open tab come back from its workspace list to this thread's worktree.
+    const params = { ...(chip?.workspaceId ? { workspaceId: chip.workspaceId } : {}), at: Date.now() };
+    if (!navigate.openThreadPanel({ actionId: CODE_TAB, title: "VS Code", params }) && chip?.workspaceId)
       navigate.toPluginPanel(PANEL_PATH, { subPath: chip.workspaceId });
   }, [chip, navigate]);
   const spaceMenu = useSpaceMenu(threadId);
