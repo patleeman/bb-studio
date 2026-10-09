@@ -2,9 +2,9 @@ import Foundation
 
 // MARK: Chief of Staff
 
-/// Studio's Chief of Staff slot: one thread above every Space that the app,
-/// widgets, Siri and the watch all go to first. It starts empty and is never
-/// filled in from a Space's lead.
+/// Studio's Chief of Staff: the lead of the default Space (the top level), which
+/// the app, widgets, Siri and the watch all go to first. It starts empty. The
+/// `chief_of_staff` calls are Studio's view of that Space's lead.
 extension BBClient {
     /// Nil when no Chief of Staff is set, or when Studio is absent or too old to
     /// know `chief_of_staff`. Remembers the last answer per server so widgets can
