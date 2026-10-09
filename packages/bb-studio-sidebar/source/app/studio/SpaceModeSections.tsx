@@ -389,7 +389,7 @@ export function SpaceModeSections({
             {pinnedChief?.lead ? (
               <section data-chief-of-staff={pinnedChief.lead.id} aria-label="Chief of Staff">
                 {/* The top level's lead stays on top of every Space; its row's mark is an avatar. */}
-                {tree({ rootItems: pinnedChief.leadItems, threads: pinnedChief.leadThreads })}
+                {tree({ rootItems: pinnedChief.leadItems, threads: pinnedChief.leadThreads, dndParentKey: pinnedChief.sectionId })}
               </section>
             ) : null}
             {order.map((sectionId) => {
@@ -423,7 +423,8 @@ export function SpaceModeSections({
                   <SpaceStudioList spaceName={group.space.name} items={items[group.space.id]} />
                   {group.lead ? (
                     <div data-space-lead={group.lead.id} {...(group.space.isDefault ? { "data-chief-of-staff": group.lead.id } : {})}>
-                      {tree({ rootItems: group.leadItems, threads: group.leadThreads })}
+                      {/* Takes drops, so a thread dragged onto the lead nests under it as its worker. */}
+                      {tree({ rootItems: group.leadItems, threads: group.leadThreads, dndParentKey: sectionId })}
                     </div>
                   ) : null}
                   {group.pinned.length ? (
