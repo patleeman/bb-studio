@@ -7,6 +7,7 @@ import { BAR_BUTTON } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { WorkspaceView } from "./panel";
 import type { CodeContract } from "./shared";
+import { needsWorktree, tabView } from "./thread-tab-plan";
 
 export function ThreadCodePanel({ threadId, params }: { threadId: string; params: JsonValue | null }) {
   const fields = params && typeof params === "object" && !Array.isArray(params) ? params : null;
@@ -19,7 +20,9 @@ export function ThreadCodePanel({ threadId, params }: { threadId: string; params
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => setOpenId(asked), [asked, at]);
+  const lookup = needsWorktree(openId);
   useEffect(() => {
+    if (!lookup) return;
     let live = true;
     setError("");
     rpc.call("forThread", { threadId }).then(
@@ -27,14 +30,14 @@ export function ThreadCodePanel({ threadId, params }: { threadId: string; params
       (cause) => { if (live) setError(errorMessage(cause)); },
     );
     return () => { live = false; };
-  }, [rpc, threadId, attempt]);
+  }, [rpc, threadId, attempt, lookup]);
 
-  const shown = openId ?? worktreeId;
-  if (shown) return <WorkspaceView key={shown} id={shown} />;
-  if (error)
+  const view = tabView({ openId, worktreeId, error });
+  if (view.kind === "workspace") return <WorkspaceView key={view.id} id={view.id} />;
+  if (view.kind === "error")
     return (
       <div className="flex flex-col items-start gap-2 p-4 text-sm text-muted-foreground">
-        <p role="alert">{error}</p>
+        <p role="alert">{view.message}</p>
         <button type="button" className={BAR_BUTTON} onClick={() => setAttempt((n) => n + 1)}>Try again</button>
       </div>
     );
