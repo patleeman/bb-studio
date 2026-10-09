@@ -183,7 +183,9 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
     <div data-studio-workspace-tabs="" className={`flex shrink-0 items-center gap-1 ${titleBar ? "h-full min-w-0 flex-1" : "h-10 border-b bg-background pl-1.5 pr-1"}`}
       onDragOver={event => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); } }}
       onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab"); } }}>
-      <div role="tablist" aria-label="Studio items" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+      {/* As in Chrome, + follows the last tab, and stays in view once tabs overflow. */}
+      <div className="flex min-w-0 flex-1 items-center gap-0.5">
+      <div role="tablist" aria-label="Studio items" className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
         {pane.tabs.map((tab, index) => <ContextMenu key={tab.href}><ContextMenuTrigger asChild><div onDragEnd={() => setDragging(null)} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; setDragging({ source: tab.href }); }}
           onDragOver={event => { if (accepts(event)) event.preventDefault(); }}
           onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab", tab.href); } }}>
@@ -200,8 +202,9 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
           <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
         </div></ContextMenuTrigger><TabMenu pane={pane} tab={tab} index={index} /></ContextMenu>)}
       </div>
-      {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink-0 items-center" />)}
       <button className={BUTTON} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
+      </div>
+      {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink-0 items-center" />)}
       {active && <DropdownMenu><DropdownMenuTrigger asChild><button className={BUTTON} aria-label="Arrange active tab" title="Split or move"><Icon name="Columns2" className="size-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end">
         {(["left", "right", "top", "bottom"] as const).map(edge => <DropdownMenuItem key={edge} disabled={pane.tabs.length < 2 || panes(snapshot().layout).length >= 8} onSelect={() => move(active, pane.id, edge)}>Split {edge}</DropdownMenuItem>)}
         {panes(snapshot().layout).filter(other => other.id !== pane.id).map((other, index) => <DropdownMenuItem key={other.id} onSelect={() => move(active, other.id, "tab")}>Move to pane {index + 1}</DropdownMenuItem>)}

@@ -65,6 +65,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await sleep(500);
         const single = await client.evaluate(`(() => { const row = document.querySelector('[data-testid="app-page-header-content-row"] [data-studio-workspace-tabs]'); return { row: !!row, tools: !!row?.querySelector('[data-studio-workspace-bar]:not([hidden]) [data-studio-item-header]'), label: [...document.querySelectorAll('[data-testid="app-page-header-content-row"] > div:first-child')].some(element => element.checkVisibility() && element.innerText.trim() === 'Studio') }; })()`);
         if (!single.row || !single.tools || single.label) throw new Error(`A single pane's tab row did not take the title bar: ${JSON.stringify(single)}`);
+        // + sits right after the last tab, as in Chrome.
+        const gap = await client.evaluate(`(() => { const row = document.querySelector('[data-studio-workspace-tabs]'); const tabs = row.querySelectorAll('[data-studio-workspace-tab]'); return row.querySelector('[aria-label="New tab"]').getBoundingClientRect().left - tabs[tabs.length - 1].getBoundingClientRect().right; })()`);
+        if (gap < 0 || gap > 8) throw new Error(`New tab isn't beside the last tab: ${gap}px away`);
         await client.capture(new URL('../../../packages/bb-studio/assets/workspace-single.png', import.meta.url).pathname);
         // Restore the two-editor arrangement for the screenshot.
         await client.evaluate(`document.querySelector('[aria-label="New tab"]').click()`);
