@@ -136,7 +136,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await openNew(true);
         await client.clickElementWithTextAndPointer('[role="menuitem"]', "Page");
         await client.waitForSelector('[data-studio-tab][data-studio-tab^="pages:"][aria-current="page"], .tiptap');
-        const pageId = await client.evaluate(`location.pathname.split('/plugins/pages/pages/')[1]?.split('/')[0]`);
+        // The new page opens as a workspace tab, or on its own page without Studio's workspace.
+        await sleep(500);
+        const pageId = await client.evaluate(`(() => {
+          const tab = [...document.querySelectorAll('[data-studio-workspace-tab]')].find(each => each.querySelector('[aria-selected="true"]'))?.getAttribute('data-studio-workspace-tab');
+          const path = location.pathname.includes('/plugins/pages/pages/') ? location.pathname : tab ?? '';
+          return path.split('/plugins/pages/pages/')[1]?.split('/')[0];
+        })()`);
         if (!pageId || pageId === pages.page.id) throw new Error("New Page did not open the created page");
         created.push({ pluginId: "pages", id: pageId });
         await client.waitForSelector(`[data-studio-tab="pages:${pageId}"]`);
@@ -184,7 +190,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           return client.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].map(each => each.innerText.trim())`);
         };
         await client.navigate("/plugins/studio/studio/collection");
-        await client.evaluate(`localStorage.setItem('studio:query:all', ''); localStorage.setItem('studio:collection:view', 'list')`);
+        await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem('studio:query:all', ''); localStorage.setItem('studio:collection:view', 'list')`);
         await client.navigate("/plugins/studio/studio/collection");
         const unfiltered = await openNew();
         for (const label of ["Page", "Drawing", "Table"]) {
@@ -226,7 +232,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         const { space } = await pluginRpc("studio", "createSpace", { name: "Launch review", defaultProjectId: projectId });
         spaceId = space.id;
         await client.navigate("/plugins/studio/studio/collection");
-        await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:query:all", "")`);
+        await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:query:all", "")`);
         await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('input[aria-label="Search and filter studio"]');
         await client.waitForAriaButton("Filter by space");
@@ -273,7 +279,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       try {
         await client.command("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1440, height: mobile ? 844 : 1000, deviceScaleFactor: 1, mobile });
         await client.navigate("/plugins/studio/studio/collection");
-        await client.evaluate(`localStorage.setItem('studio:query:all', 'kind:Pages'); localStorage.setItem('studio:collection:view', 'list')`);
+        await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem('studio:query:all', 'kind:Pages'); localStorage.setItem('studio:collection:view', 'list')`);
         await client.navigate("/plugins/studio/studio/collection");
         await client.waitForAriaButton("Remove Kind Pages");
         // A persisted plural label resolves to the same checkbox as kind:page.
