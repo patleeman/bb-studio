@@ -42,7 +42,8 @@ viewport change.
 ![Live BB screenshot of the Studio collection](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): the Studio
-collection as a list, with search and compact Space and Kind menus above it.
+collection as the workspace's new tab, a list with search and compact Space and
+Kind menus above it.
 Project, Tags and Status are available under **More filters**. The rows show
 a paused Talk recording, a drawing and three Orbit pages.
 

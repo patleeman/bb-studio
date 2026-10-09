@@ -71,7 +71,7 @@ and an unchanged page body. The reply microphone also fits in the
 
 ![The Pages collection listing the seeded pages](assets/collection.png)
 
-The collection is what the **Pages** nav item opens. It shows:
+The **Pages** nav item opens Studio's new tab on pages. It shows:
 - Studio search, filtered to `Kind: Pages`, with **Clear filters**
 - the Space, Kind and **More filters** menus and **Save view**
 - **New** in the header
