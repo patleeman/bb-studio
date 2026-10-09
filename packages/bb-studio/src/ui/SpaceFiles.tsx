@@ -1,10 +1,13 @@
 // A space's files, read-only: the worktree of one of its threads as a tree,
 // and the open file's text beside it. It follows the thread you came from
-// when that thread is in the space, else the space's newest thread.
-import { Icon } from "@bb-studio/kit/app";
+// when that thread is in the space, else the space's newest thread. With
+// Studio Code installed, the worktree opens in VS Code.
+import { Icon, openAppPath } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { useBbContext, useRpc } from "@get-bb/plugin-sdk/app";
+import { useBbContext, useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { z } from "zod";
 import type { rpcContract, SpaceView } from "../contract";
 
 type Worktree = { threadId: string; title: string; updatedAt: number; path: string };
@@ -29,8 +32,23 @@ export function fileTree(files: readonly string[]): Folder {
   return root;
 }
 
-export function SpaceFiles({ space }: { space: SpaceView }) {
+const CODE_PLUGIN_ID = "studio-code";
+const codeWorkspace = z.object({ workspace: z.object({ id: z.string() }) });
+
+/** Opens the thread's worktree in Studio Code's VS Code. */
+async function openInCode(sdk: ReturnType<typeof useSdk>, threadId: string): Promise<void> {
+  try {
+    const { workspace } = await sdk.plugins.callRpc({ pluginId: CODE_PLUGIN_ID, method: "forThread", input: { threadId }, outputSchema: codeWorkspace });
+    openAppPath(`/plugins/${CODE_PLUGIN_ID}/workspaces/${encodeURIComponent(workspace.id)}`);
+  } catch (cause) {
+    toast.error(`Couldn't open VS Code: ${errorMessage(cause)}`);
+  }
+}
+
+/** `threadId` is the thread to follow, e.g. the one whose header opened this. */
+export function SpaceFiles({ space, threadId: wanted = null, canOpenCode = false }: { space: SpaceView; threadId?: string | null; canOpenCode?: boolean }) {
   const rpc = useRpc<typeof rpcContract>();
+  const sdk = useSdk();
   const context = useBbContext();
   const [worktrees, setWorktrees] = useState<Worktree[] | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -50,12 +68,15 @@ export function SpaceFiles({ space }: { space: SpaceView }) {
     return () => { live = false; };
   }, [rpc, space.id]);
 
+  // A new thread to follow wins over an earlier pick.
+  useEffect(() => setPicked(null), [wanted]);
+
   // Follow the thread you came from while it's in the space.
   const threadId = useMemo(() => {
     if (!worktrees?.length) return null;
     const has = (id: string | null | undefined) => (id && worktrees.some((each) => each.threadId === id) ? id : null);
-    return has(picked) ?? has(context.threadId) ?? worktrees[0]!.threadId;
-  }, [worktrees, picked, context.threadId]);
+    return has(picked) ?? has(wanted) ?? has(context.threadId) ?? worktrees[0]!.threadId;
+  }, [worktrees, picked, wanted, context.threadId]);
 
   useEffect(() => {
     if (!threadId) return;
@@ -129,6 +150,11 @@ export function SpaceFiles({ space }: { space: SpaceView }) {
           </select>
         </label>
         {current ? <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={current.path}>{current.path}</span> : null}
+        {canOpenCode && threadId ? (
+          <button type="button" onClick={() => void openInCode(sdk, threadId)} className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm hover:bg-state-hover">
+            <Icon name="Code" className="size-4" /> Open in VS Code
+          </button>
+        ) : null}
       </div>
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-md border border-border">
         <nav aria-label="Files" className="w-72 shrink-0 overflow-auto border-r border-border py-1">

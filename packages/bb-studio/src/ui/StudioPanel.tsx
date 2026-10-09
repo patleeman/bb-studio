@@ -65,6 +65,32 @@ export function openSpaceItems(navigate: ReturnType<typeof useBbNavigate>, space
   openCollectionQuery(navigate, { filters: [{ field: "space", value: space.name }], text: "" });
 }
 
+const FILES_KEY = "studio:space-files";
+const FILES_EVENT = "studio:space-files";
+
+/** Opens a space on its Files view, showing `threadId`'s worktree. */
+export function openSpaceFiles(navigate: ReturnType<typeof useBbNavigate>, space: { name: string }, threadId: string | null): void {
+  const detail = JSON.stringify({ threadId });
+  try {
+    sessionStorage.setItem(FILES_KEY, detail);
+  } catch {
+    // Storage can be refused; an open collection still hears the event.
+  }
+  window.dispatchEvent(new CustomEvent(FILES_EVENT, { detail }));
+  openSpaceItems(navigate, space);
+}
+
+/** The Files view asked for by openSpaceFiles, taken once. */
+function takeFilesRequest(): { threadId: string | null } | null {
+  try {
+    const raw = sessionStorage.getItem(FILES_KEY);
+    sessionStorage.removeItem(FILES_KEY);
+    return raw ? (JSON.parse(raw) as { threadId: string | null }) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The query, remembered across visits. */
 function useStoredQuery(key: string): [Query, (query: Query) => void] {
   const read = useCallback(() => {
@@ -399,7 +425,18 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     [data?.spaces],
   );
   // One space in the query: its documents, or its files.
-  const [showFiles, setShowFiles] = useState(false);
+  const [filesRequest] = useState(takeFilesRequest);
+  const [showFiles, setShowFiles] = useState(Boolean(filesRequest));
+  const [filesThread, setFilesThread] = useState<string | null>(filesRequest?.threadId ?? null);
+  useEffect(() => {
+    const onFiles = (event: Event) => {
+      takeFilesRequest();
+      setShowFiles(true);
+      setFilesThread((JSON.parse((event as CustomEvent<string>).detail) as { threadId: string | null }).threadId);
+    };
+    window.addEventListener(FILES_EVENT, onFiles);
+    return () => window.removeEventListener(FILES_EVENT, onFiles);
+  }, []);
   const fileSpace = filteredSpaces.length === 1 ? filteredSpaces[0]! : null;
   const spaceViews = fileSpace ? (
     <div role="tablist" aria-label={`${fileSpace.name} views`} className="mb-3 inline-flex rounded-md border border-border p-0.5 text-sm">
@@ -517,7 +554,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           <SpaceGlyph space={fileSpace} className="w-5 text-center" /> {fileSpace.name}
         </h1>
         {spaceViews}
-        <SpaceFiles space={fileSpace} />
+        <SpaceFiles space={fileSpace} threadId={filesThread} canOpenCode={providers.some((provider) => provider.pluginId === "studio-code" && provider.state === "ready")} />
       </PageColumn>
     );
   }

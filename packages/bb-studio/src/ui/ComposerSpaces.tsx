@@ -13,7 +13,7 @@ import {
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useComposer, useComposerView, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
 import { openSpaceItems } from "./StudioPanel";
@@ -76,8 +76,10 @@ export function useSpaces(threadId: string | null) {
 }
 
 /** The spaces menu: open one it's in, move it to another, or take it out. */
-export function SpacesMenuContent({ heading, othersHeading = "Add to space", holding, inherited, all, align = "start", onChange }: {
+export function SpacesMenuContent({ heading, othersHeading = "Add to space", holding, inherited, all, align = "start", onChange, children }: {
   heading: string;
+  /** Actions above the spaces, e.g. the thread header's files and VS Code. */
+  children?: ReactNode;
   othersHeading?: string;
   holding: SpaceView[];
   inherited: string[];
@@ -90,6 +92,7 @@ export function SpacesMenuContent({ heading, othersHeading = "Add to space", hol
   const removable = holding.filter((space) => !inherited.includes(space.id));
   return (
     <DropdownMenuContent side="bottom" align={align} className="max-h-96 w-64 overflow-y-auto">
+      {children}
       {holding.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{heading}</DropdownMenuLabel> : null}
       {holding.map((space) => (
         <DropdownMenuItem key={space.id} onSelect={() => openSpaceItems(navigate, space)}>
