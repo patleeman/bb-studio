@@ -30,7 +30,7 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 
 | File | Reason |
 | --- | --- |
-| `source/app.tsx` | Mount Studio section anchors above the thread list, name the provider Studio Sidebar, move thread reveal into ProjectList, and register Studio Navigation. |
+| `source/app.tsx` | Mount Studio section anchors above the thread list, name the provider Studio Sidebar, move thread reveal into ProjectList, register Studio Navigation, and register the thread Automations tab and header badge. |
 | `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, filter empty project rows, render By space with each Space's Studio items, export the grouped-mode helpers By space reuses, and pass By space's group move to the grouped drag and drop. |
 | `source/app/list/useSidebarThreadReveal.ts` | By space reveals its own sections. |
 | `source/app/list/SidebarHeaderControls.tsx` | Add the project action to the creation context, and let a section put its own button, such as Command view, in place of New thread. |

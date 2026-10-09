@@ -5,6 +5,7 @@ import { CompactViewportOverrideProvider } from "@/components/ui/hooks/use-compa
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PreferencesSync } from "./app/preferences/PreferencesSync.js";
 import { ProjectList } from "./app/list/ProjectList.js";
+import { registerThreadAutomations } from "./app/studio/automations/register.js";
 
 function ThreadList({
   activeThreadId,
@@ -38,4 +39,5 @@ export default definePluginApp((app) => {
       "Studio apps' sections above your threads: pinned threads, custom sections, projects, machines, and nested threads.",
     component: ThreadList,
   });
+  registerThreadAutomations(app);
 });

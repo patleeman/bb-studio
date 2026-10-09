@@ -33,6 +33,18 @@ stays installed. It needs BB 0.44 or newer and Plugin SDK 0.5.29 or newer.
   Pinned threads, the open thread, and Space leads always show. BB's **Hide from
   list** still hides a whole section.
 - **Studio Navigation**, selectable in BB Appearance. See [Navigation](#navigation).
+- **Automations tab.** In a thread's side panel, **+ → Automations** lists the
+  automations that wake that thread. Each row shows the name, the schedule in
+  words (such as "Every 30 min" or "Weekdays 9:00"; other crons show as
+  written), when it runs next, and the last run's result or error. A switch
+  pauses or resumes it, and **Edit** opens it in Automations. The tab
+  refreshes when it opens and every 30 seconds while it's visible. If nothing
+  targets the thread, it says so. If BB's Automations plugin is off or doesn't
+  answer, the tab says Automations are unavailable.
+- **Automations badge.** A thread that automations wake shows a clock with
+  their count in its header. Click it to open the Automations tab. The badge
+  uses BB's experimental thread header slot, so the plugin still loads where
+  that slot is missing.
 
 ### By space
 

@@ -1,28 +1,31 @@
 diff --git a/source/app.tsx b/source/app.tsx
-index bdc330d..298d754 100644
+index bdc330d..73c39b9 100644
 --- a/source/app.tsx
 +++ b/source/app.tsx
 @@ -1,0 +2,2 @@ import { definePluginApp, type PluginThreadListProps } from "@get-bb/plugin-sdk/
 +import { Navigation } from "./app/navigation/Navigation.js";
 +import { SidebarAnchors } from "@bb-studio/kit/app";
-@@ -6 +7,0 @@ import { ProjectList } from "./app/list/ProjectList.js";
+@@ -6 +8 @@ import { ProjectList } from "./app/list/ProjectList.js";
 -import { useSidebarThreadReveal } from "./app/list/useSidebarThreadReveal.js";
-@@ -13 +13,0 @@ function ThreadList({
++import { registerThreadAutomations } from "./app/studio/automations/register.js";
+@@ -13 +14,0 @@ function ThreadList({
 -  useSidebarThreadReveal();
-@@ -17,0 +18 @@ function ThreadList({
+@@ -17,0 +19 @@ function ThreadList({
 +        <SidebarAnchors onNavigate={onNavigate} />
-@@ -27,0 +29,5 @@ export default definePluginApp((app) => {
+@@ -27,0 +30,5 @@ export default definePluginApp((app) => {
 +  app.slots.experimental_sidebarNavigation({
 +    id: "navigation", title: "Studio Navigation",
 +    description: "BB navigation without the add-on rows Studio already opens.",
 +    component: Navigation,
 +  });
-@@ -30 +36 @@ export default definePluginApp((app) => {
+@@ -30 +37 @@ export default definePluginApp((app) => {
 -    title: "Thread list",
 +    title: "Studio Sidebar",
-@@ -32 +38 @@ export default definePluginApp((app) => {
+@@ -32 +39 @@ export default definePluginApp((app) => {
 -      "Pinned threads, custom sections, projects, machines, and nested threads.",
 +      "Studio apps' sections above your threads: pinned threads, custom sections, projects, machines, and nested threads.",
+@@ -34,0 +42 @@ export default definePluginApp((app) => {
++  registerThreadAutomations(app);
 diff --git a/source/app/dnd/useSectionThreadDnd.ts b/source/app/dnd/useSectionThreadDnd.ts
 index 39258e5..b1a5413 100644
 --- a/source/app/dnd/useSectionThreadDnd.ts
