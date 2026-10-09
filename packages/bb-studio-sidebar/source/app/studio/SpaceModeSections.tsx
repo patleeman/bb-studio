@@ -117,6 +117,16 @@ export function needsYouFirst(items: readonly ProjectThreadItem[]): ProjectThrea
   return [...items].sort((left, right) => ranks.get(left)! - ranks.get(right)!);
 }
 
+/**
+ * A Space's section item for drag and drop, with its lead's rows in front. The
+ * lead is rendered apart from the section's list, but its row must be in the
+ * lookup to take a drop (nesting a thread under it) and to rule out nesting a
+ * thread under itself or its own descendant.
+ */
+export function withLeadRows<T extends Extract<ProjectThreadItem, { kind: "section" }>>(item: T, leadItems: readonly ProjectThreadItem[]): T {
+  return leadItems.length === 0 ? item : { ...item, group: { ...item.group, items: [...leadItems, ...item.group.items] } };
+}
+
 /** Whether `thread` is the Chief of Staff or one of its sub-threads, at any depth. */
 export function chiefUnder(threads: readonly SidebarThread[], chiefId: string | null, thread: SidebarThread): boolean {
   if (!chiefId) return false;
@@ -311,8 +321,8 @@ export function SpaceModeSections({
     [compareThreads, draftThreadIds, groupThreadsByEnvironment, loose],
   );
   const rootItems = useMemo<ProjectThreadItem[]>(
-    () => [...looseItems, ...shown.map((candidate) => candidate.item)],
-    [looseItems, shown],
+    () => [...looseItems, ...(pinnedChief ? [pinnedChief] : []).concat(shown).map((candidate) => withLeadRows(candidate.item, candidate.leadItems))],
+    [looseItems, pinnedChief, shown],
   );
   // A thread dropped on a Space's heading, list or dot moves into that Space.
   const moveThreads = useMoveThreadsToSpace();

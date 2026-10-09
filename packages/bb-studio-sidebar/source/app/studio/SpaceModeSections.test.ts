@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildProjectThreadGroups, compareStandardThreads } from "../model/project-thread-groups.js";
 import { makeSidebarThread } from "../testing/fixtures.js";
-import { chiefUnder, needsYouFirst } from "./SpaceModeSections.js";
+import { buildGroupSectionItem } from "../list/ProjectList.js";
+import { collectSectionThreadDndLookup, resolveSectionThreadDropDecision } from "../dnd/useSectionThreadDnd.js";
+import { getSidebarThreadRowDroppableId } from "../rows/sidebarThreadRowDroppable.js";
+import { chiefUnder, needsYouFirst, withLeadRows } from "./SpaceModeSections.js";
 
 describe("By space thread order", () => {
   it("puts threads that wait on you first: questions, then failures, then results", () => {
@@ -28,5 +31,29 @@ describe("Chief of Staff", () => {
   it("knows the Chief of Staff's workers at any depth", () => {
     expect(threads.filter((candidate) => chiefUnder(threads, "thr_chief", candidate)).map((candidate) => candidate.id)).toEqual(["thr_chief", "thr_sub", "thr_deep"]);
     expect(chiefUnder(threads, null, threads[0]!)).toBe(false);
+  });
+});
+
+describe("Dropping on a lead row", () => {
+  const thread = (id: string, parentThreadId: string | null = null) => makeSidebarThread({ id, projectId: "proj", parentThreadId });
+  const lead = [thread("thr_lead"), thread("thr_worker", "thr_lead")];
+  const others = [thread("thr_other")];
+  const section = buildGroupSectionItem("sp", "space:sp", "Space", others, compareStandardThreads, new Set(), false);
+  const leadItems = buildProjectThreadGroups(lead, compareStandardThreads, new Set(), false);
+  const lookup = collectSectionThreadDndLookup([withLeadRows(section, leadItems)], "chronological");
+  const drop = (active: string, over: string) => resolveSectionThreadDropDecision(lookup, active, getSidebarThreadRowDroppableId(over));
+
+  it("nests a thread under the lead", () => {
+    expect(drop("thr_other", "thr_lead")).toMatchObject({ kind: "nest", parentThreadId: "thr_lead", threadIds: ["thr_other"] });
+  });
+
+  it("never nests the lead under its own worker, or a thread under itself", () => {
+    expect(drop("thr_lead", "thr_worker")).toMatchObject({ kind: "rejected", reason: "own-subtree" });
+    expect(drop("thr_worker", "thr_lead")).toMatchObject({ kind: "rejected", reason: "already-child" });
+  });
+
+  it("knows nothing of the lead without its rows", () => {
+    const bare = collectSectionThreadDndLookup([section], "chronological");
+    expect(resolveSectionThreadDropDecision(bare, "thr_other", getSidebarThreadRowDroppableId("thr_lead"))).toBeNull();
   });
 });
