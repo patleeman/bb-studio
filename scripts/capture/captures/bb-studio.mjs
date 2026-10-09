@@ -139,7 +139,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         // The new page opens as a workspace tab, or on its own page without Studio's workspace.
         await sleep(500);
         const pageId = await client.evaluate(`(() => {
-          const tab = [...document.querySelectorAll('[data-studio-workspace-tab]')].find(each => each.querySelector('[aria-selected="true"]'))?.getAttribute('data-studio-workspace-tab');
+          // The focused pane's tab: other panes keep tabs of their own.
+          const workspace = JSON.parse(localStorage.getItem('bb:studio-workspace:v1') ?? 'null');
+          const panes = (node) => !node ? [] : node.kind === 'pane' ? [node] : [...panes(node.first), ...panes(node.second)];
+          const tab = panes(workspace?.layout).find(pane => pane.id === workspace.focused)?.active;
           const path = location.pathname.includes('/plugins/pages/pages/') ? location.pathname : tab ?? '';
           return path.split('/plugins/pages/pages/')[1]?.split('/')[0];
         })()`);
