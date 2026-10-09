@@ -25,7 +25,15 @@ it("keeps editor drafts while switching tabs, splitting and returning to the wor
   expect(editor).not.toBeNull(); editor.value = "Keep my draft";
   await act(() => { openWorkspaceItem({ href: other, title: "Two" }); });
   expect(host.querySelectorAll('[role="tab"]')).toHaveLength(2);
-  await act(() => { openWorkspaceItem({ href: page, title: "One" }, "right"); });
+  const target = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="two"]')!;
+  const body = target.closest<HTMLElement>('[data-studio-workspace-drop]')!;
+  vi.spyOn(body, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100, x: 0, y: 0, toJSON() {} });
+  // An editor consumes its own drop events; native workspace capture must
+  // receive Studio items first, despite the editor being in a different tree.
+  target.addEventListener("drop", event => event.stopPropagation());
+  const drop = new MouseEvent("drop", { bubbles: true, cancelable: true, clientX: 95, clientY: 50 });
+  Object.defineProperty(drop, "dataTransfer", { value: { types: ["application/x-bb-studio-item"], getData: () => JSON.stringify({ href: page, title: "One" }) } });
+  await act(() => { target.dispatchEvent(drop); });
   expect(host.querySelectorAll('[data-workspace-pane]')).toHaveLength(2);
   expect(host.querySelector('textarea[aria-label="one"]')).toBe(editor);
   expect(editor.value).toBe("Keep my draft");

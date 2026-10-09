@@ -25,12 +25,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await openRow("Weekly product sync");
         await client.waitForText("Weekly product sync");
         const href = `/plugins/talk/recordings/${recording}`;
+        await client.waitForSelector(`[data-studio-workspace-editor="${href}"] [aria-label="Recording position"]`);
         const destination = await client.evaluate(`(() => { const rect = document.querySelector('[data-workspace-pane]').getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...destination, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
         await sleep(500);
         const assertLayout = async () => {
           const result = await client.evaluate(`(() => { const workspace = document.querySelector('[data-studio-workspace]'); return { panes: workspace.querySelectorAll('[data-workspace-pane]').length, tabs: workspace.querySelectorAll('[role="tab"]').length, page: workspace.innerText.includes('Launch checklist'), recording: workspace.innerText.includes('Weekly product sync') }; })()`);
-          if (result.panes !== 2 || result.tabs !== 2 || !result.page || !result.recording) throw new Error(`Workspace lost an editor: ${JSON.stringify(result)}`);
+          if (result.panes !== 2 || result.tabs !== 2 || !result.page || !result.recording) { await client.capture("/tmp/studio-workspace-failure.png"); throw new Error(`Workspace lost an editor: ${JSON.stringify(result)}`); }
         };
         await assertLayout();
         await client.navigate("/plugins/studio/studio/workspace");
@@ -46,6 +47,16 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...split, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });
         await sleep(500);
         await assertLayout();
+        const misplaced = await client.evaluate(`document.querySelectorAll('header:not([data-studio-workspace-toolbar]) [data-studio-bar-slot] [data-studio-bar]').length`);
+        if (misplaced) throw new Error("Workspace editor tools escaped into the shared app header");
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
+        await sleep(500);
+        if (await client.evaluate(`document.querySelectorAll('[data-studio-workspace] [role="tab"]').length`) !== 2) throw new Error("The compact workspace lost a tab");
+        const compact = await client.evaluate(`(() => { const workspace = document.querySelector('[data-studio-workspace]'); return { picker: !!workspace.querySelector('select[aria-label="Studio pane"]'), width: workspace.clientWidth, content: workspace.scrollWidth }; })()`);
+        if (!compact.picker || compact.content > compact.width + 1) throw new Error(`Compact workspace overflow: ${JSON.stringify(compact)}`);
+        await client.capture(new URL('../../../packages/bb-studio/assets/workspace-mobile.png', import.meta.url).pathname);
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+        await sleep(500);
         return cleanup;
       } catch (error) { await cleanup(); throw error; }
     },

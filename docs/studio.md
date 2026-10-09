@@ -81,7 +81,7 @@ split and move actions without dragging; separators support arrow-key resizing.
 Arrow keys, Home and End select tabs, and Delete closes the focused tab. Closing a
 view never deletes its item. Layout and tab selection are stored locally in the
 client; the server still keeps the shared sidebar item list. Up to eight panes fit
-in one workspace. Narrow screens can scroll the arrangement horizontally.
+in one workspace. Narrow screens show one pane at a time with a pane picker, keeping the desktop arrangement.
 
 `workspace.ts` in the kit owns a versioned cross-bundle registry of editor providers
 and destination elements. Each add-on's `RetainedPanels` renders through its own

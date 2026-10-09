@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { Icon, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioPath, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
+import { Icon, StudioBarSlot, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioPath, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import type { rpcContract } from "../contract";
 import { closeTab, emptyWorkspace, mapLayout, openItem, panes, parseWorkspace, type Layout, type Pane, type Tab, type Workspace } from "./workspace-state";
@@ -71,41 +71,60 @@ export function WorkspaceBridge() {
   return null;
 }
 
-function dragged(event: DragEvent): WorkspaceItem | null {
+function dragged(event: Pick<globalThis.DragEvent, "dataTransfer">): WorkspaceItem | null {
   try {
-    const value = JSON.parse(event.dataTransfer.getData(WORKSPACE_DRAG));
+    const value = JSON.parse(event.dataTransfer?.getData(WORKSPACE_DRAG) ?? "");
     return typeof value?.href === "string" && canOpenWorkspaceItem(value.href) ? { href: value.href, ...(typeof value.title === "string" ? { title: value.title } : {}) } : null;
   } catch { return null; }
 }
-function accepts(event: DragEvent) { return event.dataTransfer.types.includes(WORKSPACE_DRAG); }
+function accepts(event: Pick<globalThis.DragEvent, "dataTransfer">) { return event.dataTransfer?.types.includes(WORKSPACE_DRAG) ?? false; }
 function move(item: WorkspaceItem, pane: string, placement: WorkspacePlacement, before?: string) {
   update(current => openItem(current, item, placement, pane, before));
 }
 function select(pane: string, href: string) {
   update(current => ({ focused: pane, layout: mapLayout(current.layout, node => node.kind === "pane" && node.id === pane ? { ...node, active: href } : node) }));
 }
-function EditorSlot({ tab }: { tab: Tab }) {
+function EditorSlot({ tab, instance }: { tab: Tab; instance: string }) {
   const element = useRef<HTMLDivElement>(null);
   useSyncExternalStore(subscribeWorkspace, workspaceRevision, () => 0);
   const available = canOpenWorkspaceItem(tab.href);
   useLayoutEffect(() => {
     if (!element.current) return;
-    return publishWorkspaceAnchor({ id: `workspace:${tab.href}`, path: tab.href, element: element.current });
-  }, [tab.href]);
-  return <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    return publishWorkspaceAnchor({ id: `workspace:${instance}:${tab.href}`, path: tab.href, element: element.current });
+  }, [tab.href, instance]);
+  return <div data-studio-workspace-frame="" className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <header data-studio-workspace-toolbar="" className="flex h-11 shrink-0 items-center border-b px-2"><StudioBarSlot /></header>
     {!available && <div className="p-6 text-sm text-muted-foreground">This item's plugin is unavailable. Enable it to reopen this tab. <button className="underline" onClick={() => openAppPath(tab.href, { standalone: true })}>Open item page</button></div>}
     <div ref={element} data-studio-workspace-editor={tab.href} className="flex min-h-0 min-w-0 flex-1 flex-col" />
   </div>;
 }
-function TabPane({ pane, focused }: { pane: Pane; focused: string }) {
+function TabPane({ pane, focused, instance }: { pane: Pane; focused: string; instance: string }) {
   const [drop, setDrop] = useState<WorkspacePlacement | null>(null);
   const active = pane.tabs.find(tab => tab.href === pane.active);
-  const place = (event: DragEvent): WorkspacePlacement => {
-    const rect = event.currentTarget.getBoundingClientRect();
+  const paneElement = useRef<HTMLElement>(null);
+  const dropElement = useRef<HTMLDivElement>(null);
+  const place = (event: globalThis.DragEvent): WorkspacePlacement => {
+    const rect = dropElement.current!.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width, y = (event.clientY - rect.top) / rect.height;
     return x < .22 ? "left" : x > .78 ? "right" : y < .22 ? "top" : y > .78 ? "bottom" : "tab";
   };
-  return <section aria-label="Studio pane" data-workspace-pane={pane.id} className="relative flex h-full min-h-0 min-w-[240px] flex-1 flex-col overflow-hidden" onPointerDownCapture={() => { if (focused !== pane.id) update(current => ({ ...current, focused: pane.id })); }}>
+  // Native capture crosses the add-on's portal boundary; React handlers in
+  // Studio's tree cannot reliably receive events from another plugin's tree.
+  useEffect(() => {
+    const element = paneElement.current!, body = dropElement.current!;
+    const focus = () => { if (snapshot().focused !== pane.id) update(current => ({ ...current, focused: pane.id })); };
+    const over = (event: globalThis.DragEvent) => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); setDrop(place(event)); } };
+    const leave = (event: globalThis.DragEvent) => { if (!body.contains(event.relatedTarget as Node | null)) setDrop(null); };
+    const end = () => setDrop(null);
+    const receive = (event: globalThis.DragEvent) => { end(); const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, place(event)); } };
+    element.addEventListener("pointerdown", focus, true);
+    body.addEventListener("dragover", over, true);
+    body.addEventListener("drop", receive, true);
+    body.addEventListener("dragleave", leave);
+    document.addEventListener("dragend", end);
+    return () => { element.removeEventListener("pointerdown", focus, true); body.removeEventListener("dragover", over, true); body.removeEventListener("drop", receive, true); body.removeEventListener("dragleave", leave); document.removeEventListener("dragend", end); };
+  }, [pane.id]);
+  return <section ref={paneElement} aria-label="Studio pane" data-workspace-pane={pane.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     <div className={`flex min-h-9 shrink-0 items-center border-b ${focused === pane.id ? "bg-state-hover" : "bg-background"}`}
       onDragOver={event => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); } }}
       onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab"); } }}>
@@ -113,11 +132,11 @@ function TabPane({ pane, focused }: { pane: Pane; focused: string }) {
         {pane.tabs.map((tab, index) => <div key={tab.href} className="flex shrink-0 items-center border-r" data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; }}
           onDragOver={event => { if (accepts(event)) event.preventDefault(); }}
           onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab", tab.href); } }}>
-          <button role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${pane.id}-${index}`} id={`tab-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
+          <button role="tab" aria-selected={pane.active === tab.href} aria-controls={`view-${instance}-${pane.id}-${index}`} id={`tab-${instance}-${pane.id}-${index}`} tabIndex={pane.active === tab.href ? 0 : -1}
             className={`h-9 max-w-52 truncate px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${pane.active === tab.href ? "bg-background text-foreground" : "text-muted-foreground hover:bg-state-hover"}`}
             onClick={() => select(pane.id, tab.href)} onKeyDown={event => {
               const next = event.key === "ArrowRight" ? (index + 1) % pane.tabs.length : event.key === "ArrowLeft" ? (index + pane.tabs.length - 1) % pane.tabs.length : event.key === "Home" ? 0 : event.key === "End" ? pane.tabs.length - 1 : null;
-              if (next !== null) { event.preventDefault(); select(pane.id, pane.tabs[next]!.href); document.getElementById(`tab-${pane.id}-${next}`)?.focus(); }
+              if (next !== null) { event.preventDefault(); select(pane.id, pane.tabs[next]!.href); document.getElementById(`tab-${instance}-${pane.id}-${next}`)?.focus(); }
               if (event.key === "Delete") { event.preventDefault(); update(current => closeTab(current, tab.href)); }
             }}>{tab.title}</button>
           <button className={BUTTON} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3.5" /></button>
@@ -130,27 +149,39 @@ function TabPane({ pane, focused }: { pane: Pane; focused: string }) {
         <DropdownMenuItem onSelect={() => update(current => closeTab(current, active.href))}>Close tab</DropdownMenuItem>
       </DropdownMenuContent></DropdownMenu>}
     </div>
-    <div className="relative flex min-h-0 flex-1 flex-col" onDragOver={event => { if (accepts(event)) { event.preventDefault(); setDrop(place(event)); } }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDrop(null); }} onDrop={event => { setDrop(null); const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, place(event)); } }}>
-      {pane.tabs.map((tab, index) => <div key={tab.href} role="tabpanel" id={`view-${pane.id}-${index}`} aria-labelledby={`tab-${pane.id}-${index}`} hidden={pane.active !== tab.href} style={{ display: pane.active === tab.href ? "flex" : "none" }} className="min-h-0 min-w-0 flex-1 flex-col"><EditorSlot tab={tab} /></div>)}
+    <div ref={dropElement} data-studio-workspace-drop="" className="relative flex min-h-0 flex-1 flex-col">
+      {pane.tabs.map((tab, index) => <div key={tab.href} role="tabpanel" id={`view-${instance}-${pane.id}-${index}`} aria-labelledby={`tab-${instance}-${pane.id}-${index}`} hidden={pane.active !== tab.href} style={{ display: pane.active === tab.href ? "flex" : "none" }} className="min-h-0 min-w-0 flex-1 flex-col"><EditorSlot tab={tab} instance={instance} /></div>)}
       {!pane.tabs.length && <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"><p>Open an item from the sidebar, or drop one here.</p><button className="rounded border px-3 py-2 text-foreground hover:bg-state-hover" onClick={() => openAppPath(studioPath("collection"))}>Browse Studio</button></div>}
       {drop && <div className="pointer-events-none absolute z-20 flex items-center justify-center border-2 border-primary bg-primary/10 text-sm font-medium" style={{ inset: 0, ...(drop === "left" ? { right: "50%" } : drop === "right" ? { left: "50%" } : drop === "top" ? { bottom: "50%" } : drop === "bottom" ? { top: "50%" } : {}) }}>{drop === "tab" ? "Open as tab" : `Split ${drop}`}</div>}
     </div>
   </section>;
 }
-function LayoutView({ node, focused }: { node: Layout; focused: string }) {
+function LayoutView({ node, focused, compact, instance }: { node: Layout; focused: string; compact: boolean; instance: string }) {
   const container = useRef<HTMLDivElement>(null);
-  if (node.kind === "pane") return <TabPane pane={node} focused={focused} />;
+  if (node.kind === "pane") return <TabPane pane={node} focused={focused} instance={instance} />;
   const resize = (ratio: number) => update(current => ({ ...current, layout: mapLayout(current.layout, each => each.id === node.id && each.kind === "split" ? { ...each, ratio: Math.max(.2, Math.min(.8, ratio)) } : each) }));
   return <div ref={container} className="flex h-full min-h-0 min-w-0 flex-1" style={{ flexDirection: node.axis }}>
-    <div className="flex min-h-0 min-w-0" style={{ flex: `${node.ratio} 1 0%` }}><LayoutView node={node.first} focused={focused} /></div>
-    <div role="separator" aria-label="Resize Studio panes" aria-orientation={node.axis === "row" ? "vertical" : "horizontal"} aria-valuenow={Math.round(node.ratio * 100)} aria-valuemin={20} aria-valuemax={80} tabIndex={0}
+    <div className="flex min-h-0 min-w-0" style={{ flex: compact ? "1 1 0%" : `${node.ratio} 1 0%`, display: compact && !panes(node.first).some(pane => pane.id === focused) ? "none" : undefined }}><LayoutView node={node.first} focused={focused} compact={compact} instance={instance} /></div>
+    <div hidden={compact} style={{ display: compact ? "none" : undefined }} role="separator" aria-label="Resize Studio panes" aria-orientation={node.axis === "row" ? "vertical" : "horizontal"} aria-valuenow={Math.round(node.ratio * 100)} aria-valuemin={20} aria-valuemax={80} tabIndex={0}
       className={`shrink-0 touch-none bg-border hover:bg-primary focus:bg-primary ${node.axis === "row" ? "w-1 cursor-col-resize" : "h-1 cursor-row-resize"}`}
       onKeyDown={event => { if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(event.key)) { event.preventDefault(); resize(node.ratio + (["ArrowLeft", "ArrowUp"].includes(event.key) ? -.05 : .05)); } }}
       onPointerDown={event => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={event => { if (!event.currentTarget.hasPointerCapture(event.pointerId) || !container.current) return; const rect = container.current.getBoundingClientRect(); resize(node.axis === "row" ? (event.clientX - rect.left) / rect.width : (event.clientY - rect.top) / rect.height); }} onPointerUp={event => event.currentTarget.releasePointerCapture(event.pointerId)} />
-    <div className="flex min-h-0 min-w-0" style={{ flex: `${1 - node.ratio} 1 0%` }}><LayoutView node={node.second} focused={focused} /></div>
+    <div className="flex min-h-0 min-w-0" style={{ flex: compact ? "1 1 0%" : `${1 - node.ratio} 1 0%`, display: compact && !panes(node.second).some(pane => pane.id === focused) ? "none" : undefined }}><LayoutView node={node.second} focused={focused} compact={compact} instance={instance} /></div>
   </div>;
 }
 export function StudioWorkspace() {
   const workspace = useWorkspace();
-  return <div data-studio-workspace="" className="flex h-full min-h-0 min-w-0 flex-1 overflow-auto"><LayoutView node={workspace.layout} focused={workspace.focused} /></div>;
+  const instance = useId();
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(max-width: 767px)");
+    const change = () => setCompact(media.matches);
+    change(); media.addEventListener("change", change);
+    return () => media.removeEventListener("change", change);
+  }, []);
+  return <div data-studio-workspace="" className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    {compact && panes(workspace.layout).length > 1 && <label className="flex items-center gap-2 border-b px-3 py-2 text-sm">Pane<select aria-label="Studio pane" className="min-w-0 flex-1 rounded border bg-background p-1" value={workspace.focused} onChange={event => update(current => ({ ...current, focused: event.target.value }))}>{panes(workspace.layout).map((pane, index) => <option key={pane.id} value={pane.id}>{index + 1}. {pane.tabs.find(tab => tab.href === pane.active)?.title ?? "Empty pane"}</option>)}</select></label>}
+    <LayoutView node={workspace.layout} focused={workspace.focused} compact={compact} instance={instance} />
+  </div>;
 }

@@ -173,3 +173,14 @@ it("keeps workspace editor toolbars inside each editor instead of sharing the ap
   await act(async () => root.unmount());
   pane.remove();
 });
+
+it("uses a workspace editor's own header slot, never the app's slot", async () => {
+  const pane = document.createElement("div");
+  pane.innerHTML = '<header><div data-studio-bar-slot></div></header><section data-studio-workspace-frame><header><div data-studio-bar-slot></div></header><main data-studio-workspace-editor></main></section>';
+  document.body.append(pane);
+  const root = createRoot(pane.querySelector("main")!);
+  await act(async () => { root.render(<StudioBar>Page tools</StudioBar>); await settle(); });
+  expect(pane.querySelector(":scope > header")!.textContent).toBe("");
+  expect(pane.querySelector("section > header")!.textContent).toBe("Page tools");
+  await act(async () => root.unmount()); pane.remove();
+});
