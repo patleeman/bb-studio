@@ -13,6 +13,12 @@ import {
 } from "./model";
 import { AutomationsView } from "./ThreadAutomations";
 
+const sdkForTest = vi.hoisted(() => ({ current: {} as unknown }));
+vi.mock("@get-bb/plugin-sdk/app", async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  useSdk: () => sdkForTest.current,
+}));
+
 installTestPluginRuntime();
 
 const NOW = Date.UTC(2026, 9, 8, 12, 0);
@@ -132,5 +138,43 @@ describe("registration", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const tabs = (app as unknown as { threadPanelActions?: Array<{ id: string; title: string }> }).threadPanelActions ?? [];
     expect(tabs.map(t => t.title)).toContain("Automations");
+  });
+});
+
+describe("useThreadAutomations", () => {
+  async function setup(strict: boolean) {
+    const { StrictMode } = await import("react");
+    const { renderHook } = await import("@testing-library/react");
+    const reads: Array<(value: unknown) => void> = [];
+    const callRpc = vi.fn(() => new Promise((resolve) => { reads.push(resolve); }));
+    sdkForTest.current = { plugins: { callRpc }, threads: { get: vi.fn() } };
+    const { useThreadAutomations } = await import("./ThreadAutomations");
+    const hook = renderHook(({ id }) => useThreadAutomations(id, "proj_1"), {
+      ...(strict ? { wrapper: StrictMode } : {}),
+      initialProps: { id: "thr_1" },
+    });
+    return { ...hook, reads };
+  }
+
+  it("loads under React strict mode", async () => {
+    const { waitFor } = await import("@testing-library/react");
+    const { result, reads } = await setup(true);
+    await waitFor(() => expect(reads.length).toBeGreaterThan(0));
+    reads.splice(0).forEach((resolve) => resolve([automation()]));
+    await waitFor(() => expect(result.current.state.kind).toBe("ready"));
+  });
+
+  it("drops a read that belongs to the previous thread", async () => {
+    const { waitFor } = await import("@testing-library/react");
+    const { result, rerender, reads } = await setup(false);
+    await waitFor(() => expect(reads.length).toBe(1));
+    const [stale] = reads.splice(0);
+    rerender({ id: "thr_2" });
+    await waitFor(() => expect(reads.length).toBe(1));
+    reads.splice(0)[0]!([]);
+    await waitFor(() => expect(result.current.state).toEqual({ kind: "ready", rows: [] }));
+    stale!([automation()]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(result.current.state).toEqual({ kind: "ready", rows: [] });
   });
 });

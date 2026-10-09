@@ -30,8 +30,15 @@ export function useThreadAutomations(threadId: string, knownProjectId: string | 
   const sdk = useSdk();
   const [projectId, setProjectId] = useState<string | null>(knownProjectId);
   const [state, setState] = useState<AutomationsState>({ kind: "loading" });
-  const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
+  // Bumped when the thread changes and on unmount; a read that started under an
+  // older value is dropped. (A plain "mounted" flag stays false after React's
+  // strict-mode remount, so nothing would ever render.)
+  const generation = useRef(0);
+  useEffect(() => {
+    generation.current += 1;
+    setState({ kind: "loading" });
+    return () => { generation.current += 1; };
+  }, [threadId, knownProjectId]);
 
   useEffect(() => {
     if (knownProjectId) { setProjectId(knownProjectId); return; }
@@ -52,11 +59,12 @@ export function useThreadAutomations(threadId: string, knownProjectId: string | 
 
   const refresh = useCallback(async () => {
     if (!projectId) return;
+    const started = generation.current;
     try {
       const raw = await call("automations_list", { projectId });
-      if (alive.current) setState({ kind: "ready", rows: automationsForThread(raw, threadId) });
+      if (generation.current === started) setState({ kind: "ready", rows: automationsForThread(raw, threadId) });
     } catch (error) {
-      if (alive.current) setState({ kind: "unavailable", message: error instanceof Error ? error.message : String(error) });
+      if (generation.current === started) setState({ kind: "unavailable", message: error instanceof Error ? error.message : String(error) });
     }
   }, [call, projectId, threadId]);
 
