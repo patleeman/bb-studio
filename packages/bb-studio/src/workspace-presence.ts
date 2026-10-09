@@ -21,12 +21,15 @@ export type WorkspaceCommand =
   | { client: string; action: "close"; hrefs: string[] };
 
 const KEEP_MS = 24 * 60 * 60 * 1000;
+/** Windows re-report every 30 s while visible; an older "focused" may be a closed window's. */
+const FOCUS_FRESH_MS = 90 * 1000;
 const MAX_CLIENTS = 20;
 /** The new tab page's href, which isn't an item. */
 const BROWSE_HREF = "/plugins/studio/studio/browse";
 
 export class WorkspacePresence {
   private readonly reports = new Map<string, WorkspaceReport & { at: number }>();
+  private readonly waiters = new Set<(report: WorkspaceReport) => void>();
   constructor(private readonly now: () => number = Date.now) {}
 
   report(report: WorkspaceReport): void {
@@ -36,12 +39,30 @@ export class WorkspacePresence {
     for (const [client, each] of this.reports) {
       if (at - each.at > KEEP_MS || this.reports.size > MAX_CLIENTS) this.reports.delete(client);
     }
+    for (const waiter of [...this.waiters]) waiter(report);
   }
 
-  /** The window the user is most likely in: the focused one, else the last to report. */
+  /**
+   * Whether `client` reports a workspace that passes `check` within
+   * `timeoutMs`, counting its latest report; false if it never does, such as
+   * a window that has closed.
+   */
+  waitFor(client: string, check: (report: WorkspaceReport) => boolean, timeoutMs: number): Promise<boolean> {
+    const latest = this.reports.get(client);
+    if (latest && check(latest)) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const done = (passed: boolean) => { clearTimeout(timer); this.waiters.delete(waiter); resolve(passed); };
+      const waiter = (report: WorkspaceReport) => { if (report.client === client && check(report)) done(true); };
+      const timer = setTimeout(() => done(false), timeoutMs);
+      this.waiters.add(waiter);
+    });
+  }
+
+  /** The window the user is most likely in: the one recently focused, else the last to report. */
   current(): (WorkspaceReport & { at: number }) | null {
+    const now = this.now();
     const all = [...this.reports.values()].sort((a, b) => b.at - a.at);
-    return all.find((each) => each.focused) ?? all[0] ?? null;
+    return all.find((each) => each.focused && now - each.at <= FOCUS_FRESH_MS) ?? all[0] ?? null;
   }
 }
 
@@ -75,4 +96,9 @@ export function formatWorkspace(report: (WorkspaceReport & { at: number }) | nul
     }
   });
   return lines.join("\n");
+}
+
+/** Every tab href a report has open. */
+export function openHrefs(report: WorkspaceReport): Set<string> {
+  return new Set(report.panes.flatMap((pane) => pane.tabs.map((tab) => tab.href)));
 }

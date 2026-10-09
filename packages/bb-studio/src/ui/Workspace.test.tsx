@@ -100,4 +100,14 @@ it("reports its tabs for agents and opens and closes tabs an agent sends to this
   expect(host.querySelectorAll("[data-workspace-pane]")).toHaveLength(2);
   await act(() => { realtime.handler({ client: report.client, action: "close", hrefs: [other] }); });
   expect([...host.querySelectorAll('[role="tab"]')].map(tab => tab.textContent)).toEqual(["One"]);
+  // A batch keeps together where the first lands, even past a tab open elsewhere.
+  const third = "/plugins/pages/pages/three", fourth = "/plugins/pages/pages/four";
+  await act(() => { openWorkspaceItem({ href: other, title: "Two" }); });
+  await act(() => { realtime.handler({ client: report.client, action: "open", items: [{ href: third, title: "Three" }, { href: other, title: "Two" }, { href: fourth, title: "Four" }], placement: "right", show: false }); });
+  const pane = (index: number) => [...host.querySelectorAll("[data-workspace-pane]")][index]!;
+  const tabsIn = (element: Element) => [...element.querySelectorAll('[role="tab"]')].map(tab => tab.textContent);
+  expect(host.querySelectorAll("[data-workspace-pane]")).toHaveLength(2);
+  expect(tabsIn(pane(0))).toEqual(["One"]);
+  expect(tabsIn(pane(1))).toEqual(["Three", "Two", "Four"]);
+  closeWorkspaceTabs([third, other, fourth]);
 });

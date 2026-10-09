@@ -30,7 +30,7 @@ import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
-import { formatWorkspace, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
+import { formatWorkspace, openHrefs, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
 import { WORKSPACE_CHANNEL } from "./src/ids";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { listFiles, readFile, requireThreadInSpace, worktrees } from "./src/space-files";
@@ -996,6 +996,8 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   const sendToWorkspace = (command: WorkspaceCommand) => bb.realtime.publish(WORKSPACE_CHANNEL, command);
+  /** How long a window gets to report a command's result. */
+  const CONFIRM_MS = 3000;
   bb.agents.registerTool({
     name: "studio_workspace",
     description:
@@ -1024,8 +1026,14 @@ export default async function plugin(bb: BbPluginApi) {
       const opened = matched.map((item) => ({ href: item.href, title: untitled(item.title) }));
       // The sidebar's Studio list shows them too, as it does items the user opens.
       if (matched.map((item) => tabs.open(item)).some(Boolean)) tabsChanged();
-      if (opened.length) sendToWorkspace({ client: current.client, action: "open", items: opened, placement: placement === "down" ? "bottom" : placement, show });
-      const lines = opened.length ? [`Opened ${opened.map((item) => item.title).join(", ")} in the user's Studio workspace${placement === "tab" ? "" : `, split ${placement}`}.`] : [];
+      const lines: string[] = [];
+      if (opened.length) {
+        sendToWorkspace({ client: current.client, action: "open", items: opened, placement: placement === "down" ? "bottom" : placement, show });
+        const confirmed = await workspace.waitFor(current.client, (report) => opened.every((item) => openHrefs(report).has(item.href)), CONFIRM_MS);
+        lines.push(confirmed
+          ? `Opened ${opened.map((item) => item.title).join(", ")} in the user's Studio workspace${placement === "tab" ? "" : `, split ${placement}`}.`
+          : `Sent ${opened.map((item) => item.title).join(", ")} to the user's BB window, but it didn't confirm; it may have closed. Don't assume they're open.`);
+      }
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
       return lines.join("\n") || "Nothing to open.";
     },
@@ -1041,13 +1049,14 @@ export default async function plugin(bb: BbPluginApi) {
     async execute({ items: hrefs }) {
       const current = workspace.current();
       if (!current) return "No BB window has Studio's workspace open.";
-      const open = new Set(current.panes.flatMap((pane) => pane.tabs.map((tab) => tab.href)));
-      const closing = hrefs.map((href) => href.trim()).filter((href) => open.has(href));
-      const notOpen = hrefs.filter((href) => !open.has(href.trim()));
-      if (closing.length) sendToWorkspace({ client: current.client, action: "close", hrefs: closing });
-      const lines = closing.length ? [`Closed ${closing.length} tab${closing.length === 1 ? "" : "s"}.`] : [];
-      if (notOpen.length) lines.push(`Not open: ${notOpen.join(", ")}`);
-      return lines.join("\n");
+      // The last report can lag a tab just opened, so every one is sent.
+      const closing = [...new Set(hrefs.map((href) => href.trim()))];
+      const wasOpen = openHrefs(current);
+      sendToWorkspace({ client: current.client, action: "close", hrefs: closing });
+      const confirmed = await workspace.waitFor(current.client, (report) => closing.every((href) => !openHrefs(report).has(href)), CONFIRM_MS);
+      if (!confirmed) return "Sent the close to the user's BB window, but it didn't confirm; it may have closed.";
+      const closed = closing.filter((href) => wasOpen.has(href));
+      return closed.length === closing.length ? `Closed ${closed.length} tab${closed.length === 1 ? "" : "s"}.` : `Closed what was open. Not open: ${closing.filter((href) => !wasOpen.has(href)).join(", ")}`;
     },
   });
 
