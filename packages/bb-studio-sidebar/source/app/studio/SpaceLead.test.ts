@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { CHIEF_DIALOG_EVENT, chiefOfStaffOf, isSpaceLeadThread, leadSafeArchiveIds, openChiefHeartbeat } from "./SpaceLead.js";
+import { canPromoteThread, CHIEF_DIALOG_EVENT, chiefOfStaffOf, isSpaceLeadThread, leadSafeArchiveIds, openChiefHeartbeat } from "./SpaceLead.js";
 import type { StudioSpacesState } from "./studioSpaces.js";
 
 const top = { id: "sp_top", name: "Personal", color: "#000", icon: null, defaultProjectId: null, isDefault: true, projectIds: [] };
@@ -9,6 +9,13 @@ const ready = (leads: Record<string, string | null>, chiefOfStaff: string | null
 });
 
 describe("Space leads", () => {
+  it("offers Promote only for open top-level threads, or one that already holds a role", () => {
+    expect(canPromoteThread({ parentThreadId: null, archivedAt: null }, false)).toBe(true);
+    expect(canPromoteThread({ parentThreadId: "thr_p", archivedAt: null }, false)).toBe(false);
+    expect(canPromoteThread({ parentThreadId: null, archivedAt: 5 }, false)).toBe(false);
+    expect(canPromoteThread({ parentThreadId: "thr_p", archivedAt: 5 }, true)).toBe(true);
+  });
+
   it("knows a lead without By space's thread to Space map", () => {
     const state = ready({ sp_a: "thr_lead", sp_b: null });
     expect(isSpaceLeadThread(state, "thr_lead")).toBe(true);

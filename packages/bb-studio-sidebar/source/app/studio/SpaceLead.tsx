@@ -76,6 +76,15 @@ export function chiefOfStaffOf(state: StudioSpacesState): string | null {
 }
 
 /**
+ * Whether Promote ▸ is offered: not for an archived thread (it would lead from
+ * out of sight) or a sub-thread, unless it already holds a role, so it can
+ * still be removed.
+ */
+export function canPromoteThread(thread: Pick<SidebarThread, "parentThreadId" | "archivedAt">, holdsRole: boolean): boolean {
+  return holdsRole || (thread.archivedAt === null && thread.parentThreadId === null);
+}
+
+/**
  * Promote ▸ in a thread's menu while By space shows: Space lead and Chief of
  * Staff, the role the thread holds checked; choosing a checked role removes
  * it. Chief of Staff is the top level's (the default Space's) lead; Space
@@ -98,6 +107,7 @@ export function SpaceLeadItem({ thread, surface }: {
   // Space lead is for the other Spaces; the top level's lead is the Chief of Staff.
   const leadSpaceId = spaceId !== null && spaceId !== topId ? spaceId : null;
   const isLead = leadSpaceId !== null && state.leads[leadSpaceId] === thread.id;
+  if (!canPromoteThread(thread, isChief || isLead)) return null;
   const toggleLead = () => { if (leadSpaceId) setLead(leadSpaceId, isLead ? null : thread.id); };
   const toggleChief = () => { if (topId) setLead(topId, isChief ? null : thread.id); };
 
