@@ -145,7 +145,7 @@ export function ChatOverlay() {
   const rpc = useRpc<typeof rpcContract>();
   const path = usePathname();
   const active = useSyncExternalStore(subscribeWorkspace, workspaceActivePath, () => null);
-  const viewed = useViewing(rpc, path === WORKSPACE_PATH ? active ?? path : path);
+  const viewed = useViewing(rpc, path.replace(/\/+$/, "") === WORKSPACE_PATH ? active ?? path : path);
   const { open, anchor } = useOpenTarget();
   const reportError = useCallback((cause: unknown) => toast.error(errorMessage(cause)), []);
   useHomeThreads(rpc, viewed, {

@@ -9,12 +9,15 @@ threads into one place, each with an optional lead thread.
 
 ## Workspace
 
-Open items from the sidebar, collection or Studio search into tabs without a
-conversation. Drag tabs or sidebar items to a pane's edge to split; drag onto
+Studio opens on its workspace: items in tabs, without a conversation. Its new
+tab page is the Studio item list. A new workspace shows it, **+** opens it, and
+an item opened from it takes its place, as in a browser. Items opened from the
+sidebar or Studio search open as tabs too. Drag tabs or sidebar items to a pane's edge to split; drag onto
 a tab bar to move or reorder. The tab arrangement menu offers split and move
 commands, and separators resize with the mouse or arrow keys. Closing a tab
 keeps the item. The workspace remembers the layout locally across visits and
-refreshes. Use **Workspace** in the collection to return, or **+** to browse.
+refreshes. The item list still has a page of its own at a kind's address, such
+as `/plugins/studio/studio/pages`, with **Workspace** to return.
 Each tab row carries the active item's tools, such as Chat, beside its tabs.
 With one pane, the tab row takes BB's title bar, so the item sits under a
 single bar. Open items live here, not in the sidebar; a Space's Browse menu

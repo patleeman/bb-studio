@@ -3,6 +3,7 @@
 // panel's sub-path can start the query on a kind, so
 // /plugins/studio/studio/recording links to recordings. openSpaceItems lists
 // a space's items here.
+import { showBrowse } from "./Workspace";
 import {
   CollectionPage,
   createStudioItem,
@@ -57,6 +58,8 @@ export function openCollectionQuery(navigate: ReturnType<typeof useBbNavigate>, 
     // Private windows can refuse storage; an open collection still hears the event.
   }
   window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: formatQuery(query) }));
+  // The workspace's new tab page shows it.
+  showBrowse();
   navigate.toPluginPanel("studio", { subPath: "" });
 }
 
@@ -242,7 +245,8 @@ async function perPlugin(items: CollectionItem[], work: (pluginId: string, ids: 
   return { done: results.flatMap((result) => result.done), failed: results.flatMap((result) => result.failed) };
 }
 
-export function StudioPanel({ subPath }: { subPath: string }) {
+/** `embedded`: the workspace's new tab page, which keeps its kind in the query instead of the address. */
+export function StudioPanel({ subPath, embedded = false }: { subPath: string; embedded?: boolean }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const context = useBbContext();
@@ -259,9 +263,11 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     [providers],
   );
   const requested = decodeSegment(subPath.split("/").filter(Boolean)[0] ?? "") || "all";
-  const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
-
   const [query, setQuery] = useStoredQuery(QUERY_KEY);
+  const setKind = useCallback((next: string) => {
+    if (!embedded) return navigate.toPluginPanel("studio", { subPath: next === "all" ? "collection" : encodeURIComponent(next) });
+    setQuery({ ...query, filters: [...query.filters.filter((filter) => filter.field !== "kind"), ...(next === "all" ? [] : [{ field: "kind" as const, value: next }])] });
+  }, [embedded, navigate, query, setQuery]);
   // A link to a kind starts the query on it.
   const seededKind = useRef<string | null>(null);
   useEffect(() => {
@@ -462,8 +468,10 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   const headerActions = (
     <>
-    <button type="button" className="rounded px-3 py-1.5 text-sm hover:bg-state-hover" onClick={() => navigate.toPluginPanel("studio", { subPath: "workspace" })}>Workspace</button>
-    <OpenInSplitButton item={{ href: panelHref("studio", "studio", subPath), title: "Studio" }} />
+    {embedded ? null : <>
+      <button type="button" className="rounded px-3 py-1.5 text-sm hover:bg-state-hover" onClick={() => navigate.toPluginPanel("studio", { subPath: "" })}>Workspace</button>
+      <OpenInSplitButton item={{ href: panelHref("studio", "studio", subPath), title: "Studio" }} />
+    </>}
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
 import { ItemGestures } from "./src/ui/ItemGestures";
@@ -7,7 +8,7 @@ import { CommandPage } from "./src/command/command-view";
 // sub-path filters it to a kind, the sidebar's Studio tabs and Spaces, the
 // Space dialogs other plugins open by window event, each thread's space
 // in its header, and Studio search.
-import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
+import { openAppPath, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ManageSpace } from "./src/ui/ManageSpace";
 import { NewSpace } from "./src/ui/NewSpace";
@@ -21,12 +22,22 @@ import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 
+/** The workspace's old address; retained, so it checks each time it's shown. */
+function ToWorkspace() {
+  const pathname = usePathname();
+  useEffect(() => { if (pathname.replace(/\/+$/, "").endsWith("/studio/workspace")) openAppPath(WORKSPACE_PATH, { standalone: true, replace: true }); }, [pathname]);
+  return null;
+}
+
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
-  if (path === "workspace") return <StudioWorkspace />;
+  // Studio opens on its tabbed workspace; the item list is its new tab page.
+  if (path === "") return <StudioWorkspace />;
+  if (path === "workspace") return <ToWorkspace />;
+  if (path === "browse") return <StudioPanel subPath="" embedded />;
   if (path.startsWith("command/")) return <CommandPage subPath={path.slice("command/".length)} />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
-  // "collection" is the old address of the landing page.
+  // "collection" and a kind's name show the item list on its own page.
   return path === "activity" ? <ActivityPanel /> : <StudioPanel subPath={path} />;
 }
 

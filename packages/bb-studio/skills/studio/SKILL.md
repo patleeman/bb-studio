@@ -113,9 +113,8 @@ A Space’s Command view opens from its sidebar heading. It shows ordinary threa
 
 ## Item workspace
 
-Sidebar, collection and search opens use Studio's independent Workspace tabs for
-participating add-ons. No thread is required. Drag items or tabs onto a tab bar, or
+Studio opens on its Workspace, whose new tab page is the item list: **+** opens it,
+an empty workspace shows it, and an item opened from it replaces it. Sidebar,
+collection and search opens use the Workspace tabs for participating add-ons. No thread is required. Drag items or tabs onto a tab bar, or
 to an edge to split; the arrangement menu offers split and move actions. Tabs and
-pane sizes restore locally. Closing a tab does not delete its saved item. The
-collection's Workspace button returns to the layout, and the workspace's + browses
-the collection. Conversation-side views keep their existing behavior.
+pane sizes restore locally. Closing a tab does not delete its saved item. Conversation-side views keep their existing behavior.

@@ -8,7 +8,18 @@ export interface Workspace { layout: Layout; focused: string }
 let sequence = 0;
 const id = () => `pane-${Date.now().toString(36)}-${++sequence}`;
 export const emptyPane = (): Pane => ({ kind: "pane", id: id(), tabs: [], active: null });
-export function emptyWorkspace(): Workspace { const layout = emptyPane(); return { layout, focused: layout.id }; }
+/**
+ * The new tab page: Studio's item list, as a tab. "+" opens it, an empty
+ * workspace shows it, and an item opened from it takes its place.
+ */
+export const BROWSE: Tab = { href: "/plugins/studio/studio/browse", title: "Studio", kindIcon: "studio/studio" };
+export function emptyWorkspace(): Workspace { const layout: Pane = { ...emptyPane(), tabs: [BROWSE], active: BROWSE.href }; return { layout, focused: layout.id }; }
+/** A workspace with no tabs left shows the new tab page. */
+function withBrowse(state: Workspace): Workspace {
+  if (panes(state.layout).some(pane => pane.tabs.length)) return state;
+  const pane = panes(state.layout)[0]!;
+  return { layout: { ...pane, tabs: [BROWSE], active: BROWSE.href }, focused: pane.id };
+}
 export function panes(layout: Layout): Pane[] { return layout.kind === "pane" ? [layout] : [...panes(layout.first), ...panes(layout.second)]; }
 export function mapLayout(layout: Layout, fn: (node: Layout) => Layout): Layout {
   return fn(layout.kind === "pane" ? layout : { ...layout, first: mapLayout(layout.first, fn), second: mapLayout(layout.second, fn) });
@@ -26,17 +37,22 @@ function remove(layout: Layout, href: string): Layout {
 }
 export function closeTab(state: Workspace, href: string): Workspace {
   const layout = remove(state.layout, href);
-  return { layout, focused: panes(layout).some(pane => pane.id === state.focused) ? state.focused : panes(layout)[0]!.id };
+  return withBrowse({ layout, focused: panes(layout).some(pane => pane.id === state.focused) ? state.focused : panes(layout)[0]!.id });
 }
 export function openItem(state: Workspace, item: WorkspaceItem, placement: WorkspacePlacement = "tab", destination?: string, before?: string): Workspace {
   const href = workspaceItemPath(item.href);
   if (!href) return state;
   const existing = panes(state.layout).find(pane => pane.tabs.some(tab => tab.href === href));
   const previous = existing?.tabs.find(tab => tab.href === href);
-  const tab: Tab = { ...previous, href, title: item.title || previous?.title || href.split("/").pop()!.replace(/_/g, " ") };
+  const tab: Tab = href === BROWSE.href ? BROWSE : { ...previous, href, title: item.title || previous?.title || href.split("/").pop()!.replace(/_/g, " ") };
   // Ordinary opening deduplicates; an explicit destination moves/reorders.
   if (existing && placement === "tab" && destination === undefined) {
     return { focused: existing.id, layout: mapLayout(state.layout, node => node.kind === "pane" && node.id === existing.id ? { ...node, active: href, tabs: node.tabs.map(each => each.href === href ? tab : each) } : node) };
+  }
+  // Opened from the new tab page, as a browser does: the item takes its place.
+  if (!existing && placement === "tab" && destination === undefined && href !== BROWSE.href) {
+    const focused = panes(state.layout).find(pane => pane.id === state.focused);
+    if (focused?.active === BROWSE.href) return { ...state, layout: mapLayout(state.layout, node => node.kind === "pane" && node.id === focused.id ? { ...node, active: href, tabs: node.tabs.map(each => each.href === BROWSE.href ? tab : each) } : node) };
   }
   if (before === href && existing?.id === destination) return state;
   destination ??= state.focused;
@@ -88,6 +104,6 @@ export function parseWorkspace(value: unknown): Workspace {
   try {
     const record = value as Workspace;
     const layout = parse(record.layout);
-    return { layout, focused: panes(layout).some(pane => pane.id === record.focused) ? record.focused : panes(layout)[0]!.id };
+    return withBrowse({ layout, focused: panes(layout).some(pane => pane.id === record.focused) ? record.focused : panes(layout)[0]!.id });
   } catch { return emptyWorkspace(); }
 }

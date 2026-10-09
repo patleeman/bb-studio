@@ -16,6 +16,7 @@ import {
   useSidebarHosted,
   useSidebarNavigated,
   usePathname,
+  WORKSPACE_PATH,
 } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
@@ -71,7 +72,7 @@ export function SidebarTabs() {
   const hosted = useSidebarHosted();
   const path = usePathname();
   const workspace = useWorkspace();
-  const workspacePath = path.endsWith("/studio/workspace") ? panes(workspace.layout).find(pane => pane.id === workspace.focused)?.active : null;
+  const workspacePath = path.replace(/\/+$/, "") === WORKSPACE_PATH ? panes(workspace.layout).find(pane => pane.id === workspace.focused)?.active : null;
   const { tabs, setTabs, error, refetch, rpc } = useTabs(hosted);
   const navigated = useSidebarNavigated();
   const bySpace = useBySpace();

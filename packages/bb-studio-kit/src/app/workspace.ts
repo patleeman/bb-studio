@@ -13,7 +13,8 @@ interface Bridge {
 }
 const KEY = "__bbStudioWorkspace_v1";
 const EVENT = "bb-studio-workspace-change";
-export const WORKSPACE_PATH = "/plugins/studio/studio/workspace";
+/** Studio's landing page is its workspace. */
+export const WORKSPACE_PATH = "/plugins/studio/studio";
 export const WORKSPACE_DRAG = "application/x-bb-studio-item";
 function bridge(): Bridge {
   const scope = window as unknown as Record<string, Bridge>;

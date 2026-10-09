@@ -9,9 +9,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       const recording = await seedTalkRecording(projectId, { transcribe: false });
       const cleanup = async () => { await pages.cleanup(); await talkRpc("recording_delete", { id: recording }); };
       try {
-        await client.navigate("/plugins/studio/studio/collection");
+        await client.navigate("/plugins/studio/studio");
         await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem('studio:query:all', ''); localStorage.setItem('studio:collection:view', 'list')`);
-        await client.navigate("/plugins/studio/studio/collection");
+        // Studio opens on its workspace, showing the new tab page: the item list as a tab.
+        await client.navigate("/plugins/studio/studio");
         const openRow = async title => {
           const selector = `[role="row"][aria-label="${title}"]`;
           await client.waitForSelector(selector);
@@ -24,8 +25,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
             await sleep(50);
           }
         };
+        const fresh = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map(tab => tab.textContent.trim())`);
+        if (fresh.length !== 1 || fresh[0] !== "Studio") throw new Error(`The workspace didn't open on the new tab page: ${JSON.stringify(fresh)}`);
         await openRow("Offline mode launch");
         await client.waitForText("Launch checklist");
+        // The item took the new tab page's place.
+        const replaced = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map(tab => tab.textContent.trim())`);
+        if (replaced.join() !== "Offline mode launch") throw new Error(`Opening an item didn't replace the new tab page: ${JSON.stringify(replaced)}`);
         // Browse inside BB (no reload), then open a second kind of editor.
         await client.evaluate(`document.querySelector('[aria-label="Browse Studio items"]').click()`);
         await openRow("Weekly product sync");
@@ -40,8 +46,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           if (result.panes !== 2 || result.tabs !== 2 || !result.page || !result.recording) { await client.capture("/tmp/studio-workspace-failure.png"); throw new Error(`Workspace lost an editor: ${JSON.stringify(result)}`); }
         };
         await assertLayout();
+        // The old address still leads to the workspace.
         await client.navigate("/plugins/studio/studio/workspace");
         await client.waitForText("Launch checklist");
+        if (!(await client.evaluate(`location.pathname`)).endsWith("/plugins/studio/studio")) throw new Error("The workspace's old address didn't move to Studio's landing page");
         await assertLayout();
         await client.evaluate(`document.querySelector('[aria-label="Close Weekly product sync"]').click()`);
         await sleep(250);
