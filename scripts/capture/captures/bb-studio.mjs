@@ -85,6 +85,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.capture(new URL('../../../packages/bb-studio/assets/workspace-tab-menu.png', import.meta.url).pathname);
         await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
         await sleep(250);
+        // Escape hands keyboard focus back to the tab, ringed; the screenshot is of a mouse user's screen.
+        await client.evaluate(`document.activeElement?.blur()`);
         // Mid-drag, a drop layer covers each editor, so editors in iframes can't swallow the drop.
         const over = await client.evaluate(`(() => { const rect = [...document.querySelectorAll('[data-workspace-pane]')].filter(element => element.checkVisibility())[0].querySelector('[data-studio-workspace-drop]').getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.bottom - 40 }; })()`);
         const item = { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 };
