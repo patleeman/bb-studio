@@ -15,6 +15,7 @@ import {
   AUTOMATIONS_PLUGIN_ID,
   AUTOMATIONS_TAB,
   automationListSchema,
+  automationsPresent,
   automationsForThread,
   editPath,
   lastRunLabel,
@@ -44,11 +45,42 @@ export function useThreadAutomations(threadId: string, knownProjectId: string | 
     if (knownProjectId) { setProjectId(knownProjectId); return; }
     let cancelled = false;
     sdk.threads.get({ threadId }).then(
-      (thread) => { if (!cancelled) setProjectId((thread as { projectId?: string }).projectId ?? null); },
+      (thread) => {
+        if (cancelled) return;
+        const id = (thread as { projectId?: string | null }).projectId ?? null;
+        setProjectId(id);
+        if (!id) setState({ kind: "unavailable", message: "This thread has no project, so it has no automations." });
+      },
       () => { if (!cancelled) setState({ kind: "unavailable", message: "Couldn't read this thread." }); },
     );
     return () => { cancelled = true; };
   }, [sdk, threadId, knownProjectId]);
+
+  // Whether the Automations plugin runs: null while checking. When it doesn't,
+  // nothing polls; the check repeats when BB's plugins change.
+  const [present, setPresent] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    let latest = 0;
+    const check = () => {
+      const call = ++latest;
+      sdk.plugins.list().then(
+        ({ plugins }) => { if (live && call === latest) setPresent(automationsPresent(plugins)); },
+        () => { if (live && call === latest) setPresent(false); },
+      );
+    };
+    check();
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = sdk.subscribe({
+        event: "system:changed",
+        callback: (event) => { if (event.changes.includes("plugins-changed")) check(); },
+      });
+    } catch {
+      // No realtime here: the first check stands.
+    }
+    return () => { live = false; unsubscribe?.(); };
+  }, [sdk]);
 
   const call = useCallback((method: string, input: unknown) =>
     sdk.plugins.callRpc({
@@ -69,12 +101,14 @@ export function useThreadAutomations(threadId: string, knownProjectId: string | 
   }, [call, projectId, threadId]);
 
   useEffect(() => {
+    if (present === false) { setState({ kind: "absent" }); return; }
+    if (present === null) return;
     void refresh();
     const timer = setInterval(() => {
       if (typeof document === "undefined" || document.visibilityState !== "hidden") void refresh();
     }, REFRESH_MS);
     return () => clearInterval(timer);
-  }, [refresh]);
+  }, [refresh, present]);
 
   const setEnabled = useCallback(async (row: ThreadAutomation, enabled: boolean) => {
     setState(s => s.kind === "ready" ? { ...s, rows: s.rows.map(r => r.id === row.id ? { ...r, enabled } : r) } : s);
@@ -101,11 +135,11 @@ export function AutomationsView({ state, onToggle, now = Date.now() }: {
   if (state.kind === "loading") {
     return <p className="px-1 py-2 text-sm text-muted-foreground">Loading automations…</p>;
   }
-  if (state.kind === "unavailable") {
+  if (state.kind === "absent" || state.kind === "unavailable") {
     return (
       <div role="status" className="flex items-start gap-2 px-1 py-2 text-sm text-muted-foreground">
         <Icon name="AlertTriangle" aria-hidden className="mt-0.5 size-4 shrink-0" />
-        <span>Automations are unavailable. Turn on the Automations plugin to see what wakes this thread.</span>
+        <span>{state.kind === "absent" ? "Automations are unavailable. Turn on the Automations plugin to see what wakes this thread." : state.message}</span>
       </div>
     );
   }

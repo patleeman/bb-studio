@@ -118,5 +118,13 @@ export function editPath(row: Pick<ThreadAutomation, "projectId" | "id">): strin
 
 export type AutomationsState =
   | { kind: "loading" }
+  /** The Automations plugin is not installed, is off, or failed to start. */
+  | { kind: "absent" }
   | { kind: "unavailable"; message: string }
   | { kind: "ready"; rows: ThreadAutomation[] };
+
+/** Whether the Automations plugin is installed and running, from `sdk.plugins.list()`. */
+export function automationsPresent(plugins: readonly { id: string; enabled: boolean; status?: string }[]): boolean {
+  const entry = plugins.find((plugin) => plugin.id === AUTOMATIONS_PLUGIN_ID);
+  return Boolean(entry?.enabled && entry.status !== "error" && entry.status !== "incompatible");
+}

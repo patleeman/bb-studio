@@ -110,7 +110,7 @@ describe("AutomationsView", () => {
   });
 
   it("shows a degraded state when the automations plugin is unreachable", () => {
-    render(<AutomationsView state={{ kind: "unavailable", message: "plugin disabled" }} onToggle={() => {}} now={NOW} />);
+    render(<AutomationsView state={{ kind: "absent" }} onToggle={() => {}} now={NOW} />);
     expect(screen.getByRole("status").textContent).toMatch(/Automations are unavailable/);
   });
 
@@ -147,7 +147,11 @@ describe("useThreadAutomations", () => {
     const { renderHook } = await import("@testing-library/react");
     const reads: Array<(value: unknown) => void> = [];
     const callRpc = vi.fn(() => new Promise((resolve) => { reads.push(resolve); }));
-    sdkForTest.current = { plugins: { callRpc }, threads: { get: vi.fn() } };
+    sdkForTest.current = {
+      plugins: { callRpc, list: async () => ({ plugins: [{ id: "automations", enabled: true }] }) },
+      threads: { get: vi.fn() },
+      subscribe: () => () => {},
+    };
     const { useThreadAutomations } = await import("./ThreadAutomations");
     const hook = renderHook(({ id }) => useThreadAutomations(id, "proj_1"), {
       ...(strict ? { wrapper: StrictMode } : {}),
@@ -176,5 +180,37 @@ describe("useThreadAutomations", () => {
     stale!([automation()]);
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(result.current.state).toEqual({ kind: "ready", rows: [] });
+  });
+
+  it("shows the plugin as absent once, stops polling, and rechecks when plugins change", async () => {
+    const { renderHook, waitFor, act } = await import("@testing-library/react");
+    let installed = false;
+    let onChange: ((event: { changes: string[] }) => void) | undefined;
+    const callRpc = vi.fn(async () => [automation()]);
+    sdkForTest.current = {
+      plugins: { callRpc, list: async () => ({ plugins: installed ? [{ id: "automations", enabled: true }] : [] }) },
+      threads: { get: vi.fn() },
+      subscribe: ({ callback }: { callback: (event: { changes: string[] }) => void }) => { onChange = callback; return () => {}; },
+    };
+    const { useThreadAutomations } = await import("./ThreadAutomations");
+    const { result } = renderHook(() => useThreadAutomations("thr_1", "proj_1"));
+    await waitFor(() => expect(result.current.state.kind).toBe("absent"));
+    expect(callRpc).not.toHaveBeenCalled();
+    installed = true;
+    act(() => onChange!({ changes: ["plugins-changed"] }));
+    await waitFor(() => expect(result.current.state.kind).toBe("ready"));
+    expect(callRpc).toHaveBeenCalled();
+  });
+
+  it("says so when the thread has no project instead of loading forever", async () => {
+    const { renderHook, waitFor } = await import("@testing-library/react");
+    sdkForTest.current = {
+      plugins: { callRpc: vi.fn(), list: async () => ({ plugins: [{ id: "automations", enabled: true }] }) },
+      threads: { get: async () => ({ projectId: null }) },
+      subscribe: () => () => {},
+    };
+    const { useThreadAutomations } = await import("./ThreadAutomations");
+    const { result } = renderHook(() => useThreadAutomations("thr_1", null));
+    await waitFor(() => expect(result.current.state.kind).toBe("unavailable"));
   });
 });
