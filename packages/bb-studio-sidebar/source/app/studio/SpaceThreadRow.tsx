@@ -161,7 +161,8 @@ export function useSpaceThreadRow(thread: SidebarThread): SpaceThreadRow | null 
   return {
     className: cn("h-auto flex-wrap pb-1.5 max-md:pointer-coarse:h-auto", SPACE_THREAD_TITLE[state]),
     style: { rowGap: 0 },
-    dot: rows.marks?.[thread.id] ? <SpaceThreadMarkIcon mark={rows.marks[thread.id]!} state={state} /> : <SpaceThreadDot state={state} />,
+    // The Chief of Staff's avatar marks it, so its row keeps the plain status dot.
+    dot: rows.marks?.[thread.id] && rows.marks[thread.id]!.kind !== "chief" ? <SpaceThreadMarkIcon mark={rows.marks[thread.id]!} state={state} /> : <SpaceThreadDot state={state} />,
     pill: SPACE_THREAD_PILL[state] ? (
       <span
         data-space-thread-pill={state}
