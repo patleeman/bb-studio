@@ -36,6 +36,9 @@ Source toggle, Copy, Download and the ⋯ menu.
   - Images fit the window. Click to switch to actual size.
   - HTML runs in a sandboxed frame.
   - PDFs open in the browser's viewer.
+  - Audio (MP3, WAV, OGG, Opus, M4A, AAC, FLAC) and video (MP4, WebM, MOV) play
+    in the browser's player, in Studio and on the artifact's card in a chat.
+    The content route answers range requests, so seeking works.
   - Markdown renders as a document.
   - Code and text use BB's source viewer. Only the first 2 MB shows; Download has the rest.
   - Other files offer a download.

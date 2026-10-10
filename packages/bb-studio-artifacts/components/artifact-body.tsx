@@ -112,6 +112,22 @@ export function ArtifactBody({
     // serves a real PDF unsandboxed.
     return <iframe key={version.id} title={version.name} src={src} className="size-full border-0 bg-muted/40" />;
   }
+  if (version.type === "audio") {
+    // The browser's own player; the route answers its range requests.
+    return (
+      <div className={cn("flex h-full flex-col items-center justify-center gap-3", dense ? "p-3" : "p-6")}>
+        {dense ? null : <p className="max-w-full truncate text-sm font-medium">{version.name}</p>}
+        <audio key={version.id} controls preload="metadata" src={src} aria-label={`Play ${version.name}`} className="w-full max-w-xl" />
+      </div>
+    );
+  }
+  if (version.type === "video") {
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center bg-black">
+        <video key={version.id} controls preload="metadata" playsInline src={src} aria-label={`Play ${version.name}`} className="max-h-full max-w-full" />
+      </div>
+    );
+  }
   if (!showText) {
     return (
       <EmptyState icon="File" title={version.name} actions={<DownloadButton artifactId={artifactId} version={version} />}>

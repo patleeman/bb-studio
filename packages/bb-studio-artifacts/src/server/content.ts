@@ -16,7 +16,7 @@ export function contentHeaders(
   const type = versionType(version);
   const pdf = type === "pdf" && isPdf(bytes);
   const headers: Record<string, string> = {
-    "content-type": contentType(type, version.mime.startsWith("image/") ? version.mime : mimeFor(version.name), pdf),
+    "content-type": contentType(type, /^(image|audio|video)\//.test(version.mime) ? version.mime : mimeFor(version.name), pdf),
     "cache-control": "private, max-age=31536000, immutable",
     "x-content-type-options": "nosniff",
   };
@@ -28,10 +28,27 @@ export function contentHeaders(
 /** Only types the viewer shows natively keep their own mime type. */
 function contentType(type: ReturnType<typeof versionType>, mime: string, pdf: boolean): string {
   if (type === "image" && /^image\/[\w.+-]+$/.test(mime)) return mime;
+  if ((type === "audio" || type === "video") && /^(audio|video)\/[\w.+-]+$/.test(mime)) return mime;
   if (type === "html") return "text/html; charset=utf-8";
   if (pdf) return "application/pdf";
   if (type === "markdown" || type === "code" || type === "text") return "text/plain; charset=utf-8";
   return "application/octet-stream";
+}
+
+/**
+ * The bytes, or the part a `Range` header asks for: players fetch media in
+ * pieces, and seeking needs it. One range only; others get the whole file.
+ */
+export function rangeResponse(bytes: Uint8Array, headers: Record<string, string>, range: string | undefined): Response {
+  const all = { ...headers, "accept-ranges": "bytes" };
+  const match = range ? /^bytes=(\d*)-(\d*)$/.exec(range) : null;
+  if (!match) return new Response(bytes as BodyInit, { headers: { ...all, "content-length": String(bytes.length) } });
+  const start = match[1] ? Number(match[1]) : Math.max(0, bytes.length - Number(match[2]));
+  const end = match[1] && match[2] ? Math.min(Number(match[2]), bytes.length - 1) : bytes.length - 1;
+  if ((!match[1] && !match[2]) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= bytes.length) {
+    return new Response(null, { status: 416, headers: { ...all, "content-range": `bytes */${bytes.length}` } });
+  }
+  return new Response(bytes.slice(start, end + 1) as BodyInit, { status: 206, headers: { ...all, "content-range": `bytes ${start}-${end}/${bytes.length}`, "content-length": String(end - start + 1) } });
 }
 
 function isPdf(bytes: Uint8Array): boolean {

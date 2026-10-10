@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { SANDBOX_CSP, contentHeaders, withQuoteScript } from "./content";
+import { SANDBOX_CSP, contentHeaders, rangeResponse, withQuoteScript } from "./content";
+import { artifactType } from "../shared";
 
 const text = (value: string) => new Uint8Array(Buffer.from(value));
 
@@ -54,5 +55,28 @@ describe("withQuoteScript", () => {
 
   it("appends it to a fragment without a body", () => {
     expect(html(withQuoteScript(text("<h1>x</h1>")))).toMatch(/^<h1>x<\/h1><script>/);
+  });
+});
+
+describe("media", () => {
+  it("plays audio and video by name, with their own types", () => {
+    expect(artifactType("office_theme.wav", "application/octet-stream")).toBe("audio");
+    expect(artifactType("clip.mp4", "application/octet-stream")).toBe("video");
+    expect(artifactType("voice", "audio/webm")).toBe("audio");
+    expect(contentHeaders({ name: "office_theme.wav", mime: "application/octet-stream" }, new Uint8Array([1]))["content-type"]).toBe("audio/wav");
+    expect(contentHeaders({ name: "clip.mov", mime: "video/quicktime" }, new Uint8Array([1]))["content-type"]).toBe("video/quicktime");
+  });
+
+  it("answers a player's range requests", async () => {
+    const bytes = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const whole = rangeResponse(bytes, { "content-type": "audio/wav" }, undefined);
+    expect(whole.status).toBe(200);
+    expect(whole.headers.get("accept-ranges")).toBe("bytes");
+    const part = rangeResponse(bytes, { "content-type": "audio/wav" }, "bytes=2-4");
+    expect(part.status).toBe(206);
+    expect(part.headers.get("content-range")).toBe("bytes 2-4/10");
+    expect([...new Uint8Array(await part.arrayBuffer())]).toEqual([2, 3, 4]);
+    expect((rangeResponse(bytes, {}, "bytes=-3").headers.get("content-range"))).toBe("bytes 7-9/10");
+    expect(rangeResponse(bytes, {}, "bytes=20-").status).toBe(416);
   });
 });

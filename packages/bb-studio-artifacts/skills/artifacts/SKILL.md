@@ -56,8 +56,10 @@ bb artifacts delete <id>
 
 The file name's extension decides how the viewer shows it: images (png, jpg,
 gif, webp, svg), HTML (runs sandboxed, with scripts but no access to BB),
-Markdown (rendered, with a source view), code and plain text, and PDF.
-Anything else can be downloaded. The limit is 25 MB per file.
+Markdown (rendered, with a source view), code and plain text, PDF, audio (mp3,
+wav, ogg, opus, m4a, aac, flac) and video (mp4, webm, mov). Audio and video
+play right on the artifact's card in the chat, so save a track or clip there
+for the user to listen to or watch. Anything else can be downloaded. The limit is 25 MB per file.
 
 To change an artifact, export or rewrite the file, then save it again from
 the same path (or pass `artifactId`). Saving to an archived artifact brings

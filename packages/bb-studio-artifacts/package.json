@@ -16,7 +16,9 @@
       "experimental_icons": {
         "artifact": "./assets/icon.svg",
         "image": "./assets/icon-image.svg",
-        "save": "./assets/icon-save.svg"
+        "save": "./assets/icon-save.svg",
+        "audio": "./assets/icon-audio.svg",
+        "video": "./assets/icon-video.svg"
       }
     },
     "server": "./server.ts",

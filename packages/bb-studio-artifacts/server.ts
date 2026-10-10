@@ -16,7 +16,7 @@ import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext } from "./lib/mention";
 import { artifactBackupHandlers } from "./src/server/backup";
-import { contentHeaders, utf8Prefix, withQuoteScript } from "./src/server/content";
+import { contentHeaders, rangeResponse, utf8Prefix, withQuoteScript } from "./src/server/content";
 import { importedFile } from "./src/server/import-file";
 import { pageMarkdown } from "./src/server/page";
 import { TEXT_SCAN_BYTES, artifactText, registerStudio } from "./src/server/studio";
@@ -54,7 +54,7 @@ const versionSchema = z.object({
   name: z.string(),
   mime: z.string(),
   size: z.number(),
-  type: z.enum(["image", "html", "markdown", "code", "text", "pdf", "other"]),
+  type: z.enum(["image", "audio", "video", "html", "markdown", "code", "text", "pdf", "other"]),
   createdAt: z.number(),
 });
 
@@ -450,7 +450,10 @@ export default async function plugin(bb: BbPluginApi) {
     if (!version || !bytes) return context.text("Not found", 404);
     const quote = context.req.query("quote") === "1" && versionType(version) === "html";
     const body = quote ? withQuoteScript(new Uint8Array(bytes)) : new Uint8Array(bytes);
-    return serveBytes(body, contentHeaders(version, body, { download: context.req.query("download") === "1" }));
+    const headers = contentHeaders(version, body, { download: context.req.query("download") === "1" });
+    // Audio and video players fetch in ranges, and seek with them.
+    const media = versionType(version) === "audio" || versionType(version) === "video";
+    return media ? rangeResponse(body, headers, context.req.header("range")) : serveBytes(body, headers);
   });
 
   // ---------------------------------------------------------------------

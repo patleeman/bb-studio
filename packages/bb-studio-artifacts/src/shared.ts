@@ -35,10 +35,12 @@ export function isArtifactId(value: string): boolean {
 }
 
 /** How the viewer shows a file. */
-export type ArtifactType = "image" | "html" | "markdown" | "code" | "text" | "pdf" | "other";
+export type ArtifactType = "image" | "audio" | "video" | "html" | "markdown" | "code" | "text" | "pdf" | "other";
 
 export const TYPE_LABELS: Record<ArtifactType, string> = {
   image: "Image",
+  audio: "Audio",
+  video: "Video",
   html: "HTML",
   markdown: "Markdown",
   code: "Code",
@@ -49,6 +51,8 @@ export const TYPE_LABELS: Record<ArtifactType, string> = {
 
 export const TYPE_ICONS: Record<ArtifactType, string> = {
   image: "artifacts/image",
+  audio: "artifacts/audio",
+  video: "artifacts/video",
   html: "Globe",
   markdown: "FileText",
   code: "Code",
@@ -65,6 +69,27 @@ const IMAGE_MIMES: Record<string, string> = {
   webp: "image/webp",
   avif: "image/avif",
   svg: "image/svg+xml",
+};
+
+/** What browsers play natively; others stay files to download. */
+const AUDIO_MIMES: Record<string, string> = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  opus: "audio/ogg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  flac: "audio/flac",
+  weba: "audio/webm",
+};
+
+const VIDEO_MIMES: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+  ogv: "video/ogg",
 };
 
 const CODE_EXTENSIONS = new Set([
@@ -87,6 +112,8 @@ function extension(name: string): string {
 export function mimeFor(name: string): string {
   const ext = extension(name);
   if (IMAGE_MIMES[ext]) return IMAGE_MIMES[ext]!;
+  if (AUDIO_MIMES[ext]) return AUDIO_MIMES[ext]!;
+  if (VIDEO_MIMES[ext]) return VIDEO_MIMES[ext]!;
   if (ext === "html" || ext === "htm") return "text/html";
   if (ext === "md" || ext === "markdown" || ext === "mdx") return "text/markdown";
   if (ext === "pdf") return "application/pdf";
@@ -100,6 +127,8 @@ export function mimeFor(name: string): string {
 export function artifactType(name: string, mime: string): ArtifactType {
   const ext = extension(name);
   if (mime.startsWith("image/") || IMAGE_MIMES[ext]) return "image";
+  if (mime.startsWith("audio/") || AUDIO_MIMES[ext]) return "audio";
+  if (mime.startsWith("video/") || VIDEO_MIMES[ext]) return "video";
   if (mime === "text/html" || ext === "html" || ext === "htm") return "html";
   if (mime === "text/markdown" || ext === "md" || ext === "markdown" || ext === "mdx") return "markdown";
   if (mime === "application/pdf" || ext === "pdf") return "pdf";
