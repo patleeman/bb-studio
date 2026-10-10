@@ -32,7 +32,13 @@ export function pickerArtifactId(params: unknown): string | null {
   return typeof id === "string" && isArtifactId(id) ? id : null;
 }
 
-export function SavePicker({ threadId, params }: PluginThreadPanelProps) {
+export function SavePicker(props: PluginThreadPanelProps) {
+  // BB reuses the panel when its tab switches to another artifact; start over
+  // on the one asked for, rather than keep showing the first.
+  return <SavePickerView key={pickerArtifactId(props.params) ?? ""} {...props} />;
+}
+
+function SavePickerView({ threadId, params }: PluginThreadPanelProps) {
   const [openId, setOpenId] = useState<string | null>(() => pickerArtifactId(params));
   const back = useCallback(() => setOpenId(null), []);
   if (openId) return <ArtifactViewer artifactId={openId} backLabel="Artifacts" onBack={back} />;
