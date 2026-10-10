@@ -48,6 +48,8 @@ public enum Artifacts {
 
   public enum GetOutputArtifactVersionType: Sendable, Hashable, Codable {
     case image
+    case audio
+    case video
     case html
     case markdown
     case code
@@ -60,6 +62,8 @@ public enum Artifacts {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
       case "image": self = .image
+      case "audio": self = .audio
+      case "video": self = .video
       case "html": self = .html
       case "markdown": self = .markdown
       case "code": self = .code
@@ -74,6 +78,8 @@ public enum Artifacts {
       var container = encoder.singleValueContainer()
       switch self {
       case .image: try container.encode("image")
+      case .audio: try container.encode("audio")
+      case .video: try container.encode("video")
       case .html: try container.encode("html")
       case .markdown: try container.encode("markdown")
       case .code: try container.encode("code")
@@ -135,6 +141,8 @@ public enum Artifacts {
 
   public enum GetOutputVersionsItemType: Sendable, Hashable, Codable {
     case image
+    case audio
+    case video
     case html
     case markdown
     case code
@@ -147,6 +155,8 @@ public enum Artifacts {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
       case "image": self = .image
+      case "audio": self = .audio
+      case "video": self = .video
       case "html": self = .html
       case "markdown": self = .markdown
       case "code": self = .code
@@ -161,6 +171,8 @@ public enum Artifacts {
       var container = encoder.singleValueContainer()
       switch self {
       case .image: try container.encode("image")
+      case .audio: try container.encode("audio")
+      case .video: try container.encode("video")
       case .html: try container.encode("html")
       case .markdown: try container.encode("markdown")
       case .code: try container.encode("code")
@@ -306,6 +318,8 @@ public enum Artifacts {
 
   public enum ThreadArtifactsOutputArtifactsItemVersionType: Sendable, Hashable, Codable {
     case image
+    case audio
+    case video
     case html
     case markdown
     case code
@@ -318,6 +332,8 @@ public enum Artifacts {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
       case "image": self = .image
+      case "audio": self = .audio
+      case "video": self = .video
       case "html": self = .html
       case "markdown": self = .markdown
       case "code": self = .code
@@ -332,6 +348,8 @@ public enum Artifacts {
       var container = encoder.singleValueContainer()
       switch self {
       case .image: try container.encode("image")
+      case .audio: try container.encode("audio")
+      case .video: try container.encode("video")
       case .html: try container.encode("html")
       case .markdown: try container.encode("markdown")
       case .code: try container.encode("code")

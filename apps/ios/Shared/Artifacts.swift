@@ -39,13 +39,15 @@ public struct ArtifactVersion: Decodable, Identifiable, Hashable, Sendable {
     public var name: String
     public var mime: String
     public var size: Int
-    /// image, html, markdown, code, text, pdf or other.
+    /// image, audio, video, html, markdown, code, text, pdf or other.
     public var type: String
     public var createdAt: Double
 
     public var typeLabel: String {
         switch type {
         case "image": "Image"
+        case "audio": "Audio"
+        case "video": "Video"
         case "html": "HTML"
         case "markdown": "Markdown"
         case "code": "Code"
@@ -58,6 +60,8 @@ public struct ArtifactVersion: Decodable, Identifiable, Hashable, Sendable {
     public var symbol: String {
         switch type {
         case "image": "photo"
+        case "audio": "waveform"
+        case "video": "film"
         case "html": "globe"
         case "markdown": "doc.richtext"
         case "code": "chevron.left.forwardslash.chevron.right"

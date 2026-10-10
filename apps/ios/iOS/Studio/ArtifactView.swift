@@ -139,7 +139,7 @@ struct ArtifactView: View {
             }
             .id("\(version.id):\(imageAttempt)")
             .safeAreaInset(edge: .top) { header(artifact, version) }
-        case "html", "pdf":
+        case "html", "pdf", "audio", "video":
             if webErrorVersion == version.id, let webError {
                 previewFailure("Couldn't load the preview", symbol: version.symbol, message: webError) {
                     self.webError = nil
@@ -157,6 +157,7 @@ struct ArtifactView: View {
                         ArtifactPDFPreview(url: url, onFailure: failure)
                     } else {
                         // HTML is served with a sandboxing CSP, so it can't reach BB.
+                        // WebKit plays audio and video with its own controls.
                         ArtifactWebPreview(url: url, onFailure: failure)
                     }
                 }
