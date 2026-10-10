@@ -4,13 +4,19 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import {
-  experimental_SidebarNavigationIcon as NavigationIcon,
-  experimental_useSidebarNavigation,
-  experimental_useSidebarNavigationSplit,
-  type ExperimentalSidebarNavigationItem,
-  type ExperimentalSidebarNavigationProps,
+import * as bbApp from "@get-bb/plugin-sdk/app";
+import type {
+  ExperimentalSidebarNavigationItem,
+  ExperimentalSidebarNavigationProps,
 } from "@get-bb/plugin-sdk/app";
+
+// BB 0.46 dropped the sidebar navigation API. Read it from the module at run
+// time, so the plugin still builds on a BB without it; app.tsx registers this
+// section only where BB offers the slot, so these exist whenever it renders.
+const sdk = bbApp as Partial<typeof bbApp>;
+const NavigationIcon = sdk.experimental_SidebarNavigationIcon!;
+const experimental_useSidebarNavigation = () => sdk.experimental_useSidebarNavigation!();
+const experimental_useSidebarNavigationSplit: NonNullable<typeof sdk.experimental_useSidebarNavigationSplit> = (...args) => sdk.experimental_useSidebarNavigationSplit!(...args);
 import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 import {
   SortableContext,

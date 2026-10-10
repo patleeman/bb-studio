@@ -27,7 +27,8 @@ function ThreadList({
 }
 
 export default definePluginApp((app) => {
-  app.slots.experimental_sidebarNavigation({
+  // BB 0.46 has no sidebar navigation slot; there BB's own navigation stays.
+  app.slots.experimental_sidebarNavigation?.({
     id: "navigation", title: "Studio Navigation",
     description: "BB navigation without the add-on rows Studio already opens.",
     component: Navigation,
