@@ -16,10 +16,12 @@ sidebar or Studio search open as tabs too. Drag tabs or sidebar items to a pane'
 a tab bar to move or reorder. A tab's right-click menu offers split and move
 commands, and separators resize with the mouse or arrow keys. Closing a tab
 keeps the item. The workspace remembers the layout locally across visits and
-refreshes. Old list addresses, such as a kind's (`/plugins/studio/studio/page`),
+refreshes. An item always opens as a tab: its own address, from a card in a
+chat, **Open in Pages**, a link or a typed URL, opens the tab and leaves the
+address for the workspace. Old list addresses, such as a kind's (`/plugins/studio/studio/page`),
 open the new tab page on that kind.
 Right-click a tab for Close, Close others, Close tabs to the right, Close all in
-the pane, splits, moves to another pane, Rename, its own page, and Copy link.
+the pane, splits, moves to another pane, Rename, and Copy link.
 Double-click a tab, or press F2 on it, to rename its item. The tab row shows
 the item's own tools and status, such as a page saving or a recording paused;
 the tab names the item, so its title isn't repeated, and Chat isn't offered.

@@ -79,7 +79,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         // A tab's right-click menu has the usual tab actions and where it can go.
         await client.openContextMenu(`[data-studio-workspace-tab="${href}"]`);
         const menu = await client.evaluate(`[...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map(each => each.innerText.trim())`);
-        for (const label of ["Close", "Close others", "Close tabs to the right", "Close all in this pane", "Split right", "Split down", "Move to pane 1", "Rename", "Open on its own page", "Copy link"]) {
+        for (const label of ["Close", "Close others", "Close tabs to the right", "Close all in this pane", "Split right", "Split down", "Move to pane 1", "Rename", "Copy link"]) {
           if (!menu.includes(label)) throw new Error(`The tab menu has no ${label}: ${JSON.stringify(menu)}`);
         }
         await client.capture(new URL('../../../packages/bb-studio/assets/workspace-tab-menu.png', import.meta.url).pathname);

@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon, StudioBar, usePathname, registerWorkspaceCloser, setWorkspaceActive, canOpenWorkspaceItem, openAppPath, publishWorkspaceAnchor, registerWorkspaceOpener, studioTargetAt, subscribeWorkspace, workspaceRevision, WORKSPACE_DRAG, WORKSPACE_PATH, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
@@ -117,15 +117,25 @@ export function WorkspaceBridge() {
     publish();
     return subscribe(publish);
   }, []);
-  useEffect(() => registerWorkspaceOpener((item, placement) => {
+  // Opens an item as a tab and shows the workspace; `replace` drops the address that asked.
+  const openTab = useCallback((item: WorkspaceItem, placement: WorkspacePlacement, replace = false) => {
     update(current => openItem(current, item, placement));
-    openAppPath(WORKSPACE_PATH, { standalone: true });
+    openAppPath(WORKSPACE_PATH, { standalone: true, replace });
     // The server's item title takes precedence over IDs and stale link labels.
     void rpc.call("visitTab", { path: item.href }).then(({ tab }) => {
       if (!tab) return;
       update(current => ({ ...current, layout: mapLayout(current.layout, node => node.kind === "pane" ? { ...node, tabs: node.tabs.map(each => each.href === item.href ? { ...each, title: tab.title, icon: tab.icon, kindIcon: tab.kindIcon } : each) } : node) }));
     }, () => {});
-  }), [rpc]);
+  }, [rpc]);
+  useEffect(() => registerWorkspaceOpener((item, placement) => openTab(item, placement)), [openTab]);
+  // An item's own address in the main view, from a card, a chat link, BB or a
+  // typed URL, opens as a tab instead; replaced, so Back doesn't bounce. Only
+  // plain item addresses: a sub-view such as a page's chat keeps its page.
+  const providers = useSyncExternalStore(subscribeWorkspace, workspaceRevision, () => 0);
+  useEffect(() => {
+    const path = pathname.replace(/\/+$/, "");
+    if (path.split("/").length === 5 && canOpenWorkspaceItem(path)) openTab({ href: path }, "tab", true);
+  }, [pathname, providers, openTab]);
   useEffect(() => {
     let previous = panes(snapshot().layout).flatMap(pane => pane.tabs);
     return subscribe(() => {
@@ -252,7 +262,6 @@ function TabMenu({ pane, tab, index, onRename }: { pane: Pane; tab: Tab; index: 
     {item ? <>
       <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => setTimeout(onRename, 0)}>Rename</ContextMenuItem>
-      <ContextMenuItem onSelect={() => openAppPath(tab.href, { standalone: true })}>Open on its own page</ContextMenuItem>
       <ContextMenuItem onSelect={() => void copy()}>Copy link</ContextMenuItem>
     </> : null}
   </ContextMenuContent>;

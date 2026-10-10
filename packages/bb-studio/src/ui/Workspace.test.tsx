@@ -132,3 +132,18 @@ it("renames an item from its tab with a double-click", async () => {
   expect(reports.find(each => each.method === "rename")?.input).toEqual({ pluginId: "pages", id: "one", title: "Launch plan" });
   expect(host.querySelector('[role="tab"]')!.textContent).toBe("Launch plan");
 });
+it("opens an item's own address as a tab and leaves it for the workspace", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  closeWorkspaceTabs([page, other, "/plugins/pages/pages/three", "/plugins/pages/pages/four"]);
+  window.history.replaceState(null, "", page);
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  cleanup = () => { act(() => root.unmount()); host.remove(); window.history.replaceState(null, "", "/"); };
+  await act(() => root.render(<><WorkspaceBridge /><RetainedPanels path="pages" render={subPath => <textarea aria-label={subPath} />} /><StudioWorkspace /></>));
+  expect([...host.querySelectorAll('[role="tab"]')].map(tab => tab.textContent)).toEqual(["one"]);
+  expect(window.location.pathname).toBe("/plugins/studio/studio");
+  // A sub-view, such as a page's chat, keeps its own page.
+  await act(() => { window.history.replaceState(null, "", `${other}/chat/thr_1`); window.dispatchEvent(new PopStateEvent("popstate")); });
+  expect(window.location.pathname).toBe(`${other}/chat/thr_1`);
+  expect(host.querySelectorAll('[role="tab"]')).toHaveLength(1);
+});

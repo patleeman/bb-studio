@@ -104,3 +104,13 @@ formats the report of the focused window, else the last to report.
 `studio_open_items` and `studio_close_tabs` publish a command on the
 `studio-workspace` realtime channel addressed to that window, which opens or
 closes the tabs; other windows ignore it.
+
+### Items always open as tabs
+
+With Studio installed, the bridge watches the main view's address. A plain
+item address (`/plugins/<plugin>/<panel>/<id>`) from an add-on that opens in
+the workspace becomes a tab, and the address is replaced with the
+workspace's, so Back doesn't return to it. A sub-view, such as a page's chat
+(`/plugins/pages/pages/<id>/chat/<thread>`), keeps its own page. Item cards and
+**Open in Pages** call `openAppPath`, which opens the tab directly, or the
+item's page without Studio.
