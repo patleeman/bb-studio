@@ -114,7 +114,7 @@ run. The short version:
 ```sh
 bb studio-chat migrate              # wait for "Migration complete" first
 bb plugin remove studio-chat
-bb plugin remove studio-navigation  # after picking Studio Sidebar's Studio Navigation provider in Appearance
+bb plugin remove studio-navigation  # on BB 0.45, pick Studio Sidebar's Studio Navigation in Appearance first; 0.46 has no such setting
 bb plugin remove float
 bb bots list --json                 # export the bots you want before removing Teams
 bb plugin remove bot-teams
