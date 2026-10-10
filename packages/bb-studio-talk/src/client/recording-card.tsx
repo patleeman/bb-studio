@@ -1,8 +1,8 @@
 // `::recording{id="rec_…"}` in a reply: the recording's summary and the start
 // of its transcript, read-only, under a header that opens the recording.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember } from "@bb-studio/kit/app";
-import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { ItemDirectiveCard, remember, openAppPath } from "@bb-studio/kit/app";
+import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { Recording, Segment, rpcContract } from "../shared/contract";
 import { PANEL_PATH, RECORDING_CHANGED, TALK_ICON, formatClock, formatLength } from "../shared/format";
 
@@ -62,7 +62,6 @@ function RecordingPreview({ recording, segments }: Loaded) {
 }
 
 export function RecordingCard({ attributes }: PluginMessageDirectiveProps) {
-  const navigate = useBbNavigate();
   const id = attributes.id ?? "";
   const valid = isRecordingId(id);
   const loaded = remember(`recording:${id}`, useRecording(valid ? id : ""));
@@ -78,7 +77,7 @@ export function RecordingCard({ attributes }: PluginMessageDirectiveProps) {
       details={`Recording · ${formatLength(recording.durationMs)} · ${recording.wordCount} words`}
       body={<RecordingPreview {...loaded} />}
       // Talk has no workbench tab: its own page shows the recording.
-      onOpen={() => navigate.toPluginPanel(PANEL_PATH, { subPath: id })}
+      onOpen={() => openAppPath(`/plugins/talk/${PANEL_PATH}/${encodeURIComponent(id)}`)}
     />
   );
 }

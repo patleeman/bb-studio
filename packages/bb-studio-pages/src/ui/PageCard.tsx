@@ -1,6 +1,6 @@
 // `::page{id="pg_…"}` in a reply: the page shown inline, read-only, under a
 // header that opens it in the thread's workbench, beside the chat.
-import { ItemDirectiveCard, remember } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, remember, openAppPath } from "@bb-studio/kit/app";
 import { untitled } from "@bb-studio/kit/format";
 import { Markdown, useBbNavigate, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
@@ -70,7 +70,7 @@ export function PageCard({ attributes }: PluginMessageDirectiveProps) {
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
         if (!navigate.openThreadPanel({ actionId: PAGE_TAB, title, params: { pageId: id } }))
-          navigate.toPluginPanel("pages", { subPath: id });
+          openAppPath(`/plugins/pages/pages/${encodeURIComponent(id)}`);
       }}
     />
   );

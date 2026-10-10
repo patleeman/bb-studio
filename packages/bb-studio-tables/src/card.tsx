@@ -1,7 +1,7 @@
 // `::table{id="tbl_…"}` in a reply: the table's first rows, read-only, under a
 // header that opens it in the thread's workbench, beside the chat.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, remember, openAppPath } from "@bb-studio/kit/app";
 import { relativeTime } from "@bb-studio/kit/format";
 import { cellText, queryRows, TABLES_CHANNEL, TABLES_PANEL, type Row, type Table, type TablesContract } from "@bb-studio/kit/tables";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
@@ -88,7 +88,7 @@ export function TableCard({ attributes }: PluginMessageDirectiveProps) {
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
         if (!navigate.openThreadPanel({ actionId: TABLES_TAB, title, params: { tableId: id } }))
-          navigate.toPluginPanel(TABLES_PANEL, { subPath: id });
+          openAppPath(`/plugins/studio-tables/${TABLES_PANEL}/${encodeURIComponent(id)}`);
       }}
     />
   );

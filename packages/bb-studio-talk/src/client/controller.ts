@@ -1,3 +1,4 @@
+import { openAppPath } from "@bb-studio/kit/app";
 import { errorMessage as message } from "@bb-studio/kit/format";
 // The capture controller: one per browser window, living at module scope so it
 // outlives route changes. The app overlay attaches it to RPC and renders it;
@@ -346,7 +347,7 @@ export class TalkController {
 
   private openPath(path: string): void {
     if (this.openTarget) this.openTarget({ kind: "path", path });
-    else this.navigate?.toPluginPanel(PANEL_PATH, { subPath: path.split(`/plugins/talk/${PANEL_PATH}/`)[1] });
+    else openAppPath(path);
   }
 
   /** The recording page on screen, or null when it closes. */

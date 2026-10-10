@@ -1,7 +1,7 @@
 // The Designs nav panel: the collection with a "Make something new" row
 // above it, and one design's canvas.
 import { useCallback, useState } from "react";
-import { AddOnPanel, Icon, cn, createStudioItem, useAddOnPanel } from "@bb-studio/kit/app";
+import { AddOnPanel, Icon, cn, createStudioItem, useAddOnPanel, openAppPath } from "@bb-studio/kit/app";
 import { useBbContext, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, isDesignId } from "../src/shared";
 import { DesignPage } from "./design-view";
@@ -38,7 +38,6 @@ export function DesignsPanel({ subPath }: { subPath: string }) {
 /** Starting points for a new design, as in Claude Design's home page. */
 function MakeSomethingNew() {
   const { call } = useAddOnPanel(REALTIME_CHANNEL, PANEL_PATH, "design");
-  const navigate = useBbNavigate();
   const context = useBbContext();
   const [busy, setBusy] = useState(false);
 
@@ -48,7 +47,7 @@ function MakeSomethingNew() {
       projectId: context.projectId ?? null,
       addOn: "Studio Design",
       create: async () => (await call("studio_create", { kind: "design", projectId: context.projectId ?? null })).item.id,
-      open: (designId) => navigate.toPluginPanel(PANEL_PATH, { subPath: designId }),
+      open: (designId) => openAppPath(`/plugins/${PLUGIN_ID}/${PANEL_PATH}/${encodeURIComponent(designId)}`),
     });
     setBusy(false);
   }

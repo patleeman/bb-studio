@@ -1,7 +1,7 @@
 // The Design tab in a thread's workbench, and the card that opens it from a
 // reply. The tab shows one design's canvas beside the conversation; opened
 // without one, it lists the thread's designs.
-import { BarTitle, ICON_BUTTON, Icon, ItemDirectiveCard, ThreadItemsPanel, remember } from "@bb-studio/kit/app";
+import { BarTitle, ICON_BUTTON, Icon, ItemDirectiveCard, ThreadItemsPanel, remember, openAppPath } from "@bb-studio/kit/app";
 import { useBbNavigate, type JsonValue, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { DESIGN_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../src/shared";
 import { DesignBoard, useDesign } from "./design-view";
@@ -100,7 +100,7 @@ export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
         if (!navigate.openThreadPanel({ actionId: DESIGN_TAB, title: name, params: { designId: id } }))
-          navigate.toPluginPanel(PANEL_PATH, { subPath: id });
+          openAppPath(`/plugins/${PLUGIN_ID}/${PANEL_PATH}/${encodeURIComponent(id)}`);
       }}
     />
   );

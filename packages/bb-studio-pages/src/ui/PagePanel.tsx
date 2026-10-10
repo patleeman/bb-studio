@@ -1,7 +1,7 @@
 import { untitled } from "@bb-studio/kit/format";
-import { useBbNavigate, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useState } from "react";
-import { ThreadItemsPanel } from "@bb-studio/kit/app";
+import { ThreadItemsPanel, openAppPath } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
 import { PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
@@ -52,7 +52,6 @@ export function PagePanel({ threadId, params }: PluginThreadPanelProps) {
 }
 
 function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: string; onBack?(): void }) {
-  const navigate = useBbNavigate();
   const { page, refetch } = usePanelPage(pageId);
 
   if (page === null) return <MissingPageRecovery key={pageId} pageId={pageId} onRetryPage={refetch} onBack={onBack} backLabel={backLabel ? `Back to ${backLabel}` : undefined} />;
@@ -79,7 +78,7 @@ function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: st
             <div className="truncate text-sm font-medium">{untitled(page.title)}</div>
             <div className="truncate text-[11px] text-muted-foreground">Edited {relativeTime(page.updatedAt)}</div>
           </div>
-          <OpenInPages onOpen={() => navigate.toPluginPanel("pages", { subPath: page.id })} />
+          <OpenInPages onOpen={() => openAppPath(`/plugins/pages/pages/${encodeURIComponent(page.id)}`)} />
         </header>
       }
     />

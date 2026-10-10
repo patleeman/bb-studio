@@ -1,5 +1,5 @@
-import { RetainedPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
-import { definePluginApp, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { RetainedPanels, retainPanel, StudioBarSlot, openAppPath } from "@bb-studio/kit/app";
+import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { useEffect } from "react";
 import { PAGE_TAB, PageCard } from "./src/ui/PageCard";
 import { PagePanel } from "./src/ui/PagePanel";
@@ -11,18 +11,17 @@ import "./styles.css";
 
 /** Opens a page when Talk's "Go back" asks for a dictation field of ours. */
 function TalkBridge() {
-  const navigate = useBbNavigate();
   useEffect(() => {
     const onOpen = (event: Event) => {
       const id = pageIdFromField((event as CustomEvent<{ field?: unknown }>).detail?.field);
       if (!id) return;
       // Tells Talk the page is opening, so it doesn't fall back to copying.
       event.preventDefault();
-      navigate.toPluginPanel("pages", { subPath: id });
+      openAppPath(`/plugins/pages/pages/${encodeURIComponent(id)}`);
     };
     window.addEventListener(TALK_OPEN_FIELD_EVENT, onOpen);
     return () => window.removeEventListener(TALK_OPEN_FIELD_EVENT, onOpen);
-  }, [navigate]);
+  }, []);
   return null;
 }
 

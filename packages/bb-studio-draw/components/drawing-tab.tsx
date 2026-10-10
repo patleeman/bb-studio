@@ -2,7 +2,7 @@
 // reply. The tab shows one drawing's editor beside the conversation; opened
 // without one, it lists the thread's drawings and recent ones.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, THUMBNAIL, ThreadItemsPanel, remember } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, THUMBNAIL, ThreadItemsPanel, remember, openAppPath } from "@bb-studio/kit/app";
 import { relativeTime } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc, type JsonValue, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
@@ -77,7 +77,7 @@ export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
         if (!navigate.openThreadPanel({ actionId: DRAWINGS_TAB, title: name, params: { drawingId: id } }))
-          navigate.toPluginPanel(PANEL_PATH, { subPath: id });
+          openAppPath(`/plugins/${PLUGIN_ID}/${PANEL_PATH}/${encodeURIComponent(id)}`);
       }}
     />
   );
