@@ -276,6 +276,9 @@ async function seed({ plugins, capturePlugin, ref, version }) {
     await sleep(1000);
   }
   process.stdout.write(`BB ${version} is running at ${serverUrl}\n`);
+  // BB 0.46+ opens a first-run setup guide over every page of a new install;
+  // a fixture is set up already.
+  await bb("settings", "general", "onboardingCompletedAt", new Date().toISOString());
 
   // Install every plugin as users do, from this repository's Git source.
   for (const { name } of plugins) {

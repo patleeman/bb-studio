@@ -168,6 +168,8 @@ async function checkPlugin(pluginId, spec, ref, chromeTools) {
       if (Date.now() - started > 120000) throw new Error(`BB didn't start; see ${join(instanceDir, "launcher.log")}`);
       await sleep(1000);
     }
+    // BB 0.46+ opens a first-run setup guide over every page of a new install.
+    await bb(["settings", "general", "onboardingCompletedAt", new Date().toISOString()]);
 
     // 1. Install just this plugin from GitHub, as users do.
     const install = await bb(["plugin", "install", `${repoSource}@${ref}`, "--plugin", pluginId, "--yes"]);
