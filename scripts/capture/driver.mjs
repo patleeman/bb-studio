@@ -105,6 +105,17 @@ export class CdpClient {
     throw new Error(`Timed out waiting for selector ${JSON.stringify(selector)}`);
   }
 
+  /** Waits for a Studio workspace tab titled `title`; items open as tabs, which name them. */
+  async waitForTab(title, timeoutMs = 15000) {
+    const started = Date.now();
+    const expression = `[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].some((tab) => tab.lastElementChild?.textContent === ${JSON.stringify(title)})`;
+    while (Date.now() - started < timeoutMs) {
+      if (await this.poll(expression)) return;
+      await sleep(250);
+    }
+    throw new Error(`Timed out waiting for a Studio tab titled ${JSON.stringify(title)}`);
+  }
+
   async waitForInputValue(label, expected, timeoutMs = 15000) {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
@@ -222,9 +233,11 @@ export class CdpClient {
     await sleep(900);
   }
 
-  async clickAriaButtonWithPointer(label) {
+  /** `within`, a selector, picks the button inside it, such as an open menu's. */
+  async clickAriaButtonWithPointer(label, within = null) {
     const point = await this.evaluate(`(() => {
-      const button = Array.from(document.querySelectorAll("button"))
+      const root = ${JSON.stringify(within)} ? document.querySelector(${JSON.stringify(within)}) : document;
+      const button = Array.from(root?.querySelectorAll("button") ?? [])
         .find((candidate) => candidate.getAttribute("aria-label") === ${JSON.stringify(label)});
       if (!button) throw new Error("Button not found: ${label}");
       const rect = button.getBoundingClientRect();

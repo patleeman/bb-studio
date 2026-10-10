@@ -330,7 +330,7 @@ export default (context) => [
       const { id, cleanup } = await seedDesign("welcome", context);
       try {
         await client.navigate(`/plugins/design/designs/${id}`);
-        await client.waitForInputValue("Design name", "Orbit onboarding");
+        await client.waitForTab("Orbit onboarding");
         await client.waitForSelector("h2#round-1");
         await client.waitForText("Welcome screen");
         await client.waitForText("Desktop: the pitch beside the upcoming releases");
@@ -356,7 +356,7 @@ export default (context) => [
       const { id, cleanup } = await seedDesign("prototype", context);
       try {
         await client.navigate(`/plugins/design/designs/${id}`);
-        await client.waitForInputValue("Design name", "New release flow");
+        await client.waitForTab("New release flow");
         await client.waitForText("Create a release");
         await client.waitForText("3 steps");
         await waitForPills(client);
@@ -384,7 +384,7 @@ export default (context) => [
       const { id, cleanup } = await seedDesign("deck", context);
       try {
         await client.navigate(`/plugins/design/designs/${id}`);
-        await client.waitForInputValue("Design name", "ORBIT-42 all-hands");
+        await client.waitForTab("ORBIT-42 all-hands");
         await client.waitForText("All-hands deck");
         await client.waitForText("4 slides");
         await waitForPills(client);

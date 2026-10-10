@@ -302,9 +302,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         // A persisted plural label resolves to the same checkbox as kind:page.
         await client.clickAriaButtonWithPointer("Filter by kind");
         await client.waitForSelector('button[aria-label="Pages"][aria-pressed="true"]');
-        await client.clickAriaButtonWithPointer("Pages");
+        // The Kind menu's checkbox, not BB's own Pages row in the sidebar.
+        await client.clickAriaButtonWithPointer("Pages", "[data-radix-popper-content-wrapper]");
         if (await client.evaluate(`!!document.querySelector('button[aria-label="Remove Kind Pages"]')`)) throw new Error("The checkbox failed to remove a stored plural filter");
-        await client.clickAriaButtonWithPointer("Pages");
+        await client.clickAriaButtonWithPointer("Pages", "[data-radix-popper-content-wrapper]");
         await escape();
         await client.waitForAriaButton("Remove Kind Pages");
         await client.evaluate(`document.querySelector('input[aria-label="Search and filter studio"]').focus()`);

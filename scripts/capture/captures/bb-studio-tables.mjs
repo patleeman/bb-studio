@@ -14,7 +14,7 @@ export default ({ projectId, pluginRpc, sleep }) => [{
         { name: "Review notes", status: "In review", quantity: 8, checked: false },
       ]) await pluginRpc("studio-tables", "insert", { id: table.id, values });
       await client.navigate(`/plugins/studio-tables/tables/${table.id}`);
-      await client.waitForInputValue("Table title", "QA Inventory");
+      await client.waitForTab("QA Inventory");
       // Text cells render as text until you edit them; the seeded row shows in the grid.
       await client.waitForSelector('[role="checkbox"][aria-label="Checked"][aria-checked="true"]');
       await client.waitForText("Sample kits");

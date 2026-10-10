@@ -98,8 +98,8 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         await client.clickAriaButtonWithPointer("Collapse dictation transcript");
         await checkInline();
         if (!await client.evaluate(`!!document.activeElement?.closest('[data-talk-inline]')`)) throw new Error("Collapsing the transcript lost keyboard focus.");
-        // Use the native nav without reloading the recorder's window.
-        await client.clickButtonText("Studio");
+        // Use the sidebar's Studio entry (a row, or BB 0.46's icon rail) without reloading the recorder's window.
+        await client.evaluate(`(() => { const entry = [...document.querySelectorAll('[data-sidebar="sidebar"] :is(a, button)')].find((each) => each.innerText.trim() === "Studio" || each.getAttribute("aria-label")?.startsWith("Studio")); if (!entry) throw new Error("No Studio entry in the sidebar"); entry.click(); })()`);
         await client.waitForSelector("[data-talk-overlay]");
         await client.waitForAriaButton("Back to where you're dictating");
         if (await client.evaluate(`JSON.parse(localStorage.getItem('bb-plugin-talk:active')).recordingId !== ${JSON.stringify(recordingId)}`)) throw new Error("Navigation replaced the ongoing dictation.");

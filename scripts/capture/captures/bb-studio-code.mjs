@@ -62,7 +62,7 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => [
       };
       try {
         await client.navigate(item.href);
-        await client.waitForInputValue("Workspace name", item.title);
+        await client.waitForTab(item.title);
         await revealIn(client, pluginRpc, sleep, item.id, 8, 18);
         // Laid out for BB: VS Code's side bar on the right, no title bar.
         if (!(await inEditor(client, `document.querySelector(".part.sidebar")?.classList.contains("right")`))) throw new Error("VS Code's side bar isn't on the right");
