@@ -41,12 +41,11 @@ line never shows while the plugin is enabled.
 
 ![Live BB screenshot of Studio Reactions settings](assets/staged-preview.png)
 
-Captured from a staged stable BB at commit `306c841`. The native settings
+Captured from a staged stable BB at commit `6f85cdb`. The native settings
 form is the only reaction editor. It shows the default reaction list (Agree,
 Disagree, Do it, Clarify), quoting before the reaction, and all three location
 toggles enabled. The saved preview below confirms these menu settings are
-applied in this window. This capture predates the removal of smart reactions
-and still shows the old **Smart reactions** switch; it needs a recapture.
+applied in this window.
 
 ## Settings
 
