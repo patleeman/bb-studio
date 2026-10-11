@@ -1,7 +1,9 @@
 import { parseEmojiItems } from "./emoji-items";
 import type { MenuSettings } from "./settings";
 
-const ICON = 'span[data-plugin-icon-asset*="plugins/studio/assets/icons/studio.svg"]';
+// Studio's plugin icon. BB serves it at /api/v1/plugins/studio/assets/icon
+// (the manifest icon) or, in some surfaces, at .../assets/icons/studio.svg.
+const ICON = 'span[data-plugin-icon-asset*="/plugins/studio/assets/icon"]';
 
 /** Stable hosts expose action registration but no per-surface emoji renderer.
  * Keep the DOM dependency here, touch only positively identified plugin icons,
