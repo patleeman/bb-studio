@@ -118,20 +118,32 @@ async function pushedRef(ref) {
  * Next row offering both as quick replies. Running it also gives the thread a
  * workspace in the Orbit repository, where the artifact capture stages its
  * report. GPT-6-Luna leaves the quick replies out, so this uses GPT-6.1-Sol.
+ * The Next row is optional for the model, and on low reasoning it sometimes
+ * skips it, so the prompt asks for it and a reply without it is retried in a
+ * fresh thread; only the thread with the row is kept.
  */
 async function seedWorkspaceThread(project, machine, orbitDir) {
-  const thread = await bb(
-    "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
-    "--provider", "codex", "--model", "gpt-6.1-sol", "--reasoning-level", "low",
-    "--title", "Pick a database for the todo app",
-    "--prompt", "I'm building a small todo app just for me. Should it store its data in SQLite or Postgres? Give me two short sentences on the trade-off, then ask me which one I want.",
-  );
-  await bb("thread", "wait", thread.id, "--timeout", "5m");
-  const events = await bb("thread", "messages", thread.id);
-  const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
-  if (!/::next\{[^}]*SQLite[^}]*Postgres/.test(reply)) throw new Error(`The SQLite or Postgres reply has no Next row quick replies: ${reply}`);
-  await bb("thread", "read", thread.id);
-  return thread;
+  const attempts = 3;
+  const replies = [];
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const thread = await bb(
+      "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
+      "--provider", "codex", "--model", "gpt-6.1-sol", "--reasoning-level", "low",
+      "--title", "Pick a database for the todo app",
+      "--prompt", "I'm building a small todo app just for me. Should it store its data in SQLite or Postgres? Give me two short sentences on the trade-off, then ask me which one I want, and end with the Next row offering SQLite and Postgres as quick replies.",
+    );
+    await bb("thread", "wait", thread.id, "--timeout", "5m");
+    const events = await bb("thread", "messages", thread.id);
+    const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
+    if (/::next\{[^}]*SQLite[^}]*Postgres/.test(reply)) {
+      await bb("thread", "read", thread.id);
+      return thread;
+    }
+    replies.push(reply);
+    process.stdout.write(`The SQLite or Postgres reply has no Next row quick replies (attempt ${attempt} of ${attempts})\n`);
+    await bb("thread", "archive", thread.id).catch(() => {});
+  }
+  throw new Error(`The SQLite or Postgres reply had no Next row quick replies in ${attempts} attempts. Last reply: ${replies.at(-1)}`);
 }
 
 async function start() {
