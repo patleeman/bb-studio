@@ -121,10 +121,9 @@ open in the background, so it's as you left it when you come back.
   own catch-all folder under `~/Spaces`, where its new threads and items go.
   A thread can also be added to a space by itself, which moves it there.
   A space can have a lead, one of its threads, which a Heartbeat wakes on a
-  schedule. [Studio Sidebar](../bb-studio-sidebar)'s **By space** view shows
-  one Space at a time with its lead (a star), pinned threads, open items as
-  chips and a **Browse** menu; without it, Studio's own **Spaces** section
-  lists them. Nothing is made for a space but its folder. Deleting a space
+  schedule. [Studio Sidebar](../bb-studio-sidebar) shows one Space at a
+  time with its lead (a star), pinned threads and a **Browse** menu; without
+  it, Studio's own **Spaces** section lists them. Nothing is made for a space but its folder. Deleting a space
   hands its projects and threads back to Personal. See
   [`docs/spaces.md`](../../docs/spaces.md).
 - **Shared actions**: select items (shift-click for a range) to start a
@@ -147,6 +146,16 @@ open in the background, so it's as you left it when you come back.
   dark. Teal-black and pale-teal surfaces, a coral accent, teal file paths.
   Pick **BB Studio** in Settings → Appearance, or run `bb theme set
   plugin:studio:bb-studio`.
+- **Automations tab.** In a thread's side panel, **+ → Automations** lists the
+  automations that wake that thread: the name, the schedule in words (such as
+  "Every 30 min" or "Weekdays 9:00"; other crons show as written), when it
+  runs next, and the last run's result or error. A switch pauses or resumes
+  one, and **Edit** opens it in Automations. The tab refreshes when it opens
+  and every 30 seconds while it's visible. If BB's Automations plugin is off
+  or doesn't answer, the tab says Automations are unavailable.
+- **Automations badge.** A thread that automations wake shows a clock with
+  their count in its header; click it to open the Automations tab. It uses
+  BB's experimental thread header slot, so Studio still loads without it.
 - **For agents**: the `studio_list_items`, `studio_list_spaces`,
   `studio_tag_items`, `studio_delete_items`, `studio_space_items` and
   `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill. With
@@ -201,8 +210,7 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   `bot-teams` if they're installed: why each is retired, what removing it
   keeps and deletes, and what to do first. **Remove…** asks before it removes
   anything. Studio Chat can't be removed until its chat links are in Studio
-  (`bb studio-chat migrate` reports **Migration complete**), and Studio
-  Navigation can't until Studio Sidebar is installed and on.
+  (`bb studio-chat migrate` reports **Migration complete**).
 - Problems with plugins outside BB Studio are listed at the bottom.
 
 `bb studio setup` prints the same status, the retired plugins and the

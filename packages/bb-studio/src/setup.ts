@@ -126,19 +126,11 @@ export const RETIRED: readonly RetiredPlugin[] = [
   {
     id: "studio-navigation",
     name: "Studio Navigation",
-    why: "Navigation now ships in Studio Sidebar.",
+    why: "BB's own navigation replaces it; Studio's ⋯ menu can hide the add-ons' rows.",
     kept: "Navigation visibility and order (kept in BB's own preferences), saved drafts, quotes, page history and historical bot authors.",
     deleted: REMOVED,
-    before: [
-      step("Update Studio Sidebar.", "bb plugin update thread-list-plus --yes"),
-      step("In Settings → Appearance, pick Studio Sidebar's Studio Navigation provider."),
-    ],
-    async blocker(_plugin, { plugins }) {
-      const sidebar = plugins.get("thread-list-plus");
-      if (!sidebar) return `Install Studio Sidebar first; it provides navigation now: ${installCommand("thread-list-plus")}`;
-      if (!sidebar.enabled) return `Turn on Studio Sidebar first; it provides navigation now: ${enableCommand("thread-list-plus")}`;
-      return null;
-    },
+    before: [step("In Settings → Appearance, pick BB's own navigation provider.")],
+    blocker: async () => null,
   },
   {
     id: "float",

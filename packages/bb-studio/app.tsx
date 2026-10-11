@@ -19,6 +19,7 @@ import { ThreadSpaceLink } from "./src/ui/ThreadSpaceLink";
 import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
+import { registerThreadAutomations } from "./src/ui/automations/register";
 
 /**
  * An old address that showed the item list (`collection`, a kind such as
@@ -84,6 +85,8 @@ export default definePluginApp((app) => {
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));
   app.slots.experimental_appOverlay({ id: "health-watch", component: HealthWatch });
+  // The thread panel's Automations tab and the header's clock badge.
+  registerThreadAutomations(app);
   app.commands.register({
     id: "search",
     title: "Studio: Search everything",

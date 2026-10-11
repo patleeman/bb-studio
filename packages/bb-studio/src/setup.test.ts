@@ -118,13 +118,9 @@ describe("retired plugins", () => {
     expect(calls).toEqual(["rpc studio-chat viewing"]);
   });
 
-  it("blocks removing Studio Navigation until Studio Sidebar is on", async () => {
-    const without = await buildSetup(fakeSdk([plugin("studio-navigation")]).sdk, health());
-    expect(without.retired[0]!.blocker).toContain("bb plugin install thread-list-plus@bb-studio --yes");
-    const off = await buildSetup(fakeSdk([plugin("studio-navigation"), plugin("thread-list-plus", { enabled: false })]).sdk, health());
-    expect(off.retired[0]!.blocker).toContain("bb plugin enable thread-list-plus");
-    const on = await buildSetup(fakeSdk([plugin("studio-navigation"), plugin("thread-list-plus")]).sdk, health());
-    expect(on.retired[0]!.blocker).toBeNull();
+  it("lets Studio Navigation go without Studio Sidebar", async () => {
+    const setup = await buildSetup(fakeSdk([plugin("studio-navigation")]).sdk, health());
+    expect(setup.retired[0]!.blocker).toBeNull();
   });
 });
 
