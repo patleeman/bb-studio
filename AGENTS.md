@@ -23,9 +23,9 @@ Work directly on `main`. Don't create branches or pull requests.
 Marketplace entries install from the `stable` branch (`ref: "stable"`;
 `node scripts/check-marketplace.mjs` enforces it). Keep committing to `main`;
 never commit to `stable` or push it by hand. Move it only with
-`node scripts/release.mjs [--ref <commit>] [--solo]`, which checks the commit
-out alone, runs every repo check and package test there (and with `--solo`
-the one-plugin-at-a-time install check), and then fast-forwards `stable`.
+`node scripts/release.mjs [--ref <commit>]`, which checks the commit out
+alone, runs every repo check and package test there, and then fast-forwards
+`stable`.
 Release only when Patrick asks or the project lead thread does it.
 
 ## Marketplace maintenance
@@ -63,14 +63,11 @@ Stable BB then refuses the plugin with "requires bb plugin SDK ...".
   raise a floor past stable to make it pass; wait for the API to ship in
   stable instead.
 
-## Solo install
+## Studio is required
 
-Every plugin must work when it is the only BB Studio plugin installed. Don't
-make a plugin need Studio, Pages or another plugin to start or render; degrade
-when they're absent. After a change that could affect that (dependencies, kit,
-cross-plugin RPC, startup), push it and run
-`node scripts/solo-check.mjs --plugin <id>` (all plugins without `--plugin`).
-It stages a fresh stable BB per plugin and cleans up after itself.
+Add-ons (Pages, Draw, Talk, Tables, Artifacts and the rest) are built to run
+with Studio installed. They may rely on Studio, and don't need to work or
+degrade when it's absent.
 
 ## Plugin documentation
 
