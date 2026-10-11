@@ -577,8 +577,9 @@ public enum Studio {
     public var agentHint: String?
     public var hasOwnChat: Bool?
     public var background: Bool?
+    public var replaces: String?
 
-    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [OverviewOutputProvidersItemKindsItemColumnsItem]? = nil, actions: [OverviewOutputProvidersItemKindsItemActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: OverviewOutputProvidersItemKindsItemCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil, hasOwnChat: Bool? = nil, background: Bool? = nil) {
+    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [OverviewOutputProvidersItemKindsItemColumnsItem]? = nil, actions: [OverviewOutputProvidersItemKindsItemActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: OverviewOutputProvidersItemKindsItemCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil, hasOwnChat: Bool? = nil, background: Bool? = nil, replaces: String? = nil) {
       self.id = id
       self.label = label
       self.plural = plural
@@ -593,6 +594,7 @@ public enum Studio {
       self.agentHint = agentHint
       self.hasOwnChat = hasOwnChat
       self.background = background
+      self.replaces = replaces
     }
   }
 
@@ -3580,8 +3582,9 @@ public enum Studio {
     public var agentHint: String?
     public var hasOwnChat: Bool?
     public var background: Bool?
+    public var replaces: String?
 
-    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [ItemAtOutputKindColumnsItem]? = nil, actions: [ItemAtOutputKindActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: ItemAtOutputKindCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil, hasOwnChat: Bool? = nil, background: Bool? = nil) {
+    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [ItemAtOutputKindColumnsItem]? = nil, actions: [ItemAtOutputKindActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: ItemAtOutputKindCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil, hasOwnChat: Bool? = nil, background: Bool? = nil, replaces: String? = nil) {
       self.id = id
       self.label = label
       self.plural = plural
@@ -3596,6 +3599,7 @@ public enum Studio {
       self.agentHint = agentHint
       self.hasOwnChat = hasOwnChat
       self.background = background
+      self.replaces = replaces
     }
   }
 

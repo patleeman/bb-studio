@@ -149,6 +149,15 @@ export interface StudioKind {
    * these items, while the kind's own filter and search still find them.
    */
   background?: boolean;
+  /**
+   * The id of a kind built into Studio ("page", "drawing", "recording",
+   * "artifact", "design") that this kind can stand in for. Studio then offers
+   * it under Setup → Kinds as "Open and create with" for that kind; when
+   * chosen (or when it's the only replacement), Studio's New menus and agent
+   * hints create this kind instead. Items already made with the built-in
+   * keep opening in the built-in.
+   */
+  replaces?: string;
 }
 
 export interface StudioProviderInfo {
@@ -232,6 +241,7 @@ export function studioSchemas(z: typeof Zod) {
     agentHint: z.string().max(500).optional(),
     hasOwnChat: z.boolean().optional(),
     background: z.boolean().optional(),
+    replaces: z.string().min(1).max(100).optional(),
   });
   const info = z.object({ pluginId: z.string(), version: z.literal(2), panel: z.string().nullable(), kinds: z.array(kind) });
   const ids = z.array(z.string().min(1).max(200)).min(1).max(500);
