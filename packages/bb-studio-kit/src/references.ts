@@ -19,7 +19,7 @@ export interface ReferenceOptions {
 }
 
 const LEGACY_NAMESPACES: Record<string, readonly string[]> = {
-  pages: ["page"], excalidraw: ["drawing"], artifacts: ["artifact"], design: ["design"], talk: ["recordings"], "bot-teams": ["bot"],
+  pages: ["page"], excalidraw: ["drawing"], artifacts: ["artifact"], design: ["design"], talk: ["recordings"],
 };
 /**
  * Kinds built into Studio: their mention provider id (registered by Studio)
@@ -44,7 +44,6 @@ const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { pluginId: "talk", path: `${STUDIO_PANEL}recordings/` },
   // The address recordings had before they were built into Studio.
   { pluginId: "talk", path: "/plugins/talk/recordings/" },
-  { pluginId: "bot-teams", path: "/plugins/bot-teams/bots/", subpaths: ["profile"] },
 ];
 const validPlugin = (id: string) => /^[a-z0-9-]+$/.test(id);
 

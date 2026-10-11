@@ -69,4 +69,3 @@ export function registerWorkspaceCloser(close: (href: string) => void) {
   bridge().close = close;
   return () => { if (bridge().close === close) delete bridge().close; };
 }
-export function closeWorkspaceItem(href: string) { bridge().close?.(href); }

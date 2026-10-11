@@ -138,18 +138,3 @@ export function setResolved(doc: Y.Doc, author: string, threadId: string, resolv
 function requireThread(doc: Y.Doc, threadId: string): void {
   if (isDeleted(doc, threadId)) throw new Error(`No comment thread "${threadId}" on this page.`);
 }
-
-/** Raw thread data for change detection (comment ids and authors). */
-export function threadAuthors(doc: Y.Doc): Map<string, { resolved: boolean; comments: { id: string; author: string; text: string }[] }> {
-  const out = new Map<string, { resolved: boolean; comments: { id: string; author: string; text: string }[] }>();
-  for (const thread of store(doc, "reader").getThreads().values() as Iterable<ThreadData>) {
-    if (isDeleted(doc, thread.id)) continue;
-    out.set(thread.id, {
-      resolved: thread.resolved,
-      comments: thread.comments
-        .filter((comment) => !comment.deletedAt)
-        .map((comment) => ({ id: comment.id, author: comment.userId, text: bodyText(comment.body) })),
-    });
-  }
-  return out;
-}

@@ -23,17 +23,6 @@ export function OpenInPages({ onOpen }: { onOpen(): void }) {
   );
 }
 
-export function PanelMessage({ title, detail, children }: { title: string; detail?: string; children?: React.ReactNode }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-      <Icon name="studio/pages" fallback="FileText" className="size-6 text-muted-foreground" />
-      <p className="text-sm font-medium">{title}</p>
-      {detail ? <p className="max-w-xs text-xs text-muted-foreground">{detail}</p> : null}
-      {children}
-    </div>
-  );
-}
-
 /** The panel tab's frame around a page's live editor: a header above it, and anything below it. */
 export function PanelShell({ page, header, footer }: { page: PageMetaView; header: React.ReactNode; footer?: React.ReactNode }) {
   const rpc = useRpc<typeof rpcContract>();

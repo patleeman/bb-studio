@@ -19,8 +19,6 @@ export const PANEL_PATH = "recordings";
 /** Where recordings live in Studio. */
 export const RECORDINGS_ROOT = `/plugins/studio/studio/${PANEL_PATH}`;
 
-/** Recordings' address before Talk was built into Studio. */
-export const LEGACY_ROOT = "/plugins/talk/recordings";
 
 /** Audio the server refused, kept on this device: /plugins/studio/studio/recordings/unsent. */
 export const UNSENT_PATH = "unsent";
@@ -164,9 +162,6 @@ export function recordingBadge(
   if (recording.failedCount > 0) return { label: `${recording.failedCount} failed`, tone: "danger" };
   return null;
 }
-
-/** Hold-to-talk choices, as the setting shows them; the first is the default. */
-export { HOLD_KEY_OPTIONS } from "@bb-studio/kit/talk-contract";
 
 /** The KeyboardEvent.code a hold-to-talk setting listens for, or null when off. */
 export function holdKeyCode(setting: unknown): string | null {

@@ -8,8 +8,6 @@ import { DESIGN_SCREEN_ID } from "@bb-studio/kit/design-contract";
 export const PLUGIN_ID = "design";
 /** Studio's panel sub-path: /plugins/studio/studio/designs/<id> shows one design. */
 export const ROUTE_SEGMENT = "designs";
-/** Where a design lived when Design was its own plugin; saved tabs and links still use it. */
-export const LEGACY_ROOT = "/plugins/design/designs";
 export const DESIGN_ICON = "studio/design";
 /** Realtime channel: the server tells open canvases that a design changed. */
 export const REALTIME_CHANNEL = "design";

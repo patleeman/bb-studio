@@ -9,8 +9,6 @@ export const PLUGIN_ID = "artifacts";
 export const ARTIFACTS_TAB = "save-to-studio";
 /** Studio's panel sub-path: /plugins/studio/studio/artifacts/<id> shows one artifact. */
 export const ROUTE_SEGMENT = "artifacts";
-/** Where an artifact lived when Artifacts was its own plugin; saved tabs and links still use it. */
-export const LEGACY_ROOT = "/plugins/artifacts/artifacts";
 export const ARTIFACT_ICON = "studio/artifact";
 /** The Artifacts thread panel and its "Save to Studio" button. */
 export const SAVE_ICON = "studio/artifact-save";

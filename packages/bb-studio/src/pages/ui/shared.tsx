@@ -22,7 +22,7 @@ import { CopyReferenceMenuItem, type Project } from "@bb-studio/kit/app";
 export type BotsState = { available: boolean; reason: string | null; bots: BotView[] };
 
 // Shared with every Studio plugin, so the chrome matches.
-export { FLOATING, ICON_BUTTON } from "@bb-studio/kit/app";
+export { ICON_BUTTON } from "@bb-studio/kit/app";
 export { relativeTime } from "@bb-studio/kit/format";
 
 export function actorName(key: string, bots: BotView[]): string {

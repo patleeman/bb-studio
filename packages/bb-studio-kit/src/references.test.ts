@@ -19,7 +19,6 @@ describe("canonical Studio references", () => {
     expect(parseStudioItemHref("/plugins/pages/pages/a%3Ab%2Fc")).toEqual({ pluginId: "pages", id: "a:b/c" });
     for (const path of ["/plugins/pages/pages/a%", "/plugins/pages/pages/%ZZ", "/plugins/pages/settings/pg_1", "/plugins/custom/objects/a", "/plugins/pages/pages/a/unknown"]) expect(parseStudioItemHref(path)).toBeNull();
     expect(parseStudioItemHref("/plugins/custom/objects/a%3Ab", { routes: [{ pluginId: "custom", path: "/plugins/custom/objects/" }] })).toEqual({ pluginId: "custom", id: "a:b" });
-    expect(parseStudioItemHref("/plugins/bot-teams/bots/bot_1/profile")).toEqual({ pluginId: "bot-teams", id: "bot_1" });
     expect(parseStudioItemHref("/plugins/studio/studio/pages/pg_1")).toEqual({ pluginId: "pages", id: "pg_1" });
     expect(parseStudioItemHref("/plugins/pages/pages/pg_1/chat/thr_1")).toEqual({ pluginId: "pages", id: "pg_1" });
     expect(parseStudioMentionReference("studio", "page:pg_1")).toEqual({ pluginId: "pages", id: "pg_1" });

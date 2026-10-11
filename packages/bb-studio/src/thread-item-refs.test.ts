@@ -19,14 +19,12 @@ it("resolves serialized mention provider IDs, including Studio's cross-plugin pi
     { pluginId: "studio", itemId: "item:excalidraw:drawing_1" },
     { pluginId: "pages", itemId: "page:pg_1" },
     { pluginId: "talk", itemId: "recordings:rec_1" },
-    { pluginId: "bot-teams", itemId: "bot:bot_1" },
     { pluginId: "extension", itemId: "unknown:colon:id" },
   ].map((resource) => ({ resource: { kind: "plugin", ...resource } }));
   expect(firstThreadItemRefs([{ type: "client/turn/requested", data: { input: [{ type: "text", text: "Review these", mentions }] } }])).toEqual([
     { pluginId: "excalidraw", id: "drawing_1" },
     { pluginId: "pages", id: "pg_1" },
     { pluginId: "talk", id: "rec_1" },
-    { pluginId: "bot-teams", id: "bot_1" },
     { pluginId: "extension", id: "unknown:colon:id" },
   ]);
 });

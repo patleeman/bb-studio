@@ -5,13 +5,11 @@
 // so the full Draw editor and agents keep working on the same drawing.
 import type { WhiteboardStroke } from "@bb-studio/kit/pages-contract";
 
-export { WHITEBOARD_COLORS, whiteboardStrokeSchema, whiteboardViewSchema, type WhiteboardStroke, type WhiteboardView } from "@bb-studio/kit/pages-contract";
+export { WHITEBOARD_COLORS, type WhiteboardStroke, type WhiteboardView } from "@bb-studio/kit/pages-contract";
 const MAX_ELEMENTS = 2000;
 const MAX_IMAGE_CHARS = 1_500_000;
 const PADDING = 24;
 const DEFAULT_STROKE = "#1e1e1e";
-
-export const DRAW_PLUGIN_ID = "excalidraw";
 
 export type SceneElement = Record<string, unknown> & { id: string; type: string };
 export type Scene = { elements: SceneElement[]; appState: Record<string, unknown>; files: Record<string, unknown> };

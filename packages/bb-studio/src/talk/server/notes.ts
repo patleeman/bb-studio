@@ -11,7 +11,6 @@ import { z } from "zod";
 import type { Recording } from "../shared/contract";
 import type { TalkStore } from "./store";
 
-export const PAGES_PLUGIN_ID = "pages";
 export const PAGES_MISSING = "Pages aren't available; reload Studio to make notes.";
 export const notesPagePath = (pageId: string) => `/plugins/studio/studio/pages/${pageId}`;
 

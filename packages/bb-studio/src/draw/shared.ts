@@ -7,8 +7,6 @@
 export const PLUGIN_ID = "excalidraw";
 /** Studio's panel sub-path: /plugins/studio/studio/drawings/<id> shows one drawing. */
 export const ROUTE_SEGMENT = "drawings";
-/** Where a drawing lived when Draw was its own plugin; saved tabs and links still use it. */
-export const LEGACY_ROOT = "/plugins/excalidraw/drawings";
 export const DRAW_ICON = "studio/draw";
 /** Realtime channel: the server pushes scene updates to open editors. */
 export const REALTIME_CHANNEL = "excalidraw";

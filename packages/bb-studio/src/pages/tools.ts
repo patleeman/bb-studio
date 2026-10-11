@@ -252,10 +252,6 @@ export function registerTools(
 /** Pages' agent tools, which Studio configures in every session with its other kinds'. */
 export const PAGE_TOOLS: readonly string[] = TOOL_NAMES;
 
-export function agentConfiguration() {
-  return { tools: [...TOOL_NAMES], skills: [], instructions: AGENT_INSTRUCTIONS };
-}
-
 function threadSummary(thread: ThreadView): string {
   const head = `- Thread ${thread.id}${thread.resolved ? " (resolved)" : ""}${thread.blockId ? ` on ^${shortId(thread.blockId)}` : ""}${thread.quote ? ` "${truncate(thread.quote, 120)}"` : ""}`;
   const comments = thread.comments.map((comment) => `  - ${authorLabel(comment.author)}: ${truncate(comment.text, 800)}`);

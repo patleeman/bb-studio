@@ -46,19 +46,6 @@ const EMPTY_QUERY: Query = { filters: [], text: "" };
 const QUERY_KEY = "studio:query:all";
 const QUERY_EVENT = "studio:query";
 
-/** Opens the Studio collection on `query`, e.g. a project's items. */
-export function openCollectionQuery(navigate: ReturnType<typeof useBbNavigate>, query: Query): void {
-  try {
-    localStorage.setItem(QUERY_KEY, formatQuery(query));
-  } catch {
-    // Private windows can refuse storage; an open collection still hears the event.
-  }
-  window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: formatQuery(query) }));
-  // The workspace's new tab page shows it.
-  showBrowse();
-  navigate.toPluginPanel("studio", { subPath: "" });
-}
-
 /** Opens the new tab page, on `kind`'s items when given, from an old address that showed the list. */
 export function openCollection(kind: string | null): void {
   if (kind) {

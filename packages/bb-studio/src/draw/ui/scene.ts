@@ -19,13 +19,6 @@ export function parseScene(data: string): StoredScene | null {
   }
 }
 
-/** Elements that are not deleted (rendering/reading surfaces). */
-export function getNonDeletedElements(scene: StoredScene | null): unknown[] {
-  return (scene?.elements ?? []).filter(
-    (el) => !(el as { isDeleted?: boolean }).isDeleted,
-  );
-}
-
 /**
  * Serialize the live scene for storage, KEEPING deleted elements
  * (`isDeleted: true`) as tombstones. The stock `serializeAsJSON` drops
