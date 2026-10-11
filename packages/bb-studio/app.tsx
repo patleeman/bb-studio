@@ -16,7 +16,6 @@ import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { ComposerSpaces } from "./src/ui/ComposerSpaces";
 import { ThreadSpaceLink } from "./src/ui/ThreadSpaceLink";
-import { ActivityPanel } from "./src/ui/HomePanel";
 import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
@@ -58,7 +57,6 @@ function StudioRoot({ subPath }: { subPath: string }) {
   if (path === "") return <StudioWorkspace />;
   if (path === "browse") return <StudioPanel />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
-  if (path === "activity") return <ActivityPanel />;
   return <ToWorkspace path={path} />;
 }
 

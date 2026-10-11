@@ -3,20 +3,6 @@ import XCTest
 final class NewSurfacesUITests: XCTestCase {
     private let projectId = "proj_8ztiq6dkh5"
 
-    func testHomeAndCollection() throws {
-        guard rpc("studio", "home", ["periodDays": 7]) != nil else { throw XCTSkip("Updated Studio plugin is not installed") }
-        let app = launch()
-        app.tabBars.buttons["Studio"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 15))
-        XCTAssertTrue(studioSearch(app).exists)
-        shot(app, "collection")
-        app.buttons["studioToday"].tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
-        shot(app, "home")
-        app.buttons["studioCollection"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
-    }
-
     func testSearch() throws {
         guard rpcRaw("studio", "searchAll", ["query": "QA iOS7", "limit": 10]) is [[String: Any]] else {
             throw XCTSkip("Updated Studio search is not installed")

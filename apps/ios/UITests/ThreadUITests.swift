@@ -506,7 +506,7 @@ final class ThreadUITests: XCTestCase {
     /// Studio opens on the collection.
     private func openStudioCollection() {
         app.open(URL(string: "bbstudio://studio")!)
-        XCTAssertTrue(app.buttons["studioToday"].waitForExistence(timeout: 10), "Studio collection")
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio collection")
     }
 
     /// The socket closes in the background: on return the inbox catches up on what

@@ -44,9 +44,7 @@ import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
 import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
-import { homeData } from "./src/home";
 import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
-import { respondToNeed } from "./src/needs-you";
 import { zipFiles } from "./src/export-zip";
 import { SpaceLeads } from "./src/space-lead";
 
@@ -367,13 +365,6 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   bb.rpc.register(rpcContract, {
-    home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, providerComments, projectId, periodDays),
-    homeRespond: async (input) => {
-      await respondToNeed(bb.sdk, input);
-      changes.append(null);
-      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-      return { ok: true };
-    },
     overview: () => overview(),
     search: ({ query }) => contentSearch(query),
     searchStatus: () => searchIndex.status(),
@@ -848,7 +839,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_tag_items",
     description:
-      "Group the user's BB Studio items with tags. Tags work across pages, recordings, drawings, artifacts, tables and other items; new tag names are created. Pass items as the links studio_list_items shows.",
+      "Group the user's BB Studio items with tags. Tags work across pages, recordings, drawings, artifacts and other items; new tag names are created. Pass items as the links studio_list_items shows.",
     parameters: z.object({
       items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
       add: z.array(z.string().max(100)).max(20).optional().describe("Tag names to add"),
@@ -874,7 +865,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_delete_items",
     description:
-      "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts, tables and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove; spaces stay the user's to delete.",
+      "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove; spaces stay the user's to delete.",
     parameters: z.object({
       items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
     }),

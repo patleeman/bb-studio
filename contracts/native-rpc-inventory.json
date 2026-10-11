@@ -100,18 +100,6 @@
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "studio",
-      "method": "home",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio",
-      "method": "homeRespond",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio",
       "method": "searchAll",
       "coverage": "generated method"
     },

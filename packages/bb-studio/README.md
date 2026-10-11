@@ -93,16 +93,10 @@ Everything opens in BB's main view, and the Studio sidebar lists what you
 open. ⌘/Ctrl-click an item or thread link, or choose **Open in split** from
 its menu, to open it in a split instead. Right-click any Studio item or
 thread link, anywhere, for **Open**, **Open in split**, **Copy reference**
-(**Copy link** for a thread) and **New thread with this**. Item, collection and
-Activity headers have an **Open in split** button. An editor you leave stays
+(**Copy link** for a thread) and **New thread with this**. Item and collection
+headers have an **Open in split** button. An editor you leave stays
 open in the background, so it's as you left it when you come back.
 
-- **Activity** (Studio's **…** menu) shows measured thread turns, duration and
-  failures and recent Studio changes.
-  Choose 1, 7 or 30 days. The `home` RPC returns this data, plus what needs
-  you (pending approvals and questions, and unresolved comment replies or
-  mentions), active threads, recent items and today's automations,
-  for other clients such as the iOS app's Today view.
 - **One collection** (sidebar → Studio): every add-on's items in one list,
   with search over titles and content, filters by kind, project, space and
   tag, and an Archived view. **Display** groups the list by kind, project,

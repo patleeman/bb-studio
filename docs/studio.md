@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts, Tables and Design keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
+BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts and Design keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
 
 ## Provider contract
 
@@ -36,15 +36,13 @@ Tag schemas live in the kit's `studioTagSchemas`. A kind's `mentionProviderId` i
 
 The Studio hub stores links, item threads, activity, comments, and content versions. Add-ons call it through `studioServices(bb.sdk)` from `@bb-studio/kit/server`; they remain usable when Studio is absent. `RelatedPanel` in the kit shows backlinks, outgoing links, threads, comments, and versions from item headers.
 
-`replaceLinks` replaces one source's outgoing edges for an item. Pages sends mentions and item links. `links` returns outgoing edges and backlinks. `spawnForItem` creates and records a thread; `linkItemThread` records threads created by existing workflows, and `threadItems` lists a thread's linked items. The Pages, Drawings and Tables thread panel tabs use both: they list the thread's items first, and link each item they create to the thread with the `created` role. Studio also links the first accepted composer input's item refs, including multiple selected items, while keeping the composer's model and workspace choices. Studio reconciles thread states at startup and tracks lifecycle events. Pages chats and Studio Chat links are linked the same way.
+`replaceLinks` replaces one source's outgoing edges for an item. Pages sends mentions and item links. `links` returns outgoing edges and backlinks. `spawnForItem` creates and records a thread; `linkItemThread` records threads created by existing workflows, and `threadItems` lists a thread's linked items. The Pages and Drawings thread panel tabs use both: they list the thread's items first, and link each item they create to the thread with the `created` role. Studio also links the first accepted composer input's item refs, including multiple selected items, while keeping the composer's model and workspace choices. Studio reconciles thread states at startup and tracks lifecycle events. Pages chats and Studio Chat links are linked the same way.
 
 `recordActivity` accepts a kit `Actor`, verb, item ref, time, and summary. `activity` reads a bounded feed, optionally filtered by item and cursor. Comments use `comments`, `commentCreate`, and `commentResolve`; Pages keeps its Yjs comments and maps them to this interface. Other item comments live in Studio. Versions use `versions`, `versionCreate`, and `versionRead`. Studio deduplicates new drawing blobs by SHA-256. Pages snapshots and artifact versions stay in their owner stores and are read through adapters.
 
 ## Search and Home
 
 Studio keeps an SQLite FTS index of every provider's titles and `studio_read` text, updated from the change feed; `bb studio reindex` rebuilds it. `searchAll { query, kinds?, limit }` merges that index with live BB thread search and returns ranked hits with highlighted snippets. Cmd/Ctrl+Shift+K opens it as a quick-open palette; Cmd/Ctrl+K stays BB's thread search.
-
-`home { projectId?, periodDays }` feeds Studio's Activity view and the iOS app's Today view. **Needs you** gathers BB approvals and questions and open comment replies and mentions, ranked by urgency. `homeRespond` answers a BB approval or question. The other sections list running threads, recent items, upcoming automations, and the activity feed.
 
 Templates and bulk export are described in the [Studio README](../packages/bb-studio/README.md#templates-and-export).
 

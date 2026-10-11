@@ -10,7 +10,7 @@ struct RootView: View {
             .tag(Tab.inbox)
 
             NavigationStack(path: $model.studioPath) {
-                StudioHomeView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+                StudioView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)

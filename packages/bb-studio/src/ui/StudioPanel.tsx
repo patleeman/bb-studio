@@ -488,12 +488,8 @@ export function StudioPanel() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuItem onSelect={() => navigate.toPluginPanel("studio", { subPath: "activity" })}>
-          <Icon name="ChartColumn" className="size-4" /> Activity
-        </DropdownMenuItem>
         {sidebar?.panels.length ? (
           <>
-            <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Add-ons in the sidebar</DropdownMenuLabel>
             {shownPanels.length ? (
               <DropdownMenuItem onSelect={() => void setVisible(false)}>
@@ -505,9 +501,9 @@ export function StudioPanel() {
                 <Icon name="Eye" className="size-4" /> Show {sidebar.panels.map((panel) => panel.label).join(", ")}
               </DropdownMenuItem>
             ) : null}
+            <DropdownMenuSeparator />
           </>
         ) : null}
-        <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Add-ons</DropdownMenuLabel>
         {providers.map((provider) => (
           <DropdownMenuItem key={provider.pluginId} disabled className="opacity-100">
