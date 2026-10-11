@@ -14,7 +14,6 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRealtime: (_channel: string, handler: typeof state.handler) => { state.handler = handler; },
 }));
 vi.mock("@bb-studio/kit/app", () => ({
-  AddOnCollection: () => null,
   openAppPath: vi.fn(), studioPath: vi.fn(),
 }));
 vi.mock("./shared", () => ({ useProjects: () => [] }));

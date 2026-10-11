@@ -1,10 +1,9 @@
-// The Studio frontend kit: the shared collection, item header, sidebar
-// sections, and the pieces they are built from.
+// The Studio frontend kit: the shared collection, item header, and the
+// pieces they are built from.
 // Every Studio surface shows `title` attributes as fast tooltips.
 import "../ui/fast-title";
 export {
   CollectionPage,
-  type CollectionFilter,
   itemKey,
   type ActionResults,
   type CollectionHandlers,
@@ -12,17 +11,13 @@ export {
   type CollectionKind,
   type CollectionTag,
 } from "./collection";
-export { AddOnCollection, type ProviderCall } from "./add-on";
-export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
-export { ThreadItemsPanel } from "./thread-items";
-export { BarCrumb, BarSeparator, BarTitle, ChatButton, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, OpenInSplitButton, openNewItemThread, type ChatMenuItem, type ItemThread } from "./item-header";
-export { type RelatedRef } from "./item-header";
+export { ThreadItemsPanel, type ProviderCall } from "./thread-items";
+export { BarCrumb, BarSeparator, BarTitle, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, openNewItemThread, type ItemThread } from "./item-header";
 export { CopyReferenceMenuItem, ItemDeleteConfirm, ItemMenu } from "./item-menu";
-export { ITEM_LINK_PILLS, ItemLinkText, ItemLinkTextarea } from "./item-links";
 export { itemReferenceFrom } from "./item-reference";
 export { ItemDirectiveCard, remember } from "./directive-card";
 export { openAppPath, studioPath, panelHref } from "./nav";
-export { createStudioItem, type CreateStudioItemOptions } from "./create-item";
+export { createStudioItem } from "./create-item";
 export {
   Badge,
   Checkbox,
@@ -38,7 +33,6 @@ export {
   OUTLINE_BUTTON,
   PageColumn,
   PAGE_TITLE,
-  PILL,
   PRIMARY_BUTTON,
   projectName,
   SECTION_TITLE,
@@ -49,37 +43,15 @@ export {
 export { TagDot } from "./tags";
 export { RetainedPanels, retainPanel } from "./retained";
 export {
-  openPathInSplit,
   STUDIO_ITEM_CLICKS_OFF,
   studioItemProps,
   studioTargetAt,
   studioThreadProps,
   targetHref,
   threadLinkId,
-  type StudioItemLink,
 } from "./studio-item";
 export { useOpenMain, useOpenTarget, type OpenPlace, type OpenTarget } from "./move";
-export { MoveToItems, MoveToSubmenu } from "./move-to";
 export { usePathname } from "./route";
-export { NewConversationComposer, type NewConversationProps, type ConversationSubmit } from "./new-conversation";
-export {
-  SIDEBAR_ROW,
-  SIDEBAR_ROW_SELECTED,
-  SidebarAnchors,
-  SidebarDisplayMenuItems,
-  SidebarGroupHeading,
-  SidebarNote,
-  SidebarPortal,
-  SidebarSection,
-  showSidebarSection,
-  useHiddenSidebarSections,
-  useSidebarDisplay,
-  useSidebarHosted,
-  useSidebarNavigated,
-  type SidebarDirection,
-  type SidebarDisplay,
-  type SidebarSectionAction,
-} from "./sidebar";
 export {
   setItemChatHost,
   itemChatChanged,
@@ -89,7 +61,6 @@ export {
   type ItemChatHost,
   type ItemChatRef,
 } from "./item-chat";
-export { publishThreadBadges, useThreadBadge, type ThreadBadge } from "./thread-badges";
 export {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,4 +76,4 @@ export { Icon } from "../ui/icon";
 export { Tooltip } from "../ui/tooltip";
 export { cn } from "../ui/utils";
 
-export { WORKSPACE_PATH, WORKSPACE_DRAG, setWorkspaceActive, workspaceActivePath, registerWorkspaceCloser, closeWorkspaceItem, workspaceItemPath, canOpenWorkspaceItem, openWorkspaceItem, registerWorkspaceOpener, registerWorkspaceProvider, publishWorkspaceAnchor, subscribeWorkspace, workspaceRevision, type WorkspaceItem, type WorkspacePlacement } from "./workspace";
+export { WORKSPACE_PATH, WORKSPACE_DRAG, setWorkspaceActive, workspaceActivePath, registerWorkspaceCloser, workspaceItemPath, canOpenWorkspaceItem, openWorkspaceItem, registerWorkspaceOpener, registerWorkspaceProvider, publishWorkspaceAnchor, subscribeWorkspace, workspaceRevision, type WorkspaceItem, type WorkspacePlacement } from "./workspace";

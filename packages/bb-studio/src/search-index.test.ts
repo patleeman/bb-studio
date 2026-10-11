@@ -175,18 +175,21 @@ it("keeps undiscovered providers through discovery failure, retries once due, an
       if (failDiscovery) throw new Error("Discovery temporarily unavailable");
       return installed ? [{ pluginId: "custom" }] : [];
     });
+    const answer = (pluginId: string, method: string) => method === "studio_describe"
+      ? { pluginId, version: 2, panel: null, kinds: [] }
+      : method === "studio_read" ? { content: "" } : { items: [{ ...item("a", pluginId === "pages" ? pageTitle : customTitle), pluginId }] };
     const sdk: HubSdk = { plugins: {
-      list: async () => ({ plugins: ["pages", ...(installed ? ["custom"] : [])].map((id) => ({ id, name: id, enabled: true, status: "running", statusDetail: null, version: "1" })) }),
+      list: async () => ({ plugins: (installed ? ["custom"] : []).map((id) => ({ id, name: id, enabled: true, status: "running", statusDetail: null, version: "1" })) }),
       experimental_discoverRpc: discover,
-      callRpc: async ({ pluginId, method, outputSchema }) => outputSchema.parse(method === "studio_describe"
-        ? { pluginId, version: 2, panel: null, kinds: [] }
-        : method === "studio_read" ? { content: "" } : { items: [{ ...item("a", pluginId === "pages" ? pageTitle : customTitle), pluginId }] }),
+      callRpc: async ({ pluginId, method, outputSchema }) => outputSchema.parse(answer(pluginId, method)),
     } };
-    await new SearchIndex(db, new StudioHub(sdk)).ensure();
+    const handlers = Object.fromEntries(["studio_describe", "studio_list", "studio_read"].map((method) => [method, () => answer("pages", method)]));
+    const builtins = [{ pluginId: "pages", name: "Pages", handlers: handlers as never }];
+    await new SearchIndex(db, new StudioHub(sdk, builtins)).ensure();
     failDiscovery = true;
     pageTitle = "Updated built-in";
     // A fresh hub has no in-memory provider history, only the saved index.
-    const restarted = new SearchIndex(db, new StudioHub(sdk));
+    const restarted = new SearchIndex(db, new StudioHub(sdk, builtins));
     await restarted.ensure();
     expect(restarted.search("Extension").map((hit) => hit.ref.pluginId)).toEqual(["custom"]);
     expect(restarted.search("Updated").map((hit) => hit.ref.pluginId)).toEqual(["pages"]);

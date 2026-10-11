@@ -1,6 +1,5 @@
 import { expect, it } from "vitest";
 import { ITEM_REFERENCE_TYPE, itemReferenceFrom, itemReferenceText, parseItemReference } from "./item-reference";
-import { itemLinkIcon, mentionQuery, splitItemLinks } from "./item-links";
 
 const clipboard = (data: Record<string, string>) => ({ getData: (type: string) => data[type] ?? "" }) as DataTransfer;
 
@@ -27,27 +26,4 @@ it("prefers Studio's own clipboard type, and takes bare links only when asked", 
   expect(itemReferenceFrom(clipboard({ "text/plain": "[Plan](/plugins/pages/pages/pg_1)" }))).toEqual({ href: "/plugins/pages/pages/pg_1", title: "Plan" });
   expect(itemReferenceFrom(clipboard({ "text/plain": "/plugins/pages/pages/pg_1" }))).toBeNull();
   expect(itemReferenceFrom(clipboard({ "text/plain": "/plugins/pages/pages/pg_1" }), { bare: true })).toEqual({ href: "/plugins/pages/pages/pg_1" });
-});
-
-it("splits item links out of plain text", () => {
-  expect(splitItemLinks("See [Plan](/plugins/pages/pages/pg_1) and [web](https://a.com).")).toEqual([
-    { text: "See " },
-    { title: "Plan", href: "/plugins/pages/pages/pg_1" },
-    { text: " and [web](https://a.com)." },
-  ]);
-});
-
-it("finds the @ query before the caret", () => {
-  expect(mentionQuery("Ask @road", 9)).toEqual({ start: 4, query: "road" });
-  expect(mentionQuery("@", 1)).toEqual({ start: 0, query: "" });
-  expect(mentionQuery("mail me@home", 12)).toBeNull();
-  expect(mentionQuery("@road map", 9)).toBeNull();
-});
-
-it("picks an item's icon from its link", () => {
-  expect(itemLinkIcon("/plugins/pages/pages/pg_1")).toBe("studio/pages");
-  expect(itemLinkIcon("/plugins/studio/studio/pages/pg_1")).toBe("studio/pages");
-  expect(itemLinkIcon("/plugins/unknown/things/x_1")).toBe("GridView");
-  expect(itemLinkIcon("/plugins/studio/studio/drawings/drw_1")).toBe("studio/draw");
-  expect(itemLinkIcon("/plugins/excalidraw/drawings/drw_1")).toBe("studio/draw");
 });

@@ -37,7 +37,7 @@ function fakeSdk(options: {
     calls,
     plugins: {
       list: async () => ({ plugins: options.plugins }),
-      experimental_discoverRpc: async () => (options.discovered ?? []).map((pluginId) => ({ pluginId })),
+      experimental_discoverRpc: async () => (options.discovered ?? options.plugins.map((entry) => entry.id)).map((pluginId) => ({ pluginId })),
       callRpc: async ({ pluginId, method, input, outputSchema }) => {
         calls.push(`${pluginId}.${method}`);
         const handler = options.rpc[`${pluginId}.${method}`];
@@ -117,18 +117,19 @@ describe("StudioHub", () => {
       expect((await hub.providers())[0]!.kinds[0]!.label).toBe(label);
     } finally { vi.useRealTimers(); }
   });
-  it("marks failed discovery incomplete while still loading known providers", async () => {
-    const sdk = fakeSdk({ plugins: [plugin("pages"), plugin("custom")], rpc: {
-      "pages.studio_describe": () => ({ pluginId: "pages", version: 2, panel: null, kinds: [kind] }),
-      "pages.studio_list": () => ({ items: [item("pg_1")] }),
-    } });
+  it("marks failed discovery incomplete while still loading built-in providers", async () => {
+    const sdk = fakeSdk({ plugins: [plugin("custom")], rpc: {} });
     sdk.plugins.experimental_discoverRpc = async () => { throw new Error("Discovery down"); };
-    const overview = await new StudioHub(sdk).overview();
+    const pages = { pluginId: "pages", name: "Pages", handlers: {
+      studio_describe: () => ({ pluginId: "pages", version: 2, panel: null, kinds: [kind] }),
+      studio_list: () => ({ items: [item("pg_1")] }),
+    } as never };
+    const overview = await new StudioHub(sdk, [pages]).overview();
     expect(overview).toMatchObject({ discoveryComplete: false });
     expect(overview.items.map((entry) => entry.id)).toEqual(["pg_1"]);
   });
 
-  it("lists suite plugins first, then discovered ones, skipping disabled plugins and itself", async () => {
+  it("lists discovered plugins, skipping disabled plugins and itself", async () => {
     const sdk = fakeSdk({
       plugins: [plugin("zeta"), plugin("pages"), plugin("talk", { enabled: false }), plugin("studio")],
       discovered: ["zeta", "studio", "pages"],
@@ -144,7 +145,7 @@ describe("StudioHub", () => {
     ]);
   });
 
-  it("takes a suite plugin without studio_describe, and one that isn't running, offline", async () => {
+  it("takes a plugin without studio_describe, and one that isn't running, offline", async () => {
     const sdk = fakeSdk({ plugins: [plugin("pages"), plugin("talk", { status: "error", statusDetail: "Crashed" })], rpc: {} });
     const providers = await new StudioHub(sdk).providers();
     expect(providers).toMatchObject([

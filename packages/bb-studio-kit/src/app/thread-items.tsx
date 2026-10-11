@@ -9,11 +9,16 @@ import { STUDIO_PLUGIN_ID, type StudioSchemas } from "../contract";
 import { errorMessage, relativeTime, untitled } from "../format";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
-import type { ProviderCall } from "./add-on";
 import { ItemTile, PRIMARY_BUTTON, THUMBNAIL } from "./pieces";
 import { studioItemProps } from "./studio-item";
 
 type Provider = StudioSchemas["provider"];
+
+/** Calls an add-on's `studio_*` methods, e.g. `useRpc().call`. */
+export type ProviderCall = <M extends keyof Provider>(
+  method: M,
+  input: z.input<Provider[M]["input"]>,
+) => Promise<z.output<Provider[M]["output"]>>;
 type Item = z.output<Provider["studio_list"]["output"]>["items"][number];
 type Kind = z.output<Provider["studio_describe"]["output"]>["kinds"][number];
 

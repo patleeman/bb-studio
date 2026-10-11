@@ -86,14 +86,14 @@ describe("server helpers", () => {
           { id: "pages", enabled: true, name: "Pages", status: "running", statusDetail: null, version: "1" },
           { id: "extra", enabled: true, name: "Extra", status: "running", statusDetail: null, version: "1" },
         ] }),
-        experimental_discoverRpc: async () => [{ pluginId: "extra" }],
+        experimental_discoverRpc: async () => [{ pluginId: "pages" }, { pluginId: "extra" }],
       },
-    }, { method: "studio_list", known: ["pages"] });
-    expect(providers.map((item) => item.id)).toEqual(["pages", "extra"]);
+    }, { method: "studio_list" });
+    expect(providers.map((item) => item.id)).toEqual(["extra", "pages"]);
     expect(await fanOutProviders(providers, async (item) => {
       if (item.id === "extra") throw new Error("offline");
       return item.id;
-    }, () => "failed")).toEqual(["pages", "failed"]);
+    }, () => "failed")).toEqual(["failed", "pages"]);
   });
 
   it("serves immutable private bytes with caller CSP", () => {

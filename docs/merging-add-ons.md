@@ -331,9 +331,14 @@ commit, run `bb <old> migrate`, and check the items in Studio
 
 ## After the merge (follow-ups)
 
-- Delete `AddOnCollection`, `AddOnPanel` and `handOver` from the kit: no
-  add-on with a collection is left.
 - Delete the bridge packages (`bb-studio-pages`, `-talk`, `-draw`,
   `-artifacts`, `-design`) and their iOS fallbacks after a release cycle,
   keeping their `RETIRED` entries.
-- Drop `SUITE`/`STUDIO_SUITE` entries for kinds that are built in.
+- The kit stays a packed tarball (`packages/bb-studio-kit.tgz`): Code,
+  Reactions, Decisions and the bridges install alone from Git and can't
+  import its sources. Once the bridges are gone, it could shrink to what
+  those three use.
+
+Done: the kit's `AddOnCollection`, `AddOnPanel` and `handOver` are gone (Code
+hands its collection path to Studio itself), and provider discovery no longer
+keeps a list of known add-ons, since every kind that had one is built in.

@@ -8,9 +8,6 @@ import type { z } from "zod";
 import type { ProviderView } from "./contract";
 import { schemas } from "./contract";
 
-/** The BB Studio suite, in the order Studio lists it. */
-export const SUITE = ["pages", "talk", "excalidraw", "artifacts"];
-
 /**
  * A kind built into Studio. It answers to the plugin id it had as an add-on
  * and implements the same provider methods, which the hub calls in-process
@@ -100,7 +97,7 @@ export class StudioHub {
 
   private async providerSnapshot(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; discoveryComplete: boolean; installed: Set<string> }> {
     const builtinIds = [...this.builtins.keys()];
-    const snapshot = await discoverProviderSnapshot(this.sdk, { method: "studio_describe", known: SUITE.filter((id) => !this.builtins.has(id)), exclude: [STUDIO_PLUGIN_ID, ...builtinIds] });
+    const snapshot = await discoverProviderSnapshot(this.sdk, { method: "studio_describe", exclude: [STUDIO_PLUGIN_ID, ...builtinIds] });
     this.inventory ??= this.inventoryMap(snapshot.installed);
     const builtins: PluginEntry[] = [...this.builtins.values()].map((builtin) => ({ id: builtin.pluginId, name: builtin.name, enabled: true, status: "running", statusDetail: null, version: "builtin" }));
     const installed = new Set([...snapshot.installed.map((entry) => entry.id), ...builtinIds]);

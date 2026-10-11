@@ -48,9 +48,9 @@ Templates and bulk export are described in the [Studio README](../packages/bb-st
 
 ## Collection and installation
 
-`CollectionPage` in the kit renders the shared list, grid, filters, selection and action menus. An add-on uses `AddOnCollection` for its standalone panel and hands its collection view to Studio when Studio is available. Item views remain with their owning plugin. Studio can hide add-on sidebar entries while keeping their routes available.
+`CollectionPage` in the kit renders the shared list, grid, filters, selection and action menus. A separate plugin with items (Code) hands its collection path to Studio's collection; its item views stay with it.
 
-`packages/bb-studio-kit` (`@bb-studio/kit`) is a source package. Each add-on depends on its packed copy, `file:../bb-studio-kit.tgz` (rebuilt by `scripts/refresh-locks.sh`), and `bb plugin build` bundles it. The kit exports `CollectionPage`, `AddOnCollection`, `AddOnPanel`, item headers and menus, directive cards, format helpers and shared UI primitives. Plugins use the kit's `bb.pluginTailwindContent` so its classes are included in their builds.
+`packages/bb-studio-kit` (`@bb-studio/kit`) is a source package. Each add-on depends on its packed copy, `file:../bb-studio-kit.tgz` (rebuilt by `scripts/refresh-locks.sh`), and `bb plugin build` bundles it. The kit exports `CollectionPage`, item headers and menus, directive cards, format helpers and shared UI primitives. Plugins use the kit's `bb.pluginTailwindContent` so its classes are included in their builds.
 
 BB installs a Git plugin by cloning the repository and running `npm install --omit=dev` in the package directory. Each plugin's `package-lock.json` must therefore include the kit link. Use `scripts/refresh-locks.sh <package>` to regenerate locks in a clean clone.
 

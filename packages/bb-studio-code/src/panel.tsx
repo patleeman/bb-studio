@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { AddOnPanel, BAR_BUTTON, BarTitle, ICON_BUTTON, Icon, ItemHeader, ItemMenu } from "@bb-studio/kit/app";
+import { BAR_BUTTON, BarTitle, ICON_BUTTON, Icon, ItemHeader, ItemMenu, openAppPath, studioPath } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { toast } from "sonner";
 import { FileBrowser } from "./file-browser";
@@ -8,18 +8,17 @@ import { FolderPicker } from "./folder-picker";
 import { themeChanges, useThemeSync } from "./theme-sync";
 import { CHANNEL, HIDDEN_RELEASE_MS, KIND_ID, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
 
+/** A workspace, or Studio's collection filtered to workspaces. */
 export function CodePanel({ subPath }: { subPath: string }) {
-  return (
-    <AddOnPanel
-      subPath={subPath}
-      pluginId={PLUGIN_ID}
-      title="Workspaces"
-      kind={KIND_ID}
-      channel={CHANNEL}
-      isItemId={isWorkspaceId}
-      renderItem={(id, back) => <WorkspaceView key={id} id={id} back={back} />}
-    />
-  );
+  const [id = ""] = subPath.split("/").filter(Boolean);
+  const workspace = isWorkspaceId(id);
+  useEffect(() => {
+    if (!workspace) openAppPath(studioPath(KIND_ID), { replace: true });
+  }, [workspace]);
+  const toCollection = useCallback((replace = false) => openAppPath(studioPath(KIND_ID), { replace }), []);
+  // Blank while handing over to Studio.
+  if (!workspace) return <div className="h-full bg-background" />;
+  return <WorkspaceView key={id} id={id} back={{ backLabel: "Studio", onBack: toCollection }} />;
 }
 
 /**

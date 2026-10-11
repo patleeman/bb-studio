@@ -7,8 +7,6 @@ import { STUDIO_BUILTINS, STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, type St
 import { untitled } from "../format";
 import { discoverProviderSnapshot, fanOutProviders, loadProviderItems } from "./discovery";
 
-/** The Studio add-ons, in the order their items are offered. */
-const STUDIO_SUITE = ["excalidraw", "artifacts", "talk", "pages"];
 const FRESH_MS = 5_000;
 const MAX_ITEMS = 500;
 
@@ -72,7 +70,7 @@ export function studioIndex(sdk: BbPluginApi["sdk"], studio: StudioSchemas, opti
 
   async function load(): Promise<Snapshot> {
     const exclude = ["studio", ...(options.exclude ?? [])];
-    const discovery = await discoverProviderSnapshot(sdk, { method: "studio_list", known: STUDIO_SUITE.filter((id) => !STUDIO_BUILTINS.includes(id)), exclude: [...exclude, ...STUDIO_BUILTINS] });
+    const discovery = await discoverProviderSnapshot(sdk, { method: "studio_list", exclude: [...exclude, ...STUDIO_BUILTINS] });
     // Built-in kinds are there whenever Studio is.
     const studioPlugin = discovery.installed.find((plugin) => plugin.id === STUDIO_PLUGIN_ID)
       ?? (await sdk.plugins.list()).plugins.find((plugin) => plugin.id === STUDIO_PLUGIN_ID && plugin.enabled);

@@ -37,10 +37,10 @@ export interface DiscoverySdk<T extends DiscoveredPlugin> {
   };
 }
 
-/** Find installed, enabled providers; known add-ons retain their display order. */
+/** Find installed, enabled providers, in id order. */
 export async function discoverProviderSnapshot<T extends DiscoveredPlugin>(
   sdk: DiscoverySdk<T>,
-  options: { method: string; known: readonly string[]; exclude?: readonly string[] },
+  options: { method: string; exclude?: readonly string[] },
 ): Promise<ProviderDiscovery<T>> {
   const [{ plugins }, discovered] = await Promise.all([
     sdk.plugins.list(),
@@ -49,8 +49,7 @@ export async function discoverProviderSnapshot<T extends DiscoveredPlugin>(
       () => ({ ids: [] as string[], complete: false }),
     ),
   ]);
-  const extras = [...new Set(discovered.ids)].filter((id) => !options.known.includes(id)).sort();
-  const providers = [...options.known, ...extras].flatMap((id) => {
+  const providers = [...new Set(discovered.ids)].sort().flatMap((id) => {
     const entry = plugins.find((plugin) => plugin.id === id);
     return entry?.enabled && !options.exclude?.includes(id) ? [entry] : [];
   });
