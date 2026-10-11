@@ -195,8 +195,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForText("Weekly product sync");
         await client.waitForText("Checkout flow");
         // The drawing's card shows its server-rendered thumbnail.
-        await client.waitForSelector('img[src*="/plugins/excalidraw/http/thumbnail"]');
-        const loaded = await client.evaluate(`(async () => { const img = document.querySelector('img[src*="/plugins/excalidraw/http/thumbnail"]'); await img.decode(); return img.naturalWidth > 0; })()`, true);
+        await client.waitForSelector('img[src*="/plugins/studio/http/drawings/thumbnail"]');
+        const loaded = await client.evaluate(`(async () => { const img = document.querySelector('img[src*="/plugins/studio/http/drawings/thumbnail"]'); await img.decode(); return img.naturalWidth > 0; })()`, true);
         if (!loaded) throw new Error("The drawing thumbnail didn't load");
         await sleep(1000);
       } catch (error) {

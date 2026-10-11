@@ -119,12 +119,13 @@ export async function seedDrawing() {
       strokeColor: "#868e96",
     }),
   );
-  const { drawing } = await pluginRpc("excalidraw", "createDrawing", { name: "Checkout flow", projectId });
-  await pluginRpc("excalidraw", "saveDrawing", {
+  // Drawings are built into Studio (its `drawings.*` methods).
+  const { drawing } = await pluginRpc("studio", "drawings.createDrawing", { name: "Checkout flow", projectId });
+  await pluginRpc("studio", "drawings.saveDrawing", {
     id: drawing.id,
     data: JSON.stringify({ type: "excalidraw", version: 2, source: "bb-capture", elements, appState: { viewBackgroundColor: "#ffffff" }, files: {} }),
   });
-  return { drawing, cleanup: () => pluginRpc("excalidraw", "deleteDrawing", { id: drawing.id }).catch(() => {}) };
+  return { drawing, cleanup: () => pluginRpc("studio", "drawings.deleteDrawing", { id: drawing.id }).catch(() => {}) };
 }
 
 
