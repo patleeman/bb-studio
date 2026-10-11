@@ -1,7 +1,7 @@
 import { parseEmojiItems } from "./emoji-items";
 import type { MenuSettings } from "./settings";
 
-const ICON = 'span[data-plugin-icon-asset*="plugins/studio/assets/icon"]';
+const ICON = 'span[data-plugin-icon-asset*="plugins/studio/assets/icons/studio.svg"]';
 
 /** Stable hosts expose action registration but no per-surface emoji renderer.
  * Keep the DOM dependency here, touch only positively identified plugin icons,

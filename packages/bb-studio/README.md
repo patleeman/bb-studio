@@ -112,62 +112,7 @@ with `BB_CAPTURE_ONLY=pages-comments`.
 
 The compact page header at 390 pixels, with **Item actions** open.
 
-### Reactions
-
-Emoji reactions on replies, in the text selection menu and the bar under each
-message. They were the Studio Reactions plugin (`emoji-react`); Studio has
-them built in now (`src/reactions/`).
-
-Select text in a reply. The floating selection menu (next to "Add to chat")
-shows one emoji button per reaction. Click one and the composer gets a draft,
-then focus:
-
-```
-> <the highlighted text>
-
-👍 Agree
-```
-
-Buttons show the emoji only. The draft uses the full item text. An item can be
-just an emoji (`🚀`); then the draft is that emoji. The draft goes to the
-composer for the message's thread, in the main view or a split; with no
-usable composer, a toast asks you to open the thread's composer.
-
-**Quote position.** With `before` (default) the quote comes first, then the
-reaction. With `after` the reaction comes first, then the quote. If you
-already typed a draft, `after` puts the reaction between your text and the
-quote.
-
-Older replies that end with a `::reactions{items="…"}` line still render it
-as reaction buttons. Agents no longer write it; the [Next row](#next-row)
-offers quick replies.
-
-| Setting | Key | Default |
-| --- | --- | --- |
-| Reactions: up to 8 `emoji label` items, separated by lines or commas. Empty removes the buttons. | `emojiItems` | `👍 Agree, 👎 Disagree, ✅ Do it, ❓ Clarify` |
-| Quote the highlighted text | `quoteSelection` | on |
-| Quote position: `before` or `after` the reaction | `quotePosition` | `before` |
-| In the text selection menu (and the right-click menu) | `showInSelectionMenu` | on |
-| Under assistant messages | `showInAssistantBar` | on |
-| Under your messages | `showInUserBar` | on |
-
-```sh
-bb plugin config studio set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
-bb plugin config studio set quotePosition after
-```
-
-Message menus read the settings once when Studio's frontend loads. The
-**Saved reactions** section previews the stored list and says whether this
-window still uses older settings; **Reload window to apply** refreshes the
-menus. Other open windows update on their next reload.
-
-**Moving from Studio Reactions.** On its first start with `emoji-react`
-installed, Studio copies that plugin's settings once (a KV marker records
-it), skipping any you already changed in Studio. Then remove the old plugin
-from **Setup → Retired plugins** or with `bb plugin remove emoji-react`;
-while both are installed, each shows its own buttons.
-
-## What you get
+### What you get
 
 - **A block editor.** Built on [BlockNote](https://www.blocknotejs.org): type
   `/` for headings, lists, checklists, toggles, quotes, code, tables, images,
@@ -887,6 +832,69 @@ plays from `GET /api/v1/plugins/studio/http/recordings/audio`. The Studio
 provider exports a recording's transcript as Markdown, its audio segments, or
 both (`markdown`, `audio`, `bundle`); recordings can't be duplicated, since
 copying the metadata without its audio would make a misleading recording.
+
+## Reactions
+
+Emoji reactions on replies, in the text selection menu and the bar under each
+message. They were the Studio Reactions plugin (`emoji-react`); Studio has
+them built in now (`src/reactions/`).
+
+Select text in a reply. The floating selection menu (next to "Add to chat")
+shows one emoji button per reaction. Click one and the composer gets a draft,
+then focus:
+
+```
+> <the highlighted text>
+
+👍 Agree
+```
+
+Buttons show the emoji only. The draft uses the full item text. An item can be
+just an emoji (`🚀`); then the draft is that emoji. The draft goes to the
+composer for the message's thread, in the main view or a split; with no
+usable composer, a toast asks you to open the thread's composer.
+
+**Quote position.** With `before` (default) the quote comes first, then the
+reaction. With `after` the reaction comes first, then the quote. If you
+already typed a draft, `after` puts the reaction between your text and the
+quote.
+
+Older replies that end with a `::reactions{items="…"}` line still render it
+as reaction buttons. Agents no longer write it; the [Next row](#next-row)
+offers quick replies.
+
+![Live BB screenshot of the Reactions settings in Studio](assets/reactions.png)
+
+Captured from a staged BB: Studio's settings page with the default reaction
+list (Agree, Disagree, Do it, Clarify), quoting before the reaction, all three
+location toggles on, and the **Saved reactions** preview saying the menu
+settings are applied in this window. Before it, the capture checks that the
+seeded agent reply's message bar shows the four reactions as emoji.
+
+| Setting | Key | Default |
+| --- | --- | --- |
+| Reactions: up to 8 `emoji label` items, separated by lines or commas. Empty removes the buttons. | `emojiItems` | `👍 Agree, 👎 Disagree, ✅ Do it, ❓ Clarify` |
+| Quote the highlighted text | `quoteSelection` | on |
+| Quote position: `before` or `after` the reaction | `quotePosition` | `before` |
+| In the text selection menu (and the right-click menu) | `showInSelectionMenu` | on |
+| Under assistant messages | `showInAssistantBar` | on |
+| Under your messages | `showInUserBar` | on |
+
+```sh
+bb plugin config studio set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
+bb plugin config studio set quotePosition after
+```
+
+Message menus read the settings once when Studio's frontend loads. The
+**Saved reactions** section previews the stored list and says whether this
+window still uses older settings; **Reload window to apply** refreshes the
+menus. Other open windows update on their next reload.
+
+**Moving from Studio Reactions.** On its first start with `emoji-react`
+installed, Studio copies that plugin's settings once (a KV marker records
+it), skipping any you already changed in Studio. Then remove the old plugin
+from **Setup → Retired plugins** or with `bb plugin remove emoji-react`;
+while both are installed, each shows its own buttons.
 
 ## What you get
 

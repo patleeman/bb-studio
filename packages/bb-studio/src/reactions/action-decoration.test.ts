@@ -3,7 +3,7 @@ import { afterEach, expect, it } from "vitest";
 import { mountActionDecoration } from "./action-decoration";
 import { menuSettings } from "./settings";
 
-const icon = '<span data-plugin-icon-asset="/api/v1/plugins/studio/assets/icon?h=1"></span>';
+const icon = '<span data-plugin-icon-asset="/api/v1/plugins/studio/assets/icons/studio.svg?h=1"></span>';
 afterEach(() => { document.body.replaceChildren(); });
 
 it("only decorates positively identified reaction actions and restores their icons", () => {
