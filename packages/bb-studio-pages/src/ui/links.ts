@@ -1,7 +1,7 @@
 // Pasting a lone link on an empty line turns it into an embed: a page,
 // thread, drawing, artifact, recording for a BB
 // link, a bookmark for anything else on the web.
-import { itemAtPath } from "@bb-studio/kit/contract";
+import { itemAtPath, parseStudioItemHref } from "@bb-studio/kit/contract";
 import { STUDIO_EMBEDS, isEmbedKindItem, type EmbedKind, type StudioEmbedKind } from "../schema-config";
 
 const PAGE_PATH = /^\/plugins\/pages\/pages\/(pg_[a-f0-9]{12}(?:[a-f0-9]{4})?)(?:\/|$)/;
@@ -10,6 +10,12 @@ const ITEM_PATH = /^\/plugins\/([a-z0-9-]+)\/([a-z0-9-]+)\/([A-Za-z0-9_-]+)\/?$/
 
 /** The embed for a Studio add-on's item page, e.g. `/plugins/excalidraw/drawings/<id>`. */
 export function studioLink(pathname: string): { kind: StudioEmbedKind; target: string } | null {
+  // A kind built into Studio lives under Studio's panel, e.g. /plugins/studio/studio/artifacts/<id>.
+  if (pathname.startsWith("/plugins/studio/studio/")) {
+    const ref = parseStudioItemHref(pathname);
+    const kind = ref && (Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).find((each) => isEmbedKindItem(each, ref.pluginId));
+    return ref && kind ? { kind, target: ref.id } : null;
+  }
   const match = ITEM_PATH.exec(pathname);
   if (!match) return null;
   const [, pluginId, panel, id] = match;

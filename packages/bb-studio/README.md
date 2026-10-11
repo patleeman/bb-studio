@@ -87,6 +87,64 @@ Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
 "offline sync": an HTML artifact and two pages match on their title or
 content, each showing the matching text with the match in bold.
 
+## Artifacts
+
+Artifacts are built into Studio: the images, pages, reports and files your
+agents make, kept with every version. They used to be the separate Studio
+Artifacts plugin (`artifacts`). Items keep that id as their namespace
+(`artifacts:<id>`), so tags, Spaces, tabs, links and chats carry over. If you
+had the plugin, see [its upgrade bridge](../bb-studio-artifacts/README.md) to
+copy your artifacts in.
+
+![Live BB screenshot of an artifact open as a Studio tab](assets/artifacts-preview.png)
+
+Captured from a staged BB. The seeded HTML report "Q3 usage report", saved
+twice from a staged thread's workspace, opened from its old
+`/plugins/artifacts/artifacts/<id>` address. Studio rewrote it and opened the
+artifact as a workspace tab at `/plugins/studio/studio/artifacts/<id>`. The
+viewer shows version 2 (`HTML · 2.1 KB · v2`) in its sandboxed frame, with
+**Chat**, Related, Open in split, the Source toggle, Copy, Download and the ⋯ menu.
+
+![The compact artifact header](assets/artifacts-compact-header.png)
+
+The same viewer at 390 pixels wide, with **Item actions** open.
+
+- **In the library.** Artifacts list next to pages, recordings and drawings,
+  with type, size and version columns, image thumbnails, projects, archive,
+  move and delete. Artifacts have no collection page of their own:
+  `/plugins/studio/studio/artifacts` opens the library filtered to the
+  Artifact kind. Studio search matches titles, descriptions and the text of
+  text files up to 1 MB (HTML by its words). Studio can't create an artifact;
+  they come from threads.
+- **Viewer** (`/plugins/studio/studio/artifacts/<id>`, loaded the first time
+  one opens). Images fit the window, and a click shows actual size. HTML runs
+  in a sandboxed frame, PDFs open in the browser's viewer, and audio and video
+  play with seeking. Markdown renders as a document. Code and text use BB's
+  source viewer (first 2 MB). Other files offer a download. The header has an
+  editable title, the artifact's chat, Copy, Download, and a menu with Open
+  source thread, Save as page, Versions, Move to and Delete. Select text or
+  drag over an image to **Send to thread**.
+- **Save from a thread.** **Artifacts** in the thread panel launcher lists the
+  files the latest reply created, changed or generated, the thread's storage
+  files, and what the thread already saved. Nothing is saved automatically.
+- **Agent tools and skill.** `artifacts_save`, `artifacts_list` and
+  `artifacts_read`, and the `artifacts` skill. A saved artifact comes back as
+  `::artifact{id="art_…"}`, a card with an inline preview that opens the
+  viewer beside the chat. `@artifact` mentions give the agent the artifact's
+  details and, for text up to 1 MB, its contents.
+- **Commands.** `bb studio artifacts save <path> [--title <title>]
+  [--description <text>]`, `list [--thread]`, `show <id>`,
+  `export <id> [path] [--force]` and `delete <id>`. A plugin registers one CLI
+  command, so the old `bb artifacts …` moved under `bb studio`.
+- **Limits.** 25 MB per file. A version is keyed on its source thread and
+  path; unchanged bytes add no version. Saving reads only from the thread's
+  workspace or thread storage.
+
+Files are stored as BLOBs in Studio's SQLite database. Contents come from
+`GET /api/v1/plugins/studio/http/artifacts/content`. Every response except a
+real PDF carries a `sandbox allow-scripts` CSP, so HTML gets an opaque origin
+and can't call BB's API with your session.
+
 ## What you get
 
 Everything opens in BB's main view, and the Studio sidebar lists what you
@@ -174,6 +232,11 @@ bb studio reindex
 
 ## How it works
 
+- Some kinds are built into Studio (Artifacts so far; see
+  [`docs/merging-add-ons.md`](../../docs/merging-add-ons.md)). They implement
+  the same provider contract in-process, keep the plugin id they had as add-ons,
+  and open under Studio's one panel. Other add-ons reach them through Studio's
+  `provider.call`.
 - Add-ons implement the Studio provider contract (`studio_describe`,
   `studio_list`, `studio_search`, `studio_create`, `studio_move`,
   `studio_archive`, `studio_delete`, `studio_action`) from
@@ -205,10 +268,11 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   same CLI command with a Copy button, for when it fails.
 - If BB doesn't know the `bb-studio` marketplace yet, the page shows
   `bb marketplace add git:github.com/patleeman/bb-studio@main` first.
-- **Retired plugins** shows `studio-navigation`, `float`, `bot-teams` and
-  `studio-tables` if they're installed: why each is retired, what removing it
+- **Retired plugins** shows `artifacts`, `studio-navigation`, `float`,
+  `bot-teams` and `studio-tables` if they're installed: why each is retired, what removing it
   keeps and deletes, and what to do first. **Remove…** asks before it removes
-  anything.
+  anything. Studio Artifacts can't be removed until its upgrade bridge has
+  copied every artifact into Studio (`bb artifacts migrate`).
 - Problems with plugins outside BB Studio are listed at the bottom.
 
 `bb studio setup` prints the same status, the retired plugins and the

@@ -1,9 +1,9 @@
 import Database from "better-sqlite3";
-import { ArtifactStore, MIGRATIONS } from "../server/store";
+import { ARTIFACT_TABLES, ArtifactStore } from "../server/store";
 
 export function memoryStore(now: () => number = Date.now): { db: Database.Database; store: ArtifactStore } {
   const db = new Database(":memory:");
-  for (const statement of MIGRATIONS) db.exec(statement);
+  db.exec(ARTIFACT_TABLES);
   return { db, store: new ArtifactStore(db, now) };
 }
 

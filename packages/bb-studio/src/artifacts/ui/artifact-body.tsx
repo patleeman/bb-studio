@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import { EmptyState, Icon, OUTLINE_BUTTON, cn } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { Markdown, experimental_SourceCode as SourceCode, useRpc } from "@get-bb/plugin-sdk/app";
-import type { rpcContract } from "../server";
-import { contentUrl, formatBytes, isTextType, type ArtifactType } from "../src/shared";
+import type { rpcContract } from "../contract";
+import { contentUrl, formatBytes, isTextType, type ArtifactType } from "../shared";
 import { AreaBox, useImageArea, type Picked } from "./artifact-quote";
 
 export type ArtifactVersion = {
@@ -32,7 +32,7 @@ function useVersionText(artifactId: string, version: ArtifactVersion, wanted: bo
     if (!wanted) return;
     let live = true;
     setText(null);
-    rpc.call("text", { id: artifactId, versionId: version.id }).then(
+    rpc.call("artifacts.text", { id: artifactId, versionId: version.id }).then(
       (result) => live && setText(result),
       (error) => live && setText({ error: errorMessage(error) }),
     );

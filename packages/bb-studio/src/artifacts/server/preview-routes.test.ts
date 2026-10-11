@@ -1,21 +1,19 @@
-import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it } from "vitest";
-import plugin from "../../server";
+import { artifactsHost } from "../test/host";
 import { SANDBOX_CSP } from "./content";
 
-const hosts: ReturnType<typeof createFakePluginHost>[] = [];
+const hosts: ReturnType<typeof artifactsHost>[] = [];
 afterEach(async () => { for (const host of hosts.splice(0)) await host.harness.lifecycle.dispose(); });
 async function fixture() {
-  const host = createFakePluginHost({ pluginId: "artifacts" });
+  const host = artifactsHost();
   hosts.push(host);
-  await plugin(host.bb);
   const rpc = host.harness.behavior;
   return {
     ...host, rpc,
     async save(name: string, mime: string, bytes: Buffer) {
-      const { id } = await rpc.callRpc("importFile", { name, mime, bytes: bytes.toString("base64"), projectId: null }) as { id: string };
-      const { artifact } = await rpc.callRpc("get", { id }) as { artifact: { version: { id: string; name: string; mime: string; type: string } } };
-      return { id, version: artifact.version, url: `/content?artifact=${id}&version=${artifact.version.id}` };
+      const { id } = await rpc.callRpc("artifacts.importFile", { name, mime, bytes: bytes.toString("base64"), projectId: null }) as { id: string };
+      const { artifact } = await rpc.callRpc("artifacts.get", { id }) as { artifact: { version: { id: string; name: string; mime: string; type: string } } };
+      return { id, version: artifact.version, url: `/artifacts/content?artifact=${id}&version=${artifact.version.id}` };
     },
   };
 }
@@ -39,7 +37,7 @@ it.each([
   expect(response.headers.get("content-security-policy")).toBe(SANDBOX_CSP);
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   expect(await response.text()).toBe(source);
-  const text = await host.rpc.callRpc("text", { id: saved.id, versionId: saved.version.id });
+  const text = await host.rpc.callRpc("artifacts.text", { id: saved.id, versionId: saved.version.id });
   expect(text).toEqual({ text: type === "image" || type === "other" ? null : source, truncated: false });
   const download = await host.rpc.fetchHttp("GET", `${saved.url}&download=1`);
   expect(download.headers.get("content-disposition")).toContain("attachment;");
@@ -80,32 +78,32 @@ it("normalizes filenames and rejects invalid imports without creating artifacts"
   expect(response.status).toBe(200);
   expect(response.headers.get("content-disposition")).toContain("filename*=UTF-8''rapport%20%22%C3%A9t%C3%A9%22.txt");
   expect(await response.text()).toBe("");
-  const before = await host.rpc.callRpc("studio_list", null);
+  const before = await host.artifacts.provider.studio_list(null as never);
   for (const [name, bytes] of [["..", ""], ["bad.txt", "%%%="], ["bad.txt", "YQ"]]) {
-    await expect(host.rpc.callRpc("importFile", { name, mime: "text/plain", bytes, projectId: null })).rejects.toThrow();
+    await expect(host.rpc.callRpc("artifacts.importFile", { name, mime: "text/plain", bytes, projectId: null })).rejects.toThrow();
   }
-  expect(await host.rpc.callRpc("studio_list", null)).toEqual(before);
+  expect(await host.artifacts.provider.studio_list(null as never)).toEqual(before);
 });
 
 it("isolates version ownership and returns clear missing/deleted/blob-missing responses", async () => {
   const host = await fixture();
   const a = await host.save("a.txt", "text/plain", Buffer.from("A"));
   const b = await host.save("b.txt", "text/plain", Buffer.from("B"));
-  expect((await host.rpc.fetchHttp("GET", `/content?artifact=${a.id}&version=${b.version.id}`)).status).toBe(404);
-  expect((await host.rpc.fetchHttp("GET", "/content")).status).toBe(404);
-  await expect(host.rpc.callRpc("text", { id: a.id, versionId: b.version.id })).rejects.toThrow(/Version not found/);
+  expect((await host.rpc.fetchHttp("GET", `/artifacts/content?artifact=${a.id}&version=${b.version.id}`)).status).toBe(404);
+  expect((await host.rpc.fetchHttp("GET", "/artifacts/content")).status).toBe(404);
+  await expect(host.rpc.callRpc("artifacts.text", { id: a.id, versionId: b.version.id })).rejects.toThrow(/Version not found/);
   host.bb.storage.database().prepare("DELETE FROM artifact_blobs").run();
   expect((await host.rpc.fetchHttp("GET", a.url)).status).toBe(404);
-  expect(await host.rpc.callRpc("text", { id: a.id, versionId: a.version.id })).toEqual({ text: null, truncated: false });
-  await host.rpc.callRpc("delete", { id: a.id });
-  expect(await host.rpc.callRpc("get", { id: a.id })).toEqual({ artifact: null, versions: [] });
+  expect(await host.rpc.callRpc("artifacts.text", { id: a.id, versionId: a.version.id })).toEqual({ text: null, truncated: false });
+  await host.rpc.callRpc("artifacts.delete", { id: a.id });
+  expect(await host.rpc.callRpc("artifacts.get", { id: a.id })).toEqual({ artifact: null, versions: [] });
 });
 
 it("marks the 2 MiB text preview truncated while downloads retain all bytes", async () => {
   const host = await fixture();
   const bytes = Buffer.from("x".repeat(2 * 1024 * 1024) + "final suffix");
   const saved = await host.save("large.txt", "text/plain", bytes);
-  const result = await host.rpc.callRpc("text", { id: saved.id, versionId: saved.version.id }) as { text: string; truncated: boolean };
+  const result = await host.rpc.callRpc("artifacts.text", { id: saved.id, versionId: saved.version.id }) as { text: string; truncated: boolean };
   expect(result.truncated).toBe(true);
   expect(result.text.length).toBe(2 * 1024 * 1024);
   const downloaded = Buffer.from(await (await host.rpc.fetchHttp("GET", `${saved.url}&download=1`)).arrayBuffer());
@@ -116,7 +114,7 @@ it("marks the 2 MiB text preview truncated while downloads retain all bytes", as
 it("cuts the 2 MiB text preview before a multi-byte character, not inside it", async () => {
   const host = await fixture();
   const saved = await host.save("accents.txt", "text/plain", Buffer.from("x".repeat(2 * 1024 * 1024 - 1) + "é tail"));
-  const result = await host.rpc.callRpc("text", { id: saved.id, versionId: saved.version.id }) as { text: string; truncated: boolean };
+  const result = await host.rpc.callRpc("artifacts.text", { id: saved.id, versionId: saved.version.id }) as { text: string; truncated: boolean };
   expect(result.truncated).toBe(true);
   expect(result.text).not.toContain("\uFFFD");
   expect(result.text === "x".repeat(2 * 1024 * 1024 - 1)).toBe(true);

@@ -1,21 +1,26 @@
 // Names, paths and file types the server and the app share.
 
+/**
+ * Artifacts are built into Studio, but keep the id of the plugin they came
+ * from: items stay `artifacts:<id>` in Studio's tables, mentions and links.
+ */
 export const PLUGIN_ID = "artifacts";
-/** The nav panel: /plugins/artifacts/artifacts, and artifacts/<id> for one artifact. */
 /** The "Artifacts" workbench tab's action id; reply cards open it with `{ artifactId }`. */
 export const ARTIFACTS_TAB = "save-to-studio";
-export const PANEL_PATH = "artifacts";
-export const ARTIFACT_ICON = "artifacts/artifact";
+/** Studio's panel sub-path: /plugins/studio/studio/artifacts/<id> shows one artifact. */
+export const ROUTE_SEGMENT = "artifacts";
+/** Where an artifact lived when Artifacts was its own plugin; saved tabs and links still use it. */
+export const LEGACY_ROOT = "/plugins/artifacts/artifacts";
+export const ARTIFACT_ICON = "studio/artifact";
 /** The Artifacts thread panel and its "Save to Studio" button. */
-export const SAVE_ICON = "artifacts/save";
+export const SAVE_ICON = "studio/artifact-save";
 /** Realtime channel: the server says when an artifact changed. */
 export const REALTIME_CHANNEL = "artifacts";
 export const ARTIFACT_UPDATE_TYPE = "artifact:updated";
-/** BB's download cap; larger files are refused at save time. */
-export const MAX_ARTIFACT_BYTES = 25 * 1024 * 1024;
+export { MAX_ARTIFACT_BYTES } from "@bb-studio/kit/artifacts-contract";
 
 export function artifactHref(id: string): string {
-  return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}`;
+  return `/plugins/studio/studio/${ROUTE_SEGMENT}/${encodeURIComponent(id)}`;
 }
 
 /** A version's bytes. Versions never change, so the response caches forever. */
@@ -25,7 +30,7 @@ export const SELECTION_MESSAGE = "bb-artifact-selection";
 /** `quote` adds, to HTML, the script that tells the viewer what's selected. */
 export function contentUrl(artifactId: string, versionId: string, options: { download?: boolean; quote?: boolean } = {}): string {
   const query = `artifact=${encodeURIComponent(artifactId)}&version=${encodeURIComponent(versionId)}`;
-  return `/api/v1/plugins/${PLUGIN_ID}/http/content?${query}${options.download ? "&download=1" : ""}${options.quote ? "&quote=1" : ""}`;
+  return `/api/v1/plugins/studio/http/artifacts/content?${query}${options.download ? "&download=1" : ""}${options.quote ? "&quote=1" : ""}`;
 }
 
 const ID = /^art_[0-9a-z]{16}$/;
@@ -50,9 +55,9 @@ export const TYPE_LABELS: Record<ArtifactType, string> = {
 };
 
 export const TYPE_ICONS: Record<ArtifactType, string> = {
-  image: "artifacts/image",
-  audio: "artifacts/audio",
-  video: "artifacts/video",
+  image: "studio/artifact-image",
+  audio: "studio/artifact-audio",
+  video: "studio/artifact-video",
   html: "Globe",
   markdown: "FileText",
   code: "Code",

@@ -24,14 +24,14 @@ import {
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
-import type { rpcContract } from "../server";
-import { ARTIFACT_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../src/shared";
+import type { rpcContract } from "../contract";
+import { ARTIFACT_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { ArtifactBody, type BodyView } from "./artifact-body";
 import { QuoteCard, useSelectionPick, type Picked } from "./artifact-quote";
 
 const SPIN = "animate-spin motion-reduce:animate-none";
 
-type Loaded = z.infer<(typeof rpcContract)["get"]["output"]>;
+type Loaded = z.infer<(typeof rpcContract)["artifacts.get"]["output"]>;
 
 export function ArtifactViewer({
   artifactId,
@@ -76,7 +76,7 @@ export function ArtifactViewer({
 
   const load = useCallback(
     () =>
-      rpc.call("get", { id: artifactId }).then(
+      rpc.call("artifacts.get", { id: artifactId }).then(
         (result) => {
           if (!result.artifact) {
             if (deleting.current) return;
@@ -124,7 +124,7 @@ export function ArtifactViewer({
   function rename(next: string) {
     const title = next.trim();
     if (!title || title === artifact.title) return;
-    void rpc.call("update", { id: artifactId, title }).catch((failure) => toast.error(errorMessage(failure)));
+    void rpc.call("artifacts.update", { id: artifactId, title }).catch((failure) => toast.error(errorMessage(failure)));
   }
 
   const thread = { title: artifact.title, href: artifactHref(artifactId) };
@@ -138,7 +138,7 @@ export function ArtifactViewer({
         toast.success("Image copied");
         return;
       }
-      const { text: copied } = await rpc.call("text", { id: artifactId, versionId: version.id });
+      const { text: copied } = await rpc.call("artifacts.text", { id: artifactId, versionId: version.id });
       if (copied === null) throw new Error("This artifact isn't text.");
       await navigator.clipboard.writeText(copied);
       toast.success("Copied");
@@ -150,7 +150,7 @@ export function ArtifactViewer({
   async function saveAsPage() {
     setBusy(true);
     try {
-      const { href } = await rpc.call("saveAsPage", { id: artifactId });
+      const { href } = await rpc.call("artifacts.saveAsPage", { id: artifactId });
       toast.success("Saved as a page", { action: { label: "Open", onClick: () => openAppPath(href) } });
     } catch (failure) {
       toast.error(errorMessage(failure));
@@ -161,7 +161,7 @@ export function ArtifactViewer({
 
   async function move(projectId: string | null) {
     try {
-      await rpc.call("move", { id: artifactId, projectId });
+      await rpc.call("artifacts.move", { id: artifactId, projectId });
       toast.success(`Moved to ${projectName(projects, projectId)}`);
     } catch (failure) {
       toast.error(errorMessage(failure));
@@ -171,7 +171,7 @@ export function ArtifactViewer({
   async function remove() {
     deleting.current = true;
     try {
-      await rpc.call("delete", { id: artifactId });
+      await rpc.call("artifacts.delete", { id: artifactId });
       toast.success("Artifact deleted");
       onBack(true);
     } catch (failure) {

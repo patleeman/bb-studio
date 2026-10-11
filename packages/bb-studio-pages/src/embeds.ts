@@ -4,7 +4,7 @@
 // add-on on its behalf.
 import { untitled } from "@bb-studio/kit/format";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
-import { indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/server";
+import { callProvider, indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { changesData, DRAW_PLUGIN_ID, parseScene, renderWhiteboard, whiteboardChanges, type WhiteboardStroke, type WhiteboardView } from "./whiteboard";
@@ -53,8 +53,8 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
     /** A new item from an add-on's Studio contract, as the index lists it. */
     async create(pluginId: string, kind: string, projectId: string | null): Promise<StudioIndexItem> {
       const [{ item }, info] = await Promise.all([
-        call(pluginId, "studio_create", { kind, projectId }, studio.provider.studio_create.output),
-        call(pluginId, "studio_describe", null, studio.info),
+        callProvider(sdk, pluginId, "studio_create", { kind, projectId }, studio.provider.studio_create.output),
+        callProvider(sdk, pluginId, "studio_describe", null, studio.info),
       ]);
       index.invalidate();
       return indexItem(pluginId, item, info);
@@ -102,21 +102,22 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       return view;
     },
     async artifactView(id: string) {
-      const { artifact } = await sdk.plugins.callRpc({ pluginId: "artifacts", method: "get", input: { id } as never, outputSchema: artifactSchema });
+      // Artifacts are built into Studio (its `artifacts.*` methods).
+      const { artifact } = await sdk.plugins.callRpc({ pluginId: "studio", method: "artifacts.get", input: { id } as never, outputSchema: artifactSchema });
       if (!artifact) return null;
       const { version } = artifact;
       let text: string | null = null;
       if (version.type === "markdown" || version.type === "code" || version.type === "text") {
         const result = await sdk.plugins.callRpc({
-          pluginId: "artifacts",
-          method: "studio_read",
-          input: { id, format: "markdown" } as never,
-          outputSchema: studio.provider.studio_read.output,
+          pluginId: "studio",
+          method: "artifacts.text",
+          input: { id, versionId: version.id } as never,
+          outputSchema: z.object({ text: z.string().nullable(), truncated: z.boolean() }),
         });
-        text = result.content === null ? null : result.content.slice(0, MAX_TEXT) + (result.content.length > MAX_TEXT ? "\n…" : "");
+        text = result.text === null ? null : result.text.slice(0, MAX_TEXT) + (result.text.length > MAX_TEXT || result.truncated ? "\n…" : "");
       }
       const query = `artifact=${encodeURIComponent(artifact.id)}&version=${encodeURIComponent(version.id)}`;
-      return { type: version.type, name: version.name, url: `/api/v1/plugins/artifacts/http/content?${query}`, text };
+      return { type: version.type, name: version.name, url: `/api/v1/plugins/studio/http/artifacts/content?${query}`, text };
     },
   };
 }

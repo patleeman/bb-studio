@@ -1,6 +1,8 @@
 // BB Studio's add-ons, copied from the repository's marketplace.json so
-// Studio knows them without a network call. setup-addons.test.ts fails when
+// Studio knows them without a network call. setup.test.ts fails when
 // this list drifts from marketplace.json; copy the entries over when it does.
+// Marketplace entries for retired plugins (setup.ts RETIRED), such as an
+// upgrade bridge kept installable for existing users, are left out.
 
 /** The marketplace these add-ons install from (marketplace.json "name"). */
 export const MARKETPLACE_NAME = "bb-studio";
@@ -18,7 +20,6 @@ export const ADDONS: readonly AddOn[] = [
   { id: "pages", displayName: "Studio Pages", description: "Part of BB Studio. Collaborative pages you write with your agents, with live editing, comments, version history and ordinary agent chats." },
   { id: "talk", displayName: "Studio Talk", description: "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable." },
   { id: "excalidraw", displayName: "Studio Draw", description: "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations." },
-  { id: "artifacts", displayName: "Studio Artifacts", description: "Part of BB Studio. Keep the images, pages, reports and files your agents make, in Studio's collection." },
   { id: "thread-list-plus", displayName: "Studio Sidebar", description: "BB's sidebar thread list, organized by Studio Space: one Space at a time with its lead, pins and two-line rows." },
   { id: "mobile", displayName: "Studio Mobile", description: "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads." },
   { id: "emoji-react", displayName: "Studio Reactions", description: "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer." },

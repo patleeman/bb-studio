@@ -1,8 +1,7 @@
-// Artifacts as a Studio add-on: the `studio_*` methods Studio calls to list
-// and manage artifacts in its collection.
-import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { copyTitle, eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
-import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
+// Artifacts as a Studio kind: the same `studio_*` provider methods an add-on
+// publishes over RPC, called in-process by Studio's hub (src/hub.ts).
+import { copyTitle, eachId, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
+import { mustGet as requireItem, storeSearch, type StudioProviderHandlers } from "@bb-studio/kit/server";
 import { ARTIFACT_ICON, PLUGIN_ID, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { displayTitle, versionType, type ArtifactStore, type ArtifactWithVersion } from "./store";
 
@@ -124,16 +123,15 @@ export function toStudioItem(store: ArtifactStore, artifact: ArtifactWithVersion
 /** Studio lists at most this many; past it, Studio keeps tags of items it didn't see. */
 const LIST_LIMIT = 10_000;
 
-export function registerStudio(
-  bb: Pick<BbPluginApi, "rpc">,
-  schemas: StudioSchemas,
-  deps: { store: ArtifactStore; changed(id: string): void },
-): void {
+export function artifactProvider(deps: { store: ArtifactStore; changed(id: string): void }): StudioProviderHandlers {
   const { store } = deps;
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Artifact not found.");
+  const unsupported = () => { throw new Error("Artifacts don't support this operation."); };
+  const each = (action: (id: string) => void) => ({ ids }: { ids: string[] }) => eachId(ids, action);
 
-  createStoreProvider<ArtifactWithVersion>(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "artifacts", kinds: [ARTIFACT_KIND] }),
+  return {
+    // No panel of its own: the kind's collection is Studio's library filtered to it.
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: null, kinds: [ARTIFACT_KIND] }),
     studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(store, row)] : []; }) }),
     studio_read: ({ id, format }) => { const row = store.get(id); const content = row ? artifactText(store, row) : null; return { content: content && format === "text" && versionType(row!.version) === "html" ? htmlText(content) : content }; },
     studio_list: () => {
@@ -174,23 +172,24 @@ export function registerStudio(
       if (!parts.length) return { message: ids.length === 1 ? "This artifact isn't text." : "None of these are text.", text: null };
       return { message: parts.length === 1 ? "Text copied" : `Copied text from ${parts.length} artifacts`, text: parts.join("\n\n") };
     },
-  }, {
-    move: (id: string, projectId: string | null) => {
+    studio_template: unsupported,
+    studio_instantiate: unsupported,
+    studio_move: ({ ids, projectId }) => eachId(ids, (id) => {
       mustGet(id);
       store.setProject(id, projectId);
       deps.changed(id);
-    },
-    archive: (id: string, archived: boolean) => {
+    }),
+    studio_archive: ({ ids, archived }) => eachId(ids, (id) => {
       mustGet(id);
       store.setArchived(id, archived);
       deps.changed(id);
-    },
-    delete: (id: string) => {
+    }),
+    studio_delete: each((id) => {
       mustGet(id);
       store.delete(id);
       deps.changed(id);
-    },
-  }, {
+    }),
+    studio_search: storeSearch<ArtifactWithVersion>({
     find: (query) => {
       const needle = query.toLowerCase();
       return store.list({ limit: 10_000 })
@@ -201,5 +200,6 @@ export function registerStudio(
         .slice(0, 200);
     },
     text: (artifact) => [artifact.description, searchText(store, artifact)].filter(Boolean).join("\n"),
-  });
+    }),
+  };
 }

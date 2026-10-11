@@ -1,31 +1,20 @@
 {
   "name": "@bb-studio/artifacts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
-  "description": "Part of BB Studio. Keep the images, pages, reports and files your agents make, in Studio's collection.",
+  "description": "Upgrade bridge for Studio Artifacts, now built into Studio: copies your artifacts into Studio and forwards older clients and mentions.",
   "engines": {
     "bb": ">=0.45",
     "bbPluginSdk": ">=0.6.15"
   },
   "bb": {
     "name": "Studio Artifacts",
-    "description": "Part of BB Studio. Keep the images, pages, reports and files your agents make, in Studio's collection.",
+    "description": "Upgrade bridge for Studio Artifacts, now built into Studio: copies your artifacts into Studio and forwards older clients and mentions.",
     "branding": {
-      "icon": "./assets/icon.svg",
-      "experimental_icons": {
-        "artifact": "./assets/icon.svg",
-        "image": "./assets/icon-image.svg",
-        "save": "./assets/icon-save.svg",
-        "audio": "./assets/icon-audio.svg",
-        "video": "./assets/icon-video.svg"
-      }
+      "icon": "./assets/icon.svg"
     },
-    "server": "./server.ts",
-    "app": "./app.tsx",
-    "skills": [
-      "skills"
-    ]
+    "server": "./server.ts"
   },
   "scripts": {
     "test": "vitest run --config vitest.config.mts",
@@ -40,14 +29,7 @@
     "@get-bb/plugin-sdk": "0.6.15",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "better-sqlite3": "^12.11.1",
-    "hono": "^4.11.9",
-    "jsdom": "29.0.1",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "sonner": "^1.7.4",
     "typescript": "^5.7.0",
     "vitest": "4.1.1"
   }

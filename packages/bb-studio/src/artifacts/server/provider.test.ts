@@ -2,14 +2,12 @@ import { studioSchemas } from "@bb-studio/kit/contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { bytes, memoryStore } from "../test/db";
-import { htmlText, registerStudio } from "./studio";
+import { artifactProvider, htmlText } from "./provider";
 
 function setup() {
   const { store } = memoryStore();
-  let handlers: Record<string, (input: unknown) => unknown> = {};
-  const bb = { rpc: { register: (_contract: unknown, registered: typeof handlers) => (handlers = registered) } };
   const changed: string[] = [];
-  registerStudio(bb as never, studioSchemas(z), { store, changed: (id) => void changed.push(id) });
+  const handlers = artifactProvider({ store, changed: (id) => void changed.push(id) }) as unknown as Record<string, (input: unknown) => unknown>;
   const call = async (method: string, input: unknown): Promise<any> => handlers[method]!(input);
   const save = (name: string, text: string, extra: Record<string, unknown> = {}) =>
     store.save({ name, mime: "", bytes: bytes(text), projectId: null, by: "agent", ...extra }).artifact;
@@ -38,7 +36,7 @@ describe("the Artifacts Studio provider", () => {
   it("describes artifacts, which Studio can't create", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);
-    expect(info).toMatchObject({ pluginId: "artifacts", panel: "artifacts", kinds: [{ id: "artifact", create: null, canArchive: true }] });
+    expect(info).toMatchObject({ pluginId: "artifacts", panel: null, kinds: [{ id: "artifact", create: null, canArchive: true }] });
     expect(studioSchemas(z).info.parse(info)).toBeTruthy();
     await expect(call("studio_create", { kind: "artifact", projectId: null, title: "x" })).rejects.toThrow(/saved from threads/);
   });
@@ -62,13 +60,13 @@ describe("the Artifacts Studio provider", () => {
         { id: "versions", value: "1", sort: 1 },
       ],
       thumbnailUrl: null,
-      href: `/plugins/artifacts/artifacts/${doc.id}`,
+      href: `/plugins/studio/studio/artifacts/${doc.id}`,
       archived: false,
     });
     expect(byId[image.id]).toMatchObject({
       title: "chart.png",
       facts: expect.arrayContaining([{ id: "type", value: "Image", sort: null }]),
-      thumbnailUrl: `/api/v1/plugins/artifacts/http/content?artifact=${image.id}&version=${image.version.id}`,
+      thumbnailUrl: `/api/v1/plugins/studio/http/artifacts/content?artifact=${image.id}&version=${image.version.id}`,
     });
   });
 

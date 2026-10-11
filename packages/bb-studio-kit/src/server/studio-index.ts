@@ -3,7 +3,7 @@
 // shows up without changes here.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { z } from "zod";
-import type { StudioSchemas } from "../contract";
+import { STUDIO_BUILTINS, STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, type StudioSchemas } from "../contract";
 import { untitled } from "../format";
 import { discoverProviderSnapshot, fanOutProviders, loadProviderItems } from "./discovery";
 
@@ -50,6 +50,20 @@ export function indexItem(pluginId: string, item: ProviderItem, info: z.infer<St
   };
 }
 
+type Sdk = Pick<BbPluginApi["sdk"], "plugins">;
+
+/**
+ * Calls an add-on's `studio_*` provider method. A kind built into Studio
+ * answers through Studio; the plugin that had its id before (an old copy, or
+ * its upgrade bridge) is never asked.
+ */
+export function callProvider<T>(sdk: Sdk, pluginId: string, method: string, input: unknown, outputSchema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
+  if (STUDIO_BUILTINS.includes(pluginId)) {
+    return sdk.plugins.callRpc({ pluginId: STUDIO_PLUGIN_ID, method: STUDIO_PROVIDER_CALL_METHOD, input: { pluginId, method, input } as never, outputSchema, ...(signal ? { signal } : {}) });
+  }
+  return sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema, ...(signal ? { signal } : {}) });
+}
+
 /** The newest live items across add-ons, cached for a few seconds. */
 export function studioIndex(sdk: BbPluginApi["sdk"], studio: StudioSchemas, options: { exclude?: readonly string[] } = {}) {
   type Snapshot = { items: StudioIndexItem[]; complete: boolean };
@@ -57,8 +71,14 @@ export function studioIndex(sdk: BbPluginApi["sdk"], studio: StudioSchemas, opti
   const previous = new Map<string, StudioIndexItem[]>();
 
   async function load(): Promise<Snapshot> {
-    const discovery = await discoverProviderSnapshot(sdk, { method: "studio_list", known: STUDIO_SUITE, exclude: ["studio", ...(options.exclude ?? [])] });
-    const installed = new Set(discovery.installed.map((plugin) => plugin.id));
+    const exclude = ["studio", ...(options.exclude ?? [])];
+    const discovery = await discoverProviderSnapshot(sdk, { method: "studio_list", known: STUDIO_SUITE.filter((id) => !STUDIO_BUILTINS.includes(id)), exclude: [...exclude, ...STUDIO_BUILTINS] });
+    // Built-in kinds are there whenever Studio is.
+    const studioPlugin = discovery.installed.find((plugin) => plugin.id === STUDIO_PLUGIN_ID)
+      ?? (await sdk.plugins.list()).plugins.find((plugin) => plugin.id === STUDIO_PLUGIN_ID && plugin.enabled);
+    const builtins = studioPlugin ? STUDIO_BUILTINS.filter((id) => !exclude.includes(id)).map((id) => ({ ...studioPlugin, id })) : [];
+    discovery.providers.push(...builtins);
+    const installed = new Set([...discovery.installed.map((plugin) => plugin.id), ...builtins.map((plugin) => plugin.id)]);
     const discovered = new Set(discovery.providers.map((plugin) => plugin.id));
     for (const id of previous.keys()) if (!installed.has(id) || (discovery.complete && !discovered.has(id))) previous.delete(id);
     let complete = discovery.complete;
@@ -66,8 +86,8 @@ export function studioIndex(sdk: BbPluginApi["sdk"], studio: StudioSchemas, opti
       if (!["running", "starting", "degraded"].includes(plugin.status)) { complete = false; return; }
       const result = await loadProviderItems(async () => {
         const [listed, info] = await Promise.all([
-          sdk.plugins.callRpc({ pluginId: plugin.id, method: "studio_list", input: null as never, outputSchema: studio.provider.studio_list.output, signal: AbortSignal.timeout(10_000) }),
-          sdk.plugins.callRpc({ pluginId: plugin.id, method: "studio_describe", input: null as never, outputSchema: studio.info, signal: AbortSignal.timeout(10_000) }),
+          callProvider(sdk, plugin.id, "studio_list", null, studio.provider.studio_list.output, AbortSignal.timeout(10_000)),
+          callProvider(sdk, plugin.id, "studio_describe", null, studio.info, AbortSignal.timeout(10_000)),
         ]);
         return { items: listed.items.map((item) => ({ ...indexItem(plugin.id, item, info), archived: item.archived })), truncated: listed.truncated };
       });

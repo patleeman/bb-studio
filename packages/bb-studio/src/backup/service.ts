@@ -90,6 +90,11 @@ export interface BackupDeps {
   bbVersion(): Promise<string | null>;
   /** Studio's own section. */
   studioData: BackupHandlers;
+  /**
+   * Kinds built into Studio, by the plugin id their section had when they
+   * were add-ons, so old backups restore into them and new ones read the same.
+   */
+  builtins?: Readonly<Record<string, { name: string; handlers: BackupHandlers }>>;
   limits?: ZipLimits;
 }
 
@@ -153,11 +158,22 @@ export class BackupService {
       const session = await this.session();
       try {
         const { plugins, able, discovered } = await this.providers(STUDIO_BACKUP_METHOD);
-        const extras = [...able].filter((id) => id !== "studio" && !(BACKUP_ADDONS as readonly string[]).includes(id)).sort();
+        const extras = [...able].filter((id) => id !== "studio" && !this.deps.builtins?.[id] && !(BACKUP_ADDONS as readonly string[]).includes(id)).sort();
         const sections: BackupSection[] = [];
         const empty = { version: null, counts: {}, files: 0, bytes: 0, notes: [] };
         for (const pluginId of [...BACKUP_ADDONS, ...extras]) {
           const plugin = plugins.find((each) => each.id === pluginId);
+          const builtin = this.deps.builtins?.[pluginId];
+          if (builtin) {
+            const base = { pluginId, name: builtin.name, pluginVersion: plugins.find((each) => each.id === "studio")?.version ?? null };
+            try {
+              sections.push({ ...base, status: "included", reason: null, ...(await runBackup(join(session.dir, pluginId), builtin.handlers)) });
+            } catch (error) {
+              await rm(join(session.dir, pluginId), { recursive: true, force: true });
+              sections.push({ ...base, ...empty, status: "failed", reason: message(error) });
+            }
+            continue;
+          }
           const base = { pluginId, name: nameOf(pluginId, plugins), pluginVersion: plugin?.version ?? null };
           if (!plugin) sections.push({ ...base, ...empty, status: "skipped", reason: "Not installed on this BB." });
           else if (!plugin.enabled) sections.push({ ...base, ...empty, status: "skipped", reason: "Turned off on this BB." });
@@ -245,6 +261,15 @@ export class BackupService {
           if (section.pluginId === "studio") {
             try {
               sections.push({ ...base, status: "restored", reason: null, report: await runRestore(join(session.dir, "studio"), this.deps.studioData, input) });
+            } catch (error) {
+              sections.push({ ...base, status: "failed", reason: message(error), report: null });
+            }
+            continue;
+          }
+          const builtin = this.deps.builtins?.[section.pluginId];
+          if (builtin) {
+            try {
+              sections.push({ ...base, status: "restored", reason: null, report: await runRestore(join(session.dir, section.pluginId), builtin.handlers, input) });
             } catch (error) {
               sections.push({ ...base, status: "failed", reason: message(error), report: null });
             }

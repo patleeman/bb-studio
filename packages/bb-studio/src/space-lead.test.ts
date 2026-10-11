@@ -1,6 +1,9 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
+
+/** The migration that moved the Chief of Staff into the default space. */
+const LEGACY = MIGRATIONS.findIndex((statement) => statement.includes("DROP TABLE chief_of_staff"));
 import { spaceRunSchema, type SpaceRun } from "./contract";
 import { SpaceLeads } from "./space-lead";
 import { SpaceStore, THREAD_REF } from "./spaces";
@@ -93,7 +96,7 @@ it("retains custom cron when switched off and uses it when enabled again", async
 });
 
 it("migrates legacy settings and automation identity without changing them", async () => {
-  const x = await setup(MIGRATIONS.slice(0, -1));
+  const x = await setup(MIGRATIONS.slice(0, LEGACY));
   x.db.prepare("INSERT INTO space_runs (space_id, enabled, cadence, time, automation_id, automation_project_id) VALUES (?, 1, 'weekdays', '08:30', 'legacy', 'p')").run(x.garden.id);
   x.bb.storage.migrate(x.db, MIGRATIONS);
   expect(x.leads.runs.get(x.garden.id)).toEqual({ enabled: true, cadence: "weekdays", time: "08:30" });
@@ -367,7 +370,6 @@ it("forgets a deleted Chief of Staff", async () => {
   expect(await x.leads.chief()).toMatchObject({ threadId: null });
 });
 
-const LEGACY = MIGRATIONS.length - 1;
 
 it("migrates the old Chief of Staff into the default space's lead, over an old lead, with no run (live data shape)", async () => {
   const x = await setup(MIGRATIONS.slice(0, LEGACY));

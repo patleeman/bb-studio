@@ -2,7 +2,7 @@
 // as is; text and code go in a fence longer than any backtick run inside.
 import { formatBytes, isTextType } from "../shared";
 import { versionType, type VersionRow } from "./store";
-import { TEXT_SCAN_BYTES } from "./studio";
+import { TEXT_SCAN_BYTES } from "./provider";
 
 /** `text` is the version's text from `artifactText`: null when it isn't text or is too big to read. */
 export function pageMarkdown(version: Pick<VersionRow, "name" | "mime" | "size">, text: string | null): string {

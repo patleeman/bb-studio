@@ -21,9 +21,18 @@ export interface ReferenceOptions {
 const LEGACY_NAMESPACES: Record<string, readonly string[]> = {
   pages: ["page"], excalidraw: ["drawing"], artifacts: ["artifact"], talk: ["recordings"], "bot-teams": ["bot"],
 };
+/**
+ * Kinds built into Studio: their mention provider id (registered by Studio)
+ * and the item namespace they keep, their old add-on's plugin id.
+ */
+const STUDIO_BUILTIN_MENTIONS: Record<string, string> = { artifact: "artifacts" };
+/** Studio's panel, where built-in kinds' items live at <segment>/<id>. */
+const STUDIO_PANEL = "/plugins/studio/studio/";
 const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { pluginId: "pages", path: "/plugins/pages/pages/" },
   { pluginId: "excalidraw", path: "/plugins/excalidraw/drawings/" },
+  { pluginId: "artifacts", path: `${STUDIO_PANEL}artifacts/` },
+  // The address artifacts had before they were built into Studio.
   { pluginId: "artifacts", path: "/plugins/artifacts/artifacts/" },
   { pluginId: "talk", path: "/plugins/talk/recordings/" },
   { pluginId: "bot-teams", path: "/plugins/bot-teams/bots/", subpaths: ["profile"] },
@@ -38,6 +47,11 @@ export function parseStudioItemReference(value: string): StudioReference | null 
 export function parseStudioMentionReference(pluginId: string, itemId: string, providers: readonly ReferenceProvider[] = []): StudioReference | null {
   if (!validPlugin(pluginId) || !itemId) return null;
   if (pluginId === "studio" && itemId.startsWith("item:")) return parseStudioItemReference(itemId);
+  if (pluginId === "studio") {
+    for (const [provider, namespace] of Object.entries(STUDIO_BUILTIN_MENTIONS)) {
+      if (itemId.startsWith(`${provider}:`) && itemId.length > provider.length + 1) return { pluginId: namespace, id: itemId.slice(provider.length + 1) };
+    }
+  }
   const namespaces = [...(LEGACY_NAMESPACES[pluginId] ?? []), ...providers.filter((provider) => provider.pluginId === pluginId).flatMap((provider) => provider.kinds.flatMap((kind) => kind.mentionProviderId ? [kind.mentionProviderId] : []))];
   const prefix = namespaces.sort((a, b) => b.length - a.length).find((namespace) => itemId.startsWith(`${namespace}:`));
   const id = prefix ? itemId.slice(prefix.length + 1) : itemId;
@@ -60,7 +74,8 @@ export function parseStudioItemHref(href: string, options: ReferenceOptions = {}
     } catch { return null; }
   }
   for (const route of [...STUDIO_REFERENCE_ROUTES, ...(options.routes ?? [])]) {
-    if (!validPlugin(route.pluginId) || !route.path.startsWith(`/plugins/${route.pluginId}/`) || !route.path.endsWith("/") || !path.startsWith(route.path)) continue;
+    const owned = route.path.startsWith(`/plugins/${route.pluginId}/`) || route.path.startsWith(STUDIO_PANEL);
+    if (!validPlugin(route.pluginId) || !owned || !route.path.endsWith("/") || !path.startsWith(route.path)) continue;
     try {
       const [id, ...suffix] = path.slice(route.path.length).split("/").map(decodeURIComponent);
       if (!id || id === "." || id === ".." || suffix.some((part) => !part || part === "." || part === "..")) continue;

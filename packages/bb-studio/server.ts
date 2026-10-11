@@ -1,4 +1,7 @@
 import { registerChat } from "./src/chat/server";
+import { registerArtifacts } from "./src/artifacts/server";
+import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
+import { builtinProviderContract } from "./src/builtin-provider";
 import { subcommand, usage } from "@bb-studio/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -19,7 +22,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type SpaceThreadView, type TabView } from "./src/contract";
@@ -75,10 +78,21 @@ const HEALTH_INTERVAL_MS = 3 * 60_000;
 
 export default async function plugin(bb: BbPluginApi) {
   await registerChat(bb);
-  const hub = new StudioHub(bb.sdk);
   const changes = new ChangeLog();
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
+  // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
+  const artifacts = registerArtifacts(bb, db);
+  bb.onDispose(() => artifacts.dispose());
+  const hub = new StudioHub(bb.sdk, [{ pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider }]);
+  // Other add-ons reach built-in kinds' provider methods through Studio
+  // (callProvider in the kit), as they reach an add-on's over RPC.
+  bb.rpc.register(builtinProviderContract, {
+    [STUDIO_PROVIDER_CALL_METHOD]: ({ pluginId, method, input }) => {
+      if (!BUILTIN_PLUGIN_IDS.has(pluginId)) throw new Error(`${pluginId} isn't built into Studio.`);
+      return hub.call(pluginId, method, input as never);
+    },
+  });
   const tags = new TagStore(db);
   const spaces = new SpaceStore(db);
   spaces.reconcileProjects((await bb.sdk.projects.list({ includePersonal: true })).map((project) => project.id));
@@ -109,7 +123,15 @@ export default async function plugin(bb: BbPluginApi) {
     };
   };
   const services = new StudioServices(db);
-  const providerHistory = new ProviderHistory(bb.sdk);
+  const providerHistory = new ProviderHistory(bb.sdk, {
+    artifacts: {
+      versions: (id) => artifacts.store.versions(id).map((version) => ({ id: version.id, name: version.name, createdAt: version.created_at })),
+      bytes: (id, versionId) => {
+        const version = artifacts.store.version(id, versionId);
+        return version ? artifacts.store.bytes(version.sha256) : null;
+      },
+    },
+  });
   const providerComments = new ProviderComments(bb.sdk);
   const threadState = async (threadId: string) => {
     try {
@@ -134,7 +156,9 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.unarchived", ({ thread }) => updateThread(thread.id, "idle"));
   // The composer does not expose a thread id to add-ons. Its first accepted
   // input still contains the item's link or mention, so link it when saved.
-  const mentionProviders = mentionProviderLookup((pluginId, signal) => bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null, outputSchema: schemas.provider.studio_describe.output, signal }));
+  const mentionProviders = mentionProviderLookup((pluginId, signal) => BUILTIN_PLUGIN_IDS.has(pluginId)
+    ? hub.call(pluginId, "studio_describe", null)
+    : bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null, outputSchema: schemas.provider.studio_describe.output, signal }));
   const checkedThreads = new Set<string>();
   const checkingThreads = new Set<string>();
   const pendingThreads = new Map<string, { id: string; createdAt: number; status: string }>();
@@ -344,6 +368,9 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   const itemForPath = async (path: string) => {
+    // A built-in's Studio address, or its old add-on address.
+    const builtin = builtinItemAt(path);
+    if (builtin) return itemAtPath(await hub.get(builtin.pluginId, [builtin.id]).catch(() => []), builtin.href);
     const parts = path.split(/[?#]/)[0]!.split("/");
     const pluginId = parts[2];
     const id = parts[4];
@@ -569,8 +596,8 @@ export default async function plugin(bb: BbPluginApi) {
     sidebar: () => readSidebar(),
     tabs: async () => ({ tabs: tabViews(await tabData()) }),
     visitTab: async ({ path }) => {
-      // Studio's own pages aren't items.
-      if (!path.startsWith("/plugins/") || path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`)) return { tab: null };
+      // Studio's own pages aren't items; its built-in kinds' item pages are.
+      if (!path.startsWith("/plugins/") || (path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`) && !builtinItemAt(path))) return { tab: null };
       const item = await itemForPath(path);
       if (!item) return { tab: null };
       if (tabs.open(item)) tabsChanged();
@@ -612,7 +639,7 @@ export default async function plugin(bb: BbPluginApi) {
       return readSidebar();
     },
     itemAt: async (input) => {
-      if ("path" in input && input.path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`)) return { item: null, kind: null };
+      if ("path" in input && input.path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`) && !builtinItemAt(input.path)) return { item: null, kind: null };
       const providers = await hub.providers();
       const item = "path" in input
         ? await itemForPath(input.path)
@@ -1055,6 +1082,7 @@ export default async function plugin(bb: BbPluginApi) {
         void searchIndex.rebuild().catch((error) => bb.log.warn(`Reindex after restore failed: ${errorText(error)}`));
       },
     }),
+    builtins: { artifacts: { name: "Studio Artifacts", handlers: artifacts.backup } },
   });
   registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));
   /** A CLI path, relative to where the command ran. */
@@ -1074,8 +1102,11 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
       { name: "backup", summary: "Save every Studio item, from every add-on, into one .zip file", usage: "bb studio backup [--out <file|folder>]" },
       { name: "restore", summary: "Restore a Studio backup; shows what would change first", usage: "bb studio restore <file> [--dry-run | --yes]" },
+      { name: "artifacts", summary: "Save and read artifacts: save, list, show, export, delete", usage: "bb studio artifacts <save|list|show|export|delete> …" },
     ],
     async run(argv, ctx) {
+      // Built-in kinds' commands (`bb artifacts …` before the merge).
+      if (argv[0] === "artifacts") return artifacts.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
         list: "bb studio list [query…] [--all] [--json] [--space <name>] [--kind <kind>] [--tag <tag>] [--query <text>]",
@@ -1188,7 +1219,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|spaces|move|providers|health|setup|reindex|backup|restore> …");
+            return usage("bb studio <list|tags|spaces|move|providers|health|setup|reindex|backup|restore|artifacts> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

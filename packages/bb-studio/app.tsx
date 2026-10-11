@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
 import { ItemGestures } from "./src/ui/ItemGestures";
@@ -7,7 +7,11 @@ import { ConversationPage } from "./src/chat/ui/ConversationComposer";
 // sub-path filters it to a kind, the sidebar's Studio tabs and Spaces, the
 // Space dialogs other plugins open by window event, each thread's space
 // in its header, and Studio search.
-import { openAppPath, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "@bb-studio/kit/app";
+import { openAppPath, registerWorkspaceProvider, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "@bb-studio/kit/app";
+import { BUILTIN_ROUTES, builtinSegment, STUDIO_ROOT } from "./src/builtins";
+import { ArtifactCard } from "./src/artifacts/ui/artifact-card";
+import { SavePicker } from "./src/artifacts/ui/save-picker";
+import { ARTIFACTS_TAB, isArtifactId, SAVE_ICON } from "./src/artifacts/shared";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ManageSpace } from "./src/ui/ManageSpace";
 import { NewSpace } from "./src/ui/NewSpace";
@@ -27,10 +31,10 @@ import { registerThreadAutomations } from "./src/ui/automations/register";
  * except for `workspace`. Retained, so it checks each time it's shown. In a
  * pane of its own, such as a restored BB split, it offers the move instead.
  */
-function ToWorkspace({ path }: { path: string }) {
+function ToWorkspace({ path, kind }: { path: string; kind?: string }) {
   const pathname = usePathname();
   const go = (replace: boolean) => {
-    if (path !== "workspace") openCollection(path === "collection" ? null : decodeSegment(path));
+    if (path !== "workspace") openCollection(kind ?? (path === "collection" ? null : decodeSegment(path)));
     openAppPath(WORKSPACE_PATH, { replace });
   };
   // Either side may be percent-encoded; compare them decoded.
@@ -52,13 +56,40 @@ function decodeSegment(segment: string): string {
   }
 }
 
+/** Built-in kinds' item pages, each loaded the first time one opens. */
+const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: ComponentType<{ id: string }> }> = {
+  artifacts: { isId: isArtifactId, View: lazy(() => import("./src/artifacts/ui/route")) },
+};
+
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
   // Studio opens on its tabbed workspace; the item list is only its new tab page.
   if (path === "") return <StudioWorkspace />;
   if (path === "browse") return <StudioPanel />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
+  // A built-in kind: <segment>/<id> is one item; <segment> alone is the
+  // library filtered to the kind, like any add-on's kind.
+  const builtin = builtinSegment(path);
+  if (builtin) {
+    const view = BUILTIN_VIEWS[builtin.route.segment];
+    const id = decodeSegment(builtin.rest.split("/")[0] ?? "");
+    if (view && view.isId(id)) return <Suspense fallback={null}><view.View id={id} /></Suspense>;
+    return <ToWorkspace path={builtin.route.segment} kind={builtin.route.kind} />;
+  }
   return <ToWorkspace path={path} />;
+}
+
+/**
+ * Lets the workspace open built-in kinds' items as tabs, from their Studio
+ * address and from the address their old add-on had (links and bookmarks
+ * made before the merge), which it rewrites.
+ */
+function BuiltinRoutes() {
+  useLayoutEffect(() => {
+    const disposers = BUILTIN_ROUTES.flatMap((route) => [registerWorkspaceProvider(`${STUDIO_ROOT}/${route.segment}`), registerWorkspaceProvider(route.legacyRoot)]);
+    return () => disposers.forEach((dispose) => dispose());
+  }, []);
+  return null;
 }
 
 export default definePluginApp((app) => {
@@ -71,6 +102,11 @@ export default definePluginApp((app) => {
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
+  app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });
+  // Artifacts (built in; docs/merging-add-ons.md): the thread panel that saves
+  // a reply's files, and the `::artifact{id="art_…"}` card in replies.
+  app.slots.threadPanelAction({ id: ARTIFACTS_TAB, title: "Artifacts", icon: SAVE_ICON, layout: "flush", component: SavePicker });
+  app.slots.messageDirective({ id: "artifact", component: ArtifactCard });
   // Renders nothing itself; portals the tabs section into the Studio Sidebar.
   app.slots.experimental_appOverlay({ id: "sidebar-tabs", component: SidebarTabs });
   // Spaces: threads and Studio items, with an optional lead (docs/spaces.md).

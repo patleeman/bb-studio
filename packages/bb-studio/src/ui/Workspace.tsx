@@ -7,6 +7,7 @@ import type { rpcContract } from "../contract";
 import { TABS_CHANNEL, WORKSPACE_CHANNEL } from "../ids";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import type { WorkspaceCommand } from "../workspace-presence";
+import { builtinItemAt, canonicalPath } from "../builtins";
 import { BROWSE, closeTab, emptyWorkspace, mapLayout, openItem, panes, parseWorkspace, type Layout, type Pane, type Tab, type Workspace } from "./workspace-state";
 
 const STORAGE = "bb:studio-workspace:v1";
@@ -118,7 +119,8 @@ export function WorkspaceBridge() {
     return subscribe(publish);
   }, []);
   // Opens an item as a tab and shows the workspace; `replace` drops the address that asked.
-  const openTab = useCallback((item: WorkspaceItem, placement: WorkspacePlacement, replace = false) => {
+  const openTab = useCallback((requested: WorkspaceItem, placement: WorkspacePlacement, replace = false) => {
+    const item = { ...requested, href: canonicalPath(requested.href) };
     update(current => openItem(current, item, placement));
     openAppPath(WORKSPACE_PATH, { replace });
     // The server's item title takes precedence over IDs and stale link labels.
@@ -133,8 +135,9 @@ export function WorkspaceBridge() {
   // plain item addresses: a sub-view such as a page's chat keeps its page.
   const providers = useSyncExternalStore(subscribeWorkspace, workspaceRevision, () => 0);
   useEffect(() => {
-    const path = pathname.replace(/\/+$/, "");
-    if (path.split("/").length === 5 && canOpenWorkspaceItem(path)) openTab({ href: path }, "tab", true);
+    // A built-in kind's item (its Studio address, or its old add-on one) too.
+    const path = canonicalPath(pathname.replace(/\/+$/, ""));
+    if ((path.split("/").length === 5 || builtinItemAt(path)?.href === path) && canOpenWorkspaceItem(path)) openTab({ href: path }, "tab", true);
   }, [pathname, providers, openTab]);
   useEffect(() => {
     let previous = panes(snapshot().layout).flatMap(pane => pane.tabs);

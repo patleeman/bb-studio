@@ -22,7 +22,12 @@
         "tag": "./icons/tag.svg",
         "hash": "./icons/hash.svg",
         "link": "./icons/link.svg",
-        "bookmark": "./icons/bookmark.svg"
+        "bookmark": "./icons/bookmark.svg",
+        "artifact": "./icons/artifact.svg",
+        "artifact-image": "./icons/artifact-image.svg",
+        "artifact-save": "./icons/artifact-save.svg",
+        "artifact-audio": "./icons/artifact-audio.svg",
+        "artifact-video": "./icons/artifact-video.svg"
       }
     },
     "server": "./server.ts",

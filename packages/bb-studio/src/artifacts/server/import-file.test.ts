@@ -1,24 +1,22 @@
-import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { describe, expect, it } from "vitest";
-import plugin from "../../server";
+import { artifactsHost } from "../test/host";
 import { MAX_ARTIFACT_BYTES } from "../shared";
 import { memoryStore } from "../test/db";
 import { importedFile } from "./import-file";
 
 describe("importedFile", () => {
   it("exposes a validated RPC that can be read and deleted", async () => {
-    const { bb, harness } = createFakePluginHost({ pluginId: "artifacts" });
-    await plugin(bb);
+    const { harness } = artifactsHost();
     try {
-      const { id } = (await harness.behavior.callRpc("importFile", {
+      const { id } = (await harness.behavior.callRpc("artifacts.importFile", {
         name: "QA capture.txt", mime: "text/plain", bytes: Buffer.from("hello").toString("base64"), projectId: "proj_qa",
       })) as { id: string };
-      const read = (await harness.behavior.callRpc("get", { id })) as {
+      const read = (await harness.behavior.callRpc("artifacts.get", { id })) as {
         artifact: { projectId: string; version: { name: string } };
       };
       expect(read.artifact).toMatchObject({ projectId: "proj_qa", version: { name: "QA capture.txt" } });
-      await harness.behavior.callRpc("delete", { id });
-      expect(await harness.behavior.callRpc("get", { id })).toMatchObject({ artifact: null });
+      await harness.behavior.callRpc("artifacts.delete", { id });
+      expect(await harness.behavior.callRpc("artifacts.get", { id })).toMatchObject({ artifact: null });
     } finally {
       await harness.lifecycle.dispose();
     }

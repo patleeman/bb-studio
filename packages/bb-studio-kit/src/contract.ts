@@ -39,6 +39,15 @@ export const STUDIO_REALTIME_CHANNEL = "studio-changed";
 /** Studio's RPC that finds the item a path opens, or an item by id. */
 export const STUDIO_ITEM_AT_METHOD = "itemAt";
 
+/**
+ * Kinds built into Studio, by the plugin id they had as add-ons (their item
+ * namespace). Their provider methods are Studio's: call them through Studio's
+ * `provider.call` (see callProvider in ./server), not the old plugin.
+ */
+export const STUDIO_BUILTINS: readonly string[] = ["artifacts"];
+/** Studio's method that runs a built-in kind's `studio_*` provider method. */
+export const STUDIO_PROVIDER_CALL_METHOD = "provider.call";
+
 export type StudioTone = "neutral" | "live" | "progress" | "warning" | "danger" | "success";
 
 export interface StudioFact {
@@ -330,4 +339,4 @@ export function mentionPrompt(items: readonly { title: string; href: string }[])
 
 export { copyTitle, fillTemplate, fillTemplateJson } from "./template";
 
-export { parseStudioMentionReference, studioTextReferences, type StudioReference, type ReferenceProvider, type ReferenceRoute, type ReferenceOptions } from "./references";
+export { parseStudioItemHref, parseStudioMentionReference, studioTextReferences, type StudioReference, type ReferenceProvider, type ReferenceRoute, type ReferenceOptions } from "./references";

@@ -1,0 +1,62 @@
+// Kinds built into Studio (docs/merging-add-ons.md). Each keeps the plugin id
+// it had as its own add-on, so its items stay `<pluginId>:<id>` in Studio's
+// tables, and its items open under Studio's one panel at
+// /plugins/studio/studio/<segment>/<id>. The old add-on's own address still
+// resolves, so saved tabs, links and bookmarks keep working.
+
+export const STUDIO_ROOT = "/plugins/studio/studio";
+
+export interface BuiltinRoute {
+  /** The item namespace: the add-on's old plugin id. */
+  pluginId: string;
+  /** Studio panel sub-path: /plugins/studio/studio/<segment>/<id>. */
+  segment: string;
+  /** The kind Studio's library filters to at /plugins/studio/studio/<segment>. */
+  kind: string;
+  /** The add-on's own item route before the merge, without a trailing slash. */
+  legacyRoot: string;
+}
+
+export const BUILTIN_ROUTES: readonly BuiltinRoute[] = [
+  { pluginId: "artifacts", segment: "artifacts", kind: "artifact", legacyRoot: "/plugins/artifacts/artifacts" },
+];
+
+export const BUILTIN_PLUGIN_IDS: ReadonlySet<string> = new Set(BUILTIN_ROUTES.map((route) => route.pluginId));
+
+const decode = (segment: string) => {
+  try { return decodeURIComponent(segment); } catch { return null; }
+};
+
+/**
+ * The built-in item a path opens, from its Studio address or its old add-on
+ * address, with the Studio address it now has. Sub-views after the id are
+ * kept in `href` so a deep link still lands where it pointed.
+ */
+export function builtinItemAt(path: string): { route: BuiltinRoute; pluginId: string; id: string; href: string } | null {
+  const clean = path.split(/[?#]/)[0]!.replace(/\/+$/, "");
+  for (const route of BUILTIN_ROUTES) {
+    for (const root of [`${STUDIO_ROOT}/${route.segment}`, route.legacyRoot]) {
+      if (!clean.startsWith(`${root}/`)) continue;
+      const [raw, ...rest] = clean.slice(root.length + 1).split("/");
+      const id = raw ? decode(raw) : null;
+      if (!id) return null;
+      return { route, pluginId: route.pluginId, id, href: [`${STUDIO_ROOT}/${route.segment}`, encodeURIComponent(id), ...rest].join("/") };
+    }
+  }
+  return null;
+}
+
+/** A path with an old add-on address rewritten to its Studio address; others unchanged. */
+export function canonicalPath(path: string): string {
+  const found = builtinItemAt(path);
+  if (!found) return path;
+  const suffix = path.slice(path.split(/[?#]/)[0]!.length);
+  return `${found.href}${suffix}`;
+}
+
+/** Whether a Studio sub-path (no leading slash) is a built-in kind's route. */
+export function builtinSegment(subPath: string): { route: BuiltinRoute; rest: string } | null {
+  const [segment, ...rest] = subPath.replace(/^\/+|\/+$/g, "").split("/");
+  const route = BUILTIN_ROUTES.find((each) => each.segment === segment);
+  return route ? { route, rest: rest.join("/") } : null;
+}

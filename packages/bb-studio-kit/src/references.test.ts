@@ -36,4 +36,11 @@ describe("canonical Studio references", () => {
       { ref: { pluginId: "pages", id: "pg_3" }, kind: "link" },
     ]);
   });
+  it("maps built-in kinds' Studio mentions and addresses, old and new, to their item namespace", () => {
+    expect(parseStudioMentionReference("studio", "artifact:art_1")).toEqual({ pluginId: "artifacts", id: "art_1" });
+    expect(parseStudioMentionReference("artifacts", "artifact:art_1")).toEqual({ pluginId: "artifacts", id: "art_1" });
+    expect(parseStudioItemHref("/plugins/studio/studio/artifacts/art_1")).toEqual({ pluginId: "artifacts", id: "art_1" });
+    expect(parseStudioItemHref("/plugins/artifacts/artifacts/art_1")).toEqual({ pluginId: "artifacts", id: "art_1" });
+    expect(parseStudioItemHref("/plugins/studio/studio/browse")).toBeNull();
+  });
 });

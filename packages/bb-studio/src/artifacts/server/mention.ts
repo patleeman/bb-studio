@@ -1,6 +1,6 @@
 // Pure helper: the agent-visible context for an artifact mention. Kept free of
 // bb imports so it can be unit-tested standalone.
-import { TYPE_LABELS, artifactHref, formatBytes, isTextType, type ArtifactType } from "../src/shared";
+import { TYPE_LABELS, artifactHref, formatBytes, isTextType, type ArtifactType } from "../shared";
 
 const MAX_INLINE_CHARS = 60_000;
 
@@ -29,18 +29,18 @@ export function mentionContext(artifact: MentionArtifact): string {
     // Text types come back null only when they're past the scan limit.
     lines.push(
       `It's ${formatBytes(artifact.size)} of text, too large to inline. ` +
-        `Read it with 'bb artifacts show ${artifact.id}', or copy it into your workspace with 'bb artifacts export ${artifact.id}'.`,
+        `Read it with 'bb studio artifacts show ${artifact.id}', or copy it into your workspace with 'bb studio artifacts export ${artifact.id}'.`,
     );
   } else if (artifact.text === null) {
     lines.push(
-      `To look at it, copy it into your workspace with 'bb artifacts export ${artifact.id}' and open the file it prints.`,
+      `To look at it, copy it into your workspace with 'bb studio artifacts export ${artifact.id}' and open the file it prints.`,
     );
   } else if (artifact.text.length <= MAX_INLINE_CHARS) {
     lines.push(`Contents of ${artifact.name}:\n\n${artifact.text}`);
   } else {
     lines.push(
       `It's ${artifact.text.length.toLocaleString("en-US")} characters, too long to inline. ` +
-        `Read it with 'bb artifacts show ${artifact.id}', or copy it into your workspace with 'bb artifacts export ${artifact.id}'.`,
+        `Read it with 'bb studio artifacts show ${artifact.id}', or copy it into your workspace with 'bb studio artifacts export ${artifact.id}'.`,
     );
   }
   lines.push(

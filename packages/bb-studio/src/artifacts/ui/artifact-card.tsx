@@ -5,11 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { ItemDirectiveCard, remember, openAppPath } from "@bb-studio/kit/app";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
-import type { rpcContract } from "../server";
+import type { rpcContract } from "../contract";
 import { ArtifactBody } from "./artifact-body";
-import { ARTIFACT_ICON, ARTIFACTS_TAB, ARTIFACT_UPDATE_TYPE, PANEL_PATH, REALTIME_CHANNEL, TYPE_ICONS, TYPE_LABELS, formatBytes, isArtifactId } from "../src/shared";
+import { ARTIFACT_ICON, ARTIFACTS_TAB, ARTIFACT_UPDATE_TYPE, REALTIME_CHANNEL, artifactHref, TYPE_ICONS, TYPE_LABELS, formatBytes, isArtifactId } from "../shared";
 
-type Artifact = NonNullable<z.infer<(typeof rpcContract)["get"]["output"]>["artifact"]>;
+type Artifact = NonNullable<z.infer<(typeof rpcContract)["artifacts.get"]["output"]>["artifact"]>;
 
 export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
   const id = attributes.id ?? "";
@@ -21,7 +21,7 @@ export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
 
   const load = useCallback(() => {
     if (!valid) return;
-    rpc.call("get", { id }).then(
+    rpc.call("artifacts.get", { id }).then(
       (result) => setArtifact(result.artifact),
       () => setArtifact(null),
     );
@@ -45,7 +45,7 @@ export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
         if (!navigate.openThreadPanel({ actionId: ARTIFACTS_TAB, title: artifact.title, params: { artifactId: artifact.id } }))
-          openAppPath(`/plugins/artifacts/${PANEL_PATH}/${encodeURIComponent(artifact.id)}`);
+          openAppPath(artifactHref(artifact.id));
       }}
       body={version.type === "other" ? undefined : (
         // A player is a row high; other previews get room.

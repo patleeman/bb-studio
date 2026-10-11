@@ -9,13 +9,13 @@ import { Badge, Checkbox, EmptyState, Icon, PRIMARY_BUTTON, cn } from "@bb-studi
 import { errorMessage, plural, relativeTime } from "@bb-studio/kit/format";
 import { useRealtime, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
-import type { rpcContract } from "../server";
-import { REALTIME_CHANNEL, SAVE_ICON, TYPE_ICONS, TYPE_LABELS, artifactType, baseName, isArtifactId, mimeFor, prunePicked } from "../src/shared";
+import type { rpcContract } from "../contract";
+import { REALTIME_CHANNEL, SAVE_ICON, TYPE_ICONS, TYPE_LABELS, artifactType, baseName, isArtifactId, mimeFor, prunePicked } from "../shared";
 import { ArtifactViewer } from "./artifact-viewer";
 
-type Candidates = z.infer<(typeof rpcContract)["candidates"]["output"]>;
+type Candidates = z.infer<(typeof rpcContract)["artifacts.candidates"]["output"]>;
 type Candidate = Candidates["reply"][number];
-type Saved = z.infer<(typeof rpcContract)["threadArtifacts"]["output"]>["artifacts"];
+type Saved = z.infer<(typeof rpcContract)["artifacts.threadArtifacts"]["output"]>["artifacts"];
 
 const SPIN = "animate-spin motion-reduce:animate-none";
 const KIND_LABELS: Record<Candidate["kind"], string> = { image: "Generated", created: "New", changed: "Changed", storage: "" };
@@ -60,7 +60,7 @@ function PickerList({ threadId, seq, onOpen }: { threadId: string; seq: number |
   const load = useCallback(() => {
     const request = ++latest.current;
     const current = () => request === latest.current;
-    rpc.call("candidates", { threadId, seq }).then(
+    rpc.call("artifacts.candidates", { threadId, seq }).then(
       (result) => {
         if (!current()) return;
         setCandidates(result);
@@ -71,7 +71,7 @@ function PickerList({ threadId, seq, onOpen }: { threadId: string; seq: number |
         if (current()) setError(errorMessage(failure));
       },
     );
-    rpc.call("threadArtifacts", { threadId }).then(
+    rpc.call("artifacts.threadArtifacts", { threadId }).then(
       (result) => {
         if (current()) setSaved(result.artifacts);
       },
@@ -106,7 +106,7 @@ function PickerList({ threadId, seq, onOpen }: { threadId: string; seq: number |
   async function save() {
     setSaving(true);
     try {
-      const { saved: done, failed } = await rpc.call("saveFiles", { threadId, paths: chosen });
+      const { saved: done, failed } = await rpc.call("artifacts.saveFiles", { threadId, paths: chosen });
       const changed = done.filter((each) => each.outcome !== "unchanged" || each.restored).length;
       if (done.length) {
         toast.success(

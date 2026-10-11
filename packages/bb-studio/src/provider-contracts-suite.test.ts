@@ -6,8 +6,8 @@ import { PagesService } from "../../bb-studio-pages/src/service";
 import { readMarkdown } from "../../bb-studio-pages/src/doc";
 import { registerStudio as registerTalk } from "../../bb-studio-talk/src/server/studio";
 import { memoryStore as talkStore, addSegment } from "../../bb-studio-talk/src/test/db";
-import { registerStudio as registerArtifacts } from "../../bb-studio-artifacts/src/server/studio";
-import { memoryStore as artifactStore, bytes } from "../../bb-studio-artifacts/src/test/db";
+import { artifactProvider } from "./artifacts/server/provider";
+import { memoryStore as artifactStore, bytes } from "./artifacts/test/db";
 import { schemas } from "./contract";
 import { providerConformance, type ProviderHarness } from "./test/provider-conformance";
 
@@ -67,9 +67,8 @@ for (const kind of ["recording", "dictation"] as const) providerConformance(`Tal
 
 providerConformance("Artifacts", () => {
   const { db, store } = artifactStore();
-  const { handlers, bb } = registration();
   const changed: string[] = [];
-  registerArtifacts(bb as never, schemas, { store, changed: (id) => { changed.push(id); } });
+  const handlers = artifactProvider({ store, changed: (id) => { changed.push(id); } }) as unknown as ProviderHarness["handlers"];
   return {
     pluginId: "artifacts", kind: "artifact", handlers, expectedContent: "Conformance artifact body",
     seed: (projectId) => store.save({ name: "conformance.md", mime: "text/markdown", bytes: bytes("Conformance artifact body"), projectId, by: "agent" }).artifact.id,

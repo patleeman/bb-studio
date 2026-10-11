@@ -83,6 +83,17 @@ public enum Studio {
     public static let chat_link = "chat.link"
     public static let chat_unlink = "chat.unlink"
     public static let chat_send = "chat.send"
+    public static let artifacts_get = "artifacts.get"
+    public static let artifacts_versionBytes = "artifacts.versionBytes"
+    public static let artifacts_text = "artifacts.text"
+    public static let artifacts_update = "artifacts.update"
+    public static let artifacts_delete = "artifacts.delete"
+    public static let artifacts_move = "artifacts.move"
+    public static let artifacts_threadArtifacts = "artifacts.threadArtifacts"
+    public static let artifacts_candidates = "artifacts.candidates"
+    public static let artifacts_saveFiles = "artifacts.saveFiles"
+    public static let artifacts_importFile = "artifacts.importFile"
+    public static let artifacts_saveAsPage = "artifacts.saveAsPage"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -264,6 +275,28 @@ public enum Studio {
   public typealias ChatUnlink = ChatUnlinkOutput
 
   public typealias ChatSend = ChatSendOutput
+
+  public typealias ArtifactsGet = ArtifactsGetOutput
+
+  public typealias ArtifactsVersionBytes = ArtifactsVersionBytesOutput
+
+  public typealias ArtifactsText = ArtifactsTextOutput
+
+  public typealias ArtifactsUpdate = ArtifactsUpdateOutput
+
+  public typealias ArtifactsDelete = ArtifactsDeleteOutput
+
+  public typealias ArtifactsMove = ArtifactsMoveOutput
+
+  public typealias ArtifactsThreadArtifacts = ArtifactsThreadArtifactsOutput
+
+  public typealias ArtifactsCandidates = ArtifactsCandidatesOutput
+
+  public typealias ArtifactsSaveFiles = ArtifactsSaveFilesOutput
+
+  public typealias ArtifactsImportFile = ArtifactsImportFileOutput
+
+  public typealias ArtifactsSaveAsPage = ArtifactsSaveAsPageOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -5771,6 +5804,604 @@ public enum Studio {
 
     public init(threadId: String? = nil) {
       self.threadId = threadId
+    }
+  }
+
+  public struct ArtifactsGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum ArtifactsGetOutputArtifactVersionType: Sendable, Hashable, Codable {
+    case image
+    case audio
+    case video
+    case html
+    case markdown
+    case code
+    case text
+    case pdf
+    case other
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "audio": self = .audio
+      case "video": self = .video
+      case "html": self = .html
+      case "markdown": self = .markdown
+      case "code": self = .code
+      case "text": self = .text
+      case "pdf": self = .pdf
+      case "other": self = .other
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .audio: try container.encode("audio")
+      case .video: try container.encode("video")
+      case .html: try container.encode("html")
+      case .markdown: try container.encode("markdown")
+      case .code: try container.encode("code")
+      case .text: try container.encode("text")
+      case .pdf: try container.encode("pdf")
+      case .other: try container.encode("other")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsGetOutputArtifactVersion: Sendable, Hashable, Codable {
+    public var id: String?
+    public var number: Double?
+    public var name: String?
+    public var mime: String?
+    public var size: Double?
+    public var type: ArtifactsGetOutputArtifactVersionType?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, number: Double? = nil, name: String? = nil, mime: String? = nil, size: Double? = nil, type: ArtifactsGetOutputArtifactVersionType? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.number = number
+      self.name = name
+      self.mime = mime
+      self.size = size
+      self.type = type
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct ArtifactsGetOutputArtifact: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var projectId: String?
+    public var sourceThreadId: String?
+    public var sourcePath: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var version: ArtifactsGetOutputArtifactVersion?
+    public var versions: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, sourceThreadId: String? = nil, sourcePath: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, version: ArtifactsGetOutputArtifactVersion? = nil, versions: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.projectId = projectId
+      self.sourceThreadId = sourceThreadId
+      self.sourcePath = sourcePath
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.version = version
+      self.versions = versions
+    }
+  }
+
+  public enum ArtifactsGetOutputVersionsItemType: Sendable, Hashable, Codable {
+    case image
+    case audio
+    case video
+    case html
+    case markdown
+    case code
+    case text
+    case pdf
+    case other
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "audio": self = .audio
+      case "video": self = .video
+      case "html": self = .html
+      case "markdown": self = .markdown
+      case "code": self = .code
+      case "text": self = .text
+      case "pdf": self = .pdf
+      case "other": self = .other
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .audio: try container.encode("audio")
+      case .video: try container.encode("video")
+      case .html: try container.encode("html")
+      case .markdown: try container.encode("markdown")
+      case .code: try container.encode("code")
+      case .text: try container.encode("text")
+      case .pdf: try container.encode("pdf")
+      case .other: try container.encode("other")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsGetOutputVersionsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var number: Double?
+    public var name: String?
+    public var mime: String?
+    public var size: Double?
+    public var type: ArtifactsGetOutputVersionsItemType?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, number: Double? = nil, name: String? = nil, mime: String? = nil, size: Double? = nil, type: ArtifactsGetOutputVersionsItemType? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.number = number
+      self.name = name
+      self.mime = mime
+      self.size = size
+      self.type = type
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct ArtifactsGetOutput: Sendable, Hashable, Codable {
+    public var artifact: ArtifactsGetOutputArtifact?
+    public var versions: [ArtifactsGetOutputVersionsItem]?
+
+    public init(artifact: ArtifactsGetOutputArtifact? = nil, versions: [ArtifactsGetOutputVersionsItem]? = nil) {
+      self.artifact = artifact
+      self.versions = versions
+    }
+  }
+
+  public struct ArtifactsVersionBytesInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var versionId: String?
+
+    public init(id: String? = nil, versionId: String? = nil) {
+      self.id = id
+      self.versionId = versionId
+    }
+  }
+
+  public struct ArtifactsVersionBytesOutput: Sendable, Hashable, Codable {
+    public var bytes: String?
+    public var sha256: String?
+
+    public init(bytes: String? = nil, sha256: String? = nil) {
+      self.bytes = bytes
+      self.sha256 = sha256
+    }
+  }
+
+  public struct ArtifactsTextInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var versionId: String?
+
+    public init(id: String? = nil, versionId: String? = nil) {
+      self.id = id
+      self.versionId = versionId
+    }
+  }
+
+  public struct ArtifactsTextOutput: Sendable, Hashable, Codable {
+    public var text: String?
+    public var truncated: Bool?
+
+    public init(text: String? = nil, truncated: Bool? = nil) {
+      self.text = text
+      self.truncated = truncated
+    }
+  }
+
+  public struct ArtifactsUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+    }
+  }
+
+  public struct ArtifactsUpdateOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ArtifactsDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ArtifactsDeleteOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ArtifactsMoveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+
+    public init(id: String? = nil, projectId: String? = nil) {
+      self.id = id
+      self.projectId = projectId
+    }
+  }
+
+  public struct ArtifactsMoveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ArtifactsThreadArtifactsInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public enum ArtifactsThreadArtifactsOutputArtifactsItemVersionType: Sendable, Hashable, Codable {
+    case image
+    case audio
+    case video
+    case html
+    case markdown
+    case code
+    case text
+    case pdf
+    case other
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "audio": self = .audio
+      case "video": self = .video
+      case "html": self = .html
+      case "markdown": self = .markdown
+      case "code": self = .code
+      case "text": self = .text
+      case "pdf": self = .pdf
+      case "other": self = .other
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .audio: try container.encode("audio")
+      case .video: try container.encode("video")
+      case .html: try container.encode("html")
+      case .markdown: try container.encode("markdown")
+      case .code: try container.encode("code")
+      case .text: try container.encode("text")
+      case .pdf: try container.encode("pdf")
+      case .other: try container.encode("other")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsThreadArtifactsOutputArtifactsItemVersion: Sendable, Hashable, Codable {
+    public var id: String?
+    public var number: Double?
+    public var name: String?
+    public var mime: String?
+    public var size: Double?
+    public var type: ArtifactsThreadArtifactsOutputArtifactsItemVersionType?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, number: Double? = nil, name: String? = nil, mime: String? = nil, size: Double? = nil, type: ArtifactsThreadArtifactsOutputArtifactsItemVersionType? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.number = number
+      self.name = name
+      self.mime = mime
+      self.size = size
+      self.type = type
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct ArtifactsThreadArtifactsOutputArtifactsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var projectId: String?
+    public var sourceThreadId: String?
+    public var sourcePath: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var version: ArtifactsThreadArtifactsOutputArtifactsItemVersion?
+    public var versions: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, sourceThreadId: String? = nil, sourcePath: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, version: ArtifactsThreadArtifactsOutputArtifactsItemVersion? = nil, versions: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.projectId = projectId
+      self.sourceThreadId = sourceThreadId
+      self.sourcePath = sourcePath
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.version = version
+      self.versions = versions
+    }
+  }
+
+  public struct ArtifactsThreadArtifactsOutput: Sendable, Hashable, Codable {
+    public var artifacts: [ArtifactsThreadArtifactsOutputArtifactsItem]?
+
+    public init(artifacts: [ArtifactsThreadArtifactsOutputArtifactsItem]? = nil) {
+      self.artifacts = artifacts
+    }
+  }
+
+  public struct ArtifactsCandidatesInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var seq: Int?
+
+    public init(threadId: String? = nil, seq: Int? = nil) {
+      self.threadId = threadId
+      self.seq = seq
+    }
+  }
+
+  public enum ArtifactsCandidatesOutputReplyItemKind: Sendable, Hashable, Codable {
+    case image
+    case created
+    case changed
+    case storage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "created": self = .created
+      case "changed": self = .changed
+      case "storage": self = .storage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .created: try container.encode("created")
+      case .changed: try container.encode("changed")
+      case .storage: try container.encode("storage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsCandidatesOutputReplyItem: Sendable, Hashable, Codable {
+    public var path: String?
+    public var display: String?
+    public var kind: ArtifactsCandidatesOutputReplyItemKind?
+    public var artifactId: String?
+
+    public init(path: String? = nil, display: String? = nil, kind: ArtifactsCandidatesOutputReplyItemKind? = nil, artifactId: String? = nil) {
+      self.path = path
+      self.display = display
+      self.kind = kind
+      self.artifactId = artifactId
+    }
+  }
+
+  public enum ArtifactsCandidatesOutputStorageItemKind: Sendable, Hashable, Codable {
+    case image
+    case created
+    case changed
+    case storage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "created": self = .created
+      case "changed": self = .changed
+      case "storage": self = .storage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .created: try container.encode("created")
+      case .changed: try container.encode("changed")
+      case .storage: try container.encode("storage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsCandidatesOutputStorageItem: Sendable, Hashable, Codable {
+    public var path: String?
+    public var display: String?
+    public var kind: ArtifactsCandidatesOutputStorageItemKind?
+    public var artifactId: String?
+
+    public init(path: String? = nil, display: String? = nil, kind: ArtifactsCandidatesOutputStorageItemKind? = nil, artifactId: String? = nil) {
+      self.path = path
+      self.display = display
+      self.kind = kind
+      self.artifactId = artifactId
+    }
+  }
+
+  public struct ArtifactsCandidatesOutput: Sendable, Hashable, Codable {
+    public var reply: [ArtifactsCandidatesOutputReplyItem]?
+    public var storage: [ArtifactsCandidatesOutputStorageItem]?
+    public var storageError: String?
+
+    public init(reply: [ArtifactsCandidatesOutputReplyItem]? = nil, storage: [ArtifactsCandidatesOutputStorageItem]? = nil, storageError: String? = nil) {
+      self.reply = reply
+      self.storage = storage
+      self.storageError = storageError
+    }
+  }
+
+  public struct ArtifactsSaveFilesInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var paths: [String]?
+
+    public init(threadId: String? = nil, paths: [String]? = nil) {
+      self.threadId = threadId
+      self.paths = paths
+    }
+  }
+
+  public enum ArtifactsSaveFilesOutputSavedItemOutcome: Sendable, Hashable, Codable {
+    case created
+    case versioned
+    case unchanged
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "created": self = .created
+      case "versioned": self = .versioned
+      case "unchanged": self = .unchanged
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .created: try container.encode("created")
+      case .versioned: try container.encode("versioned")
+      case .unchanged: try container.encode("unchanged")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsSaveFilesOutputSavedItem: Sendable, Hashable, Codable {
+    public var path: String?
+    public var artifactId: String?
+    public var outcome: ArtifactsSaveFilesOutputSavedItemOutcome?
+    public var restored: Bool?
+
+    public init(path: String? = nil, artifactId: String? = nil, outcome: ArtifactsSaveFilesOutputSavedItemOutcome? = nil, restored: Bool? = nil) {
+      self.path = path
+      self.artifactId = artifactId
+      self.outcome = outcome
+      self.restored = restored
+    }
+  }
+
+  public struct ArtifactsSaveFilesOutputFailedItem: Sendable, Hashable, Codable {
+    public var path: String?
+    public var error: String?
+
+    public init(path: String? = nil, error: String? = nil) {
+      self.path = path
+      self.error = error
+    }
+  }
+
+  public struct ArtifactsSaveFilesOutput: Sendable, Hashable, Codable {
+    public var saved: [ArtifactsSaveFilesOutputSavedItem]?
+    public var failed: [ArtifactsSaveFilesOutputFailedItem]?
+
+    public init(saved: [ArtifactsSaveFilesOutputSavedItem]? = nil, failed: [ArtifactsSaveFilesOutputFailedItem]? = nil) {
+      self.saved = saved
+      self.failed = failed
+    }
+  }
+
+  public struct ArtifactsImportFileInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var mime: String?
+    public var bytes: String?
+    public var projectId: String?
+
+    public init(name: String? = nil, mime: String? = nil, bytes: String? = nil, projectId: String? = nil) {
+      self.name = name
+      self.mime = mime
+      self.bytes = bytes
+      self.projectId = projectId
+    }
+  }
+
+  public struct ArtifactsImportFileOutput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ArtifactsSaveAsPageInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ArtifactsSaveAsPageOutput: Sendable, Hashable, Codable {
+    public var href: String?
+
+    public init(href: String? = nil) {
+      self.href = href
     }
   }
 

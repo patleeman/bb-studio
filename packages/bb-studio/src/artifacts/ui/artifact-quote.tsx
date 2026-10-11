@@ -9,7 +9,7 @@ import { GHOST_BUTTON, Icon, PRIMARY_BUTTON, useHomeThread, useItemChat } from "
 import { mentionPrompt } from "@bb-studio/kit/contract";
 import { errorMessage, quoteMessage, type ItemQuote } from "@bb-studio/kit/format";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { SELECTION_MESSAGE } from "../src/shared";
+import { SELECTION_MESSAGE } from "../shared";
 
 export type Rect = { left: number; top: number; right: number; bottom: number };
 

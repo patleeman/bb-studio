@@ -5,9 +5,15 @@ import type { Ref, ItemVersion } from "./services";
 type Sdk = { plugins: { callRpc<T>(args: { pluginId: string; method: string; input: never; outputSchema: z.ZodType<T>; signal?: AbortSignal }): Promise<T> } };
 const bytesSchema = z.object({ bytes: z.string().nullable() });
 
+/** A built-in kind's own version history, read in-process. */
+export interface LocalHistory {
+  versions(id: string): { id: string; name: string; createdAt: number }[];
+  bytes(id: string, versionId: string): Uint8Array | null;
+}
+
 /** Existing provider histories stay in their source stores. */
 export class ProviderHistory {
-  constructor(private readonly sdk: Sdk) {}
+  constructor(private readonly sdk: Sdk, private readonly local: Readonly<Record<string, LocalHistory>> = {}) {}
 
   private call<T>(pluginId: string, method: string, input: unknown, outputSchema: z.ZodType<T>): Promise<T> {
     return this.sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) });
@@ -26,8 +32,9 @@ export class ProviderHistory {
         };
       }));
     }
-    if (ref.pluginId === "artifacts") {
-      const { versions } = await this.call("artifacts", "get", { id: ref.id }, z.object({ versions: z.array(z.object({ id: z.string(), name: z.string(), createdAt: z.number() })) }));
+    const local = this.local[ref.pluginId];
+    if (local) {
+      const versions = local.versions(ref.id);
       return Promise.all(versions.map(async (version) => {
         const bytes = await this.read(ref, version.id);
         return { id: version.id, ref, label: version.name, createdAt: version.createdAt,
@@ -42,10 +49,8 @@ export class ProviderHistory {
       const { bytes } = await this.call("pages", "snapshotBytes", { id: ref.id, snapshotId: id }, bytesSchema);
       return bytes ? Buffer.from(bytes, "base64") : null;
     }
-    if (ref.pluginId === "artifacts") {
-      const { bytes } = await this.call("artifacts", "versionBytes", { id: ref.id, versionId: id }, bytesSchema);
-      return bytes ? Buffer.from(bytes, "base64") : null;
-    }
+    const local = this.local[ref.pluginId];
+    if (local) return local.bytes(ref.id, id);
     return null;
   }
 }

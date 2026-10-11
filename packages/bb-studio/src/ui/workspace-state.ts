@@ -1,4 +1,5 @@
 import { workspaceItemPath, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
+import { canonicalPath } from "../builtins";
 /** `icon` is the item's emoji, else `kindIcon` names its kind's icon; both arrive once the item is visited. */
 export interface Tab { href: string; title: string; icon?: string | null; kindIcon?: string }
 export interface Pane { kind: "pane"; id: string; tabs: Tab[]; active: string | null }
@@ -89,12 +90,14 @@ export function parseWorkspace(value: unknown): Workspace {
     const tabs: Tab[] = [];
     for (const tab of value.tabs) {
       if (typeof tab?.href !== "string" || typeof tab.title !== "string") continue;
-      const href = workspaceItemPath(tab.href);
+      // Tabs saved before a kind moved into Studio still name its old add-on address.
+      const href = workspaceItemPath(canonicalPath(tab.href));
       if (!href || seen.has(href)) continue;
       seen.add(href); if (href === BROWSE.href) { tabs.push(BROWSE); continue; }
       tabs.push({ href, title: tab.title.slice(0, 300), ...(typeof tab.icon === "string" && tab.icon.length <= 16 ? { icon: tab.icon } : {}), ...(typeof tab.kindIcon === "string" && tab.kindIcon.length <= 64 ? { kindIcon: tab.kindIcon } : {}) });
     }
-    return { kind: "pane", id: value.id, tabs, active: tabs.some(tab => tab.href === value.active) ? value.active : tabs[0]?.href ?? null };
+    const active = typeof value.active === "string" ? canonicalPath(value.active) : null;
+    return { kind: "pane", id: value.id, tabs, active: tabs.some(tab => tab.href === active) ? active : tabs[0]?.href ?? null };
   }
   try {
     const record = value as Workspace;

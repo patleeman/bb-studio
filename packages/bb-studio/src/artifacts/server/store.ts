@@ -8,11 +8,12 @@ import type Database from "better-sqlite3";
 import { MAX_ARTIFACT_BYTES, artifactType, formatBytes, type ArtifactType } from "../shared";
 
 /**
- * Append-only: statement index is the migration id, and BB checks each
- * statement against the hash it recorded, so never edit one (not even its
- * whitespace).
+ * The artifact tables, as the old Artifacts plugin created them. Studio's
+ * MIGRATIONS (src/migrations.ts) runs it; BB checks each statement against
+ * the hash it recorded, so never edit it (not even its whitespace). Changes
+ * go in new statements appended there.
  */
-export const MIGRATIONS = [
+export const ARTIFACT_TABLES =
   `CREATE TABLE IF NOT EXISTS artifacts (
        id TEXT PRIMARY KEY,
        title TEXT NOT NULL,
@@ -41,8 +42,7 @@ export const MIGRATIONS = [
    CREATE TABLE IF NOT EXISTS artifact_blobs (
        sha256 TEXT PRIMARY KEY,
        bytes BLOB NOT NULL
-     );`,
-];
+     );`;
 
 export type ArtifactRow = {
   id: string;
@@ -78,6 +78,21 @@ export type Writer = Extract<Actor["kind"], "agent" | "cli" | "app">;
 
 export function writerKind(by: Writer): "user" | "agent" {
   return by === "app" ? "user" : "agent";
+}
+
+/** An artifact as another store had it, with its versions' metadata. */
+export interface ImportedArtifact {
+  id: string;
+  title: string;
+  description: string;
+  projectId: string | null;
+  sourceThreadId: string | null;
+  sourcePath: string | null;
+  createdAt: number;
+  updatedAt: number;
+  updatedBy: string | null;
+  archivedAt: number | null;
+  versions: { id: string; number: number; name: string; mime: string; size: number; sha256: string; createdAt: number }[];
 }
 
 export interface SaveInput {
@@ -249,6 +264,51 @@ export class ArtifactStore {
           .run();
       }
       return removed;
+    })();
+  }
+
+  /** Blobs among these that aren't stored yet. */
+  missingBlobs(hashes: readonly string[]): string[] {
+    const has = this.db.prepare("SELECT 1 FROM artifact_blobs WHERE sha256 = ?");
+    return [...new Set(hashes)].filter((sha256) => !has.get(sha256));
+  }
+
+  /** Stores bytes under their hash, once. Refuses bytes that don't match it. */
+  putBlob(sha256: string, bytes: Uint8Array): void {
+    if (createHash("sha256").update(bytes).digest("hex") !== sha256) throw new Error(`Blob ${sha256.slice(0, 12)}… doesn't match its hash.`);
+    this.db.prepare("INSERT OR IGNORE INTO artifact_blobs (sha256, bytes) VALUES (?, ?)").run(sha256, Buffer.from(bytes));
+  }
+
+  /**
+   * Copies an artifact as it was in another store (the old Artifacts
+   * plugin's), keeping its ids and times. One Studio already has is left as
+   * it is; one whose blobs are missing or whose source file is already saved
+   * here as another artifact is refused with the reason.
+   */
+  importArtifact(item: ImportedArtifact): { outcome: "imported" | "existing" } | { outcome: "skipped"; reason: string } {
+    return this.db.transaction(() => {
+      if (this.db.prepare("SELECT 1 FROM artifacts WHERE id = ?").get(item.id)) return { outcome: "existing" as const };
+      const missing = this.missingBlobs(item.versions.map((version) => version.sha256));
+      if (missing.length) return { outcome: "skipped" as const, reason: `${missing.length} of its files weren't copied.` };
+      const numbers = new Set(item.versions.map((version) => version.number));
+      if (numbers.size !== item.versions.length) return { outcome: "skipped" as const, reason: "Two of its versions have the same number." };
+      if (item.sourceThreadId && item.sourcePath) {
+        const other = this.findBySource(item.sourceThreadId, item.sourcePath);
+        if (other) return { outcome: "skipped" as const, reason: `Its file was saved again in Studio after the update, as ${other.id}.` };
+      }
+      const versionTaken = this.db.prepare("SELECT 1 FROM artifact_versions WHERE id = ?");
+      if (item.versions.some((version) => versionTaken.get(version.id))) return { outcome: "skipped" as const, reason: "One of its version ids is already used." };
+      this.db
+        .prepare(
+          `INSERT INTO artifacts (id, title, description, project_id, source_thread_id, source_path, created_at, updated_at, updated_by, archived_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(item.id, item.title, item.description, item.projectId, item.sourceThreadId, item.sourcePath, item.createdAt, item.updatedAt, item.updatedBy, item.archivedAt);
+      const insert = this.db.prepare(
+        `INSERT INTO artifact_versions (id, artifact_id, number, name, mime, size, sha256, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+      for (const version of item.versions) insert.run(version.id, item.id, version.number, version.name, version.mime, version.size, version.sha256, version.createdAt);
+      return { outcome: "imported" as const };
     })();
   }
 

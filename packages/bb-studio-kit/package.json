@@ -20,7 +20,8 @@
     "./composer": "./src/composer.tsx",
     "./ui": "./src/ui/index.ts",
     "./chat-contract": "./src/chat-contract.ts",
-    "./chat-schemas": "./src/chat-schemas.ts"
+    "./chat-schemas": "./src/chat-schemas.ts",
+    "./artifacts-contract": "./src/artifacts-contract.ts"
   },
   "files": [
     "src",

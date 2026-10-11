@@ -3,13 +3,25 @@ export { errorText };
 // Finds the Studio add-ons and fans Studio's requests out to them. Add-ons
 // publish `studio_describe` for discovery.
 import { STUDIO_PLUGIN_ID, type StudioItem, type StudioProviderInfo } from "@bb-studio/kit/contract";
-import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems } from "@bb-studio/kit/server";
+import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems, type StudioProviderHandlers } from "@bb-studio/kit/server";
 import type { z } from "zod";
 import type { ProviderView } from "./contract";
 import { schemas } from "./contract";
 
 /** The BB Studio suite, in the order Studio lists it. */
 export const SUITE = ["pages", "talk", "excalidraw", "artifacts"];
+
+/**
+ * A kind built into Studio. It answers to the plugin id it had as an add-on
+ * and implements the same provider methods, which the hub calls in-process
+ * instead of over RPC. An installed plugin with the same id (the old add-on,
+ * or its upgrade bridge) is not discovered: the built-in owns its items.
+ */
+export interface BuiltinProvider {
+  pluginId: string;
+  name: string;
+  handlers: StudioProviderHandlers;
+}
 const CALL_TIMEOUT_MS = 10_000;
 const LIVE_STATES = new Set(["running", "degraded", "starting"]);
 
@@ -38,7 +50,11 @@ export class StudioHub {
   private readonly described = new Map<string, { revision: string; expiresAt: number; info: StudioProviderInfo }>();
   private inventory: Map<string, string> | null = null;
 
-  constructor(private readonly sdk: HubSdk) {}
+  private readonly builtins: ReadonlyMap<string, BuiltinProvider>;
+
+  constructor(private readonly sdk: HubSdk, builtins: readonly BuiltinProvider[] = []) {
+    this.builtins = new Map(builtins.map((builtin) => [builtin.pluginId, builtin]));
+  }
 
   private inventoryMap(plugins: readonly PluginEntry[]): Map<string, string> {
     return new Map(plugins.filter(plugin => plugin.enabled && plugin.id !== STUDIO_PLUGIN_ID)
@@ -59,6 +75,15 @@ export class StudioHub {
     input: z.input<ProviderMethods[M]["input"]>,
   ): Promise<z.output<ProviderMethods[M]["output"]>> {
     if (pluginId === STUDIO_PLUGIN_ID) return Promise.reject(new Error("Studio isn't a provider."));
+    const builtin = this.builtins.get(pluginId);
+    if (builtin) {
+      // The same parsing an RPC call gets, so built-ins and add-ons behave alike.
+      const schema = schemas.provider[method];
+      const handler = builtin.handlers[method] as (input: unknown) => unknown;
+      return Promise.resolve()
+        .then(() => handler(schema.input.parse(input)))
+        .then((output) => schema.output.parse(output) as z.output<ProviderMethods[M]["output"]>);
+    }
     return this.sdk.plugins.callRpc({
       pluginId,
       method,
@@ -74,11 +99,13 @@ export class StudioHub {
   }
 
   private async providerSnapshot(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; discoveryComplete: boolean; installed: Set<string> }> {
-    const snapshot = await discoverProviderSnapshot(this.sdk, { method: "studio_describe", known: SUITE, exclude: [STUDIO_PLUGIN_ID] });
+    const builtinIds = [...this.builtins.keys()];
+    const snapshot = await discoverProviderSnapshot(this.sdk, { method: "studio_describe", known: SUITE.filter((id) => !this.builtins.has(id)), exclude: [STUDIO_PLUGIN_ID, ...builtinIds] });
     this.inventory ??= this.inventoryMap(snapshot.installed);
-    const installed = new Set(snapshot.installed.map((entry) => entry.id));
+    const builtins: PluginEntry[] = [...this.builtins.values()].map((builtin) => ({ id: builtin.pluginId, name: builtin.name, enabled: true, status: "running", statusDetail: null, version: "builtin" }));
+    const installed = new Set([...snapshot.installed.map((entry) => entry.id), ...builtinIds]);
     for (const id of this.described.keys()) if (!installed.has(id)) this.described.delete(id);
-    const candidates = snapshot.providers.filter((entry) => !only || only.has(entry.id));
+    const candidates = [...snapshot.providers.filter((entry) => !this.builtins.has(entry.id)), ...builtins].filter((entry) => !only || only.has(entry.id));
     return { providers: await Promise.all(candidates.map((entry) => this.describe(entry))), discoveryComplete: snapshot.complete, installed };
   }
 

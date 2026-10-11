@@ -1,0 +1,600 @@
+// Artifacts, built into Studio: keep the files agents make.
+//
+// Saving is explicit: an agent calls `artifacts_save` (or
+// `bb studio artifacts save`), or the user picks files from a reply with
+// "Save to Studio". Either way the bytes are copied at save time, since
+// workspace and thread-storage files change and vanish. Saving the same file
+// from the same thread again adds a version.
+//
+// This was the Artifacts plugin (id `artifacts`). Its items keep that id as
+// their namespace, its agent tools, skill, mention provider and message
+// directive keep their names, and the plugin's last release is an upgrade
+// bridge that copies its rows here (see `bridge` below and
+// docs/merging-add-ons.md).
+import { basename } from "node:path";
+import { parseFlags } from "@bb-studio/kit/cli";
+import { studioSchemas } from "@bb-studio/kit/contract";
+import { errorMessage } from "@bb-studio/kit/format";
+import { createChangeBus, defineItemMention, displayPath, resolveSource, serveBytes, studioServices, threadRoots as rootsOf, type BackupHandlers, type ResolvedSource, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type Database from "better-sqlite3";
+import { z } from "zod";
+import { bridgeContract, rpcContract, type artifactSchema, type candidateSchema } from "./contract";
+import { artifactBackupHandlers } from "./server/backup";
+import { contentHeaders, rangeResponse, utf8Prefix, withQuoteScript } from "./server/content";
+import { importedFile } from "./server/import-file";
+import { mentionContext } from "./server/mention";
+import { pageMarkdown } from "./server/page";
+import { TEXT_SCAN_BYTES, artifactProvider, artifactText } from "./server/provider";
+import {
+  ArtifactStore,
+  displayTitle,
+  versionType,
+  type ArtifactWithVersion,
+  type SaveResult,
+  type VersionRow,
+  type Writer,
+} from "./server/store";
+import { EVENT_PAGE, turnFiles, turnRows, type EventRow } from "./server/turn-files";
+import {
+  ARTIFACT_UPDATE_TYPE,
+  MAX_ARTIFACT_BYTES,
+  PLUGIN_ID,
+  REALTIME_CHANNEL,
+  TYPE_LABELS,
+  artifactHref,
+  formatBytes,
+  isTextType,
+  mimeFor,
+  titleFromName,
+} from "./shared";
+
+export const ARTIFACTS_USAGE = [
+  "usage: bb studio artifacts <command>",
+  "  save <path> [--title <title>] [--description <text>]   Save a file from this thread's workspace or thread storage",
+  "  list [--thread]                                       List artifacts",
+  "  show <id>                                             Print a text artifact's contents",
+  "  export <id> [path] [--force]                          Copy an artifact into this thread's workspace (or a path you give)",
+  "  delete <id>                                           Delete an artifact and all its versions",
+].join("\n");
+
+/** The viewer shows at most this much text; Download has the rest. */
+const MAX_VIEW_TEXT = 2 * 1024 * 1024;
+const MAX_TOOL_TEXT = 100_000;
+
+type ArtifactDto = z.infer<typeof artifactSchema>;
+type Candidate = z.infer<typeof candidateSchema>;
+
+function toVersionDto(version: VersionRow) {
+  return {
+    id: version.id,
+    number: version.number,
+    name: version.name,
+    mime: version.mime,
+    size: version.size,
+    type: versionType(version),
+    createdAt: version.created_at,
+  };
+}
+
+function toDto(artifact: ArtifactWithVersion): ArtifactDto {
+  return {
+    id: artifact.id,
+    title: displayTitle(artifact),
+    description: artifact.description,
+    projectId: artifact.project_id,
+    sourceThreadId: artifact.source_thread_id,
+    sourcePath: artifact.source_path,
+    createdAt: artifact.created_at,
+    updatedAt: artifact.updated_at,
+    archived: artifact.archived_at !== null,
+    version: toVersionDto(artifact.version),
+    versions: artifact.versions,
+  };
+}
+
+/** The line an agent puts in its reply to show a saved artifact as a card. */
+function directive(id: string): string {
+  return `::artifact{id="${id}"}`;
+}
+
+export interface BuiltinArtifacts {
+  store: ArtifactStore;
+  /** Studio's provider methods, which the hub calls in-process. */
+  provider: StudioProviderHandlers;
+  /** Its section of a Studio backup, still named `artifacts`. */
+  backup: BackupHandlers;
+  /** `bb studio artifacts …` */
+  cli(argv: string[], ctx: { threadId?: string | null; cwd?: string | null }): Promise<{ exitCode: number; stdout?: string; stderr?: string }>;
+  dispose(): void;
+}
+
+/** Registers artifacts' RPC, HTTP route, agent tools and mention provider on Studio. Studio has run the migrations. */
+export function registerArtifacts(bb: BbPluginApi, db: Database.Database): BuiltinArtifacts {
+  const store = new ArtifactStore(db);
+
+  const studio = studioSchemas(z);
+  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: ARTIFACT_UPDATE_TYPE, artifactId: id }) });
+
+  const services = studioServices(bb.sdk);
+  /** A new artifact saved from a thread joins the thread's spaces. */
+  function created(result: SaveResult, threadId: string | null) {
+    if (result.outcome === "created" && threadId) void services.created({ pluginId: PLUGIN_ID, id: result.artifact.id }, threadId).catch(() => {});
+  }
+
+  /** Tells open viewers, collections and Studio that an artifact changed. */
+  function changed(id: string) {
+    changeBus.changed(id);
+  }
+
+  function mustGet(id: string): ArtifactWithVersion {
+    const artifact = store.get(id);
+    if (!artifact) throw new Error(`Artifact ${id} not found.`);
+    return artifact;
+  }
+
+  /** What an `@artifact` mention gives the agent. */
+  function mention(id: string): string {
+    const artifact = mustGet(id);
+    return mentionContext({
+      id: artifact.id,
+      title: displayTitle(artifact),
+      description: artifact.description,
+      type: versionType(artifact.version),
+      name: artifact.version.name,
+      size: artifact.version.size,
+      versions: artifact.versions,
+      updatedAt: artifact.updated_at,
+      text: artifactText(store, artifact),
+    });
+  }
+
+  const threadRoots = (threadId: string) => rootsOf(bb, threadId);
+  /**
+   * Reads a file to save. BB has no stat, so the host still sends the file,
+   * but its reported size is checked before the content is decoded, hashed
+   * or stored.
+   */
+  async function readSource(source: ResolvedSource): Promise<{ bytes: Uint8Array; mime: string | undefined }> {
+    const file = await bb.sdk.files.read({ hostId: source.root.hostId, rootPath: source.root.path, path: source.path });
+    if (file.sizeBytes > MAX_ARTIFACT_BYTES) {
+      throw new Error(`${basename(source.path)} is ${formatBytes(file.sizeBytes)}; artifacts can be at most ${formatBytes(MAX_ARTIFACT_BYTES)}.`);
+    }
+    const bytes = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64") : Buffer.from(file.content, "utf8");
+    return { bytes: new Uint8Array(bytes), mime: file.mimeType };
+  }
+
+  /** Whether a file is there. A read that fails counts as no file; a write would fail the same way. */
+  async function exists(source: ResolvedSource): Promise<boolean> {
+    try {
+      await bb.sdk.files.read({ hostId: source.root.hostId, rootPath: source.root.path, path: source.path });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Copies a file from a thread into an artifact. */
+  async function saveFromThread(input: {
+    threadId: string;
+    path: string;
+    cwd?: string | null;
+    title?: string | null;
+    description?: string | null;
+    artifactId?: string | null;
+    by: Writer;
+  }): Promise<SaveResult & { display: string }> {
+    const { projectId, roots } = await threadRoots(input.threadId);
+    const source = resolveSource(input.path, roots, input.cwd);
+    if ("error" in source) throw new Error(source.error);
+    const { bytes, mime } = await readSource(source);
+    const name = basename(source.path);
+    const guessed = mimeFor(name);
+    const result = store.save({
+      title: input.title ?? (input.artifactId ? null : titleFromName(name)),
+      description: input.description,
+      name,
+      mime: guessed !== "application/octet-stream" ? guessed : (mime ?? guessed),
+      bytes,
+      projectId,
+      sourceThreadId: input.threadId,
+      sourcePath: source.path,
+      artifactId: input.artifactId,
+      by: input.by,
+    });
+    if (result.outcome !== "unchanged" || result.restored || input.title || input.description) changed(result.artifact.id);
+    created(result, input.threadId);
+    return { ...result, display: displayPath(source) };
+  }
+
+  function saveInline(input: {
+    content: string;
+    name: string;
+    projectId: string | null;
+    threadId: string | null;
+    title?: string | null;
+    description?: string | null;
+    artifactId?: string | null;
+    by: Writer;
+  }): SaveResult {
+    const name = basename(input.name.trim()) || "artifact.txt";
+    // "." and ".." would name a folder when the artifact is exported.
+    if (name === "." || name === "..") throw new Error("Give the file a name, like report.md.");
+    const result = store.save({
+      title: input.title ?? (input.artifactId ? null : titleFromName(name)),
+      description: input.description,
+      name,
+      mime: mimeFor(name),
+      bytes: new Uint8Array(Buffer.from(input.content, "utf8")),
+      projectId: input.projectId,
+      sourceThreadId: input.threadId,
+      artifactId: input.artifactId,
+      by: input.by,
+    });
+    changed(result.artifact.id);
+    created(result, input.threadId);
+    return result;
+  }
+
+  function savedLine(result: SaveResult): string {
+    const { artifact, outcome } = result;
+    const what =
+      outcome === "created"
+        ? `Saved "${displayTitle(artifact)}" to Studio`
+        : outcome === "versioned"
+          ? `Saved version ${artifact.version.number} of "${displayTitle(artifact)}"`
+          : `"${displayTitle(artifact)}" is already saved with these contents (version ${artifact.version.number})`;
+    const restored = result.restored ? " It was archived; saving brought it back." : "";
+    return `${what}: ${TYPE_LABELS[versionType(artifact.version)]}, ${formatBytes(artifact.version.size)}, id ${artifact.id}, link ${artifactHref(artifact.id)}.${restored}`;
+  }
+
+  bb.rpc.register(rpcContract, {
+    "artifacts.get"({ id }) {
+      const artifact = store.get(id);
+      return { artifact: artifact ? toDto(artifact) : null, versions: artifact ? store.versions(id).map(toVersionDto) : [] };
+    },
+    "artifacts.versionBytes"({ id, versionId }) {
+      const version = store.version(id, versionId);
+      const bytes = version ? store.bytes(version.sha256) : null;
+      return { bytes: bytes?.toString("base64") ?? null, sha256: version?.sha256 ?? null };
+    },
+    "artifacts.text"({ id, versionId }) {
+      const version = store.version(id, versionId);
+      if (!version) throw new Error("Version not found.");
+      if (!isTextType(versionType(version))) return { text: null, truncated: false };
+      const bytes = store.bytes(version.sha256);
+      if (!bytes) return { text: null, truncated: false };
+      const truncated = bytes.byteLength > MAX_VIEW_TEXT;
+      return { text: utf8Prefix(bytes, MAX_VIEW_TEXT).toString("utf8"), truncated };
+    },
+    "artifacts.update"({ id, title, description }) {
+      store.update(id, { title, description }, "app");
+      changed(id);
+      return { ok: true };
+    },
+    "artifacts.delete"({ id }) {
+      if (store.delete(id)) changed(id);
+      return { ok: true };
+    },
+    "artifacts.move"({ id, projectId }) {
+      mustGet(id);
+      store.setProject(id, projectId);
+      changed(id);
+      return { ok: true };
+    },
+    "artifacts.threadArtifacts"({ threadId }) {
+      return { artifacts: store.list({ threadId, limit: 200 }).map(toDto) };
+    },
+    async "artifacts.candidates"({ threadId, seq }) {
+      const { roots, storageError } = await threadRoots(threadId);
+      const describe = (path: string) => {
+        const source = resolveSource(path, roots);
+        return "error" in source ? null : source;
+      };
+      const reply: Candidate[] = [];
+      {
+        // No seq: the thread's latest reply.
+        const rows = await turnRows(
+          async (beforeSeq) =>
+            (await bb.sdk.threads.events.list({
+              threadId,
+              ...(beforeSeq === null ? {} : { beforeSeq: String(beforeSeq) }),
+              order: "desc",
+              limit: String(EVENT_PAGE),
+              types: ["item/completed", "client/turn/requested"],
+            })) as unknown as EventRow[],
+          seq,
+        );
+        for (const file of turnFiles(rows, seq ?? Number.MAX_SAFE_INTEGER)) {
+          const source = describe(file.path);
+          // Files outside the workspace and thread storage can't be read.
+          if (!source) continue;
+          reply.push({
+            path: source.path,
+            display: displayPath(source),
+            kind: file.kind,
+            artifactId: store.findBySource(threadId, source.path)?.id ?? null,
+          });
+        }
+      }
+      const storage: Candidate[] = [];
+      const storageRoot = roots.find((root) => root.kind === "storage");
+      let listError = storageError;
+      if (storageRoot) {
+        try {
+          const { files } = await bb.sdk.threads.storageFiles({ threadId, limit: "200" });
+          for (const file of files) {
+            const source = describe(file.path.startsWith("/") ? file.path : `${storageRoot.path}/${file.path}`);
+            if (!source || reply.some((each) => each.path === source.path)) continue;
+            storage.push({
+              path: source.path,
+              display: displayPath(source),
+              kind: "storage",
+              artifactId: store.findBySource(threadId, source.path)?.id ?? null,
+            });
+          }
+        } catch (error) {
+          listError = errorMessage(error);
+        }
+      }
+      return { reply, storage, storageError: listError };
+    },
+    async "artifacts.saveFiles"({ threadId, paths }) {
+      const saved: { path: string; artifactId: string; outcome: SaveResult["outcome"]; restored: boolean }[] = [];
+      const failed: { path: string; error: string }[] = [];
+      for (const path of paths) {
+        try {
+          const result = await saveFromThread({ threadId, path, by: "app" });
+          saved.push({ path, artifactId: result.artifact.id, outcome: result.outcome, restored: result.restored ?? false });
+        } catch (error) {
+          failed.push({ path, error: errorMessage(error) });
+        }
+      }
+      return { saved, failed };
+    },
+    "artifacts.importFile"({ name, mime, bytes, projectId }) {
+      const file = importedFile({ name, mime, bytes });
+      const result = store.save({ ...file, title: titleFromName(file.name), projectId, by: "app" });
+      changed(result.artifact.id);
+      return { id: result.artifact.id };
+    },
+    async "artifacts.saveAsPage"({ id }) {
+      const artifact = mustGet(id);
+      const markdown = pageMarkdown(artifact.version, artifactText(store, artifact));
+      const { page } = await bb.sdk.plugins.callRpc({
+        pluginId: "pages",
+        method: "create",
+        input: { projectId: artifact.project_id, parentId: null, title: displayTitle(artifact), markdown },
+        outputSchema: z.object({ page: z.object({ id: z.string() }).passthrough() }),
+      });
+      return { href: `/plugins/pages/pages/${page.id}` };
+    },
+  });
+
+  bb.rpc.register(bridgeContract, {
+    "artifacts.missingBlobs": ({ sha256 }) => ({ missing: store.missingBlobs(sha256) }),
+    "artifacts.importBlob"({ sha256, bytes }) {
+      store.putBlob(sha256, new Uint8Array(Buffer.from(bytes, "base64")));
+      return { ok: true };
+    },
+    "artifacts.importRows"({ artifacts }) {
+      const imported: string[] = [];
+      const existing: string[] = [];
+      const skipped: { id: string; reason: string }[] = [];
+      for (const item of artifacts) {
+        const result = store.importArtifact(item);
+        if (result.outcome === "imported") imported.push(item.id);
+        else if (result.outcome === "existing") existing.push(item.id);
+        else if (result.outcome === "skipped") skipped.push({ id: item.id, reason: result.reason });
+      }
+      for (const id of imported) changed(id);
+      return { imported, existing, skipped };
+    },
+    "artifacts.mentionContext": ({ id }) => ({ context: mention(id) }),
+  });
+
+  // A version's bytes, for images, the HTML and PDF viewers, and Download.
+  // Headers (a sandbox CSP on everything that isn't a real PDF) are in
+  // src/server/content.ts. `quote=1` adds the script that reports selected
+  // text to the viewer, for HTML.
+  bb.http.route("GET", "/artifacts/content", (context) => {
+    const version = store.version(context.req.query("artifact") ?? "", context.req.query("version") ?? "");
+    const bytes = version ? store.bytes(version.sha256) : null;
+    if (!version || !bytes) return context.text("Not found", 404);
+    const quote = context.req.query("quote") === "1" && versionType(version) === "html";
+    const body = quote ? withQuoteScript(new Uint8Array(bytes)) : new Uint8Array(bytes);
+    const headers = contentHeaders(version, body, { download: context.req.query("download") === "1" });
+    // Audio and video players fetch in ranges, and seek with them.
+    const media = versionType(version) === "audio" || versionType(version) === "video";
+    return media ? rangeResponse(body, headers, context.req.header("range")) : serveBytes(body, headers);
+  });
+
+  // ---------------------------------------------------------------------
+  // Agent tools
+  // ---------------------------------------------------------------------
+
+  bb.agents.registerTool({
+    name: "artifacts_save",
+    description:
+      "Save a finished deliverable to the user's Studio, where they keep what agents make: a generated image, an HTML page, a report, a document, a data file. " +
+      "Pass `path` to a file in this thread's workspace or thread storage (relative paths are from the workspace root), or `content` plus a file `name` for short text. " +
+      "Saving the same path again from this thread adds a new version. Save final outputs the user would want to keep, not scratch or intermediate files. " +
+      "For repository coding tasks, keep changes in Git. Do not create or save patches, source copies, logs, or implementation summaries to Studio unless the user explicitly requests that export. Local or unpushed commits do not justify an artifact save. " +
+      "The result includes a line to put in your reply so the artifact shows as a card.",
+    parameters: z.object({
+      path: z.string().min(1).max(4096).optional(),
+      content: z.string().max(1_000_000).optional(),
+      name: z.string().min(1).max(200).optional(),
+      title: z.string().min(1).max(200),
+      description: z.string().max(2000).optional(),
+      artifactId: z.string().min(1).max(100).optional(),
+    }),
+    async execute({ path, content, name, title, description, artifactId }, context) {
+      try {
+        let result: SaveResult;
+        if (path && content === undefined) {
+          result = await saveFromThread({ threadId: context.threadId, path, title, description, artifactId, by: "agent" });
+        } else if (content !== undefined && !path) {
+          if (!name) throw new Error("Give a file `name` with `content`, like report.md, so Studio knows how to show it.");
+          result = saveInline({ content, name, title, description, artifactId, projectId: context.projectId ?? null, threadId: context.threadId, by: "agent" });
+        } else {
+          throw new Error("Pass either `path` or `content`, not both.");
+        }
+        return `${savedLine(result)}\n\nPut this line on its own in your reply so the user can open the artifact beside the chat:\n${directive(result.artifact.id)}`;
+      } catch (error) {
+        return { content: [{ type: "text", text: errorMessage(error) }], isError: true };
+      }
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "artifacts_list",
+    description: "List artifacts saved in the user's Studio: id, title, type, size and link. Pass `thisThread` to list only ones saved from this thread.",
+    parameters: z.object({ thisThread: z.boolean().optional(), query: z.string().max(200).optional() }),
+    execute({ thisThread, query }, context) {
+      const needle = query?.trim().toLowerCase();
+      const rows = store
+        .list({ threadId: thisThread ? context.threadId : undefined, limit: needle ? undefined : 100 })
+        .filter((artifact) => !needle || `${displayTitle(artifact)} ${artifact.description} ${artifact.version.name}`.toLowerCase().includes(needle))
+        .slice(0, 100);
+      if (!rows.length) return thisThread ? "Nothing has been saved from this thread yet." : "No artifacts match.";
+      return rows
+        .map(
+          (artifact) =>
+            `- ${displayTitle(artifact)} (id ${artifact.id}): ${TYPE_LABELS[versionType(artifact.version)]}, ${artifact.version.name}, ` +
+            `${formatBytes(artifact.version.size)}, v${artifact.version.number}, link ${artifactHref(artifact.id)}`,
+        )
+        .join("\n");
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "artifacts_read",
+    description: "Read a Studio artifact: its details and, for text types (Markdown, HTML, code, text), its contents. For images and other files, use `bb studio artifacts export <id>` to copy it into the workspace.",
+    parameters: z.object({ artifactId: z.string().min(1).max(100) }),
+    execute({ artifactId }) {
+      const artifact = store.get(artifactId);
+      if (!artifact) return { content: [{ type: "text", text: `Artifact ${artifactId} not found.` }], isError: true };
+      const text = artifactText(store, artifact);
+      const head = savedLine({ artifact, outcome: "unchanged" }).replace(/ is already saved with these contents/, "");
+      if (text === null && isTextType(versionType(artifact.version))) {
+        return `${head}\n\nToo large to read here (text over ${formatBytes(TEXT_SCAN_BYTES)}). Print it with: bb studio artifacts show ${artifact.id}, or copy it into the workspace with: bb studio artifacts export ${artifact.id}`;
+      }
+      if (text === null) return `${head}\n\nNot text. Copy it into the workspace with: bb studio artifacts export ${artifact.id}`;
+      const shown = text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n…(truncated; full text: bb studio artifacts show ${artifact.id})` : text;
+      return `${head}\n\n${artifact.description ? `Description: ${artifact.description}\n\n` : ""}${shown}`;
+    },
+  });
+
+  bb.agents.configure(() => ({ tools: ["artifacts_save", "artifacts_list", "artifacts_read"], skills: [] }));
+
+  // `@artifact` in any composer.
+  bb.ui.registerMentionProvider(defineItemMention({
+    id: "artifact",
+    label: "Artifacts",
+    search({ query }) {
+      const needle = query.trim().toLowerCase();
+      return store
+        .list({ limit: needle ? undefined : 50 })
+        .filter((artifact) => !needle || displayTitle(artifact).toLowerCase().includes(needle))
+        .slice(0, 50)
+        .map((artifact) => ({
+          id: artifact.id,
+          title: displayTitle(artifact),
+          subtitle: `${TYPE_LABELS[versionType(artifact.version)]} · ${formatBytes(artifact.version.size)}`,
+        }));
+    },
+    resolve: (itemId) => ({ context: mention(itemId) }),
+  }));
+
+  // CLI: `bb studio artifacts …`. A plugin registers one CLI command, and
+  // Studio's is `studio`, so `bb artifacts …` went with the old plugin.
+  const cli = {
+    async run(argv: string[], ctx: { threadId?: string | null; cwd?: string | null }) {
+      const [cmd, ...rest] = argv;
+      const flags = parseFlags(rest, ["thread", "force"]);
+      switch (cmd) {
+        case "save": {
+          const [path] = flags.positional;
+          if (!path) return { exitCode: 1, stderr: "usage: bb studio artifacts save <path> [--title <title>] [--description <text>]\n" };
+          if (!ctx.threadId) return { exitCode: 1, stderr: "Run this from a BB thread, so the path can be found.\n" };
+          try {
+            const result = await saveFromThread({
+              threadId: ctx.threadId,
+              path,
+              cwd: ctx.cwd ?? undefined,
+              title: flags.values.title,
+              description: flags.values.description,
+              by: "cli",
+            });
+            return { exitCode: 0, stdout: `${savedLine(result)}\nShow it in your reply with:\n${directive(result.artifact.id)}\n` };
+          } catch (error) {
+            return { exitCode: 1, stderr: `${errorMessage(error)}\n` };
+          }
+        }
+        case "list": {
+          const thisThread = flags.values.thread !== undefined;
+          if (thisThread && !ctx.threadId) return { exitCode: 1, stderr: "--thread lists one thread's artifacts; run it from a BB thread.\n" };
+          const rows = store.list({ threadId: thisThread ? (ctx.threadId ?? undefined) : undefined });
+          if (!rows.length) return { exitCode: 0, stdout: "No artifacts yet.\n" };
+          const lines = rows.map(
+            (artifact) =>
+              `${artifact.id}\t${displayTitle(artifact)}\t${TYPE_LABELS[versionType(artifact.version)]}\t${formatBytes(artifact.version.size)}\tv${artifact.version.number}`,
+          );
+          return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
+        }
+        case "show": {
+          const artifact = store.get(flags.positional[0] ?? "");
+          if (!artifact) return { exitCode: 1, stderr: "usage: bb studio artifacts show <id>\n" };
+          const text = artifactText(store, artifact) ?? (isTextType(versionType(artifact.version)) ? store.bytes(artifact.version.sha256)?.toString("utf8") : null);
+          if (text == null) return { exitCode: 1, stderr: `${artifact.id} isn't text. Copy it out with: bb studio artifacts export ${artifact.id}\n` };
+          return { exitCode: 0, stdout: text.length > 900_000 ? `${text.slice(0, 900_000)}\n…(truncated)\n` : `${text}\n` };
+        }
+        case "export": {
+          const [id, target] = flags.positional;
+          const artifact = store.get(id ?? "");
+          if (!artifact) return { exitCode: 1, stderr: "usage: bb studio artifacts export <id> [path] [--force]\n" };
+          if (!ctx.threadId) return { exitCode: 1, stderr: "Run this from a BB thread, so there's a workspace to write to.\n" };
+          const bytes = store.bytes(artifact.version.sha256);
+          if (!bytes) return { exitCode: 1, stderr: "This artifact's contents are missing.\n" };
+          try {
+            const { roots } = await threadRoots(ctx.threadId);
+            const destination = resolveSource(target ?? artifact.version.name, roots, ctx.cwd ?? undefined);
+            if ("error" in destination) throw new Error(destination.error);
+            if (flags.values.force === undefined && (await exists(destination))) {
+              return { exitCode: 1, stderr: `${displayPath(destination)} already exists. Pass --force to overwrite it, or give another path.\n` };
+            }
+            await bb.sdk.files.write({
+              hostId: destination.root.hostId,
+              rootPath: destination.root.path,
+              path: destination.path,
+              content: bytes.toString("base64"),
+              contentEncoding: "base64",
+              createParents: true,
+            });
+            return { exitCode: 0, stdout: `${destination.path}\n` };
+          } catch (error) {
+            return { exitCode: 1, stderr: `${errorMessage(error)}\n` };
+          }
+        }
+        case "delete": {
+          const id = flags.positional[0];
+          if (!id) return { exitCode: 1, stderr: "usage: bb studio artifacts delete <id>\n" };
+          if (!store.delete(id)) return { exitCode: 1, stderr: `Artifact ${id} not found\n` };
+          changed(id);
+          return { exitCode: 0, stdout: `deleted ${id}\n` };
+        }
+        default:
+          return { exitCode: 1, stderr: `${ARTIFACTS_USAGE}\n` };
+      }
+    },
+  };
+
+  return {
+    store,
+    provider: artifactProvider({ store, changed }),
+    backup: artifactBackupHandlers(z, { db, store, changed }),
+    cli: (argv, ctx) => cli.run(argv, ctx),
+    dispose: () => changeBus.dispose(),
+  };
+}

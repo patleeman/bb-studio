@@ -3,6 +3,7 @@
 // go. Studio's Setup page and `bb studio setup` both show this. Installs,
 // enables and removes use BB's plugin SDK; every action also has the CLI
 // command that does the same, for when the SDK call fails.
+import { ARTIFACTS_BRIDGE_VERSION, bridgeStatusContract } from "@bb-studio/kit/artifacts-contract";
 import type { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
 import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
@@ -63,6 +64,17 @@ export function classify(plugin: SetupPluginEntry | undefined, problems: readonl
   return "installed";
 }
 
+/** -1, 0 or 1, comparing dotted version numbers; pre-release tags are ignored. */
+export function compareVersions(a: string, b: string): number {
+  const parts = (version: string) => version.split(/[-+]/)[0]!.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const [left, right] = [parts(a), parts(b)];
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const diff = (left[i] ?? 0) - (right[i] ?? 0);
+    if (diff) return Math.sign(diff);
+  }
+  return 0;
+}
+
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const step = (text: string, command: string | null = null) => ({ text, command });
 const REMOVED = "Its settings, secrets and schedules, and its installed files.";
@@ -78,7 +90,34 @@ interface RetiredPlugin {
   blocker(plugin: SetupPluginEntry, ctx: { sdk: SetupSdk; plugins: ReadonlyMap<string, SetupPluginEntry> }): Promise<string | null>;
 }
 
+/**
+ * Has the Artifacts upgrade bridge copied every artifact into Studio? Older
+ * releases can't copy, a turned-off one can't run, and the bridge itself says
+ * how far its copy got.
+ */
+async function artifactsBlocker(plugin: SetupPluginEntry, { sdk }: { sdk: SetupSdk }): Promise<string | null> {
+  const migrate = "Run `bb artifacts migrate` and wait for Migration complete.";
+  if (compareVersions(plugin.version, ARTIFACTS_BRIDGE_VERSION) < 0) return `It's version ${plugin.version}, from before the upgrade bridge. Update it so it can copy your artifacts into Studio (\`bb plugin update artifacts --yes\`), then: ${migrate}`;
+  if (!plugin.enabled) return `It's turned off, so it can't copy your artifacts into Studio. Turn it on with \`${enableCommand(plugin.id)}\`, then: ${migrate}`;
+  const status = await sdk.plugins.callRpc({ pluginId: plugin.id, method: "migrationStatus", input: null, outputSchema: bridgeStatusContract.migrationStatus.output, signal: AbortSignal.timeout(30_000) });
+  if (status.complete) return null;
+  const why = status.error ? ` The last try failed: ${status.error}` : "";
+  return `${status.copied} of ${status.total} artifacts are in Studio so far.${why} ${migrate}`;
+}
+
 export const RETIRED: readonly RetiredPlugin[] = [
+  {
+    id: "artifacts",
+    name: "Studio Artifacts",
+    why: "Artifacts are built into Studio now. This last release is only an upgrade bridge: it copies your artifacts into Studio and forwards older clients.",
+    kept: "Every artifact it copied into Studio, with its versions, files, tags, Spaces, links and chats. Links to /plugins/artifacts/artifacts/<id> still open them in Studio.",
+    deleted: `${REMOVED} Any rows \`bb artifacts migrate\` listed as skipped (malformed) are lost; copy what you need from them first. iOS app builds from before the merge stop opening artifacts.`,
+    before: [
+      step("Update Studio and Studio Artifacts.", "bb plugin update studio --yes && bb plugin update artifacts --yes"),
+      step("Copy its artifacts into Studio, and wait for Migration complete.", "bb artifacts migrate"),
+    ],
+    blocker: artifactsBlocker,
+  },
   {
     id: "studio-navigation",
     name: "Studio Navigation",

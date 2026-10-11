@@ -17,6 +17,7 @@ describe("linkEmbed", () => {
   it("makes Studio cards of add-on item links", () => {
     expect(linkEmbed(`${ORIGIN}/plugins/excalidraw/drawings/drw_1`, ORIGIN)).toEqual({ kind: "drawing", target: "drw_1" });
     expect(linkEmbed(`${ORIGIN}/plugins/artifacts/artifacts/art_0123456789abcdef`, ORIGIN)).toEqual({ kind: "artifact", target: "art_0123456789abcdef" });
+    expect(linkEmbed(`${ORIGIN}/plugins/studio/studio/artifacts/art_0123456789abcdef`, ORIGIN)).toEqual({ kind: "artifact", target: "art_0123456789abcdef" });
     expect(linkEmbed(`${ORIGIN}/plugins/talk/recordings/rec_1/`, ORIGIN)).toEqual({ kind: "recording", target: "rec_1" });
     // Another app's link, or an unknown panel, stays a bookmark.
     expect(linkEmbed("https://other.dev/plugins/excalidraw/drawings/drw_1", ORIGIN)?.kind).toBe("bookmark");

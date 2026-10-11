@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { schemas } from "../contract";
 import { StudioHub, type HubSdk } from "../hub";
 import { MIGRATIONS } from "../migrations";
+import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "../builtins";
 import { SearchIndex } from "../search-index";
 
 type Method = keyof typeof schemas.provider;
@@ -37,11 +38,19 @@ export function providerConformance(label: string, create: () => ProviderHarness
         const parsed = schema.input.parse(input);
         return schema.output.parse(await harness.handlers[method]!(parsed as never));
       };
+      // A built-in kind's methods are reached through Studio's provider.call by
+      // other add-ons; the hub here still calls them as a transport would.
+      const builtin = BUILTIN_PLUGIN_IDS.has(harness.pluginId);
+      const entry = (id: string) => ({ id, enabled: true, status: "running", statusDetail: null, version: "1", name: label });
       const sdk: HubSdk = { plugins: {
-        list: async () => ({ plugins: transport.installed ? [{ id: harness.pluginId, enabled: true, status: "running", statusDetail: null, version: "1", name: label }] : [] }),
+        list: async () => ({ plugins: transport.installed ? [entry(harness.pluginId), ...(builtin ? [entry("studio")] : [])] : [] }),
         experimental_discoverRpc: async () => transport.installed ? [{ pluginId: harness.pluginId }] : [],
         callRpc: async ({ method, input, outputSchema }) => {
           if (transport.unavailable) throw new Error("Temporary transport outage");
+          if (method === "provider.call") {
+            const wrapped = input as unknown as { method: Method; input: unknown };
+            return outputSchema.parse(await call(wrapped.method, wrapped.input));
+          }
           return outputSchema.parse(await call(method as Method, input));
         },
       } };
@@ -71,7 +80,9 @@ export function providerConformance(label: string, create: () => ProviderHarness
       const found = await hub.get(harness.pluginId, [created.item.id, "missing_conformance"]);
       expect(found).toHaveLength(1);
       expect(found[0]).toMatchObject({ pluginId: harness.pluginId, id: created.item.id, kind: harness.kind, projectId: harness.projectId === null ? null : "proj_conformance", href: created.item.href });
-      expect(created.item.href).toContain(`/plugins/${harness.pluginId}/`);
+      // A built-in kind's items live under Studio's panel; an add-on's under its own.
+      if (BUILTIN_PLUGIN_IDS.has(harness.pluginId)) expect(builtinItemAt(created.item.href)).toMatchObject({ pluginId: harness.pluginId, id: created.item.id, href: created.item.href });
+      else expect(created.item.href).toContain(`/plugins/${harness.pluginId}/`);
       expect((await hub.overview()).items.some((item) => item.id === created.item.id)).toBe(true);
       const read = await call("studio_read", { id: created.item.id, format: "text" }) as { content: string | null };
       expect(read).toMatchObject({ content: expect.any(String) });

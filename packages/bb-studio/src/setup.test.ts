@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { HealthSummary, Problem } from "./health-contract";
-import { buildSetup, classify, formatSetup, oneLine, SetupService, type SetupPluginEntry, type SetupSdk } from "./setup";
+import { buildSetup, classify, compareVersions, formatSetup, oneLine, RETIRED, SetupService, type SetupPluginEntry, type SetupSdk } from "./setup";
 import { ADDONS, MARKETPLACE_NAME } from "./setup-addons";
 
 const plugin = (id: string, extra: Partial<SetupPluginEntry> = {}): SetupPluginEntry => ({ id, name: id, enabled: true, status: "running", version: "1.0.0", ...extra });
@@ -40,7 +40,8 @@ describe("add-on list", () => {
   it("matches marketplace.json", () => {
     const marketplace = JSON.parse(readFileSync(new URL("../../../marketplace.json", import.meta.url), "utf8")) as { name: string; plugins: { id: string; displayName: string; description: string }[] };
     expect(marketplace.name).toBe(MARKETPLACE_NAME);
-    expect(ADDONS).toEqual(marketplace.plugins.map(({ id, displayName, description }) => ({ id, displayName, description })));
+    const retired = new Set(RETIRED.map((plugin) => plugin.id));
+    expect(ADDONS).toEqual(marketplace.plugins.filter(({ id }) => !retired.has(id)).map(({ id, displayName, description }) => ({ id, displayName, description })));
   });
 
   it("shortens descriptions to one line", () => {
@@ -96,6 +97,20 @@ describe("retired plugins", () => {
     expect(summary.retired.map((each) => each.id)).toEqual(["float", "bot-teams"]);
     expect(summary.retired[0]).toMatchObject({ blocker: null, removeCommand: "bb plugin remove float", kept: expect.any(String), deleted: expect.stringContaining("settings") });
     expect(summary.retired[1]!.before.map((each) => each.command)).toContain("bb bots list --json");
+  });
+
+  it("keeps Studio Artifacts until its bridge has copied every artifact into Studio", async () => {
+    const status = (extra: object) => ({ complete: false, total: 3, copied: 1, skipped: [], error: null, ...extra });
+    const blocker = async (entry: SetupPluginEntry, answer?: object) => {
+      const fake = fakeSdk([entry]);
+      if (answer) fake.raw.plugins.callRpc.mockResolvedValueOnce(answer as never);
+      return (await buildSetup(fake.sdk, health())).retired.find((each) => each.id === "artifacts")!.blocker;
+    };
+    expect(await blocker(plugin("artifacts", { version: "0.1.0" }))).toContain("before the upgrade bridge");
+    expect(await blocker(plugin("artifacts", { version: "0.2.0", enabled: false }))).toContain("bb plugin enable artifacts");
+    expect(await blocker(plugin("artifacts", { version: "0.2.0" }), status({ error: "Studio isn't running" }))).toMatch(/1 of 3 artifacts.*Studio isn't running.*bb artifacts migrate/);
+    expect(await blocker(plugin("artifacts", { version: "0.2.0" }), status({ complete: true, copied: 2, skipped: [{ id: "art_x", reason: "bad" }] }))).toBeNull();
+    expect(compareVersions("0.10.0", "0.2.0")).toBe(1);
   });
 
   it("lets Studio Navigation go without Studio Sidebar", async () => {

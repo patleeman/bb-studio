@@ -14,7 +14,8 @@ const plugins = [
   ["studio", "Studio", "../packages/bb-studio/src/public-contract.ts", "rpcContract"],
   ["talk", "Talk", "../packages/bb-studio-talk/src/shared/contract.ts", "rpcContract"],
   ["pages", "Pages", "../packages/bb-studio-pages/src/contract.ts", "rpcContract"],
-  ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "rpcContract"],
+  // Artifacts are built into Studio; the old plugin's upgrade bridge forwards these for older clients.
+  ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "legacyContract"],
   ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "rpcContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
   ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],

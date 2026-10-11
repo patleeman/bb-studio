@@ -17,22 +17,22 @@ describe("mentionContext", () => {
   it("describes the artifact, links it and inlines its text", () => {
     const context = mentionContext({ ...base, description: "Numbers for the board" });
     expect(context).toContain(`Studio artifact "Q3 [draft]" (id art_0123456789abcdef): Markdown, q3.md, 2 KB, 2 versions`);
-    expect(context).toContain("[Q3 draft](/plugins/artifacts/artifacts/art_0123456789abcdef)");
+    expect(context).toContain("[Q3 draft](/plugins/studio/studio/artifacts/art_0123456789abcdef)");
     expect(context).toContain("Description: Numbers for the board");
     expect(context).toContain("Contents of q3.md:\n\n# Q3");
     expect(context).toContain(`artifactId "art_0123456789abcdef"`);
   });
 
   it("points to the CLI for long text and for files that aren't text", () => {
-    expect(mentionContext({ ...base, text: "x".repeat(70_000) })).toContain("bb artifacts show art_0123456789abcdef");
+    expect(mentionContext({ ...base, text: "x".repeat(70_000) })).toContain("bb studio artifacts show art_0123456789abcdef");
     const image = mentionContext({ ...base, type: "image", name: "a.png", text: null });
-    expect(image).toContain("bb artifacts export art_0123456789abcdef");
+    expect(image).toContain("bb studio artifacts export art_0123456789abcdef");
     expect(image).not.toContain("Contents of");
   });
 
   it("says text past the read limit is too large, not that it isn't text", () => {
     const big = mentionContext({ ...base, size: 3 * 1024 * 1024, text: null });
     expect(big).toContain("too large to inline");
-    expect(big).toContain("bb artifacts show art_0123456789abcdef");
+    expect(big).toContain("bb studio artifacts show art_0123456789abcdef");
   });
 });

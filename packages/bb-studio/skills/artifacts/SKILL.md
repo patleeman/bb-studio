@@ -1,17 +1,18 @@
 ---
 name: artifacts
-description: Use when you finish a deliverable the user will want to keep (a generated image, an HTML page, a report, a document, a data file), when the user asks to save something "to Studio" or "as an artifact", or when they refer to a Studio artifact: a /plugins/artifacts/artifacts/<id> link or an @artifact mention. For repository coding tasks, use only when the user explicitly requests an artifact export.
+description: Use when you finish a deliverable the user will want to keep (a generated image, an HTML page, a report, a document, a data file), when the user asks to save something "to Studio" or "as an artifact", or when they refer to a Studio artifact: a /plugins/studio/studio/artifacts/<id> link (or an older /plugins/artifacts/artifacts/<id> one) or an @artifact mention. For repository coding tasks, use only when the user explicitly requests an artifact export.
 ---
 
 # Studio Artifacts
 
-Artifacts are copies of the files agents make, kept in BB so they outlive the
+Artifacts are built into Studio. They are copies of the files agents make, kept in BB so they outlive the
 thread's workspace. Saving copies the file's bytes at that moment. Saving the
 same file from the same thread again adds a new version (unchanged bytes are
 skipped), so the user can step back through versions.
 
 Artifacts belong to the thread's project, or are global. Link to one as
-`[Title](/plugins/artifacts/artifacts/<artifact-id>)`.
+`[Title](/plugins/studio/studio/artifacts/<artifact-id>)`. Older links to
+`/plugins/artifacts/artifacts/<artifact-id>` still open the same artifact.
 
 ## When to save
 
@@ -44,12 +45,12 @@ a button that opens it in a tab beside the chat.
 ## CLI (works in every agent session)
 
 ```sh
-bb artifacts save <path> [--title <title>] [--description <text>]
-bb artifacts list [--thread]
-bb artifacts show <id>          # print a text artifact
-bb artifacts export <id> [path] [--force] # copy it into the workspace (default: its file name;
+bb studio artifacts save <path> [--title <title>] [--description <text>]
+bb studio artifacts list [--thread]
+bb studio artifacts show <id>          # print a text artifact
+bb studio artifacts export <id> [path] [--force] # copy it into the workspace (default: its file name;
                                           # --force replaces a file already there)
-bb artifacts delete <id>
+bb studio artifacts delete <id>
 ```
 
 ## Types

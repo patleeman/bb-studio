@@ -1,3 +1,4 @@
+import { ARTIFACT_TABLES } from "./artifacts/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
 // (src/search-index.ts) and spaces (src/spaces.ts, src/space-threads.ts,
@@ -144,4 +145,6 @@ export const MIGRATIONS = [
      SELECT c.thread_id, s.id, c.updated_at FROM chief_of_staff c, spaces s WHERE s.is_default = 1
      ON CONFLICT (thread_id) DO UPDATE SET space_id = excluded.space_id;
    DROP TABLE chief_of_staff;`,
+  // Artifacts are built in (src/artifacts): the old plugin's tables, filled by its upgrade bridge.
+  ARTIFACT_TABLES,
 ];
