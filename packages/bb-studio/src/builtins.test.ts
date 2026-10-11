@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ARTIFACT_TABLES, ArtifactStore } from "./artifacts/server/store";
 import { artifactProvider } from "./artifacts/server/provider";
 import { STUDIO_BUILTINS } from "@bb-studio/kit/contract";
-import { BUILTIN_PLUGIN_IDS, builtinItemAt, builtinSegment, canonicalPath } from "./builtins";
+import { BUILTIN_PLUGIN_IDS, builtinItemAt, builtinSegment, canonicalPath, legacyChatPath } from "./builtins";
 import { StudioHub, type HubSdk } from "./hub";
 import { parseWorkspace } from "./ui/workspace-state";
 import Database from "better-sqlite3";
@@ -22,6 +22,14 @@ describe("built-in kinds' addresses", () => {
     expect(canonicalPath("/plugins/custom/objects/obj_1")).toBe("/plugins/custom/objects/obj_1");
     expect(builtinSegment("artifacts/art_1")).toMatchObject({ route: { kind: "artifact" }, rest: "art_1" });
     expect(builtinSegment("browse")).toBeNull();
+  });
+
+  it("maps the retired Chat panel's conversations under Studio's panel", () => {
+    expect(legacyChatPath("/plugins/studio/chats/quote/q1")).toBe("/plugins/studio/studio/chats/quote/q1");
+    expect(legacyChatPath("/plugins/studio/chats")).toBe("/plugins/studio/studio/chats");
+    expect(legacyChatPath("/plugins/studio/chatsx")).toBeNull();
+    expect(legacyChatPath("/plugins/studio/studio/chats/item/x")).toBeNull();
+    expect(canonicalPath("/plugins/studio/chats/item/%7B%7D?x=1")).toBe("/plugins/studio/studio/chats/item/%7B%7D?x=1");
   });
 
   it("maps pages' old Pages address to Studio, keeping a chat after the id", () => {

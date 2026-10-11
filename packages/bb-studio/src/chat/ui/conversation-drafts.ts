@@ -1,11 +1,13 @@
 import { z } from "zod";
 import type { ItemQuote } from "@bb-studio/kit/format";
 import { quote, ref, type ItemRef } from "../schemas";
+import { CHATS_PATH, CHATS_ROOT } from "../../builtins";
 
-export const CHATS_PATH = "chats";
+export { CHATS_PATH };
 export const CHAT_ICON = "MessageSquare";
 export const CONVERSATION_STARTED = "bb-studio-chat:started";
-const ROOT = `/plugins/studio/${CHATS_PATH}`;
+/** Conversations open under Studio's one panel: /plugins/studio/studio/chats/… */
+const ROOT = CHATS_ROOT;
 const STORE = "quotes";
 /** Quote drafts never sent or whose tab was closed are dropped after this long. */
 export const STALE_DRAFT_MS = 7 * 24 * 60 * 60 * 1000;

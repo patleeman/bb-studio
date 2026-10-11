@@ -7,7 +7,7 @@ import { ConversationPage } from "./src/chat/ui/ConversationComposer";
 // sub-path filters it to a kind, project leads in
 // the Setup page, and Studio search.
 import { openAppPath, registerWorkspaceProvider, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "@bb-studio/kit/app";
-import { BUILTIN_ROUTES, builtinSegment, STUDIO_ROOT } from "./src/builtins";
+import { BUILTIN_ROUTES, builtinSegment, CHATS_PATH, legacyChatPath, STUDIO_ROOT } from "./src/builtins";
 import { ArtifactCard } from "./src/artifacts/ui/artifact-card";
 import { SavePicker } from "./src/artifacts/ui/save-picker";
 import { ARTIFACTS_TAB, isArtifactId, SAVE_ICON } from "./src/artifacts/shared";
@@ -88,6 +88,8 @@ function StudioRoot({ subPath }: { subPath: string }) {
   if (path === "") return <StudioWorkspace />;
   if (path === "browse") return <StudioPanel />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
+  // Conversations about items: chats/item/…, chats/choose/…, chats/quote/….
+  if (path === CHATS_PATH || path.startsWith(`${CHATS_PATH}/`)) return <ConversationPage subPath={path.slice(CHATS_PATH.length + 1)} />;
   // A built-in kind: <segment>/<id> is one item; <segment> alone is the
   // library filtered to the kind, like any add-on's kind.
   const builtin = builtinSegment(path);
@@ -99,6 +101,14 @@ function StudioRoot({ subPath }: { subPath: string }) {
     return <ToWorkspace path={builtin.route.segment} kind={builtin.route.kind} />;
   }
   return <ToWorkspace path={path} />;
+}
+
+/** Sends links to the retired Chat panel (/plugins/studio/chats/…) to Studio's. */
+function LegacyChats() {
+  const pathname = usePathname();
+  const target = legacyChatPath(pathname);
+  useEffect(() => { if (target) openAppPath(target, { replace: true }); }, [target]);
+  return null;
 }
 
 /**
@@ -119,8 +129,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
   // Right-click and Mod-click on Studio items and threads anywhere on screen.
   app.slots.experimental_appOverlay({ id: "item-gestures", component: ItemGestures });
-  app.slots.navPanel({ id: "chats", path: "chats", title: "Chat", icon: "MessageSquare", component: retainPanel("chats", ConversationPage), headerContent: StudioBarSlot });
-  app.slots.experimental_appOverlay({ id: "retained-chats", component: () => <RetainedPanels path="chats" render={subPath => <ConversationPage subPath={subPath} />} /> });
+  app.slots.experimental_appOverlay({ id: "legacy-chats", component: LegacyChats });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });

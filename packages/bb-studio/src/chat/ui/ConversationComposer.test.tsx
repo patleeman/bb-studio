@@ -36,7 +36,7 @@ const quote = { text: "Fix the arrow", note: "", where: "top left", image: "data
 let root: Root;
 let container: HTMLDivElement;
 /** The panel's sub-path for a draft route, as BB passes it. */
-const subPathOf = (path: string) => decodeURIComponent(path.slice("/plugins/studio/chats/".length));
+const subPathOf = (path: string) => decodeURIComponent(path.slice("/plugins/studio/studio/chats/".length));
 const render = async (path: string) => { await act(async () => { root.render(<ConversationPage subPath={subPathOf(path)} />); }); };
 
 beforeEach(() => {

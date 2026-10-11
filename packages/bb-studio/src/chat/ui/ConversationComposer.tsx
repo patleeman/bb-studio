@@ -36,7 +36,7 @@ function ItemChip({ item }: { item: Viewed }) {
   </span>;
 }
 
-export function ConversationPage({ subPath }: PluginNavPanelProps) {
+export function ConversationPage({ subPath }: Pick<PluginNavPanelProps, "subPath">) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const [loaded, setLoaded] = useState<Loaded | null>(null);

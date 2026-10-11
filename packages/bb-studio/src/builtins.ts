@@ -6,6 +6,19 @@
 
 export const STUDIO_ROOT = "/plugins/studio/studio";
 
+/** Studio panel sub-path for conversations about items: chats/item/…, chats/choose/…, chats/quote/…. */
+export const CHATS_PATH = "chats";
+export const CHATS_ROOT = `${STUDIO_ROOT}/${CHATS_PATH}`;
+/** Where conversations opened when Chat had its own panel; old links still resolve. */
+const LEGACY_CHATS_ROOT = `/plugins/studio/${CHATS_PATH}`;
+
+/** A path under the old Chat panel rewritten to its Studio address, or null. */
+export function legacyChatPath(path: string): string | null {
+  const rest = path.slice(LEGACY_CHATS_ROOT.length);
+  if (!path.startsWith(LEGACY_CHATS_ROOT) || !/^(?:$|[/?#])/.test(rest)) return null;
+  return `${CHATS_ROOT}${rest}`;
+}
+
 export interface BuiltinRoute {
   /** The item namespace: the add-on's old plugin id. */
   pluginId: string;
@@ -54,6 +67,8 @@ export function builtinItemAt(path: string): { route: BuiltinRoute; pluginId: st
 
 /** A path with an old add-on address rewritten to its Studio address; others unchanged. */
 export function canonicalPath(path: string): string {
+  const chat = legacyChatPath(path);
+  if (chat) return chat;
   const found = builtinItemAt(path);
   if (!found) return path;
   const suffix = path.slice(path.split(/[?#]/)[0]!.length);

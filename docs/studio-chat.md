@@ -42,17 +42,19 @@ Choosing a conversation changes the item's link; starting another changes
 it only after successful submission.
 
 Item chat draws nothing over the screen. **Chat** opens the linked thread
-in a BB split beside the item. Without a link, it opens the Chat panel's
-new-conversation composer for the item (`/plugins/studio/chats/item/…`,
+in a BB split beside the item. Without a link, it opens Studio's
+new-conversation composer for the item (`/plugins/studio/studio/chats/item/…`,
 draft key `studio-chat:<plugin>:<id>`) in that split, so the item stays on
 screen while you write. A successful submission navigates that pane to the
 new thread and refreshes the item's home link. Failed submissions keep the
 draft and quote. **Choose conversation…** opens a thread picker at
-`/plugins/studio/chats/choose/…` in the same split; picking links the thread
+`/plugins/studio/studio/chats/choose/…` in the same split; picking links the thread
 and opens it there. A quote without a link is saved to IndexedDB and opens
-its composer at `/plugins/studio/chats/quote/<id>`. Where BB doesn't split,
+its composer at `/plugins/studio/studio/chats/quote/<id>`. Where BB doesn't split,
 each of these opens in the main view. Quote routes saved before Float was
-removed still open from their IndexedDB copy.
+removed still open from their IndexedDB copy. Chat no longer has its own
+rail icon: links to the old `/plugins/studio/chats/…` panel open the same
+composer under Studio's panel.
 
 ## Stable SDK integration
 
