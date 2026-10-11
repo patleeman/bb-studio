@@ -17,11 +17,17 @@ describe("built-in kinds' addresses", () => {
     expect(builtinItemAt("/plugins/studio/studio/artifacts/art_1")).toMatchObject(expected);
     expect(builtinItemAt("/plugins/artifacts/artifacts/art_1/")).toMatchObject(expected);
     expect(builtinItemAt("/plugins/studio/studio/artifacts")).toBeNull();
-    expect(builtinItemAt("/plugins/pages/pages/pg_1")).toBeNull();
+    expect(builtinItemAt("/plugins/custom/objects/obj_1")).toBeNull();
     expect(canonicalPath("/plugins/artifacts/artifacts/art_1?x=1#y")).toBe("/plugins/studio/studio/artifacts/art_1?x=1#y");
-    expect(canonicalPath("/plugins/pages/pages/pg_1")).toBe("/plugins/pages/pages/pg_1");
+    expect(canonicalPath("/plugins/custom/objects/obj_1")).toBe("/plugins/custom/objects/obj_1");
     expect(builtinSegment("artifacts/art_1")).toMatchObject({ route: { kind: "artifact" }, rest: "art_1" });
     expect(builtinSegment("browse")).toBeNull();
+  });
+
+  it("maps pages' old Pages address to Studio, keeping a chat after the id", () => {
+    expect(builtinItemAt("/plugins/pages/pages/pg_0123456789ab")).toMatchObject({ pluginId: "pages", id: "pg_0123456789ab", href: "/plugins/studio/studio/pages/pg_0123456789ab" });
+    expect(canonicalPath("/plugins/pages/pages/pg_1/chat/thr_1")).toBe("/plugins/studio/studio/pages/pg_1/chat/thr_1");
+    expect(builtinSegment("pages")).toMatchObject({ route: { kind: "page", pluginId: "pages" }, rest: "" });
   });
 
   it("maps drawings' old Draw address to Studio", () => {

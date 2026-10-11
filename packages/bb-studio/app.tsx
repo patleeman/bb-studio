@@ -20,6 +20,11 @@ import { DesignCard } from "./src/design/ui/design-card";
 import { QuestionFormView } from "./src/design/ui/question-form";
 import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
+import { isPageId, PAGE_TAB, PageCard } from "./src/pages/ui/PageCard";
+import { ThreadPageLink } from "./src/pages/ui/ThreadPageLink";
+import { TalkBridge } from "./src/pages/ui/talk-bridge";
+import { registerExploreApp } from "./src/explore/app";
+import "./src/pages/ui/styles.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
@@ -59,7 +64,9 @@ function decodeSegment(segment: string): string {
 }
 
 /** Built-in kinds' item pages, each loaded the first time one opens. */
-const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: ComponentType<{ id: string }> }> = {
+const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: ComponentType<{ id: string; rest?: string }> }> = {
+  // The editor (BlockNote, Yjs, Mermaid, Shiki, Recharts) loads when a page first opens.
+  pages: { isId: isPageId, View: lazy(() => import("./src/pages/ui/route")) },
   artifacts: { isId: isArtifactId, View: lazy(() => import("./src/artifacts/ui/route")) },
   // Excalidraw is big: it loads when a drawing first opens, not with Studio.
   drawings: { isId: isDrawingId, View: lazy(() => import("./src/draw/ui/route")) },
@@ -68,6 +75,8 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   recordings: { isId: (id) => isRecordingId(id) || id === UNSENT_PATH, View: lazy(() => import("./src/talk/ui/route")) },
 };
 
+/** The thread's Pages tab; it brings the page editor, so it loads when first opened. */
+const PagesTab = lazy(() => import("./src/pages/ui/PagePanel"));
 /** The thread's Drawings tab; it brings Excalidraw, so it loads when first opened. */
 const DrawingsTab = lazy(() => import("./src/draw/ui/drawings-tab"));
 /** The thread's Design tab, with the canvas; loaded when first opened. */
@@ -84,8 +93,9 @@ function StudioRoot({ subPath }: { subPath: string }) {
   const builtin = builtinSegment(path);
   if (builtin) {
     const view = BUILTIN_VIEWS[builtin.route.segment];
-    const id = decodeSegment(builtin.rest.split("/")[0] ?? "");
-    if (view && view.isId(id)) return <Suspense fallback={null}><view.View id={id} /></Suspense>;
+    const [first = "", ...rest] = builtin.rest.split("/");
+    const id = decodeSegment(first);
+    if (view && view.isId(id)) return <Suspense fallback={null}><view.View id={id} rest={rest.join("/")} /></Suspense>;
     return <ToWorkspace path={builtin.route.segment} kind={builtin.route.kind} />;
   }
   return <ToWorkspace path={path} />;
@@ -115,6 +125,21 @@ export default definePluginApp((app) => {
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });
+  // Pages (built in; docs/merging-add-ons.md): the thread's Pages tab, the
+  // `::page{id="pg_…"}` card in replies, the header link back to a page a
+  // thread was started from, and opening a page Talk dictated into.
+  app.slots.threadPanelAction({
+    id: PAGE_TAB,
+    title: "Pages",
+    icon: "studio/pages",
+    layout: "flush",
+    component: (props) => <Suspense fallback={null}><PagesTab {...props} /></Suspense>,
+  });
+  app.slots.messageDirective({ id: "page", component: PageCard });
+  app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
+  app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
+  // Explore (built in, as it was in Pages): the Next row and "along the way" findings.
+  registerExploreApp(app);
   // Artifacts (built in; docs/merging-add-ons.md): the thread panel that saves
   // a reply's files, and the `::artifact{id="art_…"}` card in replies.
   app.slots.threadPanelAction({ id: ARTIFACTS_TAB, title: "Artifacts", icon: SAVE_ICON, layout: "flush", component: SavePicker });

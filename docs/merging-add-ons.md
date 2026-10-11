@@ -1,11 +1,13 @@
 # Merging an add-on into Studio
 
 Studio is one plugin with one rail icon (`studio/studio`). Its content kinds
-are moving into it one at a time. Artifacts went first (`packages/bb-studio/src/artifacts`),
+moved into it one at a time: Artifacts first (`packages/bb-studio/src/artifacts`),
 then Draw (`packages/bb-studio/src/draw`), then Design
-(`packages/bb-studio/src/design`), then Talk (`packages/bb-studio/src/talk`);
-Pages follows the same steps. This is the checklist, with what Artifacts,
-Draw, Design and Talk taught.
+(`packages/bb-studio/src/design`), then Talk (`packages/bb-studio/src/talk`),
+and last Pages (`packages/bb-studio/src/pages`, with Explore in
+`packages/bb-studio/src/explore`). This is the checklist, with what each
+taught. Users moving from the separate add-ons follow
+[upgrade-unified-studio.md](upgrade-unified-studio.md).
 
 ## Rules
 
@@ -287,11 +289,46 @@ commit, run `bb <old> migrate`, and check the items in Studio
   - **Kit contracts in the frontend.** A kit contract the app imports at
     runtime must not import the root SDK, including through another kit
     contract (`decisions-contract` now uses the local `defineRpcContract`).
-- **Pages** is called by other add-ons and calls them (embeds, `itemAt`);
-  move those calls to `callProvider` and Studio's prefixed methods. Its
-  whiteboard already calls Studio's `drawings.getDrawing`/`saveDrawing`.
-- When every add-on is merged, delete `AddOnCollection`, `AddOnPanel` and
-  `handOver` from the kit.
-- After the bridge's release cycle, delete the bridge package and its iOS
+- **Pages** (done) was the biggest and the most linked-to. What it added:
+  - **Item namespace vs. host.** `PLUGIN_ID` stays `pages` (refs, mentions,
+    backups, `ThreadItemsPanel`), and a separate `HOST_PLUGIN_ID`/`HTTP_ROOT`
+    builds RPC and HTTP addresses. Every `/api/v1/plugins/${PLUGIN_ID}/http`
+    in the moved code was a bug waiting to happen.
+  - **URLs inside content.** Pages embed their uploaded files' addresses in
+    the document (Yjs block attributes and the Markdown cache). Studio
+    rewrites `/api/v1/plugins/pages/http/files` to
+    `/api/v1/plugins/studio/http/pages/files` on import (pages and saved
+    versions), and the editor's `resolveFileUrl` maps any left over (an old
+    backup restored later). The bridge also redirects the old URL.
+  - **Sub-paths after the id.** `<id>/chat/<thread>` is kept by
+    `builtinItemAt` and passed to the view as `rest`; the kit's reference
+    route lists it as `subpaths: ["chat/:id"]`.
+  - **Many internal callers.** Studio's chat, comments and version adapters,
+    Talk's notes pages and Artifacts' "Save as page" called the `pages`
+    plugin's RPC; they call Studio's `pages.*` now (a plugin may call its
+    own RPC through `bb.sdk.plugins.callRpc`).
+  - **A feature riding along.** Explore ran inside Pages (its own
+    `explore.db`, settings prefixed `explore_`, RPC prefixed `explore_`).
+    Studio appends only the live table's statements (`next_suggestions`) to
+    its migrations, keeps the setting keys, and the bridge copies the click
+    log once (`explore.importNextSuggestions`). Its instructions keep their
+    order after Pages' in Studio's one `agents.configure`.
+  - **Heavy editor.** `frontend-imports.test.ts` keeps BlockNote, tiptap,
+    Yjs, y-prosemirror, y-protocols, lib0, Mermaid, Shiki and Recharts out of
+    app.tsx's static graph (the `::page` card reads metadata through
+    `use-panel-page.ts`, not the editor's frame), and pdf-lib out of the
+    server's.
+  - **Update order for all bridges.** Old add-on first, then Studio, for
+    every bridge (Setup's steps say so now); one procedure covers them all.
+- After the bridges' release cycle, delete each bridge package and its iOS
   fallback the way studio-chat went (commits `d3df3ceb`, `f4f1ae22`). Keep
   the old-address mapping; it costs nothing.
+
+## After the merge (follow-ups)
+
+- Delete `AddOnCollection`, `AddOnPanel` and `handOver` from the kit: no
+  add-on with a collection is left.
+- Delete the bridge packages (`bb-studio-pages`, `-talk`, `-draw`,
+  `-artifacts`, `-design`) and their iOS fallbacks after a release cycle,
+  keeping their `RETIRED` entries.
+- Drop `SUITE`/`STUDIO_SUITE` entries for kinds that are built in.

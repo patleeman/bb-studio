@@ -20,6 +20,7 @@ export interface BuiltinRoute {
 }
 
 export const BUILTIN_ROUTES: readonly BuiltinRoute[] = [
+  { pluginId: "pages", segment: "pages", kind: "page", legacyRoot: "/plugins/pages/pages" },
   { pluginId: "artifacts", segment: "artifacts", kind: "artifact", legacyRoot: "/plugins/artifacts/artifacts" },
   { pluginId: "excalidraw", segment: "drawings", kind: "drawing", legacyRoot: "/plugins/excalidraw/drawings" },
   { pluginId: "design", segment: "designs", kind: "design", legacyRoot: "/plugins/design/designs" },

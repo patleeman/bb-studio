@@ -1,7 +1,7 @@
 // "Make notes": a recording's summary, decisions and action items as a Studio
 // Page. The model call goes through Studio Decisions (the same askModel path
-// and Summaries model as recording summaries); the page goes through Pages'
-// own RPC, so Talk never touches Pages' database. Action items are a Pages
+// and Summaries model as recording summaries); the page goes through Studio's
+// `pages.*` RPC, so Talk never touches Pages' tables. Action items are a Pages
 // checklist, so each can be handed to an agent from the page.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { askModel } from "@bb-studio/kit/decisions";
@@ -12,8 +12,8 @@ import type { Recording } from "../shared/contract";
 import type { TalkStore } from "./store";
 
 export const PAGES_PLUGIN_ID = "pages";
-export const PAGES_MISSING = "Install Studio Pages to make notes.";
-export const notesPagePath = (pageId: string) => `/plugins/${PAGES_PLUGIN_ID}/pages/${pageId}`;
+export const PAGES_MISSING = "Pages aren't available; reload Studio to make notes.";
+export const notesPagePath = (pageId: string) => `/plugins/studio/studio/pages/${pageId}`;
 
 export interface RecordingNotes {
   summary: string;
@@ -247,7 +247,7 @@ export async function generateNotes(
 // ── Pages ────────────────────────────────────────────────────────────────
 
 export interface PagesClient {
-  /** Pages is installed, enabled and loaded. */
+  /** Pages answers (it's built into Studio, so it does whenever Studio runs). */
   available(): Promise<boolean>;
   exists(pageId: string): Promise<boolean>;
   create(input: { projectId: string | null; title: string; markdown: string }): Promise<string>;
@@ -263,12 +263,12 @@ type PluginsSdk = Pick<BbPluginApi["sdk"]["plugins"], "list" | "callRpc">;
 
 export function pagesClient(plugins: PluginsSdk): PagesClient {
   const call = <T>(method: string, input: unknown, outputSchema: z.ZodType<T>) =>
-    plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(30_000) });
+    plugins.callRpc({ pluginId: "studio", method: `pages.${method}`, input: input as never, outputSchema, signal: AbortSignal.timeout(30_000) });
   return {
     async available() {
       try {
         const { plugins: installed } = await plugins.list();
-        const entry = installed.find((plugin) => plugin.id === PAGES_PLUGIN_ID);
+        const entry = installed.find((plugin) => plugin.id === "studio");
         return Boolean(entry?.enabled && !LOADED_ERRORS.has(String((entry as { status?: unknown }).status ?? "")));
       } catch {
         return false;

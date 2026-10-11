@@ -27,7 +27,8 @@ final class PageModel: ObservableObject {
         detach()
         realtime = app.realtime
         listener = app.realtime.listen { [weak self] event in
-            guard let self, case .pluginSignal(let pluginId, _, let payload) = event, pluginId == "pages" else { return }
+            guard let self, case .pluginSignal(let pluginId, let channel, let payload) = event,
+                pluginId == "pages" || (pluginId == "studio" && channel == "pages") else { return }
             switch payload["type"]?.stringValue {
             case "page" where payload["pageId"]?.stringValue == pageId:
                 scheduleReload(client)

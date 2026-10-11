@@ -1,0 +1,482 @@
+// Pages, built into Studio: collaborative documents you write with your
+// agents, with live editing (Yjs over the `/pages/sync` WebSocket), comments,
+// version history and ordinary agent chats.
+//
+// This was the Studio Pages plugin (id `pages`). Its pages keep that id as
+// their namespace; its agent tools (`pages_*`), skill, `page` mention
+// provider, `::page` directive, thread panel and header actions keep their
+// names; its RPC methods are Studio's `pages.*`; and the plugin's last release
+// is an upgrade bridge that copies its pages, versions, files, Next row click
+// log and settings here (see the bridge methods below and
+// docs/merging-add-ons.md).
+import { createStudioNotifier, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import type { BbPluginApi, PluginCliRegistration } from "@get-bb/plugin-sdk";
+import type Database from "better-sqlite3";
+import { studioSchemas } from "@bb-studio/kit/contract";
+import { untitled } from "@bb-studio/kit/format";
+import { bridgeContract, PAGE_FILES_URL, PAGES_SETTINGS, type ImportNextSuggestion, type PagesSettings } from "@bb-studio/kit/pages-contract";
+import { pagesBackup } from "./backup";
+import * as Y from "yjs";
+import { z } from "zod";
+import { actorColor } from "./actors";
+import { FILES_PATH, HUMAN_USER_ID, MAX_UPLOAD_BYTES, MERMAID_PATH, PLUGIN_ID, PLUGIN_RPC_ACTOR, SYNC_PATH, UPLOAD_PATH } from "./constants";
+import { rpcContract } from "./contract";
+import { studioEmbeds } from "./embeds";
+import { fetchPreview } from "./unfurl";
+import { createThread, listThreads, reply, setResolved } from "./comments";
+import { readMarkdown, textBlocks } from "./doc";
+import type { Socket } from "./hub";
+import { errorText, pageUrl, PagesService, requestView, toView, truncate } from "./service";
+import { PageStore } from "./store";
+import { pageProvider } from "./studio";
+import { outgoingStudioLinks } from "./studio-links";
+import { registerTools } from "./tools";
+import { importPages } from "./import";
+import { Checklists } from "./checklists";
+import { pagesCli } from "./cli";
+
+const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
+
+export { PAGE_TOOLS } from "./tools";
+
+export interface BuiltinPages {
+  store: PageStore;
+  /** Studio's provider methods, which the hub calls in-process. */
+  provider: StudioProviderHandlers;
+  /** Its section of a Studio backup, still named `pages`. */
+  backup: BackupHandlers;
+  /** `bb studio pages …` */
+  cli: PluginCliRegistration["run"];
+  dispose(): void;
+}
+
+export interface PagesSettingsAccess {
+  /** The `snapshotsPerPage` setting, read on each save. */
+  snapshotsPerPage(): number;
+  /** Pages' and Explore's settings as they are, and setting some (once, from the bridge). */
+  get(): Promise<Record<string, unknown>>;
+  set(values: PagesSettings): Promise<void>;
+}
+
+/** Registers pages' RPC, HTTP routes, agent tools, mention provider and thread events on Studio. Studio has run the migrations. */
+export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, explore: { importNext(rows: ImportNextSuggestion[]): { imported: number; existing: number } }): BuiltinPages {
+  const store = new PageStore(db, () => settings.snapshotsPerPage());
+  const imports = importPages(db);
+  const service = new PagesService(bb, store);
+  const checklists = new Checklists(bb, db, service, store);
+
+  // Live sync -----------------------------------------------------------------
+
+  const sockets = new WeakMap<object, { pageId: string; socket: Socket }>();
+  bb.http.experimental_websocket(
+    SYNC_PATH,
+    ({ url }) => {
+      const pageId = url.searchParams.get("page") ?? "";
+      return {
+        onOpen(ws) {
+          if (!store.meta(pageId)) {
+            ws.close(4404, "Page not found");
+            return;
+          }
+          const socket: Socket = {
+            send: (data) => ws.readyState === 1 && ws.send(data),
+            close: (code, reason) => ws.close(code, reason),
+          };
+          sockets.set(ws, { pageId, socket });
+          service.hub.connect(pageId, socket);
+        },
+        onMessage(ws, data) {
+          const entry = sockets.get(ws);
+          if (!entry || typeof data === "string") return;
+          try {
+            service.hub.receive(entry.pageId, entry.socket, data);
+          } catch (error) {
+            bb.log.warn(`Dropping a bad sync message for ${entry.pageId}: ${errorText(error)}`);
+          }
+        },
+        onClose(ws) {
+          const entry = sockets.get(ws);
+          if (!entry) return;
+          sockets.delete(ws);
+          service.hub.disconnect(entry.pageId, entry.socket);
+        },
+      };
+    },
+    { auth: "local" },
+  );
+
+  // Files ---------------------------------------------------------------------
+
+  bb.http.route(
+    "POST",
+    UPLOAD_PATH,
+    async (c) => {
+      const body = (await c.req.json().catch(() => null)) as {
+        pageId?: unknown;
+        name?: unknown;
+        mime?: unknown;
+        dataBase64?: unknown;
+      } | null;
+      if (!body || typeof body.pageId !== "string" || typeof body.dataBase64 !== "string") {
+        return c.json({ error: "Expected { pageId, name, mime, dataBase64 }." }, 400);
+      }
+      if (!store.meta(body.pageId)) return c.json({ error: "Page not found." }, 404);
+      const data = Buffer.from(body.dataBase64, "base64");
+      if (!data.length) return c.json({ error: "The file is empty." }, 400);
+      if (data.length > MAX_UPLOAD_BYTES) return c.json({ error: "Files are limited to 15 MB." }, 413);
+      const name = typeof body.name === "string" && body.name ? body.name.slice(0, 200) : "file";
+      const mime = typeof body.mime === "string" && /^[\w.+-]+\/[\w.+-]+$/.test(body.mime) ? body.mime : "application/octet-stream";
+      const id = store.addFile(body.pageId, name, mime, data);
+      return c.json({ id, url: `${PAGE_FILES_URL}?id=${id}` });
+    },
+    { auth: "local" },
+  );
+
+  bb.http.route(
+    "GET",
+    FILES_PATH,
+    (c) => {
+      const file = store.file(c.req.query("id") ?? "");
+      if (!file) return c.text("Not found", 404);
+      const inline = INLINE_MIME.test(file.mime);
+      return serveBytes(new Uint8Array(file.data), {
+        "content-type": inline ? file.mime : "application/octet-stream",
+        "content-disposition": `${inline ? "inline" : "attachment"}; filename="${file.name.replace(/["\\\r\n]/g, "_")}"`,
+        "content-security-policy": "sandbox",
+      });
+    },
+    { auth: "local" },
+  );
+
+  // Mermaid's browser build is 3.5 MB, so it isn't in the app bundle every
+  // window loads; the editor fetches it the first time a page shows a diagram.
+  let mermaidScript: Promise<string> | null = null;
+  bb.http.route(
+    "GET",
+    MERMAID_PATH,
+    async (c) => {
+      mermaidScript ??= readFile(createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js"), "utf8");
+      try {
+        return new Response(await mermaidScript, {
+          headers: {
+            "content-type": "text/javascript; charset=utf-8",
+            "cache-control": "private, max-age=86400",
+            "x-content-type-options": "nosniff",
+          },
+        });
+      } catch (error) {
+        mermaidScript = null;
+        bb.log.warn(`Mermaid's browser build is missing: ${errorText(error)}`);
+        return c.text("Mermaid isn't installed with Studio.", 404);
+      }
+    },
+    { auth: "local" },
+  );
+
+  // RPC -----------------------------------------------------------------------
+
+  const requireMeta = (id: string) => {
+    const meta = store.meta(id);
+    if (!meta) throw new Error("Page not found.");
+    return meta;
+  };
+
+  // Comment RPCs write as the user. A non-string origin is what the hub and
+  // the bot watcher treat as a human edit, like an editor socket's.
+  const CLIENT_ORIGIN = { client: "rpc" };
+  const authorNames = async (authors: string[]) => {
+    const names = new Map<string, string>();
+    const unique = [...new Set(authors)];
+    for (const author of unique) {
+      if (author === HUMAN_USER_ID) names.set(author, "You");
+      else if (author.startsWith("bot:")) names.set(author, "Former bot");
+      else if (author.startsWith("agent:thr_")) names.set(author, (await service.actorForThread(author.slice(6))).actor.name);
+    }
+    return names;
+  };
+
+  const studio = studioSchemas(z);
+  const embeds = studioEmbeds(bb.sdk, studio);
+
+  bb.rpc.register(rpcContract, {
+    "pages.tree": ({ projectId }) => ({ pages: store.list({ projectId, includeArchived: true }).map(toView) }),
+    "pages.create": (input) => ({ page: toView(service.createPage({ ...input, actor: HUMAN_USER_ID })) }),
+    "pages.update": ({ id, title, expectedTitle, icon, parentId, projectId, position, archived }) => {
+      const meta = requireMeta(id);
+      let nextProject = projectId === undefined ? meta.project_id : projectId;
+      if (parentId) {
+        if (parentId === id || store.descendants(id).includes(parentId)) throw new Error("A page can't be nested inside itself.");
+        nextProject = requireMeta(parentId).project_id;
+      }
+      const page = store.update(
+        id,
+        {
+          title,
+          icon,
+          parent_id: parentId,
+          project_id: nextProject,
+          position,
+          archived_at: archived === undefined ? undefined : archived ? Date.now() : null,
+        },
+        HUMAN_USER_ID,
+        expectedTitle,
+      )!;
+      if (nextProject !== meta.project_id) {
+        for (const child of store.descendants(id)) store.update(child, { project_id: nextProject }, HUMAN_USER_ID);
+      }
+      service.publish({ type: "tree", projectId: meta.project_id });
+      if (nextProject !== meta.project_id) service.publish({ type: "tree", projectId: nextProject });
+      return { page: toView(page) };
+    },
+    "pages.remove": ({ id }) => {
+      requireMeta(id);
+      return { deleted: service.deletePage(id) };
+    },
+    "pages.get": ({ id }) => {
+      const meta = store.meta(id);
+      return { page: meta ? toView(meta) : null };
+    },
+    "pages.linkPreview": ({ url }) => fetchPreview(url),
+    "pages.studioItems": async () => ({ items: await embeds.items() }),
+    "pages.artifactView": async ({ id }) => ({ view: await embeds.artifactView(id) }),
+    "pages.checklistHandOff": ({ id, blockId, note }) => checklists.handOff({ pageId: id, blockId, note: note ?? null }),
+    "pages.whiteboardGet": async ({ id }) => ({ whiteboard: await embeds.whiteboard(id) }),
+    "pages.whiteboardSave": async ({ id, add, erase }) => ({ whiteboard: await embeds.saveWhiteboard(id, add, erase) }),
+    "pages.studioCreate": async ({ pageId, pluginId, kind }) => ({ item: await embeds.create(pluginId, kind, requireMeta(pageId).project_id) }),
+    "pages.recordingView": async ({ id }) => ({ recording: await embeds.recording(id) }),
+    "pages.markdown": ({ id }) => {
+      requireMeta(id);
+      return { markdown: readMarkdown(service.hub.open(id).doc) };
+    },
+    "pages.editableMarkdown": ({ id }) => {
+      requireMeta(id);
+      return { markdown: readMarkdown(service.hub.open(id).doc, { ids: true }) };
+    },
+    "pages.editDocument": ({ id, expected, markdown }) => ({ markdown: service.editClientDocument(id, expected, markdown) }),
+    "pages.replaceMarkdown": ({ id, markdown, snapshotName }) => {
+      requireMeta(id);
+      const actor = { key: PLUGIN_RPC_ACTOR, name: "Agent", color: actorColor(PLUGIN_RPC_ACTOR) };
+      return { page: toView(service.replaceMarkdown(id, markdown, snapshotName, actor)) };
+    },
+    "pages.search": ({ query, projectId }) => ({ pages: store.search(query, projectId).map(toView) }),
+    "pages.requests": ({ pageId }) => ({ requests: store.requests(pageId).map(requestView) }),
+    "pages.work": async ({ id, request }) => {
+      const meta = requireMeta(id);
+      const markdown = readMarkdown(service.hub.open(id).doc, { ids: true });
+      const thread = await bb.sdk.threads.spawn({
+        ...request,
+        input: [
+          ...request.input,
+          {
+            type: "text",
+            visibility: "agent-only",
+            mentions: [],
+            text: service.requestPrompt(meta, [
+              "The user is working with you from a page. Their message is about this page.",
+              "Current page with block ids:",
+              truncate(markdown, 40_000),
+            ]),
+          },
+        ],
+      });
+      store.addChat(id, thread.id);
+      service.publish({ type: "chats", pageId: id, threadId: thread.id });
+      const at = Date.now();
+      void services.linkThread({ threadId: thread.id, ref: { pluginId: PLUGIN_ID, id }, role: "chat", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Best effort. */ });
+      return { threadId: thread.id, botName: null };
+    },
+    "pages.chats": async ({ pageId }) => {
+      // Skips chats whose thread was deleted; the row stays in case the lookup failed for another reason.
+      const rows = await Promise.all(
+        store.chats(pageId).map(async (row) =>
+          (await bb.sdk.threads.get({ threadId: row.thread_id }).then(() => true, () => false))
+            ? { threadId: row.thread_id, createdAt: row.created_at }
+            : null,
+        ),
+      );
+      return { chats: rows.filter((chat) => chat !== null) };
+    },
+    "pages.chatPage": ({ threadId }) => {
+      const id = store.chatPageId(threadId);
+      const meta = id ? store.meta(id) : null;
+      return { page: meta ? toView(meta) : null };
+    },
+    "pages.snapshots": ({ id }) => ({
+      snapshots: store.snapshots(id).map((row) => ({ id: row.id, label: row.label, actor: row.actor, createdAt: row.created_at })),
+    }),
+    "pages.snapshotBytes": ({ id, snapshotId }) => {
+      const snapshot = store.snapshotState(snapshotId);
+      return { bytes: snapshot?.page_id === id ? snapshot.state.toString("base64") : null };
+    },
+    "pages.snapshot": ({ id, label }) => {
+      requireMeta(id);
+      const row = store.addSnapshot(id, Y.encodeStateAsUpdate(service.hub.open(id).doc), label?.trim() || "Saved version", HUMAN_USER_ID);
+      return { snapshot: { id: row.id, label: row.label, actor: row.actor, createdAt: row.created_at } };
+    },
+    "pages.restore": ({ snapshotId }) => ({ ok: service.restore(snapshotId, HUMAN_USER_ID) }),
+    "pages.comments": async ({ id, includeResolved }) => {
+      requireMeta(id);
+      const threads = listThreads(service.hub.open(id).doc, { includeResolved });
+      const names = await authorNames(threads.flatMap((thread) => thread.comments.map((comment) => comment.author)));
+      return {
+        threads: threads.map((thread) => ({
+          ...thread,
+          comments: thread.comments.map((comment) => ({ ...comment, authorName: names.get(comment.author) ?? "Agent" })),
+        })),
+      };
+    },
+    "pages.commentBlocks": ({ id }) => {
+      requireMeta(id);
+      return { blocks: textBlocks(service.hub.open(id).doc) };
+    },
+    "pages.commentCreate": async ({ id, block, quote, text }) => {
+      requireMeta(id);
+      const { threadId } = await createThread(service.hub.open(id).doc, HUMAN_USER_ID, { block, quote, text }, CLIENT_ORIGIN);
+      return { threadId };
+    },
+    "pages.commentReply": ({ id, thread, text }) => {
+      requireMeta(id);
+      reply(service.hub.open(id).doc, HUMAN_USER_ID, thread, text, CLIENT_ORIGIN);
+      return { ok: true };
+    },
+    "pages.commentResolve": ({ id, thread, resolved }) => {
+      requireMeta(id);
+      setResolved(service.hub.open(id).doc, HUMAN_USER_ID, thread, resolved, CLIENT_ORIGIN);
+      return { ok: true };
+    },
+  });
+
+  // Studio --------------------------------------------------------------------
+
+  const provider = pageProvider(service);
+  // Typing saves a page every few seconds; Studio only needs to hear about it now and then.
+  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });
+  const services = studioServices(bb.sdk);
+  for (const page of store.list({ includeArchived: true })) {
+    for (const chat of store.chats(page.id, 1000)) void services.linkThread({
+      threadId: chat.thread_id, ref: { pluginId: PLUGIN_ID, id: page.id }, role: "chat", state: "idle",
+      createdAt: chat.created_at, updatedAt: chat.created_at, metadata: {},
+    }).catch(() => { /* Best effort. */ });
+  }
+  const syncLinks = (id: string) => {
+    const ref = { pluginId: PLUGIN_ID, id };
+    const markdown = store.meta(id) ? readMarkdown(service.hub.open(id).doc) : "";
+    void services.replaceLinks(ref, PLUGIN_ID, outgoingStudioLinks(id, markdown)).catch(() => { /* Best effort. */ });
+  };
+  service.onPublish = (event) => {
+    if (event.type === "page") {
+      studioNotifier.changed(event.pageId); syncLinks(event.pageId);
+      const meta = store.meta(event.pageId);
+      if (meta) void services.recordActivity({
+        ref: { pluginId: PLUGIN_ID, id: event.pageId },
+        actor: meta.updated_by.startsWith("bot:") ? { kind: "bot", id: meta.updated_by.slice(4) } : meta.updated_by.startsWith("agent:") ? { kind: "agent", id: meta.updated_by.slice(6) } : { kind: "user" },
+        verb: "updated", at: meta.updated_at, summary: meta.title || "Untitled page",
+      }).catch(() => { /* Best effort. */ });
+    }
+    else if (event.type === "deleted") for (const id of event.pageIds) { studioNotifier.changed(id); syncLinks(id); }
+    else studioNotifier.changed();
+  };
+
+  // Backup: the `pages` section of `bb studio backup` / `bb studio restore`.
+  // Publishing tells open views and, through onPublish, Studio about restored pages.
+  const backup = pagesBackup({ db, hub: service.hub, publish: (event) => service.publish(event) });
+
+  // Agents --------------------------------------------------------------------
+
+  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Best effort. */ });
+  /** A page an agent changed belongs to its thread too, so the thread's tab lists it. */
+  const edited = (id: string, threadId: string) => {
+    const at = Date.now();
+    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Best effort. */ });
+  };
+  // Studio configures them once, with its other kinds' tools (PAGE_TOOLS).
+  registerTools(bb, service, created, edited);
+
+  const mentionContext = (itemId: string) => {
+    const meta = requireMeta(itemId);
+    const markdown = readMarkdown(service.hub.open(itemId).doc, { ids: true });
+    return [
+      `The user referenced the BB Page "${untitled(meta.title)}" (id ${meta.id}, ${pageUrl(meta.id)}). Current content with block ids:`,
+      "",
+      truncate(markdown, 40_000),
+      "",
+      "Use pages_read for the latest version and pages_edit to change it.",
+    ].join("\n");
+  };
+  bb.ui.registerMentionProvider(defineItemMention({
+    id: "page",
+    label: "Pages",
+    search({ query, projectId }) {
+      const pages = query.trim() ? store.search(query, projectId) : store.list({ projectId }).slice(0, 20);
+      return pages.map((page) => ({
+        id: page.id,
+        title: `${page.icon ? `${page.icon} ` : ""}${untitled(page.title)}`,
+        subtitle: page.project_id ? "Page" : "Global page",
+        icon: "FileText",
+      }));
+    },
+    resolve: (itemId) => ({ context: mentionContext(itemId) }),
+  }));
+
+  const cli = pagesCli(service, created);
+
+  // The upgrade bridge (packages/bb-studio-pages) -----------------------------
+
+  const SETTINGS_IMPORTED = "pages:settings-imported";
+  bb.rpc.register(bridgeContract, {
+    "pages.missingFiles": ({ ids }) => ({ missing: ids.filter((id) => !store.hasFile(id)) }),
+    "pages.importFile": (file) => ({ ok: imports.file(file) }),
+    "pages.importSnapshots": ({ snapshots }) => imports.snapshots(snapshots),
+    "pages.importRows": ({ pages }) => {
+      const result = imports.pages(pages);
+      for (const id of result.imported) service.publish({ type: "page", pageId: id });
+      if (result.imported.length) service.publish({ type: "tree", projectId: null });
+      return result;
+    },
+    "explore.importNextSuggestions": ({ rows }) => explore.importNext(rows),
+    async "pages.importSettings"({ settings: values }) {
+      if (await bb.storage.kv.get(SETTINGS_IMPORTED)) return { applied: [] };
+      const applied: string[] = [];
+      // A setting the user already changed in Studio stays as they set it.
+      const current = await settings.get();
+      const next: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(values)) {
+        if (value === undefined || !(key in PAGES_SETTINGS)) continue;
+        if (current[key] !== PAGES_SETTINGS[key as keyof typeof PAGES_SETTINGS].default || value === current[key]) continue;
+        next[key] = value;
+        applied.push(key);
+      }
+      if (applied.length) await settings.set(next as PagesSettings);
+      await bb.storage.kv.set(SETTINGS_IMPORTED, { at: Date.now(), applied });
+      return { applied };
+    },
+    "pages.mentionContext": ({ id }) => ({ context: mentionContext(id) }),
+  });
+
+  // Bot request lifecycle -----------------------------------------------------
+
+  // Checklist items handed to agents follow their thread.
+  bb.events.on("thread.active", ({ thread }) => checklists.signal(thread.id, "active"));
+  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => checklists.signal(thread.id, "idle", lastAssistantText));
+  bb.events.on("thread.failed", ({ thread, error }) => checklists.signal(thread.id, "failed", error));
+  bb.events.on("interaction.pending", ({ thread }) => checklists.signal(thread.id, "needs-input"));
+  bb.events.on("thread.archived", ({ thread }) => checklists.signal(thread.id, "archived"));
+  bb.events.on("thread.unarchived", ({ thread }) => checklists.signal(thread.id, "unarchived"));
+  bb.events.on("thread.deleted", ({ thread }) => checklists.signal(thread.id, "deleted"));
+
+
+  return {
+    store,
+    provider,
+    backup,
+    cli: (argv, ctx) => cli.run(argv, ctx),
+    dispose() {
+      studioNotifier.dispose();
+      service.onPublish = null;
+      service.hub.flushAll();
+      service.dispose();
+    },
+  };
+}

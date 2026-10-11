@@ -7,6 +7,7 @@ import { ARTIFACTS_BRIDGE_VERSION, bridgeStatusContract } from "@bb-studio/kit/a
 import { DRAW_BRIDGE_VERSION } from "@bb-studio/kit/draw-contract";
 import { DESIGN_BRIDGE_VERSION } from "@bb-studio/kit/design-contract";
 import { TALK_BRIDGE_VERSION } from "@bb-studio/kit/talk-contract";
+import { PAGES_BRIDGE_VERSION } from "@bb-studio/kit/pages-contract";
 import type { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
 import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
@@ -110,7 +111,25 @@ function bridgeBlocker(noun: string, bridgeVersion: string) {
   };
 }
 
+/** The one ordered procedure for moving from the separate add-ons to unified Studio. */
+export const UPGRADE_GUIDE_URL = "https://github.com/patleeman/bb-studio/blob/main/docs/upgrade-unified-studio.md";
+/** Ids of the add-ons built into Studio whose last release is an upgrade bridge. */
+export const BRIDGE_IDS: ReadonlySet<string> = new Set(["pages", "talk", "excalidraw", "artifacts", "design"]);
+
 export const RETIRED: readonly RetiredPlugin[] = [
+  {
+    id: "pages",
+    name: "Studio Pages",
+    why: "Pages are built into Studio now, with Explore's Next row. This last release is only an upgrade bridge: it copies your pages, their versions, files and comments, the Next row's click stats and your Pages settings into Studio, and forwards older clients.",
+    kept: "Every page it copied into Studio, with its content, comments, versions, uploaded files, chats, tags and links, the Next row's click stats, and your Pages and Explore settings. Links to /plugins/pages/pages/<id> still open them in Studio.",
+    deleted: `${REMOVED} Any pages \`bb pages migrate\` listed as skipped are lost; copy what you need from them first. iOS app builds from before the merge stop opening pages.`,
+    before: [
+      step("Close pages you're editing, so their last changes are saved.", null),
+      step("Update Studio Pages, then Studio, so Studio can take over its agent tools. (Updated Studio first? Reload it: bb plugin reload studio.)", "bb plugin update pages --yes && bb plugin update studio --yes"),
+      step("Copy its pages, versions, files, click stats and settings into Studio, and wait for Migration complete.", "bb pages migrate"),
+    ],
+    blocker: bridgeBlocker("pages", PAGES_BRIDGE_VERSION),
+  },
   {
     id: "artifacts",
     name: "Studio Artifacts",
@@ -118,7 +137,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
     kept: "Every artifact it copied into Studio, with its versions, files, tags, links and chats. Links to /plugins/artifacts/artifacts/<id> still open them in Studio.",
     deleted: `${REMOVED} Any rows \`bb artifacts migrate\` listed as skipped (malformed) are lost; copy what you need from them first. iOS app builds from before the merge stop opening artifacts.`,
     before: [
-      step("Update Studio and Studio Artifacts.", "bb plugin update studio --yes && bb plugin update artifacts --yes"),
+      step("Update Studio Artifacts, then Studio, so Studio can take over its agent tools. (Updated Studio first? Reload it: bb plugin reload studio.)", "bb plugin update artifacts --yes && bb plugin update studio --yes"),
       step("Copy its artifacts into Studio, and wait for Migration complete.", "bb artifacts migrate"),
     ],
     blocker: bridgeBlocker("artifacts", ARTIFACTS_BRIDGE_VERSION),
@@ -130,7 +149,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
     kept: "Every drawing it copied into Studio, with its scene, images, tags, links and chats. Links to /plugins/excalidraw/drawings/<id> still open them in Studio.",
     deleted: `${REMOVED} Any rows \`bb excalidraw migrate\` listed as skipped (malformed) are lost; copy what you need from them first. iOS app builds from before the merge stop opening drawings.`,
     before: [
-      step("Update Studio and Studio Draw.", "bb plugin update studio --yes && bb plugin update excalidraw --yes"),
+      step("Update Studio Draw, then Studio, so Studio can take over its agent tools. (Updated Studio first? Reload it: bb plugin reload studio.)", "bb plugin update excalidraw --yes && bb plugin update studio --yes"),
       step("Copy its drawings into Studio, and wait for Migration complete.", "bb excalidraw migrate"),
     ],
     blocker: bridgeBlocker("drawings", DRAW_BRIDGE_VERSION),
@@ -142,7 +161,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
     kept: "Every design it copied into Studio, with its rounds, screens, comments, conversation, tags and links, and your saved styles. Links to /plugins/design/designs/<id> still open them in Studio.",
     deleted: `${REMOVED} Any rows \`bb design migrate\` listed as skipped are lost; copy what you need from them first. iOS app builds from before the merge stop opening designs.`,
     before: [
-      step("Update Studio and Studio Design.", "bb plugin update studio --yes && bb plugin update design --yes"),
+      step("Update Studio Design, then Studio, so Studio can take over its agent tools. (Updated Studio first? Reload it: bb plugin reload studio.)", "bb plugin update design --yes && bb plugin update studio --yes"),
       step("Copy its designs into Studio, and wait for Migration complete.", "bb design migrate"),
     ],
     blocker: bridgeBlocker("designs", DESIGN_BRIDGE_VERSION),
@@ -376,6 +395,7 @@ export function formatSetup(summary: SetupSummary): string {
   }
   if (summary.retired.length) {
     lines.push("", "Retired plugins still installed");
+    if (summary.retired.some((entry) => BRIDGE_IDS.has(entry.id))) lines.push(`  Moving from the separate add-ons? Follow ${UPGRADE_GUIDE_URL}`);
     for (const entry of summary.retired) {
       lines.push(`  ${pad(entry.id, idWidth)}${entry.why}`);
       lines.push(`    Kept: ${entry.kept}`, `    Deleted: ${entry.deleted}`);

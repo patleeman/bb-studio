@@ -248,8 +248,8 @@ function useNotes(id: string, refetch: () => void) {
   return { pagesAvailable, busy, make, canMake };
 }
 
-const PAGES_MISSING = "Install Studio Pages to make notes.";
-const notesPath = (pageId: string) => `/plugins/pages/pages/${pageId}`;
+const PAGES_MISSING = "Pages aren't available; reload Studio to make notes.";
+const notesPath = (pageId: string) => `/plugins/studio/studio/pages/${pageId}`;
 
 function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnType<typeof useNotes> }) {
   const pageId = recording.notesPageId ?? null;

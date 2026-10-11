@@ -16,11 +16,11 @@ function actor(author: string): Actor {
   return { kind: "user" };
 }
 
-/** Pages keeps comments in Yjs; this adapter presents them through the shared API. */
+/** Pages (built into Studio) keeps comments in Yjs; this adapter presents them through the shared API. */
 export class ProviderComments {
   constructor(private readonly sdk: Sdk) {}
   private call<T>(method: string, input: unknown, outputSchema: z.ZodType<T>): Promise<T> {
-    return this.sdk.plugins.callRpc({ pluginId: "pages", method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) });
+    return this.sdk.plugins.callRpc({ pluginId: "studio", method: `pages.${method}`, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) });
   }
   async list(ref: Ref): Promise<ItemComment[] | null> {
     if (ref.pluginId !== "pages") return null;

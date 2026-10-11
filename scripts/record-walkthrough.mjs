@@ -62,7 +62,7 @@ const ownScenes = {
   pages: async (client) => {
     const { page, cleanup } = await seedPages();
     try {
-      await client.navigate(`/plugins/pages/pages/${page.id}`);
+      await client.navigate(`/plugins/studio/studio/pages/${page.id}`);
       for (const text of ["Offline mode launch", "Crash-free sessions", "Launch checklist"]) await client.waitForText(text);
       await client.waitForSelector(".recharts-bar-rectangle");
       await sleep(800);

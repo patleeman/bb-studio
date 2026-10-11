@@ -1,0 +1,153 @@
+---
+name: pages
+description: Use when the user refers to a BB Page — a /plugins/studio/studio/pages/<id> link (or an older /plugins/pages/pages/<id> one), a page mention, "the launch page", a doc they want written or kept up to date — or asks you to read, write, comment on, or restructure a page, or how Pages works.
+---
+
+# Pages
+
+**Settings → Studio → Saved versions per page** controls history
+retention: 50 by default, 1 to 1000 for a limit, or 0 to keep all. Lowering it
+prunes older versions only when that page next saves a version. It never
+changes the current page text.
+
+Pages are collaborative documents inside BB. Pages are built into Studio: the user edits them live
+in Studio tabs while agents edit the same document through
+tools. Every change merges in real time (Yjs), so nobody's typing is
+overwritten.
+
+Pages belong to a project or are global, and nest into a tree. Link to one as
+`[Title](/plugins/studio/studio/pages/<page-id>)`. Older links,
+`/plugins/pages/pages/<page-id>`, open the same page.
+
+When you create or change a page, put its card on its own line in your reply:
+
+```
+::page{id="<page-id>"}
+```
+
+The card shows the page's title and its text inline, so don't repeat the
+page's content in your reply. Its arrow opens the page in a tab beside the
+chat. `pages_create` and `pages_edit` print the line for you.
+
+## Agent tools
+
+| Tool | Use it to |
+| --- | --- |
+| `pages_list` | List this project's pages and global pages as a tree. Pass `query` to search titles and content. |
+| `pages_read` | Read a page as Markdown. Each block is preceded by a `<!-- ^id -->` marker naming it; use those ids in edits. |
+| `pages_create` | Create a page from Markdown. Set `global` for a global page, `parent` to nest it. |
+| `pages_edit` | Apply small edit operations to a page (see below). |
+| `pages_comments` | List comment threads with their ids, commented text, and replies. |
+| `pages_comment` | Start a comment thread on a block, optionally on an exact quote from it. |
+| `pages_comment_reply` | Reply in a comment thread. |
+| `pages_comment_resolve` | Resolve or reopen a thread. |
+
+Pages can be referenced by id (`pg_…`) or exact title.
+
+### Editing without clobbering the user
+
+Always `pages_read` first, then edit with targeted operations that reference
+block ids (the full id or its first 8 characters):
+
+- `insert_after` / `insert_before` a block, `replace` a block, `delete` a block
+- `append` / `prepend` Markdown to the page
+- `set_checked` on a checklist item
+- `replace_text` inside one block, or the first match in the page
+- `replace_all` — only when the user asks to rewrite the whole page
+
+Pages saves a restore point before an agent's or bot's first edit in a
+while, so the user can roll back from **Version history**.
+
+## Checklists handed to agents
+
+A checklist item can carry a thread mention such as
+`@[Agent · working](thread:thr_…)`: the user handed that item to an agent,
+and Pages keeps the label on the thread's state. Leave the mention in place
+when editing the item. If you are that agent, end with a one-line summary
+and don't check the item off; the user does that after reviewing.
+
+## Markdown
+
+Pages reads and writes GitHub-flavoured Markdown plus:
+
+- **Callouts:** `> [!NOTE] text` (also `TIP`, `WARNING`, `CAUTION`, `IMPORTANT`).
+- **Toggles:** `<details>` with a `<summary>` line, the hidden blocks, then
+  `</details>`, each separated by a blank line. The summary takes inline
+  Markdown; start it with `##` for a toggle heading. Toggles can nest.
+- **Charts:** a fenced ` ```chart ` block holding JSON:
+  `{"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"stacked":false,"unit":"$","data":[{"label":"Q1","Revenue":10}]}`.
+  `x` and `series` default to the first text column and the numeric columns.
+- **Stats:** a fenced ` ```stats ` block holding 1–6 items:
+  `[{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up","caption":"vs last month"}]`.
+- **Mermaid:** a fenced ` ```mermaid ` block renders as a diagram.
+- **HTML:** a fenced ` ```html ` block renders its HTML in a sandboxed
+  iframe that grows to fit its content (up to 2,400px tall). Scripts run, but
+  in an opaque origin: no cookies, storage, BB APIs, popups, or navigation of
+  the page, and don't count on network access. Make it self-contained, with
+  inline `<style>` and `<script>` and no external assets. The frame's
+  `prefers-color-scheme` follows BB's light or dark theme, so style both,
+  e.g. `@media (prefers-color-scheme: dark) { … }`, and leave the page
+  background transparent so it sits on the page. The source is limited to 200,000 characters;
+  longer ones show as an HTML code block instead. A bare ` ```html ` fence
+  renders, so show HTML *source* as ` ```html source ` (how HTML code blocks
+  read back) or with another fence language (` ```xml `).
+- **Embeds:** a fenced ` ```embed ` block:
+  `{"kind":"bookmark|thread|page|drawing|artifact|recording|item","target":"https://… or an id","title":"…"}`.
+  Bookmarks may also carry `description` and `image`; leave them out and the
+  editor fetches the link's preview when the page opens. `drawing`,
+  `artifact`, and `recording` take the item's id
+  in Excalidraw, Artifacts, or Talk. `item` embeds anything in
+  Studio, with `plugin:id` as the target (`studio_list_items` lists ids). A
+  drawing shows its picture, an artifact its content,
+  a recording its player and transcript, and the
+  rest a card. To track work in a page, use checklists.
+- **Mentions:** `@[Title](page:pg_id)`,
+  `@[Title](thread:thr_id)`, `@[Title](item:plugin:id)`,
+  `@[2026-10-01](date:2026-10-01)`.
+
+Historical bot mentions remain readable. Use thread mentions and page chats for
+new agent work; bot profiles and their mention/refresh workers are retired.
+
+Tables, checklists (`- [ ]`), headings, quotes, and images work as in GFM.
+Code fences keep their language and are highlighted for TypeScript,
+JavaScript, JSON, Python, shell, Go, Rust, SQL, HTML (` ```html source `),
+CSS, YAML, Markdown, diffs, Java, Kotlin, Swift, C, C#, TOML, Dockerfile,
+GraphQL, and XML.
+
+## Working from a page
+
+The page header's Chat action continues its conversation or opens BB's
+new-thread composer. New conversation starts another. Sending starts a
+normal agent thread in the page's project and opens it in BB's main view.
+Existing page chat links still work. The thread also appears in
+the sidebar, and its header links back to the page. Its first message carries the page id and
+its Markdown with block ids as hidden context. The copy can go stale as the
+user types, so read the page again right before you edit it with
+`pages_edit`.
+
+## Dictation
+
+With the Talk plugin installed, the user can dictate into a page: **Dictate**
+in the header, `/dictate`, or *Talk: Start or finish dictation* while the
+cursor is in the page. Talk records and transcribes, and Pages inserts the
+text at the cursor, or at the end if the user hasn't clicked into the page.
+Text finished elsewhere is added when the user goes back to the page.
+Dictation edits the page as the user, not an agent. Recordings are in Talk's
+Recordings page (`bb talk list`).
+
+## CLI
+
+Output is bounded and tab-separated where it is a list.
+
+```sh
+bb studio pages list [--all]                                   # this project + global; --all for every project
+bb studio pages show <page-id|title> [--ids]                   # Markdown; --ids adds block id markers
+bb studio pages create <title> [--global] [--markdown <text>]  # prints the new page id
+bb studio pages append <page-id|title> <markdown…>             # "\n" in arguments becomes a newline
+```
+
+## Limits
+
+- Uploaded files (images, video, audio, files) are limited to 15 MB each.
+- `pages_read` returns up to 60,000 characters.
+- Deleting a page deletes its sub-pages. Archive it instead to keep it.

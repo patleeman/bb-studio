@@ -14,7 +14,8 @@ const plugins = [
   ["studio", "Studio", "../packages/bb-studio/src/public-contract.ts", "rpcContract"],
   // Talk is built into Studio; the old plugin's upgrade bridge forwards these for older clients.
   ["talk", "Talk", "../packages/bb-studio-talk/server.ts", "legacyContract"],
-  ["pages", "Pages", "../packages/bb-studio-pages/src/contract.ts", "rpcContract"],
+  // Pages are built into Studio; the old plugin's upgrade bridge forwards these for older clients.
+  ["pages", "Pages", "../packages/bb-studio-pages/server.ts", "legacyContract"],
   // Artifacts are built into Studio; the old plugin's upgrade bridge forwards these for older clients.
   ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "legacyContract"],
   // Drawings are built into Studio; the old plugin's upgrade bridge forwards these for older clients.

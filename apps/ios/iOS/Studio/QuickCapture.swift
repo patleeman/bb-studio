@@ -74,7 +74,7 @@ struct QuickWriteView: View {
     /// Save makes a page; the menu offers the other homes for it.
     private var saveMenu: some View {
         Menu {
-            if running("pages") {
+            if (running("studio") || running("pages")) {
                 Button("Save as Page", systemImage: "doc.richtext") { Task { await savePage() } }
             }
             Button("Start a Thread", systemImage: "bubble.left.and.text.bubble.right") { startingThread = true }
@@ -86,7 +86,7 @@ struct QuickWriteView: View {
         } label: {
             if saving { ProgressView() } else { Text("Save").fontWeight(.semibold) }
         } primaryAction: {
-            if running("pages") { Task { await savePage() } } else { startingThread = true }
+            if (running("studio") || running("pages")) { Task { await savePage() } } else { startingThread = true }
         }
         .disabled(trimmed.isEmpty || saving)
         .accessibilityIdentifier("quickWriteSave")

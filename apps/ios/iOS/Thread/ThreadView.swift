@@ -199,7 +199,7 @@ struct ThreadView: View {
             model.attach(app)
             Task { await muted.refresh() }
             Task { reactionSettings = (try? await client.reactionSettings()) ?? .defaults }
-            if runningPlugins.split(separator: ",").contains("pages") {
+            if runningPlugins.split(separator: ",").contains(where: { $0 == "studio" || $0 == "pages" }) {
                 Task { sourcePage = try? await client.chatPage(model.threadId) }
             }
             if runningPlugins.split(separator: ",").contains("studio") {

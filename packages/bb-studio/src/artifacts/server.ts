@@ -363,13 +363,14 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
     async "artifacts.saveAsPage"({ id }) {
       const artifact = mustGet(id);
       const markdown = pageMarkdown(artifact.version, artifactText(store, artifact));
+      // Pages is built into Studio too.
       const { page } = await bb.sdk.plugins.callRpc({
-        pluginId: "pages",
-        method: "create",
+        pluginId: "studio",
+        method: "pages.create",
         input: { projectId: artifact.project_id, parentId: null, title: displayTitle(artifact), markdown },
         outputSchema: z.object({ page: z.object({ id: z.string() }).passthrough() }),
       });
-      return { href: `/plugins/pages/pages/${page.id}` };
+      return { href: `/plugins/studio/studio/pages/${page.id}` };
     },
   });
 

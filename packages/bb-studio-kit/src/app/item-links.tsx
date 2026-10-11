@@ -74,10 +74,11 @@ type Result = z.infer<typeof resultSchema>[number];
 
 // Each add-on's item icon, by the plugin and panel its links open.
 const LINK_ICONS: Record<string, string> = {
-  "pages/pages": "pages/pages",
+  "pages/pages": "studio/pages",
   "excalidraw/drawings": "studio/draw",
   "artifacts/artifacts": "studio/artifact",
   // Kinds built into Studio, at /plugins/studio/studio/<segment>/<id>.
+  "studio/studio/pages": "studio/pages",
   "studio/studio/drawings": "studio/draw",
   "studio/studio/artifacts": "studio/artifact",
   "studio/studio/designs": "studio/design",

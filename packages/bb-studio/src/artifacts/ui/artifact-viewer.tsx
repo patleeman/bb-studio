@@ -215,7 +215,7 @@ export function ArtifactViewer({
           ) : null}
           {text && version.type !== "html" ? (
             <DropdownMenuItem disabled={busy} onSelect={() => void saveAsPage()}>
-              <Icon name="pages/pages" fallback="FileText" className="size-4" /> Save as page
+              <Icon name="studio/pages" fallback="FileText" className="size-4" /> Save as page
             </DropdownMenuItem>
           ) : null}
           {versions.length > 1 ? (

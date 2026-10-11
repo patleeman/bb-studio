@@ -20,6 +20,8 @@ final class StudioStore: ObservableObject {
     @Published private(set) var plugins: Set<String> = []
     /// Recording and dictation: built into Studio, or the Talk plugin on an older server.
     var hasTalk: Bool { plugins.contains("studio") || plugins.contains("talk") }
+    /// Pages are built into Studio; an older Studio has them in the Pages plugin.
+    var hasPages: Bool { plugins.contains("studio") || plugins.contains("pages") }
     /// Listed by the Studio plugin, which can also search content and delete anything.
     @Published private(set) var viaStudio = false
     @Published var error: String?
@@ -126,7 +128,7 @@ final class StudioStore: ObservableObject {
                 // Studio failed; list the add-ons directly below.
             }
         }
-        async let pages = Self.attempt(plugins.contains("pages")) { try await client.pages() }
+        async let pages = Self.attempt(hasPages) { try await client.pages() }
         // Recordings are built into Studio; an older Studio has them in the Talk plugin.
         async let recordings = Self.attempt(hasTalk) { try await client.recordings(limit: 200) }
         // Drawings are built into Studio; an older Studio has them in the Draw plugin.
@@ -152,7 +154,7 @@ final class StudioStore: ObservableObject {
     /// Keys of items whose content matches, with the matching text when there is one.
     func search(_ query: String, client: BBClient) async -> [String: String] {
         if viaStudio { return (try? await client.studioSearch(query)) ?? [:] }
-        guard plugins.contains("pages"), let pages = try? await client.searchPages(query) else { return [:] }
+        guard hasPages, let pages = try? await client.searchPages(query) else { return [:] }
         return Dictionary(pages.map { ("pages:\($0.id)", "") }, uniquingKeysWith: { a, _ in a })
     }
 
@@ -542,7 +544,7 @@ struct StudioView: View {
                     }
                 }
             }
-            if query.isEmpty, !selecting, store.hasTalk || store.plugins.contains("pages") {
+            if query.isEmpty, !selecting, store.hasTalk || store.hasPages {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -584,7 +586,7 @@ struct StudioView: View {
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
             if store.hasTalk {
                 tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
-                    if store.plugins.contains("pages") {
+                    if store.hasPages {
                         Button("Dictate a Page", systemImage: "doc.badge.plus") { dictatingPage = true }
                     }
                     Button("Record", systemImage: "record.circle") { recordingKind = "recording" }

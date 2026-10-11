@@ -44,7 +44,7 @@ export const STUDIO_ITEM_AT_METHOD = "itemAt";
  * namespace). Their provider methods are Studio's: call them through Studio's
  * `provider.call` (see callProvider in ./server), not the old plugin.
  */
-export const STUDIO_BUILTINS: readonly string[] = ["artifacts", "excalidraw", "design", "talk"];
+export const STUDIO_BUILTINS: readonly string[] = ["pages", "artifacts", "excalidraw", "design", "talk"];
 /** Studio's method that runs a built-in kind's `studio_*` provider method. */
 export const STUDIO_PROVIDER_CALL_METHOD = "provider.call";
 
@@ -85,7 +85,7 @@ export interface StudioItem {
   badge: StudioBadge | null;
   /** A small image shown in place of the icon, served by the provider. */
   thumbnailUrl: string | null;
-  /** App path that opens the item, e.g. /plugins/pages/pages/pg_x. */
+  /** App path that opens the item, e.g. /plugins/studio/studio/pages/pg_x. */
   href: string;
   archived: boolean;
   /** A reusable source item. */

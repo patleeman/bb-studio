@@ -1,69 +1,39 @@
 {
   "name": "@bb-studio/pages",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
+  "description": "Upgrade bridge for Studio Pages, now built into Studio: copies your pages, their versions and files, the Next row's click stats and your Pages settings into Studio and forwards older clients and mentions.",
   "engines": {
     "bb": ">=0.45",
     "bbPluginSdk": ">=0.6.15"
   },
   "bb": {
     "name": "Studio Pages",
-    "description": "Part of BB Studio. Collaborative pages you write with your agents, with live editing, comments, version history and ordinary agent chats.",
+    "description": "Upgrade bridge for Studio Pages, now built into Studio: copies your pages, their versions and files, the Next row's click stats and your Pages settings into Studio and forwards older clients and mentions.",
     "branding": {
-      "icon": "./icons/pages.svg",
-      "experimental_icons": {
-        "pages": "./icons/pages.svg",
-        "explore": "./src/explore/icons/explore.svg"
-      }
+      "icon": "./assets/icon.svg"
     },
-    "server": "./server.ts",
-    "app": "./app.tsx",
-    "skills": [
-      "skills",
-      "src/explore/skills"
-    ]
+    "server": "./server.ts"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.mts",
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build ."
   },
   "dependencies": {
     "@bb-studio/kit": "file:../bb-studio-kit.tgz",
-    "@blocknote/core": "0.55.0",
-    "@blocknote/react": "0.55.0",
-    "@blocknote/shadcn": "0.55.0",
-    "@tiptap/pm": "3.31.3",
-    "lib0": "0.2.119",
-    "mdast-util-from-markdown": "^2.0.3",
-    "mdast-util-gfm": "^3.1.0",
-    "mermaid": "^11.16.1",
-    "micromark-extension-gfm": "^3.0.0",
-    "pdf-lib": "1.17.1",
-    "recharts": "3.10.1",
-    "shiki": "4.4.3",
-    "y-prosemirror": "^1.3.7",
-    "y-protocols": "1.0.7",
-    "yjs": "13.6.33",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.6.15",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/mdast": "^4.0.4",
     "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "better-sqlite3": "^12.11.1",
-    "hono": "^4.11.9",
-    "jsdom": "29.0.1",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "sonner": "^1.7.4",
     "typescript": "^5.7.0",
     "vitest": "4.1.1"
   },
-  "scripts": {
-    "test": "vitest run --config vitest.config.mts",
-    "typecheck": "tsc --noEmit",
-    "build": "bb plugin build .",
-    "tailwind:blocknote": "node scripts/blocknote-tailwind.mjs",
-    "css:blocknote": "node scripts/blocknote-css.mjs"
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
   }
 }

@@ -84,30 +84,47 @@ public struct PagesSnapshot: Codable, Sendable {
 
 // MARK: Pages
 
+/// Pages are built into Studio. For one release, a Studio from before the
+/// merge (no `pages.*` methods) falls back to the Pages plugin, whose last
+/// release forwards to Studio anyway.
+nonisolated(unsafe) var pagesInStudio = true
+
 extension BBClient {
+    /// Studio first; the Pages plugin only when Studio doesn't have the method.
+    public func pagesViaStudio<T>(_ studio: () async throws -> T, else legacy: () async throws -> T) async throws -> T {
+        do {
+            let result = try await studio()
+            pagesInStudio = true
+            return result
+        } catch where Self.isMissingRPC(error) {
+            pagesInStudio = false
+            return try await legacy()
+        }
+    }
+
     /// Every page, global and in all projects, archived ones left out.
     public func pages() async throws -> [PageMeta] {
         struct Tree: Decodable { var pages: [PageMeta] }
-        let tree: Tree = try await rpc("pages", "tree", [:])
+        let tree: Tree = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_tree, [:]) }, else: { try await self.rpc("pages", Pages.Method.tree, [:]) })
         return tree.pages.filter { $0.archived != true }
     }
 
     public func page(_ id: String) async throws -> PageMeta? {
         struct Envelope: Decodable { var page: PageMeta? }
-        let envelope: Envelope = try await rpc("pages", "get", ["id": .string(id)])
+        let envelope: Envelope = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_get, ["id": .string(id)]) }, else: { try await self.rpc("pages", Pages.Method.get, ["id": .string(id)]) })
         return envelope.page
     }
 
     public func pageMarkdown(_ id: String) async throws -> String {
         struct Envelope: Decodable { var markdown: String }
-        let envelope: Envelope = try await rpc("pages", "markdown", ["id": .string(id)])
+        let envelope: Envelope = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_markdown, ["id": .string(id)]) }, else: { try await self.rpc("pages", Pages.Method.markdown, ["id": .string(id)]) })
         return envelope.markdown
     }
 
     /// Title and content search.
     public func searchPages(_ query: String) async throws -> [PageMeta] {
         struct Envelope: Decodable { var pages: [PageMeta] }
-        let envelope: Envelope = try await rpc("pages", "search", ["query": .string(String(query.prefix(200)))])
+        let envelope: Envelope = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_search, ["query": .string(String(query.prefix(200)))]) }, else: { try await self.rpc("pages", Pages.Method.search, ["query": .string(String(query.prefix(200)))]) })
         return envelope.pages.filter { $0.archived != true }
     }
 
@@ -129,20 +146,20 @@ extension BBClient {
             "environment": ["type": "project-default"],
             "input": [["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))]],
         ]
-        let result: Result = try await rpc("pages", "work", ["id": .string(id), "request": request])
+        let result: Result = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_work, ["id": .string(id), "request": request]) }, else: { try await self.rpc("pages", Pages.Method.work, ["id": .string(id), "request": request]) })
         return (result.threadId, result.botName)
     }
 
     public func pageChats(_ id: String) async throws -> [PageChat] {
         struct Result: Decodable { var chats: [PageChat] }
-        let result: Result = try await rpc("pages", "chats", ["pageId": .string(id)])
+        let result: Result = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_chats, ["pageId": .string(id)]) }, else: { try await self.rpc("pages", Pages.Method.chats, ["pageId": .string(id)]) })
         return result.chats
     }
 
     /// The page a thread was started from with "Work with this page".
     public func chatPage(_ threadId: String) async throws -> PageMeta? {
         struct Result: Decodable { var page: PageMeta? }
-        let result: Result = try await rpc("pages", "chatPage", ["threadId": .string(threadId)])
+        let result: Result = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_chatPage, ["threadId": .string(threadId)]) }, else: { try await self.rpc("pages", Pages.Method.chatPage, ["threadId": .string(threadId)]) })
         return result.page
     }
 
@@ -151,12 +168,12 @@ extension BBClient {
         if let title { input["title"] = .string(String(title.prefix(200))) }
         if let icon { input["icon"] = .string(String(icon.prefix(16))) }
         if let archived { input["archived"] = .bool(archived) }
-        let _: JSONValue = try await rpc("pages", "update", .object(input))
+        let _: JSONValue = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_update, .object(input)) }, else: { try await self.rpc("pages", Pages.Method.update, .object(input)) })
     }
 
     public func pageSnapshots(_ id: String) async throws -> [PageSnapshot] {
         struct Result: Decodable { var snapshots: [PageSnapshot] }
-        let result: Result = try await rpc("pages", "snapshots", ["id": .string(id)])
+        let result: Result = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_snapshots, ["id": .string(id)]) }, else: { try await self.rpc("pages", Pages.Method.snapshots, ["id": .string(id)]) })
         return result.snapshots
     }
 
@@ -165,40 +182,37 @@ extension BBClient {
         if let label = label?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty {
             input["label"] = .string(String(label.prefix(120)))
         }
-        let _: JSONValue = try await rpc("pages", "snapshot", .object(input))
+        let _: JSONValue = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_snapshot, .object(input)) }, else: { try await self.rpc("pages", Pages.Method.snapshot, .object(input)) })
     }
 
     public func restorePage(snapshotId: String) async throws {
-        let _: JSONValue = try await rpc("pages", "restore", ["snapshotId": .string(snapshotId)])
+        let _: JSONValue = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_restore, ["snapshotId": .string(snapshotId)]) }, else: { try await self.rpc("pages", Pages.Method.restore, ["snapshotId": .string(snapshotId)]) })
     }
 
     /// Every comment thread, resolved ones included.
     public func pageComments(_ id: String) async throws -> [PageCommentThread] {
         struct Result: Decodable { var threads: [PageCommentThread] }
-        let result: Result = try await rpc("pages", "comments", ["id": .string(id), "includeResolved": .bool(true)])
+        let result: Result = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_comments, ["id": .string(id), "includeResolved": .bool(true)]) }, else: { try await self.rpc("pages", Pages.Method.comments, ["id": .string(id), "includeResolved": .bool(true)]) })
         return result.threads
     }
 
     public func pageCommentBlocks(_ id: String) async throws -> [PageTextBlock] {
         struct Result: Decodable { var blocks: [PageTextBlock] }
-        let result: Result = try await rpc("pages", "commentBlocks", ["id": .string(id)])
+        let result: Result = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_commentBlocks, ["id": .string(id)]) }, else: { try await self.rpc("pages", Pages.Method.commentBlocks, ["id": .string(id)]) })
         return result.blocks
     }
 
     /// Starts a page comment thread as you.
     public func commentOnPage(_ id: String, block: String, text: String) async throws {
-        let _: JSONValue = try await rpc(
-            "pages", "commentCreate", ["id": .string(id), "block": .string(block), "text": .string(String(text.prefix(8000)))])
+        let _: JSONValue = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_commentCreate, ["id": .string(id), "block": .string(block), "text": .string(String(text.prefix(8000)))]) }, else: { try await self.rpc("pages", Pages.Method.commentCreate, ["id": .string(id), "block": .string(block), "text": .string(String(text.prefix(8000)))]) })
     }
 
     public func replyToPageComment(_ id: String, thread: String, text: String) async throws {
-        let _: JSONValue = try await rpc(
-            "pages", "commentReply", ["id": .string(id), "thread": .string(thread), "text": .string(String(text.prefix(8000)))])
+        let _: JSONValue = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_commentReply, ["id": .string(id), "thread": .string(thread), "text": .string(String(text.prefix(8000)))]) }, else: { try await self.rpc("pages", Pages.Method.commentReply, ["id": .string(id), "thread": .string(thread), "text": .string(String(text.prefix(8000)))]) })
     }
 
     public func resolvePageComment(_ id: String, thread: String, resolved: Bool) async throws {
-        let _: JSONValue = try await rpc(
-            "pages", "commentResolve", ["id": .string(id), "thread": .string(thread), "resolved": .bool(resolved)])
+        let _: JSONValue = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_commentResolve, ["id": .string(id), "thread": .string(thread), "resolved": .bool(resolved)]) }, else: { try await self.rpc("pages", Pages.Method.commentResolve, ["id": .string(id), "thread": .string(thread), "resolved": .bool(resolved)]) })
     }
 
     /// The ids of plugins installed and running on the server.
@@ -215,6 +229,6 @@ extension BBClient {
     }
 
     public func webURL(forPage id: String) -> URL {
-        URL(string: "/plugins/pages/pages/\(id)", relativeTo: baseURL)!
+        URL(string: pagesInStudio ? "/plugins/studio/studio/pages/\(id)" : "/plugins/pages/pages/\(id)", relativeTo: baseURL)!
     }
 }

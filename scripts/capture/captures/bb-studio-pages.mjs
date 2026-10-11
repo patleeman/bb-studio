@@ -1,12 +1,24 @@
-export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
+// Pages, built into Studio: a page as a Studio tab (opened from its old Pages
+// address), page comments with dictation, and the Pages bridge on Setup.
+
+/** Opens a page from its old Pages address and checks it lands as a Studio tab. */
+async function openPage(client, id) {
+  await client.navigate(`/plugins/pages/pages/${id}`);
+  await client.waitForSelector(`[data-studio-workspace-editor="/plugins/studio/studio/pages/${id}"]`, 30000);
+  const path = await client.evaluate("location.pathname");
+  if (path !== "/plugins/studio/studio") throw new Error(`The old page address didn't open in Studio's workspace: ${path}`);
+}
+
+export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => [
   {
     id: "pages",
-    packageDir: "bb-studio-pages",
+    packageDir: "bb-studio",
+    fileName: "pages-preview.png",
     privateSidebar: true,
     setup: async (client) => {
       const { page, cleanup } = await seedPages();
       try {
-        await client.navigate(`/plugins/pages/pages/${page.id}`);
+        await openPage(client, page.id);
         await client.waitForSelector('nav[aria-label="Breadcrumb"]');
         await client.waitForAriaButton("Comments");
         await client.waitForAriaButton("Page actions");
@@ -32,16 +44,16 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
   },
   {
     id: "pages-comments",
-    packageDir: "bb-studio-pages",
-    fileName: "comments.png",
+    packageDir: "bb-studio",
+    fileName: "pages-comments.png",
     privateSidebar: true,
     setup: async (client) => {
-      const { page } = await pluginRpc("pages", "create", {
+      const { page } = await pluginRpc("studio", "pages.create", {
         projectId, parentId: null, title: "Offline launch review", icon: "🚀",
         markdown: "## Launch checklist\n\nTest offline sync before the beta release.\n\n- [ ] Try reconnecting after editing a note\n- [ ] Check the first-run onboarding",
       });
-      const cleanup = () => pluginRpc("pages", "remove", { id: page.id }).catch(() => {});
-      const original = await pluginRpc("pages", "markdown", { id: page.id });
+      const cleanup = () => pluginRpc("studio", "pages.remove", { id: page.id }).catch(() => {});
+      const original = await pluginRpc("studio", "pages.markdown", { id: page.id });
       const insert = async (text, selector = ".pages-comment-dictation") => {
         const accepted = await client.evaluate(`(() => {
           const field = document.querySelector(${JSON.stringify(selector)});
@@ -50,7 +62,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         })()`);
         if (!accepted) throw new Error("Comment draft did not accept dictation");
       };
-      const comments = () => pluginRpc("pages", "comments", { id: page.id });
+      const comments = () => pluginRpc("studio", "pages.comments", { id: page.id });
       const waitForComments = async (count) => {
         for (let attempt = 0; attempt < 40; attempt++) {
           const result = await comments();
@@ -67,7 +79,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForSelector('.pages-comments button[aria-label="Dictate comment"]');
       };
       try {
-        await client.navigate(`/plugins/pages/pages/${page.id}`);
+        await openPage(client, page.id);
         await client.waitForText("Test offline sync");
         await client.waitForAriaButton("Dictate");
         await client.evaluate(`(() => {
@@ -106,7 +118,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         if ((await comments()).threads[0].comments.length !== 1) throw new Error("Dictation posted a reply before Save");
         await client.clickElementWithTextAndPointer(".pages-comments .bn-comment-actions button", "Save");
         await waitForComments(2);
-        const after = await pluginRpc("pages", "markdown", { id: page.id });
+        const after = await pluginRpc("studio", "pages.markdown", { id: page.id });
         if (after.markdown !== original.markdown) throw new Error("Comment dictation changed the page body");
         // The same comment sheet and microphone fit on phones.
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
@@ -122,7 +134,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight;
         })()`);
         if (!fits) throw new Error("Comment microphone is outside the mobile viewport");
-        await client.capture("packages/bb-studio-pages/assets/comments-mobile.png");
+        await client.capture("packages/bb-studio/assets/pages-comments-mobile.png");
         await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await sleep(700);
         await selectThread();
@@ -136,32 +148,24 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     },
   },
   {
-    id: "pages-collection",
+    // Run after `bb pages migrate` copied pages made with the 0.1.0 plugin.
+    id: "pages-bridge",
     packageDir: "bb-studio-pages",
-    fileName: "collection.png",
-    privateSidebar: true,
     setup: async (client) => {
-      const { cleanup } = await seedPages();
-      try {
-        // With Studio installed, Pages' collection hands over to Studio,
-        // filtered to pages. Shows the list view across every project.
-        await client.navigate("/plugins/pages/pages");
-        await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem("studio:collection:view", "list"); localStorage.setItem("studio:query:all", "")`);
-        await client.navigate("/plugins/studio/studio/page");
-        await client.waitForSelector('input[aria-label="Search and filter studio"]');
-        await client.waitForSelector('button[aria-label="Remove Kind Pages"]');
-        await client.waitForSelector('[role="grid"]');
-        // New offers every kind, even with the list filtered to pages.
-        if (!await client.evaluate(`[...document.querySelectorAll("button")].some(button => button.innerText.trim() === "New")`)) throw new Error("The collection has no New button");
-        await client.waitForText("Offline mode launch");
-        await client.waitForText("Rollout risks");
-        await client.waitForText("Release notes: October");
-        await sleep(800);
-      } catch (error) {
-        await cleanup();
-        throw error;
-      }
-      return cleanup;
+      const migrated = await bbCli(["pages", "migrate"]);
+      if (!migrated.includes("Migration complete")) throw new Error(`bb pages migrate didn't finish: ${migrated}`);
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Set up BB Studio", 30000);
+      await client.waitForText("Retired plugins");
+      await client.waitForText("Pages are built into Studio now");
+      await client.waitForText("bb pages migrate");
+      await client.waitForText("Close pages you're editing");
+      // Copied: nothing blocks removal.
+      const blocked = await client.evaluate(`[...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Not yet:") && p.closest("li,div")?.textContent.includes("Studio Pages"))`);
+      if (blocked) throw new Error("Setup still blocks removing Studio Pages after Migration complete");
+      // Other bridges may be listed first; show Studio Pages' entry.
+      await client.evaluate(`[...document.querySelectorAll("p")].find((p) => p.textContent.startsWith("Pages are built into Studio now"))?.closest("li,section,div")?.scrollIntoView({ block: "start" })`);
+      await sleep(400);
     },
-  }
+  },
 ];

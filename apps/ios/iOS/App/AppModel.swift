@@ -24,8 +24,14 @@ extension Route {
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
         // Kinds built into Studio live under its panel: /plugins/studio/studio/<segment>/<id>.
+        // A page's chat (/plugins/studio/studio/pages/<id>/chat/<thread>) opens the page.
+        if parts.count == 7, parts[0] == "plugins", parts[1] == "studio", parts[2] == "studio", parts[3] == "pages", parts[5] == "chat" {
+            self = .page(id: parts[4])
+            return
+        }
         if parts.count == 5, parts[0] == "plugins", parts[1] == "studio", parts[2] == "studio" {
             switch parts[3] {
+            case "pages": self = .page(id: parts[4])
             case "artifacts": self = .artifact(id: parts[4])
             case "drawings": self = .drawing(id: parts[4])
             case "designs": self = .design(id: parts[4])

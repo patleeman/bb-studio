@@ -36,16 +36,12 @@
     {
       "id": "pages",
       "displayName": "Studio Pages",
-      "description": "Part of BB Studio. Collaborative pages you write with your agents, with live editing, comments, version history and ordinary agent chats.",
+      "description": "Upgrade bridge for Studio Pages, now built into Studio: copies your pages, their versions and files, the Next row's click stats and your Pages settings into Studio and forwards older clients and mentions.",
       "icon": {
-        "url": "./packages/bb-studio-pages/icons/pages.svg"
+        "url": "./packages/bb-studio-pages/assets/icon.svg"
       },
       "tags": [
-        "productivity",
         "documents",
-        "collaboration",
-        "bots",
-        "agents",
         "bb-studio"
       ],
       "author": {

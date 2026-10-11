@@ -1,14 +1,13 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import { registerStudio as registerPages } from "../../bb-studio-pages/src/studio";
-import { PageStore, MIGRATIONS as PAGE_MIGRATIONS } from "../../bb-studio-pages/src/store";
-import { PagesService } from "../../bb-studio-pages/src/service";
-import { readMarkdown } from "../../bb-studio-pages/src/doc";
+import { pageProvider } from "./pages/studio";
+import { PageStore, MIGRATIONS as PAGE_MIGRATIONS } from "./pages/store";
+import { PagesService } from "./pages/service";
+import { readMarkdown } from "./pages/doc";
 import { recordingProvider } from "./talk/server/studio";
 import { memoryStore as talkStore, addSegment } from "./talk/test/db";
 import { artifactProvider } from "./artifacts/server/provider";
 import { memoryStore as artifactStore, bytes } from "./artifacts/test/db";
-import { schemas } from "./contract";
 import { providerConformance, type ProviderHarness } from "./test/provider-conformance";
 
 function registration() {
@@ -30,7 +29,7 @@ providerConformance("Pages", () => {
   const store = new PageStore(db);
   const { handlers, bb, events } = registration();
   const service = new PagesService(bb as never, store);
-  registerPages(bb as never, service, schemas);
+  Object.assign(handlers, pageProvider(service));
   return {
     pluginId: "pages", kind: "page", handlers,
     prepareContent: (id) => { service.editClientDocument(id, readMarkdown(service.hub.open(id).doc, { ids: true }), "Conformance page body"); },

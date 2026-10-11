@@ -115,6 +115,37 @@ public enum Studio {
     public static let recordings_recording_cleanup = "recordings.recording_cleanup"
     public static let recordings_recording_keep = "recordings.recording_keep"
     public static let recordings_recording_delete = "recordings.recording_delete"
+    public static let pages_tree = "pages.tree"
+    public static let pages_create = "pages.create"
+    public static let pages_update = "pages.update"
+    public static let pages_remove = "pages.remove"
+    public static let pages_get = "pages.get"
+    public static let pages_linkPreview = "pages.linkPreview"
+    public static let pages_studioItems = "pages.studioItems"
+    public static let pages_artifactView = "pages.artifactView"
+    public static let pages_checklistHandOff = "pages.checklistHandOff"
+    public static let pages_whiteboardGet = "pages.whiteboardGet"
+    public static let pages_whiteboardSave = "pages.whiteboardSave"
+    public static let pages_studioCreate = "pages.studioCreate"
+    public static let pages_recordingView = "pages.recordingView"
+    public static let pages_markdown = "pages.markdown"
+    public static let pages_editableMarkdown = "pages.editableMarkdown"
+    public static let pages_editDocument = "pages.editDocument"
+    public static let pages_replaceMarkdown = "pages.replaceMarkdown"
+    public static let pages_search = "pages.search"
+    public static let pages_requests = "pages.requests"
+    public static let pages_work = "pages.work"
+    public static let pages_chats = "pages.chats"
+    public static let pages_chatPage = "pages.chatPage"
+    public static let pages_snapshots = "pages.snapshots"
+    public static let pages_snapshotBytes = "pages.snapshotBytes"
+    public static let pages_snapshot = "pages.snapshot"
+    public static let pages_restore = "pages.restore"
+    public static let pages_comments = "pages.comments"
+    public static let pages_commentBlocks = "pages.commentBlocks"
+    public static let pages_commentCreate = "pages.commentCreate"
+    public static let pages_commentReply = "pages.commentReply"
+    public static let pages_commentResolve = "pages.commentResolve"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -366,6 +397,70 @@ public enum Studio {
   public typealias RecordingsRecordingKeep = RecordingsRecordingKeepOutput
 
   public typealias RecordingsRecordingDelete = RecordingsRecordingDeleteOutput
+
+  public typealias PagesTree = PagesTreeOutput
+
+  public typealias PagesCreate = PagesCreateOutput
+
+  public typealias PagesUpdate = PagesUpdateOutput
+
+  public typealias PagesRemove = PagesRemoveOutput
+
+  public typealias PagesGet = PagesGetOutput
+
+  public typealias PagesLinkPreview = PagesLinkPreviewOutput
+
+  public typealias PagesStudioItemsInput = StudioJSONValue
+
+  public typealias PagesStudioItems = PagesStudioItemsOutput
+
+  public typealias PagesArtifactView = PagesArtifactViewOutput
+
+  public typealias PagesChecklistHandOff = PagesChecklistHandOffOutput
+
+  public typealias PagesWhiteboardGet = PagesWhiteboardGetOutput
+
+  public typealias PagesWhiteboardSave = PagesWhiteboardSaveOutput
+
+  public typealias PagesStudioCreate = PagesStudioCreateOutput
+
+  public typealias PagesRecordingView = PagesRecordingViewOutput
+
+  public typealias PagesMarkdown = PagesMarkdownOutput
+
+  public typealias PagesEditableMarkdown = PagesEditableMarkdownOutput
+
+  public typealias PagesEditDocument = PagesEditDocumentOutput
+
+  public typealias PagesReplaceMarkdown = PagesReplaceMarkdownOutput
+
+  public typealias PagesSearch = PagesSearchOutput
+
+  public typealias PagesRequests = PagesRequestsOutput
+
+  public typealias PagesWork = PagesWorkOutput
+
+  public typealias PagesChats = PagesChatsOutput
+
+  public typealias PagesChatPage = PagesChatPageOutput
+
+  public typealias PagesSnapshots = PagesSnapshotsOutput
+
+  public typealias PagesSnapshotBytes = PagesSnapshotBytesOutput
+
+  public typealias PagesSnapshot = PagesSnapshotOutput
+
+  public typealias PagesRestore = PagesRestoreOutput
+
+  public typealias PagesComments = PagesCommentsOutput
+
+  public typealias PagesCommentBlocks = PagesCommentBlocksOutput
+
+  public typealias PagesCommentCreate = PagesCommentCreateOutput
+
+  public typealias PagesCommentReply = PagesCommentReplyOutput
+
+  public typealias PagesCommentResolve = PagesCommentResolveOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -8590,6 +8685,1382 @@ public enum Studio {
 
     public init(deleted: Bool? = nil) {
       self.deleted = deleted
+    }
+  }
+
+  public struct PagesTreeInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+
+    public init(projectId: String? = nil) {
+      self.projectId = projectId
+    }
+  }
+
+  public struct PagesTreeOutputPagesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var title: String?
+    public var icon: String?
+    public var position: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.parentId = parentId
+      self.title = title
+      self.icon = icon
+      self.position = position
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.archived = archived
+    }
+  }
+
+  public struct PagesTreeOutput: Sendable, Hashable, Codable {
+    public var pages: [PagesTreeOutputPagesItem]?
+
+    public init(pages: [PagesTreeOutputPagesItem]? = nil) {
+      self.pages = pages
+    }
+  }
+
+  public struct PagesCreateInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var parentId: String?
+    public var title: String?
+    public var icon: String?
+    public var markdown: String?
+
+    public init(projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, markdown: String? = nil) {
+      self.projectId = projectId
+      self.parentId = parentId
+      self.title = title
+      self.icon = icon
+      self.markdown = markdown
+    }
+  }
+
+  public struct PagesCreateOutputPage: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var title: String?
+    public var icon: String?
+    public var position: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.parentId = parentId
+      self.title = title
+      self.icon = icon
+      self.position = position
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.archived = archived
+    }
+  }
+
+  public struct PagesCreateOutput: Sendable, Hashable, Codable {
+    public var page: PagesCreateOutputPage?
+
+    public init(page: PagesCreateOutputPage? = nil) {
+      self.page = page
+    }
+  }
+
+  public struct PagesUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var expectedTitle: String?
+    public var icon: String?
+    public var parentId: String?
+    public var projectId: String?
+    public var position: Double?
+    public var archived: Bool?
+
+    public init(id: String? = nil, title: String? = nil, expectedTitle: String? = nil, icon: String? = nil, parentId: String? = nil, projectId: String? = nil, position: Double? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.expectedTitle = expectedTitle
+      self.icon = icon
+      self.parentId = parentId
+      self.projectId = projectId
+      self.position = position
+      self.archived = archived
+    }
+  }
+
+  public struct PagesUpdateOutputPage: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var title: String?
+    public var icon: String?
+    public var position: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.parentId = parentId
+      self.title = title
+      self.icon = icon
+      self.position = position
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.archived = archived
+    }
+  }
+
+  public struct PagesUpdateOutput: Sendable, Hashable, Codable {
+    public var page: PagesUpdateOutputPage?
+
+    public init(page: PagesUpdateOutputPage? = nil) {
+      self.page = page
+    }
+  }
+
+  public struct PagesRemoveInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct PagesRemoveOutput: Sendable, Hashable, Codable {
+    public var deleted: [String]?
+
+    public init(deleted: [String]? = nil) {
+      self.deleted = deleted
+    }
+  }
+
+  public struct PagesGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct PagesGetOutputPage: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var title: String?
+    public var icon: String?
+    public var position: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.parentId = parentId
+      self.title = title
+      self.icon = icon
+      self.position = position
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.archived = archived
+    }
+  }
+
+  public struct PagesGetOutput: Sendable, Hashable, Codable {
+    public var page: PagesGetOutputPage?
+
+    public init(page: PagesGetOutputPage? = nil) {
+      self.page = page
+    }
+  }
+
+  public struct PagesLinkPreviewInput: Sendable, Hashable, Codable {
+    public var url: String?
+
+    public init(url: String? = nil) {
+      self.url = url
+    }
+  }
+
+  public struct PagesLinkPreviewOutput: Sendable, Hashable, Codable {
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public struct PagesStudioItemsOutputItemsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var kindLabel: String?
+    public var kindIcon: String?
+    public var title: String?
+    public var icon: String?
+    public var preview: String?
+    public var facts: [String]?
+    public var badge: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, kindLabel: String? = nil, kindIcon: String? = nil, title: String? = nil, icon: String? = nil, preview: String? = nil, facts: [String]? = nil, badge: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.kindLabel = kindLabel
+      self.kindIcon = kindIcon
+      self.title = title
+      self.icon = icon
+      self.preview = preview
+      self.facts = facts
+      self.badge = badge
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct PagesStudioItemsOutput: Sendable, Hashable, Codable {
+    public var items: [PagesStudioItemsOutputItemsItem]?
+
+    public init(items: [PagesStudioItemsOutputItemsItem]? = nil) {
+      self.items = items
+    }
+  }
+
+  public struct PagesArtifactViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum PagesArtifactViewOutputViewType: Sendable, Hashable, Codable {
+    case image
+    case html
+    case markdown
+    case code
+    case text
+    case pdf
+    case other
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "html": self = .html
+      case "markdown": self = .markdown
+      case "code": self = .code
+      case "text": self = .text
+      case "pdf": self = .pdf
+      case "other": self = .other
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .markdown: try container.encode("markdown")
+      case .code: try container.encode("code")
+      case .text: try container.encode("text")
+      case .pdf: try container.encode("pdf")
+      case .other: try container.encode("other")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct PagesArtifactViewOutputView: Sendable, Hashable, Codable {
+    public var type: PagesArtifactViewOutputViewType?
+    public var name: String?
+    public var url: String?
+    public var text: String?
+
+    public init(type: PagesArtifactViewOutputViewType? = nil, name: String? = nil, url: String? = nil, text: String? = nil) {
+      self.type = type
+      self.name = name
+      self.url = url
+      self.text = text
+    }
+  }
+
+  public struct PagesArtifactViewOutput: Sendable, Hashable, Codable {
+    public var view: PagesArtifactViewOutputView?
+
+    public init(view: PagesArtifactViewOutputView? = nil) {
+      self.view = view
+    }
+  }
+
+  public struct PagesChecklistHandOffInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var blockId: String?
+    public var note: String?
+
+    public init(id: String? = nil, blockId: String? = nil, note: String? = nil) {
+      self.id = id
+      self.blockId = blockId
+      self.note = note
+    }
+  }
+
+  public struct PagesChecklistHandOffOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct PagesWhiteboardGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct PagesWhiteboardGetOutputWhiteboard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var updatedAt: Double?
+    public var viewBox: [StudioJSONValue]?
+    public var markup: String?
+
+    public init(id: String? = nil, name: String? = nil, updatedAt: Double? = nil, viewBox: [StudioJSONValue]? = nil, markup: String? = nil) {
+      self.id = id
+      self.name = name
+      self.updatedAt = updatedAt
+      self.viewBox = viewBox
+      self.markup = markup
+    }
+  }
+
+  public struct PagesWhiteboardGetOutput: Sendable, Hashable, Codable {
+    public var whiteboard: PagesWhiteboardGetOutputWhiteboard?
+
+    public init(whiteboard: PagesWhiteboardGetOutputWhiteboard? = nil) {
+      self.whiteboard = whiteboard
+    }
+  }
+
+  public enum PagesWhiteboardSaveInputAddItemColor: Sendable, Hashable, Codable {
+    case _1e1e1e
+    case _e03131
+    case _1971c2
+    case _2f9e44
+    case _f08c00
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "#1e1e1e": self = ._1e1e1e
+      case "#e03131": self = ._e03131
+      case "#1971c2": self = ._1971c2
+      case "#2f9e44": self = ._2f9e44
+      case "#f08c00": self = ._f08c00
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case ._1e1e1e: try container.encode("#1e1e1e")
+      case ._e03131: try container.encode("#e03131")
+      case ._1971c2: try container.encode("#1971c2")
+      case ._2f9e44: try container.encode("#2f9e44")
+      case ._f08c00: try container.encode("#f08c00")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct PagesWhiteboardSaveInputAddItem: Sendable, Hashable, Codable {
+    public var points: [[StudioJSONValue]]?
+    public var color: PagesWhiteboardSaveInputAddItemColor?
+    public var width: Double?
+
+    public init(points: [[StudioJSONValue]]? = nil, color: PagesWhiteboardSaveInputAddItemColor? = nil, width: Double? = nil) {
+      self.points = points
+      self.color = color
+      self.width = width
+    }
+  }
+
+  public struct PagesWhiteboardSaveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var add: [PagesWhiteboardSaveInputAddItem]?
+    public var erase: [String]?
+
+    public init(id: String? = nil, add: [PagesWhiteboardSaveInputAddItem]? = nil, erase: [String]? = nil) {
+      self.id = id
+      self.add = add
+      self.erase = erase
+    }
+  }
+
+  public struct PagesWhiteboardSaveOutputWhiteboard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var updatedAt: Double?
+    public var viewBox: [StudioJSONValue]?
+    public var markup: String?
+
+    public init(id: String? = nil, name: String? = nil, updatedAt: Double? = nil, viewBox: [StudioJSONValue]? = nil, markup: String? = nil) {
+      self.id = id
+      self.name = name
+      self.updatedAt = updatedAt
+      self.viewBox = viewBox
+      self.markup = markup
+    }
+  }
+
+  public struct PagesWhiteboardSaveOutput: Sendable, Hashable, Codable {
+    public var whiteboard: PagesWhiteboardSaveOutputWhiteboard?
+
+    public init(whiteboard: PagesWhiteboardSaveOutputWhiteboard? = nil) {
+      self.whiteboard = whiteboard
+    }
+  }
+
+  public struct PagesStudioCreateInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var pluginId: String?
+    public var kind: String?
+
+    public init(pageId: String? = nil, pluginId: String? = nil, kind: String? = nil) {
+      self.pageId = pageId
+      self.pluginId = pluginId
+      self.kind = kind
+    }
+  }
+
+  public struct PagesStudioCreateOutputItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var kindLabel: String?
+    public var kindIcon: String?
+    public var title: String?
+    public var icon: String?
+    public var preview: String?
+    public var facts: [String]?
+    public var badge: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, kindLabel: String? = nil, kindIcon: String? = nil, title: String? = nil, icon: String? = nil, preview: String? = nil, facts: [String]? = nil, badge: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.kindLabel = kindLabel
+      self.kindIcon = kindIcon
+      self.title = title
+      self.icon = icon
+      self.preview = preview
+      self.facts = facts
+      self.badge = badge
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct PagesStudioCreateOutput: Sendable, Hashable, Codable {
+    public var item: PagesStudioCreateOutputItem?
+
+    public init(item: PagesStudioCreateOutputItem? = nil) {
+      self.item = item
+    }
+  }
+
+  public struct PagesRecordingViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct PagesRecordingViewOutputRecordingSegmentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var offsetMs: Double?
+    public var durationMs: Double?
+    public var text: String?
+    public var url: String?
+
+    public init(id: String? = nil, offsetMs: Double? = nil, durationMs: Double? = nil, text: String? = nil, url: String? = nil) {
+      self.id = id
+      self.offsetMs = offsetMs
+      self.durationMs = durationMs
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct PagesRecordingViewOutputRecording: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var durationMs: Double?
+    public var createdAt: Double?
+    public var summary: String?
+    public var decisions: [String]?
+    public var segments: [PagesRecordingViewOutputRecordingSegmentsItem]?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, durationMs: Double? = nil, createdAt: Double? = nil, summary: String? = nil, decisions: [String]? = nil, segments: [PagesRecordingViewOutputRecordingSegmentsItem]? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.durationMs = durationMs
+      self.createdAt = createdAt
+      self.summary = summary
+      self.decisions = decisions
+      self.segments = segments
+    }
+  }
+
+  public struct PagesRecordingViewOutput: Sendable, Hashable, Codable {
+    public var recording: PagesRecordingViewOutputRecording?
+
+    public init(recording: PagesRecordingViewOutputRecording? = nil) {
+      self.recording = recording
+    }
+  }
+
+  public struct PagesMarkdownInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct PagesMarkdownOutput: Sendable, Hashable, Codable {
+    public var markdown: String?
+
+    public init(markdown: String? = nil) {
+      self.markdown = markdown
+    }
+  }
+
+  public struct PagesEditableMarkdownInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct PagesEditableMarkdownOutput: Sendable, Hashable, Codable {
+    public var markdown: String?
+
+    public init(markdown: String? = nil) {
+      self.markdown = markdown
+    }
+  }
+
+  public struct PagesEditDocumentInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var expected: String?
+    public var markdown: String?
+
+    public init(id: String? = nil, expected: String? = nil, markdown: String? = nil) {
+      self.id = id
+      self.expected = expected
+      self.markdown = markdown
+    }
+  }
+
+  public struct PagesEditDocumentOutput: Sendable, Hashable, Codable {
+    public var markdown: String?
+
+    public init(markdown: String? = nil) {
+      self.markdown = markdown
+    }
+  }
+
+  public struct PagesReplaceMarkdownInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var markdown: String?
+    public var snapshotName: String?
+
+    public init(id: String? = nil, markdown: String? = nil, snapshotName: String? = nil) {
+      self.id = id
+      self.markdown = markdown
+      self.snapshotName = snapshotName
+    }
+  }
+
+  public struct PagesReplaceMarkdownOutputPage: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var title: String?
+    public var icon: String?
+    public var position: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.parentId = parentId
+      self.title = title
+      self.icon = icon
+      self.position = position
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.archived = archived
+    }
+  }
+
+  public struct PagesReplaceMarkdownOutput: Sendable, Hashable, Codable {
+    public var page: PagesReplaceMarkdownOutputPage?
+
+    public init(page: PagesReplaceMarkdownOutputPage? = nil) {
+      self.page = page
+    }
+  }
+
+  public struct PagesSearchInput: Sendable, Hashable, Codable {
+    public var query: String?
+    public var projectId: String?
+
+    public init(query: String? = nil, projectId: String? = nil) {
+      self.query = query
+      self.projectId = projectId
+    }
+  }
+
+  public struct PagesSearchOutputPagesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var title: String?
+    public var icon: String?
+    public var position: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.parentId = parentId
+      self.title = title
+      self.icon = icon
+      self.position = position
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.archived = archived
+    }
+  }
+
+  public struct PagesSearchOutput: Sendable, Hashable, Codable {
+    public var pages: [PagesSearchOutputPagesItem]?
+
+    public init(pages: [PagesSearchOutputPagesItem]? = nil) {
+      self.pages = pages
+    }
+  }
+
+  public struct PagesRequestsInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+
+    public init(pageId: String? = nil) {
+      self.pageId = pageId
+    }
+  }
+
+  public enum PagesRequestsOutputRequestsItemKind: Sendable, Hashable, Codable {
+    case mention
+    case comment
+    case refresh
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "mention": self = .mention
+      case "comment": self = .comment
+      case "refresh": self = .refresh
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .mention: try container.encode("mention")
+      case .comment: try container.encode("comment")
+      case .refresh: try container.encode("refresh")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum PagesRequestsOutputRequestsItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case working
+    case done
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "working": self = .working
+      case "done": self = .done
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .working: try container.encode("working")
+      case .done: try container.encode("done")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct PagesRequestsOutputRequestsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var botName: String?
+    public var threadId: String?
+    public var kind: PagesRequestsOutputRequestsItemKind?
+    public var blockId: String?
+    public var commentThreadId: String?
+    public var summary: String?
+    public var status: PagesRequestsOutputRequestsItemStatus?
+    public var error: String?
+    public var result: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, botId: String? = nil, botName: String? = nil, threadId: String? = nil, kind: PagesRequestsOutputRequestsItemKind? = nil, blockId: String? = nil, commentThreadId: String? = nil, summary: String? = nil, status: PagesRequestsOutputRequestsItemStatus? = nil, error: String? = nil, result: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.botId = botId
+      self.botName = botName
+      self.threadId = threadId
+      self.kind = kind
+      self.blockId = blockId
+      self.commentThreadId = commentThreadId
+      self.summary = summary
+      self.status = status
+      self.error = error
+      self.result = result
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct PagesRequestsOutput: Sendable, Hashable, Codable {
+    public var requests: [PagesRequestsOutputRequestsItem]?
+
+    public init(requests: [PagesRequestsOutputRequestsItem]? = nil) {
+      self.requests = requests
+    }
+  }
+
+  public enum PagesWorkInputRequestReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum PagesWorkInputRequestPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum PagesWorkInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum PagesWorkInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum PagesWorkInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum PagesWorkInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum PagesWorkInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct PagesWorkInputRequestExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: PagesWorkInputRequestExecutionInputSourcesModel?
+    public var permissionMode: PagesWorkInputRequestExecutionInputSourcesPermissionMode?
+    public var providerId: PagesWorkInputRequestExecutionInputSourcesProviderId?
+    public var reasoningLevel: PagesWorkInputRequestExecutionInputSourcesReasoningLevel?
+    public var serviceTier: PagesWorkInputRequestExecutionInputSourcesServiceTier?
+
+    public init(model: PagesWorkInputRequestExecutionInputSourcesModel? = nil, permissionMode: PagesWorkInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: PagesWorkInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: PagesWorkInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: PagesWorkInputRequestExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct PagesWorkInputRequest: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: PagesWorkInputRequestReasoningLevel?
+    public var permissionMode: PagesWorkInputRequestPermissionMode?
+    public var serviceTier: String?
+    public var executionInputSources: PagesWorkInputRequestExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: PagesWorkInputRequestReasoningLevel? = nil, permissionMode: PagesWorkInputRequestPermissionMode? = nil, serviceTier: String? = nil, executionInputSources: PagesWorkInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct PagesWorkInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var request: PagesWorkInputRequest?
+
+    public init(id: String? = nil, request: PagesWorkInputRequest? = nil) {
+      self.id = id
+      self.request = request
+    }
+  }
+
+  public struct PagesWorkOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botName: String?
+
+    public init(threadId: String? = nil, botName: String? = nil) {
+      self.threadId = threadId
+      self.botName = botName
+    }
+  }
+
+  public struct PagesChatsInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+
+    public init(pageId: String? = nil) {
+      self.pageId = pageId
+    }
+  }
+
+  public struct PagesChatsOutputChatsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var createdAt: Double?
+
+    public init(threadId: String? = nil, createdAt: Double? = nil) {
+      self.threadId = threadId
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct PagesChatsOutput: Sendable, Hashable, Codable {
+    public var chats: [PagesChatsOutputChatsItem]?
+
+    public init(chats: [PagesChatsOutputChatsItem]? = nil) {
+      self.chats = chats
+    }
+  }
+
+  public struct PagesChatPageInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct PagesChatPageOutputPage: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var title: String?
+    public var icon: String?
+    public var position: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, title: String? = nil, icon: String? = nil, position: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.parentId = parentId
+      self.title = title
+      self.icon = icon
+      self.position = position
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.archived = archived
+    }
+  }
+
+  public struct PagesChatPageOutput: Sendable, Hashable, Codable {
+    public var page: PagesChatPageOutputPage?
+
+    public init(page: PagesChatPageOutputPage? = nil) {
+      self.page = page
+    }
+  }
+
+  public struct PagesSnapshotsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct PagesSnapshotsOutputSnapshotsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+    public var `actor`: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, label: String? = nil, `actor`: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.label = label
+      self.`actor` = `actor`
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct PagesSnapshotsOutput: Sendable, Hashable, Codable {
+    public var snapshots: [PagesSnapshotsOutputSnapshotsItem]?
+
+    public init(snapshots: [PagesSnapshotsOutputSnapshotsItem]? = nil) {
+      self.snapshots = snapshots
+    }
+  }
+
+  public struct PagesSnapshotBytesInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var snapshotId: String?
+
+    public init(id: String? = nil, snapshotId: String? = nil) {
+      self.id = id
+      self.snapshotId = snapshotId
+    }
+  }
+
+  public struct PagesSnapshotBytesOutput: Sendable, Hashable, Codable {
+    public var bytes: String?
+
+    public init(bytes: String? = nil) {
+      self.bytes = bytes
+    }
+  }
+
+  public struct PagesSnapshotInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct PagesSnapshotOutputSnapshot: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+    public var `actor`: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, label: String? = nil, `actor`: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.label = label
+      self.`actor` = `actor`
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct PagesSnapshotOutput: Sendable, Hashable, Codable {
+    public var snapshot: PagesSnapshotOutputSnapshot?
+
+    public init(snapshot: PagesSnapshotOutputSnapshot? = nil) {
+      self.snapshot = snapshot
+    }
+  }
+
+  public struct PagesRestoreInput: Sendable, Hashable, Codable {
+    public var snapshotId: String?
+
+    public init(snapshotId: String? = nil) {
+      self.snapshotId = snapshotId
+    }
+  }
+
+  public struct PagesRestoreOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct PagesCommentsInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var includeResolved: Bool?
+
+    public init(id: String? = nil, includeResolved: Bool? = nil) {
+      self.id = id
+      self.includeResolved = includeResolved
+    }
+  }
+
+  public struct PagesCommentsOutputThreadsItemCommentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var author: String?
+    public var authorName: String?
+    public var text: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, author: String? = nil, authorName: String? = nil, text: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.author = author
+      self.authorName = authorName
+      self.text = text
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct PagesCommentsOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var resolved: Bool?
+    public var blockId: String?
+    public var quote: String?
+    public var comments: [PagesCommentsOutputThreadsItemCommentsItem]?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, resolved: Bool? = nil, blockId: String? = nil, quote: String? = nil, comments: [PagesCommentsOutputThreadsItemCommentsItem]? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.resolved = resolved
+      self.blockId = blockId
+      self.quote = quote
+      self.comments = comments
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct PagesCommentsOutput: Sendable, Hashable, Codable {
+    public var threads: [PagesCommentsOutputThreadsItem]?
+
+    public init(threads: [PagesCommentsOutputThreadsItem]? = nil) {
+      self.threads = threads
+    }
+  }
+
+  public struct PagesCommentBlocksInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct PagesCommentBlocksOutputBlocksItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var text: String?
+
+    public init(id: String? = nil, text: String? = nil) {
+      self.id = id
+      self.text = text
+    }
+  }
+
+  public struct PagesCommentBlocksOutput: Sendable, Hashable, Codable {
+    public var blocks: [PagesCommentBlocksOutputBlocksItem]?
+
+    public init(blocks: [PagesCommentBlocksOutputBlocksItem]? = nil) {
+      self.blocks = blocks
+    }
+  }
+
+  public struct PagesCommentCreateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var block: String?
+    public var quote: String?
+    public var text: String?
+
+    public init(id: String? = nil, block: String? = nil, quote: String? = nil, text: String? = nil) {
+      self.id = id
+      self.block = block
+      self.quote = quote
+      self.text = text
+    }
+  }
+
+  public struct PagesCommentCreateOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct PagesCommentReplyInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var thread: String?
+    public var text: String?
+
+    public init(id: String? = nil, thread: String? = nil, text: String? = nil) {
+      self.id = id
+      self.thread = thread
+      self.text = text
+    }
+  }
+
+  public struct PagesCommentReplyOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct PagesCommentResolveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var thread: String?
+    public var resolved: Bool?
+
+    public init(id: String? = nil, thread: String? = nil, resolved: Bool? = nil) {
+      self.id = id
+      self.thread = thread
+      self.resolved = resolved
+    }
+  }
+
+  public struct PagesCommentResolveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 

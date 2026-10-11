@@ -45,7 +45,8 @@ it("finds the @ query before the caret", () => {
 });
 
 it("picks an item's icon from its link", () => {
-  expect(itemLinkIcon("/plugins/pages/pages/pg_1")).toBe("pages/pages");
+  expect(itemLinkIcon("/plugins/pages/pages/pg_1")).toBe("studio/pages");
+  expect(itemLinkIcon("/plugins/studio/studio/pages/pg_1")).toBe("studio/pages");
   expect(itemLinkIcon("/plugins/unknown/things/x_1")).toBe("GridView");
   expect(itemLinkIcon("/plugins/studio/studio/drawings/drw_1")).toBe("studio/draw");
   expect(itemLinkIcon("/plugins/excalidraw/drawings/drw_1")).toBe("studio/draw");

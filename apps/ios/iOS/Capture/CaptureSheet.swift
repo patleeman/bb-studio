@@ -227,12 +227,13 @@ struct CaptureSheet: View {
         let saved = AppGroup.defaults.string(forKey: ServerScope.key("newThreadProjectId", serverURL: client.baseURL))
         let project = projects.first { $0.id == saved }?.id ?? projects.first?.id
         struct Envelope: Decodable { var page: PageMeta }
-        let result: Envelope = try await client.rpc("pages", "create", [
+        let input: JSONValue = [
             "projectId": project.map { .string($0) } ?? .null,
             "parentId": .null,
             "title": .string(CaptureNote.title(from: text)),
             "markdown": .string(String(text.prefix(200_000))),
-        ])
+        ]
+        let result: Envelope = try await client.pagesViaStudio({ try await client.rpc("studio", Studio.Method.pages_create, input) }, else: { try await client.rpc("pages", Pages.Method.create, input) })
         return result.page.id
     }
 

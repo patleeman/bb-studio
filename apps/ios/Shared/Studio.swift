@@ -117,7 +117,7 @@ extension StudioItem {
         self.init(
             pluginId: "pages", itemId: page.id, kind: "page", title: page.title ?? "", icon: page.emoji,
             projectId: page.projectId, parentId: page.parentId, createdAt: page.createdAt ?? 0,
-            updatedAt: page.updatedAt ?? page.createdAt ?? 0, href: "/plugins/pages/pages/\(page.id)")
+            updatedAt: page.updatedAt ?? page.createdAt ?? 0, href: "/plugins/studio/studio/pages/\(page.id)")
     }
 
     init(recording: Recording) {
@@ -400,16 +400,17 @@ extension BBClient {
     }
 
     public func deletePage(_ id: String) async throws {
-        let _: JSONValue = try await rpc("pages", "remove", ["id": .string(id)])
+        let _: JSONValue = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_remove, ["id": .string(id)]) }, else: { try await self.rpc("pages", Pages.Method.remove, ["id": .string(id)]) })
     }
 
     /// A new global page with this Markdown as its body.
     public func createPage(title: String, markdown: String) async throws -> PageMeta {
         struct Envelope: Decodable { var page: PageMeta }
-        let envelope: Envelope = try await rpc(
-            "pages", "create",
-            ["projectId": .null, "parentId": .null, "title": .string(String(title.prefix(200))),
-             "markdown": .string(String(markdown.prefix(200_000)))])
+        let input: JSONValue = [
+            "projectId": .null, "parentId": .null, "title": .string(String(title.prefix(200))),
+            "markdown": .string(String(markdown.prefix(200_000))),
+        ]
+        let envelope: Envelope = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_create, input) }, else: { try await self.rpc("pages", Pages.Method.create, input) })
         return envelope.page
     }
 }

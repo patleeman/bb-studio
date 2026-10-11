@@ -50,31 +50,32 @@ function fakeSdk(options: {
 
 describe("StudioHub", () => {
   it("shares absence, outage and partial-list behavior with the standalone picker", async () => {
-    const options = { plugins: [plugin("pages")], rpc: {
-      "pages.studio_describe": () => ({ pluginId: "pages", version: 2, panel: null, kinds: [kind] }),
-      "pages.studio_list": (): unknown => ({ items: [item("pg_1")], truncated: false }),
-      "pages.studio_get": (): unknown => ({ items: [item("pg_1")] }),
+    // An add-on that isn't built into Studio (Pages is, so the picker asks Studio for it).
+    const options = { plugins: [plugin("notes")], discovered: ["notes"], rpc: {
+      "notes.studio_describe": () => ({ pluginId: "notes", version: 2, panel: null, kinds: [kind] }),
+      "notes.studio_list": (): unknown => ({ items: [item("pg_1")], truncated: false }),
+      "notes.studio_get": (): unknown => ({ items: [item("pg_1")] }),
     } };
     const sdk = fakeSdk(options);
     const hub = new StudioHub(sdk);
     const picker = studioIndex(sdk as never, schemas);
     expect((await picker.snapshot()).items.map((entry) => entry.id)).toEqual(["pg_1"]);
-    options.rpc["pages.studio_list"] = () => { throw new Error("Temporary outage"); };
-    options.rpc["pages.studio_get"] = () => { throw new Error("Temporary outage"); };
+    options.rpc["notes.studio_list"] = () => { throw new Error("Temporary outage"); };
+    options.rpc["notes.studio_get"] = () => { throw new Error("Temporary outage"); };
     picker.invalidate();
-    expect(await hub.itemsResult("pages", ["pg_1"])).toMatchObject({ status: "unavailable" });
-    await expect(hub.get("pages", ["pg_1"])).rejects.toThrow("Temporary outage");
+    expect(await hub.itemsResult("notes", ["pg_1"])).toMatchObject({ status: "unavailable" });
+    await expect(hub.get("notes", ["pg_1"])).rejects.toThrow("Temporary outage");
     expect(await picker.snapshot()).toMatchObject({ complete: false, items: [{ id: "pg_1" }] });
-    options.rpc["pages.studio_list"] = () => ({ items: [], truncated: true });
+    options.rpc["notes.studio_list"] = () => ({ items: [], truncated: true });
     picker.invalidate();
     expect((await picker.items()).map((entry) => entry.id)).toEqual(["pg_1"]);
-    options.rpc["pages.studio_list"] = () => ({ items: [], truncated: false });
-    options.rpc["pages.studio_get"] = () => ({ items: [] });
+    options.rpc["notes.studio_list"] = () => ({ items: [], truncated: false });
+    options.rpc["notes.studio_get"] = () => ({ items: [] });
     picker.invalidate();
-    expect(await hub.itemsResult("pages", ["pg_1"])).toEqual({ status: "ready", items: [], complete: true });
+    expect(await hub.itemsResult("notes", ["pg_1"])).toEqual({ status: "ready", items: [], complete: true });
     expect(await picker.items()).toEqual([]);
     options.plugins = [];
-    expect(await hub.itemsResult("pages", ["pg_1"])).toEqual({ status: "absent" });
+    expect(await hub.itemsResult("notes", ["pg_1"])).toEqual({ status: "absent" });
   });
 
   it("refreshes same-version descriptions after observed restart or public metadata change", async () => {

@@ -2,8 +2,8 @@
 
 > **Studio** is the core of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make. See the [suite overview](../../README.md).
 
-Studio opens on the collection: everything the Studio add-ons make, including pages, Talk
-recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
+Studio opens on the collection: everything Studio and its add-ons make, including pages, Talk
+recordings and dictations, drawings, designs and saved artifacts. Search across all of them, filter by
 kind, project and tag, and hand any of them to an agent. Each BB project can have a lead thread
 woken by a Heartbeat.
 
@@ -79,6 +79,197 @@ unfiltered collection.
 Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
 "offline sync": an HTML artifact and two pages match on their title or
 content, each showing the matching text with the match in bold.
+
+## Pages
+
+Pages are built into Studio: collaborative documents you write together with
+your agents, in a Notion-style block editor with live multiplayer editing,
+comments, charts, embeds, version history and ordinary agent chats. They used
+to be the separate Studio Pages plugin (`pages`). Pages keep that id as their
+namespace (`pages:<id>`), so tags, tabs, links, chats and backups carry over.
+A page opens as a Studio tab at `/plugins/studio/studio/pages/<id>`; links to
+`/plugins/pages/pages/<id>`, in threads, pages, skills and BB's own
+instructions, open the same tab. The library filtered to pages is their
+collection. If you had the plugin, see
+[its upgrade bridge](../bb-studio-pages/README.md) to copy your pages in, or
+[docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md) to move
+from every separate add-on at once.
+
+### What you get
+
+- **A block editor.** Built on [BlockNote](https://www.blocknotejs.org): type
+  `/` for headings, lists, checklists, toggles, quotes, code, tables, images,
+  video, audio, files, and the custom blocks below. Blocks can be dragged,
+  nested, and turned into other types. Markdown shortcuts work as you type.
+- **Live collaboration.** Every page is a Yjs document synced over a
+  WebSocket. Agents edit the same document from the server, so their
+  changes stream into your editor, with cursors, while you keep typing.
+- **Code and diagrams.** Code blocks are syntax-highlighted for about
+  twenty languages, in light and dark. A `mermaid` block renders its
+  diagram; click it to edit the source.
+- **HTML blocks.** An `html` block runs its HTML, CSS, and scripts in a
+  sandboxed frame (no access to BB, its cookies, or storage) that grows to
+  fit its content. Click its label to edit the source.
+- **A card in the agent's reply.** When an agent creates or changes a page,
+  its reply shows the page's card (`::page{id="…"}`). The card shows the
+  page's text inline, read-only, and updates as the page changes. The chevron
+  hides or shows the text; the choice is remembered for every Studio card.
+  Click the title or the arrow to open the page in a **Pages** tab in the
+  thread's workbench, beside the chat. Where there's no workbench, it opens
+  in the main area.
+- **In a thread's workbench.** The **Pages** tab lists the thread's pages
+  (the ones made or changed in it, and the page it was started from), then
+  the project's recent ones. **New** makes a page in the thread's project and links it to
+  the thread in Studio. A page opens in its live editor, with a link to the
+  full page.
+- **Custom blocks.** Callouts, charts (bar, line, area, pie), stat rows, and
+  embed cards for links, BB threads, and other pages. Paste a link on an
+  empty line to turn it into a card; web links fetch their title,
+  description, and preview image.
+- **Studio embeds.** The `/` menu's Studio group embeds a drawing, artifact,
+  or recording, picked by search, or makes a new drawing in the page's
+  project and embeds it.
+  Embeds stay live:
+  - a recording plays in the page, with its summary, decisions and
+    transcript; click a line to play from there;
+  - a drawing is an inline whiteboard: it shows the drawing, and **Sketch**
+    (or a double-click) adds a pen, an eraser and five colors. Strokes save
+    to the Studio drawing as ordinary Excalidraw elements, merged with
+    other edits, so **Open drawing** shows them in the full editor. `/whiteboard`
+    makes a new drawing in the page's project and opens it ready to draw.
+    Pages draws the scene as plain SVG and doesn't load Excalidraw;
+  - an artifact shows its content (images, HTML, PDFs, code, text).
+
+  Pasting a link to a Studio item embeds it too.
+  Charts and stats are edited as JSON, which makes them easy for agents to
+  write.
+- **Mentions.** Type `@` to mention another page, a BB thread, a
+  Studio item, or a date. Page and thread mentions open where they point.
+- **Comments.** Select text to comment on it. Threads show in a floating
+  card where you can reply, react, edit, and resolve. Agents can read, start,
+  reply to, and resolve threads. Clients without the editor, like the BB
+  Studio phone app, use Studio's `pages.comments`, `pages.commentBlocks`,
+  `pages.commentCreate`, `pages.commentReply` and `pages.commentResolve` RPCs,
+  which write as you.
+- **Pages in the library.** Studio's library filtered to pages
+  (`/plugins/studio/studio/pages`) lists every page, with search over titles
+  and content, filters, a project filter, and sorting and grouping from
+  **Display**. **New → Page** opens a blank page as a Studio tab.
+- **Projects and nesting.** Pages belong to a project or are global, and
+  nest to any depth, with a breadcrumb back up. Give a page an emoji icon,
+  move it, archive it, or delete it from its ⋯ menu.
+- **Chat about a page.** **Chat** opens beside the page, in a split: the
+  page's linked thread, or a new conversation with the page as context.
+  **Choose conversation…** picks another. Sending starts an agent thread in
+  the page's project.
+- **Version history.** Pages saves a version before an agent's first
+  edit in a while. You can save one yourself and restore any version, and the
+  current page is saved before a restore.
+
+### Dictation
+
+Talk is built into Studio too, so you can dictate into a page:
+
+- The **Dictate** button at the top right, or **Dictate** in the `/` menu, starts Talk. Press
+  **Stop dictation** or ✓ in Talk's pill to finish, and the transcript goes in
+  at your cursor. Blank lines in the transcript start new paragraphs. If you
+  haven't clicked into the page yet, the text goes at the end.
+- *Talk: Start or finish dictation* from the command palette works while the
+  cursor is in a page.
+- If you finish while you're somewhere else, Talk keeps the text. Its **Go
+  back** button reopens the page, and the text is added when the page loads.
+
+Talk does the recording, transcription, and durability. Pages only marks the
+editor as a Talk dictation field and inserts the text Talk hands it.
+
+### Checklists and agents
+
+A checklist item is a unit of work. **Hand to agent** (in the item's ⋮⋮
+menu, or `/hand to agent` on the item) starts a thread in the page's project
+with the item as its prompt and a mention of the page. Pages puts a mention
+of that thread at the end of the item, labelled with the thread's state:
+**Agent · starting**, **working**, **needs input**, **replied**, **failed**,
+**archived** or **deleted**. Click it to
+open the thread. Check the item off yourself after reviewing; the agent is
+told not to.
+
+### For agents
+
+Agents get eight tools: `pages_list`, `pages_read`, `pages_create`,
+`pages_edit`, `pages_comments`, `pages_comment`, `pages_comment_reply`, and
+`pages_comment_resolve`. `pages_read` returns Markdown with a block id on the
+line before each block, and `pages_edit` applies small operations against those ids. An
+agent can then change one checklist item or paragraph without overwriting
+what you are typing.
+
+The same actions are available from the CLI (`bb pages …` before the merge):
+
+```sh
+bb studio pages list [--all]
+bb studio pages show <page-id|title> [--ids]
+bb studio pages create <title> [--global] [--markdown <text>]
+bb studio pages append <page-id|title> <markdown…>
+```
+
+[skills/pages/SKILL.md](skills/pages/SKILL.md) documents the tools, the
+Markdown extensions (charts, stats, HTML, embeds, callouts, mentions), and the agent
+workflows.
+
+### Storage
+
+In **Settings → Studio**, **Saved versions per page** controls history
+retention. The default is 50. Set 1 to 1000 to keep that many versions, or 0
+to keep all. Lowering the limit removes older versions when that page next
+saves a version. Existing pages use the new limit without a restart.
+
+Pages, versions, uploads, and historical requests live in Studio's SQLite
+database in the BB data directory. Uploads are limited to 15 MB each and are
+served back at `/api/v1/plugins/studio/http/pages/files`; a page saved before
+the merge, with `/api/v1/plugins/pages/http/files` addresses in it, shows its
+files from Studio too. Live editing syncs over Studio's `/pages/sync`
+WebSocket. The editor (BlockNote, Yjs, Mermaid, Shiki, Recharts) loads the
+first time a page opens, not with Studio; the server loads pdf-lib only for a
+PDF export.
+
+BlockNote's menus and toolbars are styled with Tailwind classes that live in
+`node_modules`, which `bb plugin build` doesn't scan. `blocknote-tailwind.txt`
+lists them so the build generates them. After upgrading `@blocknote/shadcn`,
+run `pnpm tailwind:blocknote` (and `pnpm css:blocknote` for the stylesheet).
+
+### Backup
+
+Pages are the `pages` section of `bb studio backup` (see
+[docs/backup.md](../../docs/backup.md)), as they were with the separate
+plugin, so older backups restore into Studio. A backup holds each page's
+content with its comments, the Markdown copy, saved versions and uploaded
+files, plus its title, icon, place in the tree, template and refresh settings,
+and whether it is archived. Page request history, page chats and checklist
+hand-offs are left out, because they point at BB threads that won't exist on
+another BB. A page that is open in an editor or has unsaved changes is not
+overwritten on restore: it is reported as failed with a reason, and restoring
+again after you close it picks it up.
+
+## Explore
+
+Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one drafts "💬 Tell me more" about it so the agent explains it in the thread. It ran inside the Studio Pages plugin and moved into Studio with it: Studio keeps the Next row's click log in its own database (the [Pages bridge](../bb-studio-pages/README.md) copies the old `explore.db` in). The CLI is `bb studio pages explore stats` (`bb pages explore stats` before the merge).
+
+Explore's settings appear in **Settings → Studio** with an **Explore:** prefix (keys `explore_next`, `explore_explore`, `explore_quickReplies`, `explore_replyItems`, as before): **End replies with a Next row** (on), **Suggest things to explore** (on), **Offer quick replies** (on), and **Preferred quick replies** (`👍 Looks good, 🔁 Try another way, ❓ Explain more`). They apply to agent sessions started after the change.
+
+### Next row
+
+With **Explore: End replies with a Next row** on (the default), agents end a reply with one compact **What next?** card instead of separate lines. Each row has a short label saying what its buttons are for; hover a label for more:
+
+- **Reply**: quick answers to this message, when it asks you something. Turn them off with **Explore: Offer quick replies**; the agent prefers the ones in **Explore: Preferred quick replies** when they fit. Clicking a reply or a request drafts it for you to send.
+- **Ask for**: things the agent offers to do next, such as "📄 Write this up as a page" or "🧵 Start a thread to fix the retry bug".
+- **By the way**: what the agent noticed along the way, told back to you in plain sentences: "I noticed the new endpoint retries without waiting between tries. If the server is down, it will get hammered." Each has **Tell me more**, which drafts "💬 Tell me more: <note>" so the agent explains it right there in the thread. Notes marked 🐛 also have **Fix this**, which drafts a request to fix it.
+
+The agent writes it as one line, and any group can be left out:
+
+```
+::next{reply="👍 Ship it|🧪 Add tests first" btw="🐛 I noticed the new endpoint retries without waiting. If the server is down, it will get hammered." do="📄 Write up the plan as a page"}
+```
+
+Studio logs each suggestion once when it's shown and counts its clicks. The log keeps the last 180 days (at most 50,000 suggestions). `bb studio pages explore stats [--days 30]` prints how often each kind (reply, do, fix, more for Tell me more; older logs also have explore, for the removed Visual explainer) is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines, or `explore` items in `::next`, still render.
 
 ## Artifacts
 
@@ -469,8 +660,6 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
   agent keep their state. Notes use the Summaries model through Studio
   Decisions. Long transcripts are read in parts of about 30,000 characters
   and combined; past six parts, the page says the notes cover the first part.
-  Without Studio Pages, the button is disabled and says
-  "Install Studio Pages to make notes."
 - **Exports.** Download a finished transcript as Markdown or plain text, or
   download its original audio segments together as a tar archive.
 - **Agent tools.** `talk_list`, `talk_read`, and `talk_search` let agents find
@@ -616,7 +805,7 @@ DOM, defined in [src/talk/ui/fields.ts](src/talk/ui/fields.ts):
 - **Summaries.** They need Studio Decisions and its configured fallback
   model. If generation fails, use **Generate** or **Regenerate** in the
   recording menu after the model is available.
-- **Notes pages.** They need Studio Pages and Studio Decisions. Updating
+- **Notes pages.** They need Studio Decisions. Updating
   notes replaces the page's text with fresh notes; restore an earlier version
   from the page's history to get your edits back.
 - **Backup and restore.** BB Studio backups include every recording: its
@@ -625,7 +814,7 @@ DOM, defined in [src/talk/ui/fields.ts](src/talk/ui/fields.ts):
   that is newer here or a recording still being recorded or transcribed. A
   restored recording comes back finished, with pieces that were not
   transcribed marked failed so **Retry** can pick them up. It does not keep the
-  BB thread it was started from. The notes page reconnects when Studio Pages
+  BB thread it was started from. The notes page reconnects when the backup
   restores the same page; otherwise **Update notes** finds or makes it again.
 - **Personal project threads.** Titling runs hidden agent threads in BB's
   Personal project.

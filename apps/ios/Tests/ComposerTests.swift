@@ -96,7 +96,7 @@ final class ComposerTests: XCTestCase {
             case "/api/v1/plugins/studio/rpc/tagItems":
                 XCTAssertEqual(value["items"]?.arrayValue?.first?["id"]?.stringValue, "pg_aaaaaaaaaaaa")
                 XCTAssertEqual(value["items"]?.arrayValue?.first?["pluginId"]?.stringValue, "pages")
-            case "/api/v1/plugins/pages/rpc/chats":
+            case "/api/v1/plugins/studio/rpc/pages.chats":
                 XCTAssertEqual(value["pageId"]?.stringValue, "pg_aaaaaaaaaaaa")
                 return (200, Data(#"{"ok":true,"result":{"chats":[]}}"#.utf8))
             default: XCTFail("Unexpected path: \(path)")

@@ -1,7 +1,7 @@
 export default context => {
   const { projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc, sleep } = context;
   const fixtures = [
-    { id: "pages", packageDir: "bb-studio-pages", seed: async () => { const { page, cleanup } = await seedPages(); return { path: `/plugins/pages/pages/${page.id}`, ready: '.pages-editor .ProseMirror', cleanup }; } },
+    { id: "pages", packageDir: "bb-studio", fileName: "pages-compact-header.png", seed: async () => { const { page, cleanup } = await seedPages(); return { path: `/plugins/studio/studio/pages/${page.id}`, ready: '.pages-editor .ProseMirror', cleanup }; } },
     { id: "draw", packageDir: "bb-studio", fileName: "drawings-compact-header.png", seed: async () => { const { drawing, cleanup } = await seedDrawing(); return { path: `/plugins/studio/studio/drawings/${drawing.id}`, ready: 'canvas.excalidraw__canvas', cleanup }; } },
     { id: "artifacts", packageDir: "bb-studio", fileName: "artifacts-compact-header.png", seed: async () => { const { artifactId, cleanup } = await seedArtifact(); return { path: `/plugins/studio/studio/artifacts/${artifactId}`, ready: 'iframe[title="q3-usage-report.html"]', cleanup }; } },
     { id: "talk", packageDir: "bb-studio", fileName: "recordings-compact-header.png", seed: async () => { const id = await seedTalkRecording(projectId, { transcribe: false }); return { path: `/plugins/studio/studio/recordings/${id}`, ready: 'input[aria-label="Title"]', cleanup: () => talkRpc("recording_delete", { id }) }; } },

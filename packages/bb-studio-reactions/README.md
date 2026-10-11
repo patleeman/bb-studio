@@ -30,10 +30,10 @@ quote.
 
 ## Quick replies from the agent
 
-Studio Reactions no longer asks agents to suggest reactions. Studio Pages'
-[Next row](../bb-studio-pages/README.md#next-row) offers quick replies instead;
+Studio Reactions no longer asks agents to suggest reactions. Studio's
+[Next row](../bb-studio/README.md#next-row) offers quick replies instead;
 set them with **Explore: Offer quick replies** and **Explore: Preferred quick
-replies** in Pages' settings. Older replies that end with a
+replies** in Studio's settings. Older replies that end with a
 `::reactions{items="…"}` line still render it as reaction buttons, so the raw
 line never shows while the plugin is enabled.
 

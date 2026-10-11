@@ -106,4 +106,20 @@ final class RPCFallbackTests: XCTestCase {
         XCTAssertTrue(old.drawingThumbnailPath("drw_1", updatedAt: 2).hasPrefix("/api/v1/plugins/excalidraw/http/thumbnail"))
         _ = try await current.drawings()
     }
+
+    func testPagesGoToStudioAndFallBackOnlyWhenStudioPredatesTheMerge() async throws {
+        let found = Data(#"{"ok":true,"result":{"pages":[]}}"#.utf8)
+        let (current, currentCalls) = client { _ in (200, found) }
+        _ = try await current.pages()
+        let currentPaths = await currentCalls.paths
+        XCTAssertEqual(currentPaths, ["/api/v1/plugins/studio/rpc/pages.tree"])
+        XCTAssertEqual(current.webURL(forPage: "pg_1").path(), "/plugins/studio/studio/pages/pg_1")
+
+        let (old, oldCalls) = client { path in path.contains("/studio/") ? (404, Self.missingMethod) : (200, found) }
+        _ = try await old.pages()
+        let oldPaths = await oldCalls.paths
+        XCTAssertEqual(oldPaths, ["/api/v1/plugins/studio/rpc/pages.tree", "/api/v1/plugins/pages/rpc/tree"])
+        XCTAssertEqual(old.webURL(forPage: "pg_1").path(), "/plugins/pages/pages/pg_1")
+        _ = try await current.pages()
+    }
 }

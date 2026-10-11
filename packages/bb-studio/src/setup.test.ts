@@ -62,21 +62,21 @@ describe("classify", () => {
 
 describe("buildSetup", () => {
   it("lists every add-on with its status, checks and the commands left", async () => {
-    const plugins = allInstalled().filter((each) => !["pages", "mobile"].includes(each.id)).map((each) => (each.id === "emoji-react" ? { ...each, enabled: false } : each));
+    const plugins = allInstalled().filter((each) => !["applets", "mobile"].includes(each.id)).map((each) => (each.id === "emoji-react" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("other")]);
     const summary = await buildSetup(sdk, health({
       problems: [problem("smart-decisions", "degraded", "No Jev provider is set up"), problem("other", "broken", "Stopped")],
       healthy: [{ pluginId: "studio-code", pluginName: "Studio Code", titles: ["code-server found"] }],
     }));
     const byId = Object.fromEntries(summary.addOns.map((addOn) => [addOn.id, addOn]));
-    expect(byId.pages).toMatchObject({ status: "not-installed", command: "bb plugin install pages@bb-studio --yes", summary: expect.stringMatching(/^Collaborative pages/) });
+    expect(byId.applets).toMatchObject({ status: "not-installed", command: "bb plugin install applets@bb-studio --yes", summary: expect.stringMatching(/^Experimental/) });
     expect(byId.mobile).toMatchObject({ status: "not-installed", optional: expect.stringContaining("iOS") });
     expect(byId["emoji-react"]).toMatchObject({ status: "disabled", command: "bb plugin enable emoji-react" });
     expect(byId["smart-decisions"]).toMatchObject({ status: "needs-setup", command: null });
     expect(byId["smart-decisions"]!.problems.map((each) => each.title)).toEqual(["No Jev provider is set up"]);
     expect(byId["studio-code"]).toMatchObject({ status: "installed", passed: ["code-server found"] });
-    expect(summary.commands).toEqual(["bb plugin install pages@bb-studio --yes", "bb plugin enable emoji-react"]);
-    expect(summary.installAll).toBe("bb plugin install pages@bb-studio --yes");
+    expect(summary.commands).toEqual(["bb plugin install applets@bb-studio --yes", "bb plugin enable emoji-react"]);
+    expect(summary.installAll).toBe("bb plugin install applets@bb-studio --yes");
     expect(summary.otherProblems.map((each) => each.pluginId)).toEqual(["other"]);
     expect(summary.checkedAt).toBe(1000);
   });
@@ -158,8 +158,8 @@ describe("SetupService", () => {
 
   it("installs from the bb-studio marketplace with the source BB resolved, and reports failures", async () => {
     const fake = fakeSdk([plugin("studio")], { installFails: ["emoji-react"] });
-    const result = await service(fake).install(["pages", "emoji-react"]);
-    expect(fake.calls).toEqual(["install pages@bb-studio confirmed"]);
+    const result = await service(fake).install(["applets", "emoji-react"]);
+    expect(fake.calls).toEqual(["install applets@bb-studio confirmed"]);
     expect(result.failures).toEqual([{ id: "emoji-react", error: "permission denied" }]);
     await expect(service(fake).install(["not-ours"])).resolves.toMatchObject({ failures: [{ id: "not-ours", error: expect.stringContaining("isn't a BB Studio add-on") }] });
   });
@@ -167,8 +167,8 @@ describe("SetupService", () => {
   it("refuses an incompatible add-on", async () => {
     const fake = fakeSdk([]);
     fake.raw.plugins.catalog.installPlan.mockResolvedValueOnce({ kind: "marketplace", compatible: false, incompatibleReason: "Needs BB 0.50" as never, resolvedSource: {} as never });
-    const result = await service(fake).install(["pages"]);
-    expect(result.failures).toEqual([{ id: "pages", error: "Needs BB 0.50" }]);
+    const result = await service(fake).install(["applets"]);
+    expect(result.failures).toEqual([{ id: "applets", error: "Needs BB 0.50" }]);
     expect(fake.raw.plugins.catalog.install).not.toHaveBeenCalled();
   });
 
@@ -176,7 +176,7 @@ describe("SetupService", () => {
     const fake = fakeSdk([plugin("emoji-react", { enabled: false }), plugin("float")]);
     await service(fake).enable("emoji-react");
     await expect(service(fake).enable("float")).rejects.toThrow("isn't a BB Studio add-on");
-    await expect(service(fake).remove("pages")).rejects.toThrow("isn't a retired");
+    await expect(service(fake).remove("emoji-react")).rejects.toThrow("isn't a retired");
     await service(fake).remove("float");
     expect(fake.calls.filter((call) => !call.startsWith("rpc"))).toEqual(["enable emoji-react", "remove float"]);
   });
@@ -184,17 +184,17 @@ describe("SetupService", () => {
 
 describe("formatSetup", () => {
   it("prints the status, retired plugins and the commands to run", async () => {
-    const plugins = allInstalled().filter((each) => each.id !== "pages").map((each) => (each.id === "emoji-react" ? { ...each, enabled: false } : each));
+    const plugins = allInstalled().filter((each) => each.id !== "applets").map((each) => (each.id === "emoji-react" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("float")]);
     const text = formatSetup(await buildSetup(sdk, health({ problems: [{ ...problem("smart-decisions", "degraded", "No Jev provider is set up"), detail: "Add a key" }] })));
     expect(text).toContain("BB Studio add-ons\n");
-    expect(text).toMatch(/ {2}not installed +pages +Studio Pages: Collaborative pages/);
+    expect(text).toMatch(/ {2}not installed +applets +Studio Applets: Experimental/);
     expect(text).toMatch(/ {2}disabled +emoji-react +Studio Reactions:/);
     expect(text).toMatch(/ {2}needs setup +smart-decisions +Studio Decisions:.*\n +degraded: No Jev provider is set up\. Add a key/);
     expect(text).toMatch(/ {2}ok +studio +Studio:/);
     expect(text).toContain("Retired plugins still installed\n  float");
     expect(text).toContain("Then remove it: bb plugin remove float");
-    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin install pages@bb-studio --yes\n  bb plugin enable emoji-react")).toBe(true);
+    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin install applets@bb-studio --yes\n  bb plugin enable emoji-react")).toBe(true);
   });
 
   it("says when there's nothing left to run", async () => {
@@ -219,10 +219,10 @@ describe("SetupService install", () => {
       active--;
     });
     const service = new SetupService({ sdk, health: async () => health() });
-    const [first, second] = await Promise.all([service.install(["studio", "pages"]), service.install(["pages", "emoji-react"])]);
+    const [first, second] = await Promise.all([service.install(["studio", "applets"]), service.install(["applets", "emoji-react"])]);
     expect(first.failures).toEqual([]);
     expect(second.failures).toEqual([]);
-    expect(calls).toEqual(["install pages", "install emoji-react"]);
+    expect(calls).toEqual(["install applets", "install emoji-react"]);
     expect(overlapped).toBe(false);
   });
 });

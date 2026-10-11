@@ -107,6 +107,8 @@ final class StudioDesignTests: XCTestCase {
 
     func testItemPathsOpenTheItem() {
         XCTAssertEqual(Route(href: "/plugins/pages/pages/pg_1"), .page(id: "pg_1"))
+        XCTAssertEqual(Route(href: "/plugins/studio/studio/pages/pg_1"), .page(id: "pg_1"))
+        XCTAssertEqual(Route(href: "/plugins/studio/studio/pages/pg_1/chat/thr_1"), .page(id: "pg_1"))
         XCTAssertEqual(Route(href: "/plugins/studio/studio/artifacts/art_1"), .artifact(id: "art_1"))
         XCTAssertEqual(Route(href: "/plugins/artifacts/artifacts/art_1"), .artifact(id: "art_1"))
         XCTAssertEqual(Route(href: "/plugins/studio/studio/drawings/drw_1"), .drawing(id: "drw_1"))

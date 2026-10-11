@@ -271,25 +271,25 @@ describe("NotesMaker", () => {
 });
 
 describe("pagesClient", () => {
-  it("treats a missing, disabled, failed or unlistable Pages as unavailable", async () => {
+  it("treats a missing, disabled, failed or unlistable Studio as unavailable", async () => {
     const client = (plugins: unknown[] | Error) => pagesClient({
       list: async () => { if (plugins instanceof Error) throw plugins; return { plugins } as never; },
       callRpc: vi.fn() as never,
     });
     expect(await client([]).available()).toBe(false);
-    expect(await client([{ id: "pages", enabled: false }]).available()).toBe(false);
-    expect(await client([{ id: "pages", enabled: true, status: "error" }]).available()).toBe(false);
+    expect(await client([{ id: "studio", enabled: false }]).available()).toBe(false);
+    expect(await client([{ id: "studio", enabled: true, status: "error" }]).available()).toBe(false);
     expect(await client(new Error("down")).available()).toBe(false);
-    expect(await client([{ id: "pages", enabled: true, status: "running" }]).available()).toBe(true);
+    expect(await client([{ id: "studio", enabled: true, status: "running" }]).available()).toBe(true);
   });
 
-  it("creates and replaces pages through Pages' RPC", async () => {
-    const callRpc = vi.fn(async ({ method }: { pluginId: string; method: string }) => (method === "create" || method === "replaceMarkdown" ? { page: { id: "pg_aaaaaaaaaaaa" } } : { page: null }));
+  it("creates and replaces pages through Studio's pages RPC", async () => {
+    const callRpc = vi.fn(async ({ method }: { pluginId: string; method: string }) => (method === "pages.create" || method === "pages.replaceMarkdown" ? { page: { id: "pg_aaaaaaaaaaaa" } } : { page: null }));
     const client = pagesClient({ list: async () => ({ plugins: [] }) as never, callRpc: callRpc as never });
     expect(await client.create({ projectId: null, title: "T notes", markdown: "x" })).toBe("pg_aaaaaaaaaaaa");
     await client.replace("pg_aaaaaaaaaaaa", "y");
     expect(await client.exists("pg_aaaaaaaaaaaa")).toBe(false);
-    expect(callRpc.mock.calls.map(([call]) => [call.pluginId, call.method])).toEqual([["pages", "create"], ["pages", "replaceMarkdown"], ["pages", "get"]]);
+    expect(callRpc.mock.calls.map(([call]) => [call.pluginId, call.method])).toEqual([["studio", "pages.create"], ["studio", "pages.replaceMarkdown"], ["studio", "pages.get"]]);
   });
 });
 

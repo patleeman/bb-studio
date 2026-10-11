@@ -21,7 +21,7 @@ export class ProviderHistory {
 
   async versions(ref: Ref): Promise<ItemVersion[] | null> {
     if (ref.pluginId === "pages") {
-      const { snapshots } = await this.call("pages", "snapshots", { id: ref.id }, z.object({ snapshots: z.array(z.object({ id: z.string(), label: z.string(), actor: z.string(), createdAt: z.number() })) }));
+      const { snapshots } = await this.call("studio", "pages.snapshots", { id: ref.id }, z.object({ snapshots: z.array(z.object({ id: z.string(), label: z.string(), actor: z.string(), createdAt: z.number() })) }));
       return Promise.all(snapshots.map(async (snapshot) => {
         const bytes = await this.read(ref, snapshot.id);
         return {
@@ -46,7 +46,7 @@ export class ProviderHistory {
 
   async read(ref: Ref, id: string): Promise<Uint8Array | null> {
     if (ref.pluginId === "pages") {
-      const { bytes } = await this.call("pages", "snapshotBytes", { id: ref.id, snapshotId: id }, bytesSchema);
+      const { bytes } = await this.call("studio", "pages.snapshotBytes", { id: ref.id, snapshotId: id }, bytesSchema);
       return bytes ? Buffer.from(bytes, "base64") : null;
     }
     const local = this.local[ref.pluginId];

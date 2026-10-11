@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BROWSE, closeTab, emptyWorkspace, openItem, panes, parseWorkspace } from "./workspace-state";
-const page = { href: "/plugins/pages/pages/pg_one", title: "Notes" };
+const page = { href: "/plugins/studio/studio/pages/pg_one", title: "Notes" };
 const recording = { href: "/plugins/studio/studio/recordings/rec_one", title: "Interview" };
 const drawing = { href: "/plugins/excalidraw/drawings/draw_one", title: "Diagram" };
 describe("Studio workspace", () => {
@@ -55,7 +55,7 @@ describe("Studio workspace", () => {
 
 it("restores the maximum nested eight-pane arrangement", () => {
   let state = emptyWorkspace();
-  for (let index = 0; index < 8; index++) state = openItem(state, { href: `/plugins/pages/pages/page_${index}`, title: `Page ${index}` }, "right");
+  for (let index = 0; index < 8; index++) state = openItem(state, { href: `/plugins/studio/studio/pages/page_${index}`, title: `Page ${index}` }, "right");
   expect(panes(state.layout)).toHaveLength(8);
   expect(parseWorkspace(JSON.parse(JSON.stringify(state)))).toEqual(state);
 });

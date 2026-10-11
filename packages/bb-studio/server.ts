@@ -2,7 +2,11 @@ import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
 import { DRAW_TOOLS, registerDraw } from "./src/draw/server";
 import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
-import { registerTalk, TALK_SETTINGS, TALK_TOOLS } from "./src/talk/server";
+import { registerTalk, TALK_SETTINGS, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
+import { PAGE_TOOLS, registerPages } from "./src/pages/server";
+import { AGENT_INSTRUCTIONS as PAGE_INSTRUCTIONS } from "./src/pages/tools";
+import { registerExploreBuiltin } from "./src/explore/server";
+import { PAGES_SETTINGS, type PagesSettings } from "@bb-studio/kit/pages-contract";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
 import { subcommand, usage } from "@bb-studio/kit/cli";
@@ -85,12 +89,32 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => drawings.dispose());
   const designs = registerDesign(bb, db);
   bb.onDispose(() => designs.dispose());
-  // BB takes one settings definition per plugin. Studio's settings are Talk's.
-  const recordings = await registerTalk(bb, db, bb.settings.define(TALK_SETTINGS));
+  // BB takes one settings definition per plugin. Studio's settings are Talk's,
+  // Pages' and Explore's, under the keys they had in their own plugins.
+  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS });
+  const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
-  // BB takes one agent configuration per plugin: the built-in kinds' tools, in every session.
-  bb.agents.configure(() => ({ tools: [...ARTIFACT_TOOLS, ...DRAW_TOOLS, ...DESIGN_TOOLS, ...TALK_TOOLS], skills: [] }));
+  let settingValues: Record<string, unknown> = await settings.get();
+  const explore = registerExploreBuiltin(bb, db, settingValues);
+  settings.onChange((next) => {
+    settingValues = next;
+    explore.update(next);
+  });
+  const pages = registerPages(bb, db, {
+    snapshotsPerPage: () => Number(settingValues.snapshotsPerPage ?? PAGES_SETTINGS.snapshotsPerPage.default),
+    get: () => settings.get(),
+    set: async (values: PagesSettings) => { await settings.experimental_set(values as never); },
+  }, explore);
+  bb.onDispose(() => pages.dispose());
+  // BB takes one agent configuration per plugin: the built-in kinds' tools in
+  // every session, with Pages' instructions and the Next row's (Explore's), as
+  // the Pages plugin gave them.
+  bb.agents.configure(() => {
+    const instructions = [PAGE_INSTRUCTIONS, explore.instructions()].filter(Boolean).join("\n\n");
+    return { tools: [...PAGE_TOOLS, ...ARTIFACT_TOOLS, ...DRAW_TOOLS, ...DESIGN_TOOLS, ...TALK_TOOLS], skills: [], instructions };
+  });
   const hub = new StudioHub(bb.sdk, [
+    { pluginId: "pages", name: "Pages", handlers: pages.provider },
     { pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider },
     { pluginId: "excalidraw", name: "Drawings", handlers: drawings.provider },
     { pluginId: "design", name: "Designs", handlers: designs.provider },
@@ -673,7 +697,7 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Group the user's BB Studio items with tags. Tags work across pages, recordings, drawings, artifacts and other items; new tag names are created. Pass items as the links studio_list_items shows.",
     parameters: z.object({
-      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
+      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/studio/studio/pages/pg_x"),
       add: z.array(z.string().max(100)).max(20).optional().describe("Tag names to add"),
       remove: z.array(z.string().max(100)).max(20).optional().describe("Tag names to remove"),
     }),
@@ -699,7 +723,7 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove.",
     parameters: z.object({
-      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
+      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/studio/studio/pages/pg_x"),
     }),
     async execute({ items: refs }) {
       const { found, missing } = await resolveItems(refs);
@@ -752,7 +776,7 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Open BB Studio items as tabs in the user's Studio workspace, in the BB window they're using, and show it to them. Pass items as the links studio_list_items shows. Open beside what they're looking at with placement right or down. Only open what the user asked to see, or what you made for them to look at.",
     parameters: z.object({
-      items: z.array(z.string().max(500)).min(1).max(20).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
+      items: z.array(z.string().max(500)).min(1).max(20).describe("Item links, e.g. /plugins/studio/studio/pages/pg_x"),
       placement: z.enum(["tab", "right", "down"]).optional().describe("tab (default) adds tabs to the focused pane; right or down splits it and opens them there"),
       show: z.boolean().optional().describe("Bring the workspace on screen (default true); false only adds the tabs"),
     }),
@@ -786,7 +810,7 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Close tabs in the user's Studio workspace. Closing a tab keeps the item. Pass the links studio_workspace shows. Close only tabs the user asked to close, or ones you opened for them.",
     parameters: z.object({
-      items: z.array(z.string().max(2000)).min(1).max(100).describe("Tab links, e.g. /plugins/pages/pages/pg_x"),
+      items: z.array(z.string().max(2000)).min(1).max(100).describe("Tab links, e.g. /plugins/studio/studio/pages/pg_x"),
     }),
     async execute({ items: hrefs }) {
       const current = workspace.current();
@@ -811,7 +835,7 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Move the user's BB Studio items to another BB project, or to Global (no project). Pass items as the links studio_list_items shows.",
     parameters: z.object({
-      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
+      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/studio/studio/pages/pg_x"),
       project: z.string().min(1).max(200).describe('The project\'s id or name, or "global" for no project'),
     }),
     async execute({ items, project }) {
@@ -861,6 +885,7 @@ export default async function plugin(bb: BbPluginApi) {
       },
     }),
     builtins: {
+      pages: { name: "Studio Pages", handlers: pages.backup },
       artifacts: { name: "Studio Artifacts", handlers: artifacts.backup },
       excalidraw: { name: "Studio Draw", handlers: drawings.backup },
       design: { name: "Studio Design", handlers: designs.backup },
@@ -873,7 +898,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.cli.register({
     name: "studio",
-    summary: "List BB Studio items across Pages, Talk, Draw and other add-ons",
+    summary: "BB Studio: pages, recordings, drawings, designs, artifacts and other add-ons' items",
     commands: [
       { name: "list", summary: "List items in the current project and global ones", usage: "bb studio list [query…] [--all] [--json], e.g. bb studio list kind:page -tag:draft pricing" },
       { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
@@ -888,6 +913,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "drawings", summary: "Create, read and edit Excalidraw drawings", usage: "bb studio drawings <list|create|show|rename|delete|merge|remove-elements> …" },
       { name: "designs", summary: "List and read designs: list, show, html, rename, delete", usage: "bb studio designs <list|show|html|rename|delete> …" },
       { name: "recordings", summary: "Read Talk recordings and their transcripts: list, show, transcript, notes", usage: "bb studio recordings <list|show|transcript|notes> …" },
+      { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
@@ -895,6 +921,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
       if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
+      if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
         list: "bb studio list [query…] [--all] [--json] [--kind <kind>] [--tag <tag>] [--query <text>]",
@@ -941,7 +968,7 @@ export default async function plugin(bb: BbPluginApi) {
           }
           case "providers": {
             const providers = await hub.providers();
-            if (!providers.length) return { exitCode: 0, stdout: "No Studio add-ons installed. Install Studio Pages.\n" };
+            if (!providers.length) return { exitCode: 0, stdout: "No Studio kinds are ready. Reload Studio: bb plugin reload studio\n" };
             const lines = providers.map(
               (provider) =>
                 `${provider.pluginId}\t${provider.state}\t${provider.kinds.map((kind) => kind.id).join(",") || "-"}${provider.detail ? `\t${provider.detail}` : ""}`,
@@ -985,7 +1012,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|artifacts|drawings|designs|recordings> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

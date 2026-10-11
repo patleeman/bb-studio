@@ -5,6 +5,7 @@
 import { Button, cn, Icon } from "@bb-studio/kit/ui";
 import { useState } from "react";
 import type { AddOnEntry, AddOnStatus, RetiredEntry } from "../../setup-contract";
+import { BRIDGE_IDS, UPGRADE_GUIDE_URL } from "../../setup";
 import { ProblemRow } from "../health/HealthViews";
 import { useHealth, type HealthApi } from "../health/use-health";
 import { useSetup, type SetupApi } from "./use-setup";
@@ -162,6 +163,13 @@ export function SetupPage() {
             <section className="flex flex-col gap-2">
               <h2 className="text-sm font-medium text-foreground">Retired plugins ({summary.retired.length})</h2>
               <p className="text-xs text-muted-foreground">These were part of BB Studio and are no longer needed. Removing one asks first.</p>
+              {summary.retired.some((entry) => BRIDGE_IDS.has(entry.id)) ? (
+                <p className="text-xs text-muted-foreground">
+                  Moving from the separate add-ons? Follow{" "}
+                  <a className="text-foreground underline underline-offset-2" href={UPGRADE_GUIDE_URL} target="_blank" rel="noreferrer">Upgrading to unified Studio</a>
+                  : old add-ons first, then Studio, then each migrate command.
+                </p>
+              ) : null}
               <ul className="flex flex-col gap-2">
                 {summary.retired.map((entry) => <RetiredRow key={entry.id} entry={entry} setup={setup} />)}
               </ul>

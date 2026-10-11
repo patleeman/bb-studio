@@ -1,0 +1,6 @@
+// Pages' RPC surface, in the kit (`@bb-studio/kit/pages-contract`) so the
+// upgrade bridge and the iOS app share it. Methods are Studio's `pages.*`.
+// Document content doesn't go through RPC: editors sync over `/pages/sync`
+// (src/pages/hub.ts).
+export * from "./constants";
+export * from "@bb-studio/kit/pages-contract";

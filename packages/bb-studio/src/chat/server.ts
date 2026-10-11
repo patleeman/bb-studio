@@ -6,7 +6,7 @@ import { quoteMessage } from "@bb-studio/kit/format";
 // - `viewing` asks Studio which item a path opens, so the chat knows what's
 //   on screen without per-kind code.
 // - `start` begins a thread about that item. Pages keeps its own page chats,
-//   so a page goes through Pages' `work`; other items get a pill that our
+//   so a page goes through Studio's `pages.work`; other items get a pill that our
 //   mention provider resolves into a pointer note (src/context.ts).
 // - Each item has a home thread for its chat and quotes (kv
 //   `link:<plugin>:<id>`): the one started or picked for it, else the thread
@@ -17,6 +17,7 @@ import { MENTION_PROVIDER_ID, pagesSchemas, rpcContract, schemas, type ItemRef }
 import { itemKey, missingNote, parseItemKey, pointerNote, toViewed, withItemPill } from "./context";
 
 const PLUGIN_ID = "studio";
+/** Pages' item namespace; Pages is built into Studio (src/pages). */
 const PAGES_PLUGIN_ID = "pages";
 const CALL_TIMEOUT_MS = 10_000;
 /** Starting a page chat creates a thread, which can take a while; don't wait forever. */
@@ -56,8 +57,8 @@ export async function registerChat(bb: BbPluginApi) {
   const lastPageChat = async (pageId: string): Promise<Link | null> => {
     try {
       const { chats } = await bb.sdk.plugins.callRpc({
-        pluginId: PAGES_PLUGIN_ID,
-        method: "chats",
+        pluginId: STUDIO_PLUGIN_ID,
+        method: "pages.chats",
         input: { pageId },
         outputSchema: pagesSchemas.chats,
         signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
@@ -125,8 +126,8 @@ export async function registerChat(bb: BbPluginApi) {
       if (ref && (!found?.item || found.item.archived)) throw new Error("That Studio item is archived or gone.");
       if (ref?.pluginId === PAGES_PLUGIN_ID) {
         const { threadId } = await bb.sdk.plugins.callRpc({
-          pluginId: PAGES_PLUGIN_ID,
-          method: "work",
+          pluginId: STUDIO_PLUGIN_ID,
+          method: "pages.work",
           input: { id: ref.id, request },
           outputSchema: pagesSchemas.work,
           signal: AbortSignal.timeout(START_TIMEOUT_MS),

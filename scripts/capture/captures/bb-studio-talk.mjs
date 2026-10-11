@@ -233,7 +233,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
       let notesPageId = null;
       const cleanup = async () => {
         await talkRpc("recording_delete", { id: recordingId });
-        if (notesPageId) await pluginRpc("pages", "remove", { id: notesPageId }).catch(() => {});
+        if (notesPageId) await pluginRpc("studio", "pages.remove", { id: notesPageId }).catch(() => {});
       };
       try {
         // Summaries are optional. Generate this fixture's summary explicitly.
@@ -251,7 +251,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         const { recording: withNotes } = await talkRpc("recording_get", { id: recordingId });
         if (!withNotes.notesPageId) throw new Error("Make notes did not save the notes page on the recording.");
         notesPageId = withNotes.notesPageId;
-        const { markdown: notesMarkdown } = await pluginRpc("pages", "markdown", { id: notesPageId });
+        const { markdown: notesMarkdown } = await pluginRpc("studio", "pages.markdown", { id: notesPageId });
         if (!notesMarkdown.includes(`(item:talk:${recordingId})`) || !/## Action items\n\n- \[ \] /.test(notesMarkdown) || !notesMarkdown.includes("## Decisions")) {
           throw new Error(`The notes page is missing its recording link, decisions, or action-item checklist: ${notesMarkdown}`);
         }

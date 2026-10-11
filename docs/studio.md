@@ -108,5 +108,6 @@ With Studio installed, the bridge watches the main view's address. A plain
 item address (`/plugins/<plugin>/<panel>/<id>`) from an add-on that opens in
 the workspace becomes a tab, and the address is replaced with the
 workspace's, so Back doesn't return to it. A sub-view, such as a page's chat
-(`/plugins/pages/pages/<id>/chat/<thread>`), keeps its own page. Item cards and
+(`/plugins/studio/studio/pages/<id>/chat/<thread>`, or the old
+`/plugins/pages/pages/<id>/chat/<thread>`), keeps its own page. Item cards and
 **Open in Pages** call `openAppPath`, which opens the tab directly.

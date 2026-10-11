@@ -219,21 +219,39 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "studio",
+      "method": "pages.editableMarkdown",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
       "plugin": "pages",
       "method": "editableMarkdown",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "studio",
+      "method": "pages.editDocument",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+PageEditing.swift",
       "plugin": "pages",
       "method": "editDocument",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "studio",
+      "method": "pages.requests",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+PageEditing.swift",
       "plugin": "pages",
       "method": "requests",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+Push.swift",
@@ -423,99 +441,195 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.tree",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "tree",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.get",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "get",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.markdown",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "markdown",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.search",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "search",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.work",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "work",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.chats",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "chats",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.chatPage",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "chatPage",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.update",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "update",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.snapshots",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "snapshots",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.snapshot",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "snapshot",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.restore",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "restore",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.comments",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "comments",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.commentBlocks",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "commentBlocks",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.commentCreate",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "commentCreate",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.commentReply",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "commentReply",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.commentResolve",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "commentResolve",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/PluginExtras.swift",
@@ -669,15 +783,27 @@
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "pages.remove",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
       "plugin": "pages",
       "method": "remove",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "pages.create",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
       "plugin": "pages",
       "method": "create",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/StudioChat.swift",
@@ -693,9 +819,15 @@
     },
     {
       "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
+      "plugin": "studio",
+      "method": "pages.create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
       "plugin": "pages",
       "method": "create",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/iOS/Capture/CaptureSheet.swift",

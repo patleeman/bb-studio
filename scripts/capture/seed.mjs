@@ -39,11 +39,11 @@ export async function seedPages() {
     "- [ ] Localise onboarding for Japanese and German",
     "- [ ] Final go/no-go review",
   ].join("\n");
-  const { page } = await pluginRpc("pages", "create", { projectId, parentId: null, title: "Offline mode launch", icon: "🚀", markdown });
-  const { page: child } = await pluginRpc("pages", "create", { projectId, parentId: page.id, title: "Rollout risks", icon: "⚠️", markdown: "- Storage quota on older devices" });
-  const { page: notes } = await pluginRpc("pages", "create", { projectId, parentId: null, title: "Release notes: October", icon: "📝", markdown: "## Highlights\n\n- Offline sync for every team" });
+  const { page } = await pluginRpc("studio", "pages.create", { projectId, parentId: null, title: "Offline mode launch", icon: "🚀", markdown });
+  const { page: child } = await pluginRpc("studio", "pages.create", { projectId, parentId: page.id, title: "Rollout risks", icon: "⚠️", markdown: "- Storage quota on older devices" });
+  const { page: notes } = await pluginRpc("studio", "pages.create", { projectId, parentId: null, title: "Release notes: October", icon: "📝", markdown: "## Highlights\n\n- Offline sync for every team" });
   const cleanup = async () => {
-    for (const id of [child.id, page.id, notes.id]) await pluginRpc("pages", "remove", { id }).catch(() => {});
+    for (const id of [child.id, page.id, notes.id]) await pluginRpc("studio", "pages.remove", { id }).catch(() => {});
   };
   return { page, notes, cleanup };
 }
