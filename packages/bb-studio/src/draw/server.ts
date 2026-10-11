@@ -49,6 +49,9 @@ export const DRAWINGS_USAGE = [
   "  remove-elements <id> <element-id…>    Delete elements by id",
 ].join("\n");
 
+/** Available in every agent session. */
+export const DRAW_TOOLS = ["excalidraw_list_drawings", "excalidraw_get_drawing", "excalidraw_create_drawing", "excalidraw_update_drawing"];
+
 export interface BuiltinDrawings {
   store: DrawingStore;
   /** Studio's provider methods, which the hub calls in-process. */
@@ -370,11 +373,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database): BuiltinDra
     },
   });
 
-  // Make the excalidraw tools available in every agent session.
-  bb.agents.configure(() => ({
-    tools: ["excalidraw_list_drawings", "excalidraw_get_drawing", "excalidraw_create_drawing", "excalidraw_update_drawing"],
-    skills: [],
-  }));
+  // Studio calls bb.agents.configure once, with DRAW_TOOLS (BB allows one configuration per plugin).
 
   // `@drawing` in any composer: at send time the agent receives its scene as context.
   bb.ui.registerMentionProvider(defineItemMention({

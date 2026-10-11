@@ -98,6 +98,8 @@ function directive(id: string): string {
   return `::artifact{id="${id}"}`;
 }
 
+export const ARTIFACT_TOOLS = ["artifacts_save", "artifacts_list", "artifacts_read"];
+
 export interface BuiltinArtifacts {
   store: ArtifactStore;
   /** Studio's provider methods, which the hub calls in-process. */
@@ -486,7 +488,7 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
     },
   });
 
-  bb.agents.configure(() => ({ tools: ["artifacts_save", "artifacts_list", "artifacts_read"], skills: [] }));
+  // Studio calls bb.agents.configure once, with every built-in kind's tools (BB allows one configuration per plugin).
 
   // `@artifact` in any composer.
   bb.ui.registerMentionProvider(defineItemMention({

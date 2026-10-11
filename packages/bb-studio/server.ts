@@ -1,6 +1,6 @@
 import { registerChat } from "./src/chat/server";
-import { registerArtifacts } from "./src/artifacts/server";
-import { registerDraw } from "./src/draw/server";
+import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
+import { DRAW_TOOLS, registerDraw } from "./src/draw/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
 import { subcommand, usage } from "@bb-studio/kit/cli";
@@ -81,6 +81,8 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => artifacts.dispose());
   const drawings = registerDraw(bb, db);
   bb.onDispose(() => drawings.dispose());
+  // BB takes one agent configuration per plugin: the built-in kinds' tools, in every session.
+  bb.agents.configure(() => ({ tools: [...ARTIFACT_TOOLS, ...DRAW_TOOLS], skills: [] }));
   const hub = new StudioHub(bb.sdk, [
     { pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider },
     { pluginId: "excalidraw", name: "Drawings", handlers: drawings.provider },
