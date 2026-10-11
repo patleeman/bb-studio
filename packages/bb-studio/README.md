@@ -159,7 +159,7 @@ Studio tab.
 ![The compact drawing header](assets/drawings-compact-header.png)
 
 The same editor at 390 pixels wide, with **Item actions** open, captured
-before the merge from Draw's own page.
+before the merge from the add-on's own page.
 
 - **In the library.** Drawings list next to pages, recordings and artifacts:
   thumbnails, projects, search over the words on a drawing, archive, move,
