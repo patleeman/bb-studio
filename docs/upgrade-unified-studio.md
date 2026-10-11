@@ -46,10 +46,10 @@ copy until Studio answers, and `bb <id> migrate` runs it on demand.
    for id in studio pages talk excalidraw artifacts design; do bb plugin source "$id"; done
    ```
 
-   `bb plugin source` shows each plugin's source. One that names a branch
-   (`@stable` or `@main`) updates with `bb plugin update`. One pinned to a
-   commit (a 40-character hash, as from `bb plugin install git:…@<commit>`)
-   doesn't: `bb plugin update` reports it as up to date and skips it.
+   `bb plugin source` prints each plugin's `requested:` source. One that
+   names a branch (`@stable` or `@main`) updates with `bb plugin update`. One
+   pinned to a commit (a 40-character hash, as from
+   `bb plugin install git:…@<commit>`) doesn't: `bb plugin update` skips it.
 
 2. **Back up.** With the Studio you have now:
 
@@ -81,20 +81,26 @@ bb plugin update artifacts --yes
 bb plugin update design --yes
 ```
 
-For one **pinned to a commit**, install the marketplace entry over it instead.
-Installing a plugin id that's already installed replaces its code and keeps
-its database, settings and files; don't `bb plugin remove` it first, which
-deletes its settings, and for a bridge that hasn't copied yet, what it would
-have copied:
+For one **pinned to a commit**, `bb plugin update` says
+`skipped — pinned` and changes nothing. BB won't install a plugin id over an
+installed one (`already installed from …; remove it first`), so move it with
+a remove and an install. This keeps its data: `bb plugin remove` deletes the
+plugin's code, settings, secrets and schedules, but not its database, its
+files (Talk's audio, Pages' `explore.db`) or its stored values (Talk's model
+choices). Settings are the one thing to carry by hand, because the bridge
+copies them into Studio:
 
 ```sh
-bb plugin install pages@bb-studio --yes   # and talk@, excalidraw@, artifacts@, design@
+bb plugin config pages > ~/pages-settings.txt     # note every setting you changed
+bb plugin remove pages
+bb plugin install pages@bb-studio --yes           # the release branch; or git:github.com/patleeman/bb-studio@<commit> --plugin pages
+bb plugin config pages set snapshotsPerPage 20    # each setting you had changed, before migrating
 ```
 
-That moves it to the marketplace's release branch (`stable`), so
-`bb plugin update` works for it from then on. To stay pinned, install a
-specific pushed commit the same way:
-`bb plugin install git:github.com/patleeman/bb-studio@<commit> --plugin pages --yes`.
+Do the same for `talk` (its settings), `excalidraw`, `artifacts` and
+`design` (no settings to carry). Installing from the marketplace entry puts
+it on the release branch (`stable`), so `bb plugin update` works for it from
+then on.
 
 Check each one is the bridge: `bb plugin list` shows version 0.2.0 and a
 description starting "Upgrade bridge".
@@ -102,8 +108,13 @@ description starting "Upgrade bridge".
 ## 2. Update Studio
 
 ```sh
-bb plugin update studio --yes          # or, pinned: bb plugin install studio@bb-studio --yes
+bb plugin update studio --yes
 ```
+
+Pinned? The same way: note `bb plugin config studio`, then
+`bb plugin remove studio && bb plugin install studio@bb-studio --yes`, and set
+those settings again. Studio's database (tags, links, leads, everything the
+earlier bridges copied) stays.
 
 Then check Studio holds every tool and nothing failed:
 

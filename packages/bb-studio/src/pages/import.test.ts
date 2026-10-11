@@ -38,6 +38,17 @@ describe("importing the Pages plugin's rows", () => {
     expect(studioFileUrl(`${LEGACY_PAGE_FILES_URL}?id=file_1`)).toBe(`${PAGE_FILES_URL}?id=file_1`);
     expect(studioFileUrl("https://example.com/a.png")).toBe("https://example.com/a.png");
     expect(imageUrl(rewriteFileUrls(stateWithImage(`${LEGACY_PAGE_FILES_URL}?id=file_1`)))).toBe(`${PAGE_FILES_URL}?id=file_1`);
+    const doc = new Y.Doc();
+    const paragraph = new Y.XmlElement("paragraph");
+    const text = new Y.XmlText();
+    paragraph.insert(0, [text]);
+    doc.getXmlFragment(DOCUMENT_FRAGMENT).insert(0, [paragraph]);
+    text.insert(0, "see ");
+    text.insert(4, "note.txt", { link: { href: `${LEGACY_PAGE_FILES_URL}?id=file_2` } });
+    const linked = new Y.Doc();
+    Y.applyUpdate(linked, rewriteFileUrls(Y.encodeStateAsUpdate(doc)));
+    const run = (((linked.getXmlFragment(DOCUMENT_FRAGMENT).get(0) as Y.XmlElement).get(0) as Y.XmlText).toDelta() as { attributes?: { link?: { href: string } } }[])[1];
+    expect(run?.attributes?.link?.href).toBe(`${PAGE_FILES_URL}?id=file_2`);
     const untouched = stateWithImage("https://example.com/a.png");
     expect(rewriteFileUrls(untouched)).toBe(untouched);
   });

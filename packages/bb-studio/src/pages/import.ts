@@ -18,7 +18,7 @@ const LEGACY_BYTES = Buffer.from(LEGACY_PAGE_FILES_URL);
 
 /**
  * A page's Yjs state with old file addresses in its blocks' attributes (an
- * image's or file's `url`) pointed at Studio's. Unchanged when there are none.
+ * image's or file's `url`) and in its links' `href` pointed at Studio's. Unchanged when there are none.
  */
 export function rewriteFileUrls(state: Uint8Array): Uint8Array {
   if (!Buffer.from(state.buffer, state.byteOffset, state.byteLength).includes(LEGACY_BYTES)) return state;
@@ -33,7 +33,26 @@ export function rewriteFileUrls(state: Uint8Array): Uint8Array {
         if (next !== value) { node.setAttribute(key, next); changed = true; }
       }
     }
-    for (const child of node.toArray()) if (child instanceof Y.XmlElement || child instanceof Y.XmlFragment) visit(child);
+    for (const child of node.toArray()) {
+      if (child instanceof Y.XmlElement || child instanceof Y.XmlFragment) visit(child);
+      else if (child instanceof Y.XmlText) relink(child);
+    }
+  };
+  // Links in text are marks: `link: { href }` on a run of characters.
+  const relink = (text: Y.XmlText) => {
+    let index = 0;
+    for (const op of text.toDelta() as { insert: unknown; attributes?: Record<string, unknown> }[]) {
+      const length = typeof op.insert === "string" ? op.insert.length : 1;
+      for (const [mark, value] of Object.entries(op.attributes ?? {})) {
+        if (!value || typeof value !== "object") continue;
+        const attrs = value as Record<string, unknown>;
+        if (typeof attrs.href === "string" && attrs.href.includes(LEGACY_PAGE_FILES_URL)) {
+          text.format(index, length, { [mark]: { ...attrs, href: attrs.href.split(LEGACY_PAGE_FILES_URL).join(PAGE_FILES_URL) } });
+          changed = true;
+        }
+      }
+      index += length;
+    }
   };
   doc.transact(() => visit(doc.getXmlFragment(DOCUMENT_FRAGMENT)));
   const result = changed ? Y.encodeStateAsUpdate(doc) : state;
