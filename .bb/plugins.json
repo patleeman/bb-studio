@@ -24,10 +24,6 @@
       "source": "./packages/bb-studio-artifacts"
     },
     {
-      "name": "thread-list-plus",
-      "source": "./packages/bb-studio-sidebar"
-    },
-    {
       "name": "mobile",
       "source": "./packages/bb-studio-mobile"
     },

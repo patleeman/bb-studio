@@ -131,29 +131,6 @@
       }
     },
     {
-      "id": "thread-list-plus",
-      "displayName": "Studio Sidebar",
-      "description": "BB's sidebar thread list, organized by Studio Space: one Space at a time with its lead, pins and two-line rows.",
-      "icon": "ListView",
-      "tags": [
-        "sidebar",
-        "threads",
-        "spaces",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-sidebar",
-          "ref": "stable"
-        }
-      }
-    },
-    {
       "id": "mobile",
       "displayName": "Studio Mobile",
       "description": "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads.",

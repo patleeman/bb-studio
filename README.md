@@ -16,7 +16,6 @@ agent.
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Upgrade bridge only. Artifacts are built into Studio now; this copies an existing install's artifacts into Studio. |
 | [Studio Design](packages/bb-studio-design/) | `design` | UI prototypes you design with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work. |
 | [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces in your Spaces: one or more folders in a full editor beside your threads, run by a local code-server. |
-| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | The sidebar's thread list organized by Studio Space: one Space at a time, its lead and pins on top, two-line rows. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
@@ -51,7 +50,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - pages: collaborative pages
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
-   - thread-list-plus: Studio Sidebar; the thread list organized by Space
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
    - design: Studio Design; UI prototypes designed with agents

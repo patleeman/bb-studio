@@ -1,5 +1,4 @@
 /** The README capture entry modules, in capture order. Other files in captures/ are helpers. */
-import bb_studio_sidebar from "./captures/bb-studio-sidebar.mjs";
 import bb_studio_draw from "./captures/bb-studio-draw.mjs";
 import bb_studio_talk from "./captures/bb-studio-talk.mjs";
 import bb_studio_pages from "./captures/bb-studio-pages.mjs";
@@ -16,7 +15,6 @@ import compactHeaders from "./captures/compact-headers.mjs";
 export function loadCaptures(context) {
   return [
     ...(process.env.BB_CAPTURE_COMPACT_HEADERS === "1" ? compactHeaders(context) : []),
-    ...bb_studio_sidebar(context),
     ...bb_studio_draw(context),
     ...bb_studio_talk(context),
     ...bb_studio_pages(context),

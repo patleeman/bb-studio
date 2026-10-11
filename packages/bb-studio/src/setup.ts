@@ -128,6 +128,15 @@ export const RETIRED: readonly RetiredPlugin[] = [
     blocker: async () => null,
   },
   {
+    id: "thread-list-plus",
+    name: "Studio Sidebar",
+    why: "Studio no longer has Spaces, so there is nothing for it to organize by. BB's own sidebar lists threads by project, and a project's lead and heartbeat are set in Studio's settings.",
+    kept: "Your threads, and each Space's lead and heartbeat, now on the Space's main project.",
+    deleted: REMOVED,
+    before: [],
+    blocker: async () => null,
+  },
+  {
     id: "float",
     name: "Float",
     why: "Threads and Studio items open in the main view, or in a split with ⌘-click, and the sidebar lists what you open.",
