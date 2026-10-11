@@ -9,7 +9,7 @@ final class StudioOverviewDecodingTests: XCTestCase {
             {"ok":true,"result":{
               "items":[
                 {"pluginId":"artifacts","id":"a1","kind":"artifact","title":"Chart"},
-                {"pluginId":"studio-tables","id":"t1","title":"No kind"},
+                {"pluginId":"notes","id":"t1","title":"No kind"},
                 {"pluginId":"design","id":"d1","kind":"design","title":"Onboarding"}
               ],
               "providers":[

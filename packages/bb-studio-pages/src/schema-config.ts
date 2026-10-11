@@ -49,19 +49,17 @@ export const htmlConfig = {
 /** The longest HTML source an ```html fence may hold; longer ones stay code. */
 export const MAX_HTML_CHARS = 200_000;
 
-export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "table", "item"] as const;
+export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "item"] as const;
 export type EmbedKind = (typeof EMBED_KINDS)[number];
 
 /**
  * Embeds of other Studio add-ons' items. Their target is the item's id; an
- * "item" embed reaches any add-on with a `pluginId:itemId` target. A table's
- * target may name the view it shows: `<table id>/view/<view id>`.
+ * "item" embed reaches any add-on with a `pluginId:itemId` target.
  */
 export const STUDIO_EMBEDS = {
   drawing: { pluginId: "excalidraw", panel: "drawings", label: "Drawing" },
   artifact: { pluginId: "artifacts", panel: "artifacts", label: "Artifact" },
   recording: { pluginId: "talk", panel: "recordings", label: "Recording" },
-  table: { pluginId: "studio-tables", panel: "tables", label: "Table" },
 } as const;
 export type StudioEmbedKind = keyof typeof STUDIO_EMBEDS;
 
@@ -76,10 +74,6 @@ export function isStudioEmbed(kind: string): kind is StudioEmbedKind | "item" {
 
 /** The add-on item an embed or mention points at, if it points at one. */
 export function studioRef(kind: string, target: string): { pluginId: string; id: string } | null {
-  if (kind === "table") {
-    const [id] = target.split("/");
-    return id ? { pluginId: STUDIO_EMBEDS.table.pluginId, id } : null;
-  }
   if (kind in STUDIO_EMBEDS) return target ? { pluginId: STUDIO_EMBEDS[kind as StudioEmbedKind].pluginId, id: target } : null;
   if (kind !== "item") return null;
   const split = target.indexOf(":");

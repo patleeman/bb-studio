@@ -1,6 +1,6 @@
 // The Studio panels Studio Navigation leaves out, by the label bb gives their rows.
-const LEFT_OUT = ["Pages", "Drawings", "Artifacts", "Recordings", "Tables", "Command"];
-const STUDIO_PLUGINS = ["studio", "pages", "excalidraw", "artifacts", "talk", "studio-tables", "thread-list-plus"];
+const LEFT_OUT = ["Pages", "Drawings", "Artifacts", "Recordings", "Command"];
+const STUDIO_PLUGINS = ["studio", "pages", "excalidraw", "artifacts", "talk", "thread-list-plus"];
 // Staged by scripts/staged-bb.mjs: a plugin outside BB Studio whose row stays.
 const OUTSIDE_PLUGIN = "staged-forecast";
 

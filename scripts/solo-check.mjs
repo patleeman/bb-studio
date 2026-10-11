@@ -55,7 +55,6 @@ const PLUGINS = {
   talk: { cli: ["talk", "list"], surface: "/plugins/talk/recordings", labels: ["Dictations", "No recordings yet"] },
   excalidraw: { cli: ["excalidraw", "list"], surface: "/plugins/excalidraw/drawings", labels: ["No drawings yet"] },
   artifacts: { cli: ["artifacts", "list"], surface: "/plugins/artifacts/artifacts", labels: ["No artifacts yet"] },
-  "studio-tables": { cli: ["tables", "list"], surface: "/plugins/studio-tables/tables", labels: ["No tables yet"] },
   "thread-list-plus": {
     cli: ["thread-list-plus", "--help"],
     surface: "/projects/{project}/threads/{thread}",

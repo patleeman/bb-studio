@@ -14,7 +14,7 @@ export interface AddOn {
 }
 
 export const ADDONS: readonly AddOn[] = [
-  { id: "studio", displayName: "Studio", description: "The home of BB Studio: one collection for pages, recordings, drawings, artifacts and tables, with search, tags, Spaces, item conversations and quotes." },
+  { id: "studio", displayName: "Studio", description: "The home of BB Studio: one collection for pages, recordings, drawings and artifacts, with search, tags, Spaces, item conversations and quotes." },
   { id: "pages", displayName: "Studio Pages", description: "Part of BB Studio. Collaborative pages you write with your agents, with live editing, comments, version history and ordinary agent chats." },
   { id: "talk", displayName: "Studio Talk", description: "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable." },
   { id: "excalidraw", displayName: "Studio Draw", description: "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations." },
@@ -23,7 +23,6 @@ export const ADDONS: readonly AddOn[] = [
   { id: "mobile", displayName: "Studio Mobile", description: "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads." },
   { id: "emoji-react", displayName: "Studio Reactions", description: "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer." },
   { id: "smart-decisions", displayName: "Studio Decisions", description: "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and other plugins can ask it for quick decisions." },
-  { id: "studio-tables", displayName: "Studio Tables", description: "Part of BB Studio. Structured tables with typed columns, rows, views, CSV import and export, and agent tools." },
   { id: "design", displayName: "Studio Design", description: "Part of BB Studio. Design UI prototypes and slide decks with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work." },
   { id: "studio-code", displayName: "Studio Code", description: "Part of BB Studio. VS Code workspaces in your Spaces: open one or more folders in a full editor, run by a local code-server." },
   { id: "applets", displayName: "Studio Applets", description: "Part of BB Studio. Experimental. Small native macOS apps your agents write as plain folders, such as a HUD of running threads, run by one signed Studio Applets app. Applets reach the desktop and BB only through an API you approve." },

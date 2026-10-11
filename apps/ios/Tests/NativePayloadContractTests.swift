@@ -45,20 +45,6 @@ final class NativePayloadContractTests: XCTestCase {
     }
 
 
-    func testGeneratedTableDecoderPreservesEveryCellValueShape() async throws {
-        let client = try client("table-read")
-        let response = try await client.studioTable("tbl_contract")
-        let table = try XCTUnwrap(response)
-        let row = try XCTUnwrap(table.rows?.first)
-        let values = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(row.values)) as? [String: Any])
-        XCTAssertEqual(values["text"] as? String, "Text")
-        XCTAssertEqual(values["number"] as? Int, 42)
-        XCTAssertEqual(values["check"] as? Bool, true)
-        XCTAssertEqual(values["multi"] as? [String], ["a", "b"])
-        XCTAssertEqual((values["relation"] as? [String: String])?["itemId"], "pg_contract")
-        XCTAssertTrue(values["empty"] is NSNull)
-    }
-
     func testChatStartEnvelope() async throws {
         let chatClient = try client("chat-start")
         let thread = try await chatClient.startStudioChat(pluginId: "pages", itemId: "pg_contract", projectId: "proj_contract", text: "Discuss")

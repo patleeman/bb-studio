@@ -29,23 +29,6 @@ final class NewSurfacesUITests: XCTestCase {
         return search
     }
 
-    func testTableViews() throws {
-        guard rpc("studio-tables", "list", NSNull()) != nil else { throw XCTSkip("Studio Tables is not installed") }
-        let created = try XCTUnwrap(rpc("studio-tables", "create", [
-            "title": "QA iOS7 table", "projectId": projectId,
-        ])?["table"] as? [String: Any])
-        let id = try XCTUnwrap(created["id"] as? String)
-        addTeardownBlock { _ = self.rpc("studio-tables", "remove", ["id": id]) }
-        let app = launch()
-        app.open(URL(string: "bbstudio://studio")!)
-        app.tabBars.buttons["Studio"].tap()
-        XCTAssertTrue(app.staticTexts["QA iOS7 table"].waitForExistence(timeout: 15))
-        app.staticTexts["QA iOS7 table"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["studioTable"].waitForExistence(timeout: 10))
-        app.buttons["Table"].tap()
-        shot(app, "table")
-    }
-
     func testMeetingNotes() throws {
         let recordings = rpc("talk", "recordings_list", ["limit": 200])?["recordings"] as? [[String: Any]] ?? []
         guard let id = recordings.first(where: { $0["meetingNotes"] is [String: Any] })?["id"] as? String else {

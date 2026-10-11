@@ -78,7 +78,6 @@ const LINK_ICONS: Record<string, string> = {
   "excalidraw/drawings": "excalidraw/draw",
   "artifacts/artifacts": "artifacts/artifact",
   "talk/recordings": "talk/talk",
-  "studio-tables/tables": "Rows2",
   "studio-code/workspaces": "Code",
   "studio/spaces": "Layers",
   "studio/chats": "MessageSquare",

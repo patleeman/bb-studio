@@ -31,10 +31,10 @@ describe("Studio provider contract", () => {
 describe("itemAtPath", () => {
   it("prefers the deeper item when a parent's href has a query", () => {
     const items = [
-      { id: "table", href: "/plugins/studio-tables/tables/t1?view=board-with-a-long-name" },
-      { id: "row", href: "/plugins/studio-tables/tables/t1/row/r1" },
+      { id: "table", href: "/plugins/custom/things/t1?view=board-with-a-long-name" },
+      { id: "row", href: "/plugins/custom/things/t1/row/r1" },
     ];
-    expect(itemAtPath(items, "/plugins/studio-tables/tables/t1/row/r1")?.id).toBe("row");
-    expect(itemAtPath(items, "/plugins/studio-tables/tables/t1")?.id).toBe("table");
+    expect(itemAtPath(items, "/plugins/custom/things/t1/row/r1")?.id).toBe("row");
+    expect(itemAtPath(items, "/plugins/custom/things/t1")?.id).toBe("table");
   });
 });

@@ -19,11 +19,6 @@ extension BBClient {
         let _: Talk.MeetingRegenerateOutput = try await rpc("talk", Talk.Method.meeting_regenerate, ["id": .string(id)])
     }
 
-    public func studioTable(_ id: String) async throws -> Tables.GetOutputTable? {
-        let result: Tables.GetOutput = try await rpc("studio-tables", Tables.Method.get, ["id": .string(id)])
-        return result.table
-    }
-
     public func studioLinks(pluginId: String, id: String) async throws -> Studio.LinksOutput {
         try await rpc("studio", Studio.Method.links, ["ref": ["pluginId": .string(pluginId), "id": .string(id)]])
     }

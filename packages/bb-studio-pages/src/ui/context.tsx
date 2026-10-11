@@ -1,6 +1,4 @@
 import { createContext, useContext } from "react";
-import type { Column, Table, Values } from "@bb-studio/kit/tables";
-import type { TableApi } from "@bb-studio/kit/table-grid";
 import type { WhiteboardStroke, WhiteboardView } from "../whiteboard";
 import type { BotView, PageMetaView, RecordingCard, StudioEmbedItem } from "../contract";
 
@@ -26,9 +24,6 @@ export interface PagesUi {
   /** Items from the other Studio add-ons (drawings, artifacts, recordings…). */
   studioItems(): Promise<StudioEmbedItem[]>;
   artifactView(id: string): Promise<ArtifactView | null>;
-  /** A live table embed's table, read and edited through Pages. */
-  table(id: string): Promise<Table | null>;
-  tableApi(id: string): TableApi;
   recording(id: string): Promise<RecordingCard | null>;
   /** Hands a checklist item to an agent; resolves to its thread. */
   handOffChecklist(pageId: string, blockId: string): Promise<{ threadId: string }>;
@@ -37,7 +32,6 @@ export interface PagesUi {
   saveWhiteboard(input: { id: string; add: WhiteboardStroke[]; erase: string[] }): Promise<WhiteboardView>;
   /** Makes an item in another add-on, in the page's project. */
   createItem(pageId: string, pluginId: string, kind: string): Promise<StudioEmbedItem>;
-  createTable(input: { pageId: string; title: string; columns: Column[]; rows: Values[] }): Promise<Table>;
   /** Opens the composer on a draft. */
   compose(prompt: string): void;
 }
@@ -55,14 +49,11 @@ export const PagesUiContext = createContext<PagesUi>({
   linkPreview: () => Promise.reject(new Error("No link previews here.")),
   studioItems: () => Promise.resolve([]),
   artifactView: () => Promise.resolve(null),
-  table: unavailable,
-  tableApi: () => ({ update: unavailable, patchRows: unavailable }),
   recording: unavailable,
   handOffChecklist: unavailable,
   whiteboard: unavailable,
   saveWhiteboard: unavailable,
   createItem: unavailable,
-  createTable: unavailable,
   compose: () => {},
 });
 

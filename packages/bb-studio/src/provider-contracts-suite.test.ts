@@ -1,5 +1,4 @@
 import Database from "better-sqlite3";
-import { expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { registerStudio as registerPages } from "../../bb-studio-pages/src/studio";
 import { PageStore, MIGRATIONS as PAGE_MIGRATIONS } from "../../bb-studio-pages/src/store";
@@ -9,11 +8,7 @@ import { registerStudio as registerTalk } from "../../bb-studio-talk/src/server/
 import { memoryStore as talkStore, addSegment } from "../../bb-studio-talk/src/test/db";
 import { registerStudio as registerArtifacts } from "../../bb-studio-artifacts/src/server/studio";
 import { memoryStore as artifactStore, bytes } from "../../bb-studio-artifacts/src/test/db";
-import tablesPlugin from "../../bb-studio-tables/server";
 import { schemas } from "./contract";
-import { StudioHub, type HubSdk } from "./hub";
-import { SearchIndex } from "./search-index";
-import { MIGRATIONS } from "./migrations";
 import { providerConformance, type ProviderHarness } from "./test/provider-conformance";
 
 function registration() {
@@ -82,57 +77,4 @@ providerConformance("Artifacts", () => {
     editTitle: (id, title) => { store.update(id, { title }, "app"); },
     close: () => { db.close(); },
   };
-});
-
-function tablesFixture() {
-  const db = new Database(":memory:");
-  const { handlers, bb, events } = registration();
-  const optionalStudio = vi.fn(async () => { throw Object.assign(new Error("Studio is not installed"), { status: 404 }); });
-  const cleanup = tablesPlugin({
-    ...bb,
-    storage: { database: () => db, migrate: (_db: Database.Database, sql: readonly string[]) => { for (const statement of sql) db.exec(statement); } },
-    sdk: { plugins: { callRpc: optionalStudio, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] } },
-    ui: { registerMentionProvider: () => {} }, agents: { registerTool: () => {}, configure: () => {} }, cli: { register: () => {} },
-  } as never);
-  return {
-    pluginId: "studio-tables", kind: "table", handlers, optionalStudio, expectedContent: "Name",
-    notificationCount: () => events.length,
-    editTitle: async (id: string, title: string) => { await handlers.update!({ id, title } as never); },
-    close: () => { cleanup(); db.close(); },
-  };
-}
-providerConformance("Tables", tablesFixture);
-
-it("Tables native writes and reads survive the optional Studio notifier rejecting", async () => {
-  vi.useFakeTimers();
-  const fixture = tablesFixture();
-  try {
-    const created = await fixture.handlers.create!({ title: "Local table", projectId: null, columns: [{ id: "name", name: "Name", type: "text", options: [] }], rows: [{ name: "Offline content" }] } as never) as { table: { id: string } };
-    await vi.advanceTimersByTimeAsync(250);
-    expect(fixture.optionalStudio).toHaveBeenCalledOnce();
-    expect(await fixture.handlers.studio_read!({ id: created.table.id } as never)).toMatchObject({ content: expect.stringContaining("Offline content") });
-    expect(await fixture.handlers.studio_list!(null as never)).toMatchObject({ items: [{ id: created.table.id }] });
-  } finally { fixture.close(); vi.useRealTimers(); }
-});
-
-it("Tables supplies searchable text beyond the 200-row preview", async () => {
-  const fixture = tablesFixture();
-  try {
-    const created = await fixture.handlers.create!({ title: "Large table", projectId: null, columns: [{ id: "name", name: "Name", type: "text", options: [] }], rows: Array.from({ length: 201 }, (_, index) => ({ name: index === 200 ? "afterpreviewuniqueword" : `Entry ${index}` })) } as never) as { table: { id: string } };
-    const output = schemas.provider.studio_read.output.parse(await fixture.handlers.studio_read!({ id: created.table.id, format: "text" } as never));
-    expect(output.content).toContain("afterpreviewuniqueword");
-    const db = new Database(":memory:");
-    for (const sql of MIGRATIONS) db.exec(sql);
-    const sdk: HubSdk = { plugins: {
-      list: async () => ({ plugins: [{ id: "studio-tables", name: "Tables", enabled: true, status: "running", statusDetail: null, version: "1" }] }),
-      experimental_discoverRpc: async () => [{ pluginId: "studio-tables" }],
-      callRpc: async ({ method, input, outputSchema }) => outputSchema.parse(await fixture.handlers[method]!(input as never)),
-    } };
-    const index = new SearchIndex(db, new StudioHub(sdk));
-    try {
-      await index.ensure();
-      expect(index.search("afterpreviewuniqueword").map((hit) => hit.ref)).toEqual([{ pluginId: "studio-tables", id: created.table.id }]);
-      expect(index.status().state).toBe("current");
-    } finally { await index.dispose(); db.close(); }
-  } finally { fixture.close(); }
 });

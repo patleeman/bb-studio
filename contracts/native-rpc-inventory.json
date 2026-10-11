@@ -117,12 +117,6 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tables",
-      "method": "get",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "studio",
       "method": "links",
       "coverage": "generated method"

@@ -95,54 +95,6 @@
     }
   },
   {
-    "id": "table-read",
-    "plugin": "studio-tables",
-    "method": "get",
-    "input": {
-      "id": "tbl_contract"
-    },
-    "output": {
-      "table": {
-        "id": "tbl_contract",
-        "title": "Contract table",
-        "projectId": null,
-        "columns": [
-          {
-            "id": "text",
-            "name": "Text",
-            "type": "text",
-            "options": []
-          }
-        ],
-        "views": [],
-        "rows": [
-          {
-            "id": "row_contract",
-            "values": {
-              "text": "Text",
-              "number": 42,
-              "check": true,
-              "multi": [
-                "a",
-                "b"
-              ],
-              "relation": {
-                "pluginId": "pages",
-                "itemId": "pg_contract"
-              },
-              "empty": null
-            },
-            "createdAt": 1,
-            "updatedAt": 2
-          }
-        ],
-        "archived": false,
-        "createdAt": 1,
-        "updatedAt": 2
-      }
-    }
-  },
-  {
     "id": "chat-start",
     "plugin": "studio",
     "method": "chat.start",

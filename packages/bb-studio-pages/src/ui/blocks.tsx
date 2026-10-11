@@ -293,7 +293,6 @@ const EMBED_ICONS = {
   drawing: "Palette",
   artifact: "File",
   recording: "Mic",
-  table: "Rows2",
   item: "GridView",
 } as const satisfies Record<EmbedKind, string>;
 
@@ -388,7 +387,7 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
         />
       );
     }
-    return <StudioEmbed kind={kind} target={target} onEdit={onEdit ? () => setEditing(true) : undefined} onTargetChange={onEdit} />;
+    return <StudioEmbed kind={kind} target={target} onEdit={onEdit ? () => setEditing(true) : undefined} />;
   }
   const page = kind === "page" ? ui.pages.find((candidate) => candidate.id === target) : undefined;
   const heading = title || page?.title || (kind === "bookmark" ? hostOf(target) : target) || "Embed";

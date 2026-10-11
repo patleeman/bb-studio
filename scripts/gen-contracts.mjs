@@ -18,7 +18,6 @@ const plugins = [
   ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "rpcContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
   ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],
-  ["studio-tables", "Tables", "../packages/bb-studio-kit/src/tables/contract.ts", "tablesContract"],
   ["design", "Design", "../packages/bb-studio-design/server.ts", "rpcContract"],
 ];
 

@@ -1,7 +1,7 @@
 # Backup and restore
 
 One file holds every Studio item: pages, Talk recordings, drawings,
-artifacts, tables and designs, plus Studio's own data (tags, Spaces, saved
+artifacts and designs, plus Studio's own data (tags, Spaces, saved
 views, item links, comments and versions). Restoring it on another BB adds
 what's missing. A second restore changes nothing, and work that is newer on
 the BB you restore to is never overwritten.
@@ -28,7 +28,6 @@ use the CLI.
 | `talk/` | Studio Talk | Each recording with its segments, transcripts, meeting notes and the id of its notes page, and its audio files. |
 | `excalidraw/` | Studio Draw | Each drawing's scene, and its images as separate files. |
 | `artifacts/` | Studio Artifacts | Each artifact with every version's bytes. |
-| `studio-tables/` | Studio Tables | Each table: its columns, views and rows. |
 | `design/` | Studio Design | Each design with its rounds, screens (as HTML files) and comments. |
 | `studio/` | Studio | Tags and which items have them, saved views, Spaces with their projects, threads, leads (the default space's lead is the Chief of Staff) and check-in settings, item links, item chats, comments, versions and activity. |
 
@@ -90,7 +89,6 @@ Section layouts:
 - `talk/`: `items/<id>.json`, `audio/<id>/<segment file>`.
 - `excalidraw/`: `items/<id>.json`, `files/<id>/<n>`; each image's path and MIME type are in the item JSON.
 - `artifacts/`: `items/<id>.json`, `files/<id>/<version id>`.
-- `studio-tables/`: `items/<id>.json`.
 - `design/`: `items/<id>.json`, `files/<id>/screens/<screen id>.html`.
 - `studio/`: `tags.json`, `item-tags.json`, `views.json`, `spaces.json`, `links.json`, `item-chats.json`, `comments.json`, `versions.json`, `activity.json`, `blobs/<sha256>`.
 

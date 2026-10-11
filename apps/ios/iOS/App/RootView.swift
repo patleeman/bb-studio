@@ -105,7 +105,6 @@ struct RouteDestination: View {
         case .drawing(let id): DrawingView(id: id)
         case .recording(let id): RecordingDetailView(id: id)
         case .artifact(let id): ArtifactView(id: id)
-        case .table(let id): StudioTableView(id: id).id(id)
         case .design(let id): DesignView(id: id).id(id)
         case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
         }

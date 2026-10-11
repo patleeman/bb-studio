@@ -17,7 +17,6 @@ enum Route: Hashable {
     case drawing(id: String)
     case recording(id: String)
     case artifact(id: String)
-    case table(id: String)
     case design(id: String)
     case terminals(scope: TerminalScope, title: String)
 }
@@ -33,7 +32,6 @@ extension Route {
         case ("artifacts", "artifacts"): self = .artifact(id: id)
         case ("excalidraw", "drawings"): self = .drawing(id: id)
         case ("talk", "recordings"): self = .recording(id: id)
-        case ("studio-tables", "tables"): self = .table(id: id)
         case ("design", "designs"): self = .design(id: id)
         default: return nil
         }

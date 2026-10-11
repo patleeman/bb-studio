@@ -1,7 +1,7 @@
 # Native plugin contract coverage
 
 `pnpm gen:contracts` generates JSON schemas and Swift models from each included
-plugin's actual RPC contract: Studio, Pages, Draw, Talk, Chat, Tables,
+plugin's actual RPC contract: Studio, Pages, Draw, Talk, Chat,
 Artifacts, Mobile and Decisions.
 
 `pnpm check:contracts` also checks the generated
@@ -28,7 +28,6 @@ then call the real Swift wrappers, decode their serialized transport requests,
 compare them with those same fixtures, and check response decoding:
 
 - Talk recording creation, audio segment upload and transcript reads.
-- Tables text, number, boolean, list, relation and null cell values.
 - Studio Chat's start envelope.
 
 Existing Studio Chat tests

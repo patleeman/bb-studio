@@ -1,15 +1,12 @@
-// Embeds that stay live: a table edited in place, a recording played with its
+// Embeds that stay live: a recording played with its
 // transcript. Each reads and writes its add-on
 // through Pages and refreshes while it's shown.
 import { errorMessage } from "@bb-studio/kit/format";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon, cn } from "@bb-studio/kit/ui";
-import { parseTableSubPath, tableHref, tableSubPath, type Table } from "@bb-studio/kit/tables";
-import { TableView, type TableHost } from "@bb-studio/kit/table-grid";
 import { toast } from "sonner";
-import type { RecordingCard, StudioEmbedItem } from "../contract";
+import type { RecordingCard } from "../contract";
 import { usePagesUi } from "./context";
-import { useStudioItems } from "./studio-embeds";
 
 const POLL_MS = 5_000;
 
@@ -35,84 +32,6 @@ function useLive<T>(load: () => Promise<T>, key: string): { value: T | undefined
     return () => clearInterval(timer);
   }, [key, reload]);
   return { value, failed, reload };
-}
-
-// ---- Tables ----
-
-/** A table edited in place; `target` is `<table id>` or `<table id>/view/<view id>`. */
-export function TableEmbed({ target, onTargetChange }: { target: string; onTargetChange?(target: string): void }) {
-  const ui = usePagesUi();
-  const linked = parseTableSubPath(target);
-  const tableId = linked?.tableId ?? "";
-  const { value: table, failed } = useLive<Table | null>(() => ui.table(tableId), tableId);
-  const items = useStudioItems();
-  const api = useMemo(() => ui.tableApi(tableId), [ui, tableId]);
-  const host = useMemo<TableHost>(
-    () => ({
-      openUrl: ui.openUrl,
-      openItem: (relation) => {
-        const item = items?.find((each) => each.pluginId === relation.pluginId && each.id === relation.itemId);
-        if (item) ui.openPath(item.href);
-      },
-      items: (items ?? []).map((item: StudioEmbedItem) => ({
-        pluginId: item.pluginId,
-        itemId: item.id,
-        title: item.title,
-        kindLabel: item.kindLabel,
-        kindIcon: item.kindIcon,
-        icon: item.icon,
-        href: item.href,
-      })),
-      bots: ui.bots.map((bot) => bot.name),
-      copyLink: ({ viewId, rowId }) =>
-        void navigator.clipboard.writeText(new URL(tableHref({ tableId, viewId, rowId }), window.location.origin).href).then(
-          () => toast.success(rowId ? "Copied a link to the row." : viewId ? "Copied a link to the view." : "Copied a link to the table."),
-          (error) => toast.error(errorMessage(error)),
-        ),
-      onError: (error) => toast.error(errorMessage(error)),
-    }),
-    [ui, items, tableId],
-  );
-
-  if (!table) {
-    return (
-      <p role={failed || table === null ? "alert" : "status"} className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-        <Icon name="Rows2" className="size-4" />
-        {table === null ? "This table was deleted." : failed ? "Studio Tables isn't available." : "Loading table…"}
-      </p>
-    );
-  }
-  return (
-    <div className="pages-table-embed">
-      <header className="flex items-center gap-2 px-3 pt-2.5">
-        <Icon name="Rows2" className="size-4 shrink-0 text-muted-foreground" />
-        <button
-          type="button"
-          className="min-w-0 truncate text-sm font-medium text-foreground hover:underline"
-          title="Open in Tables"
-          onClick={() => ui.openPath(tableHref({ tableId, viewId: linked?.viewId }))}
-        >
-          {table.title}
-        </button>
-        <button
-          type="button"
-          aria-label="Open in Tables"
-          className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
-          onClick={() => ui.openPath(tableHref({ tableId, viewId: linked?.viewId }))}
-        >
-          <Icon name="ArrowUpRight" className="size-4" />
-        </button>
-      </header>
-      <TableView
-        embedded
-        table={table}
-        api={api}
-        host={host}
-        viewId={linked?.viewId}
-        onViewChange={onTargetChange ? (viewId) => onTargetChange(tableSubPath({ tableId, viewId })) : undefined}
-      />
-    </div>
-  );
 }
 
 // ---- Recordings ----

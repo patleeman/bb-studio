@@ -9,12 +9,11 @@ agent.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, artifacts and tables, with search, tags, project filters, templates, item chats and quotes, Spaces (areas of work with a lead thread and a Command view), a Setup page for the add-ons, plugin health and backup and restore. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings and artifacts, with search, tags, project filters, templates, item chats and quotes, Spaces (areas of work with a lead thread and a Command view), a Setup page for the add-ons, plugin health and backup and restore. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents, with checklists you hand to agents, inline whiteboards, and Explore: pages explaining what an agent noticed along the way. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
-| [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
 | [Studio Design](packages/bb-studio-design/) | `design` | UI prototypes you design with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work. |
 | [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces in your Spaces: one or more folders in a full editor beside your threads, run by a local code-server. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Thread lists organized by Space, project, section or machine, plus navigation without duplicate Studio rows. |
@@ -30,8 +29,8 @@ all.
 ## iOS app
 
 [`apps/ios`](apps/ios/) is BB Studio for iPhone and Apple Watch: BB's threads,
-approvals, terminals and automations, plus native Studio, Pages, Talk, Draw,
-Artifacts and Tables. It talks to your BB server and uses the plugins
+approvals, terminals and automations, plus native Studio, Pages, Talk, Draw
+and Artifacts. It talks to your BB server and uses the plugins
 above; install `mobile` for push notifications. See its
 [README](apps/ios/README.md) to build it and ship it to TestFlight.
 
@@ -53,7 +52,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
-   - studio-tables: structured tables with views and CSV import and export
    - thread-list-plus: Studio Sidebar; thread organization and sidebar navigation
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
@@ -98,7 +96,7 @@ bb plugin remove talk
 bb plugin install talk@bb-studio --yes
 ```
 
-Your items (pages, recordings, drawings, artifacts and tables) are kept, but removing a
+Your items (pages, recordings, drawings and artifacts) are kept, but removing a
 plugin deletes its settings and secrets, so note them first.
 
 ## Consolidation upgrades

@@ -19,7 +19,7 @@ describe("canonical Studio references", () => {
     expect(parseStudioItemHref("/plugins/pages/pages/a%3Ab%2Fc")).toEqual({ pluginId: "pages", id: "a:b/c" });
     for (const path of ["/plugins/pages/pages/a%", "/plugins/pages/pages/%ZZ", "/plugins/pages/settings/pg_1", "/plugins/custom/objects/a", "/plugins/pages/pages/a/unknown"]) expect(parseStudioItemHref(path)).toBeNull();
     expect(parseStudioItemHref("/plugins/custom/objects/a%3Ab", { routes: [{ pluginId: "custom", path: "/plugins/custom/objects/" }] })).toEqual({ pluginId: "custom", id: "a:b" });
-    expect(parseStudioItemHref("/plugins/studio-tables/tables/tbl_1/view/view_1/row/row_1")).toEqual({ pluginId: "studio-tables", id: "tbl_1" });
+    expect(parseStudioItemHref("/plugins/bot-teams/bots/bot_1/profile")).toEqual({ pluginId: "bot-teams", id: "bot_1" });
   });
   it("requires a matching origin for absolute and protocol-relative links", () => {
     const options = { origin: "https://bb.example" };

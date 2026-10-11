@@ -6,7 +6,7 @@ description: Use when a message says the user has a Studio item open ("Context f
 # Studio Chat
 
 Item chat is part of Studio. It provides the Chat action on BB Studio items: pages,
-drawings, recordings, artifacts and tables. Starting a chat from it
+drawings, recordings and artifacts. Starting a chat from it
 adds a pill for the item whose Chat action the user chose, including an item
 in a split. The main pane can show another item. When the message is sent, the pill turns
 into a short note for you:

@@ -2,12 +2,11 @@ import SwiftUI
 import WebKit
 
 /// The Studio item a reply card opens: `::page{id="pg_…"}`, `::drawing{…}`,
-/// `::table{…}`, `::design{…}` or `::recording{…}` on its own line.
+/// `::design{…}` or `::recording{…}` on its own line.
 /// Artifacts have `ArtifactCard`.
 enum ReplyItem: Hashable {
     case page(String)
     case drawing(String)
-    case table(String)
     case design(String)
     case recording(String)
 
@@ -17,7 +16,6 @@ enum ReplyItem: Hashable {
         switch directive.name {
         case "page": self = .page(id)
         case "drawing": self = .drawing(id)
-        case "table": self = .table(id)
         case "design" where BBClient.isDesignId(id): self = .design(id)
         case "recording" where id.wholeMatch(of: /rec_[a-z0-9]{8,32}/) != nil: self = .recording(id)
         default: return nil
@@ -26,7 +24,7 @@ enum ReplyItem: Hashable {
 
     var id: String {
         switch self {
-        case .page(let id), .drawing(let id), .table(let id), .design(let id), .recording(let id): id
+        case .page(let id), .drawing(let id), .design(let id), .recording(let id): id
         }
     }
 
@@ -34,7 +32,6 @@ enum ReplyItem: Hashable {
         switch self {
         case .page(let id): .page(id: id)
         case .drawing(let id): .drawing(id: id)
-        case .table(let id): .table(id: id)
         case .design(let id): .design(id: id)
         case .recording(let id): .recording(id: id)
         }
@@ -44,7 +41,6 @@ enum ReplyItem: Hashable {
         switch self {
         case .page: StudioKind.of("page")
         case .drawing: StudioKind.of("drawing")
-        case .table: StudioKind.of("table")
         case .design: StudioKind.of("design")
         case .recording: StudioKind.of("recording")
         }
@@ -55,7 +51,6 @@ enum ReplyItem: Hashable {
 enum ReplyPreview {
     case markdown(String)
     case drawing(DrawingScene)
-    case table(StudioTablePreview)
     case design(id: String, screens: [DesignScreen])
     case recording(RecordingPreview)
     /// The item has nothing to show yet, such as an empty page.
@@ -63,27 +58,6 @@ enum ReplyPreview {
 
     /// The tallest a preview gets before it scrolls, as on the web.
     static let maxHeight: CGFloat = 320
-}
-
-/// The first view's first rows, as text.
-struct StudioTablePreview {
-    static let rowLimit = 20
-
-    var columns: [String]
-    var rows: [[String]]
-    var total: Int
-
-    /// The table's rows in its own order, without the first view's hidden columns.
-    init(_ table: Tables.GetOutputTable) {
-        let hidden = Set(table.views?.first?.hidden ?? [])
-        let shown = (table.columns ?? []).filter { !hidden.contains($0.id ?? "") }
-        let all = table.rows ?? []
-        columns = shown.map { $0.name ?? "Column" }
-        rows = all.prefix(Self.rowLimit).map { row in
-            shown.map { column in column.id.flatMap { row.values?[$0] }.map(StudioTableView.text) ?? "" }
-        }
-        total = all.count
-    }
 }
 
 /// A recording's summary and the start of its transcript.
@@ -258,15 +232,6 @@ struct ReplyItemCard: View {
                     detail: count == 1 ? "1 element" : "\(count) elements",
                     preview: count == 0 ? .note("This drawing is empty.") : .drawing(drawing.scene))
             }
-        case .table(let id):
-            return try await client.studioTable(id).map { table in
-                let rows = table.rows?.count ?? 0, columns = table.columns?.count ?? 0
-                let title = (table.title ?? "").trimmingCharacters(in: .whitespaces)
-                let preview = StudioTablePreview(table)
-                return Summary(title: title.isEmpty ? "Untitled table" : title,
-                    detail: "\(rows) row\(rows == 1 ? "" : "s") · \(columns) column\(columns == 1 ? "" : "s")",
-                    preview: preview.total == 0 || preview.columns.isEmpty ? .note("This table has no rows yet.") : .table(preview))
-            }
         case .design(let id):
             return try await client.design(id).map { design in
                 let count = design.screens.count
@@ -318,8 +283,6 @@ struct ReplyPreviewView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Open drawing")
-        case .table(let table):
-            tableGrid(table)
         case .design(let id, let screens):
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
@@ -347,43 +310,6 @@ struct ReplyPreviewView: View {
         .frame(maxHeight: ReplyPreview.maxHeight)
     }
 
-    private func tableGrid(_ table: StudioTablePreview) -> some View {
-        let grid = Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
-            GridRow {
-                ForEach(Array(table.columns.enumerated()), id: \.offset) { _, name in cell(name, heading: true) }
-            }
-            ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
-                GridRow {
-                    ForEach(Array(row.enumerated()), id: \.offset) { _, value in cell(value) }
-                }
-            }
-        }
-        return VStack(alignment: .leading, spacing: 0) {
-            // As tall as the rows up to the limit, then scrolling both ways.
-            ViewThatFits(in: .vertical) {
-                ScrollView(.horizontal) { grid }
-                ScrollView([.horizontal, .vertical]) { grid }
-            }
-            .frame(maxHeight: ReplyPreview.maxHeight)
-            if table.total > table.rows.count {
-                Divider()
-                Text("\(table.total - table.rows.count) more rows").font(.caption).foregroundStyle(.secondary)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-            }
-        }
-    }
-
-    private func cell(_ text: String, heading: Bool = false) -> some View {
-        Text(text)
-            .font(heading ? .caption.weight(.semibold) : .caption)
-            .foregroundStyle(heading ? .secondary : .primary)
-            .lineLimit(1)
-            .frame(width: 130, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(heading ? Color.secondary.opacity(0.1) : Color.clear)
-            .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 0.5) }
-    }
 
     private func recordingBody(_ recording: RecordingPreview) -> some View {
         VStack(alignment: .leading, spacing: 8) {

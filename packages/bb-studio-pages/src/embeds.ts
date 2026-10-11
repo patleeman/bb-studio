@@ -1,11 +1,10 @@
 // Items from the other Studio add-ons, for embeds and mentions, and what
-// their live embeds show and edit: an artifact's content, a table, a
+// their live embeds show and edit: an artifact's content, a
 // recording. A plugin's UI can only call its own RPCs, so Pages asks each
 // add-on on its behalf.
 import { untitled } from "@bb-studio/kit/format";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/server";
-import { TABLES_PLUGIN_ID, tablesContract } from "@bb-studio/kit/tables";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { changesData, DRAW_PLUGIN_ID, parseScene, renderWhiteboard, whiteboardChanges, type WhiteboardStroke, type WhiteboardView } from "./whiteboard";
@@ -47,10 +46,6 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
   const index = studioIndex(sdk, studio, { exclude: [PLUGIN_ID] });
   const call = <T extends z.ZodType>(pluginId: string, method: string, input: unknown, outputSchema: T): Promise<z.infer<T>> =>
     sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema }) as Promise<z.infer<T>>;
-  type Tables = typeof tablesContract;
-  /** Calls Studio Tables with its own contract's schemas. */
-  const table = <M extends keyof Tables>(method: M, input: z.input<Tables[M]["input"]>) =>
-    call(TABLES_PLUGIN_ID, method, input, tablesContract[method].output) as Promise<z.infer<Tables[M]["output"]>>;
 
   return {
     /** Every add-on's items. */
@@ -63,12 +58,6 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       ]);
       index.invalidate();
       return indexItem(pluginId, item, info);
-    },
-    table,
-    async createTable(input: z.input<Tables["create"]["input"]>) {
-      const result = await table("create", input);
-      index.invalidate();
-      return result;
     },
 
     async recording(id: string): Promise<RecordingCard | null> {

@@ -212,7 +212,7 @@ commands left to run; `--json` prints the whole summary.
 
 `bb studio backup [--out <file|folder>]` saves every Studio item into one
 `.zip`. That covers pages, recordings with their audio, drawings, artifacts,
-tables, designs, and Studio's tags, Spaces, views, links, comments and
+designs, and Studio's tags, Spaces, views, links, comments and
 versions. `bb studio restore <file>` shows what would change, and `--yes`
 restores it. Restore matches each item by its original id, so running it
 again changes nothing, and it never overwrites a copy that is newer here.

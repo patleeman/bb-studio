@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings, artifacts and tables — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (Studio Pages, Studio Talk, Studio Draw, Studio Artifacts, Studio Tables) fit together.
+description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (Studio Pages, Studio Talk, Studio Draw, Studio Artifacts) fit together.
 ---
 
 # Studio
@@ -14,7 +14,6 @@ the core: one collection that lists every item from every installed add-on.
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Studio Draw | `excalidraw` | Drawings | the `draw` skill and `excalidraw_*` tools |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
-| Studio Tables | `studio-tables` | Tables with typed columns and views | the `tables_*` tools |
 
 Items belong to a BB project or are global. Every item has a link
 (`/plugins/<plugin id>/<panel>/<item id>`); put it in replies as
@@ -55,7 +54,7 @@ user asks to group, file or label items; don't invent tags on your own.
 ## Deleting
 
 `studio_delete_items` with `items` (item links) permanently deletes pages,
-recordings, drawings, artifacts, tables and other add-on items.
+recordings, drawings, artifacts and other add-on items.
 A page takes its sub-pages with it. There's no undo, so delete only what the user asked
 to remove, and confirm first when the request is vague, like "clean up old
 stuff". It doesn't delete spaces.

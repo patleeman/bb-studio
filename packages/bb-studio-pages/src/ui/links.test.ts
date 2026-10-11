@@ -18,9 +18,6 @@ describe("linkEmbed", () => {
     expect(linkEmbed(`${ORIGIN}/plugins/excalidraw/drawings/drw_1`, ORIGIN)).toEqual({ kind: "drawing", target: "drw_1" });
     expect(linkEmbed(`${ORIGIN}/plugins/artifacts/artifacts/art_0123456789abcdef`, ORIGIN)).toEqual({ kind: "artifact", target: "art_0123456789abcdef" });
     expect(linkEmbed(`${ORIGIN}/plugins/talk/recordings/rec_1/`, ORIGIN)).toEqual({ kind: "recording", target: "rec_1" });
-    expect(linkEmbed(`${ORIGIN}/plugins/studio-tables/tables/tbl_1`, ORIGIN)).toEqual({ kind: "table", target: "tbl_1" });
-    // A table link keeps its view and leaves the row to the embed.
-    expect(linkEmbed(`${ORIGIN}/plugins/studio-tables/tables/tbl_1/view/view_2/row/row_3`, ORIGIN)).toEqual({ kind: "table", target: "tbl_1/view/view_2" });
     // Another app's link, or an unknown panel, stays a bookmark.
     expect(linkEmbed("https://other.dev/plugins/excalidraw/drawings/drw_1", ORIGIN)?.kind).toBe("bookmark");
     expect(linkEmbed(`${ORIGIN}/plugins/excalidraw/settings/x`, ORIGIN)?.kind).toBe("bookmark");
@@ -35,8 +32,8 @@ describe("linkEmbed", () => {
 });
 
 it("turns a pasted reference into a page or item mention", () => {
-  const items = [{ pluginId: "studio-tables", id: "tbl_1", href: "/plugins/studio-tables/tables/tbl_1" }];
+  const items = [{ pluginId: "notes", id: "nt_1", href: "/plugins/notes/notes/nt_1" }];
   expect(referenceMention("/plugins/pages/pages/pg_0123456789ab", items)).toEqual({ kind: "page", target: "pg_0123456789ab" });
-  expect(referenceMention("/plugins/studio-tables/tables/tbl_1/view/v_1", items)).toEqual({ kind: "item", target: "studio-tables:tbl_1" });
+  expect(referenceMention("/plugins/notes/notes/nt_1", items)).toEqual({ kind: "item", target: "notes:nt_1" });
   expect(referenceMention("/plugins/feed/feed/p_1", items)).toBeNull();
 });

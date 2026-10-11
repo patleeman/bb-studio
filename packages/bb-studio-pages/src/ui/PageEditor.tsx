@@ -49,12 +49,10 @@ const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
   drawing: "Embed an Excalidraw drawing",
   artifact: "Embed an artifact: image, HTML, PDF or text",
   recording: "Embed a Talk recording",
-  table: "Embed a live Studio table",
 };
-const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", table: "Rows2" };
+const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic" };
 /** Slash items that make a new item in another add-on and embed it. */
 const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
-  { kind: "table", aliases: ["database", "spreadsheet", "sheet", "grid"] },
   { kind: "drawing", aliases: ["whiteboard", "excalidraw", "sketch", "diagram", "draw"] },
 ];
 
@@ -299,8 +297,7 @@ export function PageEditor({
         onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "thread" } }),
       },
       ...(Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).map((kind) => ({
-        // BlockNote's own "Table" is the basic one.
-        title: kind === "table" ? "Live table" : STUDIO_EMBEDS[kind].label,
+        title: STUDIO_EMBEDS[kind].label,
         subtext: STUDIO_EMBED_SUBTEXT[kind],
         aliases: [kind, STUDIO_EMBEDS[kind].pluginId, "studio", "embed"],
         group: "Studio",
@@ -512,7 +509,7 @@ export function PageEditor({
           </div>
         </aside>
       ) : null}
-      <PageSideMenu pageId={page.id} pageTitle={page.title} />
+      <PageSideMenu pageId={page.id} />
       <SuggestionMenuController triggerCharacter="/" getItems={slashMenuItems} />
       <SuggestionMenuController triggerCharacter="@" getItems={mentionItems} />
       <Suspense>

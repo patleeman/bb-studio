@@ -223,10 +223,6 @@ async function registerPages(bb: BbPluginApi) {
     whiteboardGet: async ({ id }) => ({ whiteboard: await embeds.whiteboard(id) }),
     whiteboardSave: async ({ id, add, erase }) => ({ whiteboard: await embeds.saveWhiteboard(id, add, erase) }),
     studioCreate: async ({ pageId, pluginId, kind }) => ({ item: await embeds.create(pluginId, kind, requireMeta(pageId).project_id) }),
-    tableGet: ({ id }) => embeds.table("get", { id }),
-    tableUpdate: (input) => embeds.table("update", input),
-    tablePatchRows: (input) => embeds.table("patchRows", input),
-    tableCreate: ({ pageId, ...input }) => embeds.createTable({ ...input, projectId: requireMeta(pageId).project_id }),
     recordingView: async ({ id }) => ({ recording: await embeds.recording(id) }),
     markdown: ({ id }) => {
       requireMeta(id);

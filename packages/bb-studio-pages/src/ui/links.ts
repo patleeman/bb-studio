@@ -1,21 +1,15 @@
 // Pasting a lone link on an empty line turns it into an embed: a page,
-// thread, drawing, artifact, recording or live table for a BB
+// thread, drawing, artifact, recording for a BB
 // link, a bookmark for anything else on the web.
 import { itemAtPath } from "@bb-studio/kit/contract";
-import { parseTableSubPath, tableSubPath } from "@bb-studio/kit/tables";
 import { STUDIO_EMBEDS, isEmbedKindItem, type EmbedKind, type StudioEmbedKind } from "../schema-config";
 
 const PAGE_PATH = /^\/plugins\/pages\/pages\/(pg_[a-f0-9]{12}(?:[a-f0-9]{4})?)(?:\/|$)/;
 const THREAD_PATH = /(?:^|\/)threads\/(thr_[a-z0-9]+)(?:\/|$)/;
 const ITEM_PATH = /^\/plugins\/([a-z0-9-]+)\/([a-z0-9-]+)\/([A-Za-z0-9_-]+)\/?$/;
-const TABLE_PATH = new RegExp(`^/plugins/${STUDIO_EMBEDS.table.pluginId}/${STUDIO_EMBEDS.table.panel}/(.+)$`);
 
 /** The embed for a Studio add-on's item page, e.g. `/plugins/excalidraw/drawings/<id>`. */
 export function studioLink(pathname: string): { kind: StudioEmbedKind; target: string } | null {
-  const table = TABLE_PATH.exec(pathname);
-  const linked = table ? parseTableSubPath(table[1]!) : null;
-  // A table link keeps the view it points at; the embed opens rows itself.
-  if (linked) return { kind: "table", target: tableSubPath({ tableId: linked.tableId, viewId: linked.viewId }) };
   const match = ITEM_PATH.exec(pathname);
   if (!match) return null;
   const [, pluginId, panel, id] = match;

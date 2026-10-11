@@ -3,7 +3,7 @@ import SwiftUI
 /// Block-level markdown on top of `AttributedString`'s inline parser: headings,
 /// paragraphs, ordered, nested and task lists, quotes, tables, rules and fenced
 /// code, and images. `::artifact{id="…"}` lines become artifact cards, `::page{…}`, `::drawing{…}`,
-/// `::table{…}`, `::design{…}` and `::recording{…}` lines cards that preview and open the item,
+/// `::design{…}` and `::recording{…}` lines cards that preview and open the item,
 /// and `::inline-vis{…}` lines show the file they name; other directives, such as `::reactions{…}`,
 /// are left out; see `Directive`.
 struct MarkdownText: View {

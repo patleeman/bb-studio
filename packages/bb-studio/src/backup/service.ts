@@ -12,7 +12,7 @@ import { ADDONS } from "../setup-addons";
 import { extractEntries, readEntry, readZip, zipDirectory, type ZipLimits, DEFAULT_LIMITS } from "./zip";
 
 /** The add-ons whose items a backup holds, in restore order. */
-export const BACKUP_ADDONS = ["pages", "talk", "excalidraw", "artifacts", "studio-tables", "design"] as const;
+export const BACKUP_ADDONS = ["pages", "talk", "excalidraw", "artifacts", "design"] as const;
 
 /** What a backup leaves out, on purpose. Written into every manifest. */
 export const NOT_INCLUDED = [

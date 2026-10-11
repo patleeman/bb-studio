@@ -45,12 +45,11 @@ const ACCENT = "#c8ff3d";
 
 // [capture ID, headline (*accent*), line under it, seconds, CSS width]
 const SCENES = [
-  ["studio", "*Everything* in one place.", "Pages, recordings, drawings and tables.", 3.5, 1040],
+  ["studio", "*Everything* in one place.", "Pages, recordings, drawings and artifacts.", 3.5, 1040],
   ["studio-search", "Search *all* of it.", "⌘⇧K looks inside every item.", 3.5],
   ["pages", "Pages you write *with* agents.", "Live stats, charts and checklists.", 4],
   ["talk", "Talk. It *transcribes*.", "Long recordings, saved as you speak.", 3.5],
   ["excalidraw", "*Sketch* it together.", "Excalidraw, shared with your agents.", 3],
-  ["studio-tables", "Real *tables*.", "Typed columns, views, CSV and agent tools.", 3],
   ["artifacts", "Keep what they *make*.", "Reports, images and files, all saved.", 3],
   ["bots", "Bots that work as a *team*.", "A Command view, delegation and memory.", 4, 900],
   ["studio-item-chat", "Chat about *what you see*.", "The agent knows what's on screen.", 3.5],

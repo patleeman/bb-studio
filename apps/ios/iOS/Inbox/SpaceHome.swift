@@ -356,7 +356,6 @@ struct SpaceItemChip: View {
         case .drawing: StudioKind.of("drawing").symbol
         case .artifact: StudioKind.of("artifact").symbol
         case .recording: StudioKind.of("recording").symbol
-        case .table: "tablecells"
         case .design: StudioKind.of("design").symbol
         default: "doc"
         }

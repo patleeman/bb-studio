@@ -14,7 +14,7 @@
   },
   "bb": {
     "name": "Studio",
-    "description": "The home of BB Studio: one collection for pages, recordings, drawings, artifacts and tables, with search, tags, Spaces, item conversations and quotes.",
+    "description": "The home of BB Studio: one collection for pages, recordings, drawings and artifacts, with search, tags, Spaces, item conversations and quotes.",
     "branding": {
       "icon": "./icons/studio.svg",
       "experimental_icons": {

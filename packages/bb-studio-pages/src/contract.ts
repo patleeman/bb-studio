@@ -1,7 +1,6 @@
 import { conversationRequestSchema } from "@bb-studio/kit/contract";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { columnSchema, rowPatchSchema, tableSchema, tableUpdateSchema, valuesSchema } from "@bb-studio/kit/tables";
 import { whiteboardStrokeSchema, whiteboardViewSchema } from "./whiteboard";
 
 export * from "./constants";
@@ -182,27 +181,10 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: itemId, add: z.array(whiteboardStrokeSchema).max(200), erase: z.array(z.string().min(1).max(200)).max(2000) }),
     output: z.object({ whiteboard: whiteboardViewSchema }),
   },
-  /** A new item of another add-on, such as a table or drawing, in the page's project. */
+  /** A new item of another add-on, such as a drawing, in the page's project. */
   studioCreate: {
     input: z.object({ pageId, pluginId: z.string().min(1).max(100), kind: z.string().min(1).max(100) }),
     output: z.object({ item: studioItemSchema }),
-  },
-  /** A live table embed reads and edits its table through Studio Tables. */
-  tableGet: {
-    input: z.object({ id: itemId }),
-    output: z.object({ table: tableSchema.nullable() }),
-  },
-  tableUpdate: { input: tableUpdateSchema, output: z.object({ table: tableSchema }) },
-  tablePatchRows: { input: rowPatchSchema.extend({ id: itemId }), output: z.object({ table: tableSchema }) },
-  /** A table made in a page, such as from a basic table block, in the page's project. */
-  tableCreate: {
-    input: z.object({
-      pageId,
-      title: z.string().trim().min(1).max(200),
-      columns: z.array(columnSchema).min(1).max(100),
-      rows: z.array(valuesSchema).max(5000),
-    }),
-    output: z.object({ table: tableSchema }),
   },
 
   recordingView: {

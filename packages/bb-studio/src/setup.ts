@@ -162,6 +162,15 @@ export const RETIRED: readonly RetiredPlugin[] = [
     ],
     blocker: async () => null,
   },
+  {
+    id: "studio-tables",
+    name: "Studio Tables",
+    why: "Studio Tables is retired and gets no more updates. Studio and Pages no longer list, link or embed tables.",
+    kept: "Nothing: tables have no replacement.",
+    deleted: `${REMOVED} Export any table you still need as CSV from its menu first.`,
+    before: [],
+    blocker: async () => null,
+  },
 ];
 
 const RETIRED_IDS = new Set(RETIRED.map((plugin) => plugin.id));

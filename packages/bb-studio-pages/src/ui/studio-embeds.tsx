@@ -1,5 +1,5 @@
 // Embeds of other Studio add-ons' items: a drawing shows its picture, an
-// artifact its content, a table its live grid, a recording its player and
+// artifact its content, a recording its player and
 // transcript, and the rest a card. Each opens the
 // item in its own add-on.
 import { useEffect, useMemo, useState } from "react";
@@ -9,7 +9,7 @@ import { cn } from "@bb-studio/kit/ui";
 import type { StudioEmbedItem } from "../contract";
 import { STUDIO_EMBEDS, isEmbedKindItem, studioRef, studioSubtitle, type StudioEmbedKind } from "../schema-config";
 import { usePagesUi, type ArtifactView } from "./context";
-import { RecordingBody, TableEmbed } from "./live-embeds";
+import { RecordingBody } from "./live-embeds";
 import { Whiteboard } from "./whiteboard";
 
 export function useStudioItems(enabled = true): StudioEmbedItem[] | null {
@@ -48,7 +48,6 @@ const FALLBACK_ICONS: Record<StudioEmbedKind | "item", string> = {
   drawing: "Palette",
   artifact: "File",
   recording: "Mic",
-  table: "Rows2",
   item: "GridView",
 };
 
@@ -142,14 +141,11 @@ function ItemBody({ item }: { item: StudioEmbedItem }) {
   return item.preview ? <div className="line-clamp-3 border-t border-border px-3 py-2 text-xs text-muted-foreground">{item.preview}</div> : null;
 }
 
-export function StudioEmbed({ kind, target, onEdit, onTargetChange }: {
+export function StudioEmbed({ kind, target, onEdit }: {
   kind: StudioEmbedKind | "item";
   target: string;
   onEdit?: () => void;
-  /** Keeps what a live embed shows, such as a table's view, with the page. */
-  onTargetChange?(target: string): void;
 }) {
-  if (kind === "table") return <TableEmbed target={target} onTargetChange={onTargetChange} />;
   return <ItemEmbed kind={kind} target={target} onEdit={onEdit} />;
 }
 

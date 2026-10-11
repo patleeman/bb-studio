@@ -48,11 +48,6 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
         return studioItems.current.items;
       },
       artifactView: (id) => rpc.call("artifactView", { id }).then((result) => result.view),
-      table: (id) => rpc.call("tableGet", { id }).then((result) => result.table),
-      tableApi: (id) => ({
-        update: (meta) => rpc.call("tableUpdate", { id, ...meta }),
-        patchRows: (patch) => rpc.call("tablePatchRows", { id, ...patch }),
-      }),
       recording: (id) => rpc.call("recordingView", { id }).then((result) => result.recording),
       handOffChecklist: (pageId, blockId) => rpc.call("checklistHandOff", { id: pageId, blockId }),
       whiteboard: (id) => rpc.call("whiteboardGet", { id }).then((result) => result.whiteboard),
@@ -62,11 +57,6 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
         rpc.call("studioCreate", { pageId, pluginId, kind }).then((result) => {
           studioItems.current = null;
           return result.item;
-        }),
-      createTable: (input) =>
-        rpc.call("tableCreate", input).then((result) => {
-          studioItems.current = null;
-          return result.table;
         }),
       compose: (prompt) => navigate.toCompose({ initialPrompt: prompt, focusPrompt: true }),
     }),

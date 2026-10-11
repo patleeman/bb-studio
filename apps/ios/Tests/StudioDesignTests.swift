@@ -37,13 +37,12 @@ final class StudioDesignTests: XCTestCase {
         XCTAssertEqual(StudioKind.of("design").label, "Design")
     }
 
-    func testReplyCardsForPagesDrawingsTablesAndDesigns() {
+    func testReplyCardsForPagesDrawingsAndDesigns() {
         let reply = """
             Made it.
 
             ::page{id="pg_1"}
             ::drawing{id="drw_2"}
-            ::table{id="tbl_3"}
             ::design{id="dsn_0123456789abcdef"}
             ::design{id="not-a-design"}
             ::recording{id="rec_abcd1234"}
@@ -54,21 +53,9 @@ final class StudioDesignTests: XCTestCase {
             if case .item(let item) = block { return item }
             return nil
         }
-        XCTAssertEqual(items, [.page("pg_1"), .drawing("drw_2"), .table("tbl_3"), .design("dsn_0123456789abcdef"), .recording("rec_abcd1234")])
-        XCTAssertEqual(items.map(\.route), [.page(id: "pg_1"), .drawing(id: "drw_2"), .table(id: "tbl_3"), .design(id: "dsn_0123456789abcdef"), .recording(id: "rec_abcd1234")])
+        XCTAssertEqual(items, [.page("pg_1"), .drawing("drw_2"), .design("dsn_0123456789abcdef"), .recording("rec_abcd1234")])
+        XCTAssertEqual(items.map(\.route), [.page(id: "pg_1"), .drawing(id: "drw_2"), .design(id: "dsn_0123456789abcdef"), .recording(id: "rec_abcd1234")])
         XCTAssertEqual(items.last?.kind.label, "Recording")
-    }
-
-    func testTablePreviewShowsTheFirstRowsWithoutHiddenColumns() {
-        let table = Tables.GetOutputTable(
-            columns: [.init(id: "name", name: "Name"), .init(id: "size", name: "Size")],
-            views: [.init(id: "v", name: "All", hidden: ["size"])],
-            rows: (0..<25).map { .init(id: "r\($0)", values: ["name": .string("Row \($0)"), "size": .number(Double($0))]) })
-        let preview = StudioTablePreview(table)
-        XCTAssertEqual(preview.columns, ["Name"])
-        XCTAssertEqual(preview.rows.count, StudioTablePreview.rowLimit)
-        XCTAssertEqual(preview.rows.first, ["Row 0"])
-        XCTAssertEqual(preview.total, 25)
     }
 
     func testRecordingPreviewPrefersCleanedTextAndSkipsEmptySegments() throws {

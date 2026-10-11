@@ -7,7 +7,7 @@ import SwiftUI
 final class StudioStore: ObservableObject {
     let serverURL = ServerScope.selectedURL
     static var shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tables", "design"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "design"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
@@ -342,7 +342,6 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .orange),
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
-        StudioKind(id: "table", label: "Table", plural: "Tables", symbol: "tablecells", tint: .cyan),
         StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
         StudioKind(id: "space", label: "Space", plural: "Spaces", symbol: "square.stack.3d.up", tint: .mint),
     ]
@@ -859,7 +858,6 @@ struct StudioView: View {
         case "talk": .recording(id: item.itemId)
         case "excalidraw": .drawing(id: item.itemId)
         case "artifacts": .artifact(id: item.itemId)
-        case "studio-tables": .table(id: item.itemId)
         case "design": .design(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
