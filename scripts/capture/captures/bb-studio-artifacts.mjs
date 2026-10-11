@@ -1,7 +1,7 @@
 // Artifacts are built into Studio (docs/merging-add-ons.md): the viewer is a
 // Studio capture, and the old Artifacts plugin's README shows its last
 // release, the upgrade bridge, where users meet it: Studio's Setup page.
-export default ({ seedArtifact, pluginRpc, bbCli, threadId, sleep }) => [
+export default ({ seedArtifact, pluginRpc, bbCli, sleep }) => [
   {
     id: "studio-artifacts",
     packageDir: "bb-studio",
@@ -15,13 +15,11 @@ export default ({ seedArtifact, pluginRpc, bbCli, threadId, sleep }) => [
         await client.waitForSelector(`[data-studio-workspace-editor="/plugins/studio/studio/artifacts/${artifactId}"]`, 30000);
         const path = await client.evaluate("location.pathname");
         if (path !== "/plugins/studio/studio") throw new Error(`The old artifact address didn't open in Studio's workspace: ${path}`);
-        await client.waitForInputValue("Artifact title", "Q3 usage report");
-        await client.waitForText("HTML ·");
+        // In a workspace tab the title is the tab's, and the viewer's tools sit in the tab row.
+        await client.waitForText("Q3 usage report");
+        await client.waitForText("HTML ·", 30000);
         await client.waitForText("· v2");
         await client.waitForAriaButton("Show source");
-        // Item chat names the artifact's thread: the one that saved it.
-        const { thread: saver } = JSON.parse(await bbCli(["thread", "get", process.env.BB_CAPTURE_WORKSPACE_THREAD_ID ?? threadId, "--json"]));
-        await client.waitForSelector(`[data-studio-chat-item="artifacts:${artifactId}"] > button[title=${JSON.stringify(`Continue "${saver.title}"`)}]`);
         await client.waitForAriaButton("Copy");
         await client.waitForAriaButton("More");
         // The report renders in its sandboxed frame from Studio's content route.

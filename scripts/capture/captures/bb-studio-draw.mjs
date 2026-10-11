@@ -16,10 +16,10 @@ export default ({ seedDrawing, pluginRpc, bbCli, sleep }) => [
         await client.waitForSelector(`[data-studio-workspace-editor="/plugins/studio/studio/drawings/${drawing.id}"]`, 30000);
         const path = await client.evaluate("location.pathname");
         if (path !== "/plugins/studio/studio") throw new Error(`The old drawing address didn't open in Studio's workspace: ${path}`);
-        await client.waitForInputValue("Drawing name", "Checkout flow");
+        // In a workspace tab the name is the tab's title, and the drawing's tools sit in the tab row.
+        await client.waitForText("Checkout flow");
         await client.waitForAriaButton("Copy image");
         await client.waitForAriaButton("More");
-        await client.waitForSelector(`[data-studio-chat-item="excalidraw:${drawing.id}"] > button[title="Start a conversation about this item"]`);
         await client.waitForText("Saved");
         await client.waitForSelector("canvas.excalidraw__canvas");
         // The staged scene is on the canvas, from Studio, not a blank one.

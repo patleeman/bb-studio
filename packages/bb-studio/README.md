@@ -91,13 +91,12 @@ copy your artifacts in.
 
 ![Live BB screenshot of an artifact open as a Studio tab](assets/artifacts-preview.png)
 
-Captured from a staged BB before the merge, when this viewer was the
-Artifacts plugin's page; it now opens as a Studio tab. The seeded HTML
-report "Q3 usage report", saved twice from a staged thread's workspace, at
-version 2 (`HTML · 2.1 KB · v2`) in its sandboxed frame, with **Chat**,
-Related, Open in split, the Source toggle, Copy, Download and the ⋯ menu.
-Recapture with `BB_CAPTURE_ONLY=studio-artifacts`, which also checks that the
-old address opens it as a tab.
+Captured from a staged BB after the merge: the seeded HTML report "Q3 usage
+report", saved twice from a staged thread's workspace, open as a Studio tab
+at version 2 (`HTML · 2.1 KB · v2` in the tab row, with Source, Copy,
+Download and the ⋯ menu) in its sandboxed frame. Recapture with
+`BB_CAPTURE_ONLY=studio-artifacts`, which also checks that the old address
+opens it as a tab.
 
 ![The compact artifact header](assets/artifacts-compact-header.png)
 
@@ -150,15 +149,17 @@ tags, tabs, links and chats carry over. If you had the plugin, see
 ![Live BB screenshot of a drawing open as a Studio tab](assets/drawings-preview.png)
 
 The seeded "Checkout flow" drawing open in the Excalidraw editor as a Studio
-tab, under Studio's item header: Cart, Payment and Confirmation boxes joined by
-arrows, with a "Retry payment on failure" note. Recapture with
+tab, with sync status, Copy image and the ⋯ menu in the tab row: Cart,
+Payment and Confirmation boxes joined by arrows, with a "Retry payment on
+failure" note. Recapture with
 `BB_CAPTURE_ONLY=excalidraw`, which opens it from its old
 `/plugins/excalidraw/drawings/<id>` address and checks that it lands as a
 Studio tab.
 
 ![The compact drawing header](assets/drawings-compact-header.png)
 
-The same editor at 390 pixels wide, with **Item actions** open.
+The same editor at 390 pixels wide, with **Item actions** open, captured
+before the merge from Draw's own page.
 
 - **In the library.** Drawings list next to pages, recordings and artifacts:
   thumbnails, projects, search over the words on a drawing, archive, move,
