@@ -14,7 +14,7 @@ cleanup() {
 import json,pathlib,sys,urllib.request
 path=pathlib.Path(sys.argv[1])/'fixture-ids.json'
 for id in json.loads(path.read_text()) if path.exists() else []:
-    request=urllib.request.Request('http://127.0.0.1:49486/api/v1/plugins/pages/rpc/remove',data=json.dumps({'id':id}).encode(),headers={'Content-Type':'application/json'})
+    request=urllib.request.Request('http://127.0.0.1:49486/api/v1/plugins/studio/rpc/pages.remove',data=json.dumps({'id':id}).encode(),headers={'Content-Type':'application/json'})
     try:
         response=json.load(urllib.request.urlopen(request,timeout=10))
         assert response['ok'],response
@@ -39,7 +39,7 @@ for path in (dest/'UITests').glob('*.swift'):
 ids=[]
 for i in range(24):
     body={'projectId':None,'parentId':None,'title':f'Native Performance {i:02d}','markdown':'# Navigation fixture\n\nRead-only native review fixture.\n\n'+'\n\n'.join(f'Paragraph {n}: deterministic sample text for repeated native navigation.' for n in range(18))}
-    request=urllib.request.Request('http://127.0.0.1:49486/api/v1/plugins/pages/rpc/create',data=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
+    request=urllib.request.Request('http://127.0.0.1:49486/api/v1/plugins/studio/rpc/pages.create',data=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
     result=json.load(urllib.request.urlopen(request,timeout=15)); assert result['ok'],result
     ids.append(result['result']['page']['id'])
     (out/'fixture-ids.json').write_text(json.dumps(ids,indent=2))

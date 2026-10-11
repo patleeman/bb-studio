@@ -33,7 +33,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
   # All writes are rejected. Native RPC lookup/text/list requests are read-only.
   if self.command=='POST' and self.path.rsplit('/',1)[-1] not in ['get','text','list','threadArtifacts','resolve','projectNames','settings','status']:
    self.answer(403,b'QA proxy rejects writes');return
-  if self.command=='GET' and urllib.parse.urlsplit(self.path).path!='/api/v1/plugins/artifacts/http/content':
+  if self.command=='GET' and urllib.parse.urlsplit(self.path).path!='/api/v1/plugins/studio/http/artifacts/content':
    self.answer(403,b'QA proxy only serves artifact bytes');return
   payload=json.loads(body) if body else {}
   if self.path.endswith('/artifacts/rpc/get') and payload.get('id')==fixtures['lookup']['id'] and state['lookup']:

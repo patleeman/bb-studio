@@ -52,8 +52,8 @@ type Sdk = Pick<BbPluginApi["sdk"], "plugins">;
 
 /**
  * Calls an add-on's `studio_*` provider method. A kind built into Studio
- * answers through Studio; the plugin that had its id before (an old copy, or
- * its upgrade bridge) is never asked.
+ * answers through Studio; the plugin that had its id before (an old copy) is
+ * never asked.
  */
 export function callProvider<T>(sdk: Sdk, pluginId: string, method: string, input: unknown, outputSchema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
   if (STUDIO_BUILTINS.includes(pluginId)) {

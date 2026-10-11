@@ -6,7 +6,7 @@ import { registerTalk, TALK_SETTINGS, TALK_TOOLS, type TalkSettingsHandle } from
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { AGENT_INSTRUCTIONS as PAGE_INSTRUCTIONS } from "./src/pages/tools";
 import { registerExploreBuiltin } from "./src/explore/server";
-import { PAGES_SETTINGS, type PagesSettings } from "@bb-studio/kit/pages-contract";
+import { PAGES_SETTINGS } from "@bb-studio/kit/pages-contract";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
 import { subcommand, usage } from "@bb-studio/kit/cli";
@@ -102,9 +102,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   const pages = registerPages(bb, db, {
     snapshotsPerPage: () => Number(settingValues.snapshotsPerPage ?? PAGES_SETTINGS.snapshotsPerPage.default),
-    get: () => settings.get(),
-    set: async (values: PagesSettings) => { await settings.experimental_set(values as never); },
-  }, explore);
+  });
   bb.onDispose(() => pages.dispose());
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as

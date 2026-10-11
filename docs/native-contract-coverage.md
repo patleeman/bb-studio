@@ -2,8 +2,7 @@
 
 `pnpm gen:contracts` generates JSON schemas and Swift models from each included
 plugin's actual RPC contract: Studio (with item chat and the built-in kinds),
-Mobile and Decisions, plus the legacy contracts the Pages, Talk, Draw,
-Artifacts and Design upgrade bridges forward for older clients.
+Mobile and Decisions.
 
 `pnpm check:contracts` also checks the generated
 [native RPC inventory](../contracts/native-rpc-inventory.json). It scans the

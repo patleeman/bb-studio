@@ -1,5 +1,5 @@
 // Pages, built into Studio: a page as a Studio tab (opened from its old Pages
-// address), page comments with dictation, and the Pages bridge on Setup.
+// address) and page comments with dictation.
 
 /** Opens a page from its old Pages address and checks it lands as a Studio tab. */
 async function openPage(client, id) {
@@ -9,7 +9,7 @@ async function openPage(client, id) {
   if (path !== "/plugins/studio/studio") throw new Error(`The old page address didn't open in Studio's workspace: ${path}`);
 }
 
-export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => [
+export default ({ projectId, seedPages, pluginRpc, sleep }) => [
   {
     id: "pages",
     packageDir: "bb-studio",
@@ -146,27 +146,6 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => [
         throw error;
       }
       return cleanup;
-    },
-  },
-  {
-    // Run after `bb pages migrate` copied pages made with the 0.1.0 plugin.
-    id: "pages-bridge",
-    packageDir: "bb-studio-pages",
-    setup: async (client) => {
-      const migrated = await bbCli(["pages", "migrate"]);
-      if (!migrated.includes("Migration complete")) throw new Error(`bb pages migrate didn't finish: ${migrated}`);
-      await client.navigate("/plugins/studio/studio/setup");
-      await client.waitForText("Set up BB Studio", 30000);
-      await client.waitForText("Retired plugins");
-      await client.waitForText("Pages are built into Studio now");
-      await client.waitForText("bb pages migrate");
-      await client.waitForText("Close pages you're editing");
-      // Copied: nothing blocks removal.
-      const blocked = await client.evaluate(`[...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Not yet:") && p.closest("li,div")?.textContent.includes("Studio Pages"))`);
-      if (blocked) throw new Error("Setup still blocks removing Studio Pages after Migration complete");
-      // Other bridges may be listed first; show Studio Pages' entry.
-      await client.evaluate(`[...document.querySelectorAll("p")].find((p) => p.textContent.startsWith("Pages are built into Studio now"))?.closest("li,section,div")?.scrollIntoView({ block: "start" })`);
-      await sleep(400);
     },
   },
 ];

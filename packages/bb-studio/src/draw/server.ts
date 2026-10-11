@@ -9,16 +9,14 @@
 //
 // This was the Draw plugin (id `excalidraw`). Its items keep that id as their
 // namespace, its agent tools, skill, mention provider, message directive,
-// thread tab and composer entry keep their names, and the plugin's last
-// release is an upgrade bridge that copies its rows here (see `bridge` below
-// and docs/merging-add-ons.md).
+// thread tab and composer entry keep their names (docs/merging-add-ons.md).
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { createChangeBus, defineItemMention, readThreadFile, resolveSource, serveBytes, studioServices, threadRoots, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { bridgeContract, rpcContract } from "./contract";
+import { rpcContract } from "./contract";
 import {
   applyElementUpserts,
   elementCount,
@@ -230,27 +228,6 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database): BuiltinDra
       if (result.outcome === "cancelled") return { drawingId: null };
       const value = result.value as { drawingId?: string };
       return { drawingId: value?.drawingId ?? null };
-    },
-  });
-
-  bb.rpc.register(bridgeContract, {
-    "drawings.importRows"({ drawings }) {
-      const imported: string[] = [];
-      const existing: string[] = [];
-      const skipped: { id: string; reason: string }[] = [];
-      for (const item of drawings) {
-        const result = store.importDrawing(item);
-        if (result.outcome === "imported") imported.push(item.id);
-        else if (result.outcome === "existing") existing.push(item.id);
-        else if (result.outcome === "skipped") skipped.push({ id: item.id, reason: result.reason });
-      }
-      for (const id of imported) changed(id, store.get(id)?.updated_at ?? Date.now(), "studio");
-      return { imported, existing, skipped };
-    },
-    "drawings.mentionContext": ({ id }) => ({ context: mention(id) }),
-    "drawings.thumbnail"({ id }) {
-      const row = store.get(id);
-      return { svg: row ? sceneThumbnail(parseSceneData(row.data)) : null };
     },
   });
 

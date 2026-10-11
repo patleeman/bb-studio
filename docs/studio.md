@@ -60,7 +60,7 @@ Studio's Setup page (`/plugins/studio/studio/setup`) and `bb studio setup` are t
 
 - **Add-ons.** `src/setup-addons.ts` is a copy of `marketplace.json`'s entries, bundled so Studio needs no network call; `setup.test.ts` fails when the two drift. Each add-on is installed, not installed, turned off, needs setup (a degraded health problem) or broken (a broken one), with its health checks.
 - **Actions.** Install uses `sdk.plugins.catalog.installPlan` and `catalog.install` for `<id>@bb-studio`, passing the source BB resolved as the confirmation a third-party marketplace needs. Turn on uses `sdk.plugins.enable`. Each action also shows its CLI command (`bb plugin install <id>@bb-studio --yes`, `bb plugin enable <id>`) with a Copy button, for when the call fails.
-- **Retired plugins.** The upgrade bridges (`pages`, `talk`, `excalidraw`, `artifacts`, `design`), `thread-list-plus` and `studio-tables` show up when installed, with what's kept, what's deleted and the steps first. Remove uses `sdk.plugins.remove` after a confirm.
+- **Retired plugins.** `studio-tables` shows up when installed, with what's kept and what's deleted. Remove uses `sdk.plugins.remove` after a confirm.
 
 The RPCs are `setup.summary`, `setup.install`, `setup.enable` and `setup.remove` (`src/setup-contract.ts`).
 

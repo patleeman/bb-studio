@@ -1,8 +1,7 @@
 // BB Studio's add-ons, copied from the repository's marketplace.json so
 // Studio knows them without a network call. setup.test.ts fails when
 // this list drifts from marketplace.json; copy the entries over when it does.
-// Marketplace entries for retired plugins (setup.ts RETIRED), such as an
-// upgrade bridge kept installable for existing users, are left out.
+// Marketplace entries for retired plugins (setup.ts RETIRED) are left out.
 
 /** The marketplace these add-ons install from (marketplace.json "name"). */
 export const MARKETPLACE_NAME = "bb-studio";

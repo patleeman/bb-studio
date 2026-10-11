@@ -12,17 +12,8 @@ if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check")) {
 
 const plugins = [
   ["studio", "Studio", "../packages/bb-studio/src/public-contract.ts", "rpcContract"],
-  // Talk is built into Studio; the old plugin's upgrade bridge forwards these for older clients.
-  ["talk", "Talk", "../packages/bb-studio-talk/server.ts", "legacyContract"],
-  // Pages are built into Studio; the old plugin's upgrade bridge forwards these for older clients.
-  ["pages", "Pages", "../packages/bb-studio-pages/server.ts", "legacyContract"],
-  // Artifacts are built into Studio; the old plugin's upgrade bridge forwards these for older clients.
-  ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "legacyContract"],
-  // Drawings are built into Studio; the old plugin's upgrade bridge forwards these for older clients.
-  ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "legacyContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
   ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],
-  ["design", "Design", "../packages/bb-studio-design/server.ts", "legacyContract"],
 ];
 
 const swiftKeywords = new Set("associatedtype class deinit enum extension fileprivate func import init inout internal let open operator private protocol public rethrows static struct subscript typealias var break case catch continue default defer do else fallthrough for guard if in repeat return switch throw try while as Any false is nil self Self super throws true where await async actor some".split(" "));

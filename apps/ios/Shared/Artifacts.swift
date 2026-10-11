@@ -75,31 +75,14 @@ public struct ArtifactVersion: Decodable, Identifiable, Hashable, Sendable {
     public var isText: Bool { ["markdown", "code", "text"].contains(type) }
 }
 
-/// Artifacts are built into Studio. For one release, a Studio from before the
-/// merge (no `artifacts.*` methods) falls back to the Artifacts plugin, whose
-/// last release forwards to Studio anyway.
-nonisolated(unsafe) private var artifactsInStudio = true
-
 extension BBClient {
-    /// Studio first; the Artifacts plugin only when Studio doesn't have the method.
-    func viaStudio<T>(_ studio: () async throws -> T, else legacy: () async throws -> T) async throws -> T {
-        do {
-            let result = try await studio()
-            artifactsInStudio = true
-            return result
-        } catch where Self.isMissingRPC(error) {
-            artifactsInStudio = false
-            return try await legacy()
-        }
-    }
-
     public func artifact(_ id: String) async throws -> (artifact: Artifact?, versions: [ArtifactVersion]) {
         struct Result: Decodable {
             var artifact: Artifact?
             var versions: [ArtifactVersion]
         }
         let input: JSONValue = ["id": .string(id)]
-        let result: Result = try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_get, input) }, else: { try await self.rpc("artifacts", "get", input) })
+        let result: Result = try await self.rpc("studio", Studio.Method.artifacts_get, input)
         return (result.artifact, result.versions)
     }
 
@@ -110,15 +93,15 @@ extension BBClient {
             var truncated: Bool
         }
         let input: JSONValue = ["id": .string(id), "versionId": .string(versionId)]
-        let result: Result = try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_text, input) }, else: { try await self.rpc("artifacts", "text", input) })
+        let result: Result = try await self.rpc("studio", Studio.Method.artifacts_text, input)
         return (result.text, result.truncated)
     }
 
     /// A version's bytes. Versions never change, so it caches forever.
     public func artifactContentURL(_ id: String, versionId: String, download: Bool = false) -> URL {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
-        // Studio serves artifacts; a Studio from before the merge doesn't, and the old plugin does.
-        components.path = artifactsInStudio ? "/api/v1/plugins/studio/http/artifacts/content" : "/api/v1/plugins/artifacts/http/content"
+        // Studio serves artifacts.
+        components.path = "/api/v1/plugins/studio/http/artifacts/content"
         components.queryItems = [URLQueryItem(name: "artifact", value: id), URLQueryItem(name: "version", value: versionId)]
             + (download ? [URLQueryItem(name: "download", value: "1")] : [])
         return components.url!
@@ -126,24 +109,24 @@ extension BBClient {
 
     public func renameArtifact(_ id: String, title: String) async throws {
         let input: JSONValue = ["id": .string(id), "title": .string(String(title.prefix(200)))]
-        let _: JSONValue = try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_update, input) }, else: { try await self.rpc("artifacts", "update", input) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.artifacts_update, input)
     }
 
     public func moveArtifact(_ id: String, projectId: String?) async throws {
         let input: JSONValue = ["id": .string(id), "projectId": projectId.map { .string($0) } ?? .null]
-        let _: JSONValue = try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_move, input) }, else: { try await self.rpc("artifacts", "move", input) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.artifacts_move, input)
     }
 
     public func deleteArtifact(_ id: String) async throws {
         let input: JSONValue = ["id": .string(id)]
-        let _: JSONValue = try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_delete, input) }, else: { try await self.rpc("artifacts", "delete", input) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.artifacts_delete, input)
     }
 
     /// Copies a Markdown or text artifact into a new page; returns the page's app path.
     public func saveArtifactAsPage(_ id: String) async throws -> String {
         struct Result: Decodable { var href: String }
         let input: JSONValue = ["id": .string(id)]
-        let result: Result = try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_saveAsPage, input) }, else: { try await self.rpc("artifacts", "saveAsPage", input) })
+        let result: Result = try await self.rpc("studio", Studio.Method.artifacts_saveAsPage, input)
         return result.href
     }
 
@@ -151,20 +134,20 @@ extension BBClient {
     public func threadArtifacts(_ threadId: String) async throws -> [Artifact] {
         struct Result: Decodable { var artifacts: [Artifact] }
         let input: JSONValue = ["threadId": .string(threadId)]
-        let result: Result = try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_threadArtifacts, input) }, else: { try await self.rpc("artifacts", "threadArtifacts", input) })
+        let result: Result = try await self.rpc("studio", Studio.Method.artifacts_threadArtifacts, input)
         return result.artifacts
     }
 
     /// Files a reply produced (the reply ending at `seq`, or the latest one) and the thread's storage files.
     public func artifactCandidates(threadId: String, seq: Int?) async throws -> ArtifactCandidates {
         let input: JSONValue = ["threadId": .string(threadId), "seq": seq.map { .number(Double($0)) } ?? .null]
-        return try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_candidates, input) }, else: { try await self.rpc("artifacts", "candidates", input) })
+        return try await self.rpc("studio", Studio.Method.artifacts_candidates, input)
     }
 
     /// Saves files into Studio; a file saved before gets a new version.
     public func saveFilesToStudio(threadId: String, paths: [String]) async throws -> SavedFiles {
         let input: JSONValue = ["threadId": .string(threadId), "paths": .array(paths.prefix(50).map { .string($0) })]
-        return try await viaStudio({ try await self.rpc("studio", Studio.Method.artifacts_saveFiles, input) }, else: { try await self.rpc("artifacts", "saveFiles", input) })
+        return try await self.rpc("studio", Studio.Method.artifacts_saveFiles, input)
     }
 }
 

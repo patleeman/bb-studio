@@ -603,11 +603,11 @@ final class ThreadUITests: XCTestCase {
     func testPageComments() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
         // Reopen the first thread and drop what earlier runs added.
-        let threads = (rpc("pages", "comments", ["id": id, "includeResolved": true])?["threads"] as? [[String: Any]]) ?? []
+        let threads = (rpc("studio", "pages.comments", ["id": id, "includeResolved": true])?["threads"] as? [[String: Any]]) ?? []
         let first = try XCTUnwrap(threads.min { ($0["updatedAt"] as? Double ?? 0) < ($1["updatedAt"] as? Double ?? 0) }?["id"] as? String)
-        _ = rpc("pages", "commentResolve", ["id": id, "thread": first, "resolved": false])
+        _ = rpc("studio", "pages.commentResolve", ["id": id, "thread": first, "resolved": false])
         for thread in threads where thread["id"] as? String != first {
-            _ = rpc("pages", "commentResolve", ["id": id, "thread": thread["id"] as? String ?? "", "resolved": true])
+            _ = rpc("studio", "pages.commentResolve", ["id": id, "thread": thread["id"] as? String ?? "", "resolved": true])
         }
         app.open(URL(string: "bbstudio://page/\(id)")!)
         let comments = app.buttons["Comments"].firstMatch
@@ -716,7 +716,7 @@ final class ThreadUITests: XCTestCase {
                 guard item["pluginId"] as? String == "pages", (item["createdAt"] as? Double ?? 0) >= start,
                     (item["title"] as? String ?? "").isEmpty || item["title"] as? String == "Untitled" || item["title"] as? String == "QA embeds"
                 else { continue }
-                _ = self.rpc("pages", "remove", ["id": item["id"] as? String ?? ""])
+                _ = self.rpc("studio", "pages.remove", ["id": item["id"] as? String ?? ""])
             }
         }
         openStudioCollection()
@@ -744,7 +744,7 @@ final class ThreadUITests: XCTestCase {
             {"kind":"task","target":"task_missing","title":"A task"}
             ```
             """
-        let page = rpc("pages", "create", ["projectId": NSNull(), "parentId": NSNull(), "title": "QA embeds", "markdown": markdown])
+        let page = rpc("studio", "pages.create", ["projectId": NSNull(), "parentId": NSNull(), "title": "QA embeds", "markdown": markdown])
         let pageId = try XCTUnwrap((page?["page"] as? [String: Any])?["id"] as? String)
         app.open(URL(string: "bbstudio://page/\(pageId)")!)
         let embed = app.buttons["studioEmbed"].firstMatch
@@ -765,7 +765,7 @@ final class ThreadUITests: XCTestCase {
         addTeardownBlock {
             let items = (self.rpc("studio", "overview", NSNull())?["items"] as? [[String: Any]]) ?? []
             for item in items where titles.contains(item["title"] as? String ?? "") && item["pluginId"] as? String == "pages" {
-                _ = self.rpc("pages", "remove", ["id": item["id"] as? String ?? ""])
+                _ = self.rpc("studio", "pages.remove", ["id": item["id"] as? String ?? ""])
             }
         }
         openStudioCollection()
@@ -931,14 +931,14 @@ final class ThreadUITests: XCTestCase {
     func testStudioTags() throws {
         let stamp = Int(Date().timeIntervalSince1970)
         let title = "QA tag page \(stamp)", tagName = "QA tag \(stamp)"
-        let created = rpc("pages", "create", ["projectId": NSNull(), "parentId": NSNull(), "title": title, "markdown": ""])
+        let created = rpc("studio", "pages.create", ["projectId": NSNull(), "parentId": NSNull(), "title": title, "markdown": ""])
         let id = try XCTUnwrap((created?["page"] as? [String: Any])?["id"] as? String)
         func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
         addTeardownBlock {
             for tag in (overview()?["tags"] as? [[String: Any]]) ?? [] where tag["name"] as? String == tagName {
                 _ = self.rpc("studio", "deleteTag", ["id": tag["id"] as? String ?? ""])
             }
-            _ = self.rpc("pages", "remove", ["id": id])
+            _ = self.rpc("studio", "pages.remove", ["id": id])
         }
         openStudioCollection()
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
@@ -973,17 +973,17 @@ final class ThreadUITests: XCTestCase {
         let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
         var ids: [String] = []
         for title in [titleA, titleB] {
-            let created = rpc("pages", "create", ["projectId": "proj_8ztiq6dkh5", "parentId": NSNull(), "title": title, "markdown": "Has \(word) inside."])
+            let created = rpc("studio", "pages.create", ["projectId": "proj_8ztiq6dkh5", "parentId": NSNull(), "title": title, "markdown": "Has \(word) inside."])
             ids.append(try XCTUnwrap((created?["page"] as? [String: Any])?["id"] as? String))
         }
         func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
         func tagId(_ name: String) -> String? {
             ((overview()?["tags"] as? [[String: Any]]) ?? []).first { $0["name"] as? String == name }?["id"] as? String
         }
-        func page(_ id: String) -> [String: Any]? { self.rpc("pages", "get", ["id": id])?["page"] as? [String: Any] }
+        func page(_ id: String) -> [String: Any]? { self.rpc("studio", "pages.get", ["id": id])?["page"] as? [String: Any] }
         addTeardownBlock {
             for name in [tagName, renamed] { if let id = tagId(name) { _ = self.rpc("studio", "deleteTag", ["id": id]) } }
-            for id in ids { _ = self.rpc("pages", "remove", ["id": id]) }
+            for id in ids { _ = self.rpc("studio", "pages.remove", ["id": id]) }
         }
         let tag = try XCTUnwrap((rpc("studio", "createTag", ["name": tagName])?["tag"] as? [String: Any])?["id"] as? String)
         _ = rpc("studio", "tagItems", ["items": [["pluginId": "pages", "id": ids[0]]], "add": [tag], "remove": [String]()])

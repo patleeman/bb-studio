@@ -1,8 +1,6 @@
 // Studio's page RPC methods (Pages is built into Studio). They are the old
-// Studio Pages plugin's (`pages`) client methods with a `pages.` prefix, so
-// Studio's app, the iOS app and the Pages upgrade bridge
-// (packages/bb-studio-pages) share one set of shapes. The kit holds them
-// because the bridge is a separate package and can't import Studio.
+// Studio Pages plugin's (`pages`) client methods with a `pages.` prefix, shared by
+// Studio's app and the iOS app's generated contract.
 // Document content doesn't go through RPC: editors sync over Studio's
 // `/pages/sync` WebSocket.
 import type { defineRpcContract as sdkDefineRpcContract } from "@get-bb/plugin-sdk";
@@ -304,9 +302,6 @@ export const rpcContract = defineRpcContract({
   },
 });
 
-
-// ── The upgrade bridge ────────────────────────────────────────────────────
-
 /** Where Studio serves page files; the old plugin served them at /api/v1/plugins/pages/http/files. */
 export const PAGE_FILES_URL = "/api/v1/plugins/studio/http/pages/files";
 export const LEGACY_PAGE_FILES_URL = "/api/v1/plugins/pages/http/files";
@@ -316,72 +311,12 @@ export function studioFileUrl(url: string): string {
   return url.startsWith(`${LEGACY_PAGE_FILES_URL}?`) ? `${PAGE_FILES_URL}${url.slice(LEGACY_PAGE_FILES_URL.length)}` : url;
 }
 
-/** Pages per `pages.importRows` call, and the bytes of Yjs state and Markdown a call carries (one larger page goes alone). Snapshots batch the same way. */
-export const IMPORT_BATCH = 100;
-export const IMPORT_BATCH_BYTES = 8 * 1024 * 1024;
-/** Largest uploaded file Pages accepted; files go one per `pages.importFile` call. */
-export const MAX_PAGE_FILE_BYTES = 15 * 1024 * 1024;
-/** Next row suggestions per `explore.importNextSuggestions` call. */
-export const NEXT_IMPORT_BATCH = 1000;
-
-const time = z.number().int().min(0);
-const id = z.string().min(1).max(200);
-/** Yjs state, base64. A long-edited page keeps its history, so this can be large. */
-const state = z.string().max(200_000_000);
-
-/** A page as the bridge sends it: the old plugin's rows for it, unchanged. Its files and versions go first. */
-export const importPageSchema = z.object({
-  id,
-  projectId: id.nullable(),
-  parentId: id.nullable(),
-  title: z.string().max(10_000),
-  icon: z.string().max(200),
-  position: z.number(),
-  state: state.nullable(),
-  markdown: z.string().max(50_000_000),
-  createdAt: time,
-  updatedAt: time,
-  updatedBy: z.string().max(500),
-  archivedAt: time.nullable(),
-  template: z.boolean(),
-  refresh: z.object({ botId: z.string().max(500).nullable(), cron: z.string().max(500).nullable(), instructions: z.string().max(100_000), lastAt: time.nullable() }),
-  chats: z.array(z.object({ threadId: id, createdAt: time })).max(100_000),
-  requests: z.array(z.object({
-    id, botId: z.string().max(500), botName: z.string().max(500), threadId: id.nullable(), kind: z.string().max(50), blockId: z.string().max(200).nullable(),
-    commentThreadId: z.string().max(200).nullable(), summary: z.string().max(100_000), status: z.string().max(50), error: z.string().max(100_000).nullable(),
-    result: z.string().max(1_000_000).nullable(), dedupeKey: z.string().max(2000), createdAt: time, updatedAt: time,
-  })).max(100_000),
-  checklistHandoffs: z.array(z.object({
-    threadId: id, blockId: z.string().max(200), title: z.string().max(100_000), state: z.string().max(50), note: z.string().max(100_000).nullable(), createdAt: time, updatedAt: time,
-  })).max(100_000),
-});
-export type ImportPage = z.infer<typeof importPageSchema>;
-
-/** A saved version of a page. */
-export const importSnapshotSchema = z.object({ id, pageId: id, state, label: z.string().max(10_000), actor: z.string().max(500), createdAt: time });
-export type ImportSnapshot = z.infer<typeof importSnapshotSchema>;
-
-/** A file uploaded to a page, with its bytes (base64). */
-export const importFileSchema = z.object({
-  id, pageId: id, name: z.string().max(2000), mime: z.string().max(200), size: z.number().int().min(0), createdAt: time,
-  data: z.string().max(4 * Math.ceil(MAX_PAGE_FILE_BYTES * 2 / 3) + 4),
-});
-export type ImportFile = z.infer<typeof importFileSchema>;
-
-/** One Next row suggestion from the click log (`bb studio pages explore stats`). */
-export const importNextSuggestionSchema = z.object({
-  key: z.string().min(1).max(2000), threadId: id, messageId: id, kind: z.string().max(50), emoji: z.string().max(64), label: z.string().max(2000),
-  shownAt: time, clickedAt: time.nullable(), clicks: z.number().int().min(0),
-});
-export type ImportNextSuggestion = z.infer<typeof importNextSuggestionSchema>;
-
 /** The Next row's default preferred quick replies. */
 export const DEFAULT_REPLIES = ["👍 Looks good", "🔁 Try another way", "❓ Explain more"];
 
 /**
  * Pages' and Explore's settings, which Studio has now under the same keys
- * (Explore's keep their `explore_` prefix). The upgrade bridge defines them
- * too, only to read what the user had set and copy it.
+ * (Explore's keep their `explore_` prefix).
  */
 export const PAGES_SETTINGS = {
   snapshotsPerPage: {
@@ -429,61 +364,3 @@ export const pagesSettingsSchema = z.object({
   explore_replyItems: z.string().max(10_000),
 }).partial();
 export type PagesSettings = z.infer<typeof pagesSettingsSchema>;
-
-const importResult = z.object({
-  imported: z.array(z.string()),
-  existing: z.array(z.string()),
-  skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
-});
-
-/**
- * The upgrade bridge's methods: it copies the old plugin's files, versions,
- * pages, Next row click log and settings into Studio, and forwards old
- * mentions. Not for clients.
- */
-export const bridgeContract = defineRpcContract({
-  /** Which of these page files Studio doesn't have yet. */
-  "pages.missingFiles": {
-    input: z.object({ ids: z.array(id).max(1000) }),
-    output: z.object({ missing: z.array(z.string()) }),
-  },
-  /** One file; one Studio already has (same id) is left as it is. */
-  "pages.importFile": {
-    input: importFileSchema,
-    output: z.object({ ok: z.boolean() }),
-  },
-  /** Saved versions; ones Studio already has (same id) are left as they are. */
-  "pages.importSnapshots": {
-    input: z.object({ snapshots: z.array(importSnapshotSchema).max(IMPORT_BATCH) }),
-    output: importResult,
-  },
-  /**
-   * Pages with their chats, historical requests and checklist hand-offs. A
-   * page Studio already has (same id) is left as it is, so a rerun changes
-   * nothing. Old file URLs in the content point at Studio's.
-   */
-  "pages.importRows": {
-    input: z.object({ pages: z.array(importPageSchema).max(IMPORT_BATCH) }),
-    output: importResult,
-  },
-  /** The Next row's click log; suggestions Studio already has keep Studio's counts. */
-  "explore.importNextSuggestions": {
-    input: z.object({ rows: z.array(importNextSuggestionSchema).max(NEXT_IMPORT_BATCH) }),
-    output: z.object({ imported: z.number(), existing: z.number() }),
-  },
-  /** The old plugin's settings; Studio takes each one the user hasn't set in Studio. Once. */
-  "pages.importSettings": {
-    input: z.object({ settings: pagesSettingsSchema }),
-    output: z.object({ applied: z.array(z.string()) }),
-  },
-  /** What an old `@page` mention pill gives the agent. */
-  "pages.mentionContext": {
-    input: z.object({ id: z.string().min(1).max(200) }),
-    output: z.object({ context: z.string() }),
-  },
-});
-
-/** The Studio Pages plugin release that is only the upgrade bridge. */
-export const PAGES_BRIDGE_VERSION = "0.2.0";
-
-export { bridgeStatusContract, migrationStatusSchema, type MigrationStatus } from "./draw-contract";

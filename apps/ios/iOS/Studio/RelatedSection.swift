@@ -67,7 +67,7 @@ struct RelatedSection: View {
                 : plugin == "excalidraw" ? "/plugins/studio/studio/drawings/\(id)"
                 : plugin == "talk" ? "/plugins/studio/studio/recordings/\(id)"
                 : plugin == "pages" ? "/plugins/studio/studio/pages/\(id)"
-                : "/plugins/\(plugin)/\(plugin == "pages" ? "pages" : plugin == "talk" ? "recordings" : "designs")/\(id)"
+                : "/plugins/studio/studio/designs/\(id)"
             if let route = Route(href: href) {
                 NavigationLink(value: route) { Label(label, systemImage: "link") }
             } else {

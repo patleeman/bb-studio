@@ -7,16 +7,15 @@
 //
 // This was the Studio Design plugin (id `design`). Its items keep that id as
 // their namespace; its agent tools, skill, mention provider, message
-// directive, question form and thread tab keep their names; and the plugin's
-// last release is an upgrade bridge that copies its rows here (see the
-// bridge methods below and docs/merging-add-ons.md).
+// directive, question form and thread tab keep their names
+// (docs/merging-add-ons.md).
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { createChangeBus, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { bridgeContract, rpcContract } from "./contract";
+import { rpcContract } from "./contract";
 import { printCsp, printPage } from "./server/print";
 import { applyTextEdit } from "./server/text-edit";
 import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, ROUTE_SEGMENT, SCREEN_ID, VIEWPORT_NAMES, VIEWPORTS, MIN_SIDE, MAX_SIDE, frameSize, parseViewport, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl } from "./shared";
@@ -301,35 +300,6 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database): BuiltinD
     else reviews.userChanged(id);
     changed(id, store.get(id)?.updated_at ?? Date.now(), "studio");
   };
-
-  bb.rpc.register(bridgeContract, {
-    "designs.importRows"({ designs }) {
-      const imported: string[] = [];
-      const existing: string[] = [];
-      const skipped: { id: string; reason: string }[] = [];
-      for (const item of designs) {
-        const result = store.importDesign(item);
-        if (result.outcome === "imported") imported.push(item.id);
-        else if (result.outcome === "existing") existing.push(item.id);
-        else if ("reason" in result) skipped.push({ id: item.id, reason: result.reason });
-      }
-      for (const id of imported) changed(id, store.get(id)?.updated_at ?? Date.now(), "studio");
-      return { imported, existing, skipped };
-    },
-    "designs.importStyles"({ styles }) {
-      const imported: string[] = [];
-      const existing: string[] = [];
-      const skipped: { id: string; reason: string }[] = [];
-      for (const item of styles) {
-        const result = store.importStyle(item);
-        if (result.outcome === "imported") imported.push(item.id);
-        else if (result.outcome === "existing") existing.push(item.id);
-        else if ("reason" in result) skipped.push({ id: item.id, reason: result.reason });
-      }
-      return { imported, existing, skipped };
-    },
-    "designs.mentionContext": ({ id }) => ({ context: mentionContext(id) }),
-  });
 
   // One screen's HTML, for the canvas frames and the reviewer's browser. The
   // URL carries the design's revision, so a cached response never goes stale.

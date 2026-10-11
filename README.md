@@ -11,11 +11,6 @@ Mobile and Applets are separate plugins beside it.
 | Plugin | ID | What it does |
 | --- | --- | --- |
 | [Studio](packages/bb-studio/) | `studio` | The hub, with everything you make built in: pages (collaborative documents with checklists you hand to agents, inline whiteboards and Explore's Next row), recordings and dictation (audio saved as you speak, then transcribed), drawings (Excalidraw scenes), designs (UI prototypes and slide decks with a reviewer) and artifacts (the files agents make). One collection with search, tags, project filters, templates, item chats and quotes, plus project leads with a Heartbeat, a Setup page, plugin health and backup and restore. |
-| [Studio Pages](packages/bb-studio-pages/) | `pages` | Upgrade bridge only. Pages are built into Studio now; this copies an existing install's pages, their versions and files, the Next row's click stats and its settings into Studio. |
-| [Studio Talk](packages/bb-studio-talk/) | `talk` | Upgrade bridge only. Recording and dictation are built into Studio now; this copies an existing install's recordings, their audio and its settings into Studio. |
-| [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Upgrade bridge only. Drawings are built into Studio now; this copies an existing install's drawings into Studio. |
-| [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Upgrade bridge only. Artifacts are built into Studio now; this copies an existing install's artifacts into Studio. |
-| [Studio Design](packages/bb-studio-design/) | `design` | Upgrade bridge only. Designs are built into Studio now; this copies an existing install's designs and saved styles into Studio. |
 | [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces for your projects: one or more folders in a full editor beside your threads, run by a local code-server. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
@@ -23,9 +18,7 @@ Mobile and Applets are separate plugins beside it.
 | [Studio Applets](packages/bb-studio-applets/) | `applets` | Experimental. Small native macOS apps your agents write as plain folders, such as a HUD of running threads, run by one signed app through an API you approve. |
 
 Install Studio first; the other plugins are built to run beside it. Studio
-Code's workspaces appear in Studio's collection. Studio Pages, Talk, Draw,
-Artifacts and Design are kept only as upgrade bridges for installs from before
-the merge; new installs don't need them.
+Code's workspaces appear in Studio's collection.
 
 ## iOS app
 
@@ -98,29 +91,16 @@ plugin deletes its settings and secrets, so note them first.
 
 Chat, Pages, Artifacts, Draw, Design and Talk now ship in Studio, and Studio
 Sidebar (`thread-list-plus`) and Studio Tables (`studio-tables`) are retired.
-New installs need at most 6 plugins.
-If you had Studio Pages, Studio Artifacts, Studio Draw, Studio Design or Studio Talk, its
-last release copies your items into Studio, then Setup lets you remove it.
-**[Upgrading to unified Studio](docs/upgrade-unified-studio.md)** is the one
-ordered procedure for all of them at once, including installs pinned to a
-commit: update the old add-ons first, then Studio, then run
-`bb pages migrate`, `bb talk migrate`, `bb excalidraw migrate`,
-`bb artifacts migrate` and `bb design migrate`.
-To see where an existing install stands, update Studio and open **Studio → Setup**. It
-lists the add-ons you're missing, flags installed retired plugins, says what
+New installs need at most 6 plugins. The separate Pages, Talk, Draw, Artifacts
+and Design add-ons and their upgrade bridges are gone; to move items from one
+of them, see [Upgrading from the separate add-ons](docs/upgrade-unified-studio.md).
+Old links to their items still open in Studio.
+
+To see where an existing install stands, open **Studio → Setup**. It lists
+the add-ons you're missing, flags installed retired plugins, says what
 removing each keeps and deletes, and removes one only after you confirm. See
-[Studio's Setup page](packages/bb-studio/README.md#setup).
-
-Without the page, `bb studio setup` prints the same list and the commands to
-run. The short version:
-
-```sh
-bb plugin remove thread-list-plus
-bb plugin remove studio-tables  # export any table you still need as CSV first
-```
-
-Remove a bridge (`pages`, `talk`, `excalidraw`, `artifacts`, `design`) only
-after its `bb <id> migrate` reports Migration complete.
+[Studio's Setup page](packages/bb-studio/README.md#setup). Without the page,
+`bb studio setup` prints the same list and the commands to run.
 
 ## Development
 

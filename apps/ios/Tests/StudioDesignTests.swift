@@ -21,15 +21,12 @@ final class StudioDesignTests: XCTestCase {
     /// Frames load the address the plugin gives each screen, so the canvas script version can't drift.
     func testDesignScreenURLUsesThePluginsAddress() throws {
         let client = BBClient(baseURL: URL(string: "https://design.invalid")!)
-        let screen = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","updatedAt":7,"url":"/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6"}"#.utf8))
-        XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", screen, step: "intro").absoluteString,
-                       "https://design.invalid/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6#intro")
         let inStudio = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","updatedAt":7,"url":"/api/v1/plugins/studio/http/designs/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6"}"#.utf8))
-        XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", inStudio).absoluteString,
-                       "https://design.invalid/api/v1/plugins/studio/http/designs/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6")
+        XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", inStudio, step: "intro").absoluteString,
+                       "https://design.invalid/api/v1/plugins/studio/http/designs/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6#intro")
         let older = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","updatedAt":7}"#.utf8))
         XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", older).absoluteString,
-                       "https://design.invalid/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7")
+                       "https://design.invalid/api/v1/plugins/studio/http/designs/screen?design=dsn_0123456789abcdef&screen=1a&v=7")
     }
 
     func testDesignPathsAndLinksOpenTheDesign() {
@@ -67,7 +64,7 @@ final class StudioDesignTests: XCTestCase {
              "segments":[{"id":"s0","offsetMs":0,"text":"um hello","cleanedText":"Hello."},{"id":"s1","offsetMs":5000,"text":"  "},
                          {"id":"s2","offsetMs":65000,"text":"Bye"}]}
             """
-        let output = try JSONDecoder().decode(Talk.RecordingGetOutput.self, from: Data(json.utf8))
+        let output = try JSONDecoder().decode(Studio.RecordingsRecordingGetOutput.self, from: Data(json.utf8))
         let preview = RecordingPreview(output)
         XCTAssertEqual(preview.summary, "Ship Friday.")
         XCTAssertEqual(preview.lines.map(\.text), ["Hello.", "Bye"])
@@ -92,17 +89,15 @@ final class StudioDesignTests: XCTestCase {
         XCTAssertEqual(form.allDecided, ["layout": ["decide": true], "mood": ["decide": true]])
     }
 
-    func testRecordingsFallBackToTheTalkPluginOnAnOlderServer() async throws {
+    func testRecordingsGoToStudio() async throws {
         let client = BBClient(baseURL: URL(string: "http://localhost")!)
         var paths: [String] = []
         client.transport = { _, path, _ in
             paths.append(path)
-            if path.hasPrefix("/api/v1/plugins/studio/") { return (404, Data(#"{"ok":false,"error":{"message":"No such method"}}"#.utf8)) }
             return (200, Data(#"{"ok":true,"result":{}}"#.utf8))
         }
         try await client.renameRecording("rec_aaaaaaaaaaaa", title: "QA")
-        XCTAssertEqual(paths, ["/api/v1/plugins/studio/rpc/recordings.recording_rename", "/api/v1/plugins/talk/rpc/recording_rename"])
-        recordingsInStudio = true
+        XCTAssertEqual(paths, ["/api/v1/plugins/studio/rpc/recordings.recording_rename"])
     }
 
     func testItemPathsOpenTheItem() {

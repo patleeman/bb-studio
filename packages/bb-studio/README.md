@@ -90,10 +90,8 @@ namespace (`pages:<id>`), so tags, tabs, links, chats and backups carry over.
 A page opens as a Studio tab at `/plugins/studio/studio/pages/<id>`; links to
 `/plugins/pages/pages/<id>`, in threads, pages, skills and BB's own
 instructions, open the same tab. The library filtered to pages is their
-collection. If you had the plugin, see
-[its upgrade bridge](../bb-studio-pages/README.md) to copy your pages in, or
-[docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md) to move
-from every separate add-on at once.
+collection. If you still have the old plugin, see
+[docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
 
 ![Live BB screenshot of a page open as a Studio tab, with stats, a chart and a checklist](assets/pages-preview.png)
 
@@ -101,9 +99,7 @@ A seeded "Offline mode launch" page, opened from its old
 `/plugins/pages/pages/<id>` address, lands as a Studio tab: a tip callout, a
 stats block, a stacked bar chart of weekly active teams and a launch
 checklist, with Dictate, Version history, Comments and the page menu in the
-tab's row. Captured in a staged BB (stable BB 0.46.0) after the full
-[upgrade procedure](../../docs/upgrade-unified-studio.md) from a pinned
-pre-merge install. Recapture with `BB_CAPTURE_ONLY=pages`.
+tab's row. Captured in a staged BB (stable BB 0.46.0). Recapture with `BB_CAPTURE_ONLY=pages`.
 
 ![Page comments with dictation in the reply box](assets/pages-comments.png)
 
@@ -272,7 +268,7 @@ again after you close it picks it up.
 
 ## Explore
 
-Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one drafts "💬 Tell me more" about it so the agent explains it in the thread. It ran inside the Studio Pages plugin and moved into Studio with it: Studio keeps the Next row's click log in its own database (the [Pages bridge](../bb-studio-pages/README.md) copies the old `explore.db` in). The CLI is `bb studio pages explore stats` (`bb pages explore stats` before the merge).
+Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one drafts "💬 Tell me more" about it so the agent explains it in the thread. It ran inside the Studio Pages plugin and moved into Studio with it: Studio keeps the Next row's click log in its own database. The CLI is `bb studio pages explore stats` (`bb pages explore stats` before the merge).
 
 Explore's settings appear in **Settings → Studio** with an **Explore:** prefix (keys `explore_next`, `explore_explore`, `explore_quickReplies`, `explore_replyItems`, as before): **End replies with a Next row** (on), **Suggest things to explore** (on), **Offer quick replies** (on), and **Preferred quick replies** (`👍 Looks good, 🔁 Try another way, ❓ Explain more`). They apply to agent sessions started after the change.
 
@@ -298,8 +294,7 @@ Artifacts are built into Studio: the images, pages, reports and files your
 agents make, kept with every version. They used to be the separate Studio
 Artifacts plugin (`artifacts`). Items keep that id as their namespace
 (`artifacts:<id>`), so tags, tabs, links and chats carry over. If you
-had the plugin, see [its upgrade bridge](../bb-studio-artifacts/README.md) to
-copy your artifacts in.
+still have the old plugin, see [docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
 
 ![Live BB screenshot of an artifact open as a Studio tab](assets/artifacts-preview.png)
 
@@ -358,8 +353,8 @@ and can't call BB's API with your session.
 Drawings are built into Studio: [Excalidraw](https://excalidraw.com) scenes
 you sketch with your agents. They used to be the separate Studio Draw plugin
 (`excalidraw`). Items keep that id as their namespace (`excalidraw:<id>`), so
-tags, tabs, links and chats carry over. If you had the plugin, see
-[its upgrade bridge](../bb-studio-draw/README.md) to copy your drawings in.
+tags, tabs, links and chats carry over. If you still have the old plugin, see
+[docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
 
 ![Live BB screenshot of a drawing open as a Studio tab](assets/drawings-preview.png)
 
@@ -431,9 +426,8 @@ Designs are built into Studio: UI prototypes and slide decks you design with
 your agents. A design is a set of rounds; each round holds a few options, and
 each option is one self-contained HTML screen. They used to be the separate
 Studio Design plugin (`design`). Items keep that id as their namespace
-(`design:<id>`), so tags, tabs, links and chats carry over. If you had the
-plugin, see [its upgrade bridge](../bb-studio-design/README.md) to copy your
-designs and saved styles in.
+(`design:<id>`), so tags, tabs, links and chats carry over. If you still have
+the old plugin, see [docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
 
 ![Live BB screenshot of a design open as a Studio tab](assets/designs-preview.png)
 
@@ -515,9 +509,8 @@ saves audio as you speak and transcribes it with the voice service in
 default). Every dictation and recording becomes a titled, searchable item you
 can link to and @-mention. It used to be the separate Studio Talk plugin
 (`talk`). Recordings keep that id as their namespace (`talk:<id>`), so tags,
-tabs, links and chats carry over. If you had the plugin, see
-[its upgrade bridge](../bb-studio-talk/README.md) to copy your recordings,
-their audio and your settings in.
+tabs, links and chats carry over. If you still have the old plugin, see
+[docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
 
 ![Live BB screenshot of a recording open as a Studio tab, with playback and the cleaned transcript](assets/recordings-preview.png)
 
@@ -532,16 +525,15 @@ Recapture with `BB_CAPTURE_ONLY=talk-page`.
 
 Studio's library filtered to recordings, with the banner for audio this
 device kept because the server refused it (a piece set aside in the browser's
-store by the capture). "Weekly product sync" was copied in from the Talk
-plugin by `bb talk migrate`. **Review** opens
+store by the capture). **Review** opens
 `/plugins/studio/studio/recordings/unsent` as an "Unsent audio" tab, where each piece can be retried,
 downloaded or discarded. Recapture with `BB_CAPTURE_ONLY=talk-unsent`.
 
 ![Talk models settings with a cleanup model selected](assets/recordings-model-settings.png)
 
-Studio's settings page after `bb talk migrate`: Talk's settings, with the
-segment length and hold-to-talk key the staged user had set in the Talk
-plugin, and **Talk models** with Codex's 6-Luna for cleanup and Studio
+Studio's settings page: Talk's settings, with the
+segment length and hold-to-talk key the staged user set,
+and **Talk models** with Codex's 6-Luna for cleanup and Studio
 Decisions for titles and summaries, chosen through the real controls.
 
 ![Dictation controls inline at the active input](assets/recordings-inline-dictation.png)
@@ -598,7 +590,7 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
   slow, or returns something that isn't a clean-up, Talk inserts the text as
   spoken.
 - **Dictation in other plugins.** Plugins can mark a text surface as a
-  dictation field, as [Pages](../bb-studio-pages) does for its editor. Talk
+  dictation field, as Pages does for its editor. Talk
   dictates into it with the same pill, durability, and **Go back** handling
   as a composer. *Talk: Start or finish dictation* works in a focused field.
 - **Recordings as spoken notes.** **New → Recording** in any Studio menu (the
@@ -747,12 +739,6 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
   with no words is deleted along with its audio, and Talk says so. This
   covers a mic tapped by accident, silence, and noise. A recording with a
   failed piece is kept, because a retry may still find speech.
-- **Updating from the Talk plugin.** The recorder belongs to whichever
-  plugin is running. Finish or stop any recording or dictation first, and let
-  its audio upload (the pill goes away), then update Talk and then Studio
-  (see [the bridge](../bb-studio-talk/README.md)). Audio set aside in the
-  browser carries over: Studio uses the same browser store, and its uploads
-  go to Studio once the bridge has copied the recording.
 
 ### Settings
 
@@ -954,12 +940,9 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   same CLI command with a Copy button, for when it fails.
 - If BB doesn't know the `bb-studio` marketplace yet, the page shows
   `bb marketplace add git:github.com/patleeman/bb-studio@main` first.
-- **Retired plugins** shows the upgrade bridges (`pages`, `talk`,
-  `excalidraw`, `artifacts`, `design`), `thread-list-plus` and
-  `studio-tables` if they're installed: why each is retired, what removing it
-  keeps and deletes, and what to do first. **Remove…** asks before it removes
-  anything. A bridge can't be removed until it has copied every item into
-  Studio (`bb <id> migrate`).
+- **Retired plugins** shows `studio-tables` if it's installed: why it is
+  retired, what removing it keeps and deletes. **Remove…** asks before it
+  removes anything.
 - Problems with plugins outside BB Studio are listed at the bottom.
 
 `bb studio setup` prints the same status, the retired plugins and the

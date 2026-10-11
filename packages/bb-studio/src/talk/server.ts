@@ -11,9 +11,7 @@
 //
 // This was the Studio Talk plugin (id `talk`). Its recordings keep that id as
 // their namespace; its agent tools, skill, mention provider, message
-// directive and commands keep their names; and the plugin's last release is
-// an upgrade bridge that copies its audio, rows and settings here (see the
-// bridge methods below and docs/merging-add-ons.md).
+// directive and commands keep their names (docs/merging-add-ons.md).
 import { join } from "node:path";
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { subcommand, takeOption } from "@bb-studio/kit/cli";
@@ -22,7 +20,7 @@ import { createChangeBus, defineItemMention, serveBytes, type BackupHandlers, ty
 import type { BbPluginApi, PluginSettingsHandle } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { bridgeContract, importRecordingSchema, rpcContract, TALK_SETTINGS, type ModelPurpose, type TalkSettings } from "./shared/contract";
+import { rpcContract, TALK_SETTINGS } from "./shared/contract";
 import { PANEL_PATH, PLUGIN_ID, RECORDING_CHANGED, formatLength, recordingHref } from "./shared/format";
 import { AudioFiles, extensionFor, pluginDataDirectory } from "./server/audio-files";
 import { audioResponse } from "./server/audio-response";
@@ -37,7 +35,6 @@ import { cleanTranscript } from "./server/cleanup";
 import { talkModels } from "./server/models";
 import { NotesMaker, PAGES_MISSING, generateNotes, notesPagePath, pagesClient } from "./server/notes";
 import { talkBackupHandlers } from "./server/backup";
-import { AudioImport, importRecording } from "./server/import";
 
 export { TALK_SETTINGS } from "./shared/contract";
 
@@ -48,8 +45,6 @@ const TITLE_MIN_CHARS = 280;
 /** A cleanup that takes longer than this inserts the text as spoken. */
 const CLEANUP_TIMEOUT_MS = 30_000;
 const DAY_MS = 86_400_000;
-/** Set once the Talk plugin's settings were copied in, so they are copied only once. */
-const SETTINGS_IMPORTED = "talk:settings-imported";
 
 /** Available in every agent session. */
 export const TALK_TOOLS = ["talk_list", "talk_read", "talk_search", "talk_make_notes"];
@@ -349,62 +344,11 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
     },
   });
 
-
-  // ── The upgrade bridge (packages/bb-studio-talk) ───────────────────────
-  const audioImport = new AudioImport(files);
   function resolveMention(id: string): string {
     const recording = mustGet(id);
     const cleaned = store.cleanedTranscript(id);
     return mentionContext(recording, cleaned ?? store.transcript(id), cleaned !== null);
   }
-  bb.rpc.register(bridgeContract, {
-    async "recordings.missingAudio"({ files: wanted }) {
-      const missing: { recordingId: string; file: string; offset: number }[] = [];
-      for (const each of wanted) {
-        const have = await audioImport.have(each.recordingId, each.file, each.bytes);
-        if (!have.complete) missing.push({ recordingId: each.recordingId, file: each.file, offset: have.offset });
-      }
-      return { missing, freeBytes: await audioImport.free() };
-    },
-    "recordings.importAudio": (input) => audioImport.write(input),
-    async "recordings.importRows"({ recordings }) {
-      const imported: string[] = [];
-      const existing: string[] = [];
-      const skipped: { id: string; reason: string }[] = [];
-      for (const item of recordings) {
-        const result = await importRecording(db, audioImport, importRecordingSchema.parse(item));
-        if (result.outcome === "imported") imported.push(item.id);
-        else if (result.outcome === "existing") existing.push(item.id);
-        else skipped.push({ id: item.id, reason: result.reason });
-      }
-      for (const id of imported) changed(id);
-      // Anything the old plugin left to transcribe continues here.
-      if (imported.length) transcriber.wake();
-      return { imported, existing, skipped };
-    },
-    async "recordings.importSettings"({ settings: values, models: chosen }) {
-      if (await bb.storage.kv.get(SETTINGS_IMPORTED)) return { applied: [] };
-      const applied: string[] = [];
-      // A setting the user already changed in Studio stays as they set it.
-      const current = await settings.get();
-      const next: Partial<Record<keyof TalkSettings, unknown>> = {};
-      for (const [key, value] of Object.entries(values) as [keyof TalkSettings, unknown][]) {
-        if (value === undefined || !(key in TALK_SETTINGS)) continue;
-        if (current[key] !== TALK_SETTINGS[key].default || value === current[key]) continue;
-        next[key] = value;
-        applied.push(key);
-      }
-      if (applied.length) await settings.experimental_set(next as never);
-      for (const [purpose, selection] of Object.entries(chosen) as [ModelPurpose, unknown][]) {
-        if (!selection || (await models.get(purpose))) continue;
-        await models.set(purpose, selection as never);
-        applied.push(`model:${purpose}`);
-      }
-      await bb.storage.kv.set(SETTINGS_IMPORTED, { at: Date.now(), applied });
-      return { applied };
-    },
-    "recordings.mentionContext": ({ id }) => ({ context: resolveMention(id) }),
-  });
 
   // Segment audio for the recording page's player. Same-origin GET only.
   bb.http.route("GET", `/${PANEL_PATH}/audio`, async (context) => {

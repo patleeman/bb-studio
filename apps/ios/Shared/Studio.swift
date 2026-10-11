@@ -144,9 +144,7 @@ extension StudioItem {
             facts: drawing.elementCount.map { [Fact(id: "elements", value: $0 == 1 ? "1 shape" : "\($0) shapes")] } ?? [],
             href: "/plugins/studio/studio/drawings/\(drawing.id)")
         if drawing.elementCount ?? 0 > 0 {
-            thumbnailUrl = drawingsInStudio
-                ? "/api/v1/plugins/studio/http/drawings/thumbnail?drawing=\(drawing.id)&v=\(Int(drawing.updatedAt))"
-                : "/api/v1/plugins/excalidraw/http/thumbnail?drawing=\(drawing.id)&v=\(Int(drawing.updatedAt))"
+            thumbnailUrl = "/api/v1/plugins/studio/http/drawings/thumbnail?drawing=\(drawing.id)&v=\(Int(drawing.updatedAt))"
         }
     }
 
@@ -385,22 +383,22 @@ extension BBClient {
 
     public func renameRecording(_ id: String, title: String) async throws {
         let input: JSONValue = ["id": .string(id), "title": .string(String(title.prefix(160)))]
-        let _: JSONValue = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_rename, input) }, else: { try await self.rpc("talk", Talk.Method.recording_rename, input) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.recordings_recording_rename, input)
     }
 
     /// Transcribes a recording's failed segments again.
     public func retryRecording(_ id: String) async throws {
         let input: JSONValue = ["id": .string(id)]
-        let _: JSONValue = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_retry, input) }, else: { try await self.rpc("talk", Talk.Method.recording_retry, input) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.recordings_recording_retry, input)
     }
 
     public func deleteRecording(_ id: String) async throws {
         let input: JSONValue = ["id": .string(id)]
-        let _: JSONValue = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_delete, input) }, else: { try await self.rpc("talk", Talk.Method.recording_delete, input) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.recordings_recording_delete, input)
     }
 
     public func deletePage(_ id: String) async throws {
-        let _: JSONValue = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_remove, ["id": .string(id)]) }, else: { try await self.rpc("pages", Pages.Method.remove, ["id": .string(id)]) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.pages_remove, ["id": .string(id)])
     }
 
     /// A new global page with this Markdown as its body.
@@ -410,7 +408,7 @@ extension BBClient {
             "projectId": .null, "parentId": .null, "title": .string(String(title.prefix(200))),
             "markdown": .string(String(markdown.prefix(200_000))),
         ]
-        let envelope: Envelope = try await pagesViaStudio({ try await self.rpc("studio", Studio.Method.pages_create, input) }, else: { try await self.rpc("pages", Pages.Method.create, input) })
+        let envelope: Envelope = try await self.rpc("studio", Studio.Method.pages_create, input)
         return envelope.page
     }
 }

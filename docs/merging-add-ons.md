@@ -6,8 +6,16 @@ then Draw (`packages/bb-studio/src/draw`), then Design
 (`packages/bb-studio/src/design`), then Talk (`packages/bb-studio/src/talk`),
 and last Pages (`packages/bb-studio/src/pages`, with Explore in
 `packages/bb-studio/src/explore`). This is the checklist, with what each
-taught. Users moving from the separate add-ons follow
-[upgrade-unified-studio.md](upgrade-unified-studio.md).
+taught.
+
+**Status: complete.** Every kind is built in, and the five upgrade bridges
+(`pages`, `talk`, `excalidraw`, `artifacts`, `design`), Studio's import RPCs
+and the iOS fallbacks to the old plugin ids were deleted after their release
+cycle. The last commit with the bridges is
+`350e69857c0f79a173abfd60ff3d11b1b2a14f66`; see
+[upgrade-unified-studio.md](upgrade-unified-studio.md). The bridge steps
+below (4, and the bridge parts of 3 and 5) are a record of how it was done;
+the packages they name are gone. The old-address mapping and item ids stay.
 
 ## Rules
 
@@ -329,15 +337,14 @@ commit, run `bb <old> migrate`, and check the items in Studio
   fallback the way studio-chat went (commits `d3df3ceb`, `f4f1ae22`). Keep
   the old-address mapping; it costs nothing.
 
-## After the merge (follow-ups)
+## After the merge
 
-- Delete the bridge packages (`bb-studio-pages`, `-talk`, `-draw`,
-  `-artifacts`, `-design`) and their iOS fallbacks after a release cycle,
-  keeping their `RETIRED` entries.
+- Done: the bridge packages (`bb-studio-pages`, `-talk`, `-draw`,
+  `-artifacts`, `-design`), their marketplace entries, Setup's `RETIRED`
+  entries for them, the import RPCs and the iOS fallbacks are deleted.
 - The kit stays a packed tarball (`packages/bb-studio-kit.tgz`): Code,
-  Reactions, Decisions and the bridges install alone from Git and can't
-  import its sources. Once the bridges are gone, it could shrink to what
-  those three use.
+  Reactions and Decisions install alone from Git and can't import its
+  sources. It could shrink to what those three use.
 
 Done: the kit's `AddOnCollection`, `AddOnPanel` and `handOver` are gone (Code
 hands its collection path to Studio itself), and provider discovery no longer

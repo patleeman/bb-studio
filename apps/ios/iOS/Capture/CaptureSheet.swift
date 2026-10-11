@@ -233,7 +233,7 @@ struct CaptureSheet: View {
             "title": .string(CaptureNote.title(from: text)),
             "markdown": .string(String(text.prefix(200_000))),
         ]
-        let result: Envelope = try await client.pagesViaStudio({ try await client.rpc("studio", Studio.Method.pages_create, input) }, else: { try await client.rpc("pages", Pages.Method.create, input) })
+        let result: Envelope = try await client.rpc("studio", Studio.Method.pages_create, input)
         return result.page.id
     }
 
@@ -257,10 +257,7 @@ struct CaptureSheet: View {
                     "bytes": .string(file.data.base64EncodedString()),
                     "projectId": project.map { .string($0) } ?? .null,
                 ]
-                // Artifacts are built into Studio; an older Studio falls back to the Artifacts plugin.
-                let result: Studio.ArtifactsImportFileOutput = try await client.viaStudio(
-                    { try await client.rpc("studio", Studio.Method.artifacts_importFile, input) },
-                    else: { try await client.rpc("artifacts", Artifacts.Method.importFile, input) })
+                let result: Studio.ArtifactsImportFileOutput = try await client.rpc("studio", Studio.Method.artifacts_importFile, input)
                 guard let id = result.id else { throw BBError(status: 500, message: "Unexpected artifact response.") }
                 savedArtifactId = id
                 files.removeAll { $0.id == file.id }

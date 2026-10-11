@@ -1,6 +1,5 @@
 // Designs in the plugin's SQLite database. A design holds rounds; a round
 // holds a few options; each option is one self-contained HTML screen.
-import type { ImportDesign, ImportStyle } from "@bb-studio/kit/design-contract";
 import type { Actor } from "@bb-studio/kit/server";
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
@@ -70,9 +69,6 @@ export const MIGRATIONS = [
 
 /** The Design plugin's statements, appended to Studio's migrations unchanged. */
 export const DESIGN_MIGRATIONS: readonly string[] = MIGRATIONS;
-
-/** What importing one row did: the bridge marks imported and existing rows as copied. */
-export type ImportOutcome = { outcome: "imported" | "existing" } | { outcome: "skipped"; reason: string };
 
 /** A look the user picked, saved so later designs and decks can start from it. */
 export type StyleRow = {
@@ -331,41 +327,6 @@ export class DesignStore {
 
   deleteStyle(id: string): boolean {
     return this.db.prepare("DELETE FROM design_styles WHERE id = ?").run(id).changes > 0;
-  }
-
-  /**
-   * A design from the Design plugin's upgrade bridge, with its ids and times.
-   * One Studio already has (same id) is left as it is, so reruns are no-ops.
-   */
-  importDesign(item: ImportDesign): ImportOutcome {
-    if (this.get(item.id)) return { outcome: "existing" };
-    const bad = item.screens.find((screen) => !parseScreenId(screen.id) || parseScreenId(screen.id)!.round !== screen.round);
-    if (bad) return { outcome: "skipped", reason: `Screen ${bad.id} doesn't match its round ${bad.round}.` };
-    this.db.transaction(() => {
-      this.db.prepare(`INSERT INTO designs (id, name, created_at, updated_at, project_id, updated_by, archived_at, template, thread_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(item.id, item.name, item.createdAt, item.updatedAt, item.projectId, item.updatedBy, item.archivedAt, item.template ? 1 : 0, item.threadId);
-      const round = this.db.prepare("INSERT OR REPLACE INTO design_rounds (design_id, round, title, intro) VALUES (?, ?, ?, ?)");
-      for (const each of item.rounds) round.run(item.id, each.round, each.title, each.intro);
-      const screen = this.db.prepare(`INSERT OR REPLACE INTO design_screens (design_id, id, round, title, caption, viewport, html, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      for (const each of item.screens) screen.run(item.id, each.id, each.round, each.title, each.caption, each.viewport, each.html, each.createdAt, each.updatedAt);
-      const comment = this.db.prepare(`INSERT OR IGNORE INTO design_comments (id, design_id, screen_id, step, selector, element_html, element_text, body, created_at, sent_at, resolved_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      for (const each of item.comments) comment.run(each.id, item.id, each.screenId, each.step, each.selector, each.elementHtml, each.elementText, each.body, each.createdAt, each.sentAt, each.resolvedAt);
-    })();
-    return { outcome: "imported" };
-  }
-
-  /** A saved style from the bridge. One with this id is left alone; a different style with the same name wins. */
-  importStyle(item: ImportStyle): ImportOutcome {
-    if (this.style(item.id)) return { outcome: "existing" };
-    const named = this.db.prepare("SELECT id FROM design_styles WHERE lower(name) = lower(?)").get(item.name) as { id: string } | undefined;
-    if (named) return { outcome: "skipped", reason: `Studio already has a style named "${item.name}".` };
-    this.db.prepare(`INSERT INTO design_styles (id, name, notes, css, source_design_id, source_screen_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(item.id, item.name, item.notes, item.css, item.sourceDesignId, item.sourceScreenId, item.createdAt, item.updatedAt);
-    return { outcome: "imported" };
   }
 
   /** The design as the canvas shows it: rounds newest first, options in letter order. */

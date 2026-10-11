@@ -5,7 +5,7 @@ assert os.environ.get('BB_ARTIFACT_QA_SERVER_URL') == origin
 assert os.environ.get('BB_DATA_DIR') == '/tmp/bb-studio-goal-staged/data'
 run=Path(os.environ['BB_ARTIFACT_QA_RUN_DIR'])
 def rpc(method,input):
- req=urllib.request.Request(origin+'/api/v1/plugins/artifacts/rpc/'+method,data=json.dumps(input).encode(),headers={'Content-Type':'application/json'})
+ req=urllib.request.Request(origin+'/api/v1/plugins/studio/rpc/artifacts.'+method,data=json.dumps(input).encode(),headers={'Content-Type':'application/json'})
  result=json.load(urllib.request.urlopen(req)); assert result['ok'],result; return result['result']
 def chunk(t,b): return struct.pack('!I',len(b))+t+b+struct.pack('!I',zlib.crc32(t+b)&0xffffffff)
 png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('!2I5B',120,80,8,2,0,0,0))+chunk(b'IDAT',zlib.compress((b'\0'+b'\x18\x91\xc2'*120)*80))+chunk(b'IEND',b'')
@@ -20,6 +20,6 @@ for kind,name,mime,data in [('emptyText','artifact-runtime-empty-text.txt','text
  fixtures[kind]=dict(id=rpc('importFile',payload)['id'],payload=payload)
  (run/'fixtures.json').write_text(json.dumps(fixtures))
  if kind.startswith('missing'):
-  db=sqlite3.connect('/tmp/bb-studio-goal-staged/data/plugins/artifacts/data.db');digest=hashlib.sha256(data).hexdigest();assert db.execute('SELECT artifact_id FROM artifact_versions WHERE sha256=?',(digest,)).fetchall() == [(fixtures[kind]['id'],)], 'Only mutate blobs referenced by this owned fixture';db.execute('DELETE FROM artifact_blobs WHERE sha256=?',(digest,));db.commit();db.close()
+  db=sqlite3.connect('/tmp/bb-studio-goal-staged/data/plugins/studio/data.db');digest=hashlib.sha256(data).hexdigest();assert db.execute('SELECT artifact_id FROM artifact_versions WHERE sha256=?',(digest,)).fetchall() == [(fixtures[kind]['id'],)], 'Only mutate blobs referenced by this owned fixture';db.execute('DELETE FROM artifact_blobs WHERE sha256=?',(digest,));db.commit();db.close()
 (run/'fixtures.json').write_text(json.dumps(fixtures))
 print(json.dumps({k:v['id'] for k,v in fixtures.items()}))

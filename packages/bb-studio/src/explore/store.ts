@@ -4,7 +4,7 @@ import { NEXT_KINDS, suggestionKey, type NextKind } from "./next";
 
 /**
  * The Next row's click log, which Studio keeps in its own database (Explore
- * kept explore.db beside Pages' database; the upgrade bridge copies it in).
+ * kept explore.db beside Pages' database).
  * Each statement is exactly as Explore ran it, since a database records the
  * hash of every statement it ran; never edit or reorder them.
  */
@@ -71,18 +71,6 @@ export class ExploreStore {
     this.db
       .prepare("UPDATE next_suggestions SET clicks = clicks + 1, clicked_at = COALESCE(clicked_at, ?) WHERE key = ?")
       .run(this.now(), suggestionKey(input));
-  }
-
-  /** Suggestions copied from the old Pages plugin's explore.db; ones Studio has keep Studio's counts. */
-  importNext(rows: readonly { key: string; threadId: string; messageId: string; kind: string; emoji: string; label: string; shownAt: number; clickedAt: number | null; clicks: number }[]): { imported: number; existing: number } {
-    const insert = this.db.prepare(
-      `INSERT INTO next_suggestions (key, thread_id, message_id, kind, emoji, label, shown_at, clicked_at, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (key) DO NOTHING`,
-    );
-    let imported = 0;
-    this.db.transaction(() => {
-      for (const row of rows) imported += insert.run(row.key, row.threadId, row.messageId, row.kind, row.emoji, row.label, row.shownAt, row.clickedAt, row.clicks).changes;
-    })();
-    return { imported, existing: rows.length - imported };
   }
 
   /** Shown and clicked suggestions since a time, per kind, and the most clicked labels. */

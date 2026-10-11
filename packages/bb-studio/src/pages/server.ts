@@ -5,10 +5,7 @@
 // This was the Studio Pages plugin (id `pages`). Its pages keep that id as
 // their namespace; its agent tools (`pages_*`), skill, `page` mention
 // provider, `::page` directive, thread panel and header actions keep their
-// names; its RPC methods are Studio's `pages.*`; and the plugin's last release
-// is an upgrade bridge that copies its pages, versions, files, Next row click
-// log and settings here (see the bridge methods below and
-// docs/merging-add-ons.md).
+// names; and its RPC methods are Studio's `pages.*` (docs/merging-add-ons.md).
 import { createStudioNotifier, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -16,7 +13,7 @@ import type { BbPluginApi, PluginCliRegistration } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { untitled } from "@bb-studio/kit/format";
-import { bridgeContract, PAGE_FILES_URL, PAGES_SETTINGS, type ImportNextSuggestion, type PagesSettings } from "@bb-studio/kit/pages-contract";
+import { PAGE_FILES_URL } from "@bb-studio/kit/pages-contract";
 import { pagesBackup } from "./backup";
 import * as Y from "yjs";
 import { z } from "zod";
@@ -33,7 +30,6 @@ import { PageStore } from "./store";
 import { pageProvider } from "./studio";
 import { outgoingStudioLinks } from "./studio-links";
 import { registerTools } from "./tools";
-import { importPages } from "./import";
 import { Checklists } from "./checklists";
 import { pagesCli } from "./cli";
 
@@ -55,15 +51,11 @@ export interface BuiltinPages {
 export interface PagesSettingsAccess {
   /** The `snapshotsPerPage` setting, read on each save. */
   snapshotsPerPage(): number;
-  /** Pages' and Explore's settings as they are, and setting some (once, from the bridge). */
-  get(): Promise<Record<string, unknown>>;
-  set(values: PagesSettings): Promise<void>;
 }
 
 /** Registers pages' RPC, HTTP routes, agent tools, mention provider and thread events on Studio. Studio has run the migrations. */
-export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, explore: { importNext(rows: ImportNextSuggestion[]): { imported: number; existing: number } }): BuiltinPages {
+export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess): BuiltinPages {
   const store = new PageStore(db, () => settings.snapshotsPerPage());
-  const imports = importPages(db);
   const service = new PagesService(bb, store);
   const checklists = new Checklists(bb, db, service, store);
 
@@ -421,39 +413,6 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
   }));
 
   const cli = pagesCli(service, created);
-
-  // The upgrade bridge (packages/bb-studio-pages) -----------------------------
-
-  const SETTINGS_IMPORTED = "pages:settings-imported";
-  bb.rpc.register(bridgeContract, {
-    "pages.missingFiles": ({ ids }) => ({ missing: ids.filter((id) => !store.hasFile(id)) }),
-    "pages.importFile": (file) => ({ ok: imports.file(file) }),
-    "pages.importSnapshots": ({ snapshots }) => imports.snapshots(snapshots),
-    "pages.importRows": ({ pages }) => {
-      const result = imports.pages(pages);
-      for (const id of result.imported) service.publish({ type: "page", pageId: id });
-      if (result.imported.length) service.publish({ type: "tree", projectId: null });
-      return result;
-    },
-    "explore.importNextSuggestions": ({ rows }) => explore.importNext(rows),
-    async "pages.importSettings"({ settings: values }) {
-      if (await bb.storage.kv.get(SETTINGS_IMPORTED)) return { applied: [] };
-      const applied: string[] = [];
-      // A setting the user already changed in Studio stays as they set it.
-      const current = await settings.get();
-      const next: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(values)) {
-        if (value === undefined || !(key in PAGES_SETTINGS)) continue;
-        if (current[key] !== PAGES_SETTINGS[key as keyof typeof PAGES_SETTINGS].default || value === current[key]) continue;
-        next[key] = value;
-        applied.push(key);
-      }
-      if (applied.length) await settings.set(next as PagesSettings);
-      await bb.storage.kv.set(SETTINGS_IMPORTED, { at: Date.now(), applied });
-      return { applied };
-    },
-    "pages.mentionContext": ({ id }) => ({ context: mentionContext(id) }),
-  });
 
   // Bot request lifecycle -----------------------------------------------------
 

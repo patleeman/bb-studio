@@ -8,22 +8,6 @@
       "source": "./packages/bb-studio"
     },
     {
-      "name": "pages",
-      "source": "./packages/bb-studio-pages"
-    },
-    {
-      "name": "talk",
-      "source": "./packages/bb-studio-talk"
-    },
-    {
-      "name": "excalidraw",
-      "source": "./packages/bb-studio-draw"
-    },
-    {
-      "name": "artifacts",
-      "source": "./packages/bb-studio-artifacts"
-    },
-    {
       "name": "mobile",
       "source": "./packages/bb-studio-mobile"
     },
@@ -34,10 +18,6 @@
     {
       "name": "smart-decisions",
       "source": "./packages/bb-studio-decisions"
-    },
-    {
-      "name": "design",
-      "source": "./packages/bb-studio-design"
     },
     {
       "name": "studio-code",

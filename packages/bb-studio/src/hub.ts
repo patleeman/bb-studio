@@ -11,8 +11,8 @@ import { schemas } from "./contract";
 /**
  * A kind built into Studio. It answers to the plugin id it had as an add-on
  * and implements the same provider methods, which the hub calls in-process
- * instead of over RPC. An installed plugin with the same id (the old add-on,
- * or its upgrade bridge) is not discovered: the built-in owns its items.
+ * instead of over RPC. An installed plugin with the same id (an old copy of
+ * the add-on) is not discovered: the built-in owns its items.
  */
 export interface BuiltinProvider {
   pluginId: string;

@@ -8,7 +8,7 @@ repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 fresh=0
 if [ "${1:-}" = "--fresh" ]; then fresh=1; shift; fi
 if [ "$#" -eq 0 ]; then
-  echo "Usage: scripts/refresh-locks.sh [--fresh] bb-studio-pages [bb-studio-decisions ...]" >&2
+  echo "Usage: scripts/refresh-locks.sh [--fresh] bb-studio [bb-studio-decisions ...]" >&2
   exit 2
 fi
 sh "$repo_dir/scripts/pack-kit.sh"

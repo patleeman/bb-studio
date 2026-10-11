@@ -84,10 +84,8 @@ struct ArtifactView: View {
         .task(id: "\(version?.id ?? ""):\(textAttempt)") { await loadText() }
         .task {
             listener = app.realtime.listen { event in
-                // Studio sends it on its `artifacts` channel; the Artifacts plugin did before the merge.
-                guard case .pluginSignal(let pluginId, let channel, let payload) = event,
-                    pluginId == "artifacts" || (pluginId == "studio" && channel == "artifacts")
-                else { return }
+                // Studio sends it on its `artifacts` channel.
+                guard case .pluginSignal("studio", "artifacts", let payload) = event else { return }
                 if let changed = (payload["artifactId"] ?? payload["id"])?.stringValue, changed != id { return }
                 Task { await load() }
             }

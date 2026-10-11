@@ -9,21 +9,9 @@
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "get",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "studio",
       "method": "artifacts.text",
       "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "text",
-      "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
@@ -33,21 +21,9 @@
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "update",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "studio",
       "method": "artifacts.move",
       "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "move",
-      "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
@@ -57,21 +33,9 @@
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "delete",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "studio",
       "method": "artifacts.saveAsPage",
       "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "saveAsPage",
-      "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
@@ -81,33 +45,15 @@
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "threadArtifacts",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "studio",
       "method": "artifacts.candidates",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "candidates",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "studio",
       "method": "artifacts.saveFiles",
       "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "saveFiles",
-      "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Automations.swift",
@@ -152,12 +98,6 @@
       "coverage": "generated method"
     },
     {
-      "file": "apps/ios/Shared/BBClient+DrawingEditing.swift",
-      "plugin": "excalidraw",
-      "method": "createDrawing",
-      "coverage": "generated method"
-    },
-    {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "studio",
       "method": "searchAll",
@@ -171,20 +111,8 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "talk",
-      "method": "recording_get",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "studio",
       "method": "recordings.meeting_regenerate",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "talk",
-      "method": "meeting_regenerate",
       "coverage": "generated method"
     },
     {
@@ -225,32 +153,14 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+PageEditing.swift",
-      "plugin": "pages",
-      "method": "editableMarkdown",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
       "plugin": "studio",
       "method": "pages.editDocument",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+PageEditing.swift",
-      "plugin": "pages",
-      "method": "editDocument",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
       "plugin": "studio",
       "method": "pages.requests",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
-      "plugin": "pages",
-      "method": "requests",
       "coverage": "generated method"
     },
     {
@@ -279,20 +189,8 @@
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recording_create",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "studio",
       "method": "recordings.segment_put",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "segment_put",
       "coverage": "generated method"
     },
     {
@@ -303,20 +201,8 @@
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recording_state",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "studio",
       "method": "recordings.recording_heartbeat",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recording_heartbeat",
       "coverage": "generated method"
     },
     {
@@ -327,20 +213,8 @@
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recording_get",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "studio",
       "method": "recordings.recordings_list",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recordings_list",
       "coverage": "generated method"
     },
     {
@@ -374,21 +248,9 @@
       "coverage": "generated method"
     },
     {
-      "file": "apps/ios/Shared/Designs.swift",
-      "plugin": "design",
-      "method": "getDesign",
-      "coverage": "generated method"
-    },
-    {
       "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "studio",
       "method": "drawings.listDrawings",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Drawings.swift",
-      "plugin": "excalidraw",
-      "method": "listDrawings",
       "coverage": "generated method"
     },
     {
@@ -399,20 +261,8 @@
     },
     {
       "file": "apps/ios/Shared/Drawings.swift",
-      "plugin": "excalidraw",
-      "method": "getDrawing",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "studio",
       "method": "drawings.getDrawingUpdatedAt",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Drawings.swift",
-      "plugin": "excalidraw",
-      "method": "getDrawingUpdatedAt",
       "coverage": "generated method"
     },
     {
@@ -423,20 +273,8 @@
     },
     {
       "file": "apps/ios/Shared/Drawings.swift",
-      "plugin": "excalidraw",
-      "method": "renameDrawing",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "studio",
       "method": "drawings.deleteDrawing",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Drawings.swift",
-      "plugin": "excalidraw",
-      "method": "deleteDrawing",
       "coverage": "generated method"
     },
     {
@@ -447,20 +285,8 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "tree",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.get",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "get",
       "coverage": "generated method"
     },
     {
@@ -471,20 +297,8 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "markdown",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.search",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "search",
       "coverage": "generated method"
     },
     {
@@ -495,20 +309,8 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "work",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.chats",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "chats",
       "coverage": "generated method"
     },
     {
@@ -519,20 +321,8 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "chatPage",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.update",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "update",
       "coverage": "generated method"
     },
     {
@@ -543,20 +333,8 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "snapshots",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.snapshot",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "snapshot",
       "coverage": "generated method"
     },
     {
@@ -567,20 +345,8 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "restore",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.comments",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "comments",
       "coverage": "generated method"
     },
     {
@@ -591,20 +357,8 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "commentBlocks",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.commentCreate",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "commentCreate",
       "coverage": "generated method"
     },
     {
@@ -615,20 +369,8 @@
     },
     {
       "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "commentReply",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.commentResolve",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Pages.swift",
-      "plugin": "pages",
-      "method": "commentResolve",
       "coverage": "generated method"
     },
     {
@@ -753,20 +495,8 @@
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
-      "plugin": "talk",
-      "method": "recording_rename",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Studio.swift",
       "plugin": "studio",
       "method": "recordings.recording_retry",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Studio.swift",
-      "plugin": "talk",
-      "method": "recording_retry",
       "coverage": "generated method"
     },
     {
@@ -777,32 +507,14 @@
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
-      "plugin": "talk",
-      "method": "recording_delete",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Studio.swift",
       "plugin": "studio",
       "method": "pages.remove",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
-      "plugin": "pages",
-      "method": "remove",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Studio.swift",
       "plugin": "studio",
       "method": "pages.create",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Studio.swift",
-      "plugin": "pages",
-      "method": "create",
       "coverage": "generated method"
     },
     {
@@ -825,20 +537,8 @@
     },
     {
       "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
-      "plugin": "pages",
-      "method": "create",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
       "plugin": "studio",
       "method": "artifacts.importFile",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
-      "plugin": "artifacts",
-      "method": "importFile",
       "coverage": "generated method"
     },
     {

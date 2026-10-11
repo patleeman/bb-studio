@@ -138,7 +138,7 @@ struct DictationView: View {
                     }
                 } label: { wide("Send to thread", "paperplane.fill") }
                 .buttonStyle(.borderedProminent)
-            } else if runningPlugins.split(separator: ",").contains(where: { $0 == "studio" || $0 == "pages" }) {
+            } else if runningPlugins.split(separator: ",").contains("studio") {
                 Button { Task { await saveAsPage(trimmed) } } label: {
                     if savingPage { ProgressView().frame(maxWidth: .infinity) } else { wide("Save as Page", "doc.richtext") }
                 }

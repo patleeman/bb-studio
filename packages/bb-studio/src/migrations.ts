@@ -150,7 +150,7 @@ export const MIGRATIONS = [
      SELECT c.thread_id, s.id, c.updated_at FROM chief_of_staff c, spaces s WHERE s.is_default = 1
      ON CONFLICT (thread_id) DO UPDATE SET space_id = excluded.space_id;
    DROP TABLE chief_of_staff;`,
-  // Artifacts are built in (src/artifacts): the old plugin's tables, filled by its upgrade bridge.
+  // Artifacts are built in (src/artifacts): the old plugin's tables.
   ARTIFACT_TABLES,
   // Spaces are gone; leads and heartbeats belong to BB projects (src/project-lead.ts).
   // Each Space's lead and heartbeat is queued here and put on its main project at
@@ -191,14 +191,14 @@ export const MIGRATIONS = [
    INSERT OR IGNORE INTO space_retired_automations (automation_id, automation_project_id)
      SELECT automation_id, automation_project_id FROM space_runs WHERE automation_id IS NOT NULL;
    UPDATE space_runs SET enabled = 0, automation_id = NULL, automation_project_id = NULL;`,
-  // Drawings are built in (src/draw): the Draw plugin's tables, filled by its upgrade bridge.
+  // Drawings are built in (src/draw): the Draw plugin's tables.
   DRAWING_TABLES,
-  // Designs are built in (src/design): the Design plugin's statements in order, filled by its upgrade bridge.
+  // Designs are built in (src/design): the Design plugin's statements in order.
   ...DESIGN_MIGRATIONS,
-  // Recordings are built in (src/talk): the Talk plugin's statements in order, filled by its upgrade bridge.
+  // Recordings are built in (src/talk): the Talk plugin's statements in order.
   ...TALK_MIGRATIONS,
-  // Pages are built in (src/pages): the Pages plugin's statements in order, filled by its upgrade bridge.
+  // Pages are built in (src/pages): the Pages plugin's statements in order.
   ...PAGE_MIGRATIONS,
-  // Explore's Next row click log, which Pages kept in explore.db; filled by the same bridge.
+  // Explore's Next row click log, which Pages kept in explore.db.
   ...NEXT_LOG_MIGRATIONS,
 ];

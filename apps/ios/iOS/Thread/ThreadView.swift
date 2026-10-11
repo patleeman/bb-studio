@@ -55,8 +55,8 @@ struct ThreadView: View {
     /// Permissions chosen in Model & permissions, waiting for the next message.
     @AppStorage private var pendingPermission: String?
 
-    /// Artifacts are built into Studio; an older Studio needs the Artifacts plugin.
-    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains { $0 == "studio" || $0 == "artifacts" } }
+    /// Artifacts are built into Studio.
+    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("studio") }
 
     /// Hides the tab bar on iPhone, for a thread pushed from a list; a tab's
     /// own thread keeps it.
@@ -199,7 +199,7 @@ struct ThreadView: View {
             model.attach(app)
             Task { await muted.refresh() }
             Task { reactionSettings = (try? await client.reactionSettings()) ?? .defaults }
-            if runningPlugins.split(separator: ",").contains(where: { $0 == "studio" || $0 == "pages" }) {
+            if runningPlugins.split(separator: ",").contains("studio") {
                 Task { sourcePage = try? await client.chatPage(model.threadId) }
             }
             if runningPlugins.split(separator: ",").contains("studio") {

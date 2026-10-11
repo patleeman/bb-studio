@@ -1,3 +1,2 @@
-// Studio's artifact RPC contract lives in the kit, so the upgrade bridge
-// (packages/bb-studio-artifacts) shares it.
+// Studio's artifact RPC contract lives in the kit.
 export * from "@bb-studio/kit/artifacts-contract";

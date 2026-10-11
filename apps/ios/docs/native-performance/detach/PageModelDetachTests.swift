@@ -25,7 +25,7 @@ final class PageModelDetachTests: XCTestCase {
         let expected = try await fixtureClient.editablePageMarkdown(page.id)
         let probe = DetachedReadProbe()
         app.client.transport = { method, path, body in
-            if path == "/api/v1/plugins/pages/rpc/markdown" {
+            if path == "/api/v1/plugins/studio/rpc/pages.markdown" {
                 await probe.started()
                 print("DETACH_PROBE markdown read started")
                 try await Task.sleep(for: .seconds(2))
@@ -38,7 +38,7 @@ final class PageModelDetachTests: XCTestCase {
         var observedChange = false
         let observer = app.realtime.listen { event in
             if case .connected = event { connected.fulfill() }
-            if case .pluginSignal("pages", _, let payload) = event,
+            if case .pluginSignal("studio", "pages", let payload) = event,
                payload["type"]?.stringValue == "page", payload["pageId"]?.stringValue == page.id,
                !observedChange {
                 observedChange = true

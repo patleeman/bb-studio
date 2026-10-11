@@ -27,8 +27,7 @@ final class PagesStore: ObservableObject {
         listener = app.realtime.listen { [weak self] event in
             guard let self else { return }
             switch event {
-            case .pluginSignal(let pluginId, let channel, let payload)
-                where pluginId == "pages" || (pluginId == "studio" && channel == "pages"):
+            case .pluginSignal("studio", "pages", let payload):
                 switch payload["type"]?.stringValue {
                 case "deleted":
                     let ids = payload["pageIds"]?.arrayValue?.compactMap(\.stringValue) ?? []

@@ -36,103 +36,6 @@
       }
     },
     {
-      "id": "pages",
-      "displayName": "Studio Pages",
-      "description": "Upgrade bridge for Studio Pages, now built into Studio: copies your pages, their versions and files, the Next row's click stats and your Pages settings into Studio and forwards older clients and mentions.",
-      "icon": {
-        "url": "./packages/bb-studio-pages/assets/icon.svg"
-      },
-      "tags": [
-        "upgrade-bridge",
-        "documents",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-pages",
-          "ref": "stable"
-        }
-      }
-    },
-    {
-      "id": "talk",
-      "displayName": "Studio Talk",
-      "description": "Upgrade bridge for Studio Talk, now built into Studio: copies your recordings, their audio and your Talk settings into Studio and forwards older clients and mentions.",
-      "icon": {
-        "url": "./packages/bb-studio-talk/assets/icon.svg"
-      },
-      "tags": [
-        "upgrade-bridge",
-        "voice",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-talk",
-          "ref": "stable"
-        }
-      }
-    },
-    {
-      "id": "excalidraw",
-      "displayName": "Studio Draw",
-      "description": "Upgrade bridge for Studio Draw, now built into Studio: copies your drawings into Studio and forwards older clients and mentions.",
-      "icon": {
-        "url": "./packages/bb-studio-draw/assets/icon.svg"
-      },
-      "tags": [
-        "upgrade-bridge",
-        "drawing",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-draw",
-          "ref": "stable"
-        }
-      }
-    },
-    {
-      "id": "artifacts",
-      "displayName": "Studio Artifacts",
-      "description": "Upgrade bridge for Studio Artifacts, now built into Studio: copies your artifacts into Studio and forwards older clients and mentions.",
-      "icon": {
-        "url": "./packages/bb-studio-artifacts/assets/icon.svg"
-      },
-      "tags": [
-        "upgrade-bridge",
-        "files",
-        "artifacts",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-artifacts",
-          "ref": "stable"
-        }
-      }
-    },
-    {
       "id": "mobile",
       "displayName": "Studio Mobile",
       "description": "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads.",
@@ -199,30 +102,6 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-decisions",
-          "ref": "stable"
-        }
-      }
-    },
-    {
-      "id": "design",
-      "displayName": "Studio Design",
-      "description": "Upgrade bridge for Studio Design, now built into Studio: copies your designs and saved styles into Studio and forwards older clients and mentions.",
-      "icon": {
-        "url": "./packages/bb-studio-design/assets/icon.svg"
-      },
-      "tags": [
-        "upgrade-bridge",
-        "design",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-design",
           "ref": "stable"
         }
       }

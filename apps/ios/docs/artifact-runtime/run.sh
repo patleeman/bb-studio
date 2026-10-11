@@ -17,7 +17,7 @@ from pathlib import Path
 p=Path(os.environ['BB_ARTIFACT_QA_RUN_DIR'])/'fixtures.json'
 if p.exists():
  for fixture in json.loads(p.read_text()).values():
-  request=urllib.request.Request('http://127.0.0.1:49486/api/v1/plugins/artifacts/rpc/delete',data=json.dumps({'id':fixture['id']}).encode(),headers={'Content-Type':'application/json'})
+  request=urllib.request.Request('http://127.0.0.1:49486/api/v1/plugins/studio/rpc/artifacts.delete',data=json.dumps({'id':fixture['id']}).encode(),headers={'Content-Type':'application/json'})
   urllib.request.urlopen(request).read()
 PY
 }

@@ -469,28 +469,12 @@ extension BBClient {
 
 // MARK: Talk
 //
-// Talk is built into Studio (`recordings.*`); a server from before the merge
-// falls back to the Talk plugin, whose last release forwards to Studio anyway.
-
-/// Whether the last recording call was answered by Studio; picks the audio URL.
-nonisolated(unsafe) var recordingsInStudio = true
+// Talk is built into Studio (`recordings.*`).
 
 extension BBClient {
-    /// Studio first; the Talk plugin only when Studio doesn't have the method.
-    func recordingsViaStudio<T>(_ studio: () async throws -> T, else legacy: () async throws -> T) async throws -> T {
-        do {
-            let result = try await studio()
-            recordingsInStudio = true
-            return result
-        } catch where Self.isMissingRPC(error) {
-            recordingsInStudio = false
-            return try await legacy()
-        }
-    }
-
     public func createRecording(kind: String, threadId: String?, projectId: String?) async throws -> Recording {
         let input: JSONValue = ["kind": .string(kind), "projectId": .from(projectId), "threadId": .from(threadId)]
-        return try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_create, input) }, else: { try await self.rpc("talk", Talk.Method.recording_create, input) })
+        return try await self.rpc("studio", Studio.Method.recordings_recording_create, input)
     }
 
     public func putSegment(
@@ -502,30 +486,30 @@ extension BBClient {
             "startedAt": .from(startedAt), "durationMs": .from(durationMs), "mimeType": .string(mimeType),
             "audioBase64": .string(audio.base64EncodedString()),
         ]
-        let _: JSONValue = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_segment_put, input) }, else: { try await self.rpc("talk", Talk.Method.segment_put, input) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.recordings_segment_put, input)
     }
 
     @discardableResult
     public func setRecordingState(_ id: String, _ status: String) async throws -> Recording {
         let input: JSONValue = ["id": .string(id), "status": .string(status)]
-        return try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_state, input) }, else: { try await self.rpc("talk", Talk.Method.recording_state, input) })
+        return try await self.rpc("studio", Studio.Method.recordings_recording_state, input)
     }
 
     public func heartbeat(_ id: String) async throws {
         let input: JSONValue = ["id": .string(id)]
-        let _: JSONValue = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_heartbeat, input) }, else: { try await self.rpc("talk", Talk.Method.recording_heartbeat, input) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.recordings_recording_heartbeat, input)
     }
 
     public func recording(_ id: String) async throws -> RecordingDetail {
         let input: JSONValue = ["id": .string(id)]
-        return try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_get, input) }, else: { try await self.rpc("talk", Talk.Method.recording_get, input) })
+        return try await self.rpc("studio", Studio.Method.recordings_recording_get, input)
     }
 
     /// One segment's audio, as it was recorded: WebM/Opus from a browser, MP4/AAC from the phone.
     public func recordingAudio(_ id: String, segment: String) async throws -> Data {
         var query = URLComponents()
         query.queryItems = [URLQueryItem(name: "recording", value: id), URLQueryItem(name: "segment", value: segment)]
-        let root = recordingsInStudio ? "/api/v1/plugins/studio/http/recordings/audio" : "/api/v1/plugins/talk/http/audio"
+        let root = "/api/v1/plugins/studio/http/recordings/audio"
         let path = root + "?" + (query.percentEncodedQuery ?? "")
         let (status, data) = try await raw(method: "GET", path: path, body: nil)
         guard (200..<300).contains(status) else {
@@ -537,7 +521,7 @@ extension BBClient {
     public func recordings(limit: Int = 50) async throws -> [Recording] {
         struct List: Decodable { var recordings: [Recording] }
         let input: JSONValue = ["limit": .from(limit)]
-        let list: List = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recordings_list, input) }, else: { try await self.rpc("talk", Talk.Method.recordings_list, input) })
+        let list: List = try await self.rpc("studio", Studio.Method.recordings_recordings_list, input)
         return list.recordings
     }
 }

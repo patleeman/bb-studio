@@ -127,35 +127,16 @@ private struct Lossy<T: Decodable>: Decodable {
     init(from decoder: Decoder) throws { value = try? T(from: decoder) }
 }
 
-/// Drawings are built into Studio. For one release, a Studio from before the
-/// merge (no `drawings.*` methods) falls back to the Draw plugin, whose last
-/// release forwards to Studio anyway.
-nonisolated(unsafe) var drawingsInStudio = true
-
 extension BBClient {
-    /// Studio first; the Draw plugin only when Studio doesn't have the method.
-    func drawingsViaStudio<T>(_ studio: () async throws -> T, else legacy: () async throws -> T) async throws -> T {
-        do {
-            let result = try await studio()
-            drawingsInStudio = true
-            return result
-        } catch where Self.isMissingRPC(error) {
-            drawingsInStudio = false
-            return try await legacy()
-        }
-    }
-
-    /// A drawing's thumbnail SVG; Studio serves it, or the Draw plugin before the merge.
+    /// A drawing's thumbnail SVG; Studio serves it.
     public func drawingThumbnailPath(_ id: String, updatedAt: Double) -> String {
-        drawingsInStudio
-            ? "/api/v1/plugins/studio/http/drawings/thumbnail?drawing=\(id)&v=\(Int(updatedAt))"
-            : "/api/v1/plugins/excalidraw/http/thumbnail?drawing=\(id)&v=\(Int(updatedAt))"
+        "/api/v1/plugins/studio/http/drawings/thumbnail?drawing=\(id)&v=\(Int(updatedAt))"
     }
 
     /// Most recently changed first.
     public func drawings() async throws -> [DrawingSummary] {
         struct Result: Decodable { var drawings: [DrawingSummary] }
-        let result: Result = try await drawingsViaStudio({ try await self.rpc("studio", Studio.Method.drawings_listDrawings) }, else: { try await self.rpc("excalidraw", Draw.Method.listDrawings) })
+        let result: Result = try await self.rpc("studio", Studio.Method.drawings_listDrawings)
         return result.drawings
     }
 
@@ -164,22 +145,22 @@ extension BBClient {
             struct Drawing: Decodable { var name: String; var updatedAt: Double; var data: String }
             var drawing: Drawing?
         }
-        let result: Result = try await drawingsViaStudio({ try await self.rpc("studio", Studio.Method.drawings_getDrawing, ["id": .string(id)]) }, else: { try await self.rpc("excalidraw", Draw.Method.getDrawing, ["id": .string(id)]) })
+        let result: Result = try await self.rpc("studio", Studio.Method.drawings_getDrawing, ["id": .string(id)])
         return result.drawing.map { ($0.name, $0.updatedAt, DrawingScene(json: $0.data)) }
     }
 
     /// Cheap check for whether an agent or the editor changed the drawing.
     public func drawingUpdatedAt(_ id: String) async throws -> Double {
         struct Result: Decodable { var updatedAt: Double }
-        let result: Result = try await drawingsViaStudio({ try await self.rpc("studio", Studio.Method.drawings_getDrawingUpdatedAt, ["id": .string(id)]) }, else: { try await self.rpc("excalidraw", Draw.Method.getDrawingUpdatedAt, ["id": .string(id)]) })
+        let result: Result = try await self.rpc("studio", Studio.Method.drawings_getDrawingUpdatedAt, ["id": .string(id)])
         return result.updatedAt
     }
 
     public func renameDrawing(_ id: String, name: String) async throws {
-        let _: JSONValue = try await drawingsViaStudio({ try await self.rpc("studio", Studio.Method.drawings_renameDrawing, ["id": .string(id), "name": .string(String(name.prefix(200)))]) }, else: { try await self.rpc("excalidraw", Draw.Method.renameDrawing, ["id": .string(id), "name": .string(String(name.prefix(200)))]) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.drawings_renameDrawing, ["id": .string(id), "name": .string(String(name.prefix(200)))])
     }
 
     public func deleteDrawing(_ id: String) async throws {
-        let _: JSONValue = try await drawingsViaStudio({ try await self.rpc("studio", Studio.Method.drawings_deleteDrawing, ["id": .string(id)]) }, else: { try await self.rpc("excalidraw", Draw.Method.deleteDrawing, ["id": .string(id)]) })
+        let _: JSONValue = try await self.rpc("studio", Studio.Method.drawings_deleteDrawing, ["id": .string(id)])
     }
 }

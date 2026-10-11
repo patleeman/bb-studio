@@ -69,9 +69,8 @@ struct DesignView: View {
             if let listener { app.realtime.removeListener(listener) }
             listener = app.realtime.listen { event in
                 switch event {
-                // Studio sends it on its `design` channel; the Design plugin did before the merge.
+                // Studio sends it on its `design` channel.
                 case .pluginSignal("studio", "design", let payload) where payload["designId"]?.stringValue == id: Task { await load() }
-                case .pluginSignal("design", _, let payload) where payload["designId"]?.stringValue == id: Task { await load() }
                 case .connected: Task { await load() }
                 default: break
                 }
@@ -103,7 +102,7 @@ struct DesignView: View {
         }
     }
 
-    private func roundView(_ round: Design.GetDesignOutputDesignRoundsItem) -> some View {
+    private func roundView(_ round: Studio.DesignsGetDesignOutputDesignRoundsItem) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(["Round \(Int(round.round ?? 0))", round.title].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
@@ -149,7 +148,7 @@ struct DesignView: View {
     }
 
     @ViewBuilder
-    private func reviewBanner(_ review: Design.GetDesignOutputDesignReview) -> some View {
+    private func reviewBanner(_ review: Studio.DesignsGetDesignOutputDesignReview) -> some View {
         let round = review.round.map { " round \(Int($0))" } ?? ""
         let (text, symbol, tint): (String, String, Color) = switch review.state {
         case .reviewing: ("Reviewing\(round)…", "eye", .blue)
@@ -169,7 +168,7 @@ struct DesignView: View {
         .padding(.horizontal)
     }
 
-    private func commentsView(_ comments: [Design.GetDesignOutputDesignCommentsItem]) -> some View {
+    private func commentsView(_ comments: [Studio.DesignsGetDesignOutputDesignCommentsItem]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Comments").font(.headline)
             ForEach(comments, id: \.id) { comment in

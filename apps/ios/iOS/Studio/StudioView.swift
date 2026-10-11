@@ -7,7 +7,6 @@ import SwiftUI
 final class StudioStore: ObservableObject {
     let serverURL = ServerScope.selectedURL
     static var shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "design"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
@@ -18,10 +17,10 @@ final class StudioStore: ObservableObject {
     @Published private(set) var supportsTags = false
     @Published private(set) var projectNames: [String: String] = [:]
     @Published private(set) var plugins: Set<String> = []
-    /// Recording and dictation: built into Studio, or the Talk plugin on an older server.
-    var hasTalk: Bool { plugins.contains("studio") || plugins.contains("talk") }
-    /// Pages are built into Studio; an older Studio has them in the Pages plugin.
-    var hasPages: Bool { plugins.contains("studio") || plugins.contains("pages") }
+    /// Recording and dictation are built into Studio.
+    var hasTalk: Bool { plugins.contains("studio") }
+    /// Pages are built into Studio.
+    var hasPages: Bool { plugins.contains("studio") }
     /// Listed by the Studio plugin, which can also search content and delete anything.
     @Published private(set) var viaStudio = false
     @Published var error: String?
@@ -42,7 +41,7 @@ final class StudioStore: ObservableObject {
             switch event {
             // Studio's open-tabs channel changes nothing listed here.
             case .pluginSignal("studio", "studio-tabs", _): break
-            case .pluginSignal(let pluginId, _, _) where Self.addOns.contains(pluginId): scheduleReload(client)
+            case .pluginSignal("studio", _, _): scheduleReload(client)
             case .connected: scheduleReload(client)
             default: break
             }
@@ -129,10 +128,8 @@ final class StudioStore: ObservableObject {
             }
         }
         async let pages = Self.attempt(hasPages) { try await client.pages() }
-        // Recordings are built into Studio; an older Studio has them in the Talk plugin.
         async let recordings = Self.attempt(hasTalk) { try await client.recordings(limit: 200) }
-        // Drawings are built into Studio; an older Studio has them in the Draw plugin.
-        let hasDrawings = plugins.contains("studio") || plugins.contains("excalidraw")
+        let hasDrawings = plugins.contains("studio")
         async let drawings = Self.attempt(hasDrawings) { try await client.drawings() }
         let (p, r, d) = await (pages, recordings, drawings)
         let lists: [Result<[StudioItem], Error>] = [

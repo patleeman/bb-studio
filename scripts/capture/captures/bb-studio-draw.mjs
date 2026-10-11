@@ -1,7 +1,6 @@
-// Drawings are built into Studio (docs/merging-add-ons.md): the editor is a
-// Studio capture, and the old Draw plugin's README shows its last release,
-// the upgrade bridge, where users meet it: Studio's Setup page.
-export default ({ seedDrawing, pluginRpc, bbCli, sleep }) => [
+// Drawings are built into Studio (docs/merging-add-ons.md): the editor as a
+// Studio tab.
+export default ({ seedDrawing, pluginRpc, sleep }) => [
   {
     id: "excalidraw",
     packageDir: "bb-studio",
@@ -35,25 +34,6 @@ export default ({ seedDrawing, pluginRpc, bbCli, sleep }) => [
         await close();
         await cleanup();
       };
-    },
-  },
-  {
-    id: "draw-bridge",
-    packageDir: "bb-studio-draw",
-    setup: async (client) => {
-      const migrated = await bbCli(["excalidraw", "migrate"]);
-      if (!migrated.includes("Migration complete")) throw new Error(`bb excalidraw migrate didn't finish: ${migrated}`);
-      await client.navigate("/plugins/studio/studio/setup");
-      await client.waitForText("Set up BB Studio", 30000);
-      await client.waitForText("Retired plugins");
-      await client.waitForText("Drawings are built into Studio now");
-      await client.waitForText("bb excalidraw migrate");
-      // Copied: nothing blocks removal.
-      const blocked = await client.evaluate(`[...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Not yet:") && p.closest("li,div")?.textContent.includes("Studio Draw"))`);
-      if (blocked) throw new Error("Setup still blocks removing Studio Draw after Migration complete");
-      // Studio Artifacts' bridge may be listed first; show Studio Draw's entry.
-      await client.evaluate(`[...document.querySelectorAll("p")].find((p) => p.textContent.startsWith("Drawings are built into Studio now"))?.closest("li,section,div")?.scrollIntoView({ block: "start" })`);
-      await sleep(400);
     },
   },
 ];

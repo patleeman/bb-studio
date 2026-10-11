@@ -1,7 +1,6 @@
-// Artifacts are built into Studio (docs/merging-add-ons.md): the viewer is a
-// Studio capture, and the old Artifacts plugin's README shows its last
-// release, the upgrade bridge, where users meet it: Studio's Setup page.
-export default ({ seedArtifact, pluginRpc, bbCli, sleep }) => [
+// Artifacts are built into Studio (docs/merging-add-ons.md): the viewer as a
+// Studio tab.
+export default ({ seedArtifact, pluginRpc, sleep }) => [
   {
     id: "studio-artifacts",
     packageDir: "bb-studio",
@@ -41,24 +40,6 @@ export default ({ seedArtifact, pluginRpc, bbCli, sleep }) => [
         await pluginRpc("studio", "closeTabs", { items: [{ pluginId: "artifacts", id: artifactId }] }).catch(() => {});
         await cleanup();
       };
-    },
-  },
-  {
-    id: "artifacts-bridge",
-    packageDir: "bb-studio-artifacts",
-    setup: async (client) => {
-      const migrated = await bbCli(["artifacts", "migrate"]);
-      if (!migrated.includes("Migration complete")) throw new Error(`bb artifacts migrate didn't finish: ${migrated}`);
-      await client.navigate("/plugins/studio/studio/setup");
-      await client.waitForText("Set up BB Studio", 30000);
-      await client.waitForText("Retired plugins");
-      await client.waitForText("Artifacts are built into Studio now");
-      await client.waitForText("bb artifacts migrate");
-      // Copied: nothing blocks removal.
-      const blocked = await client.evaluate(`[...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Not yet:") && p.closest("li,div")?.textContent.includes("Studio Artifacts"))`);
-      if (blocked) throw new Error("Setup still blocks removing Studio Artifacts after Migration complete");
-      await client.evaluate(`[...document.querySelectorAll("h2")].find((h) => h.textContent.startsWith("Retired plugins"))?.scrollIntoView({ block: "start" })`);
-      await sleep(400);
     },
   },
 ];

@@ -1,8 +1,6 @@
 // Studio's recording RPC methods (Talk is built into Studio). They are the
 // old Studio Talk plugin's (`talk`) client methods with a `recordings.`
-// prefix, so Studio's app, the iOS app and the Talk upgrade bridge
-// (packages/bb-studio-talk) share one set of shapes. The kit holds them
-// because the bridge is a separate package and can't import Studio.
+// prefix, shared by Studio's app and the iOS app's generated contract.
 import type { defineRpcContract as sdkDefineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { modelSelectionSchema } from "./decisions-contract";
@@ -191,69 +189,13 @@ export const rpcContract = defineRpcContract({
 });
 export type TalkRpcContract = typeof rpcContract;
 
-const time = z.number().int().min(0);
-const ITEM_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/;
 /** A segment's audio file, relative to the audio root: `<recordingId>/<name>.<ext>`. */
 export const AUDIO_FILE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}\/[A-Za-z0-9][A-Za-z0-9_-]{0,199}\.[a-z0-9]{1,8}$/;
-
-/** A recording as the bridge sends it: the old plugin's rows, unchanged. */
-export const importRecordingSchema = z.object({
-  id: z.string().regex(ITEM_ID),
-  title: z.string().max(2000),
-  titleSource: z.enum(["pending", "auto", "user"]),
-  titleChars: z.number().int().min(0),
-  kind: recordingKindSchema,
-  status: recordingStatusSchema,
-  projectId: z.string().min(1).max(200).nullable(),
-  threadId: z.string().min(1).max(200).nullable(),
-  createdAt: time,
-  updatedAt: time,
-  endedAt: time.nullable(),
-  heartbeatAt: time,
-  archivedAt: time.nullable(),
-  audioRemovedAt: time.nullable(),
-  /** The summary, as the old plugin stored it (JSON). */
-  meetingNotes: z.string().max(1_000_000).nullable(),
-  notesPageId: z.string().min(1).max(200).nullable(),
-  /** The action items the last notes run wrote, as stored (JSON). */
-  notesItems: z.string().max(1_000_000).nullable(),
-  segments: z.array(z.object({
-    id: z.string().regex(ITEM_ID),
-    sessionId: z.string().min(1).max(200),
-    index: z.number().int().min(0),
-    startedAt: time,
-    durationMs: z.number().int().min(0),
-    mimeType: z.string().min(1).max(200),
-    bytes: z.number().int().min(0),
-    file: z.string().regex(AUDIO_FILE),
-    /** The bridge copied this segment's audio into Studio first; false when the old plugin had none (an expired dictation's). */
-    audio: z.boolean(),
-    status: segmentStatusSchema,
-    text: z.string().nullable(),
-    cleanedText: z.string().nullable(),
-    error: z.string().max(10_000).nullable(),
-    attempts: z.number().int().min(0),
-    nextAttemptAt: time,
-    createdAt: time,
-  })).max(100_000),
-});
-export type ImportRecording = z.infer<typeof importRecordingSchema>;
-
-/** Recordings per `recordings.importRows` call, and the transcript characters a call carries (one larger recording goes alone). */
-export const IMPORT_BATCH = 100;
-export const IMPORT_BATCH_CHARS = 8 * 1024 * 1024;
-/** Audio bytes per `recordings.importAudio` call; a larger file goes in several. */
-export const AUDIO_CHUNK_BYTES = 4 * 1024 * 1024;
-/** Kept free on Studio's disk while copying audio, so the copy never fills it. */
-export const DISK_RESERVE_BYTES = 256 * 1024 * 1024;
-/** Audio files per `recordings.missingAudio` call. */
-export const AUDIO_CHECK_BATCH = 500;
 
 export const HOLD_KEY_OPTIONS = ["Right Option (Alt)", "Right Command", "Right Control", "Off"] as const;
 
 /**
- * Talk's settings (`bb.settings.define`), on Studio's settings page now. The
- * bridge defines them too, only to read what the user had set and copy it.
+ * Talk's settings (`bb.settings.define`), on Studio's settings page now.
  */
 export const TALK_SETTINGS = {
   replaceBuiltInDictation: {
@@ -311,63 +253,3 @@ export const talkSettingsSchema = z.object({
   dictationAudioDays: z.number().int().min(0).max(3650),
 }).partial();
 export type TalkSettings = z.infer<typeof talkSettingsSchema>;
-
-const importResult = z.object({
-  imported: z.array(z.string()),
-  existing: z.array(z.string()),
-  skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
-});
-const audioRef = z.object({ recordingId: z.string().regex(ITEM_ID), file: z.string().regex(AUDIO_FILE) });
-
-/**
- * The upgrade bridge's methods: it copies the old plugin's audio, rows and
- * settings into Studio, and forwards old mentions. Not for clients.
- */
-export const bridgeContract = defineRpcContract({
-  /**
-   * Which audio files Studio doesn't have whole yet, with how much of each it
-   * has (a copy that stopped part way resumes there), and the free space on
-   * Studio's disk (null when unknown).
-   */
-  "recordings.missingAudio": {
-    input: z.object({ files: z.array(audioRef.extend({ bytes: z.number().int().min(0) })).max(AUDIO_CHECK_BATCH) }),
-    output: z.object({ missing: z.array(audioRef.extend({ offset: z.number().int().min(0) })), freeBytes: z.number().nullable() }),
-  },
-  /**
-   * One piece of an audio file, written at `offset`. Studio answers with how
-   * much it has; when that is the whole file it checks the size and SHA-256
-   * and moves it into place. A piece at the wrong offset changes nothing.
-   */
-  "recordings.importAudio": {
-    input: audioRef.extend({
-      bytes: z.number().int().min(0),
-      sha256: z.string().regex(/^[a-f0-9]{64}$/),
-      offset: z.number().int().min(0),
-      data: z.string().max(Math.ceil(AUDIO_CHUNK_BYTES / 3) * 4),
-    }),
-    output: z.object({ offset: z.number().int().min(0), done: z.boolean() }),
-  },
-  /**
-   * Recordings with their segments. A recording Studio already has (same id)
-   * is left as it is, so a rerun changes nothing.
-   */
-  "recordings.importRows": {
-    input: z.object({ recordings: z.array(importRecordingSchema).max(IMPORT_BATCH) }),
-    output: importResult,
-  },
-  /** The old plugin's settings and model choices; Studio takes each one the user hasn't set in Studio. Once. */
-  "recordings.importSettings": {
-    input: z.object({ settings: talkSettingsSchema, models: modelPreferencesSchema.partial() }),
-    output: z.object({ applied: z.array(z.string()) }),
-  },
-  /** What an old `@recordings` mention pill gives the agent. */
-  "recordings.mentionContext": {
-    input: z.object({ id: z.string().min(1).max(200) }),
-    output: z.object({ context: z.string() }),
-  },
-});
-
-/** The Studio Talk plugin release that is only the upgrade bridge. */
-export const TALK_BRIDGE_VERSION = "0.2.0";
-
-export { bridgeStatusContract, migrationStatusSchema, type MigrationStatus } from "./draw-contract";

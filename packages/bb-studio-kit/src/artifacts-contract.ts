@@ -1,8 +1,6 @@
 // Studio's artifact RPC methods (artifacts are built into Studio). They are
-// the old Artifacts plugin's methods with an `artifacts.` prefix, so Studio's
-// app, the iOS app and the Artifacts upgrade bridge
-// (packages/bb-studio-artifacts) share one set of shapes. The kit holds them
-// because the bridge is a separate package and can't import Studio.
+// the old Artifacts plugin's methods with an `artifacts.` prefix, shared by
+// Studio's app and the iOS app's generated contract.
 import type { defineRpcContract as sdkDefineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
@@ -47,7 +45,6 @@ export const candidateSchema = z.object({
 
 const idSchema = z.string().min(1).max(100);
 const threadIdSchema = z.string().min(1).max(200);
-const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
 
 /** What the app and native clients call. */
 export const rpcContract = defineRpcContract({
@@ -118,91 +115,4 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: idSchema }),
     output: z.object({ href: z.string() }),
   },
-});
-
-const time = z.number().int().min(0);
-export const importVersionSchema = z.object({
-  id: idSchema,
-  number: z.number().int().min(1),
-  name: z.string().min(1).max(1000),
-  mime: z.string().min(1).max(300),
-  size: z.number().int().min(0).max(MAX_ARTIFACT_BYTES),
-  sha256,
-  createdAt: time,
-});
-export const importArtifactSchema = z.object({
-  id: idSchema,
-  title: z.string().max(10_000),
-  description: z.string().max(100_000),
-  projectId: z.string().min(1).max(200).nullable(),
-  sourceThreadId: z.string().min(1).max(500).nullable(),
-  sourcePath: z.string().min(1).max(10_000).nullable(),
-  createdAt: time,
-  updatedAt: time,
-  updatedBy: z.string().max(50).nullable(),
-  archivedAt: time.nullable(),
-  versions: z.array(importVersionSchema).min(1).max(10_000),
-});
-export type ImportArtifact = z.infer<typeof importArtifactSchema>;
-
-/** Rows per `artifacts.importRows` call; bytes go one blob per call. */
-export const IMPORT_BATCH = 100;
-
-/**
- * The upgrade bridge's methods: it copies the old plugin's rows into Studio
- * (blobs first, then rows), and forwards old mentions. Not for clients.
- */
-export const bridgeContract = defineRpcContract({
-  /** Which of these blobs Studio doesn't have yet. */
-  "artifacts.missingBlobs": {
-    input: z.object({ sha256: z.array(sha256).max(1000) }),
-    output: z.object({ missing: z.array(sha256) }),
-  },
-  /** One blob; its hash is checked. Storing a blob twice is a no-op. */
-  "artifacts.importBlob": {
-    input: z.object({ sha256, bytes: z.string().max(4 * Math.ceil(MAX_ARTIFACT_BYTES / 3) + 4) }),
-    output: z.object({ ok: z.boolean() }),
-  },
-  /**
-   * Artifact rows and their versions. An artifact or version Studio already
-   * has (same id) is left as it is, so a rerun changes nothing; one whose
-   * blobs are missing, or whose source file Studio already saved as another
-   * artifact, is skipped with the reason.
-   */
-  "artifacts.importRows": {
-    input: z.object({ artifacts: z.array(importArtifactSchema).max(IMPORT_BATCH) }),
-    output: z.object({
-      imported: z.array(z.string()),
-      existing: z.array(z.string()),
-      skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
-    }),
-  },
-  /** What an old `@artifact` mention pill gives the agent. */
-  "artifacts.mentionContext": {
-    input: z.object({ id: idSchema }),
-    output: z.object({ context: z.string() }),
-  },
-});
-
-/** The Artifacts plugin release that is only the upgrade bridge. */
-export const ARTIFACTS_BRIDGE_VERSION = "0.2.0";
-
-/** Where the bridge's copy into Studio stands; Studio's Setup page asks before removal. */
-export const migrationStatusSchema = z.object({
-  /** Every well-formed artifact is in Studio. */
-  complete: z.boolean(),
-  /** Artifacts in the old plugin. */
-  total: z.number(),
-  /** Copied (or already in Studio). */
-  copied: z.number(),
-  /** Rows that can't be copied, and why; they stay in the old plugin. */
-  skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
-  /** Why the last attempt failed, e.g. Studio isn't running. */
-  error: z.string().nullable(),
-});
-export type MigrationStatus = z.infer<typeof migrationStatusSchema>;
-
-/** The bridge's own method. */
-export const bridgeStatusContract = defineRpcContract({
-  migrationStatus: { input: z.null(), output: migrationStatusSchema },
 });

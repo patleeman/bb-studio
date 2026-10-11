@@ -8,9 +8,7 @@
 //
 // This was the Artifacts plugin (id `artifacts`). Its items keep that id as
 // their namespace, its agent tools, skill, mention provider and message
-// directive keep their names, and the plugin's last release is an upgrade
-// bridge that copies its rows here (see `bridge` below and
-// docs/merging-add-ons.md).
+// directive keep their names (docs/merging-add-ons.md).
 import { basename } from "node:path";
 import { parseFlags } from "@bb-studio/kit/cli";
 import { studioSchemas } from "@bb-studio/kit/contract";
@@ -19,7 +17,7 @@ import { createChangeBus, defineItemMention, displayPath, resolveSource, serveBy
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { bridgeContract, rpcContract, type artifactSchema, type candidateSchema } from "./contract";
+import { rpcContract, type artifactSchema, type candidateSchema } from "./contract";
 import { artifactBackupHandlers } from "./server/backup";
 import { contentHeaders, rangeResponse, utf8Prefix, withQuoteScript } from "./server/content";
 import { importedFile } from "./server/import-file";
@@ -372,28 +370,6 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
       });
       return { href: `/plugins/studio/studio/pages/${page.id}` };
     },
-  });
-
-  bb.rpc.register(bridgeContract, {
-    "artifacts.missingBlobs": ({ sha256 }) => ({ missing: store.missingBlobs(sha256) }),
-    "artifacts.importBlob"({ sha256, bytes }) {
-      store.putBlob(sha256, new Uint8Array(Buffer.from(bytes, "base64")));
-      return { ok: true };
-    },
-    "artifacts.importRows"({ artifacts }) {
-      const imported: string[] = [];
-      const existing: string[] = [];
-      const skipped: { id: string; reason: string }[] = [];
-      for (const item of artifacts) {
-        const result = store.importArtifact(item);
-        if (result.outcome === "imported") imported.push(item.id);
-        else if (result.outcome === "existing") existing.push(item.id);
-        else if (result.outcome === "skipped") skipped.push({ id: item.id, reason: result.reason });
-      }
-      for (const id of imported) changed(id);
-      return { imported, existing, skipped };
-    },
-    "artifacts.mentionContext": ({ id }) => ({ context: mention(id) }),
   });
 
   // A version's bytes, for images, the HTML and PDF viewers, and Download.

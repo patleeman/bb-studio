@@ -1,15 +1,13 @@
 import XCTest
 @testable import BBStudio
 
-/// Fallbacks to older plugins happen only when BB says the plugin or method is missing.
+/// Studio's kinds are called on Studio only; there is no fallback to the retired plugins.
 final class RPCFallbackTests: XCTestCase {
     private actor Calls {
         var paths: [String] = []
         func append(_ path: String) { paths.append(path) }
     }
 
-    private static let missingMethod = Data(#"{"ok":false,"error":{"code":"unknown_method","message":"no rpc method"}}"#.utf8)
-    private static let missingPlugin = Data(#"{"ok":false,"error":"unknown plugin \"x\""}"#.utf8)
 
     private func client(_ answer: @escaping @Sendable (String) throws -> (Int, Data)) -> (BBClient, Calls) {
         let client = BBClient(baseURL: URL(string: "https://rpc.invalid")!)
@@ -66,17 +64,12 @@ final class RPCFallbackTests: XCTestCase {
         XCTAssertEqual(store.error, "tree exploded")
     }
 
-    func testArtifactsGoToStudioAndFallBackOnlyWhenStudioPredatesTheMerge() async throws {
+    func testArtifactsGoToStudio() async throws {
         let found = Data(#"{"ok":true,"result":{"artifact":null,"versions":[]}}"#.utf8)
         let (current, currentCalls) = client { _ in (200, found) }
         _ = try await current.artifact("art_1")
         let currentPaths = await currentCalls.paths
         XCTAssertEqual(currentPaths, ["/api/v1/plugins/studio/rpc/artifacts.get"])
-
-        let (old, oldCalls) = client { path in path.contains("/studio/") ? (404, Self.missingMethod) : (200, found) }
-        _ = try await old.artifact("art_1")
-        let oldPaths = await oldCalls.paths
-        XCTAssertEqual(oldPaths, ["/api/v1/plugins/studio/rpc/artifacts.get", "/api/v1/plugins/artifacts/rpc/get"])
     }
 
     func testArtifactFailureInStudioDoesNotFallBack() async throws {
@@ -91,35 +84,21 @@ final class RPCFallbackTests: XCTestCase {
         XCTAssertEqual(paths.count, 1)
     }
 
-    func testDrawingsGoToStudioAndFallBackOnlyWhenStudioPredatesTheMerge() async throws {
+    func testDrawingsGoToStudio() async throws {
         let found = Data(#"{"ok":true,"result":{"drawings":[]}}"#.utf8)
         let (current, currentCalls) = client { _ in (200, found) }
         _ = try await current.drawings()
         let currentPaths = await currentCalls.paths
         XCTAssertEqual(currentPaths, ["/api/v1/plugins/studio/rpc/drawings.listDrawings"])
         XCTAssertTrue(current.drawingThumbnailPath("drw_1", updatedAt: 2).hasPrefix("/api/v1/plugins/studio/http/drawings/thumbnail"))
-
-        let (old, oldCalls) = client { path in path.contains("/studio/") ? (404, Self.missingMethod) : (200, found) }
-        _ = try await old.drawings()
-        let oldPaths = await oldCalls.paths
-        XCTAssertEqual(oldPaths, ["/api/v1/plugins/studio/rpc/drawings.listDrawings", "/api/v1/plugins/excalidraw/rpc/listDrawings"])
-        XCTAssertTrue(old.drawingThumbnailPath("drw_1", updatedAt: 2).hasPrefix("/api/v1/plugins/excalidraw/http/thumbnail"))
-        _ = try await current.drawings()
     }
 
-    func testPagesGoToStudioAndFallBackOnlyWhenStudioPredatesTheMerge() async throws {
+    func testPagesGoToStudio() async throws {
         let found = Data(#"{"ok":true,"result":{"pages":[]}}"#.utf8)
         let (current, currentCalls) = client { _ in (200, found) }
         _ = try await current.pages()
         let currentPaths = await currentCalls.paths
         XCTAssertEqual(currentPaths, ["/api/v1/plugins/studio/rpc/pages.tree"])
         XCTAssertEqual(current.webURL(forPage: "pg_1").path(), "/plugins/studio/studio/pages/pg_1")
-
-        let (old, oldCalls) = client { path in path.contains("/studio/") ? (404, Self.missingMethod) : (200, found) }
-        _ = try await old.pages()
-        let oldPaths = await oldCalls.paths
-        XCTAssertEqual(oldPaths, ["/api/v1/plugins/studio/rpc/pages.tree", "/api/v1/plugins/pages/rpc/tree"])
-        XCTAssertEqual(old.webURL(forPage: "pg_1").path(), "/plugins/pages/pages/pg_1")
-        _ = try await current.pages()
     }
 }

@@ -1,3 +1,2 @@
-// Studio's drawing RPC contract lives in the kit, so the upgrade bridge
-// (packages/bb-studio-draw) shares it.
+// Studio's drawing RPC contract lives in the kit.
 export * from "@bb-studio/kit/draw-contract";

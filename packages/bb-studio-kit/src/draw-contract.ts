@@ -1,8 +1,6 @@
 // Studio's drawing RPC methods (drawings are built into Studio). They are the
-// old Draw plugin's (`excalidraw`) methods with a `drawings.` prefix, so
-// Studio's app, the iOS app and the Draw upgrade bridge
-// (packages/bb-studio-draw) share one set of shapes. The kit holds them
-// because the bridge is a separate package and can't import Studio.
+// old Draw plugin's (`excalidraw`) methods with a `drawings.` prefix, shared by
+// Studio's app and the iOS app's generated contract.
 import type { defineRpcContract as sdkDefineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
@@ -104,80 +102,4 @@ export const rpcContract = defineRpcContract({
     input: z.object({ threadId: z.string() }),
     output: z.object({ drawingId: z.string().nullable() }),
   },
-});
-
-const time = z.number().int().min(0);
-/** A scene can hold images as data URLs; Draw's backup allows items this big. */
-export const MAX_SCENE_CHARS = 256 * 1024 * 1024;
-
-export const importDrawingSchema = z.object({
-  id: z.string().min(1).max(200),
-  name: z.string().max(10_000),
-  data: z.string().max(MAX_SCENE_CHARS),
-  createdAt: time,
-  updatedAt: time,
-  projectId: z.string().min(1).max(200).nullable(),
-  updatedBy: z.string().max(50).nullable(),
-  archivedAt: time.nullable(),
-  template: z.boolean(),
-  /** The editor's recovery-copy keys that made this drawing, so a retried draft doesn't copy it twice. */
-  recoveryKeys: z.array(z.string().min(1).max(1000)).max(1000),
-});
-export type ImportDrawing = z.infer<typeof importDrawingSchema>;
-
-/** Rows per `drawings.importRows` call, and the scene characters a call carries (one larger row goes alone). */
-export const IMPORT_BATCH = 100;
-export const IMPORT_BATCH_CHARS = 8 * 1024 * 1024;
-
-/**
- * The upgrade bridge's methods: it copies the old plugin's rows into Studio,
- * and forwards old mentions and thumbnails. Not for clients.
- */
-export const bridgeContract = defineRpcContract({
-  /**
-   * Drawing rows. A drawing Studio already has (same id) is left as it is,
-   * so a rerun changes nothing; one whose scene isn't a drawing is skipped
-   * with the reason.
-   */
-  "drawings.importRows": {
-    input: z.object({ drawings: z.array(importDrawingSchema).max(IMPORT_BATCH) }),
-    output: z.object({
-      imported: z.array(z.string()),
-      existing: z.array(z.string()),
-      skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
-    }),
-  },
-  /** What an old `@drawing` mention pill gives the agent. */
-  "drawings.mentionContext": {
-    input: z.object({ id: z.string().min(1).max(200) }),
-    output: z.object({ context: z.string() }),
-  },
-  /** A drawing's thumbnail SVG, for the old thumbnail URL. */
-  "drawings.thumbnail": {
-    input: z.object({ id: z.string().min(1).max(200) }),
-    output: z.object({ svg: z.string().nullable() }),
-  },
-});
-
-/** The Draw plugin release that is only the upgrade bridge. */
-export const DRAW_BRIDGE_VERSION = "0.2.0";
-
-/** Where the bridge's copy into Studio stands; Studio's Setup page asks before removal. */
-export const migrationStatusSchema = z.object({
-  /** Every well-formed drawing is in Studio. */
-  complete: z.boolean(),
-  /** Drawings in the old plugin. */
-  total: z.number(),
-  /** Copied (or already in Studio). */
-  copied: z.number(),
-  /** Rows that can't be copied, and why; they stay in the old plugin. */
-  skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
-  /** Why the last attempt failed, e.g. Studio isn't running. */
-  error: z.string().nullable(),
-});
-export type MigrationStatus = z.infer<typeof migrationStatusSchema>;
-
-/** The bridge's own method. */
-export const bridgeStatusContract = defineRpcContract({
-  migrationStatus: { input: z.null(), output: migrationStatusSchema },
 });

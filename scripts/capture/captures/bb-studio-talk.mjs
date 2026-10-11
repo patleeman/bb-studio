@@ -1,6 +1,6 @@
 // Talk, built into Studio: its Models settings, dictation at the composer, a
-// dictated message's saved source, a recording page as a Studio tab, the
-// unsent-audio banner in the library, and the Talk bridge on Setup.
+// dictated message's saved source, a recording page as a Studio tab,
+// and the unsent-audio banner in the library.
 import { resolve } from "node:path";
 
 const scrollToTop = `(() => {
@@ -395,27 +395,6 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         throw error;
       }
       return cleanup;
-    },
-  },
-  {
-    // Run after `bb talk migrate` copied a recording made with the 0.1.0 plugin.
-    id: "talk-bridge",
-    packageDir: "bb-studio-talk",
-    setup: async (client) => {
-      const migrated = await bbCli(["talk", "migrate"]);
-      if (!migrated.includes("Migration complete")) throw new Error(`bb talk migrate didn't finish: ${migrated}`);
-      await client.navigate("/plugins/studio/studio/setup");
-      await client.waitForText("Set up BB Studio", 30000);
-      await client.waitForText("Retired plugins");
-      await client.waitForText("Recording and dictation are built into Studio now");
-      await client.waitForText("bb talk migrate");
-      await client.waitForText("Finish or stop any recording or dictation in progress");
-      // Copied: nothing blocks removal.
-      const blocked = await client.evaluate(`[...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Not yet:") && p.closest("li,div")?.textContent.includes("Studio Talk"))`);
-      if (blocked) throw new Error("Setup still blocks removing Studio Talk after Migration complete");
-      // Other bridges may be listed first; show Studio Talk's entry.
-      await client.evaluate(`[...document.querySelectorAll("p")].find((p) => p.textContent.startsWith("Recording and dictation are built into Studio now"))?.closest("li,section,div")?.scrollIntoView({ block: "start" })`);
-      await sleep(400);
     },
   },
 ];

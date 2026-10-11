@@ -49,7 +49,7 @@ public struct PendingInteraction: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-/// Mirrors `packages/bb-studio-design/src/questions.ts`. Every question can be
+/// Mirrors `packages/bb-studio/src/design/questions.ts`. Every question can be
 /// left to the agent; unanswered ones are.
 public struct DesignQuestionForm: Decodable, Hashable, Sendable {
     public struct Option: Decodable, Hashable, Sendable {

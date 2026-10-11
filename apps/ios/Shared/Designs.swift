@@ -2,11 +2,10 @@ import Foundation
 
 // Studio Design: UI prototypes an agent writes as HTML screens, in rounds of
 // options ("1a", "1b", then "2a" …). The phone shows each screen live.
-// Designs are built into Studio (`designs.*`); a server from before the merge
-// falls back to the Design plugin, whose last release forwards to Studio anyway.
+// Designs are built into Studio (`designs.*`).
 
-public typealias StudioDesign = Design.GetDesignOutputDesign
-public typealias DesignScreen = Design.GetDesignOutputDesignRoundsItemScreensItem
+public typealias StudioDesign = Studio.DesignsGetDesignOutputDesign
+public typealias DesignScreen = Studio.DesignsGetDesignOutputDesignRoundsItemScreensItem
 
 extension StudioDesign {
     public var displayName: String {
@@ -43,18 +42,9 @@ extension DesignScreen {
 }
 
 extension BBClient {
-    /// Studio first; the Design plugin only when Studio doesn't have the method.
-    func designsViaStudio<T>(_ studio: () async throws -> T, else legacy: () async throws -> T) async throws -> T {
-        do {
-            return try await studio()
-        } catch where Self.isMissingRPC(error) {
-            return try await legacy()
-        }
-    }
-
     public func design(_ id: String) async throws -> StudioDesign? {
         let input: JSONValue = ["id": .string(id)]
-        let result: Design.GetDesignOutput = try await designsViaStudio({ try await self.rpc("studio", Studio.Method.designs_getDesign, input) }, else: { try await self.rpc("design", Design.Method.getDesign, input) })
+        let result: Studio.DesignsGetDesignOutput = try await self.rpc("studio", Studio.Method.designs_getDesign, input)
         return result.design
     }
 
@@ -62,12 +52,11 @@ extension BBClient {
     /// changes with each revision and each canvas-script version, so a cached copy never goes stale.
     public func designScreenURL(_ designId: String, _ screen: DesignScreen, step: String? = nil) -> URL {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
-        if let url = screen.url, let given = URLComponents(string: url), given.path.hasPrefix("/api/v1/plugins/studio/http/designs/") || given.path.hasPrefix("/api/v1/plugins/design/") {
+        if let url = screen.url, let given = URLComponents(string: url), given.path.hasPrefix("/api/v1/plugins/studio/http/designs/") {
             components.path = given.path
             components.percentEncodedQuery = given.percentEncodedQuery
         } else {
-            // A Design plugin older than ScreenView.url.
-            components.path = "/api/v1/plugins/design/http/screen"
+            components.path = "/api/v1/plugins/studio/http/designs/screen"
             components.queryItems = [
                 URLQueryItem(name: "design", value: designId),
                 URLQueryItem(name: "screen", value: screen.id ?? ""),

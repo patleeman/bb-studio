@@ -1,7 +1,6 @@
 // Designs, built into Studio (docs/merging-add-ons.md): a design open as a
 // Studio tab, with a round of two live options, a three-step prototype
-// splayed into one frame per step, and a deck. The old Design plugin's README
-// shows its last release, the upgrade bridge, on Studio's Setup page.
+// splayed into one frame per step, and a deck.
 //
 // Only agent tools write screens, so the seeder creates each design through
 // Studio's provider.call (studio_create) and then writes rounds and screens
@@ -435,25 +434,6 @@ export default (context) => [
         throw error;
       }
       return cleanup;
-    },
-  },
-  {
-    id: "design-bridge",
-    packageDir: "bb-studio-design",
-    setup: async (client) => {
-      const migrated = await context.bbCli(["design", "migrate"]);
-      if (!migrated.includes("Migration complete")) throw new Error(`bb design migrate didn't finish: ${migrated}`);
-      await client.navigate("/plugins/studio/studio/setup");
-      await client.waitForText("Set up BB Studio", 30000);
-      await client.waitForText("Retired plugins");
-      await client.waitForText("Designs are built into Studio now");
-      await client.waitForText("bb design migrate");
-      // Copied: nothing blocks removal.
-      const blocked = await client.evaluate(`[...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Not yet:") && p.closest("li,div")?.textContent.includes("Studio Design"))`);
-      if (blocked) throw new Error("Setup still blocks removing Studio Design after Migration complete");
-      // Other bridges may be listed first; show Studio Design's entry.
-      await client.evaluate(`[...document.querySelectorAll("p")].find((p) => p.textContent.startsWith("Designs are built into Studio now"))?.closest("li,section,div")?.scrollIntoView({ block: "start" })`);
-      await context.sleep(400);
     },
   },
 ];

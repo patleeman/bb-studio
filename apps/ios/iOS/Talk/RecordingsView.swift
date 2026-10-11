@@ -23,7 +23,7 @@ struct RecordingDetailView: View {
     @State private var renaming = false
     @State private var newTitle = ""
     @State private var showingRelated = false
-    @State private var meetingNotes: Talk.RecordingGetOutputRecordingMeetingNotes?
+    @State private var meetingNotes: Studio.RecordingsRecordingGetOutputRecordingMeetingNotes?
     @State private var generatingNotes = false
     @State private var listener: UUID?
 
@@ -124,9 +124,8 @@ struct RecordingDetailView: View {
             if let listener { app.realtime.removeListener(listener) }
             listener = app.realtime.listen { event in
                 switch event {
-                // Studio sends it on its `recording-changed` channel; the Talk plugin did before the merge.
+                // Studio sends it on its `recording-changed` channel.
                 case .pluginSignal("studio", "recording-changed", let payload) where payload["id"]?.stringValue == id: Task { await load() }
-                case .pluginSignal("talk", _, let payload) where payload["id"]?.stringValue == id: Task { await load() }
                 default: break
                 }
             }

@@ -1,6 +1,5 @@
 // Drawings in Studio's SQLite database, stored as serialized Excalidraw
 // scenes (the JSON shape Excalidraw's "save to file" uses).
-import type { ImportDrawing } from "@bb-studio/kit/draw-contract";
 import { newId } from "@bb-studio/kit/ids";
 import type { Actor } from "@bb-studio/kit/server";
 import type Database from "better-sqlite3";
@@ -154,26 +153,6 @@ export class DrawingStore {
 
   setArchived(id: string, archived: boolean): void {
     this.db.prepare("UPDATE drawings SET archived_at = ? WHERE id = ?").run(archived ? this.now() : null, id);
-  }
-
-  /**
-   * A drawing copied from the old Draw plugin, with its id and times. One
-   * Studio already has is left as it is, so a rerun changes nothing.
-   */
-  importDrawing(item: ImportDrawing): { outcome: "imported" | "existing" } | { outcome: "skipped"; reason: string } {
-    if (parseSceneData(item.data) === null) return { outcome: "skipped", reason: "Its scene isn't a drawing (not Excalidraw JSON)." };
-    return this.db.transaction(() => {
-      if (this.get(item.id)) return { outcome: "existing" as const };
-      this.db
-        .prepare(
-          `INSERT INTO drawings (id, name, data, created_at, updated_at, project_id, updated_by, archived_at, template)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(item.id, item.name, item.data, item.createdAt, item.updatedAt, item.projectId, item.updatedBy, item.archivedAt, item.template ? 1 : 0);
-      const key = this.db.prepare("INSERT OR IGNORE INTO drawing_recovery_copies (recovery_key, drawing_id) VALUES (?, ?)");
-      for (const recoveryKey of item.recoveryKeys) key.run(recoveryKey, item.id);
-      return { outcome: "imported" as const };
-    }).immediate();
   }
 
   delete(id: string): boolean {

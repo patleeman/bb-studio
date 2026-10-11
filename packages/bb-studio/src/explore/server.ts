@@ -31,7 +31,6 @@ export interface BuiltinExplore {
   instructions(): string | null;
   /** `bb studio pages explore …` */
   cli(argv: string[], ctx: PluginCliContext): Promise<PluginCliResult>;
-  importNext: ReturnType<typeof registerExplore>["store"]["importNext"];
 }
 
 /** Registers Explore's RPC on Studio. Studio has run NEXT_LOG_MIGRATIONS on `db`. */
@@ -59,7 +58,6 @@ export function registerExploreBuiltin(bb: BbPluginApi, db: Database.Database, i
         return { exitCode: 1, stderr: `${errorMessage(error)}\n` };
       }
     },
-    importNext: (rows) => explore.store.importNext(rows),
   };
 }
 

@@ -4,7 +4,7 @@ import os
 
 private let log = Logger(subsystem: "nyc.plee.bbgo", category: "talk")
 
-/// Native capture for the Talk plugin, following its web client's lifecycle:
+/// Native capture for Studio recordings, following its web client's lifecycle:
 /// `recording_create` → `segment_put` per cut → heartbeat every 20s →
 /// `recording_state: finishing` → poll `recording_get` until the transcript is done.
 /// Segments are 16 kHz mono PCM, cut at a pause once they pass the target length

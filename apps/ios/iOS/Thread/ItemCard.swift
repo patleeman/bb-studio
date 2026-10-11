@@ -76,7 +76,7 @@ struct RecordingPreview {
     var transcribing: Bool
 
     /// Cleaned text where a cleanup was saved, as Talk's own card shows it.
-    init(_ output: Talk.RecordingGetOutput) {
+    init(_ output: Studio.RecordingsRecordingGetOutput) {
         let all = (output.segments ?? []).enumerated().compactMap { index, segment -> Line? in
             let text = (segment.cleanedText ?? segment.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             return text.isEmpty ? nil : Line(id: segment.id ?? "\(index)", at: segment.offsetMs ?? 0, text: text)
@@ -241,7 +241,7 @@ struct ReplyItemCard: View {
                     preview: screens.isEmpty ? .note("This design has no screens yet.") : .design(id: id, screens: screens))
             }
         case .recording(let id):
-            let output: Talk.RecordingGetOutput
+            let output: Studio.RecordingsRecordingGetOutput
             do {
                 output = try await client.recordingOutput(id)
             } catch let error as BBError where error.message.hasPrefix("No recording") {
