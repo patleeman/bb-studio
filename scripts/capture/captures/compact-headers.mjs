@@ -38,11 +38,16 @@ export default context => {
         if (sidebarToggle) await client.clickAriaButtonWithPointer(sidebarToggle);
         await client.waitForAriaButton("Item actions");
         await sleep(500);
-        const chat = await client.evaluate(`(() => {
+        // A workspace tab row shows only the item's own tools (no Chat, no
+        // Open in split): the workspace splits tabs itself. Elsewhere the
+        // compact bar keeps Chat visible.
+        const { inWorkspace, chat } = await client.evaluate(`(() => {
+          const header = document.querySelector('[data-studio-item-header]');
           const button = [...document.querySelectorAll('[data-studio-item-header] button')].find(button => button.innerText.trim() === 'Chat');
-          return !!button?.checkVisibility() && !button.disabled;
+          return { inWorkspace: !!header?.closest('[data-studio-workspace-bar]'), chat: !!button?.checkVisibility() && !button.disabled };
         })()`);
-        if (!chat) throw new Error(`${fixture.id} has no available compact Chat action`);
+        if (!inWorkspace && !chat) throw new Error(`${fixture.id} has no available compact Chat action`);
+        if (inWorkspace && chat) throw new Error(`${fixture.id} offers Chat in the workspace tab row`);
         if (fixture.id === "draw") {
           await client.dragBy('canvas.excalidraw__canvas', 0, 0);
           await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "!", code: "Digit1", modifiers: 8 });
@@ -53,13 +58,6 @@ export default context => {
         await client.waitForSelector('[data-studio-item-actions]');
         await fits('[data-studio-item-header] button');
         if (await client.evaluate(`document.documentElement.scrollWidth > innerWidth + 1`)) throw new Error(`${fixture.id} overflows the compact viewport`);
-        await client.clickAriaButtonWithPointer("Related");
-        await client.waitForSelector('[data-studio-related-panel]');
-        const panelFits = await client.evaluate(`(() => { const r = document.querySelector('[data-studio-related-panel]').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; })()`);
-        if (!panelFits) throw new Error(`${fixture.id} Related popover overflows the compact viewport`);
-        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-        await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-        await sleep(400);
         const expanded = await client.evaluate(`document.querySelector('button[aria-label="Item actions"]').getAttribute('aria-expanded') === 'true'`);
         if (!expanded) await client.clickAriaButtonWithPointer("Item actions");
         await fits('[data-studio-item-header] button');

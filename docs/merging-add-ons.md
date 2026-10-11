@@ -201,6 +201,16 @@ commit, run `bb <old> migrate`, and check the items in Studio
 
 ## Notes for the next merges
 
+- **Chat on built-in items.** The merge didn't take Chat away in the
+  workspace: since `ba50c598` a workspace tab row shows only the item's own
+  tools, for every kind. Outside the workspace (a split beside a thread) the
+  header read the item from its address's 3rd and 5th parts, so a built-in
+  at `/plugins/studio/studio/drawings/<id>` chatted about `studio:drawings`.
+  `ItemHeader` now resolves the address with `parseStudioItemHref` first,
+  so add each built-in's Studio route to `STUDIO_REFERENCE_ROUTES`. The
+  compact-header capture asserts Chat outside the workspace and its absence
+  in the tab row (it also still clicked the removed Related button).
+
 - **Design** sets `handOver={false}` only because cross-plugin URL rewrites
   broke the desktop tab router. Inside Studio there's no cross-plugin
   rewrite, so that goes away.

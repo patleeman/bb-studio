@@ -8,6 +8,7 @@ import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, u
 import { createPortal } from "react-dom";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { mentionPrompt } from "../contract";
+import { parseStudioItemHref } from "../references";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
@@ -267,7 +268,9 @@ export function ItemHeader({
   // Studio owns item links and conversation creation across item views.
   const chatItem = thread ?? item;
   const path = chatItem?.href.split(/[?#]/)[0]?.split("/") ?? [];
-  const relatedRef = chatItem?.ref ?? (path[1] === "plugins" && path[2] && path[4]
+  // A kind built into Studio lives at /plugins/studio/studio/<segment>/<id>,
+  // and its items keep their old namespace: the known routes say which.
+  const relatedRef = chatItem?.ref ?? (chatItem ? parseStudioItemHref(chatItem.href) : null) ?? (path[1] === "plugins" && path[2] && path[2] !== "studio" && path[4]
     ? { pluginId: path[2], id: decodeURIComponent(path[4]) }
     : null);
   // In the workspace's tab row only the item's own tools show: the workspace

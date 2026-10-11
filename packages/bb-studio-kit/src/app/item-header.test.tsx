@@ -101,6 +101,12 @@ describe("Chat menu focus", () => {
     expect(container.querySelector('[data-studio-chat-item="pages:launch"] > button')?.textContent?.trim()).toBe("Chat");
     expect(container.querySelector('[aria-label="Open in split"]')).not.toBeNull();
   });
+  it("chats about a built-in kind's item by its own namespace, not Studio's panel", async () => {
+    await act(async () => root.render(<ItemHeader backLabel="Studio" onBack={() => {}} item={{ title: "Flow", href: "/plugins/studio/studio/drawings/d1" }} />));
+    expect(container.querySelector('[data-studio-chat-item="excalidraw:d1"] > button')?.textContent?.trim()).toBe("Chat");
+    await act(async () => root.render(<ItemHeader backLabel="Studio" onBack={() => {}} item={{ title: "Studio", href: "/plugins/studio/studio/unknown/x" }} />));
+    expect(container.querySelector('[data-studio-chat-item]')).toBeNull();
+  });
   it.each([["New conversation", "compose"], ["Choose conversation…", "choose"]])("keeps %s focused after the menu closes", async (label, mode) => {
     await menu();
     const entry = [...document.querySelectorAll('[role="menuitem"]')].find((element) => element.textContent?.trim() === label) as HTMLElement;
