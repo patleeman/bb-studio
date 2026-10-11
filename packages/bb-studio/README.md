@@ -100,7 +100,10 @@ opens it as a tab.
 
 ![The compact artifact header](assets/artifacts-compact-header.png)
 
-The same viewer at 390 pixels wide, with **Item actions** open.
+The same viewer at 390 pixels wide as a Studio tab, with **Item actions**
+open. The tab row shows only the viewer's own tools; Chat appears where the
+artifact opens outside the workspace, such as beside a thread. Recapture
+with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
 
 - **In the library.** Artifacts list next to pages, recordings and drawings,
   with type, size and version columns, image thumbnails, projects, archive,
@@ -158,8 +161,9 @@ Studio tab.
 
 ![The compact drawing header](assets/drawings-compact-header.png)
 
-The same editor at 390 pixels wide, with **Item actions** open, captured
-before the merge from the add-on's own page.
+The same editor at 390 pixels wide as a Studio tab, with **Item actions**
+open. Recapture with
+`BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=draw-compact-header`.
 
 - **In the library.** Drawings list next to pages, recordings and artifacts:
   thumbnails, projects, search over the words on a drawing, archive, move,
