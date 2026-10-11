@@ -28,7 +28,7 @@ const summary = (): SetupSummary => ({
   ],
   retired: [
     { id: "float", name: "Float", enabled: true, why: "Retired.", kept: "Threads.", deleted: "Settings.", before: [], blocker: null, removeCommand: "bb plugin remove float" },
-    { id: "studio-chat", name: "Studio Chat", enabled: true, why: "Retired.", kept: "Links.", deleted: "Settings.", before: [{ text: "Migrate.", command: "bb studio-chat migrate" }], blocker: "Run `bb studio-chat migrate`.", removeCommand: "bb plugin remove studio-chat" },
+    { id: "old-thing", name: "Old Thing", enabled: true, why: "Retired.", kept: "Links.", deleted: "Settings.", before: [{ text: "Export.", command: "bb old-thing export" }], blocker: "Run `bb old-thing export`.", removeCommand: "bb plugin remove old-thing" },
   ],
   commands: ["bb plugin install pages@bb-studio --yes"], installAll: "bb plugin install pages@bb-studio --yes", otherProblems: [],
 });
@@ -61,17 +61,10 @@ test("removing a retired plugin asks first, and a blocked one can't be removed",
   act(() => root.render(<SetupPage />));
   const removes = [...container.querySelectorAll("button")].filter((each) => each.textContent === "Remove…");
   expect(removes.map((each) => each.disabled)).toEqual([false, true]);
-  expect(container.textContent).toContain("Not yet: Run `bb studio-chat migrate`.");
+  expect(container.textContent).toContain("Not yet: Run `bb old-thing export`.");
   await act(async () => removes[0]!.click());
   expect(setup.remove).not.toHaveBeenCalled();
   expect(container.textContent).toContain("Remove Float and delete its settings?");
   await act(async () => button("Remove")!.click());
   expect(setup.remove).toHaveBeenCalledWith("float");
-});
-
-test("a turned-off Studio Chat can be turned on from the page", async () => {
-  setup.summary!.retired[1]!.enabled = false;
-  act(() => root.render(<SetupPage />));
-  await act(async () => button("Turn on")!.click());
-  expect(setup.enable).toHaveBeenCalledWith("studio-chat");
 });

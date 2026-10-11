@@ -14,9 +14,9 @@ it("reads item mentions and does not treat a later turn as the thread's origin",
   expect(firstThreadItemRefs([])).toBeNull();
 });
 
-it("resolves serialized mention provider IDs, including Studio Chat's cross-plugin pills", () => {
+it("resolves serialized mention provider IDs, including Studio's cross-plugin pills", () => {
   const mentions = [
-    { pluginId: "studio-chat", itemId: "item:excalidraw:drawing_1" },
+    { pluginId: "studio", itemId: "item:excalidraw:drawing_1" },
     { pluginId: "pages", itemId: "page:pg_1" },
     { pluginId: "talk", itemId: "recordings:rec_1" },
     { pluginId: "bot-teams", itemId: "bot:bot_1" },
@@ -47,7 +47,7 @@ it("loads only first-input serialized mention namespaces, coalesces and bounds l
     const events = [{ type: "client/turn/requested", data: { input: [{ type: "text", mentions: [
       { resource: { kind: "plugin", pluginId: "custom", itemId: "objects:id" } },
       { resource: { kind: "plugin", pluginId: "custom", itemId: "objects:other" } },
-      { resource: { kind: "plugin", pluginId: "studio-chat", itemId: "item:pages:pg_1" } },
+      { resource: { kind: "plugin", pluginId: "studio", itemId: "item:pages:pg_1" } },
       { resource: { kind: "plugin", pluginId: "pages", itemId: "page:pg_1" } },
     ] }] } }, { type: "client/turn/requested", data: { input: [{ type: "text", mentions: [{ resource: { kind: "plugin", pluginId: "later", itemId: "objects:id" } }] }] } }];
     expect(firstThreadMentionPlugins(events)).toEqual(["custom"]);

@@ -3,10 +3,9 @@
 // go. Studio's Setup page and `bb studio setup` both show this. Installs,
 // enables and removes use BB's plugin SDK; every action also has the CLI
 // command that does the same, for when the SDK call fails.
-import { legacyChatContract } from "@bb-studio/kit/chat-contract";
 import type { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
-import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE, TURN_ON_BEFORE_REMOVE } from "./setup-addons";
+import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
 import type { AddOnEntry, AddOnStatus, RetiredEntry, SetupActionResult, SetupSummary } from "./setup-contract";
 
 export interface SetupPluginEntry {
@@ -64,17 +63,6 @@ export function classify(plugin: SetupPluginEntry | undefined, problems: readonl
   return "installed";
 }
 
-/** -1, 0 or 1, comparing dotted version numbers; pre-release tags are ignored. */
-export function compareVersions(a: string, b: string): number {
-  const parts = (version: string) => version.split(/[-+]/)[0]!.split(".").map((part) => Number.parseInt(part, 10) || 0);
-  const [left, right] = [parts(a), parts(b)];
-  for (let i = 0; i < Math.max(left.length, right.length); i++) {
-    const diff = (left[i] ?? 0) - (right[i] ?? 0);
-    if (diff) return Math.sign(diff);
-  }
-  return 0;
-}
-
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const step = (text: string, command: string | null = null) => ({ text, command });
 const REMOVED = "Its settings, secrets and schedules, and its installed files.";
@@ -90,39 +78,7 @@ interface RetiredPlugin {
   blocker(plugin: SetupPluginEntry, ctx: { sdk: SetupSdk; plugins: ReadonlyMap<string, SetupPluginEntry> }): Promise<string | null>;
 }
 
-/** The first Studio Chat release that is only the upgrade bridge, with `bb studio-chat migrate`. */
-export const CHAT_BRIDGE_VERSION = "0.2.0";
-
-/**
- * Has the Studio Chat bridge copied every saved chat link into Studio? Its
- * legacy calls run the copy first and fail while it can't finish, so a call
- * that answers means the copy is complete.
- */
-async function chatBlocker(plugin: SetupPluginEntry, { sdk }: { sdk: SetupSdk }): Promise<string | null> {
-  const migrate = "Run `bb studio-chat migrate` and wait for Migration complete.";
-  if (compareVersions(plugin.version, CHAT_BRIDGE_VERSION) < 0) return `It's version ${plugin.version}, from before the upgrade bridge. Update it first so it can copy your chat links into Studio, then: ${migrate}`;
-  if (!plugin.enabled) return `It's turned off, so it can't copy your chat links into Studio. Turn it on with \`${enableCommand(plugin.id)}\`, then: ${migrate}`;
-  try {
-    await sdk.plugins.callRpc({ pluginId: plugin.id, method: "viewing", input: { path: "/" }, outputSchema: legacyChatContract.viewing.output, signal: AbortSignal.timeout(30_000) });
-    return null;
-  } catch (error) {
-    return `Its chat links aren't all in Studio yet (${message(error)}). ${migrate}`;
-  }
-}
-
 export const RETIRED: readonly RetiredPlugin[] = [
-  {
-    id: "studio-chat",
-    name: "Studio Chat",
-    why: "Item chat, conversation picking and quotes now ship in Studio. This bridge only copies old chat links into Studio and forwards older clients.",
-    kept: "Chat links it copied into Studio, unsent drafts and quotes. Studio never replaces a newer choice with an old link.",
-    deleted: `${REMOVED} Older native clients and chat bookmarks that still use studio-chat stop working.`,
-    before: [
-      step("Update Studio.", "bb plugin update studio --yes"),
-      step("Copy its chat links into Studio, and wait for Migration complete.", "bb studio-chat migrate"),
-    ],
-    blocker: chatBlocker,
-  },
   {
     id: "studio-navigation",
     name: "Studio Navigation",
@@ -275,13 +231,9 @@ export class SetupService {
   }
 
   async enable(pluginId: string): Promise<SetupActionResult> {
-    const retired = TURN_ON_BEFORE_REMOVE.has(pluginId);
-    if (!ADDON_IDS.has(pluginId) && !retired) throw new Error(`${pluginId} isn't a BB Studio add-on.`);
+    if (!ADDON_IDS.has(pluginId)) throw new Error(`${pluginId} isn't a BB Studio add-on.`);
     return this.serial(async () => {
       try {
-        if (retired && (await this.deps.sdk.plugins.list()).plugins.find((plugin) => plugin.id === pluginId)?.enabled !== false) {
-          throw new Error(`${pluginId} is only turned on here to remove it, and it isn't turned off.`);
-        }
         await this.deps.sdk.plugins.enable({ pluginId });
         return this.after([]);
       } catch (error) {

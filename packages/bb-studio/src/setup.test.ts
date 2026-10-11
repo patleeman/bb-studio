@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { HealthSummary, Problem } from "./health-contract";
-import { buildSetup, classify, compareVersions, formatSetup, oneLine, SetupService, type SetupPluginEntry, type SetupSdk } from "./setup";
+import { buildSetup, classify, formatSetup, oneLine, SetupService, type SetupPluginEntry, type SetupSdk } from "./setup";
 import { ADDONS, MARKETPLACE_NAME } from "./setup-addons";
 
 const plugin = (id: string, extra: Partial<SetupPluginEntry> = {}): SetupPluginEntry => ({ id, name: id, enabled: true, status: "running", version: "1.0.0", ...extra });
@@ -10,7 +10,7 @@ const problem = (pluginId: string, status: Problem["status"], title = "Add a key
 });
 const health = (extra: Partial<HealthSummary> = {}): HealthSummary => ({ checkedAt: 1000, problems: [], healthy: [], unanswered: [], ...extra });
 
-function fakeSdk(plugins: SetupPluginEntry[], opts: { marketplaces?: string[]; chat?: "ok" | Error; installFails?: string[] } = {}) {
+function fakeSdk(plugins: SetupPluginEntry[], opts: { marketplaces?: string[]; installFails?: string[] } = {}) {
   const calls: string[] = [];
   const sdk = {
     plugins: {
@@ -19,7 +19,6 @@ function fakeSdk(plugins: SetupPluginEntry[], opts: { marketplaces?: string[]; c
       remove: vi.fn(async ({ pluginId }: { pluginId: string }) => { calls.push(`remove ${pluginId}`); }),
       callRpc: vi.fn(async ({ pluginId, method }: { pluginId: string; method: string }) => {
         calls.push(`rpc ${pluginId} ${method}`);
-        if (opts.chat instanceof Error) throw opts.chat;
         return { item: null };
       }),
       catalog: {
@@ -57,12 +56,6 @@ describe("classify", () => {
     expect(classify(plugin("a"), [problem("a", "degraded"), problem("a", "broken")])).toBe("broken");
     expect(classify(plugin("a"), [problem("a", "degraded")])).toBe("needs-setup");
     expect(classify(plugin("a"), [])).toBe("installed");
-  });
-
-  it("compares versions", () => {
-    expect(compareVersions("0.1.9", "0.2.0")).toBe(-1);
-    expect(compareVersions("0.2.0", "0.2")).toBe(0);
-    expect(compareVersions("0.10.0-nightly.1", "0.2.0")).toBe(1);
   });
 });
 
@@ -105,19 +98,6 @@ describe("retired plugins", () => {
     expect(summary.retired[1]!.before.map((each) => each.command)).toContain("bb bots list --json");
   });
 
-  it("blocks removing Studio Chat until its links are in Studio", async () => {
-    const old = await buildSetup(fakeSdk([plugin("studio-chat", { version: "0.1.0" })]).sdk, health());
-    expect(old.retired[0]!.blocker).toMatch(/before the upgrade bridge.*bb studio-chat migrate/);
-    const off = await buildSetup(fakeSdk([plugin("studio-chat", { version: "0.2.0", enabled: false })]).sdk, health());
-    expect(off.retired[0]!.blocker).toMatch(/turned off/);
-    const failing = await buildSetup(fakeSdk([plugin("studio-chat", { version: "0.2.0" })], { chat: new Error("Studio is unavailable") }).sdk, health());
-    expect(failing.retired[0]!.blocker).toMatch(/Studio is unavailable.*bb studio-chat migrate/);
-    const { sdk, calls } = fakeSdk([plugin("studio-chat", { version: "0.2.0" })], { chat: "ok" });
-    const done = await buildSetup(sdk, health());
-    expect(done.retired[0]!.blocker).toBeNull();
-    expect(calls).toEqual(["rpc studio-chat viewing"]);
-  });
-
   it("lets Studio Navigation go without Studio Sidebar", async () => {
     const setup = await buildSetup(fakeSdk([plugin("studio-navigation")]).sdk, health());
     expect(setup.retired[0]!.blocker).toBeNull();
@@ -144,12 +124,10 @@ describe("SetupService", () => {
   });
 
   it("enables only add-ons and removes only retired plugins that nothing blocks", async () => {
-    const fake = fakeSdk([plugin("talk", { enabled: false }), plugin("float"), plugin("studio-chat", { version: "0.2.0" })], { chat: new Error("not yet") });
+    const fake = fakeSdk([plugin("talk", { enabled: false }), plugin("float")]);
     await service(fake).enable("talk");
     await expect(service(fake).enable("float")).rejects.toThrow("isn't a BB Studio add-on");
     await expect(service(fake).remove("pages")).rejects.toThrow("isn't a retired");
-    const blocked = await service(fake).remove("studio-chat");
-    expect(blocked.failures[0]!.error).toMatch(/bb studio-chat migrate/);
     await service(fake).remove("float");
     expect(fake.calls.filter((call) => !call.startsWith("rpc"))).toEqual(["enable talk", "remove float"]);
   });
@@ -197,20 +175,5 @@ describe("SetupService install", () => {
     expect(second.failures).toEqual([]);
     expect(calls).toEqual(["install pages", "install talk"]);
     expect(overlapped).toBe(false);
-  });
-});
-
-describe("turning on a retired plugin", () => {
-  it("tells a turned-off Studio Chat the exact command and allows turning it on, nothing else retired", async () => {
-    const chat = plugin("studio-chat", { enabled: false, version: "0.2.0" });
-    const { sdk, calls } = fakeSdk([...allInstalled(), chat, plugin("float")]);
-    const service = new SetupService({ sdk, health: async () => health() });
-    const summary = await service.summary(0);
-    expect(summary.retired.find((entry) => entry.id === "studio-chat")!.blocker).toContain("`bb plugin enable studio-chat`");
-    await service.enable("studio-chat");
-    expect(calls).toContain("enable studio-chat");
-    await expect(service.enable("float")).rejects.toThrow(/isn't a BB Studio add-on/);
-    chat.enabled = true;
-    expect((await service.enable("studio-chat")).failures[0]!.error).toMatch(/isn't turned off/);
   });
 });

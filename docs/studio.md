@@ -60,7 +60,7 @@ Studio's Setup page (`/plugins/studio/studio/setup`) and `bb studio setup` are t
 
 - **Add-ons.** `src/setup-addons.ts` is a copy of `marketplace.json`'s entries, bundled so Studio needs no network call; `setup.test.ts` fails when the two drift. Each add-on is installed, not installed, turned off, needs setup (a degraded health problem) or broken (a broken one), with its health checks.
 - **Actions.** Install uses `sdk.plugins.catalog.installPlan` and `catalog.install` for `<id>@bb-studio`, passing the source BB resolved as the confirmation a third-party marketplace needs. Turn on uses `sdk.plugins.enable`. Each action also shows its CLI command (`bb plugin install <id>@bb-studio --yes`, `bb plugin enable <id>`) with a Copy button, for when the call fails.
-- **Retired plugins.** `studio-chat`, `studio-navigation`, `float` and `bot-teams` show up when installed, with what's kept, what's deleted and the steps first. Remove uses `sdk.plugins.remove` after a confirm. Studio Chat is blocked until its links are in Studio: the bridge (0.2.0 or later) runs its migration before answering any legacy call, so Studio calls its `viewing` method and treats an answer as a finished migration.
+- **Retired plugins.** `studio-navigation`, `float`, `bot-teams` and `studio-tables` show up when installed, with what's kept, what's deleted and the steps first. Remove uses `sdk.plugins.remove` after a confirm.
 
 The RPCs are `setup.summary`, `setup.install`, `setup.enable` and `setup.remove` (`src/setup-contract.ts`).
 

@@ -36,7 +36,7 @@ export const pagesSchemas = {
   chats: z.object({ chats: z.array(z.object({ threadId: z.string(), createdAt: z.number() })) }),
 };
 
-export const legacyChatContract = defineRpcContract({
+const chatMethods = defineRpcContract({
   /** The Studio item whose view is at `path`, if any. */
   viewing: {
     input: z.object({ path: z.string().min(1).max(2000) }),
@@ -77,17 +77,13 @@ export const legacyChatContract = defineRpcContract({
   },
 });
 
-/** Chat is owned by Studio; legacy method names stay in the upgrade bridge. */
+/** Studio's item chat. */
 export const rpcContract = defineRpcContract({
-  "chat.viewing": legacyChatContract.viewing,
-  "chat.subject": legacyChatContract.subject,
-  "chat.start": legacyChatContract.start,
-  "chat.home": legacyChatContract.home,
-  "chat.link": legacyChatContract.link,
-  "chat.unlink": legacyChatContract.unlink,
-  "chat.send": legacyChatContract.send,
-  "chat.importLinks": {
-    input: z.object({ links: z.array(z.object({ item: ref, threadId: z.string().min(1).max(200).nullable(), at: z.number().finite().nonnegative() })).max(250) }),
-    output: z.object({ imported: z.number().int().nonnegative() }),
-  },
+  "chat.viewing": chatMethods.viewing,
+  "chat.subject": chatMethods.subject,
+  "chat.start": chatMethods.start,
+  "chat.home": chatMethods.home,
+  "chat.link": chatMethods.link,
+  "chat.unlink": chatMethods.unlink,
+  "chat.send": chatMethods.send,
 });

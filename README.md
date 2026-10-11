@@ -112,8 +112,6 @@ Without the page, `bb studio setup` prints the same list and the commands to
 run. The short version:
 
 ```sh
-bb studio-chat migrate              # wait for "Migration complete" first
-bb plugin remove studio-chat
 bb plugin remove studio-navigation  # on BB 0.45, pick BB's own navigation in Appearance first; 0.46 has no such setting
 bb plugin remove float
 bb bots list --json                 # export the bots you want before removing Teams

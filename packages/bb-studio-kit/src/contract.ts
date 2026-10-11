@@ -39,9 +39,6 @@ export const STUDIO_REALTIME_CHANNEL = "studio-changed";
 /** Studio's RPC that finds the item a path opens, or an item by id. */
 export const STUDIO_ITEM_AT_METHOD = "itemAt";
 
-/** Studio Chat: "Work with this…" on Studio items. */
-export const STUDIO_CHAT_PLUGIN_ID = "studio";
-
 export type StudioTone = "neutral" | "live" | "progress" | "warning" | "danger" | "success";
 
 export interface StudioFact {

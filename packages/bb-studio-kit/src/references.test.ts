@@ -5,7 +5,7 @@ describe("canonical Studio references", () => {
   it("preserves opaque percent escapes and colons in raw references and mentions", () => {
     expect(parseStudioItemReference("item:custom:opaque:50%2F%broken")).toEqual({ pluginId: "custom", id: "opaque:50%2F%broken" });
     expect(parseStudioMentionReference("custom", "opaque:50%2F%broken")).toEqual({ pluginId: "custom", id: "opaque:50%2F%broken" });
-    expect(parseStudioMentionReference("studio-chat", "item:custom:opaque:50%2F")).toEqual({ pluginId: "custom", id: "opaque:50%2F" });
+    expect(parseStudioMentionReference("studio", "item:custom:opaque:50%2F")).toEqual({ pluginId: "custom", id: "opaque:50%2F" });
   });
   it("strips only known legacy or declared mention namespaces, longest first", () => {
     expect(parseStudioMentionReference("pages", "page:pg_1")).toEqual({ pluginId: "pages", id: "pg_1" });

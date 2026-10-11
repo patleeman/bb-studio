@@ -27,6 +27,3 @@ export const ADDONS: readonly AddOn[] = [
   { id: "studio-code", displayName: "Studio Code", description: "Part of BB Studio. VS Code workspaces in your Spaces: open one or more folders in a full editor, run by a local code-server." },
   { id: "applets", displayName: "Studio Applets", description: "Part of BB Studio. Experimental. Small native macOS apps your agents write as plain folders, such as a HUD of running threads, run by one signed Studio Applets app. Applets reach the desktop and BB only through an API you approve." },
 ];
-
-/** Retired plugins that must be turned on before they can be removed (the bridge has to run to copy chat links). */
-export const TURN_ON_BEFORE_REMOVE: ReadonlySet<string> = new Set(["studio-chat"]);

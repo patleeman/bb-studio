@@ -1,6 +1,6 @@
 import Foundation
 
-/// Studio Chat: threads about a Studio item. The agent's first message
+/// Studio's item chat: threads about a Studio item. The agent's first message
 /// carries a pill for the item, which the plugin turns into a pointer to it
 /// and the tools that read it. Pages go through Pages, so they stay in the page's chats.
 extension BBClient {
@@ -20,26 +20,14 @@ extension BBClient {
             "input": [["type": "text", "text": .string(text), "mentions": []]],
         ]
         let input: JSONValue = ["item": ["pluginId": .string(pluginId), "id": .string(itemId)], "request": request]
-        do {
-            let result: Result = try await rpc("studio", Studio.Method.chat_start, input)
-            return result.threadId
-        } catch where Self.isMissingRPC(error) {
-            // A Studio from before it took over item chat: the studio-chat plugin's `start`.
-            let result: Result = try await rpc("studio-chat", "start", input)
-            return result.threadId
-        }
+        let result: Result = try await rpc("studio", Studio.Method.chat_start, input)
+        return result.threadId
     }
 
     /// The item's current home thread, if one is still linked.
     public func lastStudioChat(pluginId: String, itemId: String) async throws -> String? {
         let input: JSONValue = ["pluginId": .string(pluginId), "id": .string(itemId)]
-        do {
-            let result: Studio.ChatHomeOutput = try await rpc("studio", Studio.Method.chat_home, input)
-            return result.thread?.threadId
-        } catch where Self.isMissingRPC(error) {
-            // A Studio from before it took over item chat: the studio-chat plugin's `home`, in the same shape.
-            let result: Studio.ChatHomeOutput = try await rpc("studio-chat", "home", input)
-            return result.thread?.threadId
-        }
+        let result: Studio.ChatHomeOutput = try await rpc("studio", Studio.Method.chat_home, input)
+        return result.thread?.threadId
     }
 }

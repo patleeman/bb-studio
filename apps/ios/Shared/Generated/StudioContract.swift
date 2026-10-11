@@ -83,7 +83,6 @@ public enum Studio {
     public static let chat_link = "chat.link"
     public static let chat_unlink = "chat.unlink"
     public static let chat_send = "chat.send"
-    public static let chat_importLinks = "chat.importLinks"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -265,8 +264,6 @@ public enum Studio {
   public typealias ChatUnlink = ChatUnlinkOutput
 
   public typealias ChatSend = ChatSendOutput
-
-  public typealias ChatImportLinks = ChatImportLinksOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -5774,44 +5771,6 @@ public enum Studio {
 
     public init(threadId: String? = nil) {
       self.threadId = threadId
-    }
-  }
-
-  public struct ChatImportLinksInputLinksItemItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-
-    public init(pluginId: String? = nil, id: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-    }
-  }
-
-  public struct ChatImportLinksInputLinksItem: Sendable, Hashable, Codable {
-    public var item: ChatImportLinksInputLinksItemItem?
-    public var threadId: String?
-    public var at: Double?
-
-    public init(item: ChatImportLinksInputLinksItemItem? = nil, threadId: String? = nil, at: Double? = nil) {
-      self.item = item
-      self.threadId = threadId
-      self.at = at
-    }
-  }
-
-  public struct ChatImportLinksInput: Sendable, Hashable, Codable {
-    public var links: [ChatImportLinksInputLinksItem]?
-
-    public init(links: [ChatImportLinksInputLinksItem]? = nil) {
-      self.links = links
-    }
-  }
-
-  public struct ChatImportLinksOutput: Sendable, Hashable, Codable {
-    public var imported: Int?
-
-    public init(imported: Int? = nil) {
-      self.imported = imported
     }
   }
 

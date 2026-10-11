@@ -1,4 +1,4 @@
-# Studio Chat
+# Studio item chat
 
 Studio items share one **Chat** action in their header. It opens the item's
 linked conversation, or a new-conversation composer when there is no link.
@@ -7,8 +7,7 @@ Conversations open in the main view, where the sidebar lists them, or in a
 split when you ⌘-click.
 
 Item chat ships in plugin `studio`, in `packages/bb-studio/src/chat`.
-RPC methods use the `chat.` prefix. The retired `studio-chat` plugin was an
-upgrade bridge for saved links, older clients and bookmarks; its package is gone from this repo.
+RPC methods use the `chat.` prefix.
 
 ## Item identity and context
 
@@ -17,7 +16,7 @@ resolves its title, kind, project, and link through Studio's `itemAt`. A
 composer or picker stays bound to that item when the main pane navigates
 elsewhere, and an action from a split targets the split's item.
 
-The `viewing` RPC separately resolves the main pane's route, so Studio Chat
+The `viewing` RPC separately resolves the main pane's route, so item chat
 knows the home thread of the item on screen for its header chip. Kinds that
 provide their own conversation UI set `hasOwnChat: true` to skip item-chat
 discovery.
@@ -42,7 +41,7 @@ archived item produces an error rather than borrowing the main pane's item.
 Choosing a conversation changes the item's link; starting another changes
 it only after successful submission.
 
-Studio Chat draws nothing over the screen. **Chat** opens the linked thread
+Item chat draws nothing over the screen. **Chat** opens the linked thread
 in a BB split beside the item. Without a link, it opens the Chat panel's
 new-conversation composer for the item (`/plugins/studio/chats/item/…`,
 draft key `studio-chat:<plugin>:<id>`) in that split, so the item stays on
@@ -69,6 +68,6 @@ removed still open from their IndexedDB copy.
 
 ## Pages
 
-Pages renders its separate `PageChat` only when Studio is absent. Its
-`work`, `chats`, and `chatPage` contracts remain unchanged. Existing page
-chats and linked conversations carry over.
+Page conversations go through Pages' `work` RPC; its `chats` and `chatPage`
+contracts list and open them. Existing page chats and linked conversations
+carry over.

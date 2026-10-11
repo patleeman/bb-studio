@@ -205,11 +205,10 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   same CLI command with a Copy button, for when it fails.
 - If BB doesn't know the `bb-studio` marketplace yet, the page shows
   `bb marketplace add git:github.com/patleeman/bb-studio@main` first.
-- **Retired plugins** shows `studio-chat`, `studio-navigation`, `float` and
-  `bot-teams` if they're installed: why each is retired, what removing it
+- **Retired plugins** shows `studio-navigation`, `float`, `bot-teams` and
+  `studio-tables` if they're installed: why each is retired, what removing it
   keeps and deletes, and what to do first. **Remove…** asks before it removes
-  anything. Studio Chat can't be removed until its chat links are in Studio
-  (`bb studio-chat migrate` reports **Migration complete**).
+  anything.
 - Problems with plugins outside BB Studio are listed at the bottom.
 
 `bb studio setup` prints the same status, the retired plugins and the
@@ -287,8 +286,6 @@ linked thread, or opens the composer with the quote when there is none. Where
 BB doesn't split (a small screen, or splits turned off), these open in the
 main view. Pages keeps its page-chat history.
 
-Existing Studio Chat installs must migrate their links (`bb studio-chat migrate`)
-before removing the old plugin; the [Setup page](#setup) checks this for you.
 Old draft keys and quote storage are retained.
 
 ![Studio item chat: a staged image on the left, and in a split beside it a new-thread composer quoting a cropped area of it, with a note and an attached file](assets/chat-preview.png)

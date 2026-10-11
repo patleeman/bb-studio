@@ -70,22 +70,3 @@ describe("Chat item resolution and submission", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
-
-it("imports legacy links idempotently and preserves newer chosen and unlinked Studio records", async () => {
-  const values = new Map<string, unknown>([
-    ["link:pages:newer", { threadId: "new", at: 20 }],
-    ["link:pages:unlinked", { threadId: null, at: 20 }],
-  ]);
-  await plugin({
-    storage: { kv: { get: async (key: string) => values.get(key), set: async (key: string, value: unknown) => values.set(key, value) } },
-    sdk: { plugins: { callRpc: rpc }, threads: { spawn } },
-    ui: { registerMentionProvider: () => {} },
-    rpc: { register: (_contract: unknown, registered: unknown) => { handlers = registered; } },
-  } as any);
-  const links = ["fresh", "newer", "unlinked"].map(id => ({ item: { pluginId: "pages", id }, threadId: "old", at: 10 }));
-  expect(await handlers["chat.importLinks"]({ links })).toEqual({ imported: 1 });
-  expect(await handlers["chat.importLinks"]({ links })).toEqual({ imported: 0 });
-  expect(values.get("link:pages:newer")).toEqual({ threadId: "new", at: 20 });
-  expect(values.get("link:pages:unlinked")).toEqual({ threadId: null, at: 20 });
-  expect(values.get("link:pages:fresh")).toEqual({ threadId: "old", at: 10 });
-});

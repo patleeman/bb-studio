@@ -1,6 +1,6 @@
 ---
 name: studio-chat
-description: Use when a message says the user has a Studio item open ("Context for @… resolved by plugin studio, or the legacy studio-chat bridge"), when they say "this page", "this drawing" or "here" in a chat started from Studio Chat, or when they ask how Studio Chat works.
+description: Use when a message says the user has a Studio item open ("Context for @… resolved by plugin studio"), when they say "this page", "this drawing" or "here" in a chat started from Studio Chat, or when they ask how Studio Chat works.
 ---
 
 # Studio Chat

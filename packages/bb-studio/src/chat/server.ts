@@ -1,7 +1,7 @@
 import { defineItemMention } from "@bb-studio/kit/server";
 import { studioServices } from "@bb-studio/kit/server";
 import { quoteMessage } from "@bb-studio/kit/format";
-// bb-studio-chat server.
+// Studio's item chat server.
 //
 // - `viewing` asks Studio which item a path opens, so the chat knows what's
 //   on screen without per-kind code.
@@ -111,17 +111,6 @@ export async function registerChat(bb: BbPluginApi) {
   }));
 
   bb.rpc.register(rpcContract, {
-    "chat.importLinks": async ({ links }) => {
-      let imported = 0;
-      for (const link of links) {
-        const own = await bb.storage.kv.get<Link>(linkKey(link.item));
-        // An explicit unlink is a saved choice too. Never replace newer Studio work.
-        if (own && own.at >= link.at) continue;
-        await bb.storage.kv.set(linkKey(link.item), { threadId: link.threadId, at: link.at } satisfies Link);
-        imported += 1;
-      }
-      return { imported };
-    },
     "chat.viewing": async ({ path }) => {
       if (!path.startsWith("/plugins/")) return { item: null };
       const { item, kind } = await itemAt({ path }).catch(() => ({ item: null, kind: null }));
