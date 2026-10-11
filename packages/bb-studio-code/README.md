@@ -1,10 +1,10 @@
 # Studio Code
 
-Part of BB Studio. A **workspace** is a Studio item that opens one or more folders in VS Code, inside BB. Like any Studio item, it belongs to a project and so to a Space. A Space can hold as many workspaces as you like, each open to different folders. The plugin id is `studio-code`.
+Part of BB Studio. A **workspace** is a Studio item that opens one or more folders in VS Code, inside BB. Like any Studio item, it belongs to a project. A project can hold as many workspaces as you like, each open to different folders. The plugin id is `studio-code`.
 
 ## Use it
 
-- **In Studio**, choose **New, Workspace**. It starts with its project's folder (the Space's own folder when you create it inside a Space). With no Space chosen, it starts empty and asks for folders.
+- **In Studio**, choose **New, Workspace**. It starts with its project's folder. With no project chosen, it starts empty and asks for folders.
 - **Beside a thread**, open the **VS Code** tab in the right panel. It opens the thread's own worktree, so you see the agent's changes, branch and diff. The workspace is made the first time and reused. **Back** lists the thread's other workspaces. This works only when the thread runs on the computer running BB.
 - **From a reply**, a `::workspace{id="cws_…"}` card opens the workspace in that tab.
 - **From a file tab**, code files open with VS Code by default. BB's preview always shows. If the thread already has a workspace, the file also jumps to its lines in that workspace's VS Code tab. If not, **Open in VS Code** makes one, so glancing at a file never makes a workspace or starts a server. Markdown stays in BB's preview. **Settings → Files** can make BB's preview the default instead.

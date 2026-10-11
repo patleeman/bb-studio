@@ -1,4 +1,4 @@
-// Workspaces: a title, the project (and so the Space) it belongs to, and the
+// Workspaces: a title, the project it belongs to, and the
 // folders it opens.
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";

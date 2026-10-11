@@ -34,7 +34,7 @@ const KIND: StudioKind = {
   actions: [],
   create: { mode: "rpc" },
   canArchive: true,
-  // Folders, not documents: a Space shows its files in Studio's Files view instead.
+  // Folders, not documents.
   background: true,
   capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: false, templates: false },
   mentionProviderId: "workspace",
@@ -539,8 +539,7 @@ export default function plugin(bb: BbPluginApi) {
       const items = store.list().slice(0, LIST_LIMIT).map(item);
       return { items, truncated: items.length === LIST_LIMIT };
     },
-    // A new workspace opens its project's folder: a Space's own folder, or
-    // the project it was made in.
+    // A new workspace opens the folder of the project it was made in.
     studio_create: async ({ kind, projectId }) => {
       if (kind !== KIND_ID) throw new Error(`Unknown kind "${kind}".`);
       const project = projectId ? (await projects()).find((candidate) => candidate.id === projectId) : undefined;
