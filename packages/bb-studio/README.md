@@ -95,6 +95,27 @@ collection. If you had the plugin, see
 [docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md) to move
 from every separate add-on at once.
 
+![Live BB screenshot of a page open as a Studio tab, with stats, a chart and a checklist](assets/pages-preview.png)
+
+A seeded "Offline mode launch" page, opened from its old
+`/plugins/pages/pages/<id>` address, lands as a Studio tab: a tip callout, a
+stats block, a stacked bar chart of weekly active teams and a launch
+checklist, with Dictate, Version history, Comments and the page menu in the
+tab's row. Captured in a staged BB (stable BB 0.46.0) after the full
+[upgrade procedure](../../docs/upgrade-unified-studio.md) from a pinned
+pre-merge install. Recapture with `BB_CAPTURE_ONLY=pages`.
+
+![Page comments with dictation in the reply box](assets/pages-comments.png)
+
+An anchored comment and a reply, both dictated through Talk into the comment
+drafts and saved explicitly; the page body is unchanged. The microphone also
+fits the [phone comment sheet](assets/pages-comments-mobile.png). Recapture
+with `BB_CAPTURE_ONLY=pages-comments`.
+
+![The compact page header](assets/pages-compact-header.png)
+
+The compact page header at 390 pixels, with **Item actions** open.
+
 ### What you get
 
 - **A block editor.** Built on [BlockNote](https://www.blocknotejs.org): type

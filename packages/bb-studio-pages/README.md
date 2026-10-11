@@ -92,9 +92,15 @@ them, and pages keep their `pages:<id>` identity. Links to
 
 ![Studio's Setup page listing the Studio Pages bridge as retired](assets/staged-preview.png)
 
-Captured from a staged BB (`node scripts/staged-bb.mjs start`). Recapture with
-`BB_CAPTURE_ONLY=pages-bridge` after `bb pages migrate` reports Migration
-complete for pages made with the 0.1.0 plugin.
+Captured from a staged BB (`node scripts/staged-bb.mjs start --ref 6f85cdb2`,
+every old add-on installed pinned to that pre-merge commit) after following
+[the upgrade guide](../../docs/upgrade-unified-studio.md): pages with a
+comment thread, two saved versions, an uploaded file and an embedded drawing,
+a Next row click and changed Pages settings, made with the 0.1.0 plugin, then
+`bb pages migrate` reported Migration complete. Studio's Setup page lists
+Studio Pages under **Retired plugins** with what removing it keeps and
+deletes, the close-pages, update and `bb pages migrate` steps, and
+**Remove…** available. Recapture with `BB_CAPTURE_ONLY=pages-bridge`.
 
 ## Development
 

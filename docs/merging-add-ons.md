@@ -318,6 +318,11 @@ commit, run `bb <old> migrate`, and check the items in Studio
     app.tsx's static graph (the `::page` card reads metadata through
     `use-panel-page.ts`, not the editor's frame), and pdf-lib out of the
     server's.
+  - **Pinned installs.** `bb plugin update` skips an install pinned to a
+    commit, and BB refuses to install an id over an installed one. Staging
+    showed `bb plugin remove` keeps a plugin's database, files and KV but not
+    its settings, so the guide moves a pinned install by noting its
+    settings, removing, installing, and setting them again before migrating.
   - **Update order for all bridges.** Old add-on first, then Studio, for
     every bridge (Setup's steps say so now); one procedure covers them all.
 - After the bridges' release cycle, delete each bridge package and its iOS

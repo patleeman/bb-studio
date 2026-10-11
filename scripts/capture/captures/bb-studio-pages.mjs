@@ -23,8 +23,9 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => [
         await client.waitForAriaButton("Comments");
         await client.waitForAriaButton("Page actions");
         await client.waitForSelector('[data-studio-item-header] button');
+        // A workspace tab row shows only the item's own tools (docs/merging-add-ons.md).
         const chat = await client.evaluate(`Boolean([...document.querySelectorAll('[data-studio-item-header] button')].find(button => button.innerText.trim() === 'Chat'))`);
-        if (!chat) throw new Error("The page has no shared Chat action");
+        if (chat) throw new Error("The page's Studio tab shows Chat in its row");
         await client.waitForText("Offline mode launch");
         await client.waitForText("Beta teams");
         await client.waitForText("Crash-free sessions");
