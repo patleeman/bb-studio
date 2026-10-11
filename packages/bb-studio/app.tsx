@@ -32,6 +32,7 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { registerThreadAutomations } from "./src/ui/automations/register";
+import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 
 /**
  * An old address that showed the item list (`collection`, a kind such as
@@ -135,56 +136,72 @@ export default definePluginApp((app) => {
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });
+  // Setup → Kinds: a kind turned off registers no thread tab or composer
+  // entry and its reply cards render nothing; a kind whose New goes to
+  // another provider drops its composer entry. Read once per window load.
+  const kinds = readKindsSnapshot();
+  const on = (kind: string) => !kinds.off.has(kind);
   // Pages (built in; docs/merging-add-ons.md): the thread's Pages tab, the
   // `::page{id="pg_…"}` card in replies, the header link back to a page a
   // thread was started from, and opening a page Talk dictated into.
-  app.slots.threadPanelAction({
-    id: PAGE_TAB,
-    title: "Pages",
-    icon: "studio/pages",
-    layout: "flush",
-    component: (props) => <Suspense fallback={null}><PagesTab {...props} /></Suspense>,
-  });
-  app.slots.messageDirective({ id: "page", component: PageCard });
-  app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
-  app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
+  if (on("page")) {
+    app.slots.threadPanelAction({
+      id: PAGE_TAB,
+      title: "Pages",
+      icon: "studio/pages",
+      layout: "flush",
+      component: (props) => <Suspense fallback={null}><PagesTab {...props} /></Suspense>,
+    });
+    app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
+    app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
+  }
+  app.slots.messageDirective({ id: "page", component: whenOn(kinds, "page", PageCard) });
   // Explore (built in, as it was in Pages): the Next row and "along the way" findings.
   registerExploreApp(app);
   // Artifacts (built in; docs/merging-add-ons.md): the thread panel that saves
   // a reply's files, and the `::artifact{id="art_…"}` card in replies.
-  app.slots.threadPanelAction({ id: ARTIFACTS_TAB, title: "Artifacts", icon: SAVE_ICON, layout: "flush", component: SavePicker });
-  app.slots.messageDirective({ id: "artifact", component: ArtifactCard });
+  if (on("artifact")) app.slots.threadPanelAction({ id: ARTIFACTS_TAB, title: "Artifacts", icon: SAVE_ICON, layout: "flush", component: SavePicker });
+  app.slots.messageDirective({ id: "artifact", component: whenOn(kinds, "artifact", ArtifactCard) });
   // Drawings (built in): the thread's Drawings tab, the `::drawing{id="…"}`
   // card, and the composer's `+` → Drawing, which attaches one as a PNG.
-  app.slots.threadPanelAction({
-    id: DRAWINGS_TAB,
-    title: "Drawings",
-    icon: DRAW_ICON,
-    layout: "flush",
-    run: async ({ openPanel }) => { await openPanel({ title: "Drawings" }); },
-    component: (props) => <Suspense fallback={null}><DrawingsTab {...props} /></Suspense>,
-  });
-  app.slots.messageDirective({ id: "drawing", component: DrawingDirective });
+  if (on("drawing")) {
+    app.slots.threadPanelAction({
+      id: DRAWINGS_TAB,
+      title: "Drawings",
+      icon: DRAW_ICON,
+      layout: "flush",
+      run: async ({ openPanel }) => { await openPanel({ title: "Drawings" }); },
+      component: (props) => <Suspense fallback={null}><DrawingsTab {...props} /></Suspense>,
+    });
+    if (!kinds.routedAway.has("drawing")) {
+      app.composer.customize(createExcalidrawComposerCustomization((scope) => {
+        void import("./src/draw/ui/attach").then(({ attachFromComposer }) => attachFromComposer(scope));
+      }));
+    }
+  }
+  app.slots.messageDirective({ id: "drawing", component: whenOn(kinds, "drawing", DrawingDirective) });
+  // Kept while off, so a picker an agent opened earlier can still be answered.
   app.slots.pendingInteraction({ id: PICKER_ID, component: ExcalidrawPicker });
-  app.composer.customize(createExcalidrawComposerCustomization((scope) => {
-    void import("./src/draw/ui/attach").then(({ attachFromComposer }) => attachFromComposer(scope));
-  }));
   // Designs (built in): the thread's Design tab, the `::design{id="dsn_…"}`
   // card, and the question form design_ask opens in the composer.
-  app.slots.threadPanelAction({
-    id: DESIGN_TAB,
-    title: "Design",
-    icon: DESIGN_ICON,
-    layout: "flush",
-    run: async ({ openPanel }) => { await openPanel({ title: "Design" }); },
-    component: (props) => <Suspense fallback={null}><DesignTab {...props} /></Suspense>,
-  });
-  app.slots.messageDirective({ id: "design", component: DesignCard });
+  if (on("design")) {
+    app.slots.threadPanelAction({
+      id: DESIGN_TAB,
+      title: "Design",
+      icon: DESIGN_ICON,
+      layout: "flush",
+      run: async ({ openPanel }) => { await openPanel({ title: "Design" }); },
+      component: (props) => <Suspense fallback={null}><DesignTab {...props} /></Suspense>,
+    });
+  }
+  app.slots.messageDirective({ id: "design", component: whenOn(kinds, "design", DesignCard) });
   app.slots.pendingInteraction({ id: QUESTIONS_RENDERER, component: QuestionFormView });
   // Recordings (built in): the recorder overlay and pill, the composer's
   // microphone, hold-to-talk, dictation into other plugins' fields, the
   // `::recording{id="rec_…"}` card, Talk's commands and its Models settings.
-  registerTalkApp(app);
+  if (on("recording")) registerTalkApp(app);
+  // Off: the `::recording` line still renders, as nothing.
+  else app.slots.messageDirective({ id: "recording", component: () => null });
   // Reactions (built in; was Studio Reactions): emoji message actions that
   // draft a reply, the old `::reactions` line, and their settings preview.
   registerReactionsApp(app);

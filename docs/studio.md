@@ -32,6 +32,41 @@ Studio's existing `overview`, `search`, tag and bulk RPCs retain their input and
 
 Tag schemas live in the kit's `studioTagSchemas`. A kind's `mentionProviderId` identifies the prefix for BB item mentions; consumers should read it from `studio_describe` instead of maintaining plugin maps.
 
+## Replacing a built-in kind
+
+Studio's built-in kinds are `page`, `drawing`, `recording` (with dictation),
+`artifact` and `design`. A provider kind may add `replaces: "<built-in kind
+id>"` to its `studio_describe` entry (optional; the kit's `StudioKind` and
+schema have it). The hub discovers it over RPC like any provider.
+
+Setup → Kinds (`src/kinds.ts`, RPCs `kinds.state` and `kinds.update` in
+`src/kinds-contract.ts`) stores, in Studio's KV (`kinds:settings`), which
+built-in kinds are off and an "Open and create with" choice per kind.
+
+- **Precedence.** The user's choice (`studio` or a ready provider's plugin
+  id) wins, then a single ready replacing provider, then the built-in. A
+  choice whose provider is gone falls back and is kept.
+- **Routing.** `routeProviders` sets `create: null` and
+  `capabilities.create: false` on every candidate but the chosen one, so the
+  collection's New menu, Quick open's New commands and the kit's thread
+  panels offer only it. Other capabilities are unchanged: existing built-in
+  items keep opening in Studio. Agents get a "BB Studio kinds" line in
+  Studio's instructions naming the plugin to create new ones with.
+- **Off.** The hub skips the built-in provider (`builtinOn`): no listing,
+  search, `provider.call` or New entries; search drops its hits and indexes
+  them again when it's back on. `agents.configure` leaves its tools and
+  instructions out, from the next session start or resume (BB doesn't change
+  a running session). The frontend reads `kinds.state` once per window load
+  (`src/ui/kinds-snapshot.ts`): an off kind registers no thread tab or
+  composer entry (recordings: none of Talk's frontend) and its reply cards
+  render nothing; a kind routed to another provider drops its composer +
+  entry. Those need a window reload, which Setup offers. Nothing needs
+  `bb plugin reload studio`. Data, CLI commands and pending interactions stay.
+
+```ts
+kinds: [{ id: "notion-page", label: "Notion page", plural: "Notion pages", icon: "FileText", replaces: "page", create: { mode: "rpc" }, /* … */ }]
+```
+
 ## Shared item services
 
 The Studio hub stores links, item threads, activity, comments, and content versions. Add-ons call it through `studioServices(bb.sdk)` from `@bb-studio/kit/server`; `RelatedPanel` in the kit shows backlinks, outgoing links, threads, comments, and versions from item headers.

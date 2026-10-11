@@ -1007,10 +1007,70 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   Reactions, built into Studio now) if they're installed: why it is
   retired, what removing it keeps and deletes. **Remove…** asks before it
   removes anything.
+- **Kinds** turns built-in kinds on and off and picks who opens and creates
+  each; see [Kinds](#kinds).
 - Problems with plugins outside BB Studio are listed at the bottom.
 
 `bb studio setup` prints the same status, the retired plugins and the
 commands left to run; `--json` prints the whole summary.
+
+## Kinds
+
+**Setup → Kinds** lists the kinds built into Studio: pages, drawings,
+recordings and dictation, artifacts and designs.
+
+- **On/Off.** Off hides the kind: Studio's collection, search and New menus
+  leave its items out, agents don't get its tools or instructions, and its
+  thread tab, composer entries and reply cards go away. Nothing is deleted;
+  turning it back on restores everything.
+- **Open and create with** shows when another plugin offers its own version
+  of the kind (see [Replacing a built-in kind](#replacing-a-built-in-kind)).
+  Choose Studio, that plugin, or Automatic: your choice wins, else a single
+  replacing plugin, else Studio. The chosen one gets the New entries
+  (Studio's New menu, Quick open's New commands, the composer's + entry) and
+  agents are told to make new ones there. Items already made with the
+  built-in keep opening in Studio.
+
+When it applies:
+
+| What | When |
+| --- | --- |
+| Collection, search, New menus, Quick open | At once |
+| Agent tools and instructions | From each thread's next session start or resume; a running session keeps what it has |
+| Thread tabs, composer entries, reply cards, the recorder | After a window reload (Setup offers **Reload window**) |
+
+No `bb plugin reload studio` is needed. Turning recordings off stops the
+recorder and dictation in the window after its reload; recordings already
+transcribing finish on the server.
+
+### Replacing a built-in kind
+
+A Studio provider (`studio_describe` version 2) may declare that one of its
+kinds stands in for a built-in kind with `replaces`, set to `page`,
+`drawing`, `recording`, `artifact` or `design`:
+
+```ts
+studio_describe: () => ({
+  pluginId: "notion-pages",
+  version: 2,
+  panel: null,
+  kinds: [{
+    id: "notion-page",
+    label: "Notion page",
+    plural: "Notion pages",
+    icon: "FileText",
+    replaces: "page",
+    create: { mode: "rpc" },
+    capabilities: { create: true, move: false, archive: false, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: true },
+    mentionProviderId: null,
+    columns: [], actions: [], canArchive: false, blurb: "Pages in Notion.",
+  }],
+}),
+```
+
+The field is optional, so older providers are unaffected. Your kind keeps
+its own id and items; Studio only routes New to it when it's chosen (or the
+only replacement) and offers New on your kind only then.
 
 ## Backup and restore
 

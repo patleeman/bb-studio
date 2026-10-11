@@ -49,8 +49,21 @@ export class StudioHub {
 
   private readonly builtins: ReadonlyMap<string, BuiltinProvider>;
 
-  constructor(private readonly sdk: HubSdk, builtins: readonly BuiltinProvider[] = []) {
+  /**
+   * `builtinOn` leaves a built-in kind the user turned off out entirely: it
+   * isn't listed, searched or called. `route` adjusts the providers Studio
+   * shows (src/kinds.ts: who offers New for each built-in kind).
+   */
+  constructor(
+    private readonly sdk: HubSdk,
+    builtins: readonly BuiltinProvider[] = [],
+    private readonly options: { builtinOn?(pluginId: string): boolean; route?(providers: ProviderView[]): ProviderView[] } = {},
+  ) {
     this.builtins = new Map(builtins.map((builtin) => [builtin.pluginId, builtin]));
+  }
+
+  private builtinOn(pluginId: string): boolean {
+    return this.options.builtinOn?.(pluginId) ?? true;
   }
 
   private inventoryMap(plugins: readonly PluginEntry[]): Map<string, string> {
@@ -73,6 +86,7 @@ export class StudioHub {
   ): Promise<z.output<ProviderMethods[M]["output"]>> {
     if (pluginId === STUDIO_PLUGIN_ID) return Promise.reject(new Error("Studio isn't a provider."));
     const builtin = this.builtins.get(pluginId);
+    if (builtin && !this.builtinOn(pluginId)) return Promise.reject(new Error(`${builtin.name} are turned off in Studio (Setup → Kinds).`));
     if (builtin) {
       // The same parsing an RPC call gets, so built-ins and add-ons behave alike.
       const schema = schemas.provider[method];
@@ -99,11 +113,12 @@ export class StudioHub {
     const builtinIds = [...this.builtins.keys()];
     const snapshot = await discoverProviderSnapshot(this.sdk, { method: "studio_describe", exclude: [STUDIO_PLUGIN_ID, ...builtinIds] });
     this.inventory ??= this.inventoryMap(snapshot.installed);
-    const builtins: PluginEntry[] = [...this.builtins.values()].map((builtin) => ({ id: builtin.pluginId, name: builtin.name, enabled: true, status: "running", statusDetail: null, version: "builtin" }));
-    const installed = new Set([...snapshot.installed.map((entry) => entry.id), ...builtinIds]);
+    const builtins: PluginEntry[] = [...this.builtins.values()].filter((builtin) => this.builtinOn(builtin.pluginId)).map((builtin) => ({ id: builtin.pluginId, name: builtin.name, enabled: true, status: "running", statusDetail: null, version: "builtin" }));
+    const installed = new Set([...snapshot.installed.map((entry) => entry.id), ...builtinIds.filter((id) => this.builtinOn(id))]);
     for (const id of this.described.keys()) if (!installed.has(id)) this.described.delete(id);
     const candidates = [...snapshot.providers.filter((entry) => !this.builtins.has(entry.id)), ...builtins].filter((entry) => !only || only.has(entry.id));
-    return { providers: await Promise.all(candidates.map((entry) => this.describe(entry))), discoveryComplete: snapshot.complete, installed };
+    const described = await Promise.all(candidates.map((entry) => this.describe(entry)));
+    return { providers: this.options.route ? this.options.route(described) : described, discoveryComplete: snapshot.complete, installed };
   }
 
   private async describe(entry: PluginEntry): Promise<ProviderView> {

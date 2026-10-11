@@ -10,6 +10,8 @@ import { PAGES_SETTINGS } from "@bb-studio/kit/pages-contract";
 import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
+import { BUILTIN_KINDS, builtinOn, frontendState, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, type KindRoute } from "./src/kinds";
+import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { subcommand, usage } from "@bb-studio/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -116,17 +118,42 @@ export default async function plugin(bb: BbPluginApi) {
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them.
-  bb.agents.configure(() => {
-    const instructions = [PAGE_INSTRUCTIONS, explore.instructions()].filter(Boolean).join("\n\n");
-    return { tools: [...PAGE_TOOLS, ...ARTIFACT_TOOLS, ...DRAW_TOOLS, ...DESIGN_TOOLS, ...TALK_TOOLS], skills: [], instructions };
-  });
+  // Setup → Kinds: built-in kinds the user turned off, and who opens and
+  // creates each (src/kinds.ts).
+  const kindSettings = new KindSettingsStore(bb.storage.kv as never);
+  await kindSettings.load();
   const hub = new StudioHub(bb.sdk, [
     { pluginId: "pages", name: "Pages", handlers: pages.provider },
     { pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider },
     { pluginId: "excalidraw", name: "Drawings", handlers: drawings.provider },
     { pluginId: "design", name: "Designs", handlers: designs.provider },
     { pluginId: "talk", name: "Recordings", handlers: recordings.provider },
-  ]);
+  ], {
+    builtinOn: (pluginId) => builtinOn(kindSettings.current, pluginId),
+    route: (providers) => routeProviders(providers, kindSettings.current),
+  });
+  // The agent configuration is synchronous, so it reads the last resolved
+  // routes; they refresh in the background at most every 30 seconds.
+  let kindRoutes: KindRoute[] = resolveKinds([], kindSettings.current);
+  let routesCheckedAt = 0;
+  let routesRefresh: Promise<KindRoute[]> | null = null;
+  const refreshRoutes = (): Promise<KindRoute[]> => routesRefresh ??= hub.providers()
+    .then((providers) => { kindRoutes = resolveKinds(providers, kindSettings.current); routesCheckedAt = Date.now(); return kindRoutes; })
+    .catch(() => kindRoutes)
+    .finally(() => { routesRefresh = null; });
+  void refreshRoutes();
+  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS };
+  // BB takes one agent configuration per plugin: the built-in kinds' tools in
+  // every session, with Pages' instructions and the Next row's (Explore's), as
+  // the Pages plugin gave them. A kind turned off gives neither, from the next
+  // session start or resume on (BB doesn't change a running session).
+  bb.agents.configure(() => {
+    if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
+    const off = new Set(kindSettings.current.off);
+    const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
+    const instructions = [off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+    return { tools, skills: [], instructions };
+  });
   // Other add-ons reach built-in kinds' provider methods through Studio
   // (callProvider in the kit), as they reach an add-on's over RPC.
   bb.rpc.register(builtinProviderContract, {
@@ -881,6 +908,36 @@ export default async function plugin(bb: BbPluginApi) {
     "setup.install": ({ pluginIds }) => setup.install(pluginIds),
     "setup.enable": ({ pluginId }) => setup.enable(pluginId),
     "setup.remove": ({ pluginId }) => setup.remove(pluginId),
+  });
+
+  // Setup → Kinds (src/kinds.ts). Turning a kind off or on, or choosing its
+  // provider, applies to Studio's lists, search and New menus at once, to
+  // agents from their next session, and to thread tabs, composer entries and
+  // reply cards after a window reload.
+  const kindsState = async (): Promise<KindsState> => {
+    const routes = await refreshRoutes();
+    const settings = kindSettings.current;
+    return {
+      kinds: BUILTIN_KINDS.map((each) => {
+        const route = routes.find((entry) => entry.kind === each.kind)!;
+        return { kind: each.kind, label: each.label, covers: each.covers, on: !settings.off.includes(each.kind), choice: route.choice, active: route.active, reason: route.reason, alternatives: route.alternatives };
+      }),
+      frontend: frontendState(routes, settings),
+    };
+  };
+  bb.rpc.register(kindsContract, {
+    "kinds.state": () => kindsState(),
+    "kinds.update": async ({ kind, on, use }) => {
+      const before = builtinOn(kindSettings.current, BUILTIN_KINDS.find((each) => each.kind === kind)?.pluginId ?? "");
+      await kindSettings.update(kind, { on, use });
+      const pluginId = BUILTIN_KINDS.find((each) => each.kind === kind)!.pluginId;
+      bb.log.info(`Studio kind ${kind}: ${kindSettings.current.off.includes(kind) ? "off" : "on"}, open and create with ${kindSettings.current.use[kind] ?? "automatic"}.`);
+      // Search drops an off kind's hits and indexes it again when it's back on.
+      if (before !== builtinOn(kindSettings.current, pluginId)) void searchIndex.changed(pluginId).catch(() => {});
+      changes.append(null);
+      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId });
+      return kindsState();
+    },
   });
 
   // Backup and restore of every Studio item (src/backup/, docs/backup.md).

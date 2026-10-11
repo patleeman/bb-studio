@@ -12,6 +12,14 @@ type Result = { ref: { pluginId: string; id: string }; kind: string; title: stri
 type Row = { type: "result"; hit: Result } | { type: "command"; label: string; run: () => void };
 const DEBOUNCE_MS = 150;
 
+/**
+ * Whether a provider kind is where "New <kind>" goes: the kind itself, or one
+ * that replaces it (Setup → Kinds). Studio offers create on only one of them.
+ */
+function makes(each: { id: string; replaces?: string; capabilities?: { create: boolean } }, kind: string): boolean {
+  return (each.id === kind || each.replaces === kind) && Boolean(each.capabilities?.create);
+}
+
 export function QuickOpen() {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -92,21 +100,21 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   const kinds = useMemo(() => new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind]))), [providers]);
   const commands = useMemo(() => {
     const create = (kind: string, label: string): Row => ({ type: "command", label, run: () => {
-      const provider = providers.find((entry) => entry.state === "ready" && entry.kinds.some((each) => each.id === kind && each.capabilities?.create));
+      const provider = providers.find((entry) => entry.state === "ready" && entry.kinds.some((each) => makes(each, kind)));
       if (!provider) return;
-      const target = provider.kinds.find((each) => each.id === kind);
+      const target = provider.kinds.find((each) => makes(each, kind));
       if (!target) return;
       const projectId = context.projectId ?? null;
       onClose();
       void createStudioItem(target, {
         projectId,
         addOn: provider.name,
-        create: async () => (await rpc.call("create", { pluginId: provider.pluginId, kind, projectId })).item.href,
+        create: async () => (await rpc.call("create", { pluginId: provider.pluginId, kind: target.id, projectId })).item.href,
       });
     } });
     return [
       ...([ ["page", "New page"], ["recording", "New recording"], ["drawing", "New drawing"], ["task", "New task"] ] as const)
-        .filter(([kind]) => providers.some((provider) => provider.state === "ready" && provider.kinds.some((each) => each.id === kind && each.capabilities?.create)))
+        .filter(([kind]) => providers.some((provider) => provider.state === "ready" && provider.kinds.some((each) => makes(each, kind))))
         .map(([kind, label]) => create(kind, label)),
       { type: "command", label: "Open Studio", run: () => { onClose(); openAppPath("/plugins/studio/studio"); } },
       { type: "command", label: "Hand to agent", run: () => { onClose(); navigate.toCompose({ initialPrompt: results[0] ? mentionPrompt([results[0]]) : "", focusPrompt: true }); } },
