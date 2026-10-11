@@ -47,11 +47,14 @@ lives in memory, so a running review doesn't carry over.
 
 ## Staged preview
 
-![A design on the canvas, captured before the merge](assets/staged-preview.png)
+![Studio's Setup page listing the Studio Design bridge as retired](assets/staged-preview.png)
 
-Captured before the merge from Design's own page: a design's round of two
-live options on the canvas. Designs now open as Studio tabs; see
-[Studio's Designs section](../bb-studio/README.md#designs).
+Captured from a staged BB (`node scripts/staged-bb.mjs start`) after
+`bb design migrate` reported Migration complete for three designs and a
+saved style made with the 0.1.0 plugin. Studio's Setup page lists Studio
+Design under **Retired plugins** with what removing it keeps and deletes,
+the update and `bb design migrate` steps, and **Remove…** available.
+Recapture with `BB_CAPTURE_ONLY=design-bridge`.
 
 ## Development
 

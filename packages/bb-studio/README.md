@@ -228,7 +228,9 @@ designs and saved styles in.
 The seeded "Orbit onboarding" design: one round, "Welcome screen", with two
 live options side by side, `1a` (desktop) and `1b` (phone), and the floating
 pills for Reload, **Select** / **Edit text** / **Comment**, Present and zoom.
-Recapture with `BB_CAPTURE_ONLY=design`.
+Recapture with `BB_CAPTURE_ONLY=design`, which opens it from its old
+`/plugins/design/designs/<id>` address and checks that it lands as a Studio
+tab; the prototype and deck captures do the same.
 
 ![Live BB screenshot of a three-step prototype splayed by step](assets/designs-prototype.png)
 

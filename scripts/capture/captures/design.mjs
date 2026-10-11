@@ -288,7 +288,7 @@ async function seedDesign(key, { projectId, pluginRpc }) {
 
 /** Opens a design from its old Design address and checks it lands as a Studio tab. */
 async function openDesign(client, id) {
-  await openDesign(client, id);
+  await client.navigate(`/plugins/design/designs/${id}`);
   await client.waitForSelector(`[data-studio-workspace-editor="/plugins/studio/studio/designs/${id}"]`, 30000);
   const path = await client.evaluate("location.pathname");
   if (path !== "/plugins/studio/studio") throw new Error(`The old design address didn't open in Studio's workspace: ${path}`);
@@ -417,7 +417,9 @@ export default (context) => [
         await openDesign(client, id);
         await client.waitForSelector('button[title="Play 1a from What it is"]');
         await client.evaluate(`document.querySelector('button[title="Play 1a from What it is"]').click()`);
-        await client.waitForSelector('[role="dialog"][aria-label="Playing 1a"]');
+        await client.waitForSelector('[role="dialog"][aria-label="Playing 1a"] iframe');
+        // Let the first slide load, as a viewer would, before moving on.
+        await context.sleep(1500);
         // The arrow key moves the presenter to the next slide.
         await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
         await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
@@ -425,7 +427,7 @@ export default (context) => [
         await client.waitForText("Why it matters");
         await client.waitForAriaButton("Export PDF");
         await client.waitForAriaButton("Full screen");
-        const hash = await client.evaluate(`new URL(document.querySelector('[role="dialog"] iframe').src).hash`);
+        const hash = await client.evaluate(`new URL(document.querySelector('[role="dialog"][aria-label="Playing 1a"] iframe').src).hash`);
         if (hash !== "#why") throw new Error(`The presenter shows ${hash}`);
         await context.sleep(2500);
       } catch (error) {
