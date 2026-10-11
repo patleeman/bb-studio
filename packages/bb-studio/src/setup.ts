@@ -118,7 +118,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
     kept: "Chat links it copied into Studio, unsent drafts and quotes. Studio never replaces a newer choice with an old link.",
     deleted: `${REMOVED} Older native clients and chat bookmarks that still use studio-chat stop working.`,
     before: [
-      step("Update Studio and the bridge.", "bb plugin update studio --yes && bb plugin update studio-chat --yes"),
+      step("Update Studio.", "bb plugin update studio --yes"),
       step("Copy its chat links into Studio, and wait for Migration complete.", "bb studio-chat migrate"),
     ],
     blocker: chatBlocker,

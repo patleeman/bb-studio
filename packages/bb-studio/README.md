@@ -332,7 +332,7 @@ main view. Pages keeps its
 page-chat history; standalone Pages still provides its own chat when Studio is
 absent.
 
-Existing Studio Chat installs must [migrate their links](../bb-studio-chat/README.md)
+Existing Studio Chat installs must migrate their links (`bb studio-chat migrate`)
 before removing the old plugin; the [Setup page](#setup) checks this for you.
 Old draft keys and quote storage are retained.
 

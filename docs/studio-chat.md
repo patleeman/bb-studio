@@ -7,8 +7,8 @@ Conversations open in the main view, where the sidebar lists them, or in a
 split when you ⌘-click.
 
 Item chat ships in plugin `studio`, in `packages/bb-studio/src/chat`.
-RPC methods use the `chat.` prefix. The retired `studio-chat` package is an
-upgrade bridge for saved links, older clients and bookmarks.
+RPC methods use the `chat.` prefix. The retired `studio-chat` plugin was an
+upgrade bridge for saved links, older clients and bookmarks; its package is gone from this repo.
 
 ## Item identity and context
 

@@ -46,7 +46,7 @@ for (const plugin of installed.plugins) {
   try { await stat(join(root, plugin.source)); } catch { errors.push(`${plugin.name}: missing package directory`); }
 }
 // A plugin package listed in neither index would otherwise pass unnoticed.
-const retired = new Set(["packages/bb-studio-chat"]); // kept only for existing installs
+const retired = new Set(); // packages kept only for existing installs
 const listed = new Set(installed.plugins.map((plugin) => plugin.source.replace(/^\.\//, "").replace(/\/$/, "")));
 for (const dir of await readdir(join(root, "packages"))) {
   const path = `packages/${dir}`;
