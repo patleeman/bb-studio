@@ -1,17 +1,4 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "noUnusedParameters": false,
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
-  },
-  "include": [
-    "source",
-    "components",
-    "lib",
-    "hooks"
-  ]
+  "include": ["src"]
 }

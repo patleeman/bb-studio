@@ -12,7 +12,7 @@ export default defineConfig({
   test: {
     silent: "passed-only",
     name: "bb-studio-sidebar",
-    include: ["source/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules/**"],
   },
 });

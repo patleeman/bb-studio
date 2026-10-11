@@ -19,7 +19,7 @@ export const ADDONS: readonly AddOn[] = [
   { id: "talk", displayName: "Studio Talk", description: "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable." },
   { id: "excalidraw", displayName: "Studio Draw", description: "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations." },
   { id: "artifacts", displayName: "Studio Artifacts", description: "Part of BB Studio. Keep the images, pages, reports and files your agents make, in Studio's collection." },
-  { id: "thread-list-plus", displayName: "Studio Sidebar", description: "BB's sidebar: organize threads by Space, project, section or machine, and navigate without duplicate Studio add-on rows." },
+  { id: "thread-list-plus", displayName: "Studio Sidebar", description: "BB's sidebar thread list, organized by Studio Space: one Space at a time with its lead, pins and two-line rows." },
   { id: "mobile", displayName: "Studio Mobile", description: "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads." },
   { id: "emoji-react", displayName: "Studio Reactions", description: "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer." },
   { id: "smart-decisions", displayName: "Studio Decisions", description: "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and other plugins can ask it for quick decisions." },

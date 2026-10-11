@@ -16,7 +16,7 @@ agent.
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
 | [Studio Design](packages/bb-studio-design/) | `design` | UI prototypes you design with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work. |
 | [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces in your Spaces: one or more folders in a full editor beside your threads, run by a local code-server. |
-| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Thread lists organized by Space, project, section or machine, plus navigation without duplicate Studio rows. |
+| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | The sidebar's thread list organized by Studio Space: one Space at a time, its lead and pins on top, two-line rows. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
@@ -52,7 +52,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
-   - thread-list-plus: Studio Sidebar; thread organization and sidebar navigation
+   - thread-list-plus: Studio Sidebar; the thread list organized by Space
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
    - design: Studio Design; UI prototypes designed with agents
@@ -101,7 +101,7 @@ plugin deletes its settings and secrets, so note them first.
 
 ## Consolidation upgrades
 
-Chat now ships in Studio, Navigation ships in Studio Sidebar, and Float and
+Chat now ships in Studio, BB's own navigation replaces Studio Navigation, and Float and
 Studio Teams (`bot-teams`) are retired. New installs need at most 12 plugins.
 To upgrade an existing install, update Studio and open **Studio → Setup**. It
 lists the add-ons you're missing, flags installed retired plugins, says what
@@ -114,7 +114,7 @@ run. The short version:
 ```sh
 bb studio-chat migrate              # wait for "Migration complete" first
 bb plugin remove studio-chat
-bb plugin remove studio-navigation  # on BB 0.45, pick Studio Sidebar's Studio Navigation in Appearance first; 0.46 has no such setting
+bb plugin remove studio-navigation  # on BB 0.45, pick BB's own navigation in Appearance first; 0.46 has no such setting
 bb plugin remove float
 bb bots list --json                 # export the bots you want before removing Teams
 bb plugin remove bot-teams

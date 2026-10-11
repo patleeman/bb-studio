@@ -133,12 +133,12 @@
     {
       "id": "thread-list-plus",
       "displayName": "Studio Sidebar",
-      "description": "BB's sidebar: organize threads by Space, project, section or machine, and navigate without duplicate Studio add-on rows.",
+      "description": "BB's sidebar thread list, organized by Studio Space: one Space at a time with its lead, pins and two-line rows.",
       "icon": "ListView",
       "tags": [
         "sidebar",
         "threads",
-        "projects",
+        "spaces",
         "bb-studio"
       ],
       "author": {

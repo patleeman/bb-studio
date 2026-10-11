@@ -1,6 +1,6 @@
 export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
   ...(() => {
-    // By space and Hidden threads share one seeded fixture: two Spaces and
+    // The Space view and Hidden threads share one seeded fixture: two Spaces and
     // their threads. Nothing runs during the capture.
     const fixture = { spaces: {}, threads: {}, preferences: null, active: 0 };
     const spawn = async (title) => JSON.parse(await bbCli(["thread", "spawn", "--project", projectId, "--title", title, "--prompt", "Staged screenshot fixture. Do not run.", "--send-at", "30d", "--json"])).id;
@@ -33,19 +33,15 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       if (fixture.active > 0 || !fixture.preferences) return;
       if (fixture.spaces.launch) await pluginRpc("studio", "space_set_lead", { spaceId: fixture.spaces.launch.id, threadId: null }).catch(() => {});
       for (const id of Object.values(fixture.threads)) await bbCli(["thread", "delete", id, "--yes"]).catch(() => {});
-      for (const key of ["organizationMode", "hiddenThreads", "currentSpace"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: fixture.preferences[key] });
+      for (const key of ["hiddenThreads", "currentSpace"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: fixture.preferences[key] });
       Object.assign(fixture, { spaces: {}, threads: {}, preferences: null });
     };
     const showBySpace = async (client) => {
-      await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: "project" });
       await pluginRpc("thread-list-plus", "setPreference", { key: "hiddenThreads", value: [] });
       // By space shows one Space at a time: Launch, with the switcher's dots below.
       await pluginRpc("thread-list-plus", "setPreference", { key: "currentSpace", value: fixture.spaces.launch.id });
-      // Not a thread: opening one shows its own Space (Personal here) instead of Launch.
+      // Not a thread: opening one shows its own Space (Home here) instead of Launch.
       await client.navigate("/plugins/studio/studio");
-      // Studio's own Spaces section shows until the list is organized by Space.
-      await client.waitForSelector('[data-studio-sidebar-anchor="studio:spaces"]');
-      await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: "space" });
       await client.waitForSelector(`[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]`, 20000);
       for (const title of ["Launch", "Launch plan", "Launch checklist", "Release digest"]) await client.waitForText(title);
       const layout = JSON.parse(await client.evaluate(`JSON.stringify((() => {
@@ -71,7 +67,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       if (["notes", "atlas", "loose"].some((key) => layout.launch.includes(fixture.threads[key]))) throw new Error(`Launch shows another Space's threads: ${JSON.stringify(layout)}`);
       const dots = [fixture.spaces.launch.id, fixture.spaces.research.id].map((id) => layout.dots.indexOf(id));
       if (layout.dots[0] !== "all" || dots.some((index) => index < 0) || dots[1] < dots[0] || layout.current !== fixture.spaces.launch.id) throw new Error(`The Space switcher is wrong: ${JSON.stringify(layout)}`);
-      if (layout.studioSpaces) throw new Error("Studio's Spaces section still shows in By space");
+      if (layout.studioSpaces) throw new Error("Studio's Spaces section still shows beside the Space list");
       if (layout.emoji !== "🚀") throw new Error(`Launch lacks its emoji: ${JSON.stringify(layout)}`);
       if (layout.statusDots < layout.launch.length) throw new Error(`Launch's rows lack their status dots: ${JSON.stringify(layout)}`);
       if (layout.launch[0] !== fixture.threads.plan || layout.launch[1] !== fixture.threads.checklist || layout.marks.join() !== "lead,pinned") throw new Error(`Launch's lead and pin aren't first with their marks: ${JSON.stringify(layout)}`);
@@ -179,8 +175,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         const layout = JSON.parse(await client.evaluate(`JSON.stringify((() => {
           const sidebar = document.querySelector('[data-sidebar="sidebar"]');
           const studio = sidebar?.querySelector('[data-studio-sidebar-sections]');
-          // The first thread row, whether threads are grouped by project or listed together.
-          const threads = sidebar?.querySelector('[data-sidebar-rename-row]');
+          // The first thread row.
+          const threads = sidebar?.querySelector('[data-sidebar-thread-id]');
           const scrollers = Array.from(studio?.querySelectorAll('*') ?? []).filter((el) => /(auto|scroll)/.test(getComputedStyle(el).overflowY));
           return {
             tabs: Array.from(studio?.querySelectorAll('[data-studio-tab]') ?? []).map((el) => el.textContent.trim()),
@@ -201,34 +197,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       if (!sidebar) throw new Error('Sidebar not found for capture');
       const rect = sidebar.getBoundingClientRect();
       return { x: rect.x, y: rect.y, width: rect.width, height: Math.min(rect.height, 640) };
-    })()`),
-  },
-  {
-    id: "thread-list-plus-dialog",
-    packageDir: "bb-studio-sidebar",
-    fileName: "project-dialog.png",
-    showSidebar: true,
-    setup: async (client) => {
-      await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-      // New project is in every section's menu: the loose Threads section's, or
-      // with no loose threads, the seeded Orbit project's.
-      await client.waitForSelector('button[aria-label="Threads actions"], button[aria-label="Orbit actions"]');
-      const menu = await client.evaluate(`document.querySelector('button[aria-label="Threads actions"]') ? "Threads actions" : "Orbit actions"`);
-      await client.evaluate(`document.querySelector('button[aria-label=${JSON.stringify(menu)}]')?.scrollIntoView({ block: 'center' })`);
-      await sleep(350);
-      await client.clickAriaButtonWithPointer(menu);
-      await client.waitForSelector('[role="menuitem"]');
-      await client.clickElementWithTextAndPointer('[role="menuitem"]', "New project");
-      await client.waitForSelector('[role="dialog"]');
-      const hasTitle = await client.evaluate(`Array.from(document.querySelectorAll('[role="dialog"]')).find(el => el.checkVisibility())?.textContent?.includes('New project')`);
-      if (!hasTitle) throw new Error('The live New project dialog is missing its title');
-      for (const text of ["Folder path", "Browse", "Create project"]) await client.waitForText(text);
-    },
-    clip: async (client) => client.evaluate(`(() => {
-      const dialog = Array.from(document.querySelectorAll('[role="dialog"]')).find(el => el.checkVisibility());
-      if (!dialog) throw new Error('New project dialog not found for capture');
-      const rect = dialog.getBoundingClientRect();
-      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     })()`),
   }
 ];
