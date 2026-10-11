@@ -8,7 +8,7 @@
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio: one collection for pages, recordings, drawings and artifacts, with search, tags, project leads, item conversations and quotes.",
+      "description": "The home of BB Studio: one collection for pages, recordings, drawings, designs and artifacts, with search, tags, project leads, item conversations and quotes.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },
@@ -204,13 +204,12 @@
     {
       "id": "design",
       "displayName": "Studio Design",
-      "description": "Part of BB Studio. Design UI prototypes and slide decks with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work.",
+      "description": "Upgrade bridge for Studio Design, now built into Studio: copies your designs and saved styles into Studio and forwards older clients and mentions.",
       "icon": {
         "url": "./packages/bb-studio-design/assets/icon.svg"
       },
       "tags": [
         "design",
-        "prototyping",
         "bb-studio"
       ],
       "author": {

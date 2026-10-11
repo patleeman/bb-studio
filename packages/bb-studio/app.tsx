@@ -15,6 +15,9 @@ import { DRAW_ICON, DRAWINGS_TAB, isDrawingId, PICKER_ID } from "./src/draw/shar
 import { DrawingDirective } from "./src/draw/ui/drawing-directive";
 import { ExcalidrawPicker } from "./src/draw/ui/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./src/draw/ui/composer-registration";
+import { DESIGN_ICON, DESIGN_TAB, isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
+import { DesignCard } from "./src/design/ui/design-card";
+import { QuestionFormView } from "./src/design/ui/question-form";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
@@ -58,10 +61,13 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   artifacts: { isId: isArtifactId, View: lazy(() => import("./src/artifacts/ui/route")) },
   // Excalidraw is big: it loads when a drawing first opens, not with Studio.
   drawings: { isId: isDrawingId, View: lazy(() => import("./src/draw/ui/route")) },
+  designs: { isId: isDesignId, View: lazy(() => import("./src/design/ui/route")) },
 };
 
 /** The thread's Drawings tab; it brings Excalidraw, so it loads when first opened. */
 const DrawingsTab = lazy(() => import("./src/draw/ui/drawings-tab"));
+/** The thread's Design tab, with the canvas; loaded when first opened. */
+const DesignTab = lazy(() => import("./src/design/ui/design-tab"));
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
@@ -124,6 +130,18 @@ export default definePluginApp((app) => {
   app.composer.customize(createExcalidrawComposerCustomization((scope) => {
     void import("./src/draw/ui/attach").then(({ attachFromComposer }) => attachFromComposer(scope));
   }));
+  // Designs (built in): the thread's Design tab, the `::design{id="dsn_…"}`
+  // card, and the question form design_ask opens in the composer.
+  app.slots.threadPanelAction({
+    id: DESIGN_TAB,
+    title: "Design",
+    icon: DESIGN_ICON,
+    layout: "flush",
+    run: async ({ openPanel }) => { await openPanel({ title: "Design" }); },
+    component: (props) => <Suspense fallback={null}><DesignTab {...props} /></Suspense>,
+  });
+  app.slots.messageDirective({ id: "design", component: DesignCard });
+  app.slots.pendingInteraction({ id: QUESTIONS_RENDERER, component: QuestionFormView });
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));

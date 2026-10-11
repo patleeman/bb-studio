@@ -53,12 +53,12 @@ public enum Design {
     public var option: String?
     public var title: String?
     public var caption: String?
-    public var viewport: StudioJSONValue?
+    public var viewport: String?
     public var updatedAt: Double?
     public var steps: [GetDesignOutputDesignRoundsItemScreensItemStepsItem]?
     public var url: String?
 
-    public init(id: String? = nil, round: Double? = nil, option: String? = nil, title: String? = nil, caption: String? = nil, viewport: StudioJSONValue? = nil, updatedAt: Double? = nil, steps: [GetDesignOutputDesignRoundsItemScreensItemStepsItem]? = nil, url: String? = nil) {
+    public init(id: String? = nil, round: Double? = nil, option: String? = nil, title: String? = nil, caption: String? = nil, viewport: String? = nil, updatedAt: Double? = nil, steps: [GetDesignOutputDesignRoundsItemScreensItemStepsItem]? = nil, url: String? = nil) {
       self.id = id
       self.round = round
       self.option = option

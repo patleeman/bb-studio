@@ -51,7 +51,7 @@ struct DesignView: View {
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "design", itemId: id) }
         .sheet(isPresented: $showingWeb) {
             NavigationStack {
-                WebView(url: client.baseURL.appending(path: "plugins/design/designs/\(id)"))
+                WebView(url: client.baseURL.appending(path: "plugins/studio/studio/designs/\(id)"))
                     .ignoresSafeArea(edges: .bottom)
                     .navigationTitle(design?.displayName ?? "Design")
                     .navigationBarTitleDisplayMode(.inline)
@@ -69,6 +69,8 @@ struct DesignView: View {
             if let listener { app.realtime.removeListener(listener) }
             listener = app.realtime.listen { event in
                 switch event {
+                // Studio sends it on its `design` channel; the Design plugin did before the merge.
+                case .pluginSignal("studio", "design", let payload) where payload["designId"]?.stringValue == id: Task { await load() }
                 case .pluginSignal("design", _, let payload) where payload["designId"]?.stringValue == id: Task { await load() }
                 case .connected: Task { await load() }
                 default: break

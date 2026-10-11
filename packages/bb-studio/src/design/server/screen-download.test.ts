@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screenResponse } from "../../server";
+import { screenResponse } from "../server";
 import { screenDownloadUrl } from "../shared";
 
 const screen = { id: "1a", html: "<!doctype html><body><p>Hi</p></body>" };

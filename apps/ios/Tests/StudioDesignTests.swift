@@ -24,6 +24,9 @@ final class StudioDesignTests: XCTestCase {
         let screen = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","updatedAt":7,"url":"/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6"}"#.utf8))
         XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", screen, step: "intro").absoluteString,
                        "https://design.invalid/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6#intro")
+        let inStudio = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","updatedAt":7,"url":"/api/v1/plugins/studio/http/designs/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6"}"#.utf8))
+        XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", inStudio).absoluteString,
+                       "https://design.invalid/api/v1/plugins/studio/http/designs/screen?design=dsn_0123456789abcdef&screen=1a&v=7&s=6")
         let older = try JSONDecoder().decode(DesignScreen.self, from: Data(#"{"id":"1a","updatedAt":7}"#.utf8))
         XCTAssertEqual(client.designScreenURL("dsn_0123456789abcdef", older).absoluteString,
                        "https://design.invalid/api/v1/plugins/design/http/screen?design=dsn_0123456789abcdef&screen=1a&v=7")
@@ -31,6 +34,7 @@ final class StudioDesignTests: XCTestCase {
 
     func testDesignPathsAndLinksOpenTheDesign() {
         XCTAssertEqual(Route(href: "/plugins/design/designs/dsn_0123456789abcdef"), .design(id: "dsn_0123456789abcdef"))
+        XCTAssertEqual(Route(href: "/plugins/studio/studio/designs/dsn_0123456789abcdef"), .design(id: "dsn_0123456789abcdef"))
         XCTAssertTrue(BBClient.isDesignId("dsn_0123456789abcdef"))
         XCTAssertFalse(BBClient.isDesignId("dsn_nothex"))
         XCTAssertEqual(StudioKind.of("design").label, "Design")

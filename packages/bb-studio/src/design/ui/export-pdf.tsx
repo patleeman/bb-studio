@@ -3,7 +3,7 @@
 // PDF there makes the file: one page per slide or step, at the frame's size.
 import { useEffect, useState } from "react";
 import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
-import { printUrl, type ScreenView } from "../src/shared";
+import { printUrl, type ScreenView } from "../shared";
 
 /** Gives up on a print page that never reports back. */
 const PRINT_TIMEOUT_MS = 120_000;

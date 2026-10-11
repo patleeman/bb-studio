@@ -1,5 +1,6 @@
 import { ARTIFACT_TABLES } from "./artifacts/server/store";
 import { DRAWING_TABLES } from "./draw/server/store";
+import { DESIGN_MIGRATIONS } from "./design/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
 // (src/search-index.ts) and project leads (src/project-lead.ts). The space
@@ -189,4 +190,6 @@ export const MIGRATIONS = [
    UPDATE space_runs SET enabled = 0, automation_id = NULL, automation_project_id = NULL;`,
   // Drawings are built in (src/draw): the Draw plugin's tables, filled by its upgrade bridge.
   DRAWING_TABLES,
+  // Designs are built in (src/design): the Design plugin's statements in order, filled by its upgrade bridge.
+  ...DESIGN_MIGRATIONS,
 ];

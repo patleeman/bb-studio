@@ -4,7 +4,7 @@
 import { useState } from "react";
 import type { PluginPendingInteractionProps } from "@get-bb/plugin-sdk/app";
 import { GHOST_BUTTON, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
-import { DECIDE, MAX_OTHER_CHARS, MAX_TEXT_CHARS, type Answer, type Answers, type Question, type QuestionForm } from "../src/questions";
+import { DECIDE, MAX_OTHER_CHARS, MAX_TEXT_CHARS, type Answer, type Answers, type Question, type QuestionForm } from "../questions";
 
 const CHIP = "rounded-lg border px-3 py-2 text-left text-sm transition-colors";
 const CHIP_ON = "border-primary bg-primary/10 text-foreground";

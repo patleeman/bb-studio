@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
 import { ExportPdfButton } from "./export-pdf";
-import { clampSlide, frameSize, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../src/shared";
+import { clampSlide, frameSize, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../shared";
 
 const PADDING = 32;
 

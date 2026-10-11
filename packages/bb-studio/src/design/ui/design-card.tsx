@@ -1,48 +1,9 @@
-// The Design tab in a thread's workbench, and the card that opens it from a
-// reply. The tab shows one design's canvas beside the conversation; opened
-// without one, it lists the thread's designs.
-import { BarTitle, ICON_BUTTON, Icon, ItemDirectiveCard, ThreadItemsPanel, remember, openAppPath } from "@bb-studio/kit/app";
-import { useBbNavigate, type JsonValue, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { DESIGN_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../src/shared";
-import { DesignBoard, useDesign } from "./design-view";
-
-/** The workbench tab's action id; reply cards open it with `{ designId }`. */
-export const DESIGN_TAB = "design";
-
-function designParam(params: JsonValue | null): string | null {
-  const value = params && typeof params === "object" && !Array.isArray(params) ? params.designId : null;
-  return typeof value === "string" && isDesignId(value) ? value : null;
-}
-
-export function DesignTab({ threadId, params }: { threadId: string; params: JsonValue | null }) {
-  return (
-    <ThreadItemsPanel
-      threadId={threadId}
-      pluginId={PLUGIN_ID}
-      kind="design"
-      channel={REALTIME_CHANNEL}
-      initialId={designParam(params)}
-      renderItem={(id, { backLabel, onBack }) => <TabCanvas key={id} designId={id} backLabel={backLabel} onBack={onBack} />}
-    />
-  );
-}
-
-/** Just the canvas: the conversation is already beside it. */
-function TabCanvas({ designId, backLabel, onBack }: { designId: string; backLabel: string; onBack(): void }) {
-  const { design, rename } = useDesign(designId);
-  if (design === null) return <p className="p-4 text-sm text-muted-foreground">This design was deleted.</p>;
-  const back = (
-    <>
-      <button type="button" aria-label={`Back to ${backLabel}`} title={`Back to ${backLabel}`} className={ICON_BUTTON} onClick={onBack}>
-        <Icon name="ArrowLeft" className="size-4" />
-      </button>
-      <div className="max-w-56">
-        <BarTitle key={`${designId}:${design?.name ?? ""}`} title={design?.name ?? ""} label="Design name" placeholder="Untitled design" disabled={!design} onRename={rename} />
-      </div>
-    </>
-  );
-  return <div className="relative h-full min-h-0">{design ? <DesignBoard design={design} leftTools={back} inThread /> : null}</div>;
-}
+// The `::design{id="dsn_…"}` card in a reply: the newest round's screens,
+// under a header that opens the design in the thread's Design tab.
+import { ItemDirectiveCard, openAppPath, remember } from "@bb-studio/kit/app";
+import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { DESIGN_ICON, DESIGN_TAB, designHref, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../shared";
+import { useDesign } from "./use-design";
 
 /** Screens a card shows from the newest round. */
 export const PREVIEW_SCREENS = 3;
@@ -100,7 +61,7 @@ export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
         if (!navigate.openThreadPanel({ actionId: DESIGN_TAB, title: name, params: { designId: id } }))
-          openAppPath(`/plugins/${PLUGIN_ID}/${PANEL_PATH}/${encodeURIComponent(id)}`);
+          openAppPath(designHref(id));
       }}
     />
   );

@@ -213,6 +213,86 @@ one only if the server copy hasn't changed; otherwise **Save as copy**,
 `GET /api/v1/plugins/studio/http/drawings/thumbnail`, an SVG with a CSP that
 runs nothing.
 
+## Designs
+
+Designs are built into Studio: UI prototypes and slide decks you design with
+your agents. A design is a set of rounds; each round holds a few options, and
+each option is one self-contained HTML screen. They used to be the separate
+Studio Design plugin (`design`). Items keep that id as their namespace
+(`design:<id>`), so tags, tabs, links and chats carry over. If you had the
+plugin, see [its upgrade bridge](../bb-studio-design/README.md) to copy your
+designs and saved styles in.
+
+![Live BB screenshot of a design open as a Studio tab](assets/designs-preview.png)
+
+The seeded "Orbit onboarding" design: one round, "Welcome screen", with two
+live options side by side, `1a` (desktop) and `1b` (phone), and the floating
+pills for Reload, **Select** / **Edit text** / **Comment**, Present and zoom.
+Recapture with `BB_CAPTURE_ONLY=design`.
+
+![Live BB screenshot of a three-step prototype splayed by step](assets/designs-prototype.png)
+
+The seeded "New release flow": one mobile prototype that declares three
+steps, splayed into one live frame per step.
+
+![Live BB screenshot of a four-slide deck laid out on the canvas](assets/designs-deck.png)
+
+The seeded "ORBIT-42 all-hands" deck: one `slide` screen whose four steps are
+its slides, laid out in a row.
+
+![Live BB screenshot of the deck presented at its second slide](assets/designs-deck-present.png)
+
+The same deck presented with Play and moved on with →: "Why it matters",
+"2 / 4", **Full screen**, **Export PDF**, **Download HTML** and Fit/Fill.
+
+- **In the library.** Designs list next to pages, recordings, drawings and
+  artifacts: create, move, rename, duplicate, archive, delete and export
+  (each screen's HTML). Designs have no collection page of their own:
+  `/plugins/studio/studio/designs` opens the library filtered to the Design
+  kind.
+- **Canvas** (`/plugins/studio/studio/designs/<id>`; old
+  `/plugins/design/designs/<id>` links open here). Drag the background or hold
+  Space to pan; pinch, or hold ⌘ and scroll, to zoom. Rounds stack newest
+  first. Each option is a live frame at its real size (desktop, tablet,
+  mobile, slide, square, story, A4, Letter, email, or any `WIDTHxHEIGHT` from
+  200 to 4000 px a side). Screens update as the agent writes them. A
+  multi-step prototype declares its steps with a `bb-design-steps` meta tag
+  and shows one frame per step.
+- **Slide decks.** The agent shows 2–3 directions first, then writes the deck
+  as one `slide` screen whose steps are its slides. **Play** presents it
+  (←/→, Space, Page Up/Down, Home, End, **Full screen**, **Export PDF**,
+  **Download HTML**).
+- **Edit text and comments.** In **Edit text** mode, click text on a screen
+  and type over it; the change is written into the screen's HTML. In
+  **Comment** mode, pin a note to an element; **Send to agent** posts it, with
+  the element's selector and markup, to the design's thread.
+- **Card in the agent's reply** (`::design{id="…"}`) with the newest round's
+  first screens. It opens the design in the thread's **Design** tab beside
+  the chat; opened without a design, the tab lists the thread's designs.
+- **Questions.** `design_ask` shows a form in the thread (choices, multi,
+  short answers, 1–5 scales, each with "Decide for me"); the answers return
+  as the tool's result.
+- **Reviewer.** `design_ready` starts a reviewer agent in a hidden thread
+  beside the design's own. It loads each screen at its size with Browser
+  Automation, checks layout, errors and the design rules, and reports back
+  only when something needs work, in the design's thread. After 3 such
+  reviews in a row, automatic review pauses until you edit, comment or ask.
+- **Agent tools and skill.** `design_list`, `design_create`, `design_rename`,
+  `design_read`, `design_ask`, `design_ready`, `design_write_screen`,
+  `design_edit_screen`, `design_comments`, `design_resolve_comments`,
+  `design_save_style` and `design_styles`, and the `design` skill. `@design`
+  mentions give the agent the design's rounds and options.
+- **Commands.** `bb studio designs list`, `show <id>` (rounds, screens and
+  open comments as JSON), `html <id> <screen>`, `rename <id> <new-name>` and
+  `delete <id>`.
+
+Designs, rounds, screens, comments and saved styles are stored in Studio's
+SQLite database. Frames load from
+`GET /api/v1/plugins/studio/http/designs/screen`, whose response carries a
+sandbox CSP, so a screen gets an opaque origin with no access to BB.
+`bb studio backup` includes each design with its rounds, screens and
+comments; saved styles aren't in backups yet.
+
 ## What you get
 
 Everything opens in BB's main view, as a tab in Studio's workspace. ⌘/Ctrl-click an item or thread link, or choose **Open in split** from

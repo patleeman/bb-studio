@@ -80,6 +80,8 @@ const LINK_ICONS: Record<string, string> = {
   // Kinds built into Studio, at /plugins/studio/studio/<segment>/<id>.
   "studio/studio/drawings": "studio/draw",
   "studio/studio/artifacts": "studio/artifact",
+  "studio/studio/designs": "studio/design",
+  "design/designs": "studio/design",
   "talk/recordings": "talk/talk",
   "studio-code/workspaces": "Code",
   "studio/chats": "MessageSquare",

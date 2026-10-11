@@ -2,8 +2,9 @@
 
 Studio is one plugin with one rail icon (`studio/studio`). Its content kinds
 are moving into it one at a time. Artifacts went first (`packages/bb-studio/src/artifacts`),
-then Draw (`packages/bb-studio/src/draw`); Design, Talk and Pages follow the
-same steps. This is the checklist, with what Artifacts and Draw taught.
+then Draw (`packages/bb-studio/src/draw`), then Design
+(`packages/bb-studio/src/design`); Talk and Pages follow the same steps. This
+is the checklist, with what Artifacts, Draw and Design taught.
 
 ## Rules
 
@@ -211,9 +212,26 @@ commit, run `bb <old> migrate`, and check the items in Studio
   compact-header capture asserts Chat outside the workspace and its absence
   in the tab row (it also still clicked the removed Related button).
 
-- **Design** sets `handOver={false}` only because cross-plugin URL rewrites
-  broke the desktop tab router. Inside Studio there's no cross-plugin
-  rewrite, so that goes away.
+- **Design** (done) needed no `handOver={false}` inside Studio: its items
+  open as Studio tabs like the others. What it added to the pattern:
+  - An old plugin with several migration statements (Design's `ALTER`s)
+    appends all of them, in order, unchanged (`...DESIGN_MIGRATIONS`).
+  - Side tables that aren't items (saved styles) get their own import RPC
+    (`designs.importStyles`) and their own markers (`migrated-style:<id>`);
+    `migrationStatus` counts them in `total`. A style whose name Studio
+    already uses is skipped with a reason rather than duplicated.
+  - Old content URLs that Studio serves at a new path with the same query
+    (`/http/screen`, `/http/print`) redirect (302) after the copy completes;
+    no bridge RPC needed.
+  - Keep contract schemas plain (`z.string()`, not `z.custom`): the generated
+    Swift type follows the schema, and iOS reads the field as it is.
+  - Realtime: Studio now publishes the kind's channel, so iOS listens for
+    `pluginSignal("studio", "<channel>")` as well as the old plugin id.
+  - Split what app.tsx registers at startup (the reply card, the question
+    form) from the item view and thread tab, which are `lazy`;
+    `frontend-imports.test.ts` checks the canvas stays out.
+  - Design had no CLI; Studio adds `bb studio designs …`, and the bridge
+    registers only `bb design migrate`.
 - **Talk** keeps its own page only to show "set aside" unsent recordings.
   When Talk merges, show those as a banner in Studio's library when it's
   filtered to recordings.

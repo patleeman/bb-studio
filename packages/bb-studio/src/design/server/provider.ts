@@ -1,8 +1,7 @@
-// Design as a Studio add-on: the `studio_*` methods Studio calls to list and
-// manage designs in its collection.
-import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { copyTitle, eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
-import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
+// Designs as a Studio kind: the same `studio_*` provider methods an add-on
+// publishes over RPC, called in-process by Studio's hub (src/hub.ts).
+import { copyTitle, eachId, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
+import { mustGet as requireItem, storeActions, storeSearch, type StudioProviderHandlers } from "@bb-studio/kit/server";
 import { DESIGN_ICON, PLUGIN_ID, designHref } from "../shared";
 import { displayName, type DesignRow, type DesignStore } from "./store";
 
@@ -68,17 +67,14 @@ export function toStudioItem(store: DesignStore, row: DesignRow): StudioItem {
 /** Studio lists at most this many; past it, Studio keeps tags of items it didn't see. */
 const LIST_LIMIT = 10_000;
 
-export function registerStudio(
-  bb: Pick<BbPluginApi, "rpc">,
-  schemas: StudioSchemas,
-  deps: { store: DesignStore; changed(id: string): void },
-): void {
+export function designProvider(deps: { store: DesignStore; changed(id: string): void }): StudioProviderHandlers {
   const { store } = deps;
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Design not found.");
   const item = (id: string) => toStudioItem(store, mustGet(id));
 
-  createStoreProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "designs", kinds: [DESIGN_KIND] }),
+  return {
+    // No panel of its own: the kind's collection is Studio's library filtered to it.
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: null, kinds: [DESIGN_KIND] }),
     studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(store, row)] : []; }) }),
     studio_read: ({ id }) => ({ content: store.get(id) ? designText(store, id) : null }),
     studio_list: () => {
@@ -112,27 +108,31 @@ export function registerStudio(
     studio_action: ({ action }) => {
       throw new Error(`Unknown action "${action}".`);
     },
-  }, {
-    move: (id: string, projectId: string | null) => {
-      mustGet(id);
-      store.setProject(id, projectId);
-      deps.changed(id);
-    },
-    archive: (id: string, archived: boolean) => {
-      mustGet(id);
-      store.setArchived(id, archived);
-      deps.changed(id);
-    },
-    delete: (id: string) => {
-      mustGet(id);
-      store.delete(id);
-      deps.changed(id);
-    },
-  }, {
-    find: (query) => store.list({ limit: LIST_LIMIT })
-      .map((row) => ({ id: row.id, text: `${displayName(row)}\n${designText(store, row.id)}` }))
-      .filter((row) => row.text.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 200),
-    text: (row) => row.text,
-  });
+    studio_template: () => { throw new Error("Designs can't be templates."); },
+    studio_instantiate: () => { throw new Error("Designs can't be templates."); },
+    ...storeActions({
+      move: (id: string, projectId: string | null) => {
+        mustGet(id);
+        store.setProject(id, projectId);
+        deps.changed(id);
+      },
+      archive: (id: string, archived: boolean) => {
+        mustGet(id);
+        store.setArchived(id, archived);
+        deps.changed(id);
+      },
+      delete: (id: string) => {
+        mustGet(id);
+        store.delete(id);
+        deps.changed(id);
+      },
+    }),
+    studio_search: storeSearch({
+      find: (query) => store.list({ limit: LIST_LIMIT })
+        .map((row) => ({ id: row.id, text: `${displayName(row)}\n${designText(store, row.id)}` }))
+        .filter((row) => row.text.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 200),
+      text: (row) => row.text,
+    }),
+  };
 }

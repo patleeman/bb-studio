@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk and Design keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`. Artifacts and drawings are built into Studio: they implement the same contract in-process, keep `artifacts` and `excalidraw` as their item namespaces, and open at `/plugins/studio/studio/artifacts/<id>` and `/plugins/studio/studio/drawings/<id>`. Other add-ons reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes the pattern.
+BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages and Talk keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`. Artifacts, drawings and designs are built into Studio: they implement the same contract in-process, keep `artifacts`, `excalidraw` and `design` as their item namespaces, and open at `/plugins/studio/studio/artifacts/<id>`, `/plugins/studio/studio/drawings/<id>` and `/plugins/studio/studio/designs/<id>`. Other add-ons reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes the pattern.
 
 ## Provider contract
 

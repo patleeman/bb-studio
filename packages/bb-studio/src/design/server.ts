@@ -1,0 +1,705 @@
+// Designs, built into Studio: UI prototypes and slide decks made with agents.
+//
+// A design is a set of rounds; each round holds a few options; each option is
+// one self-contained HTML screen. Agents write screens with the design_* tools,
+// the canvas shows them newest round first, and a reviewer agent checks the
+// work in a hidden thread.
+//
+// This was the Studio Design plugin (id `design`). Its items keep that id as
+// their namespace; its agent tools, skill, mention provider, message
+// directive, question form and thread tab keep their names; and the plugin's
+// last release is an upgrade bridge that copies its rows here (see the
+// bridge methods below and docs/merging-add-ons.md).
+import { studioSchemas } from "@bb-studio/kit/contract";
+import { createChangeBus, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type Database from "better-sqlite3";
+import { randomBytes } from "node:crypto";
+import { z } from "zod";
+import { bridgeContract, rpcContract } from "./contract";
+import { printCsp, printPage } from "./server/print";
+import { applyTextEdit } from "./server/text-edit";
+import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, ROUTE_SEGMENT, SCREEN_ID, VIEWPORT_NAMES, VIEWPORTS, MIN_SIDE, MAX_SIDE, frameSize, parseViewport, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl } from "./shared";
+import { DesignStore, displayName, type Writer } from "./server/store";
+import { designProvider, screenText } from "./server/provider";
+import { designBackupHandlers } from "./server/backup";
+import { withScreenScript } from "./server/screen-script";
+import { VERDICT_DONE, parseVerdict, reviewTargets, reviewerPrompt } from "./server/review";
+import { MAX_REVIEWS_IN_A_ROW, ReviewQueue } from "./server/review-queue";
+import type { CommentRow, DesignRow, ScreenRow } from "./server/store";
+import { MAX_OTHER_CHARS, MAX_TEXT_CHARS, summarizeAnswers, type Answers, type QuestionForm } from "./questions";
+
+const optionSchema = z.object({ label: z.string().trim().min(1).max(120), description: z.string().max(240).optional() });
+const questionSchema = z.discriminatedUnion("kind", [
+  z.object({ id: z.string().min(1).max(40), kind: z.enum(["choice", "multi"]), question: z.string().trim().min(1).max(200), help: z.string().max(300).optional(), options: z.array(optionSchema).min(2).max(8), other: z.boolean().optional().describe("Also offer a free-text \"Other\".") }),
+  z.object({ id: z.string().min(1).max(40), kind: z.literal("text"), question: z.string().trim().min(1).max(200), help: z.string().max(300).optional(), placeholder: z.string().max(120).optional() }),
+  z.object({ id: z.string().min(1).max(40), kind: z.literal("scale"), question: z.string().trim().min(1).max(200), help: z.string().max(300).optional(), minLabel: z.string().trim().min(1).max(40), maxLabel: z.string().trim().min(1).max(40) }),
+]);
+/** What the form sends back; untrusted, so kept to plain values. A multi pick holds up to 8 options plus "Other". */
+export const answersSchema = z.record(z.string().max(40), z.union([z.string().max(MAX_TEXT_CHARS), z.array(z.string().max(MAX_OTHER_CHARS)).max(9), z.number().int().min(1).max(5), z.object({ decide: z.literal(true) })]));
+
+/** Generous for one hand-written screen; keeps a runaway write from filling the database. */
+const MAX_SCREEN_CHARS = 400_000;
+/** A style's CSS: tokens and base rules, not whole screens. */
+const MAX_STYLE_CSS = 40_000;
+/** Above this, design_read lists screens instead of inlining their HTML. */
+const MAX_READ_CHARS = 120_000;
+
+export const DESIGNS_USAGE = [
+  "usage: bb studio designs <command>",
+  "  list                       List designs",
+  "  show <id>                  Print a design's rounds, screens and open comments as JSON",
+  "  html <id> <screen>         Print one screen's HTML",
+  "  rename <id> <new-name>     Rename a design",
+  "  delete <id>                Delete a design",
+].join("\n");
+
+/** Available in every agent session. */
+export const DESIGN_TOOLS = ["design_save_style", "design_styles", "design_list", "design_create", "design_rename", "design_read", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"];
+
+export interface BuiltinDesigns {
+  store: DesignStore;
+  /** Studio's provider methods, which the hub calls in-process. */
+  provider: StudioProviderHandlers;
+  /** Its section of a Studio backup, still named `design`. */
+  backup: BackupHandlers;
+  /** `bb studio designs …` */
+  cli(argv: string[], ctx: { threadId?: string | null; projectId?: string | null }): Promise<{ exitCode: number; stdout?: string; stderr?: string }>;
+  dispose(): void;
+}
+
+/** What the agent receives for a comment: the note, the element, and how to act on it. */
+export function commentMessage(design: Pick<DesignRow, "id" | "name">, comment: CommentRow): string {
+  const name = design.name.trim() || "Untitled design";
+  return [
+    `Comment on screen ${comment.screen_id}${comment.step ? `, step "${comment.step}"` : ""} of the design "${name}" (id ${design.id}, comment ${comment.id}):`,
+    "",
+    ...comment.body.split("\n").map((line) => `> ${line}`),
+    "",
+    `On this element (selector \`${comment.selector}\`):`,
+    "```html",
+    comment.element_html,
+    "```",
+    "",
+    "Change only what the comment asks, with design_edit_screen. Then resolve it with design_resolve_comments.",
+  ].join("\n");
+}
+
+/**
+ * Screens run the agent's HTML and scripts. The sandbox gives them an opaque
+ * origin even when opened directly, so they can't reach BB's cookies, storage
+ * or API. Fonts, images and scripts may load from https (Google Fonts, CDNs).
+ */
+const SCREEN_CSP = [
+  "sandbox allow-scripts allow-forms allow-modals allow-popups",
+  "default-src 'none'",
+  "script-src 'unsafe-inline' https:",
+  "style-src 'unsafe-inline' https:",
+  "img-src data: blob: https:",
+  "font-src data: https:",
+  "media-src data: blob: https:",
+  "connect-src https:",
+].join("; ");
+
+/** Where findings go matches review(): the design's own thread, not necessarily the caller's. */
+export const DESIGN_READY_DESCRIPTION = "Call when a round (or a change) is ready for the user. A separate reviewer checks the screens in the background: it loads them at their size, takes screenshots, and checks layout, errors, steps and the design rules. It only reports back when something needs fixing, and then in the design's own thread (the thread that made the design, which may not be this one). Don't call the work done until then. Pass skipReview for trivial edits (a word, a color).";
+
+/**
+ * A screen as the canvas loads it, with the canvas script added; or, for
+ * Download HTML, the agent's HTML as written, saved as a file.
+ */
+export function screenResponse(screen: Pick<ScreenRow, "id" | "html">, download: boolean): Response {
+  return serveBytes(download ? screen.html : withScreenScript(screen.html), {
+    "content-type": "text/html; charset=utf-8",
+    "content-security-policy": SCREEN_CSP,
+    ...(download ? { "content-disposition": `attachment; filename="${screen.id}.html"` } : {}),
+  });
+}
+
+/** Registers designs' RPC, HTTP routes, agent tools and mention provider on Studio. Studio has run the migrations. */
+export function registerDesign(bb: BbPluginApi, db: Database.Database): BuiltinDesigns {
+  const store = new DesignStore(db);
+  const services = studioServices(bb.sdk);
+  const studio = studioSchemas(z);
+
+  // Agents write a screen at a time; Studio only needs to hear about it now and then.
+  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DESIGN_UPDATE_TYPE, designId: id, updatedAt, by }), delayMs: 1000 });
+  const changed = (id: string, updatedAt: number, by: Writer | "studio") => changeBus.changed(id, updatedAt, by);
+  /** Tells Studio an agent made a design, so it is linked to the thread. */
+  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => {});
+
+  // ---------------------------------------------------------------------
+  // Reviews (src/server/review.ts, src/server/review-queue.ts). The latest per
+  // design lives in memory: a restart forgets it, and the canvas then shows no status.
+  // ---------------------------------------------------------------------
+  /** Bounds a review: a stuck reviewer is stopped, and the round counts as unreviewed. */
+  const REVIEW_TIMEOUT_MS = 15 * 60_000;
+
+  const pausedNote = [
+    `That's ${MAX_REVIEWS_IN_A_ROW} reviews in a row that found problems, so automatic review is paused for this design.`,
+    "Fix what you can, then tell the user plainly: review paused after " + MAX_REVIEWS_IN_A_ROW + " rounds, and what still needs work.",
+    "Don't call design_ready again until the user edits or comments on the design, or asks for another review (then pass userAsked).",
+  ].join(" ");
+  const reviews = new ReviewQueue({
+    publish(designId) {
+      if (store.get(designId)) changed(designId, store.bump(designId, "agent"), "agent");
+    },
+    warn: (message) => bb.log.warn(message),
+    async report(designId, { screenIds, requesterThreadId }, findings, paused) {
+      const row = store.get(designId);
+      if (!row) return;
+      const round = screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
+      await bb.sdk.threads.send({
+        threadId: row.thread_id ?? requesterThreadId,
+        input: [{ type: "text", mentions: [], text: [`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`, "", findings, "", paused ? pausedNote : "Fix them, then call design_ready again."].join("\n") }],
+        mode: "queue-if-active",
+      });
+    },
+    /** Runs one review in a hidden thread beside the design's own. */
+    async run(designId, { screenIds, requesterThreadId }, disposed) {
+      const row = store.get(designId);
+      if (!row) throw new Error("Design not found.");
+      const round = screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
+      let reviewerId: string | null = null;
+      try {
+        const requester = await bb.sdk.threads.get({ threadId: requesterThreadId });
+        const hostId = (await bb.sdk.system.config()).primaryHostId;
+        if (!hostId) throw new Error("This BB server has no local machine to run the reviewer's browser on.");
+        const screens = screenIds.flatMap((id) => {
+          const screen = store.screen(designId, id);
+          return screen ? [{ id, caption: screen.caption, viewport: parseViewport(screen.viewport) ?? "desktop", steps: parseSteps(screen.html), url: screenUrl(designId, id, screen.updated_at) }] : [];
+        });
+        const prompt = reviewerPrompt({
+          designName: displayName(row),
+          designId,
+          round,
+          screens,
+          targets: reviewTargets(bb.server.loopbackBaseUrl, screens),
+          hostId,
+          rules: "The \"Taste rules\" and \"Writing screens\" sections of the design skill. Read the skill first.",
+        });
+        const reviewer = await bb.sdk.threads.spawn({
+          projectId: requester.projectId,
+          environment: { type: "reuse", environmentId: requester.environmentId },
+          providerId: requester.providerId,
+          title: `Review: ${displayName(row)}${round ? `, round ${round}` : ""}`,
+          visibility: "hidden",
+          pluginMetadata: { role: "design-reviewer", designId },
+          prompt,
+        } as Parameters<typeof bb.sdk.threads.spawn>[0]);
+        reviewerId = reviewer.id;
+        const signal = AbortSignal.any([disposed, AbortSignal.timeout(REVIEW_TIMEOUT_MS)]);
+        // Wait for it to start, then to finish; a fast reviewer may already be done.
+        await bb.sdk.threads.wait({ threadId: reviewer.id, status: "active", timeoutMs: 60_000, signal }).catch(() => undefined);
+        await bb.sdk.threads.wait({ threadId: reviewer.id, status: "idle", signal });
+        const { output } = await bb.sdk.threads.output({ threadId: reviewer.id });
+        const { verdict, findings } = parseVerdict(output ?? "");
+        if (verdict === "needs_work") return { verdict, findings };
+        if (verdict === "done") return { verdict };
+        throw new Error(`The reviewer ended without a verdict (expected "${VERDICT_DONE}" or "needs_work").`);
+      } finally {
+        // Hidden workers must always be released, or the agent process lingers.
+        if (reviewerId) {
+          await bb.sdk.threads.archive({ threadId: reviewerId }).catch(() => undefined);
+          await bb.sdk.threads.stop({ threadId: reviewerId }).catch(() => undefined);
+        }
+      }
+    },
+  });
+
+  /** Posts a comment to the design's conversation; it waits for a running turn instead of cutting in. */
+  async function sendToThread(row: DesignRow, comment: CommentRow) {
+    await bb.sdk.threads.send({ threadId: row.thread_id!, input: [{ type: "text", text: commentMessage(row, comment), mentions: [] }], mode: "queue-if-active" });
+    store.markSent(comment.id);
+  }
+
+  bb.rpc.register(rpcContract, {
+    "designs.getDesign"({ id }) {
+      const view = store.view(id);
+      return { design: view ? { ...view, review: reviews.state(id) } : null };
+    },
+    "designs.renameDesign"({ id, name }) {
+      if (!store.get(id)) throw new Error("Design not found.");
+      const updatedAt = store.rename(id, name.trim(), "editor");
+      reviews.userChanged(id);
+      changed(id, updatedAt, "editor");
+      return { ok: true, updatedAt };
+    },
+    "designs.deleteDesign"({ id }) {
+      reviews.forget(id);
+      if (store.delete(id)) changed(id, Date.now(), "app");
+      return { ok: true };
+    },
+    async "designs.addComment"({ designId, screenId, step, selector, elementHtml, elementText, body, send }) {
+      const row = store.get(designId);
+      if (!row) throw new Error("Design not found.");
+      if (!store.screen(designId, screenId)) throw new Error(`Screen ${screenId} not found.`);
+      if (send && !row.thread_id) throw new Error("This design has no conversation yet. Start one with Chat, then send the comment.");
+      const comment = store.addComment(designId, { screenId, step, selector, elementHtml, elementText, body });
+      reviews.userChanged(designId);
+      if (send) await sendToThread(row, comment);
+      changed(designId, store.bump(designId, "editor"), "editor");
+      return { id: comment.id, sent: send };
+    },
+    "designs.editText"({ designId, screenId, before, after }) {
+      const screen = store.screen(designId, screenId);
+      if (!screen) throw new Error("Screen not found.");
+      const edit = applyTextEdit(screen.html, before, after);
+      if (!edit.ok) return edit;
+      if (edit.html.length > MAX_SCREEN_CHARS) throw new Error("The screen would be too large.");
+      const updatedAt = store.writeScreen(designId, { id: screenId, html: edit.html }, "editor");
+      reviews.userChanged(designId);
+      changed(designId, updatedAt, "editor");
+      return { ok: true };
+    },
+    async "designs.sendComment"({ id }) {
+      const comment = store.comment(id);
+      const row = comment ? store.get(comment.design_id) : null;
+      if (!comment || !row) throw new Error("Comment not found.");
+      if (!row.thread_id) throw new Error("This design has no conversation yet. Start one with Chat, then send the comment.");
+      await sendToThread(row, comment);
+      reviews.userChanged(row.id);
+      changed(row.id, store.bump(row.id, "editor"), "editor");
+      return { ok: true };
+    },
+    "designs.resolveComment"({ id, resolved }) {
+      const comment = store.comment(id);
+      if (!comment) throw new Error("Comment not found.");
+      store.setResolved(id, resolved);
+      reviews.userChanged(comment.design_id);
+      changed(comment.design_id, store.bump(comment.design_id, "editor"), "editor");
+      return { ok: true };
+    },
+    "designs.deleteComment"({ id }) {
+      const comment = store.comment(id);
+      if (!comment) return { ok: true };
+      store.deleteComment(id);
+      reviews.userChanged(comment.design_id);
+      changed(comment.design_id, store.bump(comment.design_id, "editor"), "editor");
+      return { ok: true };
+    },
+  });
+
+  /** What an `@design` mention gives the agent: the design's rounds and options. */
+  function mentionContext(itemId: string): string {
+    const view = store.view(itemId);
+    if (!view) throw new Error(`Design ${itemId} not found`);
+    const rounds = view.rounds.map((round) => [
+      `Round ${round.round}${round.title ? `: ${round.title}` : ""}`,
+      ...round.screens.map((screen) => `- ${screen.id} (${screen.viewport})${screen.caption ? `: ${screen.caption}` : ""}`),
+    ].join("\n"));
+    return [
+      `Design "${displayName(view)}" (id ${view.id}, link ${designHref(view.id)}).`,
+      rounds.length ? rounds.join("\n\n") : "It has no screens yet.",
+      "Read its HTML with design_read before changing it.",
+    ].join("\n\n");
+  }
+
+  /** Studio changed or deleted a design: a deleted design's reviews are forgotten. */
+  const studioChanged = (id: string) => {
+    if (!store.get(id)) reviews.forget(id);
+    else reviews.userChanged(id);
+    changed(id, store.get(id)?.updated_at ?? Date.now(), "studio");
+  };
+
+  bb.rpc.register(bridgeContract, {
+    "designs.importRows"({ designs }) {
+      const imported: string[] = [];
+      const existing: string[] = [];
+      const skipped: { id: string; reason: string }[] = [];
+      for (const item of designs) {
+        const result = store.importDesign(item);
+        if (result.outcome === "imported") imported.push(item.id);
+        else if (result.outcome === "existing") existing.push(item.id);
+        else if ("reason" in result) skipped.push({ id: item.id, reason: result.reason });
+      }
+      for (const id of imported) changed(id, store.get(id)?.updated_at ?? Date.now(), "studio");
+      return { imported, existing, skipped };
+    },
+    "designs.importStyles"({ styles }) {
+      const imported: string[] = [];
+      const existing: string[] = [];
+      const skipped: { id: string; reason: string }[] = [];
+      for (const item of styles) {
+        const result = store.importStyle(item);
+        if (result.outcome === "imported") imported.push(item.id);
+        else if (result.outcome === "existing") existing.push(item.id);
+        else if ("reason" in result) skipped.push({ id: item.id, reason: result.reason });
+      }
+      return { imported, existing, skipped };
+    },
+    "designs.mentionContext": ({ id }) => ({ context: mentionContext(id) }),
+  });
+
+  // One screen's HTML, for the canvas frames and the reviewer's browser. The
+  // URL carries the design's revision, so a cached response never goes stale.
+  bb.http.route("GET", `/${ROUTE_SEGMENT}/screen`, (context) => {
+    const screen = store.screen(context.req.query("design") ?? "", context.req.query("screen") ?? "");
+    if (!screen) return context.text("Not found", 404);
+    return screenResponse(screen, context.req.query("download") === "1");
+  });
+
+  // Export to PDF (src/server/print.ts): every step of a screen, a page each.
+  bb.http.route("GET", `/${ROUTE_SEGMENT}/print`, (context) => {
+    const designId = context.req.query("design") ?? "";
+    const row = store.get(designId);
+    const screen = store.screen(designId, context.req.query("screen") ?? "");
+    if (!row || !screen) return context.text("Not found", 404);
+    const steps = parseSteps(screen.html);
+    const url = screenUrl(designId, screen.id, screen.updated_at);
+    const frames = steps.length ? steps.map((step) => ({ url: `${url}#${encodeURIComponent(step.id)}`, label: step.label })) : [{ url, label: screen.caption || screen.id }];
+    const nonce = randomBytes(16).toString("base64");
+    return serveBytes(printPage({ title: `${displayName(row)} ${screen.id}`, ...frameSize(screen.viewport), frames, nonce }), {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": printCsp(nonce),
+      "cache-control": "no-store",
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Agent tools. The design method itself lives in skills/design/SKILL.md.
+  // ---------------------------------------------------------------------
+
+  const notFound = (id: string) => ({ content: [{ type: "text" as const, text: `Design ${id} not found.` }], isError: true });
+  const fail = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
+  const link = (id: string, name: string) => `[${name.replace(/[[\]]/g, "")}](${designHref(id)})`;
+  /** The reply card that opens the design in the user's workbench. */
+  const card = (id: string) => `Put this line on its own in your reply so the user can open the design beside the chat:\n::design{id="${id}"}`;
+  const screenIdSchema = z.string().regex(SCREEN_ID, 'A round number and an option letter, like "1a" or "2b".');
+
+  bb.agents.registerTool({
+    name: "design_list",
+    description: "List the user's designs (id, name, screen count, last updated). Use when the user refers to an existing design.",
+    presentation: { label: { pending: "Listing designs", completed: "Listed designs" } },
+    parameters: z.object({}),
+    execute() {
+      const rows = store.list({ limit: 100 });
+      if (!rows.length) return "No designs yet. Use design_create to make one.";
+      return `Designs:\n${rows.map((row) => `- ${displayName(row)} (id ${row.id}): ${store.screens(row.id).length} screen(s), updated ${new Date(row.updated_at).toISOString()}, link ${designHref(row.id)}`).join("\n")}`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_create",
+    description: "Create an empty design in the current project and return its id and link. Designs hold UI prototypes or slide decks. Follow the design skill before writing its first screen.",
+    instructions: "For UI design work (prototypes, screens, flows) and for slides and slide decks, use the design_* tools and follow the design skill.",
+    presentation: { label: { pending: "Creating a design", completed: "Created a design" } },
+    parameters: z.object({ name: z.string().min(1).max(200) }),
+    execute({ name }, ctx) {
+      const row = store.create({ name, projectId: ctx.projectId ?? null, by: "agent" });
+      if (ctx.threadId) store.setThread(row.id, ctx.threadId);
+      changed(row.id, row.updated_at, "agent");
+      if (ctx.threadId) created(row.id, ctx.threadId);
+      return `Created design "${name}" (id ${row.id}). Link: ${link(row.id, name)}\n${card(row.id)}`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_rename",
+    description: "Rename a design. Give a new design a short, specific name once you know what it is (\"Forkful onboarding\", not \"Design\").",
+    presentation: { label: { pending: "Renaming a design", completed: "Renamed a design" } },
+    parameters: z.object({ designId: z.string().min(1), name: z.string().trim().min(1).max(200) }),
+    execute({ designId, name }) {
+      if (!store.get(designId)) return notFound(designId);
+      changed(designId, store.rename(designId, name, "agent"), "agent");
+      return `Renamed the design to "${name}".`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_read",
+    description: "Read a design: its rounds, each option's id, caption and frame size, and the HTML of the screens you name (or of the newest round when you name none). Call it before editing so you see the latest version.",
+    presentation: { label: { pending: "Reading a design", completed: "Read a design" } },
+    parameters: z.object({
+      designId: z.string().min(1),
+      screenIds: z.array(screenIdSchema).max(12).optional(),
+    }),
+    execute({ designId, screenIds }) {
+      const view = store.view(designId);
+      if (!view) return notFound(designId);
+      const wanted = screenIds?.length ? screenIds : view.rounds[0]?.screens.map((screen) => screen.id) ?? [];
+      const html = Object.fromEntries(wanted.flatMap((id) => {
+        const screen = store.screen(designId, id);
+        return screen ? [[id, screen.html]] : [];
+      }));
+      const payload = JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) }, html }, null, 2);
+      if (payload.length <= MAX_READ_CHARS) return payload;
+      return [
+        JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) } }, null, 2),
+        `The HTML of ${wanted.join(", ")} is ${payload.length} characters, too large to inline. Read fewer screens at a time with screenIds.`,
+      ].join("\n\n");
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_write_screen",
+    description: "Create or replace one screen of a design. The screen id names its round and option: \"1a\" is round 1, option a. Start a new round with a new number; keep earlier rounds unchanged. Pass a complete, self-contained HTML document. For a slide deck, write the whole deck as one screen at viewport \"slide\" with one step per slide. For a multi-step prototype, declare its steps so the canvas splays them out side by side: <meta name=\"bb-design-steps\" content=\"welcome=Welcome; address=Delivery address\">, and open the prototype at the step named by location.hash (#address), on load and on hashchange. The user's open canvas updates live.",
+    presentation: { label: { pending: "Writing a screen", completed: "Wrote a screen" } },
+    parameters: z.object({
+      designId: z.string().min(1),
+      screenId: screenIdSchema,
+      html: z.string().min(1).max(MAX_SCREEN_CHARS),
+      caption: z.string().max(300).optional().describe("One line on what this option tries, shown above its frame."),
+      viewport: z.string().optional().describe(`Frame size on the canvas. Defaults to desktop. A preset: ${VIEWPORT_NAMES.map((name) => `${name} (${VIEWPORTS[name].width}×${VIEWPORTS[name].height})`).join(", ")}. Use slide for presentation slides and decks. Or any size as "WIDTHxHEIGHT", ${MIN_SIDE}–${MAX_SIDE} px a side, like "1200x630" for a link preview.`),
+      roundTitle: z.string().max(200).optional().describe("Sets the round's heading."),
+      roundIntro: z.string().max(2000).optional().describe("Sets the round's short intro: what this round explores and how the options differ."),
+    }),
+    execute({ designId, screenId, html, caption, viewport: size, roundTitle, roundIntro }, ctx) {
+      const row = store.get(designId);
+      if (!row) return notFound(designId);
+      const viewport = size === undefined ? undefined : parseViewport(size);
+      if (viewport === null) return fail(`"${size}" isn't a frame size. Use a preset (${VIEWPORT_NAMES.join(", ")}) or "WIDTHxHEIGHT" with sides of ${MIN_SIDE}–${MAX_SIDE} px.`);
+      // A design written from a thread shows that thread beside its canvas.
+      if (!row.thread_id && ctx.threadId) {
+        store.setThread(designId, ctx.threadId);
+        created(designId, ctx.threadId);
+      }
+      const existed = store.screen(designId, screenId) !== null;
+      let updatedAt = store.writeScreen(designId, { id: screenId, html, caption, viewport }, "agent");
+      if (roundTitle !== undefined || roundIntro !== undefined)
+        updatedAt = store.setRound(designId, Number(screenId.slice(0, -1)), { title: roundTitle, intro: roundIntro }, "agent");
+      changed(designId, updatedAt, "agent");
+      const steps = parseSteps(html);
+      const unnamed = !row.name.trim() ? `\nThis design has no name yet: give it a short, specific one with design_rename.` : "";
+      return `${existed ? "Replaced" : "Added"} screen ${screenId} in "${displayName(row)}" (${screenText(html).length} characters of text${steps.length ? `, ${steps.length} steps: ${steps.map((step) => `#${step.id}`).join(", ")}` : ""}). The user's open canvas shows it now.${unnamed}\n${card(designId)}`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_edit_screen",
+    description: "Make a targeted change to one screen: replace an exact snippet of its HTML. The snippet must appear exactly once; include enough surrounding markup to make it unique. Prefer this over design_write_screen for small requests, so nothing else changes.",
+    presentation: { label: { pending: "Editing a screen", completed: "Edited a screen" } },
+    parameters: z.object({
+      designId: z.string().min(1),
+      screenId: screenIdSchema,
+      find: z.string().min(1),
+      replace: z.string(),
+    }),
+    execute({ designId, screenId, find, replace }) {
+      const row = store.get(designId);
+      if (!row) return notFound(designId);
+      const screen = store.screen(designId, screenId);
+      if (!screen) return fail(`Screen ${screenId} not found in "${displayName(row)}". Read the design with design_read.`);
+      const first = screen.html.indexOf(find);
+      if (first < 0) return fail(`The snippet isn't in screen ${screenId}. Read it again with design_read; the user or another edit may have changed it.`);
+      if (screen.html.indexOf(find, first + 1) >= 0) return fail("The snippet appears more than once. Include more surrounding markup so it matches one place.");
+      const html = screen.html.slice(0, first) + replace + screen.html.slice(first + find.length);
+      if (html.length > MAX_SCREEN_CHARS) return fail(`The screen would be over ${MAX_SCREEN_CHARS} characters.`);
+      const updatedAt = store.writeScreen(designId, { id: screenId, html }, "agent");
+      changed(designId, updatedAt, "agent");
+      return `Edited screen ${screenId} in "${displayName(row)}". The user's open canvas shows it now.`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_ask",
+    description: "Ask the user a short form of questions before designing, when the answers would change what you build and you can't find them yourself: the look is open (no design system, references or art direction), or the brief leaves out the platform, audience or flows. One round, at most 12 questions; never ask what the chat already settled, and don't ask for small follow-up edits. Kinds: choice (one option), multi (several), text (short answer), scale (1 to 5 between two labels). Every question gets a \"Decide for me\". The user's answers come back as this tool's result.",
+    presentation: { label: { pending: "Waiting for answers", completed: "Got answers" } },
+    parameters: z.object({
+      title: z.string().trim().min(1).max(120).optional().describe("Defaults to \"A few questions\"."),
+      intro: z.string().max(400).optional().describe("One sentence on why you're asking."),
+      questions: z.array(questionSchema).min(1).max(12),
+    }),
+    async execute({ title, intro, questions }, ctx) {
+      if (!ctx.threadId) return fail("Questions need a thread to show in.");
+      const ids = questions.map((question) => question.id);
+      if (new Set(ids).size !== ids.length) return fail("Each question needs its own id.");
+      const form: QuestionForm = { title: title ?? "A few questions", ...(intro ? { intro } : {}), questions };
+      const result = await bb.ui.requestInput({
+        threadId: ctx.threadId,
+        rendererId: QUESTIONS_RENDERER,
+        title: form.title,
+        payload: form as never,
+        // People think about these; give them the longest the host allows.
+        timeoutMs: 60 * 60_000,
+        presentation: { label: { pending: "Waiting for your answers", completed: "Questions answered" } },
+        describeSubmission: (value) => {
+          const parsed = answersSchema.safeParse(value);
+          return { title: "Questions answered", detail: parsed.success ? summarizeAnswers(form, parsed.data as Answers) : undefined };
+        },
+      }, { signal: ctx.signal });
+      if (result.outcome === "cancelled") return "The user closed the questions without answering. Go ahead with sensible defaults and list the assumptions you made.";
+      const parsed = answersSchema.safeParse(result.value);
+      if (!parsed.success) return fail("The answers didn't come back in a readable form. Ask again, or go ahead with sensible defaults.");
+      return `Questions answered:\n${summarizeAnswers(form, parsed.data as Answers)}\n\nUse these answers; for "you decide", choose well and say what you chose.`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_ready",
+    description: DESIGN_READY_DESCRIPTION,
+    presentation: { label: { pending: "Sending for review", completed: "Sent for review" } },
+    parameters: z.object({
+      designId: z.string().min(1),
+      screenIds: z.array(screenIdSchema).max(12).optional().describe("Defaults to the newest round."),
+      skipReview: z.boolean().optional(),
+      userAsked: z.boolean().optional().describe("Set only when the user's own message asks for another review after review paused."),
+    }),
+    execute({ designId, screenIds, skipReview, userAsked }, ctx) {
+      const view = store.view(designId);
+      if (!view) return notFound(designId);
+      const ids = screenIds?.length ? screenIds : view.rounds[0]?.screens.map((screen) => screen.id) ?? [];
+      const missing = ids.filter((id) => !store.screen(designId, id));
+      if (!ids.length) return fail("The design has no screens to review yet.");
+      if (missing.length) return fail(`Not in this design: ${missing.join(", ")}.`);
+      if (skipReview) return `Marked ready without a review.\n${card(designId)}`;
+      if (!ctx.threadId) return fail("A review needs a thread to report back to.");
+      const outcome = reviews.request(designId, { screenIds: ids, requesterThreadId: ctx.threadId }, { userAsked });
+      if (outcome === "paused") return `Automatic review is paused for this design: the last ${MAX_REVIEWS_IN_A_ROW} reviews in a row found problems. Tell the user plainly what still needs work. Call design_ready again only after the user edits or comments on the design, or asks for another review (then pass userAsked).`;
+      if (outcome === "disposed") return fail("Studio Design is reloading; call design_ready again in a moment.");
+      if (outcome === "queued") return `A review of this design is already running. Once it ends, ${ids.join(", ")} are reviewed again as they are then; findings come back only if something needs fixing.\n${card(designId)}`;
+      return `Sent ${ids.join(", ")} for review. The reviewer reports back only if something needs fixing, in the design's own thread (the one that made it, which may not be this one); until then, say the work is out for review, not done. Keep your summary short.\n${card(designId)}`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_comments",
+    description: "List the comments the user pinned to elements of a design's screens: each comment's id, screen, the element's selector and markup, and the note. Open comments only unless includeResolved is set.",
+    presentation: { label: { pending: "Reading comments", completed: "Read comments" } },
+    parameters: z.object({ designId: z.string().min(1), includeResolved: z.boolean().optional() }),
+    execute({ designId, includeResolved }) {
+      const row = store.get(designId);
+      if (!row) return notFound(designId);
+      const comments = store.comments(designId, { includeResolved });
+      if (!comments.length) return `"${displayName(row)}" has no ${includeResolved ? "" : "open "}comments.`;
+      return comments.map((comment) => [commentMessage(row, comment).split("\n\nChange only")[0], comment.resolved_at ? "(resolved)" : ""].join("\n")).join("\n\n---\n\n");
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_resolve_comments",
+    description: "Mark comments resolved once you've made the change they asked for. Their pins leave the canvas.",
+    presentation: { label: { pending: "Resolving comments", completed: "Resolved comments" } },
+    parameters: z.object({ designId: z.string().min(1), commentIds: z.array(z.string().min(1)).min(1).max(100) }),
+    execute({ designId, commentIds }) {
+      if (!store.get(designId)) return notFound(designId);
+      const missing = commentIds.filter((id) => store.comment(id)?.design_id !== designId);
+      for (const id of commentIds) if (!missing.includes(id)) store.setResolved(id, true);
+      changed(designId, store.bump(designId, "agent"), "agent");
+      return missing.length ? `Resolved ${commentIds.length - missing.length}; not in this design: ${missing.join(", ")}.` : `Resolved ${commentIds.length} comment(s).`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_save_style",
+    description: "Save the look of a design as a named style, so later designs and decks can start from it: after the user picks a direction, or when they ask to reuse a look. Saving under a name that exists updates that style.",
+    presentation: { label: { pending: "Saving a style", completed: "Saved a style" } },
+    parameters: z.object({
+      name: z.string().trim().min(1).max(80).describe("Short and specific: \"Forkful editorial\", not \"Style 1\"."),
+      notes: z.string().trim().min(1).max(4000).describe("The system in words: fonts and their roles, colors and their roles, type scale, spacing and grid, and the rules that make it this look."),
+      css: z.string().trim().min(1).max(MAX_STYLE_CSS).describe("The CSS that carries it, ready to paste into a screen's <style>: font @import lines, :root custom properties, and base rules for type and layout. No page-specific rules."),
+      designId: z.string().optional().describe("The design it comes from."),
+      screenId: screenIdSchema.optional().describe("The option it comes from, like \"1b\"."),
+    }),
+    execute({ name, notes, css, designId, screenId }) {
+      if (designId && !store.get(designId)) return notFound(designId);
+      const existed = store.styles().some((style) => style.name.toLowerCase() === name.toLowerCase());
+      const style = store.saveStyle({ name, notes, css, designId, screenId });
+      return `${existed ? "Updated" : "Saved"} the style "${style.name}" (id ${style.id}). Later designs can start from it with design_styles.`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "design_styles",
+    description: "List the user's saved styles, or read one in full (its notes and CSS) by id. Check before a new design or deck: when there are styles, offer them as a starting point.",
+    presentation: { label: { pending: "Reading styles", completed: "Read styles" } },
+    parameters: z.object({
+      styleId: z.string().optional().describe("Read this style in full."),
+      deleteStyleId: z.string().optional().describe("Delete this style. Only when the user asks."),
+    }),
+    execute({ styleId, deleteStyleId }) {
+      if (deleteStyleId) return store.deleteStyle(deleteStyleId) ? "Deleted the style." : fail(`Style ${deleteStyleId} not found.`);
+      if (styleId) {
+        const style = store.style(styleId);
+        if (!style) return fail(`Style ${styleId} not found.`);
+        return [`Style "${style.name}" (id ${style.id})${style.source_design_id ? `, from design ${style.source_design_id}${style.source_screen_id ? ` option ${style.source_screen_id}` : ""}` : ""}.`, "", style.notes, "", "```css", style.css, "```"].join("\n");
+      }
+      const styles = store.styles();
+      if (!styles.length) return "No saved styles yet. Save one with design_save_style after the user picks a direction.";
+      return `Saved styles:\n${styles.map((style) => `- ${style.name} (id ${style.id}): ${style.notes.split("\n")[0]!.slice(0, 160)}`).join("\n")}\n\nRead one in full with styleId before using it.`;
+    },
+  });
+
+  // Studio calls bb.agents.configure once, with DESIGN_TOOLS (BB allows one configuration per plugin).
+
+  // `@design` in any composer: the agent gets the design's rounds and its newest screens' text.
+  bb.ui.registerMentionProvider(defineItemMention({
+    id: "design",
+    label: "Designs",
+    search({ query }) {
+      const q = query.trim().toLowerCase();
+      return store
+        .list({ limit: 50 })
+        .filter((row) => !q || displayName(row).toLowerCase().includes(q))
+        .map((row) => ({ id: row.id, title: displayName(row), subtitle: `${store.screens(row.id).length} screens` }));
+    },
+    resolve: (itemId) => ({ context: mentionContext(itemId) }),
+  }));
+
+  // CLI: `bb studio designs …`. A plugin registers one CLI command, and
+  // Studio's is `studio`.
+  async function cli(argv: string[], ctx: { threadId?: string | null; projectId?: string | null }): Promise<{ exitCode: number; stdout?: string; stderr?: string }> {
+    const [cmd, ...rest] = argv;
+    const missing = (id: string) => ({ exitCode: 1, stderr: `Design ${id} not found\n` });
+    switch (cmd) {
+      case "list": {
+        const rows = store.list();
+        if (!rows.length) return { exitCode: 0, stdout: "No designs yet.\n" };
+        return { exitCode: 0, stdout: `${rows.map((row) => `${row.id}\t${displayName(row)}\t${store.screens(row.id).length} screens\t${new Date(row.updated_at).toISOString()}`).join("\n")}\n` };
+      }
+      case "show": {
+        const [id] = rest;
+        if (!id) return { exitCode: 1, stderr: "usage: bb studio designs show <id>\n" };
+        const view = store.view(id);
+        if (!view) return missing(id);
+        return { exitCode: 0, stdout: `${JSON.stringify({ ...view, name: displayName(view), link: designHref(id), review: reviews.state(id) }, null, 2)}\n` };
+      }
+      case "html": {
+        const [id, screenId] = rest;
+        if (!id || !screenId) return { exitCode: 1, stderr: "usage: bb studio designs html <id> <screen>\n" };
+        if (!store.get(id)) return missing(id);
+        const screen = store.screen(id, screenId);
+        if (!screen) return { exitCode: 1, stderr: `Screen ${screenId} not found in ${id}\n` };
+        return { exitCode: 0, stdout: screen.html.endsWith("\n") ? screen.html : `${screen.html}\n` };
+      }
+      case "rename": {
+        const [id, ...parts] = rest;
+        const name = parts.join(" ").trim();
+        if (!id || !name) return { exitCode: 1, stderr: "usage: bb studio designs rename <id> <new-name>\n" };
+        if (!store.get(id)) return missing(id);
+        changed(id, store.rename(id, name, "cli"), "cli");
+        return { exitCode: 0, stdout: `renamed ${id} → ${name}\n` };
+      }
+      case "delete": {
+        const [id] = rest;
+        if (!id) return { exitCode: 1, stderr: "usage: bb studio designs delete <id>\n" };
+        if (!store.get(id)) return missing(id);
+        reviews.forget(id);
+        if (store.delete(id)) changed(id, Date.now(), "cli");
+        return { exitCode: 0, stdout: `deleted ${id}\n` };
+      }
+      default:
+        void ctx;
+        return { exitCode: 1, stderr: `${DESIGNS_USAGE}\n` };
+    }
+  }
+
+  return {
+    store,
+    provider: designProvider({ store, changed: studioChanged }),
+    // `bb studio backup` / `bb studio restore` (src/design/server/backup.ts).
+    backup: designBackupHandlers({
+      db,
+      store,
+      changed: (id, updatedAt) => {
+        reviews.forget(id);
+        changed(id, updatedAt, "studio");
+      },
+    }),
+    cli,
+    dispose: () => {
+      reviews.dispose();
+      changeBus.dispose();
+    },
+  };
+}

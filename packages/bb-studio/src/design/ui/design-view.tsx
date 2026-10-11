@@ -1,59 +1,16 @@
 // One design's canvas, shown in two places: full screen in the main area
-// (opened from Studio or the Designs panel) and as the Design tab in a
+// (a Studio tab) and as the Design tab in a
 // thread's workbench, beside the conversation. Rounds stack newest first;
 // each round's options sit in a row, each a sandboxed frame of its screen at
 // the size it was designed for.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { BarTitle, ICON_BUTTON, Icon, ItemHeader, cn } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
-import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import type { rpcContract } from "../server";
-import { DESIGN_UPDATE_TYPE, REALTIME_CHANNEL, frameSize, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../src/shared";
+import { frameSize, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../shared";
+import { useDesign } from "./use-design";
 import { Canvas, type CanvasApi } from "./canvas";
 import { CommentPopover, DraftPopover, Pins, useComments, type Rect } from "./comments";
 import { PlayView } from "./play-view";
-
-/** Loads a design and follows its changes. `design` is undefined while loading and null once deleted. */
-export function useDesign(designId: string) {
-  const rpc = useRpc<typeof rpcContract>();
-  const [design, setDesign] = useState<DesignView | null | undefined>(undefined);
-  /** Only the newest load wins when changes arrive quickly. */
-  const latest = useRef(0);
-  const seen = useRef(0);
-
-  const load = useCallback(async () => {
-    const ticket = ++latest.current;
-    try {
-      const { design: next } = await rpc.call("getDesign", { id: designId });
-      if (ticket !== latest.current) return;
-      seen.current = next?.updatedAt ?? 0;
-      setDesign(next);
-    } catch (error) {
-      if (ticket === latest.current) toast.error(errorMessage(error));
-    }
-  }, [designId, rpc]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  useRealtime(REALTIME_CHANNEL, (payload) => {
-    const event = payload as { type?: string; designId?: string; updatedAt?: number } | null;
-    if (event?.type !== DESIGN_UPDATE_TYPE || event.designId !== designId) return;
-    if (event.updatedAt !== undefined && event.updatedAt <= seen.current) return;
-    void load();
-  });
-
-  const rename = useCallback((next: string) => {
-    const name = next.trim();
-    setDesign((current) => {
-      if (!current || name === current.name.trim()) return current;
-      void rpc.call("renameDesign", { id: designId, name }).catch((error) => toast.error(errorMessage(error)));
-      return { ...current, name };
-    });
-  }, [designId, rpc]);
-
-  return { design, rename };
-}
 
 /** The main-area view: Studio's item header over the full-screen canvas. */
 export function DesignPage({ designId, backLabel, onBack }: { designId: string; backLabel: string; onBack(replace?: boolean): void }) {

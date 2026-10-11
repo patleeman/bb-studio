@@ -119,7 +119,7 @@ describe("the automatic review cap", () => {
 
 describe("design_ready's description", () => {
   it("says findings go to the design's own thread, as they do", async () => {
-    const { DESIGN_READY_DESCRIPTION } = await import("../../server");
+    const { DESIGN_READY_DESCRIPTION } = await import("../server");
     expect(DESIGN_READY_DESCRIPTION).toContain("in the design's own thread");
     expect(DESIGN_READY_DESCRIPTION).not.toContain("in this thread");
   });

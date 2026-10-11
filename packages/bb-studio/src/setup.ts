@@ -5,6 +5,7 @@
 // command that does the same, for when the SDK call fails.
 import { ARTIFACTS_BRIDGE_VERSION, bridgeStatusContract } from "@bb-studio/kit/artifacts-contract";
 import { DRAW_BRIDGE_VERSION } from "@bb-studio/kit/draw-contract";
+import { DESIGN_BRIDGE_VERSION } from "@bb-studio/kit/design-contract";
 import type { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
 import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
@@ -132,6 +133,18 @@ export const RETIRED: readonly RetiredPlugin[] = [
       step("Copy its drawings into Studio, and wait for Migration complete.", "bb excalidraw migrate"),
     ],
     blocker: bridgeBlocker("drawings", DRAW_BRIDGE_VERSION),
+  },
+  {
+    id: "design",
+    name: "Studio Design",
+    why: "Designs are built into Studio now. This last release is only an upgrade bridge: it copies your designs and saved styles into Studio and forwards older clients.",
+    kept: "Every design it copied into Studio, with its rounds, screens, comments, conversation, tags and links, and your saved styles. Links to /plugins/design/designs/<id> still open them in Studio.",
+    deleted: `${REMOVED} Any rows \`bb design migrate\` listed as skipped are lost; copy what you need from them first. iOS app builds from before the merge stop opening designs.`,
+    before: [
+      step("Update Studio and Studio Design.", "bb plugin update studio --yes && bb plugin update design --yes"),
+      step("Copy its designs into Studio, and wait for Migration complete.", "bb design migrate"),
+    ],
+    blocker: bridgeBlocker("designs", DESIGN_BRIDGE_VERSION),
   },
   {
     id: "studio-navigation",

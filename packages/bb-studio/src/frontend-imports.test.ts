@@ -50,6 +50,10 @@ describe("frontend bundle", () => {
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => spec === "@get-bb/plugin-sdk")).toEqual([]);
   });
 
+  it("loads the design canvas only when a design opens", () => {
+    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(design-view|canvas|play-view|comments)$/.test(spec))).toEqual([]);
+  });
+
   it("loads Excalidraw only when a drawing opens", () => {
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => spec.startsWith("@excalidraw/"))).toEqual([]);
   });

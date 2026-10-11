@@ -89,6 +89,14 @@ public enum Studio {
     public static let drawings_deleteDrawing = "drawings.deleteDrawing"
     public static let drawings_attachDrawingImage = "drawings.attachDrawingImage"
     public static let drawings_pickDrawing = "drawings.pickDrawing"
+    public static let designs_getDesign = "designs.getDesign"
+    public static let designs_renameDesign = "designs.renameDesign"
+    public static let designs_deleteDesign = "designs.deleteDesign"
+    public static let designs_addComment = "designs.addComment"
+    public static let designs_editText = "designs.editText"
+    public static let designs_sendComment = "designs.sendComment"
+    public static let designs_resolveComment = "designs.resolveComment"
+    public static let designs_deleteComment = "designs.deleteComment"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -282,6 +290,22 @@ public enum Studio {
   public typealias DrawingsAttachDrawingImage = DrawingsAttachDrawingImageOutput
 
   public typealias DrawingsPickDrawing = DrawingsPickDrawingOutput
+
+  public typealias DesignsGetDesign = DesignsGetDesignOutput
+
+  public typealias DesignsRenameDesign = DesignsRenameDesignOutput
+
+  public typealias DesignsDeleteDesign = DesignsDeleteDesignOutput
+
+  public typealias DesignsAddComment = DesignsAddCommentOutput
+
+  public typealias DesignsEditText = DesignsEditTextOutput
+
+  public typealias DesignsSendComment = DesignsSendCommentOutput
+
+  public typealias DesignsResolveComment = DesignsResolveCommentOutput
+
+  public typealias DesignsDeleteComment = DesignsDeleteCommentOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -6066,6 +6090,329 @@ public enum Studio {
 
     public init(drawingId: String? = nil) {
       self.drawingId = drawingId
+    }
+  }
+
+  public struct DesignsGetDesignInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DesignsGetDesignOutputDesignRoundsItemScreensItemStepsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct DesignsGetDesignOutputDesignRoundsItemScreensItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var round: Double?
+    public var option: String?
+    public var title: String?
+    public var caption: String?
+    public var viewport: String?
+    public var updatedAt: Double?
+    public var steps: [DesignsGetDesignOutputDesignRoundsItemScreensItemStepsItem]?
+    public var url: String?
+
+    public init(id: String? = nil, round: Double? = nil, option: String? = nil, title: String? = nil, caption: String? = nil, viewport: String? = nil, updatedAt: Double? = nil, steps: [DesignsGetDesignOutputDesignRoundsItemScreensItemStepsItem]? = nil, url: String? = nil) {
+      self.id = id
+      self.round = round
+      self.option = option
+      self.title = title
+      self.caption = caption
+      self.viewport = viewport
+      self.updatedAt = updatedAt
+      self.steps = steps
+      self.url = url
+    }
+  }
+
+  public struct DesignsGetDesignOutputDesignRoundsItem: Sendable, Hashable, Codable {
+    public var round: Double?
+    public var title: String?
+    public var intro: String?
+    public var screens: [DesignsGetDesignOutputDesignRoundsItemScreensItem]?
+
+    public init(round: Double? = nil, title: String? = nil, intro: String? = nil, screens: [DesignsGetDesignOutputDesignRoundsItemScreensItem]? = nil) {
+      self.round = round
+      self.title = title
+      self.intro = intro
+      self.screens = screens
+    }
+  }
+
+  public struct DesignsGetDesignOutputDesignCommentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var screenId: String?
+    public var step: String?
+    public var selector: String?
+    public var elementText: String?
+    public var body: String?
+    public var createdAt: Double?
+    public var sent: Bool?
+
+    public init(id: String? = nil, screenId: String? = nil, step: String? = nil, selector: String? = nil, elementText: String? = nil, body: String? = nil, createdAt: Double? = nil, sent: Bool? = nil) {
+      self.id = id
+      self.screenId = screenId
+      self.step = step
+      self.selector = selector
+      self.elementText = elementText
+      self.body = body
+      self.createdAt = createdAt
+      self.sent = sent
+    }
+  }
+
+  public enum DesignsGetDesignOutputDesignReviewState: Sendable, Hashable, Codable {
+    case reviewing
+    case done
+    case needs_work
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "reviewing": self = .reviewing
+      case "done": self = .done
+      case "needs_work": self = .needs_work
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .reviewing: try container.encode("reviewing")
+      case .done: try container.encode("done")
+      case .needs_work: try container.encode("needs_work")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DesignsGetDesignOutputDesignReview: Sendable, Hashable, Codable {
+    public var state: DesignsGetDesignOutputDesignReviewState?
+    public var round: Double?
+    public var screens: [String]?
+    public var at: Double?
+    public var summary: String?
+
+    public init(state: DesignsGetDesignOutputDesignReviewState? = nil, round: Double? = nil, screens: [String]? = nil, at: Double? = nil, summary: String? = nil) {
+      self.state = state
+      self.round = round
+      self.screens = screens
+      self.at = at
+      self.summary = summary
+    }
+  }
+
+  public struct DesignsGetDesignOutputDesign: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var threadId: String?
+    public var updatedAt: Double?
+    public var rounds: [DesignsGetDesignOutputDesignRoundsItem]?
+    public var comments: [DesignsGetDesignOutputDesignCommentsItem]?
+    public var review: DesignsGetDesignOutputDesignReview?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, threadId: String? = nil, updatedAt: Double? = nil, rounds: [DesignsGetDesignOutputDesignRoundsItem]? = nil, comments: [DesignsGetDesignOutputDesignCommentsItem]? = nil, review: DesignsGetDesignOutputDesignReview? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.threadId = threadId
+      self.updatedAt = updatedAt
+      self.rounds = rounds
+      self.comments = comments
+      self.review = review
+    }
+  }
+
+  public struct DesignsGetDesignOutput: Sendable, Hashable, Codable {
+    public var design: DesignsGetDesignOutputDesign?
+
+    public init(design: DesignsGetDesignOutputDesign? = nil) {
+      self.design = design
+    }
+  }
+
+  public struct DesignsRenameDesignInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct DesignsRenameDesignOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var updatedAt: Double?
+
+    public init(ok: Bool? = nil, updatedAt: Double? = nil) {
+      self.ok = ok
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DesignsDeleteDesignInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DesignsDeleteDesignOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DesignsAddCommentInput: Sendable, Hashable, Codable {
+    public var designId: String?
+    public var screenId: String?
+    public var step: String?
+    public var selector: String?
+    public var elementHtml: String?
+    public var elementText: String?
+    public var body: String?
+    public var send: Bool?
+
+    public init(designId: String? = nil, screenId: String? = nil, step: String? = nil, selector: String? = nil, elementHtml: String? = nil, elementText: String? = nil, body: String? = nil, send: Bool? = nil) {
+      self.designId = designId
+      self.screenId = screenId
+      self.step = step
+      self.selector = selector
+      self.elementHtml = elementHtml
+      self.elementText = elementText
+      self.body = body
+      self.send = send
+    }
+  }
+
+  public struct DesignsAddCommentOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var sent: Bool?
+
+    public init(id: String? = nil, sent: Bool? = nil) {
+      self.id = id
+      self.sent = sent
+    }
+  }
+
+  public struct DesignsEditTextInput: Sendable, Hashable, Codable {
+    public var designId: String?
+    public var screenId: String?
+    public var before: String?
+    public var after: String?
+
+    public init(designId: String? = nil, screenId: String? = nil, before: String? = nil, after: String? = nil) {
+      self.designId = designId
+      self.screenId = screenId
+      self.before = before
+      self.after = after
+    }
+  }
+
+  public enum DesignsEditTextOutputReason: Sendable, Hashable, Codable {
+    case missing
+    case ambiguous
+    case markup
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "missing": self = .missing
+      case "ambiguous": self = .ambiguous
+      case "markup": self = .markup
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .missing: try container.encode("missing")
+      case .ambiguous: try container.encode("ambiguous")
+      case .markup: try container.encode("markup")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DesignsEditTextOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var reason: DesignsEditTextOutputReason?
+
+    public init(ok: Bool? = nil, reason: DesignsEditTextOutputReason? = nil) {
+      self.ok = ok
+      self.reason = reason
+    }
+  }
+
+  public struct DesignsSendCommentInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DesignsSendCommentOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DesignsResolveCommentInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var resolved: Bool?
+
+    public init(id: String? = nil, resolved: Bool? = nil) {
+      self.id = id
+      self.resolved = resolved
+    }
+  }
+
+  public struct DesignsResolveCommentOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DesignsDeleteCommentInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DesignsDeleteCommentOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 

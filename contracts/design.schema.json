@@ -78,7 +78,9 @@
                               "caption": {
                                 "type": "string"
                               },
-                              "viewport": {},
+                              "viewport": {
+                                "type": "string"
+                              },
                               "updatedAt": {
                                 "type": "number"
                               },

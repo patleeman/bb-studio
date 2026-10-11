@@ -1,6 +1,6 @@
 ---
 name: design
-description: Use when the user asks you to design, prototype or mock up a UI — a screen, a flow, an app, a dashboard, a landing page — or to make slides, a slide deck or a presentation, or refers to a Studio Design (a /plugins/design/designs/<id> link or an @design mention), or asks for another option, a revision or a change to one.
+description: Use when the user asks you to design, prototype or mock up a UI — a screen, a flow, an app, a dashboard, a landing page — or to make slides, a slide deck or a presentation, or refers to a Studio design (a /plugins/studio/studio/designs/<id> link, an older /plugins/design/designs/<id> link, or an @design mention), or asks for another option, a revision or a change to one.
 ---
 
 # Studio Design
@@ -168,3 +168,7 @@ the open ones with `design_comments` first.
   from any of them. Don't split a flow into one screen per step.
 - Screens run sandboxed with no access to BB, cookies or storage beyond their
   own page. Don't rely on `localStorage` persisting.
+
+## From a terminal
+
+`bb studio designs list`, `bb studio designs show <id>` (rounds, screens and open comments as JSON), `bb studio designs html <id> <screen>`, `rename` and `delete`.

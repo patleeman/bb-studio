@@ -14,7 +14,7 @@
   },
   "bb": {
     "name": "Studio",
-    "description": "The home of BB Studio: one collection for pages, recordings, drawings and artifacts, with search, tags, project leads, item conversations and quotes.",
+    "description": "The home of BB Studio: one collection for pages, recordings, drawings, designs and artifacts, with search, tags, project leads, item conversations and quotes.",
     "branding": {
       "icon": "./icons/studio.svg",
       "experimental_icons": {
@@ -28,7 +28,8 @@
         "artifact-save": "./icons/artifact-save.svg",
         "artifact-audio": "./icons/artifact-audio.svg",
         "artifact-video": "./icons/artifact-video.svg",
-        "draw": "./icons/draw.svg"
+        "draw": "./icons/draw.svg",
+        "design": "./icons/design.svg"
       }
     },
     "server": "./server.ts",

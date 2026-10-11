@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { commentMessage } from "../../server";
+import { commentMessage } from "../server";
 import { withScreenScript } from "./screen-script";
 import { DesignStore, MIGRATIONS } from "./store";
 

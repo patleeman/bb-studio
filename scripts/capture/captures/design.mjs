@@ -1,10 +1,12 @@
-// Studio Design: a design open full screen, with a round of two live options,
-// and a three-step prototype splayed into one frame per step.
+// Designs, built into Studio (docs/merging-add-ons.md): a design open as a
+// Studio tab, with a round of two live options, a three-step prototype
+// splayed into one frame per step, and a deck. The old Design plugin's README
+// shows its last release, the upgrade bridge, on Studio's Setup page.
 //
 // Only agent tools write screens, so the seeder creates each design through
-// Studio's studio_create RPC and then writes rounds and screens with the
-// plugin's own DesignStore, straight into the staged data directory's
-// plugins/design/data.db (the plugin has already run its migrations).
+// Studio's provider.call (studio_create) and then writes rounds and screens
+// with Studio's DesignStore, straight into the staged data directory's
+// plugins/studio/data.db (Studio has already run its migrations).
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,8 +14,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const storeModule = join(repoRoot, "packages/bb-studio-design/src/server/store.ts");
-const sqliteModule = join(repoRoot, "packages/bb-studio-design/node_modules/better-sqlite3/lib/index.js");
+const storeModule = join(repoRoot, "packages/bb-studio/src/design/server/store.ts");
+const sqliteModule = join(repoRoot, "packages/bb-studio/node_modules/better-sqlite3/lib/index.js");
 const tsx = join(repoRoot, "node_modules/.bin/tsx");
 
 const FONT = `-apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif`;
@@ -242,7 +244,7 @@ async function writeScreens(designId, design) {
     `import Database from ${JSON.stringify(sqliteModule)};
 import { DesignStore } from ${JSON.stringify(storeModule)};
 const input = ${JSON.stringify({ designId, rounds: design.rounds, screens: design.screens })};
-const db = new Database(${JSON.stringify(join(process.env.BB_DATA_DIR, "plugins/design/data.db"))});
+const db = new Database(${JSON.stringify(join(process.env.BB_DATA_DIR, "plugins/studio/data.db"))});
 db.pragma("busy_timeout = 5000");
 const store = new DesignStore(db);
 for (const round of input.rounds) store.setRound(input.designId, round.round, { title: round.title, intro: round.intro }, "agent");
@@ -263,23 +265,18 @@ db.close();
 }
 
 /** Creates a design the way Studio does, names it, and writes its screens. */
-async function seedDesign(key, { projectId, bbCli, pluginRpc }) {
+async function seedDesign(key, { projectId, pluginRpc }) {
   const design = DESIGNS[key];
-  const dir = await mkdtemp(join(tmpdir(), "design-create-"));
-  const inputFile = join(dir, "input.json");
-  await writeFile(inputFile, JSON.stringify({ kind: "design", projectId }));
-  let id;
+  const { item } = await pluginRpc("studio", "provider.call", { pluginId: "design", method: "studio_create", input: { kind: "design", projectId } });
+  const id = item.id;
+  const cleanup = async () => {
+    await pluginRpc("studio", "closeTabs", { items: [{ pluginId: "design", id }] }).catch(() => {});
+    await pluginRpc("studio", "designs.deleteDesign", { id }).catch(() => {});
+  };
   try {
-    const output = JSON.parse(await bbCli(["plugin", "rpc", "call", "design", "studio_create", "--input-file", inputFile, "--json"]));
-    id = (output.result ?? output).item.id;
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-  const cleanup = () => pluginRpc("design", "deleteDesign", { id }).catch(() => {});
-  try {
-    await pluginRpc("design", "renameDesign", { id, name: design.name });
+    await pluginRpc("studio", "designs.renameDesign", { id, name: design.name });
     await writeScreens(id, design);
-    const { design: view } = await pluginRpc("design", "getDesign", { id });
+    const { design: view } = await pluginRpc("studio", "designs.getDesign", { id });
     const ids = view.rounds.flatMap((round) => round.screens.map((screen) => screen.id)).join(",");
     if (ids !== design.screens.map((screen) => screen.id).join(",")) throw new Error(`The seeded design has screens ${ids}`);
   } catch (error) {
@@ -287,6 +284,14 @@ async function seedDesign(key, { projectId, bbCli, pluginRpc }) {
     throw error;
   }
   return { id, cleanup };
+}
+
+/** Opens a design from its old Design address and checks it lands as a Studio tab. */
+async function openDesign(client, id) {
+  await openDesign(client, id);
+  await client.waitForSelector(`[data-studio-workspace-editor="/plugins/studio/studio/designs/${id}"]`, 30000);
+  const path = await client.evaluate("location.pathname");
+  if (path !== "/plugins/studio/studio") throw new Error(`The old design address didn't open in Studio's workspace: ${path}`);
 }
 
 /** Waits until a frame's screen has rendered `text`, read through its own route (the frame is sandboxed). */
@@ -324,12 +329,13 @@ async function waitForPills(client) {
 export default (context) => [
   {
     id: "design",
-    packageDir: "bb-studio-design",
+    packageDir: "bb-studio",
+    fileName: "designs-preview.png",
     privateSidebar: true,
     setup: async (client) => {
       const { id, cleanup } = await seedDesign("welcome", context);
       try {
-        await client.navigate(`/plugins/design/designs/${id}`);
+        await openDesign(client, id);
         await client.waitForTab("Orbit onboarding");
         await client.waitForSelector("h2#round-1");
         await client.waitForText("Welcome screen");
@@ -349,13 +355,13 @@ export default (context) => [
   },
   {
     id: "design-prototype",
-    packageDir: "bb-studio-design",
-    fileName: "staged-prototype.png",
+    packageDir: "bb-studio",
+    fileName: "designs-prototype.png",
     privateSidebar: true,
     setup: async (client) => {
       const { id, cleanup } = await seedDesign("prototype", context);
       try {
-        await client.navigate(`/plugins/design/designs/${id}`);
+        await openDesign(client, id);
         await client.waitForTab("New release flow");
         await client.waitForText("Create a release");
         await client.waitForText("3 steps");
@@ -377,13 +383,13 @@ export default (context) => [
   },
   {
     id: "design-deck",
-    packageDir: "bb-studio-design",
-    fileName: "staged-deck.png",
+    packageDir: "bb-studio",
+    fileName: "designs-deck.png",
     privateSidebar: true,
     setup: async (client) => {
       const { id, cleanup } = await seedDesign("deck", context);
       try {
-        await client.navigate(`/plugins/design/designs/${id}`);
+        await openDesign(client, id);
         await client.waitForTab("ORBIT-42 all-hands");
         await client.waitForText("All-hands deck");
         await client.waitForText("4 slides");
@@ -402,13 +408,13 @@ export default (context) => [
   },
   {
     id: "design-deck-present",
-    packageDir: "bb-studio-design",
-    fileName: "staged-deck-present.png",
+    packageDir: "bb-studio",
+    fileName: "designs-deck-present.png",
     privateSidebar: true,
     setup: async (client) => {
       const { id, cleanup } = await seedDesign("deck", context);
       try {
-        await client.navigate(`/plugins/design/designs/${id}`);
+        await openDesign(client, id);
         await client.waitForSelector('button[title="Play 1a from What it is"]');
         await client.evaluate(`document.querySelector('button[title="Play 1a from What it is"]').click()`);
         await client.waitForSelector('[role="dialog"][aria-label="Playing 1a"]');
@@ -427,6 +433,25 @@ export default (context) => [
         throw error;
       }
       return cleanup;
+    },
+  },
+  {
+    id: "design-bridge",
+    packageDir: "bb-studio-design",
+    setup: async (client) => {
+      const migrated = await context.bbCli(["design", "migrate"]);
+      if (!migrated.includes("Migration complete")) throw new Error(`bb design migrate didn't finish: ${migrated}`);
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Set up BB Studio", 30000);
+      await client.waitForText("Retired plugins");
+      await client.waitForText("Designs are built into Studio now");
+      await client.waitForText("bb design migrate");
+      // Copied: nothing blocks removal.
+      const blocked = await client.evaluate(`[...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Not yet:") && p.closest("li,div")?.textContent.includes("Studio Design"))`);
+      if (blocked) throw new Error("Setup still blocks removing Studio Design after Migration complete");
+      // Other bridges may be listed first; show Studio Design's entry.
+      await client.evaluate(`[...document.querySelectorAll("p")].find((p) => p.textContent.startsWith("Designs are built into Studio now"))?.closest("li,section,div")?.scrollIntoView({ block: "start" })`);
+      await context.sleep(400);
     },
   },
 ];

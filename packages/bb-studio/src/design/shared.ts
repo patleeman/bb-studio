@@ -1,18 +1,30 @@
 // Names, paths and rules the server and the app share.
+import { DESIGN_SCREEN_ID } from "@bb-studio/kit/design-contract";
 
+/**
+ * Designs are built into Studio, but keep the id of the plugin they came
+ * from: items stay `design:<id>` in Studio's tables, mentions and links.
+ */
 export const PLUGIN_ID = "design";
-/** The nav panel: /plugins/design/designs, and designs/<id> for one design. */
-export const PANEL_PATH = "designs";
-export const DESIGN_ICON = "design/design";
+/** Studio's panel sub-path: /plugins/studio/studio/designs/<id> shows one design. */
+export const ROUTE_SEGMENT = "designs";
+/** Where a design lived when Design was its own plugin; saved tabs and links still use it. */
+export const LEGACY_ROOT = "/plugins/design/designs";
+export const DESIGN_ICON = "studio/design";
 /** Realtime channel: the server tells open canvases that a design changed. */
 export const REALTIME_CHANNEL = "design";
 export const DESIGN_UPDATE_TYPE = "design:updated";
 /** The question form's renderer: a pendingInteraction slot the design_ask tool opens. */
 export const QUESTIONS_RENDERER = "design-questions";
+/** The Design workbench tab's action id; reply cards open it with `{ designId }`. */
+export const DESIGN_TAB = "design";
 
 export function designHref(id: string): string {
-  return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}`;
+  return `/plugins/studio/studio/${ROUTE_SEGMENT}/${encodeURIComponent(id)}`;
 }
+
+/** Studio's HTTP routes for designs. */
+const HTTP = `/api/v1/plugins/studio/http/${ROUTE_SEGMENT}`;
 
 /**
  * Version of the script the screen route adds to every screen. Screens are
@@ -23,7 +35,7 @@ export const SCREEN_SCRIPT_VERSION = 6;
 
 /** `v` changes with every revision and `s` with the screen script, so frames reload only when either changed. */
 export function screenUrl(designId: string, screenId: string, updatedAt: number): string {
-  return `/api/v1/plugins/${PLUGIN_ID}/http/screen?design=${encodeURIComponent(designId)}&screen=${encodeURIComponent(screenId)}&v=${updatedAt}&s=${SCREEN_SCRIPT_VERSION}`;
+  return `${HTTP}/screen?design=${encodeURIComponent(designId)}&screen=${encodeURIComponent(screenId)}&v=${updatedAt}&s=${SCREEN_SCRIPT_VERSION}`;
 }
 
 /** The screen's HTML as the agent wrote it, without the canvas script, as a download. */
@@ -33,7 +45,7 @@ export function screenDownloadUrl(designId: string, screenId: string, updatedAt:
 
 /** Every step of a screen (a deck's slides), a page each, for Save as PDF. */
 export function printUrl(designId: string, screenId: string, updatedAt: number): string {
-  return `/api/v1/plugins/${PLUGIN_ID}/http/print?design=${encodeURIComponent(designId)}&screen=${encodeURIComponent(screenId)}&v=${updatedAt}`;
+  return `${HTTP}/print?design=${encodeURIComponent(designId)}&screen=${encodeURIComponent(screenId)}&v=${updatedAt}`;
 }
 
 export function isDesignId(value: string): boolean {
@@ -44,7 +56,7 @@ export function isDesignId(value: string): boolean {
  * A screen id names its round and its option: "1a" is round 1, option a.
  * Ids stay stable so the user can refer to them in chat.
  */
-export const SCREEN_ID = /^([1-9][0-9]{0,2})([a-z])$/;
+export const SCREEN_ID = DESIGN_SCREEN_ID;
 
 export function parseScreenId(id: string): { round: number; option: string } | null {
   const match = SCREEN_ID.exec(id);

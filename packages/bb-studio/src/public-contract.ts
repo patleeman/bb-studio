@@ -3,4 +3,5 @@ import { rpcContract as studio } from "./contract";
 import { rpcContract as chat } from "./chat/contract";
 import { rpcContract as artifacts } from "./artifacts/contract";
 import { rpcContract as drawings } from "./draw/contract";
-export const rpcContract = defineRpcContract({ ...studio, ...chat, ...artifacts, ...drawings });
+import { rpcContract as designs } from "./design/contract";
+export const rpcContract = defineRpcContract({ ...studio, ...chat, ...artifacts, ...drawings, ...designs });

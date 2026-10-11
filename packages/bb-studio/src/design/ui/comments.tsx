@@ -8,8 +8,8 @@ import { toast } from "sonner";
 import { Icon, cn } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
-import type { rpcContract } from "../server";
-import { frameSize, frameKey, type CommentView, type DesignView } from "../src/shared";
+import type { rpcContract } from "../contract";
+import { frameSize, frameKey, type CommentView, type DesignView } from "../shared";
 import type { CanvasApi } from "./canvas";
 import { createEditGate } from "./edit-gate";
 
@@ -117,7 +117,7 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
         editGate.current.start(key, data.before, { editing, activated: navigator.userActivation?.isActive ?? false });
       } else if (data.type === "text") {
         if (!editGate.current.take(key, data.before, editing)) return;
-        rpc.call("editText", { designId: design.id, screenId, before: data.before, after: data.text })
+        rpc.call("designs.editText", { designId: design.id, screenId, before: data.before, after: data.text })
           .then((result) => {
             if (result.ok) return;
             // The live text no longer matches the source exactly once; reload the frame to undo the typing.
@@ -212,7 +212,7 @@ export function DraftPopover({ design, draft, board, inThread, onClose }: { desi
     if (!body.trim() || busy) return;
     setBusy(true);
     try {
-      await rpc.call("addComment", { designId: design.id, screenId: draft.screenId, step: draft.step, selector: draft.selector, elementHtml: draft.html, elementText: draft.text, body: body.trim(), send });
+      await rpc.call("designs.addComment", { designId: design.id, screenId: draft.screenId, step: draft.step, selector: draft.selector, elementHtml: draft.html, elementText: draft.text, body: body.trim(), send });
       if (send) sent();
       onClose();
     } catch (error) {
@@ -294,7 +294,7 @@ export function CommentPopover({ design, comment, number, anchor, board, inThrea
       </div>
       <p className="whitespace-pre-wrap [text-wrap:pretty]">{comment.body}</p>
       <div className="mt-3 flex items-center gap-2">
-        <button type="button" disabled={busy} aria-label="Delete comment" title="Delete" className="rounded-md p-1 text-muted-foreground hover:bg-state-hover hover:text-foreground" onClick={() => void act(() => rpc.call("deleteComment", { id: comment.id }))}>
+        <button type="button" disabled={busy} aria-label="Delete comment" title="Delete" className="rounded-md p-1 text-muted-foreground hover:bg-state-hover hover:text-foreground" onClick={() => void act(() => rpc.call("designs.deleteComment", { id: comment.id }))}>
           <Icon name="Trash2" className="size-4" />
         </button>
         <span className="flex-1 text-xs text-muted-foreground">
@@ -310,12 +310,12 @@ export function CommentPopover({ design, comment, number, anchor, board, inThrea
             disabled={busy || !design.threadId}
             title={design.threadId ? "Send to the design's conversation" : "This design has no conversation yet. Start one with Chat first."}
             className="rounded-md border border-border px-2.5 py-1 hover:bg-state-hover disabled:opacity-50"
-            onClick={() => void act(() => rpc.call("sendComment", { id: comment.id }), sent)}
+            onClick={() => void act(() => rpc.call("designs.sendComment", { id: comment.id }), sent)}
           >
             Send to agent
           </button>
         )}
-        <button type="button" disabled={busy} className={cn("flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-primary-foreground hover:opacity-90 disabled:opacity-50")} onClick={() => void act(() => rpc.call("resolveComment", { id: comment.id, resolved: true }))}>
+        <button type="button" disabled={busy} className={cn("flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-primary-foreground hover:opacity-90 disabled:opacity-50")} onClick={() => void act(() => rpc.call("designs.resolveComment", { id: comment.id, resolved: true }))}>
           <Icon name="Check" className="size-3.5" /> Resolve
         </button>
       </div>

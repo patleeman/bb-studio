@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { answersSchema } from "../server";
+import { answersSchema } from "./server";
 import { DECIDE, summarizeAnswers, type QuestionForm } from "./questions";
 
 const form: QuestionForm = {

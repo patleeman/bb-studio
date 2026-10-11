@@ -28,6 +28,7 @@ extension Route {
             switch parts[3] {
             case "artifacts": self = .artifact(id: parts[4])
             case "drawings": self = .drawing(id: parts[4])
+            case "designs": self = .design(id: parts[4])
             default: return nil
             }
             return

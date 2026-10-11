@@ -303,6 +303,12 @@
     },
     {
       "file": "apps/ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.getDesign",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Designs.swift",
       "plugin": "design",
       "method": "getDesign",
       "coverage": "generated method"
