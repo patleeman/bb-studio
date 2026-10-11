@@ -4,7 +4,7 @@ import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
 import { ItemGestures } from "./src/ui/ItemGestures";
 import { ConversationPage } from "./src/chat/ui/ConversationComposer";
 // bb-studio frontend: the Studio collection, one nav panel whose
-// sub-path filters it to a kind, the sidebar's Studio tabs, project leads in
+// sub-path filters it to a kind, project leads in
 // the Setup page, and Studio search.
 import { openAppPath, registerWorkspaceProvider, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "@bb-studio/kit/app";
 import { BUILTIN_ROUTES, builtinSegment, STUDIO_ROOT } from "./src/builtins";
@@ -13,7 +13,6 @@ import { SavePicker } from "./src/artifacts/ui/save-picker";
 import { ARTIFACTS_TAB, isArtifactId, SAVE_ICON } from "./src/artifacts/shared";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
-import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
@@ -101,8 +100,6 @@ export default definePluginApp((app) => {
   // a reply's files, and the `::artifact{id="art_…"}` card in replies.
   app.slots.threadPanelAction({ id: ARTIFACTS_TAB, title: "Artifacts", icon: SAVE_ICON, layout: "flush", component: SavePicker });
   app.slots.messageDirective({ id: "artifact", component: ArtifactCard });
-  // Renders nothing itself; portals the tabs section into the Studio Sidebar.
-  app.slots.experimental_appOverlay({ id: "sidebar-tabs", component: SidebarTabs });
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));

@@ -98,7 +98,6 @@ const workDir = await mkdtemp(join(tmpdir(), "bb-walkthrough-"));
 let chromeProcess = null;
 let profileDir = null;
 let client = null;
-let space = null;
 const setView = (width) => client.command("Emulation.setDeviceMetricsOverride", { width, height: viewHeight(width), deviceScaleFactor: 2, mobile: false });
 
 // Screencast frames arrive only when the page paints. Keep the ones shown
@@ -167,8 +166,6 @@ try {
   await setView(VIEW_W);
   client.socket.addEventListener("message", onFrame);
   await client.command("Page.startScreencast", { format: "jpeg", quality: 92, maxWidth: 4000, maxHeight: 4000, everyNthFrame: 1 });
-  // The collection's filter rail lists Spaces once one exists.
-  ({ space } = await pluginRpc("studio", "createSpace", { name: "Q4 planning", icon: "🗂️", description: "Plans for the quarter.", defaultProjectId: projectId }));
   for (const scene of scenes) {
     const [id] = scene;
     const capture = ownScenes[id] ? { setup: ownScenes[id] } : captures.find((candidate) => candidate.id === id);
@@ -320,7 +317,6 @@ try {
   await ffmpeg(["-f", "concat", "-safe", "0", "-i", joinList, "-c", "copy", "-movflags", "+faststart", outPath]);
   process.stdout.write(`Wrote ${outPath}\n`);
 } finally {
-  if (space) await pluginRpc("studio", "deleteSpace", { id: space.id }).catch(() => {});
   await client?.command("Page.stopScreencast").catch(() => {});
   client?.socket?.close();
   if (chromeProcess) {

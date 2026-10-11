@@ -117,75 +117,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     },
   },
   {
-    id: "studio-sidebar-new-menu",
-    packageDir: "bb-studio",
-    fileName: "sidebar-new-menu.png",
-    showSidebar: true,
-    setup: async (client) => {
-      const pages = await seedPages();
-      const created = [];
-      const cleanup = async () => {
-        await pluginRpc("studio", "closeTabs", { items: [...created, { pluginId: "pages", id: pages.page.id }] }).catch(() => {});
-        for (const item of created) await pluginRpc("studio", "remove", { pluginId: item.pluginId, ids: [item.id] }).catch(() => {});
-        await pages.cleanup();
-      };
-      const openNew = async (keyboard = false) => {
-        await client.waitForAriaButton("New Studio item");
-        if (keyboard) {
-          await client.evaluate(`document.querySelector('button[aria-label="New Studio item"]').focus()`);
-          for (const type of ["rawKeyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
-        } else await client.clickAriaButtonWithPointer("New Studio item");
-        await client.waitForSelector('[role="menu"][aria-label="New Studio item"]');
-        await client.waitForSelector('[role="menu"][aria-label="New Studio item"] [role="menuitem"]:not([data-disabled])');
-        const labels = await client.evaluate(`[...document.querySelectorAll('[role="menu"][aria-label="New Studio item"] [role="menuitem"]')].map(each => each.innerText.trim())`);
-        for (const label of ["Page", "Drawing", "Table", "Recording"]) {
-          if (!labels.includes(label)) throw new Error(`Sidebar New menu did not offer ${label}`);
-        }
-        if (labels.includes("Artifact")) throw new Error("The sidebar offers an artifact even though artifacts cannot be created here");
-      };
-      try {
-        await client.navigate(`/plugins/pages/pages/${pages.page.id}`);
-        await client.waitForSelector(`[data-studio-tab="pages:${pages.page.id}"]`);
-        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-        await openNew(true);
-        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Page");
-        await client.waitForSelector('[data-studio-tab][data-studio-tab^="pages:"][aria-current="page"], .tiptap');
-        // The new page opens as a workspace tab, or on its own page without Studio's workspace.
-        await sleep(500);
-        const pageId = await client.evaluate(`(() => {
-          // The focused pane's tab: other panes keep tabs of their own.
-          const workspace = JSON.parse(localStorage.getItem('bb:studio-workspace:v1') ?? 'null');
-          const panes = (node) => !node ? [] : node.kind === 'pane' ? [node] : [...panes(node.first), ...panes(node.second)];
-          const tab = panes(workspace?.layout).find(pane => pane.id === workspace.focused)?.active;
-          const path = location.pathname.includes('/plugins/pages/pages/') ? location.pathname : tab ?? '';
-          return path.split('/plugins/pages/pages/')[1]?.split('/')[0];
-        })()`);
-        if (!pageId || pageId === pages.page.id) throw new Error("New Page did not open the created page");
-        created.push({ pluginId: "pages", id: pageId });
-        await client.waitForSelector(`[data-studio-tab="pages:${pageId}"]`);
-        const { items } = await pluginRpc("studio", "items", { pluginId: "pages", ids: [pageId] });
-        if (items[0]?.projectId !== projectId) throw new Error("Sidebar New Page did not use the open thread's project");
-        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-        await openNew();
-        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 800, y: 800 });
-        await sleep(350);
-        const visible = await client.evaluate(`(() => {
-          const button = document.querySelector('button[aria-label="New Studio item"]');
-          return button.getAttribute('aria-expanded') === 'true' && getComputedStyle(button.parentElement).opacity === '1';
-        })()`);
-        if (!visible) throw new Error("The sidebar plus faded while its menu was open");
-      } catch (error) { await cleanup(); throw error; }
-      return cleanup;
-    },
-    clip: async (client) => client.evaluate(`(() => {
-      const section = document.querySelector('[data-studio-sidebar-section="studio:tabs"]').getBoundingClientRect();
-      const menu = document.querySelector('[role="menu"][aria-label="New Studio item"]').getBoundingClientRect();
-      const x = Math.max(0, Math.min(section.x, menu.x) - 8);
-      const y = Math.max(0, Math.min(section.y, menu.y) - 8);
-      return { x, y, width: Math.max(section.right, menu.right) - x + 8, height: Math.max(section.bottom, menu.bottom) - y + 8 };
-    })()`),
-  },
-  {
     id: "studio-new-menu",
     packageDir: "bb-studio",
     fileName: "new-menu.png",
@@ -236,9 +167,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       const pages = await seedPages();
       const drawing = await seedDrawing();
       let recordingId = null;
-      let spaceId = null;
       const cleanup = async () => {
-        if (spaceId) await pluginRpc("studio", "deleteSpace", { id: spaceId }).catch(() => {});
         await pages.cleanup();
         await drawing.cleanup();
         if (recordingId) await talkRpc("recording_delete", { id: recordingId }).catch(() => {});
@@ -246,17 +175,15 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       try {
         // Studio only lists the recording, so it needn't be transcribed.
         recordingId = await seedTalkRecording(projectId, { transcribe: false });
-        const { space } = await pluginRpc("studio", "createSpace", { name: "Launch review", defaultProjectId: projectId });
-        spaceId = space.id;
         await client.navigate("/plugins/studio/studio/collection");
         await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:query:all", "")`);
         await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('input[aria-label="Search and filter studio"]');
-        await client.waitForAriaButton("Filter by space");
+        await client.waitForAriaButton("Filter by project");
         await client.waitForAriaButton("Filter by kind");
         if (await client.evaluate(`!!document.querySelector('aside[aria-label="Filters"]')`)) throw new Error("Studio still reserves space for a filter rail");
-        await client.clickAriaButtonWithPointer("Filter by space");
-        await client.waitForAriaButton("Launch review");
+        await client.clickAriaButtonWithPointer("Filter by project");
+        await client.waitForAriaButton("Global");
         await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
         await client.clickAriaButtonWithPointer("Filter by kind");
         for (const label of ["Pages", "Recordings", "Drawings"]) await client.waitForAriaButton(label);

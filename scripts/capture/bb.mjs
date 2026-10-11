@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 // Captures run against a staged BB (scripts/staged-bb.mjs), never the BB you
-// work in, whose projects, threads, and Spaces are private.
+// work in, whose projects and threads are private.
 if (!process.env.BB_SERVER_URL || !process.env.BB_DATA_DIR)
   throw new Error('Source a staged BB\'s capture.env first: node scripts/staged-bb.mjs start, then . "$TMPDIR/bb-studio-staged/capture.env".');
 export const serverUrl = process.env.BB_SERVER_URL.replace(/\/$/, "");
