@@ -143,10 +143,7 @@ export function suggestionKey(input: { threadId: string; messageId: string; kind
   return JSON.stringify([input.threadId, input.messageId, input.kind, labelKey(input.label)]);
 }
 
-/** Studio Reactions' plugin id: its saved reactions are the preferred replies. */
-export const REACTIONS_PLUGIN_ID = "emoji-react";
-
-/** Studio Reactions' saved `emojiItems` ("👍 Agree, 👎 Disagree") as reply items, or null when unset. */
+/** The saved `explore_replyItems` ("👍 Agree, 👎 Disagree") as reply items, or null when unset. */
 export function preferredReplies(raw: unknown): string[] | null {
   if (typeof raw !== "string") return null;
   return raw

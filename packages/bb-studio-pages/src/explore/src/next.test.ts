@@ -95,7 +95,7 @@ describe("the Next instructions", () => {
     expect(text).not.toContain("Prefer these");
   });
 
-  it("read Studio Reactions' saved replies", () => {
+  it("read the saved preferred replies", () => {
     expect(preferredReplies("👍 Agree, 👎 Disagree;✅ Do it\n❓")).toEqual(["👍 Agree", "👎 Disagree", "✅ Do it"]);
     expect(preferredReplies('🙃 say "hi"|bye')).toEqual(["🙃 say hi bye"]);
     expect(preferredReplies("")).toEqual([]);

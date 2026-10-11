@@ -12,16 +12,15 @@ export function exploreInstructions(): string {
     `::${DIRECTIVE}{items="🐛 Retry backoff disagrees in billing|🏗️ How the job queue works"}`,
     `Rules: 1 to ${MAX_ITEMS} items separated by |. Each item is one emoji, a space, and a specific label of at most 8 words that says what the user would find, such as "Cache keys ignore the tenant id", never "Learn more about caching". Pick things you saw but didn't cover in your answer: files you read but didn't cite, suspicious code, the subsystem everything here rests on, or recent changes.`,
     "Emoji: 🐛 suspicious or likely buggy, 🏗️ foundational subsystem, 🔗 connected code the answer depends on, 🕐 recently changed.",
-    'Leave the line out when nothing is worth it; never pad it. Don\'t use double quotes or | inside a label. Put it on its own line, never inside a code block. If your message ends with a ::reactions line, put this line immediately before it; otherwise make it the last line.',
+    'Leave the line out when nothing is worth it; never pad it. Don\'t use double quotes or | inside a label. Put it on its own line, never inside a code block. Make it the last line.',
     "Clicking an item asks you about it in the thread.",
   ].join("\n");
 }
 
-/** Replies to suggest when the user's Studio Reactions settings can't be read. */
+/** The default preferred quick replies (`explore_replyItems`). */
 export const DEFAULT_REPLIES = ["👍 Looks good", "🔁 Try another way", "❓ Explain more"];
 
-/** The Next row's instructions. They replace Explore's and Studio Reactions' smart reactions. */
-/** `replies` null: Studio Reactions' smart reactions are off, so the row offers no replies. */
+/** The Next row's instructions. They replace Explore's own line. `replies` null: quick replies are off. */
 export function nextInstructions({ explore, replies }: { explore: boolean; replies: readonly string[] | null }): string {
   const example = [
     ...(replies ? [`reply="👍 Ship it|🧪 Add tests first"`] : []),

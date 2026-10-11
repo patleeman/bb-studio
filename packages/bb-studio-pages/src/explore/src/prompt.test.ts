@@ -15,8 +15,8 @@ describe("the instructions", () => {
     expect(parseExploreItems(example?.[1])).toHaveLength(2);
   });
 
-  it("put ::explore before a ::reactions line, and last otherwise", () => {
-    expect(text).toMatch(/::reactions line, put this line immediately before it; otherwise make it the last line/);
+  it("put ::explore last", () => {
+    expect(text).toMatch(/Make it the last line/);
     expect(text).toMatch(/never inside a code block/);
   });
 });
