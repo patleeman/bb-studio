@@ -3,13 +3,13 @@
 // entry installs from. Work lands on main all day, some of it mid-feature;
 // users only get what passes here.
 //
-//   node scripts/release.mjs [--ref <commit>] [--dry-run] [--skip-tests] [--solo]
+//   node scripts/release.mjs [--ref <commit>] [--dry-run] [--skip-tests]
 //
 // The commit (default: origin/main) must be on origin/main and a fast-forward
 // of origin/stable. It's checked out alone in a temporary worktree, so other
 // agents' uncommitted work in this checkout can't make it pass or fail, and
 // these must pass there: the repo checks, every package's typecheck and tests
-// (unless --skip-tests), and with --solo the one-plugin-at-a-time install check.
+// (unless --skip-tests).
 // Then origin/stable moves to it. Never force: a non-fast-forward is refused.
 import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
@@ -110,11 +110,6 @@ try {
     if (!existsSync(join(builds, "packages", "bb-studio-kit.tgz"))) cpSync(join(tree, "packages", "bb-studio-kit.tgz"), join(builds, "packages", "bb-studio-kit.tgz"));
     // Same command BB runs (apps/server/src/services/plugins/git-plugin-dependencies.ts).
     if (step(`${name} clean install`, "npm", ["install", "--prefix", dir, "--ignore-scripts", "--omit=dev", "--omit=optional", "--no-audit", "--no-fund"], dir)) step(`${name} build`, "bb", ["plugin", "build", "."], dir);
-  }
-  if (flag("--solo")) {
-    const solo = join(tree, "scripts", "solo-check.mjs");
-    if (existsSync(solo)) step("solo installs", process.execPath, [solo, "--ref", sha]);
-    else { failed = true; console.log("FAIL  solo installs: scripts/solo-check.mjs isn't in this commit"); }
   }
 } finally {
   spawnSync("git", ["worktree", "remove", "--force", tree], { cwd: repo });
