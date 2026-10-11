@@ -85,7 +85,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       {
         id: "thread-list-plus-by-space",
         packageDir: "bb-studio-sidebar",
-        fileName: "by-space.png",
         showSidebar: true,
         setup: async (client) => {
           try {
@@ -151,52 +150,5 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         },
       },
     ];
-  })(),
-  {
-    id: "thread-list-plus",
-    packageDir: "bb-studio-sidebar",
-    showSidebar: true,
-    setup: async (client) => {
-      // Two Studio items opened become tabs in the Studio section, above the
-      // threads and in the same scroll area.
-      const { page, notes, cleanup: removePages } = await seedPages();
-      const opened = [page, notes];
-      const cleanup = async () => {
-        await pluginRpc("studio", "closeTabs", { items: opened.map((item) => ({ pluginId: "pages", id: item.id })) }).catch(() => {});
-        await removePages();
-      };
-      try {
-        for (const item of opened) {
-          await client.navigate(`/plugins/pages/pages/${item.id}`);
-          await client.waitForSelector(`[data-studio-tab="pages:${item.id}"]`);
-        }
-        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-        for (const item of opened) await client.waitForSelector(`[data-studio-tab="pages:${item.id}"]`);
-        const layout = JSON.parse(await client.evaluate(`JSON.stringify((() => {
-          const sidebar = document.querySelector('[data-sidebar="sidebar"]');
-          const studio = sidebar?.querySelector('[data-studio-sidebar-sections]');
-          // The first thread row.
-          const threads = sidebar?.querySelector('[data-sidebar-thread-id]');
-          const scrollers = Array.from(studio?.querySelectorAll('*') ?? []).filter((el) => /(auto|scroll)/.test(getComputedStyle(el).overflowY));
-          return {
-            tabs: Array.from(studio?.querySelectorAll('[data-studio-tab]') ?? []).map((el) => el.textContent.trim()),
-            above: Boolean(studio && threads && (studio.compareDocumentPosition(threads) & Node.DOCUMENT_POSITION_FOLLOWING)),
-            scrollers: scrollers.length,
-          };
-        })())`));
-        for (const title of ["Offline mode launch", "Release notes: October"]) {
-          if (!layout.tabs.some((tab) => tab.includes(title))) throw new Error(`The Studio section is missing the ${title} tab`);
-        }
-        if (!layout.above) throw new Error("The Studio section is not above Threads");
-        if (layout.scrollers) throw new Error("The Studio section has its own scroll area");
-      } catch (error) { await cleanup(); throw error; }
-      return cleanup;
-    },
-    clip: async (client) => client.evaluate(`(() => {
-      const sidebar = document.querySelector('[data-sidebar="sidebar"]');
-      if (!sidebar) throw new Error('Sidebar not found for capture');
-      const rect = sidebar.getBoundingClientRect();
-      return { x: rect.x, y: rect.y, width: rect.width, height: Math.min(rect.height, 640) };
-    })()`),
-  }
+  })()
 ];

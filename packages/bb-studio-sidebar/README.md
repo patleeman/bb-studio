@@ -14,8 +14,9 @@ stays installed, for its project, section and machine views.
 
 ## Features
 
-- **Studio sections above your threads.** Studio's tabs for the items you
-  have open sit at the top, in the same scroll area as the threads.
+- **Studio sections above your threads.** A Studio app can add a section at
+  the top, in the same scroll area. (Studio hides its tabs section here: open
+  items live in Studio's own tabs.)
 - **One Space at a time**, like Arc. Studio's own **Spaces** section steps
   aside while this list shows.
 - **Switcher.** A row of dots at the bottom of the list. The first, a grid,
@@ -63,18 +64,10 @@ defines no agent tools and no `settings.define` entries.
 
 ## Staged preview
 
-![Studio section with two open tabs above the threads](assets/staged-preview.png)
+![Threads organized by Studio Space](assets/staged-preview.png)
 
 Captured from the sidebar of a staged BB (`node scripts/staged-bb.mjs start`),
-with Studio Sidebar as the thread list provider. Two staged pages, "Offline
-mode launch" and "Release notes: October", were opened, so the Studio section
-lists them as tabs above the threads. The capture asserts that both tabs are
-present, that the section sits above the threads, and that it has no scroll
-area of its own.
-
-![Threads organized by Studio Space](assets/by-space.png)
-
-The Space capture creates two Spaces, Launch (🚀) and Research, and adds
+with Studio Sidebar as the thread list provider. The capture creates two Spaces, Launch (🚀) and Research, and adds
 "Launch plan", "Launch checklist", and "Release digest" to Launch, and "Paper
 notes" and "Atlas weekly sync" to Research. It makes Launch plan the Space's
 lead and pins Launch checklist, then shows Launch. The live check verifies
