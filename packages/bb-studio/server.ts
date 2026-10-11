@@ -102,7 +102,11 @@ export default async function plugin(bb: BbPluginApi) {
     explore.update(next);
   });
   // Reactions keep only settings: copy the old plugin's once, in the background.
-  const reactionsImport = { plugins: bb.sdk.plugins, kv: bb.storage.kv, settings: settings as never };
+  const reactionsImport = {
+    plugins: bb.sdk.plugins,
+    kv: bb.storage.kv,
+    settings: { get: () => settings.get(), set: (values: Record<string, unknown>) => settings.experimental_set(values as never) },
+  };
   void importReactionsSettings(reactionsImport).then((applied) => { if (applied) bb.log.info(`Copied Studio Reactions settings (${applied.join(", ") || "none changed"}).`); })
     .catch((error) => bb.log.warn(`Couldn't copy Studio Reactions settings: ${errorText(error)}`));
   const pages = registerPages(bb, db, {
