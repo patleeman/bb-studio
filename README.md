@@ -9,11 +9,11 @@ agent.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings and artifacts, with search, tags, project filters, templates, item chats and quotes, Spaces (areas of work with a lead thread and a Command view), a Setup page for the add-ons, plugin health and backup and restore. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings and artifacts (built in: the files your agents make), with search, tags, project filters, templates, item chats and quotes, Spaces (areas of work with a lead thread and a Command view), a Setup page for the add-ons, plugin health and backup and restore. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents, with checklists you hand to agents, inline whiteboards, and Explore: pages explaining what an agent noticed along the way. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
-| [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
+| [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Upgrade bridge only. Artifacts are built into Studio now; this copies an existing install's artifacts into Studio. |
 | [Studio Design](packages/bb-studio-design/) | `design` | UI prototypes you design with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work. |
 | [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces in your Spaces: one or more folders in a full editor beside your threads, run by a local code-server. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | The sidebar's thread list organized by Studio Space: one Space at a time, its lead and pins on top, two-line rows. |
@@ -51,7 +51,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - pages: collaborative pages
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
-   - artifacts: keeps files your agents make
    - thread-list-plus: Studio Sidebar; the thread list organized by Space
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
@@ -101,8 +100,10 @@ plugin deletes its settings and secrets, so note them first.
 
 ## Consolidation upgrades
 
-Chat now ships in Studio, BB's own navigation replaces Studio Navigation, and Float and
-Studio Teams (`bot-teams`) are retired. New installs need at most 12 plugins.
+Chat and Artifacts now ship in Studio, BB's own navigation replaces Studio Navigation, and Float and
+Studio Teams (`bot-teams`) are retired. New installs need at most 11 plugins.
+If you had Studio Artifacts, update it too and run `bb artifacts migrate`: its
+last release copies your artifacts into Studio, then Setup lets you remove it.
 To upgrade an existing install, update Studio and open **Studio → Setup**. It
 lists the add-ons you're missing, flags installed retired plugins, says what
 removing each keeps and deletes, and removes one only after you confirm. See

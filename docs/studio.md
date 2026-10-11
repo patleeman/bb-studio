@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts and Design keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
+BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw and Design keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`. Artifacts are built into Studio: they implement the same contract in-process, keep `artifacts` as their item namespace, and open at `/plugins/studio/studio/artifacts/<id>`. Other add-ons reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes the pattern.
 
 ## Provider contract
 
@@ -38,7 +38,7 @@ The Studio hub stores links, item threads, activity, comments, and content versi
 
 `replaceLinks` replaces one source's outgoing edges for an item. Pages sends mentions and item links. `links` returns outgoing edges and backlinks. `spawnForItem` creates and records a thread; `linkItemThread` records threads created by existing workflows, and `threadItems` lists a thread's linked items. The Pages and Drawings thread panel tabs use both: they list the thread's items first, and link each item they create to the thread with the `created` role. Studio also links the first accepted composer input's item refs, including multiple selected items, while keeping the composer's model and workspace choices. Studio reconciles thread states at startup and tracks lifecycle events. Pages chats and Studio Chat links are linked the same way.
 
-`recordActivity` accepts a kit `Actor`, verb, item ref, time, and summary. `activity` reads a bounded feed, optionally filtered by item and cursor. Comments use `comments`, `commentCreate`, and `commentResolve`; Pages keeps its Yjs comments and maps them to this interface. Other item comments live in Studio. Versions use `versions`, `versionCreate`, and `versionRead`. Studio deduplicates new drawing blobs by SHA-256. Pages snapshots and artifact versions stay in their owner stores and are read through adapters.
+`recordActivity` accepts a kit `Actor`, verb, item ref, time, and summary. `activity` reads a bounded feed, optionally filtered by item and cursor. Comments use `comments`, `commentCreate`, and `commentResolve`; Pages keeps its Yjs comments and maps them to this interface. Other item comments live in Studio. Versions use `versions`, `versionCreate`, and `versionRead`. Studio deduplicates new drawing blobs by SHA-256. Pages snapshots stay in Pages and are read through an adapter; artifact versions are read from Studio's own artifact tables.
 
 ## Search and Home
 

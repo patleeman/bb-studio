@@ -185,7 +185,7 @@ export function usageReportHtml({ draft }) {
 }
 
 /**
- * Saves "Q3 usage report" to Studio Artifacts twice from a thread's workspace,
+ * Saves "Q3 usage report" as a Studio artifact twice from a thread's workspace,
  * so the viewer shows the second version of a real HTML artifact. The staged
  * BB's workspace thread has run once, so it has one.
  */
@@ -200,17 +200,17 @@ export async function seedArtifact() {
   const write = (content) => bbCli(["file", "write", path, "--host", hostId, "--root", workspace, "--content", content]);
   let artifactId = null;
   const cleanup = async () => {
-    if (artifactId) await pluginRpc("artifacts", "delete", { id: artifactId }).catch(() => {});
+    if (artifactId) await pluginRpc("studio", "artifacts.delete", { id: artifactId }).catch(() => {});
     await bbCli(["file", "remove", path, "--yes", "--host", hostId, "--root", workspace]).catch(() => {});
   };
   try {
     for (const draft of [true, false]) {
       await write(usageReportHtml({ draft }));
-      const { saved, failed } = await pluginRpc("artifacts", "saveFiles", { threadId: workspaceThreadId, paths: [file] });
+      const { saved, failed } = await pluginRpc("studio", "artifacts.saveFiles", { threadId: workspaceThreadId, paths: [file] });
       if (failed.length) throw new Error(`Couldn't save the report: ${failed[0].error}`);
       artifactId = saved[0].artifactId;
     }
-    await pluginRpc("artifacts", "update", { id: artifactId, title: "Q3 usage report", description: "Weekly active teams, July to September" });
+    await pluginRpc("studio", "artifacts.update", { id: artifactId, title: "Q3 usage report", description: "Weekly active teams, July to September" });
   } catch (error) {
     await cleanup();
     throw error;
