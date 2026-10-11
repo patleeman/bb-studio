@@ -9,7 +9,7 @@
   },
   "bb": {
     "name": "Studio Code",
-    "description": "Part of BB Studio. VS Code workspaces in your Spaces: open one or more folders in a full editor, run by a local code-server.",
+    "description": "Part of BB Studio. VS Code workspaces in your projects: open one or more folders in a full editor, run by a local code-server.",
     "branding": {
       "icon": "./assets/icon.svg"
     },

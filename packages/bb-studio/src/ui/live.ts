@@ -1,14 +1,13 @@
-// Data for Spaces: their threads (one Space per thread) and optional lead.
-// Loads are shared per method and input, and refetch on Studio's change signal.
+// Live RPC data for Studio's views, such as project leads. Loads are shared
+// per method and input, and refetch on Studio's change signal.
 import { errorMessage } from "@bb-studio/kit/format";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import type { SpaceView } from "../../contract";
 
 type Call = (method: string, input?: unknown) => Promise<unknown>;
 
-/** The plugin RPC client without the contract's method typing, for the Space RPCs. */
+/** The plugin RPC client without the contract's method typing. */
 export function useCall(): Call {
   const rpc = useRpc() as unknown as { call: Call };
   return useCallback((method: string, input?: unknown) => rpc.call(method, input ?? null), [rpc]);
@@ -18,7 +17,7 @@ interface LiveState<T> { data: T | null; error: string | null; loading: boolean 
 
 /**
  * One shared load per method and input. Several components read the same
- * RPC (the sidebar's two slots and every page read Spaces, tabs and counts),
+ * RPC (several views read the same leads and threads),
  * and each used to fetch it on its own, again on every Studio change; while
  * the server worked through those, the page being opened waited.
  */
@@ -103,29 +102,3 @@ export function useLive<T>(method: string, input: unknown, options: { enabled?: 
 }
 
 export type Cadence = "hourly" | "daily" | "weekdays" | "every5minutes" | "every15minutes" | "every30minutes" | "every2hours" | "every6hours" | "weekly" | "custom";
-
-export interface SpaceLead {
-  spaceId: string;
-  name: string;
-  icon: string | null;
-  color: string;
-  leadThreadId: string | null;
-  defaultProjectId: string | null;
-  run: { enabled: boolean; cadence: Cadence; time?: string | null; cron?: string | null } | null;
-}
-
-export function useSpaces() {
-  const live = useLive<{ spaces: SpaceView[] }>("spaces", null, { pollMs: 0 });
-  return { spaces: live.data?.spaces ?? null, refresh: live.refresh, error: live.error };
-}
-
-export function useSpaceLead(spaceId: string | null) {
-  return useLive<SpaceLead>("space_lead", { spaceId }, { enabled: spaceId !== null, pollMs: 0 });
-}
-
-/** Which Space each thread belongs to; a thread is in at most one. */
-export function useSpaceOf() {
-  const live = useLive<{ threads: Record<string, string> }>("space_of_threads", {}, { pollMs: 0 });
-  const threads = live.data?.threads ?? {};
-  return useCallback((threadId: string | null | undefined) => (threadId ? threads[threadId] ?? null : null), [threads]);
-}

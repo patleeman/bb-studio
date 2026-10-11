@@ -2,9 +2,8 @@
 import { cn, Icon, TagDot } from "@bb-studio/kit/app";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, Popover, PopoverContent, PopoverTrigger } from "@bb-studio/kit/ui";
 import { useState, type ReactNode } from "react";
-import type { SavedViewView, SpaceView, TagView } from "../contract";
+import type { SavedViewView, TagView } from "../contract";
 import { fieldValues, formatQuery, parseQuery, resolveValue, toggleFilter, UNTAGGED, type FacetCounts, type FieldValue, type FilterField, type Query, type QueryVocabulary } from "../query";
-import { SpaceGlyph } from "./Spaces";
 
 const BUTTON = "flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring";
 
@@ -67,12 +66,11 @@ function FilterPicker(props: ChoicesProps) {
   );
 }
 
-export function FilterToolbar({ query, vocabulary, counts, onChange, spaces, views, tags, onSaveView, onDeleteView }: {
+export function FilterToolbar({ query, vocabulary, counts, onChange, views, tags, onSaveView, onDeleteView }: {
   query: Query;
   vocabulary: QueryVocabulary;
   counts: FacetCounts;
   onChange(query: Query): void;
-  spaces: readonly SpaceView[];
   views: readonly SavedViewView[];
   tags: readonly TagView[];
   onSaveView(): void;
@@ -84,13 +82,9 @@ export function FilterToolbar({ query, vocabulary, counts, onChange, spaces, vie
   const shared = { query, vocabulary, onChange };
   const idOf = (value: FieldValue) => resolveValue(value, vocabulary);
   const tagColor = new Map(tags.map((tag) => [tag.name.toLowerCase(), tag.color]));
-  const spaceByName = new Map(spaces.map((space) => [space.name.toLowerCase(), space]));
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-      {spaces.length ? <FilterPicker {...shared} field="space" label="Space" countOf={(value) => counts.space.get(idOf(value) ?? "") ?? 0} glyph={(value) => {
-        const space = spaceByName.get(value.value.toLowerCase());
-        return space ? <SpaceGlyph space={space} className="w-3.5 shrink-0 text-center text-xs" /> : null;
-      }} /> : null}
+      <FilterPicker {...shared} field="project" label="Project" countOf={(value) => counts.project.get(idOf(value) ?? "") ?? 0} />
       <FilterPicker {...shared} field="kind" label="Kind" countOf={(value) => counts.kind.get(idOf(value) ?? "") ?? 0} />
       <button type="button" aria-haspopup="dialog" className={BUTTON} onClick={() => setMoreOpen(true)}><Icon name="SlidersHorizontal" className="size-3.5" />More filters</button>
       {views.length ? (
@@ -113,7 +107,6 @@ export function FilterToolbar({ query, vocabulary, counts, onChange, spaces, vie
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>More filters</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <section aria-label="Project"><h3 className="mb-1 text-xs font-medium text-muted-foreground">Project</h3><FilterChoices {...shared} field="project" label="Projects" countOf={(value) => counts.project.get(idOf(value) ?? "") ?? 0} /></section>
             {tags.length || query.filters.some((filter) => filter.field === "tag") ? <section aria-label="Tags"><h3 className="mb-1 text-xs font-medium text-muted-foreground">Tags</h3><FilterChoices {...shared} field="tag" label="Tags" countOf={(value) => counts.tag.get(idOf(value) ?? UNTAGGED) ?? 0} glyph={(value) => value.value === UNTAGGED ? null : <TagDot color={tagColor.get(value.value.toLowerCase()) ?? "currentColor"} />} /></section> : null}
             <section aria-label="Status"><h3 className="mb-1 text-xs font-medium text-muted-foreground">Status</h3><FilterChoices {...shared} field="is" label="Status" /></section>
           </div>

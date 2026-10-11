@@ -1,8 +1,8 @@
 import { ARTIFACT_TABLES } from "./artifacts/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
-// (src/search-index.ts) and spaces (src/spaces.ts, src/space-threads.ts,
-// src/space-lead.ts, src/space-folders.ts).
+// (src/search-index.ts) and project leads (src/project-lead.ts). The space
+// tables are no longer used; they stay because migrations are append-only.
 
 /**
  * Append-only: statement index is the migration id, and BB checks each
@@ -147,4 +147,43 @@ export const MIGRATIONS = [
    DROP TABLE chief_of_staff;`,
   // Artifacts are built in (src/artifacts): the old plugin's tables, filled by its upgrade bridge.
   ARTIFACT_TABLES,
+  // Spaces are gone; leads and heartbeats belong to BB projects (src/project-lead.ts).
+  // Each Space's lead and heartbeat is queued here and put on its main project at
+  // startup (ProjectLeads.finishMoves), which needs BB to say where the lead thread
+  // is. The fallback is the Space's default project unless that's its ~/Spaces
+  // catch-all, then its first other project, then the catch-all; the default Space
+  // always moves to the personal project. Old heartbeat automations are retired
+  // (ProjectRuns.repair) and enabled ones provisioned again. Space tables stay.
+  `CREATE TABLE project_leads (
+       project_id TEXT PRIMARY KEY, lead_thread_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+     );
+   CREATE TABLE project_runs (
+       project_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL, cadence TEXT NOT NULL, time TEXT NOT NULL, cron TEXT,
+       automation_id TEXT, automation_project_id TEXT
+     );
+   CREATE TABLE project_thread_handoffs (
+       old_thread_id TEXT PRIMARY KEY, new_thread_id TEXT NOT NULL, project_id TEXT,
+       lead INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0
+     );
+   INSERT INTO project_thread_handoffs (old_thread_id, new_thread_id, project_id, lead, archived)
+     SELECT old_thread_id, new_thread_id, NULL, 0, archived FROM space_thread_handoffs;
+   CREATE TABLE space_lead_moves (
+       space_id TEXT PRIMARY KEY, is_default INTEGER NOT NULL, lead_thread_id TEXT, lead_updated_at INTEGER NOT NULL,
+       fallback_project_id TEXT, enabled INTEGER, cadence TEXT, time TEXT, cron TEXT
+     );
+   INSERT INTO space_lead_moves (space_id, is_default, lead_thread_id, lead_updated_at, fallback_project_id, enabled, cadence, time, cron)
+     SELECT s.id, s.is_default, l.lead_thread_id, COALESCE(l.updated_at, 0),
+       CASE WHEN s.default_project_id IS NOT NULL AND s.default_project_id NOT IN (SELECT project_id FROM space_folders WHERE project_id IS NOT NULL)
+         THEN s.default_project_id
+         ELSE COALESCE(
+           (SELECT p.project_id FROM space_projects p WHERE p.space_id = s.id
+              AND p.project_id NOT IN (SELECT project_id FROM space_folders WHERE project_id IS NOT NULL)
+              ORDER BY p.created_at, p.project_id LIMIT 1),
+           s.default_project_id) END,
+       r.enabled, r.cadence, r.time, r.cron
+     FROM spaces s LEFT JOIN space_leads l ON l.space_id = s.id LEFT JOIN space_runs r ON r.space_id = s.id
+     WHERE l.lead_thread_id IS NOT NULL OR r.space_id IS NOT NULL;
+   INSERT OR IGNORE INTO space_retired_automations (automation_id, automation_project_id)
+     SELECT automation_id, automation_project_id FROM space_runs WHERE automation_id IS NOT NULL;
+   UPDATE space_runs SET enabled = 0, automation_id = NULL, automation_project_id = NULL;`,
 ];

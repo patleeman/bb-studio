@@ -3,7 +3,7 @@
 // Filters on one field match any of their values, different fields all must
 // match, `-` excludes, and the remaining words search titles and content.
 
-export const FILTER_FIELDS = ["kind", "project", "tag", "space", "is"] as const;
+export const FILTER_FIELDS = ["kind", "project", "tag", "is"] as const;
 export type FilterField = (typeof FILTER_FIELDS)[number];
 
 export interface Filter {
@@ -23,7 +23,6 @@ export interface QueryVocabulary {
   kinds: readonly { id: string; label: string; plural: string; background?: boolean }[];
   projects: readonly { id: string; name: string }[];
   tags: readonly { id: string; name: string }[];
-  spaces: readonly { id: string; name: string }[];
 }
 
 export interface QueryItem {
@@ -32,7 +31,6 @@ export interface QueryItem {
   archived: boolean;
   template?: boolean;
   tags?: readonly string[];
-  spaces?: readonly string[];
 }
 
 export const GLOBAL_PROJECT = "global";
@@ -104,8 +102,6 @@ export function resolveValue(filter: Filter, vocabulary: QueryVocabulary): strin
     case "tag":
       if (value === UNTAGGED) return UNTAGGED;
       return vocabulary.tags.find((tag) => tag.id === filter.value || lower(tag.name) === value.replace(/^#/, ""))?.id;
-    case "space":
-      return vocabulary.spaces.find((space) => space.id === filter.value || lower(space.name) === value)?.id;
     case "is":
       return (IS_VALUES as readonly string[]).includes(value) ? value : undefined;
   }
@@ -119,8 +115,6 @@ function hasValue(field: FilterField, id: string | null, item: QueryItem): boole
       return item.projectId === id;
     case "tag":
       return id === UNTAGGED ? !item.tags?.length : !!item.tags?.includes(id!);
-    case "space":
-      return !!item.spaces?.includes(id!);
     case "is":
       return id === "archived" ? item.archived : !!item.template;
   }
@@ -178,7 +172,7 @@ export function compileQuery(query: Query, vocabulary: QueryVocabulary): Compile
 
 /**
  * Kinds that run in the background, as `pluginId:kind`. Lists that show what's
- * recent or what a space holds skip their items, as the All view does.
+ * recent skip their items, as the All view does.
  */
 export function backgroundKinds(providers: readonly { pluginId: string; kinds: readonly { id: string; background?: boolean }[] }[]): Set<string> {
   return new Set(providers.flatMap((provider) => provider.kinds.filter((kind) => kind.background).map((kind) => `${provider.pluginId}:${kind.id}`)));
@@ -190,7 +184,6 @@ export interface FacetCounts {
   project: Map<string, number>;
   /** By tag id, with "none" for untagged items. */
   tag: Map<string, number>;
-  space: Map<string, number>;
   archived: number;
 }
 
@@ -200,7 +193,7 @@ function bump(map: Map<string, number>, key: string) {
 
 /** How many items each value would show, given the rest of the query. */
 export function facetCounts(items: readonly QueryItem[], compiled: CompiledQuery, matchesText: (item: QueryItem) => boolean = () => true): FacetCounts {
-  const counts: FacetCounts = { kind: new Map(), project: new Map(), tag: new Map(), space: new Map(), archived: 0 };
+  const counts: FacetCounts = { kind: new Map(), project: new Map(), tag: new Map(), archived: 0 };
   for (const item of items) {
     if (!matchesText(item)) continue;
     if (compiled.test(item, "kind")) bump(counts.kind, item.kind);
@@ -209,7 +202,6 @@ export function facetCounts(items: readonly QueryItem[], compiled: CompiledQuery
       if (!item.tags?.length) bump(counts.tag, UNTAGGED);
       for (const tag of item.tags ?? []) bump(counts.tag, tag);
     }
-    if (compiled.test(item, "space")) for (const space of item.spaces ?? []) bump(counts.space, space);
     if (item.archived && compiled.test(item, "is")) counts.archived += 1;
   }
   return counts;
@@ -232,8 +224,6 @@ export function fieldValues(field: FilterField, vocabulary: QueryVocabulary): Fi
       return [{ field, value: GLOBAL_PROJECT, label: "Global" }, ...vocabulary.projects.map((project) => ({ field, value: project.name, label: project.name }))];
     case "tag":
       return [{ field, value: UNTAGGED, label: "Untagged" }, ...vocabulary.tags.map((tag) => ({ field, value: tag.name, label: tag.name }))];
-    case "space":
-      return vocabulary.spaces.map((space) => ({ field, value: space.name, label: space.name }));
     case "is":
       return IS_VALUES.map((value) => ({ field, value, label: value === "archived" ? "Archived" : "Templates" }));
   }

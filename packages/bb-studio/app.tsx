@@ -4,23 +4,17 @@ import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
 import { ItemGestures } from "./src/ui/ItemGestures";
 import { ConversationPage } from "./src/chat/ui/ConversationComposer";
 // bb-studio frontend: the Studio collection, one nav panel whose
-// sub-path filters it to a kind, the sidebar's Studio tabs and Spaces, the
-// Space dialogs other plugins open by window event, each thread's space
-// in its header, and Studio search.
+// sub-path filters it to a kind, the sidebar's Studio tabs, project leads in
+// the Setup page, and Studio search.
 import { openAppPath, registerWorkspaceProvider, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "@bb-studio/kit/app";
 import { BUILTIN_ROUTES, builtinSegment, STUDIO_ROOT } from "./src/builtins";
 import { ArtifactCard } from "./src/artifacts/ui/artifact-card";
 import { SavePicker } from "./src/artifacts/ui/save-picker";
 import { ARTIFACTS_TAB, isArtifactId, SAVE_ICON } from "./src/artifacts/shared";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
-import { ManageSpace } from "./src/ui/ManageSpace";
-import { NewSpace } from "./src/ui/NewSpace";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
-import { ComposerSpaces } from "./src/ui/ComposerSpaces";
-import { ThreadSpaceLink } from "./src/ui/ThreadSpaceLink";
-import { SidebarSpacesSection } from "./src/ui/space/SidebarSpacesSection";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { registerThreadAutomations } from "./src/ui/automations/register";
@@ -109,15 +103,7 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "artifact", component: ArtifactCard });
   // Renders nothing itself; portals the tabs section into the Studio Sidebar.
   app.slots.experimental_appOverlay({ id: "sidebar-tabs", component: SidebarTabs });
-  // Spaces: threads and Studio items, with an optional lead (docs/spaces.md).
-  app.slots.experimental_appOverlay({ id: "sidebar-spaces", component: SidebarSpacesSection });
-  app.slots.experimental_appOverlay({ id: "new-space", component: NewSpace });
-  app.slots.experimental_appOverlay({ id: "manage-space", component: ManageSpace });
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
-  // Links a thread back to its space from its header, and picks the space a
-  // new thread joins under its composer.
-  app.slots.experimental_threadHeaderAction({ id: "space-link", title: "Space", component: ThreadSpaceLink });
-  app.composer.customize({ id: "thread-spaces", scopes: ["new-thread"], actions: [{ id: "spaces", component: ComposerSpaces }] });
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));
   app.slots.experimental_appOverlay({ id: "health-watch", component: HealthWatch });

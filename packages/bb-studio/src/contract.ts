@@ -44,44 +44,18 @@ const comment = z.object({ id: z.string(), ref: itemRef, parentId: z.string().nu
 const version = z.object({ id: z.string(), ref: itemRef, sha256: z.string(), label: z.string(), actor, createdAt: z.number() });
 export type TagView = z.infer<typeof tag>;
 
-const space = z.object({
-  id: z.string(),
-  /** The default space, Personal: it holds Global items and every project no other space owns. */
-  isDefault: z.boolean(),
-  name: z.string(),
-  color: z.string(),
-  icon: z.string().nullable(),
-  description: z.string(),
-  /** Where the space's new items and threads go: its catch-all project. */
-  defaultProjectId: z.string().nullable(),
-  /** BB projects whose items and threads all belong to the space. */
-  projectIds: z.array(z.string()),
-  threadIds: z.array(z.string()),
-  /** Always empty: items follow their project. */
-  itemKeys: z.array(z.string()),
-});
-export type SpaceView = z.infer<typeof space>;
-const spaceId = z.string().min(1).max(100);
-const spaceFields = z.object({
-  icon: z.string().max(16).nullable().optional(),
-  description: z.string().max(500).optional(),
-  defaultProjectId: z.string().min(1).max(200).nullable().optional(),
-  /** A folder on the primary host to use as the default project instead; it becomes a BB project if it isn't one. */
-  defaultProjectPath: z.string().trim().min(1).max(4096).optional(),
-});
-/** `bb-project:<id>` for a whole project, or `bb-thread:<id>` for a thread. */
-const spaceMember = itemRef;
-const spaceThread = z.object({
+/** A thread to pick as a lead. */
+const threadOption = z.object({
   id: z.string(),
   title: z.string(),
   status: z.string(),
   projectId: z.string().nullable(),
   updatedAt: z.number(),
 });
-export type SpaceThreadView = z.infer<typeof spaceThread>;
+export type ThreadOptionView = z.infer<typeof threadOption>;
 const savedView = z.object({ id: z.string(), name: z.string(), query: z.string() });
 export type SavedViewView = z.infer<typeof savedView>;
-const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()), spaces: z.array(z.string()) });
+const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()) });
 
 export { TABS_CHANNEL } from "./ids";
 
@@ -97,20 +71,6 @@ const itemLink = z.object({
 /** An open tab; pinned tabs come first and are never closed to make room. */
 const tab = itemLink.extend({ pinned: z.boolean() });
 export type TabView = z.infer<typeof tab>;
-
-/** A space in the sidebar's tree, with its newest items, sub-items under their parents. */
-const treeSpace = z.object({
-  id: z.string(),
-  name: z.string(),
-  icon: z.string().nullable(),
-  color: z.string(),
-  items: z.array(itemLink.extend({ updatedAt: z.number(), parentId: z.string().nullable(), depth: z.number() })),
-  /** Every item it holds; `items` stops at a cap. */
-  itemCount: z.number(),
-  /** Its items open as tabs, in tab order: pinned first, then as opened. */
-  open: z.array(tab.extend({ kindLabel: z.string(), updatedAt: z.number(), preview: z.string().nullable() })),
-});
-export type SpaceTreeView = z.infer<typeof treeSpace>;
 
 /** Portable five-field cron: numbers/names, wildcards, lists, ranges and positive steps. */
 function validCron(cron: string): boolean {
@@ -140,31 +100,28 @@ function validCron(cron: string): boolean {
   });
 }
 
-/** A space's heartbeat. Weekly runs Monday; hour intervals use time's minute. */
-export const spaceRunSchema = z.object({
+/** A project lead's heartbeat. Weekly runs Monday; hour intervals use time's minute. */
+export const heartbeatRunSchema = z.object({
   enabled: z.boolean(),
   cadence: z.enum(["hourly", "daily", "weekdays", "every5minutes", "every15minutes", "every30minutes", "every2hours", "every6hours", "weekly", "custom"]),
   time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
   cron: z.string().trim().min(1).max(100).refine(validCron, "Use a valid five-field cron expression (minute hour day month weekday).").optional(),
 });
-export type SpaceRun = z.infer<typeof spaceRunSchema>;
-/** A space's optional lead thread and its heartbeat. */
-const spaceLead = z.object({
-  spaceId: z.string(),
-  name: z.string(),
-  icon: z.string().nullable(),
-  color: z.string(),
+export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>;
+/** A BB project's optional lead thread and its heartbeat. */
+const projectLead = z.object({
+  projectId: z.string(),
   leadThreadId: z.string().nullable(),
-  defaultProjectId: z.string().nullable(),
-  run: spaceRunSchema.nullable(),
+  run: heartbeatRunSchema.nullable(),
 });
-export type SpaceLeadView = z.infer<typeof spaceLead>;
-/** The user's Chief of Staff: the default space's lead (the top level), with its heartbeat. Same data as space_lead for the default space. */
+export type ProjectLeadView = z.infer<typeof projectLead>;
+const leadProjectId = z.string().min(1).max(200);
+/** The user's Chief of Staff: the personal project's lead, with its heartbeat. Same data as project_lead for proj_personal. */
 const chiefOfStaff = z.object({
   threadId: z.string().nullable(),
-  /** Deprecated: always null. The Chief of Staff is in the default space, and removing it leaves it there. */
+  /** Deprecated: always null. */
   originSpaceId: z.string().nullable(),
-  run: spaceRunSchema.nullable(),
+  run: heartbeatRunSchema.nullable(),
 });
 export type ChiefOfStaffView = z.infer<typeof chiefOfStaff>;
 /** The full request from experimental_NewThreadComposer; Studio picks the project. */
@@ -176,10 +133,9 @@ export const rpcContract = defineRpcContract({
     input: z.null(),
     output: z.object({
       providers: z.array(provider),
-      /** Tag ids per item, in tag-name order, and the spaces each is in. */
+      /** Tag ids per item, in tag-name order. */
       items: z.array(listedItem),
       tags: z.array(tag),
-      spaces: z.array(space),
       views: z.array(savedView),
     }),
   },
@@ -227,73 +183,22 @@ export const rpcContract = defineRpcContract({
   deleteTag: { input: z.object({ id: tagId }), output: z.object({ ok: z.boolean() }) },
   /** Adds and removes tags on items from any add-on. */
   tagItems: tagSchemas.tagItems,
-  /** Every space, for the sidebar. */
-  spaces: { input: z.null(), output: z.object({ spaces: z.array(space) }) },
-  /** Spaces are made, renamed and deleted by the user only. */
-  createSpace: { input: spaceFields.extend({ name: tagName }), output: z.object({ space }) },
-  updateSpace: { input: spaceFields.extend({ id: spaceId, name: tagName.optional() }), output: z.object({ space }) },
-  deleteSpace: { input: z.object({ id: spaceId }), output: z.object({ ok: z.boolean() }) },
-  spaceMembers: {
-    input: z.object({ id: spaceId, add: z.array(spaceMember).max(500).default([]), remove: z.array(spaceMember).max(500).default([]) }),
-    output: z.object({ space }),
-  },
-  /** Adds a folder on the primary host to a space as a project, made if it isn't one yet. */
-  addSpaceFolder: {
-    input: z.object({ id: spaceId, path: z.string().trim().min(1).max(4096) }),
-    output: z.object({ space, project: z.object({ id: z.string(), name: z.string() }) }),
-  },
-  /** The spaces a thread is in; `inherited` ones hold it through a project. */
-  spacesForThread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ spaces: z.array(space), inherited: z.array(z.string()) }) },
-  /** Spaces picked in a project's new-thread composer; the next thread started there moves to the last one. */
-  pendingThreadSpaces: { input: z.object({ projectId: z.string().min(1).max(200), ids: z.array(spaceId).max(50) }), output: z.object({ ok: z.boolean() }) },
-  /**
-   * Moves items into a space: those not in it yet go to its catch-all
-   * project. Counts what moved and stayed, and names what failed.
-   */
-  moveToSpace: {
-    input: z.object({ id: spaceId, items: z.array(itemRef).min(1).max(500) }),
-    output: z.object({ moved: z.number(), unchanged: z.number(), failed: z.array(z.object({ pluginId, id: z.string(), title: z.string(), error: z.string() })) }),
-  },
-  /** An item made in the space's catch-all project, so it's in the space. */
-  createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string(), title: z.string().optional() }) },
-  /** The project a space's new items go in, made first if the space has none: for items an add-on makes in the browser. */
-  spaceProject: { input: z.object({ id: spaceId }), output: z.object({ projectId: z.string() }) },
-  /** Worktrees of a space's newest threads, newest first, for its Files view. */
-  spaceWorktrees: {
-    input: z.object({ id: spaceId }),
-    output: z.object({ worktrees: z.array(z.object({ threadId: z.string(), title: z.string(), updatedAt: z.number(), path: z.string() })) }),
-  },
-  /** Files in a thread's worktree that git doesn't ignore, relative to it. */
-  spaceFiles: {
-    input: z.object({ id: spaceId, threadId: z.string().min(1).max(200) }),
-    output: z.object({ root: z.string(), files: z.array(z.string()), truncated: z.boolean() }),
-  },
-  /** A file's text from a thread's worktree, or why it can't be shown. */
-  spaceFile: {
-    input: z.object({ id: spaceId, threadId: z.string().min(1).max(200), path: z.string().min(1).max(4096) }),
-    output: z.object({ text: z.string().nullable(), reason: z.string().nullable() }),
-  },
-  /** Open threads to pick from when adding one to a space. */
-  recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
-  /** A space's lead and heartbeat. Clears a lead thread that was deleted, and turns its heartbeat off. */
-  space_lead: { input: z.object({ spaceId }), output: spaceLead },
-  /** Makes an existing thread the space's lead, adding it to the space; null clears the lead and turns the heartbeat off. */
-  /** Each thread's latest line for the sidebar: its last prose, or what failed or blocks it. */
-  thread_lines: {
-    input: z.object({ threadIds: z.array(z.string().min(1).max(200)).max(60) }),
-    output: z.object({ lines: z.record(z.string(), z.object({ text: z.string(), kind: z.enum(["progress", "failure", "blocked"]), at: z.number().nullable() })) }),
-  },
-  space_set_lead: { input: z.object({ spaceId, threadId: z.string().min(1).max(200).nullable() }), output: spaceLead },
-  /** The one space each thread is in. Refetch on Studio's realtime channel. */
-  space_of_threads: { input: z.object({}), output: z.object({ threads: z.record(z.string(), z.string()) }) },
+  /** Open threads, newest first, to pick a lead from. */
+  recentThreads: { input: z.null(), output: z.object({ threads: z.array(threadOption) }) },
+  /** Every project with a lead or heartbeat settings. */
+  project_leads: { input: z.object({}), output: z.object({ leads: z.array(projectLead) }) },
+  /** A project's lead and heartbeat. Clears a lead thread that was deleted, and turns its heartbeat off. */
+  project_lead: { input: z.object({ projectId: leadProjectId }), output: projectLead },
+  /** Makes an existing thread the project's lead (out of any other project's lead role); null clears the lead and turns the heartbeat off. */
+  project_set_lead: { input: z.object({ projectId: leadProjectId, threadId: z.string().min(1).max(200).nullable() }), output: projectLead },
   /** Turns the lead's heartbeat on or off; on needs a lead. */
-  space_set_run: { input: spaceRunSchema.omit({ time: true }).extend({ spaceId, time: spaceRunSchema.shape.time.optional() }), output: spaceLead },
-  /** The Chief of Staff (the default space's lead) and its heartbeat. Clears a thread that was deleted. */
+  project_set_run: { input: heartbeatRunSchema.omit({ time: true }).extend({ projectId: leadProjectId, time: heartbeatRunSchema.shape.time.optional() }), output: projectLead },
+  /** The Chief of Staff (the personal project's lead) and its heartbeat. Clears a thread that was deleted. */
   chief_of_staff: { input: z.object({}), output: chiefOfStaff },
-  /** Makes a thread the default space's lead, moving it to the top level and out of any other lead role; null leaves it an ordinary top-level thread. */
+  /** Makes a thread the personal project's lead, out of any other lead role; null leaves it an ordinary thread. */
   chief_of_staff_set: { input: z.object({ threadId: z.string().min(1).max(200).nullable() }), output: chiefOfStaff },
   /** Turns the Chief of Staff's heartbeat on or off; on needs a Chief of Staff. */
-  chief_of_staff_set_run: { input: spaceRunSchema.omit({ time: true }).extend({ time: spaceRunSchema.shape.time.optional() }), output: chiefOfStaff },
+  chief_of_staff_set_run: { input: heartbeatRunSchema.omit({ time: true }).extend({ time: heartbeatRunSchema.shape.time.optional() }), output: chiefOfStaff },
   /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and a Chief of Staff stays Chief of Staff. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** Saves a collection query by name, replacing a view with that name. */
@@ -302,8 +207,6 @@ export const rpcContract = defineRpcContract({
   /** Add-ons call this when their items change. */
   studio_changed: schemas.changed,
   sidebar: { input: z.null(), output: sidebar },
-  /** Every space with what it holds, for the sidebar's tree. */
-  spaceTree: { input: z.object({}), output: z.object({ spaces: z.array(treeSpace) }) },
   /** Open tabs, in order; tabs of deleted items are closed. */
   tabs: { input: z.null(), output: z.object({ tabs: z.array(tab) }) },
   /** Opens a tab for the item whose view is at `path`, if any. */

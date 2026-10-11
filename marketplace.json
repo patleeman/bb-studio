@@ -8,7 +8,7 @@
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio: one collection for pages, recordings, drawings and artifacts, with search, tags, Spaces, item conversations and quotes.",
+      "description": "The home of BB Studio: one collection for pages, recordings, drawings and artifacts, with search, tags, project leads, item conversations and quotes.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },
@@ -228,7 +228,7 @@
     {
       "id": "studio-code",
       "displayName": "Studio Code",
-      "description": "Part of BB Studio. VS Code workspaces in your Spaces: open one or more folders in a full editor, run by a local code-server.",
+      "description": "Part of BB Studio. VS Code workspaces in your projects: open one or more folders in a full editor, run by a local code-server.",
       "icon": {
         "url": "./packages/bb-studio-code/assets/icon.svg"
       },

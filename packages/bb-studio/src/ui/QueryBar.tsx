@@ -18,7 +18,6 @@ const FIELD_HINTS: Record<FilterField, string> = {
   kind: "Pages, recordings, drawings…",
   project: "A project, or global",
   tag: "A tag, or none",
-  space: "A space's items",
   is: "Archived or templates",
 };
 

@@ -1,8 +1,7 @@
 // The Studio collection: every add-on's items in one list, filtered by one
 // query (src/query.ts) from search and the filter menus above it. It is the
 // workspace's new tab page, never a page of its own: openCollection starts it
-// on a kind, so /plugins/studio/studio/recording opens it on recordings, and
-// openSpaceItems on a space's items.
+// on a kind, so /plugins/studio/studio/recording opens it on recordings.
 import { showBrowse } from "./Workspace";
 import {
   CollectionPage,
@@ -31,16 +30,14 @@ import { errorMessage, untitled } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ProviderView, rpcContract, SavedViewView, SidebarView, SpaceView, TagView } from "../contract";
+import type { ProviderView, rpcContract, SavedViewView, SidebarView, TagView } from "../contract";
 import { applyItemChanges } from "../partial";
 import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { QueryBar } from "./QueryBar";
 import { FilterToolbar } from "./FilterToolbar";
-import { SpaceGlyph } from "./Spaces";
-import { SpaceFiles } from "./SpaceFiles";
 
-type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
+type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[]; views: SavedViewView[] };
 const REFETCH_DEBOUNCE_MS = 300;
 const SEARCH_DEBOUNCE_MS = 200;
 const EMPTY_QUERY: Query = { filters: [], text: "" };
@@ -48,7 +45,7 @@ const EMPTY_QUERY: Query = { filters: [], text: "" };
 const QUERY_KEY = "studio:query:all";
 const QUERY_EVENT = "studio:query";
 
-/** Opens the Studio collection on `query`, e.g. a space's items. */
+/** Opens the Studio collection on `query`, e.g. a project's items. */
 export function openCollectionQuery(navigate: ReturnType<typeof useBbNavigate>, query: Query): void {
   try {
     localStorage.setItem(QUERY_KEY, formatQuery(query));
@@ -73,37 +70,6 @@ export function openCollection(kind: string | null): void {
     window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: formatQuery(query) }));
   }
   showBrowse();
-}
-
-/** Opens the Studio collection on a space's items. */
-export function openSpaceItems(navigate: ReturnType<typeof useBbNavigate>, space: { name: string }): void {
-  openCollectionQuery(navigate, { filters: [{ field: "space", value: space.name }], text: "" });
-}
-
-const FILES_KEY = "studio:space-files";
-const FILES_EVENT = "studio:space-files";
-
-/** Opens a space on its Files view, showing `threadId`'s worktree. */
-export function openSpaceFiles(navigate: ReturnType<typeof useBbNavigate>, space: { name: string }, threadId: string | null): void {
-  const detail = JSON.stringify({ threadId });
-  try {
-    sessionStorage.setItem(FILES_KEY, detail);
-  } catch {
-    // Storage can be refused; an open collection still hears the event.
-  }
-  window.dispatchEvent(new CustomEvent(FILES_EVENT, { detail }));
-  openSpaceItems(navigate, space);
-}
-
-/** The Files view asked for by openSpaceFiles, taken once. */
-function takeFilesRequest(): { threadId: string | null } | null {
-  try {
-    const raw = sessionStorage.getItem(FILES_KEY);
-    sessionStorage.removeItem(FILES_KEY);
-    return raw ? (JSON.parse(raw) as { threadId: string | null }) : null;
-  } catch {
-    return null;
-  }
 }
 
 /** The query, remembered across visits. */
@@ -284,8 +250,8 @@ export function StudioPanel() {
     setQuery({ ...query, filters: [...query.filters.filter((filter) => filter.field !== "kind"), ...(next === "all" ? [] : [{ field: "kind" as const, value: next }])] });
   }, [query, setQuery]);
   const vocabulary = useMemo<QueryVocabulary>(
-    () => ({ kinds, projects: projects.map((project) => ({ id: project.id, name: project.name })), tags: data?.tags ?? [], spaces: data?.spaces ?? [] }),
-    [kinds, projects, data?.tags, data?.spaces],
+    () => ({ kinds, projects: projects.map((project) => ({ id: project.id, name: project.name })), tags: data?.tags ?? [] }),
+    [kinds, projects, data?.tags],
   );
   // Words being typed after the last filter search; a field still waiting for its value doesn't.
   const searchText = useMemo(() => parseQuery(query.text).text.trim(), [query.text]);
@@ -431,39 +397,8 @@ export function StudioPanel() {
     } })),
   ];
 
-  const filteredSpaces = (data?.spaces ?? []).filter((each) =>
-    query.filters.some((filter) => filter.field === "space" && !filter.negate && filter.value.toLowerCase() === each.name.toLowerCase()),
-  );
-  const collectionSpaces = useMemo(
-    () => (data?.spaces ?? []).map((each) => ({ id: each.id, name: each.name, glyph: <SpaceGlyph space={each} className="w-3.5 text-center text-xs leading-none" /> })),
-    [data?.spaces],
-  );
-  // One space in the query: its documents, or its files.
-  const [filesRequest] = useState(takeFilesRequest);
-  const [showFiles, setShowFiles] = useState(Boolean(filesRequest));
-  const [filesThread, setFilesThread] = useState<string | null>(filesRequest?.threadId ?? null);
-  useEffect(() => {
-    const onFiles = (event: Event) => {
-      takeFilesRequest();
-      setShowFiles(true);
-      setFilesThread((JSON.parse((event as CustomEvent<string>).detail) as { threadId: string | null }).threadId);
-    };
-    window.addEventListener(FILES_EVENT, onFiles);
-    return () => window.removeEventListener(FILES_EVENT, onFiles);
-  }, []);
-  const fileSpace = filteredSpaces.length === 1 ? filteredSpaces[0]! : null;
-  const spaceViews = fileSpace ? (
-    <div role="tablist" aria-label={`${fileSpace.name} views`} className="mb-3 inline-flex rounded-md border border-border p-0.5 text-sm">
-      {([["Items", false], ["Files", true]] as const).map(([label, files]) => (
-        <button key={label} type="button" role="tab" aria-selected={showFiles === files} onClick={() => setShowFiles(files)} className={`rounded px-3 py-1 ${showFiles === files ? "bg-state-active font-medium" : "text-muted-foreground hover:bg-state-hover"}`}>
-          {label}
-        </button>
-      ))}
-    </div>
-  ) : null;
   const notice = (
     <>
-      {spaceViews}
       {searchText ? <SearchFreshness {...freshness} /> : null}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -550,23 +485,9 @@ export function StudioPanel() {
     ? `Nothing is called ${compiled.unknown.map((filter) => `${filter.field}:${filter.value}`).join(", ")}.`
     : compiled.archived
       ? "Nothing archived matches."
-      : filteredSpaces.length && !searchText && query.filters.length === filteredSpaces.length
-        ? spaceEmpty(filteredSpaces)
-        : searchText || query.filters.length
+      : searchText || query.filters.length
           ? "Nothing matches."
           : "No items yet.";
-
-  if (fileSpace && showFiles) {
-    return (
-      <PageColumn className="pt-6">
-        <h1 className="mb-3 flex items-center gap-2 text-xl font-semibold">
-          <SpaceGlyph space={fileSpace} className="w-5 text-center" /> {fileSpace.name}
-        </h1>
-        {spaceViews}
-        <SpaceFiles space={fileSpace} threadId={filesThread} canOpenCode={providers.some((provider) => provider.pluginId === "studio-code" && provider.state === "ready")} />
-      </PageColumn>
-    );
-  }
 
   return (
     <>
@@ -579,7 +500,6 @@ export function StudioPanel() {
         defaultProjectId={onlyProject ? onlyProject.id : (context.projectId ?? null)}
         storageKey="studio:collection"
         tags={data?.tags ?? []}
-        spaces={collectionSpaces}
         extraCreateItems={extraCreateItems}
         kind={onlyKind?.id ?? "all"}
         onKindChange={setKind}
@@ -588,7 +508,7 @@ export function StudioPanel() {
         handlers={handlers}
         filter={{
           bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} loading={!data || !projects.length} />,
-          toolbar: <FilterToolbar query={query} vocabulary={vocabulary} counts={counts} onChange={setQuery} spaces={data?.spaces ?? []} views={data?.views ?? []} tags={data?.tags ?? []} onSaveView={() => void saveView()} onDeleteView={(view) => void deleteView(view)} />,
+          toolbar: <FilterToolbar query={query} vocabulary={vocabulary} counts={counts} onChange={setQuery} views={data?.views ?? []} tags={data?.tags ?? []} onSaveView={() => void saveView()} onDeleteView={(view) => void deleteView(view)} />,
           text: searchText,
           snippets,
           archived: compiled.archived,
@@ -597,9 +517,4 @@ export function StudioPanel() {
       />
     </>
   );
-}
-
-/** An itemless space: its threads and projects are in the sidebar. */
-function spaceEmpty(spaces: readonly SpaceView[]): string {
-  return `No items in ${spaces.length === 1 ? "this space" : "these spaces"} yet.`;
 }

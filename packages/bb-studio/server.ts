@@ -13,19 +13,18 @@ import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // - Studio can hide the add-ons' own sidebar entries, since its collection
 //   lists their items (src/sidebar.ts).
 // - Studio keeps tags, which group items across add-ons (src/tags.ts).
-// - Studio keeps spaces, meta-projects: each BB project, and so its items and
-//   threads, is in one space (src/spaces.ts).
+// - Each BB project can have a lead thread with a heartbeat; the personal
+//   project's lead is the Chief of Staff (src/project-lead.ts).
 // - Studio keeps saved views, named collection queries (src/views.ts). The
 //   query language (src/query.ts) drives the agent tool and CLI too.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
-import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type SpaceThreadView, type TabView } from "./src/contract";
+import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type ThreadOptionView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
 import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
@@ -34,12 +33,7 @@ import { itemAtPath, TabStore } from "./src/tabs";
 import { formatWorkspace, openHrefs, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
 import { WORKSPACE_CHANNEL } from "./src/ids";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
-import { listFiles, readFile, requireThreadInSpace, worktrees } from "./src/space-files";
-import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
-import { SpaceFolders } from "./src/space-folders";
 import { planMove } from "./src/move-items";
-import { createThreadLines } from "./src/thread-lines";
-import { spaceOpenItems, spaceTreeItems } from "./src/space-tree";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
@@ -49,7 +43,7 @@ import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
 import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { zipFiles } from "./src/export-zip";
-import { SpaceLeads } from "./src/space-lead";
+import { ProjectLeads } from "./src/project-lead";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -94,21 +88,6 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   const tags = new TagStore(db);
-  const spaces = new SpaceStore(db);
-  spaces.reconcileProjects((await bb.sdk.projects.list({ includePersonal: true })).map((project) => project.id));
-  // A new space gets its own catch-all project under ~/Spaces (src/space-folders.ts).
-  // Staged and test BBs set BB_STUDIO_SPACES_DIR so they never write to the user's home.
-  const folders = new SpaceFolders(db, spaces, {
-    root: process.env.BB_STUDIO_SPACES_DIR || join(homedir(), "Spaces"),
-    mkdir: async (path) => { await mkdir(path, { recursive: true }); },
-    projects: async () => (await bb.sdk.projects.list({ includePersonal: true })).map((project) => ({ id: project.id, name: project.name, path: (project.sources.find((source) => source.isDefault) ?? project.sources[0])?.path ?? null })),
-    createProject: async (name, path) => {
-      const hostId = (await bb.sdk.system.config()).primaryHostId;
-      if (!hostId) throw new Error("Connect the primary host before adding a project.");
-      const project = await bb.sdk.projects.create({ name, source: { type: "local_path", hostId, path } });
-      return { id: project.id, name: project.name, path };
-    },
-  });
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
   const workspace = new WorkspacePresence();
@@ -202,23 +181,6 @@ export default async function plugin(bb: BbPluginApi) {
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   });
-  // A Space picked in a new-thread composer takes the thread its user starts
-  // there, with the first message. A thread is in one Space, so the last pick wins.
-  const PENDING_SPACES_MS = 10 * 60_000;
-  const pendingSpaces = new Map<string, { ids: string[]; at: number }>();
-  bb.experimental_hooks.on("message.dispatch", (context) => {
-    const pending = pendingSpaces.get(context.project.id);
-    if (!pending || context.thread.status !== "pending" || context.initiator !== "user" || context.senderThreadId !== null ||
-      context.originPluginId || context.thread.originPluginId) return { action: "proceed" };
-    pendingSpaces.delete(context.project.id);
-    if (Date.now() - pending.at > PENDING_SPACES_MS) return { action: "proceed" };
-    const target = pending.ids.filter((id) => spaces.get(id)).at(-1);
-    if (target) {
-      spaces.add(target, [{ pluginId: THREAD_REF, id: context.thread.id }]);
-      threadsMoved();
-    }
-    return { action: "proceed" };
-  });
   /** Every window's sidebar refetches its tabs. */
   const tabsChanged = () => bb.realtime.publish(TABS_CHANNEL, {});
 
@@ -237,19 +199,16 @@ export default async function plugin(bb: BbPluginApi) {
     }
     if (closed) tabsChanged();
     const assigned = tags.assignments();
-    const allSpaces = spaces.list();
-    const inSpaces = spaceAssignments(allSpaces, result.items);
     return {
       providers: result.providers,
-      items: result.items.map((item) => ({ ...item, tags: assigned.get(`${item.pluginId}:${item.id}`) ?? [], spaces: inSpaces.get(`${item.pluginId}:${item.id}`) ?? [] })),
+      items: result.items.map((item) => ({ ...item, tags: assigned.get(`${item.pluginId}:${item.id}`) ?? [] })),
       tags: tags.list(),
-      spaces: allSpaces,
       views: views.list(),
     };
   };
 
-  /** Recent open threads, newest first, to pick from when adding one to a space. */
-  const recentThreads = async (): Promise<SpaceThreadView[]> =>
+  /** Recent open threads, newest first, to pick a lead from. */
+  const recentThreads = async (): Promise<ThreadOptionView[]> =>
     (await bb.sdk.threads.list({ archived: false, limit: 100 }))
       .map((thread) => ({
         id: thread.id,
@@ -259,13 +218,6 @@ export default async function plugin(bb: BbPluginApi) {
         updatedAt: thread.updatedAt ?? thread.createdAt ?? 0,
       }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
-  /** The one space a thread is in (every space for the Chief of Staff), which scopes what its agent sees by default. */
-  const threadSpaces = (threadId: string, projectId: string | null) => {
-    // The Chief of Staff leads the top level, so it sees every space.
-    if (spaceLeads.chiefThreadId() === threadId) return spaces.list();
-    const space = spaces.get(spaces.ownerOfThread({ id: threadId, projectId }));
-    return space ? [space] : [];
-  };
   /** Open collections refetch, as when an add-on's items change. */
   const tagsChanged = () => {
     changes.append(null);
@@ -280,42 +232,18 @@ export default async function plugin(bb: BbPluginApi) {
     return result;
   };
 
-  const deleteSpace = async (id: string) => {
-    // A heartbeat that can't be turned off keeps the space, so deleting can be retried.
-    await spaceLeads.removeSpace(id);
-    spaces.remove(id);
-    tagsChanged();
-  };
-  /** Where a space's new items go. Items follow their project, so a space without one gets its catch-all first. */
-  const spaceProject = async (id: string): Promise<string> => {
-    if (!spaces.get(id)) throw new Error("That space no longer exists.");
-    await folders.ensureCatchAll(id);
-    const projectId = spaces.get(id)?.defaultProjectId ?? null;
-    if (!projectId) throw new Error("This Space has no folder to create items in yet.");
-    return projectId;
-  };
-  // Each space's optional lead thread and its heartbeat (src/space-lead.ts).
-  const spaceLeads = new SpaceLeads({ db, sdk: bb.sdk, spaces, changed: tagsChanged });
-  // Retires the old Chief of Staff automation and turns migrated heartbeats back on; retried next startup.
-  void spaceLeads.runs.repair((spaceId) => (db.prepare("SELECT lead_thread_id FROM space_leads WHERE space_id = ?").get(spaceId) as { lead_thread_id: string | null } | undefined)?.lead_thread_id ?? null)
+  // Each project's optional lead thread and its heartbeat (src/project-lead.ts).
+  const projectLeads = new ProjectLeads({ db, sdk: bb.sdk, changed: tagsChanged });
+  // Moves Spaces' leads to projects, retires old heartbeat automations and turns
+  // migrated heartbeats back on; whatever fails is retried next startup.
+  void projectLeads.finishMoves()
+    .then(() => projectLeads.runs.repair((projectId) => projectLeads.storedLead(projectId)))
     .catch((error) => console.warn("[studio] heartbeat repair failed; retrying next startup", error));
-  const threadLines = createThreadLines(bb.sdk);
-  /** A thread's space can change without a membership write; sidebars refetch space_of_threads. */
-  const threadsMoved = () => { spaceLeads.threadsChanged(); tagsChanged(); };
   /**
-   * Moves items to a project, or into a space through its catch-all project.
-   * Items already there stay; kinds that can't move are listed as failed.
+   * Moves items to a project. Items already there stay; kinds that can't move
+   * are listed as failed.
    */
-  const moveItems = async (refs: readonly ItemRef[], target: { spaceId: string } | { projectId: string | null }) => {
-    let projectId: string | null;
-    let space: Space | undefined;
-    if ("spaceId" in target) {
-      if (!spaces.get(target.spaceId)) throw new Error("That space no longer exists.");
-      await folders.ensureCatchAll(target.spaceId);
-      space = spaces.get(target.spaceId) ?? undefined;
-      projectId = space?.defaultProjectId ?? null;
-      if (!space || !projectId) throw new Error("This Space has no folder to move items into yet.");
-    } else projectId = target.projectId;
+  const moveItems = async (refs: readonly ItemRef[], { projectId }: { projectId: string | null }) => {
     const { items, providers } = await hub.overview();
     const movable = new Set(providers.flatMap((provider) => provider.kinds.filter((kind) => kind.capabilities?.move).map((kind) => `${provider.pluginId}:${kind.id}`)));
     const byKey = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item]));
@@ -323,7 +251,7 @@ export default async function plugin(bb: BbPluginApi) {
       const item = byKey.get(`${ref.pluginId}:${ref.id}`);
       return item ? [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), projectId: item.projectId ?? null, kind: item.kind }] : [];
     });
-    const plan = planMove(known, { projectId, space }, (item) => item.pluginId !== STUDIO_PLUGIN_ID && movable.has(`${item.pluginId}:${item.kind}`));
+    const plan = planMove(known, { projectId }, (item) => item.pluginId !== STUDIO_PLUGIN_ID && movable.has(`${item.pluginId}:${item.kind}`));
     const titleOf = (pluginId: string, id: string) => byKey.get(`${pluginId}:${id}`)?.title || id;
     const failed = [
       ...refs.filter((ref) => !byKey.has(`${ref.pluginId}:${ref.id}`)).map((ref) => ({ ...ref, title: ref.id, error: "Not found" })),
@@ -342,10 +270,6 @@ export default async function plugin(bb: BbPluginApi) {
     if (moved.length) tagsChanged();
     return { moved, unchanged: plan.unchanged, failed, projectId };
   };
-  bb.events.on("thread.created", () => threadsMoved());
-  bb.events.on("thread.archived", () => threadsMoved());
-  bb.events.on("thread.unarchived", () => threadsMoved());
-  bb.events.on("thread.deleted", ({ thread }) => { spaces.threads.forget(thread.id); threadsMoved(); });
 
   const tabViews = ({ providers, items }: { providers: Awaited<ReturnType<typeof hub.providers>>; items: HubItem[] }): TabView[] => {
     const kindIcons = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.icon])));
@@ -449,89 +373,14 @@ export default async function plugin(bb: BbPluginApi) {
       tagsChanged();
       return { ok: true };
     },
-    spaces: () => ({ spaces: spaces.list() }),
-    createSpace: async ({ defaultProjectPath, ...input }) => {
-      if (defaultProjectPath) input.defaultProjectId = (await folders.projectAt(defaultProjectPath)).id;
-      const made = spaces.create(input);
-      try {
-        await folders.ensureCatchAll(made.id);
-      } catch (error) {
-        // No half-made space: the name stays free for a retry.
-        spaces.remove(made.id);
-        throw error;
-      }
-      tagsChanged();
-      return { space: spaces.get(made.id) ?? made };
-    },
-    updateSpace: async ({ id, defaultProjectPath, ...input }) => {
-      if (defaultProjectPath) input.defaultProjectId = (await folders.projectAt(defaultProjectPath)).id;
-      const space = spaces.update(id, input);
-      tagsChanged();
-      return { space };
-    },
-    deleteSpace: async ({ id }) => {
-      await deleteSpace(id);
-      return { ok: true };
-    },
-    spaceTree: async () => {
-      const all = spaces.list();
-      if (!all.length) return { spaces: [] };
-      const { items, providers } = await hub.overview();
-      const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
-      const options = { background: backgroundKinds(providers), kindIcon: (item: HubItem) => kindsOf.get(`${item.pluginId}:${item.kind}`)?.icon ?? "File" };
-      const open = tabs.list();
-      return {
-        spaces: all.map((space) => {
-          const tree = spaceTreeItems(space, items, options);
-          return {
-            id: space.id,
-            name: space.name,
-            icon: space.icon,
-            color: space.color,
-            items: tree.items,
-            itemCount: tree.count,
-            open: spaceOpenItems(space, open, items, (item) => { const kind = kindsOf.get(`${item.pluginId}:${item.kind}`); return { icon: kind?.icon ?? "File", label: kind?.label ?? item.kind }; }),
-          };
-        }),
-      };
-    },
-    createInSpace: async ({ id, pluginId, kind }) => {
-      const projectId = await spaceProject(id);
-      const { item } = await hub.call(pluginId, "studio_create", { kind, projectId });
-      tagsChanged();
-      return { href: item.href, title: item.title || "Untitled" };
-    },
-    spaceProject: async ({ id }) => ({ projectId: await spaceProject(id) }),
-    moveToSpace: async ({ id, items }) => {
-      const { moved, unchanged, failed } = await moveItems(items, { spaceId: id });
-      return { moved: moved.length, unchanged: unchanged.length, failed };
-    },
-    spaceMembers: ({ id, add, remove }) => {
-      if (add.length) spaces.add(id, add);
-      if (remove.length) spaces.removeMembers(id, remove);
-      tagsChanged();
-      const space = spaces.get(id);
-      if (!space) throw new Error("That space no longer exists.");
-      return { space };
-    },
-    addSpaceFolder: async ({ id, path }) => {
-      if (!spaces.get(id)) throw new Error("That space no longer exists.");
-      const project = await folders.projectAt(path);
-      spaces.add(id, [{ pluginId: "bb-project", id: project.id }]);
-      tagsChanged();
-      const space = spaces.get(id);
-      if (!space) throw new Error("That space no longer exists.");
-      return { space, project: { id: project.id, name: project.name } };
-    },
-    space_lead: ({ spaceId }) => spaceLeads.get(spaceId),
-    space_set_lead: ({ spaceId, threadId }) => spaceLeads.setLead(spaceId, threadId),
-    thread_lines: async ({ threadIds }) => ({ lines: await threadLines.read(threadIds) }),
-    space_of_threads: async () => ({ threads: await spaceLeads.spaceOfThreads() }),
-    space_set_run: ({ spaceId, ...run }) => spaceLeads.setRun(spaceId, run),
-    chief_of_staff: () => spaceLeads.chief(),
-    chief_of_staff_set: ({ threadId }) => spaceLeads.setChief(threadId),
-    chief_of_staff_set_run: (run) => spaceLeads.setChiefRun(run),
-    thread_handoff: ({ threadId, request }) => spaceLeads.handoff(threadId, request),
+    project_leads: () => ({ leads: projectLeads.list() }),
+    project_lead: ({ projectId }) => projectLeads.get(projectId),
+    project_set_lead: ({ projectId, threadId }) => projectLeads.setLead(projectId, threadId),
+    project_set_run: ({ projectId, ...run }) => projectLeads.setRun(projectId, run),
+    chief_of_staff: () => projectLeads.chief(),
+    chief_of_staff_set: ({ threadId }) => projectLeads.setChief(threadId),
+    chief_of_staff_set_run: (run) => projectLeads.setChiefRun(run),
+    thread_handoff: ({ threadId, request }) => projectLeads.handoff(threadId, request),
     saveView: ({ name, query }) => {
       const view = views.save(name, query);
       tagsChanged();
@@ -542,30 +391,7 @@ export default async function plugin(bb: BbPluginApi) {
       tagsChanged();
       return { ok: true };
     },
-    spaceWorktrees: async ({ id }) => {
-      if (!spaces.get(id)) throw new Error("That space no longer exists.");
-      const threads = (await recentThreads()).filter((thread) => spaces.ownerOfThread(thread) === id);
-      return { worktrees: await worktrees(bb, threads) };
-    },
-    spaceFiles: async ({ id, threadId }) => {
-      await requireThreadInSpace(bb, (thread) => spaces.ownerOfThread(thread), id, threadId);
-      return listFiles(bb, threadId);
-    },
-    spaceFile: async ({ id, threadId, path }) => {
-      await requireThreadInSpace(bb, (thread) => spaces.ownerOfThread(thread), id, threadId);
-      return readFile(bb, threadId, path);
-    },
     recentThreads: async () => ({ threads: await recentThreads() }),
-    pendingThreadSpaces: ({ projectId, ids }) => {
-      if (ids.length) pendingSpaces.set(projectId, { ids, at: Date.now() });
-      else pendingSpaces.delete(projectId);
-      return { ok: true };
-    },
-    spacesForThread: async ({ threadId }) => {
-      const thread = await bb.sdk.threads.get({ threadId }).catch(() => null);
-      const holding = threadSpaces(threadId, thread?.projectId ?? null);
-      return { spaces: holding, inherited: holding.filter((space) => !space.threadIds.includes(threadId)).map((space) => space.id) };
-    },
     studio_changed: async ({ pluginId, ids, removed }) => {
       await searchIndex.changed(pluginId, ids, removed).catch(() => {});
       if (!ids && !removed) changes.append(null);
@@ -590,8 +416,7 @@ export default async function plugin(bb: BbPluginApi) {
     items: async ({ pluginId, ids }) => {
       const assigned = tags.assignments();
       const items = await hub.get(pluginId, ids);
-      const inSpaces = spaceAssignments(spaces.list(), items);
-      return { items: items.map((item) => ({ ...item, tags: assigned.get(`${pluginId}:${item.id}`) ?? [], spaces: inSpaces.get(`${pluginId}:${item.id}`) ?? [] })) };
+      return { items: items.map((item) => ({ ...item, tags: assigned.get(`${pluginId}:${item.id}`) ?? [] })) };
     },
     sidebar: () => readSidebar(),
     tabs: async () => ({ tabs: tabViews(await tabData()) }),
@@ -708,50 +533,39 @@ export default async function plugin(bb: BbPluginApi) {
       item.snippet ? `\n  > ${item.snippet}` : ""
     }`;
 
-  /** The named space; an unknown name lists the ones there are. */
-  const requireSpace = (name: string) => {
-    const space = spaces.find(name);
-    if (!space) throw new Error(`No space called "${name}". Spaces: ${spaces.list().map((each) => each.name).join(", ") || "none yet"}. Only the user makes spaces.`);
-    return space;
-  };
-
   /** The values a query can name, with every field's names for an error. */
   const vocabulary = async (data: Awaited<ReturnType<typeof overview>>) => ({
     kinds: data.providers.flatMap((provider) => provider.kinds),
     projects: (await bb.sdk.projects.list().catch(() => [])).map((project) => ({ id: project.id, name: project.name })),
     tags: data.tags,
-    spaces: data.spaces,
   });
   const unknownFilter = (filter: Filter, names: Awaited<ReturnType<typeof vocabulary>>) => {
     const known = {
       kind: names.kinds.map((kind) => kind.id),
       project: ["global", ...names.projects.map((project) => project.name)],
       tag: ["none", ...names.tags.map((tag) => tag.name)],
-      space: names.spaces.map((space) => space.name),
       is: ["archived", "template"],
     }[filter.field];
-    const hint = filter.field === "space" ? " Only the user makes spaces." : "";
-    return new Error(`No ${filter.field} called "${filter.value}". Try: ${known.join(", ") || "none yet"}.${hint}`);
+    return new Error(`No ${filter.field} called "${filter.value}". Try: ${known.join(", ") || "none yet"}.`);
   };
 
   /**
-   * Lists items matching a query (src/query.ts). Without `all` or a space or
-   * project filter, the spaces the thread is in scope the list; outside any
-   * space it's the project's items and global ones.
+   * Lists items matching a query (src/query.ts). Without `all` or a project
+   * filter, it's the thread's project's items and global ones; the Chief of
+   * Staff sees every project.
    */
-  const listItems = async (options: { projectId: string | null; threadId?: string; all: boolean; query?: string; kind?: string; tag?: string; space?: string }) => {
+  const listItems = async (options: { projectId: string | null; threadId?: string; all: boolean; query?: string; kind?: string; tag?: string }) => {
     const data = await overview();
     const names = await vocabulary(data);
     const parsed: Query = parseQuery(options.query ?? "");
-    for (const [field, value] of [["kind", options.kind], ["tag", options.tag], ["space", options.space]] as const) {
+    for (const [field, value] of [["kind", options.kind], ["tag", options.tag]] as const) {
       if (value) parsed.filters.push({ field, value });
     }
     const compiled = compileQuery(parsed, names);
     if (compiled.unknown.length) throw unknownFilter(compiled.unknown[0]!, names);
-    const named = parsed.filters.filter((filter) => !filter.negate && (filter.field === "space" || filter.field === "project"));
-    const scope = named.length || options.all || !options.threadId ? [] : threadSpaces(options.threadId, options.projectId);
-    const inScope = (item: HubItem) =>
-      named.length || options.all ? true : scope.length ? scope.some((space) => inSpace(space, item)) : item.projectId === null || item.projectId === options.projectId;
+    const named = parsed.filters.some((filter) => !filter.negate && filter.field === "project");
+    const everything = named || options.all || (options.threadId !== undefined && projectLeads.chiefThreadId() === options.threadId);
+    const inScope = (item: HubItem) => everything || item.projectId === null || item.projectId === options.projectId;
     const labels = new Map(data.providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.label])));
     const text = compiled.text.toLowerCase();
     const content = compiled.text ? await contentSearch(compiled.text) : null;
@@ -770,14 +584,13 @@ export default async function plugin(bb: BbPluginApi) {
       });
     const problems = data.providers.filter((provider) => provider.state !== "ready").map((provider) => `${provider.name}: ${provider.detail}`);
     const tagNames = new Map(data.tags.map((each) => [each.id, each.name]));
-    return { picked, labels, problems, tagNames, scope };
+    return { picked, labels, problems, tagNames };
   };
 
-  const formatList = ({ picked, labels, problems, tagNames, scope }: Awaited<ReturnType<typeof listItems>>, allHint = "Pass allProjects") => {
+  const formatList = ({ picked, labels, problems, tagNames }: Awaited<ReturnType<typeof listItems>>) => {
     const lines = picked.slice(0, MAX_LISTED).map((item) => itemLine(item, labels.get(`${item.pluginId}:${item.kind}`) ?? item.kind, tagNames));
     if (picked.length > MAX_LISTED) lines.push(`…and ${picked.length - MAX_LISTED} more. Narrow the query.`);
     if (!lines.length) lines.push("No Studio items match.");
-    if (scope.length) lines.unshift(`In ${scope.length === 1 ? "space" : "spaces"} ${scope.map((space) => space.name).join(", ")}. ${allHint} for everything.`, "");
     if (problems.length) lines.push("", "Unavailable:", ...problems.map((problem) => `- ${problem}`));
     return lines.join("\n");
   };
@@ -785,44 +598,19 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_list_items",
     description:
-      "List the user's BB Studio items — pages, Talk recordings, drawings and anything else a Studio add-on provides — newest first. In a thread that belongs to a Studio space it lists that space's items; otherwise this project's and global ones. A space: or project: filter, or allProjects, lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
+      "List the user's BB Studio items — pages, Talk recordings, drawings and anything else a Studio add-on provides — newest first. It lists this thread's project's items and global ones (the Chief of Staff, the personal project's lead, sees every project); a project: filter or allProjects lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
     parameters: z.object({
       query: z
         .string()
         .max(500)
         .optional()
-        .describe('Words match titles and content. Filters: kind:<kind> project:<name|global> tag:<name|none> space:<name> is:archived is:template; quote names with spaces, repeat a field for any of its values, prefix - to exclude. E.g. kind:page -tag:draft project:"Q4 launch" pricing'),
+        .describe('Words match titles and content. Filters: kind:<kind> project:<name|global> tag:<name|none> is:archived is:template; quote names with spaces, repeat a field for any of its values, prefix - to exclude. E.g. kind:page -tag:draft project:"Q4 launch" pricing'),
       kind: z.string().max(100).optional().describe("Only this kind, e.g. page, recording, drawing; same as kind: in the query"),
       allProjects: z.boolean().optional().describe("Include every project, not just this one"),
       tag: z.string().max(100).optional().describe("Only items with this tag; same as tag: in the query"),
-      space: z.string().max(100).optional().describe("Only items in this space, by name; same as space: in the query"),
     }),
-    async execute({ query, kind, allProjects, tag, space }, ctx) {
-      return formatList(await listItems({ projectId: ctx.projectId ?? null, threadId: ctx.threadId, all: allProjects === true, kind, query, tag, space }));
-    },
-  });
-
-  const formatSpaces = async (all: readonly Space[], current: readonly Space[]) => {
-    if (!all.length) return "No spaces yet. The user makes them in Studio.";
-    const { items, providers } = await hub.overview();
-    const background = backgroundKinds(providers);
-    const projectNames = new Map((await bb.sdk.projects.list().catch(() => [])).map((project) => [project.id, project.name]));
-    return all.map((space) => {
-      const count = items.filter((item) => !item.archived && !background.has(`${item.pluginId}:${item.kind}`) && inSpace(space, item)).length;
-      const projects = space.projectIds.map((id) => projectNames.get(id) ?? id);
-      return `- ${space.icon ? `${space.icon} ` : ""}${space.name}${current.some((each) => each.id === space.id) ? " (this thread)" : ""} — ${count} item${count === 1 ? "" : "s"}${
-        projects.length ? `, projects: ${projects.join(", ")}` : ""
-      }${space.threadIds.length ? `, ${space.threadIds.length} added thread${space.threadIds.length === 1 ? "" : "s"}` : ""} (${space.id})${space.description ? `\n  ${space.description}` : ""}`;
-    }).join("\n");
-  };
-
-  bb.agents.registerTool({
-    name: "studio_list_spaces",
-    description:
-      "List the user's Studio spaces. A space gathers whole BB projects, with their Studio items, and threads into one place; a thread in a space sees its items by default in studio_list_items.",
-    parameters: z.object({}),
-    async execute(_params, ctx) {
-      return formatSpaces(spaces.list(), threadSpaces(ctx.threadId, ctx.projectId ?? null));
+    async execute({ query, kind, allProjects, tag }, ctx) {
+      return formatList(await listItems({ projectId: ctx.projectId ?? null, threadId: ctx.threadId, all: allProjects === true, kind, query, tag }));
     },
   });
 
@@ -892,7 +680,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_delete_items",
     description:
-      "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove; spaces stay the user's to delete.",
+      "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove.",
     parameters: z.object({
       items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
     }),
@@ -925,33 +713,6 @@ export default async function plugin(bb: BbPluginApi) {
       if (refused.length) lines.push(`Can't be deleted here: ${refused.join(", ")}`);
       if (failed.length) lines.push(`Failed: ${failed.join(", ")}`);
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
-      return lines.join("\n");
-    },
-  });
-
-  bb.agents.registerTool({
-    name: "studio_space_items",
-    description:
-      "Move threads or Studio items into one of the user's spaces, or take this thread out. A thread is in one space at a time, so adding it moves it; taking it out returns it to its project's space. An item moves into the space's own project, unless it is already in the space. Only the user makes, renames or deletes spaces, so name one that exists. Use when the user asks to file something in a space, or when a space's lead starts a worker thread.",
-    parameters: z.object({
-      space: z.string().min(1).max(100).describe("The space's name or id"),
-      thisThread: z.enum(["add", "remove"]).optional().describe("Add this thread to the space, or take it out"),
-      threads: z.array(z.string().min(1).max(200)).max(100).optional().describe("Ids of other threads to add to the space, e.g. workers you started"),
-      items: z.array(z.string().max(500)).max(100).optional().describe("Studio items to move into the space, as the links studio_list_items shows, e.g. /plugins/pages/pages/pg_x"),
-    }),
-    async execute({ space: name, thisThread, threads = [], items = [] }, ctx) {
-      const space = requireSpace(name);
-      if (!thisThread && !threads.length && !items.length) return "Pass threads, items or thisThread.";
-      const thread = { pluginId: THREAD_REF, id: ctx.threadId };
-      const others = (await Promise.all(threads.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null)))).flatMap((found, index) => (found && found.deletedAt == null ? [{ pluginId: THREAD_REF, id: threads[index]! }] : []));
-      const missing = threads.filter((threadId) => !others.some((other) => other.id === threadId));
-      spaces.add(space.id, [...others, ...(thisThread === "add" ? [thread] : [])]);
-      if (thisThread === "remove") spaces.removeMembers(space.id, [thread]);
-      threadsMoved();
-      const lines = others.length ? [`Space ${space.name}: added ${others.length} thread${others.length === 1 ? "" : "s"}.`] : [];
-      if (thisThread) lines.push(thisThread === "add" ? "This thread is in the space." : "This thread is out of the space.");
-      if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
-      if (items.length) lines.push(...(await moveItemsReport(items, { spaceId: space.id }, `Space ${space.name}`)));
       return lines.join("\n");
     },
   });
@@ -1031,7 +792,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_move_items",
     description:
-      "Move the user's BB Studio items to another BB project, or to Global (no project). An item's space follows its project; to put items in a space, use studio_space_items instead. Pass items as the links studio_list_items shows.",
+      "Move the user's BB Studio items to another BB project, or to Global (no project). Pass items as the links studio_list_items shows.",
     parameters: z.object({
       items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
       project: z.string().min(1).max(200).describe('The project\'s id or name, or "global" for no project'),
@@ -1092,10 +853,9 @@ export default async function plugin(bb: BbPluginApi) {
     name: "studio",
     summary: "List BB Studio items across Pages, Talk, Draw and other add-ons",
     commands: [
-      { name: "list", summary: "List items in the current space, or the current project and global ones", usage: "bb studio list [query…] [--all] [--json], e.g. bb studio list kind:page -tag:draft pricing" },
+      { name: "list", summary: "List items in the current project and global ones", usage: "bb studio list [query…] [--all] [--json], e.g. bb studio list kind:page -tag:draft pricing" },
       { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
-      { name: "spaces", summary: "List spaces, their projects and how many items each has", usage: "bb studio spaces" },
-      { name: "move", summary: "Move items or threads into a space, or items to a project", usage: "bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)" },
+      { name: "move", summary: "Move items to a project", usage: "bb studio move <item-link|plugin:id>… --project <name|id|global>" },
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
       { name: "health", summary: "Check every plugin for setup problems and failures", usage: "bb studio health [--json]" },
       { name: "setup", summary: "Show which BB Studio add-ons are installed and working, and the commands to finish setup", usage: "bb studio setup [--json]" },
@@ -1109,21 +869,21 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "artifacts") return artifacts.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
-        list: "bb studio list [query…] [--all] [--json] [--space <name>] [--kind <kind>] [--tag <tag>] [--query <text>]",
-        move: "bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)",
+        list: "bb studio list [query…] [--all] [--json] [--kind <kind>] [--tag <tag>] [--query <text>]",
+        move: "bb studio move <item-link|plugin:id>… --project <name|id|global>",
         backup: "bb studio backup [--out <file|folder>]",
         restore: "bb studio restore <file> [--dry-run | --yes]",
       };
       const SPECS: Record<string, CliSpec> = {
-        list: { flags: ["--json", "--all"], options: ["--space", "--kind", "--tag", "--query"] },
+        list: { flags: ["--json", "--all"], options: ["--kind", "--tag", "--query"] },
         health: { flags: ["--json"] },
         setup: { flags: ["--json"] },
-        move: { options: ["--space", "--project"] },
+        move: { options: ["--project"] },
         backup: { options: ["--out"] },
         restore: { flags: ["--dry-run", "--yes"] },
       };
       const parsed = parseCliArgs(raw, SPECS[command ?? ""] ?? {});
-      const known = ["list", "tags", "spaces", "move", "providers", "health", "setup", "reindex", "backup", "restore"].includes(command ?? "");
+      const known = ["list", "tags", "move", "providers", "health", "setup", "reindex", "backup", "restore"].includes(command ?? "");
       if (!parsed.ok && known) return usage(`${USAGE[command!] ?? `bb studio ${command}`}\n${parsed.error}`);
       const rest = parsed.ok ? parsed.positional : [];
       const flag = (name: string) => parsed.ok && parsed.flags.has(name);
@@ -1132,11 +892,11 @@ export default async function plugin(bb: BbPluginApi) {
         switch (command) {
           case "list": {
             const json = flag("--json");
-            const options = { all: flag("--all"), space: option("--space"), kind: option("--kind"), tag: option("--tag"), query: option("--query") };
+            const options = { all: flag("--all"), kind: option("--kind"), tag: option("--tag"), query: option("--query") };
             const query = [options.query, ...rest.map(queryArg)].filter(Boolean).join(" ");
             const result = await listItems({ projectId: ctx.projectId ?? null, threadId: ctx.threadId ?? undefined, ...options, query });
             if (json) return { exitCode: 0, stdout: `${JSON.stringify(result.picked.slice(0, MAX_LISTED), null, 2)}\n` };
-            return { exitCode: 0, stdout: `${formatList(result, "Pass --all")}\n` };
+            return { exitCode: 0, stdout: `${formatList(result)}\n` };
           }
           case "tags": {
             const { items, tags: allTags } = await overview();
@@ -1144,33 +904,11 @@ export default async function plugin(bb: BbPluginApi) {
             const lines = allTags.map((tag) => `#${tag.name}\t${items.filter((item) => item.tags.includes(tag.id)).length}`);
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }
-          case "spaces":
-            return { exitCode: 0, stdout: `${await formatSpaces(spaces.list(), ctx.threadId ? threadSpaces(ctx.threadId, ctx.projectId ?? null) : [])}\n` };
           case "move": {
-            const spaceName = option("--space");
             const project = option("--project");
-            if (!rest.length || Boolean(spaceName) === Boolean(project)) return usage(USAGE.move!);
-            const threadIds = rest.filter((ref) => /^thr_[a-z0-9]+$/i.test(ref));
-            const itemRefs = rest.filter((ref) => !threadIds.includes(ref));
-            const lines: string[] = [];
-            if (spaceName) {
-              const space = requireSpace(spaceName);
-              if (threadIds.length) {
-                const found = (await Promise.all(threadIds.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null)))).flatMap((thread, index) => (thread && thread.deletedAt == null ? [threadIds[index]!] : []));
-                if (found.length) {
-                  spaces.add(space.id, found.map((id) => ({ pluginId: THREAD_REF, id })));
-                  threadsMoved();
-                  lines.push(`Space ${space.name}: moved ${found.length} thread${found.length === 1 ? "" : "s"}.`);
-                }
-                const missing = threadIds.filter((id) => !found.includes(id));
-                if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
-              }
-              if (itemRefs.length) lines.push(...(await moveItemsReport(itemRefs, { spaceId: space.id }, `Space ${space.name}`)));
-            } else {
-              if (threadIds.length) return { exitCode: 1, stderr: "Threads move between spaces; pass --space.\n" };
-              const projectId = await resolveProject(project!);
-              lines.push(...(await moveItemsReport(itemRefs, { projectId }, projectId ? `Project ${project}` : "Global")));
-            }
+            if (!rest.length || !project) return usage(USAGE.move!);
+            const projectId = await resolveProject(project);
+            const lines = await moveItemsReport(rest, { projectId }, projectId ? `Project ${project}` : "Global");
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }
           case "providers": {
@@ -1219,7 +957,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|spaces|move|providers|health|setup|reindex|backup|restore|artifacts> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|artifacts> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

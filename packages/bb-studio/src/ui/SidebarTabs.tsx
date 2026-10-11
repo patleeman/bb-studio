@@ -29,7 +29,6 @@ import { closeWorkspaceTabs, useWorkspace } from "./Workspace";
 import { panes } from "./workspace-state";
 import { SidebarItemRow } from "./SidebarItemRow";
 import { SidebarCreateMenu } from "./SidebarCreateMenu";
-import { useBySpace } from "./space/SidebarSpacesSection";
 
 const REFETCH_DEBOUNCE_MS = 300;
 const APP_NAMES: Record<string, string> = {
@@ -75,7 +74,6 @@ export function SidebarTabs() {
   const workspacePath = path.replace(/\/+$/, "") === WORKSPACE_PATH ? panes(workspace.layout).find(pane => pane.id === workspace.focused)?.active : null;
   const { tabs, setTabs, error, refetch, rpc } = useTabs(hosted);
   const navigated = useSidebarNavigated();
-  const bySpace = useBySpace();
   const [display, setDisplay] = useSidebarDisplay(
     "studio:sidebar-tabs-display",
     { organization: "none", sort: "opened", direction: "ascending" },
@@ -128,9 +126,7 @@ export function SidebarTabs() {
       : [{ label: null, tabs: sorted }];
 
   // Nothing open, nothing to show: the section only appears once an item is open.
-  // By Space, each Space lists its own open items, so this section steps aside
-  // while it keeps recording visits.
-  if (bySpace || (tabs && !tabs.length && !error)) return null;
+  if (tabs && !tabs.length && !error) return null;
   return (
     <SidebarPortal id="tabs" title="Studio" order={0}>
       <SidebarSection

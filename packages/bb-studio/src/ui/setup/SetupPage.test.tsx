@@ -10,6 +10,7 @@ const setup = vi.hoisted(() => ({
 }));
 vi.mock("./use-setup", () => ({ useSetup: () => setup }));
 vi.mock("./BackupSection", () => ({ BackupSection: () => null }));
+vi.mock("../ProjectLeads", () => ({ ProjectLeadsSection: () => null }));
 vi.mock("../health/use-health", () => ({ useHealth: () => ({}) }));
 vi.mock("../health/HealthViews", () => ({ ProblemRow: ({ problem }: { problem: { title: string } }) => React.createElement("li", null, problem.title) }));
 vi.mock("@bb-studio/kit/ui", () => ({

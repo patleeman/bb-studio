@@ -117,7 +117,7 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: ARTIFACT_UPDATE_TYPE, artifactId: id }) });
 
   const services = studioServices(bb.sdk);
-  /** A new artifact saved from a thread joins the thread's spaces. */
+  /** A new artifact saved from a thread is linked to the thread. */
   function created(result: SaveResult, threadId: string | null) {
     if (result.outcome === "created" && threadId) void services.created({ pluginId: PLUGIN_ID, id: result.artifact.id }, threadId).catch(() => {});
   }

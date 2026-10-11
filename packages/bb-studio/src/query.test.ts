@@ -8,10 +8,9 @@ const vocabulary: QueryVocabulary = {
   ],
   projects: [{ id: "proj_a", name: "bb-studio" }, { id: "proj_b", name: "Q4 launch" }],
   tags: [{ id: "tag_x", name: "Explore" }],
-  spaces: [{ id: "spc_1", name: "Launch" }],
 };
 
-const page = { kind: "page", projectId: "proj_a", archived: false, tags: ["tag_x"], spaces: ["spc_1"] };
+const page = { kind: "page", projectId: "proj_a", archived: false, tags: ["tag_x"] };
 const global = { kind: "page", projectId: null, archived: false };
 const old = { kind: "page", projectId: "proj_b", archived: true };
 const dictation = { kind: "dictation", projectId: null, archived: false };
@@ -39,7 +38,6 @@ describe("query", () => {
     expect([page, global, old].map((item) => query.test(item))).toEqual([true, true, false]);
     expect(compileQuery(parseQuery("-tag:explore"), vocabulary).test(page)).toBe(false);
     expect(compileQuery(parseQuery("tag:none"), vocabulary).test(global)).toBe(true);
-    expect(compileQuery(parseQuery("space:launch"), vocabulary).test(global)).toBe(false);
   });
 
   it("shows archived items only when asked", () => {
