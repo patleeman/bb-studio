@@ -92,11 +92,11 @@ describe("buildSetup", () => {
 
 describe("retired plugins", () => {
   it("lists only the installed ones, with what's kept and deleted", async () => {
-    const { sdk } = fakeSdk([...allInstalled(), plugin("float"), plugin("bot-teams", { enabled: false })]);
+    const { sdk } = fakeSdk([...allInstalled(), plugin("studio-tables"), plugin("thread-list-plus", { enabled: false })]);
     const summary = await buildSetup(sdk, health());
-    expect(summary.retired.map((each) => each.id)).toEqual(["float", "bot-teams"]);
-    expect(summary.retired[0]).toMatchObject({ blocker: null, removeCommand: "bb plugin remove float", kept: expect.any(String), deleted: expect.stringContaining("settings") });
-    expect(summary.retired[1]!.before.map((each) => each.command)).toContain("bb bots list --json");
+    expect(summary.retired.map((each) => each.id)).toEqual(["thread-list-plus", "studio-tables"]);
+    expect(summary.retired[1]).toMatchObject({ blocker: null, removeCommand: "bb plugin remove studio-tables", kept: expect.any(String), deleted: expect.stringContaining("CSV") });
+    expect(summary.retired[0]!.enabled).toBe(false);
   });
 
   it("keeps Studio Artifacts until its bridge has copied every artifact into Studio", async () => {
@@ -146,11 +146,6 @@ describe("retired plugins", () => {
     expect(await blocker(plugin("talk", { version: "0.2.0" }), { complete: false, total: 4, copied: 3, skipped: [], error: null })).toMatch(/3 of 4 recordings.*bb talk migrate/);
     expect(await blocker(plugin("talk", { version: "0.2.0" }), { complete: true, total: 4, copied: 4, skipped: [], error: null })).toBeNull();
   });
-
-  it("lets Studio Navigation go without Studio Sidebar", async () => {
-    const setup = await buildSetup(fakeSdk([plugin("studio-navigation")]).sdk, health());
-    expect(setup.retired[0]!.blocker).toBeNull();
-  });
 });
 
 describe("SetupService", () => {
@@ -173,27 +168,27 @@ describe("SetupService", () => {
   });
 
   it("enables only add-ons and removes only retired plugins that nothing blocks", async () => {
-    const fake = fakeSdk([plugin("emoji-react", { enabled: false }), plugin("float")]);
+    const fake = fakeSdk([plugin("emoji-react", { enabled: false }), plugin("studio-tables")]);
     await service(fake).enable("emoji-react");
-    await expect(service(fake).enable("float")).rejects.toThrow("isn't a BB Studio add-on");
+    await expect(service(fake).enable("studio-tables")).rejects.toThrow("isn't a BB Studio add-on");
     await expect(service(fake).remove("emoji-react")).rejects.toThrow("isn't a retired");
-    await service(fake).remove("float");
-    expect(fake.calls.filter((call) => !call.startsWith("rpc"))).toEqual(["enable emoji-react", "remove float"]);
+    await service(fake).remove("studio-tables");
+    expect(fake.calls.filter((call) => !call.startsWith("rpc"))).toEqual(["enable emoji-react", "remove studio-tables"]);
   });
 });
 
 describe("formatSetup", () => {
   it("prints the status, retired plugins and the commands to run", async () => {
     const plugins = allInstalled().filter((each) => each.id !== "applets").map((each) => (each.id === "emoji-react" ? { ...each, enabled: false } : each));
-    const { sdk } = fakeSdk([...plugins, plugin("float")]);
+    const { sdk } = fakeSdk([...plugins, plugin("studio-tables")]);
     const text = formatSetup(await buildSetup(sdk, health({ problems: [{ ...problem("smart-decisions", "degraded", "No Jev provider is set up"), detail: "Add a key" }] })));
     expect(text).toContain("BB Studio add-ons\n");
     expect(text).toMatch(/ {2}not installed +applets +Studio Applets: Experimental/);
     expect(text).toMatch(/ {2}disabled +emoji-react +Studio Reactions:/);
     expect(text).toMatch(/ {2}needs setup +smart-decisions +Studio Decisions:.*\n +degraded: No Jev provider is set up\. Add a key/);
     expect(text).toMatch(/ {2}ok +studio +Studio:/);
-    expect(text).toContain("Retired plugins still installed\n  float");
-    expect(text).toContain("Then remove it: bb plugin remove float");
+    expect(text).toContain("Retired plugins still installed\n  studio-tables");
+    expect(text).toContain("Then remove it: bb plugin remove studio-tables");
     expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin install applets@bb-studio --yes\n  bb plugin enable emoji-react")).toBe(true);
   });
 

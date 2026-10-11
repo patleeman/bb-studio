@@ -954,11 +954,12 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   same CLI command with a Copy button, for when it fails.
 - If BB doesn't know the `bb-studio` marketplace yet, the page shows
   `bb marketplace add git:github.com/patleeman/bb-studio@main` first.
-- **Retired plugins** shows `artifacts`, `studio-navigation`, `float`,
-  `bot-teams` and `studio-tables` if they're installed: why each is retired, what removing it
+- **Retired plugins** shows the upgrade bridges (`pages`, `talk`,
+  `excalidraw`, `artifacts`, `design`), `thread-list-plus` and
+  `studio-tables` if they're installed: why each is retired, what removing it
   keeps and deletes, and what to do first. **Remove…** asks before it removes
-  anything. Studio Artifacts can't be removed until its upgrade bridge has
-  copied every artifact into Studio (`bb artifacts migrate`).
+  anything. A bridge can't be removed until it has copied every item into
+  Studio (`bb <id> migrate`).
 - Problems with plugins outside BB Studio are listed at the bottom.
 
 `bb studio setup` prints the same status, the retired plugins and the

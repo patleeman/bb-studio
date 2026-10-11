@@ -11,13 +11,13 @@ import { z } from "zod";
 import { ADDONS } from "../setup-addons";
 import { extractEntries, readEntry, readZip, zipDirectory, type ZipLimits, DEFAULT_LIMITS } from "./zip";
 
-/** The add-ons whose items a backup holds, in restore order. */
+/** The kinds built into Studio whose items a backup holds, by their old add-on ids, in restore order. */
 export const BACKUP_ADDONS = ["pages", "talk", "excalidraw", "artifacts", "design"] as const;
 
 /** What a backup leaves out, on purpose. Written into every manifest. */
 export const NOT_INCLUDED = [
   { what: "Studio Code workspaces", why: "A workspace is a folder on disk; back the folder up with your files." },
-  { what: "Studio Mobile, Reactions, Decisions and Sidebar settings", why: "They're settings for this BB, not items; set them up again on the new BB." },
+  { what: "Studio Mobile, Reactions and Decisions settings", why: "They're settings for this BB, not items; set them up again on the new BB." },
   { what: "BB threads, projects and their files", why: "They belong to BB itself. Items are matched to projects by path or name when restored." },
   { what: "Secrets and provider credentials", why: "They never leave the BB they were entered on." },
 ];
