@@ -19,7 +19,7 @@ function Text({ text }) {
   return html`${parts.map((part, i) =>
     i % 2
       ? html`<pre key=${i} className="my-1.5 overflow-x-auto rounded-md bg-surface-recessed p-2 font-mono text-xs">${part.replace(/\n$/, "")}</pre>`
-      : html`<span key=${i} className="whitespace-pre-wrap">${part}</span>`,
+      : html`<span key=${i} className="whitespace-pre-wrap">${part.replace(/^\n+|\n+$/g, "")}</span>`,
   )}`;
 }
 
