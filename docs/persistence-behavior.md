@@ -2,8 +2,7 @@
 
 Pages, Draw and Talk use different storage engines. They share the following
 user-facing requirements; they do not need a common storage implementation.
-This is the persistence acceptance contract from the
-[codebase review](codebase-review-2026-10-02.md), with evidence and remaining gaps.
+This is the persistence acceptance contract, with evidence and remaining gaps.
 
 ## What each state means
 
@@ -68,5 +67,4 @@ for native checks. Record whether a fault was injected, a microphone was
 synthetic, or a physical device was used. Those distinctions determine what the
 evidence proves.
 
-The [issue ledger](review-issues.md) owns current closure status. This contract
-does not turn a passing unit suite into a claim of crash-proof storage.
+This contract does not turn a passing unit suite into a claim of crash-proof storage.
