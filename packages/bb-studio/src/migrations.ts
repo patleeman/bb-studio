@@ -1,4 +1,5 @@
 import { ARTIFACT_TABLES } from "./artifacts/server/store";
+import { DRAWING_TABLES } from "./draw/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
 // (src/search-index.ts) and project leads (src/project-lead.ts). The space
@@ -186,4 +187,6 @@ export const MIGRATIONS = [
    INSERT OR IGNORE INTO space_retired_automations (automation_id, automation_project_id)
      SELECT automation_id, automation_project_id FROM space_runs WHERE automation_id IS NOT NULL;
    UPDATE space_runs SET enabled = 0, automation_id = NULL, automation_project_id = NULL;`,
+  // Drawings are built in (src/draw): the Draw plugin's tables, filled by its upgrade bridge.
+  DRAWING_TABLES,
 ];

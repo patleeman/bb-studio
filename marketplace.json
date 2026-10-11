@@ -15,6 +15,7 @@
       "tags": [
         "productivity",
         "documents",
+        "drawing",
         "collaboration",
         "bb-studio"
       ],
@@ -85,13 +86,12 @@
     {
       "id": "excalidraw",
       "displayName": "Studio Draw",
-      "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations.",
+      "description": "Upgrade bridge for Studio Draw, now built into Studio: copies your drawings into Studio and forwards older clients and mentions.",
       "icon": {
         "url": "./packages/bb-studio-draw/assets/icon.svg"
       },
       "tags": [
         "drawing",
-        "collaboration",
         "bb-studio"
       ],
       "author": {

@@ -19,6 +19,7 @@ export interface BuiltinRoute {
 
 export const BUILTIN_ROUTES: readonly BuiltinRoute[] = [
   { pluginId: "artifacts", segment: "artifacts", kind: "artifact", legacyRoot: "/plugins/artifacts/artifacts" },
+  { pluginId: "excalidraw", segment: "drawings", kind: "drawing", legacyRoot: "/plugins/excalidraw/drawings" },
 ];
 
 export const BUILTIN_PLUGIN_IDS: ReadonlySet<string> = new Set(BUILTIN_ROUTES.map((route) => route.pluginId));

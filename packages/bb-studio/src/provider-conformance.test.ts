@@ -1,15 +1,9 @@
-import { registerStudio as registerDraw } from "../../bb-studio-draw/src/server/studio";
-import { memoryStore as drawingStore } from "../../bb-studio-draw/src/test/db";
-import { schemas } from "./contract";
+import { drawingProvider } from "./draw/server/provider";
+import { memoryStore as drawingStore } from "./draw/test/db";
 import { providerConformance, type ProviderHarness } from "./test/provider-conformance";
 
-function registration() {
-  const handlers: ProviderHarness["handlers"] = {};
-  return { handlers, bb: { rpc: { register: (_contract: unknown, registered: typeof handlers) => Object.assign(handlers, registered) } } };
-}
 providerConformance("Draw", () => {
   const { db, store } = drawingStore();
-  const { handlers, bb } = registration();
-  registerDraw(bb as never, schemas, { store, changed: () => {} });
+  const handlers = drawingProvider({ store, changed: () => {} }) as unknown as ProviderHarness["handlers"];
   return { pluginId: "excalidraw", kind: "drawing", handlers, editTitle: (id, title) => { store.rename(id, title, "app"); }, close: () => db.close() };
 });

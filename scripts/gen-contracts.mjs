@@ -16,7 +16,8 @@ const plugins = [
   ["pages", "Pages", "../packages/bb-studio-pages/src/contract.ts", "rpcContract"],
   // Artifacts are built into Studio; the old plugin's upgrade bridge forwards these for older clients.
   ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "legacyContract"],
-  ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "rpcContract"],
+  // Drawings are built into Studio; the old plugin's upgrade bridge forwards these for older clients.
+  ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "legacyContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
   ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],
   ["design", "Design", "../packages/bb-studio-design/server.ts", "rpcContract"],

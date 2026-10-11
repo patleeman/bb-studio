@@ -21,7 +21,8 @@
     "./ui": "./src/ui/index.ts",
     "./chat-contract": "./src/chat-contract.ts",
     "./chat-schemas": "./src/chat-schemas.ts",
-    "./artifacts-contract": "./src/artifacts-contract.ts"
+    "./artifacts-contract": "./src/artifacts-contract.ts",
+    "./draw-contract": "./src/draw-contract.ts"
   },
   "files": [
     "src",

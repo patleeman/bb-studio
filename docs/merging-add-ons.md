@@ -1,9 +1,9 @@
 # Merging an add-on into Studio
 
 Studio is one plugin with one rail icon (`studio/studio`). Its content kinds
-are moving into it one at a time. Artifacts went first (`packages/bb-studio/src/artifacts`);
-Draw, Design, Talk and Pages follow the same steps. This is the checklist,
-with what Artifacts taught.
+are moving into it one at a time. Artifacts went first (`packages/bb-studio/src/artifacts`),
+then Draw (`packages/bb-studio/src/draw`); Design, Talk and Pages follow the
+same steps. This is the checklist, with what Artifacts and Draw taught.
 
 ## Rules
 
@@ -72,7 +72,21 @@ with what Artifacts taught.
 - `app.tsx`: add the lazy item view to `BUILTIN_VIEWS`, and register the
   kind's thread panel actions, message directives and composer entries.
   `BuiltinRoutes` registers the Studio and old roots with the workspace.
-  BB's app bundle is one file, so `lazy` defers rendering, not download.
+  BB's app bundle is one file, so `lazy` defers evaluation, not download.
+- Heavy dependencies (Draw's Excalidraw, resvg-wasm) must stay out of
+  app.tsx's static import graph: split what Studio registers at startup (the
+  reply card, the composer picker) from what needs the library (the editor),
+  `lazy` the item view and the thread tab, and `import()` the library inside
+  callbacks (the composer's PNG render). On the server, `import()` a wasm
+  module on first use. `frontend-imports.test.ts` fails if `@excalidraw/` is
+  reachable from app.tsx, or `@resvg/` from server.ts; add any new heavy
+  package there. Move the package to Studio's `dependencies` (the server
+  resolves files inside it at runtime, like Excalidraw's fonts).
+- Kit pieces that call "this plugin's" `studio_*` RPCs don't work for a
+  built-in kind: Studio has no such RPC, only `provider.call`.
+  `ThreadItemsPanel` takes a `call` (Draw's `useDrawingProvider`), and
+  `ItemMenu` takes `onMove`, which goes through `provider.call` with
+  `studio_move`.
 - Version history (`provider-history.ts`) and backup (`BackupService`
   `builtins`) read the kind in-process. The backup section keeps the old
   plugin id, so old backups restore into Studio.
@@ -88,12 +102,19 @@ the old plugin's data. Copy it.
   find the statement by content instead (`project-lead.test.ts`).
 - Import RPCs on Studio: `<segment>.missingBlobs`, `<segment>.importBlob`
   (hash-checked, one per call: a blob can be 25 MB), and
-  `<segment>.importRows` (batches of 100). Import keeps ids and times. A
+  `<segment>.importRows` (batches of 100). Draw has no blobs, but a scene
+  holds its images as data URLs, so its batches are also capped at 8 MB of
+  scene (a larger row goes alone) and the bridge reads rows a batch at a
+  time. Import keeps ids and times. A
   row Studio already has is left alone, so reruns are no-ops. A conflicting
   row (same source file saved again after the update) is skipped with a
   reason.
 - Check the old plugin for data outside SQLite: KV, settings, files under
   its data dir, thread storage. Artifacts kept everything in SQLite blobs.
+  Copy side tables that make retries idempotent too: Draw's
+  `drawing_recovery_copies` keys go along with each drawing, so a browser
+  draft recovered after the update doesn't make a second copy. Browser
+  storage (Draw's IndexedDB drafts) is per origin, so it carries over.
 
 ### 4. Turn the old package into a bridge release
 
@@ -121,8 +142,13 @@ and `packages/bb-studio-artifacts`.
   Studio doesn't list the old plugin's items. Updating both together (Setup
   says so) ends that window, and the bridge copies anything written in it.
   Mention providers are scoped per plugin, so both can register the same id.
-- Studio `setup.ts`: add a `RETIRED` entry whose blocker checks the version
-  (`<BRIDGE_VERSION`: update it), that it's enabled, and `migrationStatus`.
+  An old HTTP route whose content Studio serves at a new path (Draw's
+  `/thumbnail`) is answered through a bridge RPC on Studio
+  (`drawings.thumbnail`); a forwarded call that waits on the user (Draw's
+  `pickDrawing`, up to five minutes) needs a longer timeout.
+- Studio `setup.ts`: add a `RETIRED` entry with
+  `blocker: bridgeBlocker("<noun>", <BRIDGE_VERSION>)`, which checks the
+  version (older: update it), that it's enabled, and `migrationStatus`.
   Remove the id from `ADDONS` in `setup-addons.ts`. Its test skips retired
   ids when comparing with `marketplace.json`.
 - Marketplace: keep the bridge listed in `marketplace.json` and
@@ -137,9 +163,16 @@ and `packages/bb-studio-artifacts`.
   `Shared/Artifacts.swift`), for one release. Parse the Studio address in
   `Route(href:)`. `scripts/gen-contracts.mjs` generates the old namespace
   from the bridge's `legacyContract`, so the fallback's method names stay
-  checked. Run `pnpm gen:contracts`. Xcode isn't available to agents here;
+  checked. Run `pnpm gen:contracts`. Write each call with literal generated
+  names (`Studio.Method.drawings_getDrawing`, `Draw.Method.getDrawing`):
+  the native RPC inventory can't check an interpolated method name and
+  fails. Keep a per-kind "answered by Studio" flag (Draw's
+  `drawingsInStudio`) for URLs that differ, like thumbnails.
   `swiftc -typecheck -enable-bare-slash-regex Shared/*.swift Shared/Generated/*.swift`
-  checks the shared code.
+  checks the shared code. With Xcode installed, `xcodegen generate` and
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test
+  -scheme BBStudio -only-testing:BBStudioTests` builds the app too (it caught
+  a main-actor capture `swiftc` didn't); don't commit the `.xcodeproj`.
 - Captures: move the kind's capture to `packageDir: "bb-studio"` with a
   `fileName`, open it from the old address, and assert it lands as a Studio
   tab. The bridge's README shows Studio's Setup page after
@@ -175,7 +208,8 @@ commit, run `bb <old> migrate`, and check the items in Studio
   When Talk merges, show those as a banner in Studio's library when it's
   filtered to recordings.
 - **Pages** is called by other add-ons and calls them (embeds, `itemAt`);
-  move those calls to `callProvider` and Studio's prefixed methods.
+  move those calls to `callProvider` and Studio's prefixed methods. Its
+  whiteboard already calls Studio's `drawings.getDrawing`/`saveDrawing`.
 - When every add-on is merged, delete `AddOnCollection`, `AddOnPanel` and
   `handOver` from the kit.
 - After the bridge's release cycle, delete the bridge package and its iOS

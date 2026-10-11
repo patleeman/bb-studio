@@ -27,7 +27,8 @@
         "artifact-image": "./icons/artifact-image.svg",
         "artifact-save": "./icons/artifact-save.svg",
         "artifact-audio": "./icons/artifact-audio.svg",
-        "artifact-video": "./icons/artifact-video.svg"
+        "artifact-video": "./icons/artifact-video.svg",
+        "draw": "./icons/draw.svg"
       }
     },
     "server": "./server.ts",
@@ -46,6 +47,8 @@
   },
   "dependencies": {
     "@bb-studio/kit": "file:../bb-studio-kit.tgz",
+    "@excalidraw/excalidraw": "^0.18.1",
+    "@resvg/resvg-wasm": "2.6.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

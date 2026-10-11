@@ -4,6 +4,7 @@
 // enables and removes use BB's plugin SDK; every action also has the CLI
 // command that does the same, for when the SDK call fails.
 import { ARTIFACTS_BRIDGE_VERSION, bridgeStatusContract } from "@bb-studio/kit/artifacts-contract";
+import { DRAW_BRIDGE_VERSION } from "@bb-studio/kit/draw-contract";
 import type { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
 import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
@@ -91,18 +92,20 @@ interface RetiredPlugin {
 }
 
 /**
- * Has the Artifacts upgrade bridge copied every artifact into Studio? Older
- * releases can't copy, a turned-off one can't run, and the bridge itself says
- * how far its copy got.
+ * Has an upgrade bridge copied every item into Studio? Older releases can't
+ * copy, a turned-off one can't run, and the bridge itself says how far its
+ * copy got. Every bridge answers `migrationStatus` in the same shape.
  */
-async function artifactsBlocker(plugin: SetupPluginEntry, { sdk }: { sdk: SetupSdk }): Promise<string | null> {
-  const migrate = "Run `bb artifacts migrate` and wait for Migration complete.";
-  if (compareVersions(plugin.version, ARTIFACTS_BRIDGE_VERSION) < 0) return `It's version ${plugin.version}, from before the upgrade bridge. Update it so it can copy your artifacts into Studio (\`bb plugin update artifacts --yes\`), then: ${migrate}`;
-  if (!plugin.enabled) return `It's turned off, so it can't copy your artifacts into Studio. Turn it on with \`${enableCommand(plugin.id)}\`, then: ${migrate}`;
-  const status = await sdk.plugins.callRpc({ pluginId: plugin.id, method: "migrationStatus", input: null, outputSchema: bridgeStatusContract.migrationStatus.output, signal: AbortSignal.timeout(30_000) });
-  if (status.complete) return null;
-  const why = status.error ? ` The last try failed: ${status.error}` : "";
-  return `${status.copied} of ${status.total} artifacts are in Studio so far.${why} ${migrate}`;
+function bridgeBlocker(noun: string, bridgeVersion: string) {
+  return async (plugin: SetupPluginEntry, { sdk }: { sdk: SetupSdk }): Promise<string | null> => {
+    const migrate = `Run \`bb ${plugin.id} migrate\` and wait for Migration complete.`;
+    if (compareVersions(plugin.version, bridgeVersion) < 0) return `It's version ${plugin.version}, from before the upgrade bridge. Update it so it can copy your ${noun} into Studio (\`bb plugin update ${plugin.id} --yes\`), then: ${migrate}`;
+    if (!plugin.enabled) return `It's turned off, so it can't copy your ${noun} into Studio. Turn it on with \`${enableCommand(plugin.id)}\`, then: ${migrate}`;
+    const status = await sdk.plugins.callRpc({ pluginId: plugin.id, method: "migrationStatus", input: null, outputSchema: bridgeStatusContract.migrationStatus.output, signal: AbortSignal.timeout(30_000) });
+    if (status.complete) return null;
+    const why = status.error ? ` The last try failed: ${status.error}` : "";
+    return `${status.copied} of ${status.total} ${noun} are in Studio so far.${why} ${migrate}`;
+  };
 }
 
 export const RETIRED: readonly RetiredPlugin[] = [
@@ -116,7 +119,19 @@ export const RETIRED: readonly RetiredPlugin[] = [
       step("Update Studio and Studio Artifacts.", "bb plugin update studio --yes && bb plugin update artifacts --yes"),
       step("Copy its artifacts into Studio, and wait for Migration complete.", "bb artifacts migrate"),
     ],
-    blocker: artifactsBlocker,
+    blocker: bridgeBlocker("artifacts", ARTIFACTS_BRIDGE_VERSION),
+  },
+  {
+    id: "excalidraw",
+    name: "Studio Draw",
+    why: "Drawings are built into Studio now. This last release is only an upgrade bridge: it copies your drawings into Studio and forwards older clients.",
+    kept: "Every drawing it copied into Studio, with its scene, images, tags, links and chats. Links to /plugins/excalidraw/drawings/<id> still open them in Studio.",
+    deleted: `${REMOVED} Any rows \`bb excalidraw migrate\` listed as skipped (malformed) are lost; copy what you need from them first. iOS app builds from before the merge stop opening drawings.`,
+    before: [
+      step("Update Studio and Studio Draw.", "bb plugin update studio --yes && bb plugin update excalidraw --yes"),
+      step("Copy its drawings into Studio, and wait for Migration complete.", "bb excalidraw migrate"),
+    ],
+    blocker: bridgeBlocker("drawings", DRAW_BRIDGE_VERSION),
   },
   {
     id: "studio-navigation",

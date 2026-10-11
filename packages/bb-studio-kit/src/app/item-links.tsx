@@ -75,8 +75,11 @@ type Result = z.infer<typeof resultSchema>[number];
 // Each add-on's item icon, by the plugin and panel its links open.
 const LINK_ICONS: Record<string, string> = {
   "pages/pages": "pages/pages",
-  "excalidraw/drawings": "excalidraw/draw",
-  "artifacts/artifacts": "artifacts/artifact",
+  "excalidraw/drawings": "studio/draw",
+  "artifacts/artifacts": "studio/artifact",
+  // Kinds built into Studio, at /plugins/studio/studio/<segment>/<id>.
+  "studio/studio/drawings": "studio/draw",
+  "studio/studio/artifacts": "studio/artifact",
   "talk/recordings": "talk/talk",
   "studio-code/workspaces": "Code",
   "studio/chats": "MessageSquare",
@@ -84,8 +87,8 @@ const LINK_ICONS: Record<string, string> = {
 
 /** The icon for the item a link opens, read from the link itself: /plugins/<plugin>/<panel>/<id>. */
 export function itemLinkIcon(href: string): string {
-  const [, , pluginId = "", panel = ""] = href.split(/[?#]/)[0]!.split("/");
-  return LINK_ICONS[`${pluginId}/${panel}`] ?? "GridView";
+  const [, , pluginId = "", panel = "", segment = ""] = href.split(/[?#]/)[0]!.split("/");
+  return LINK_ICONS[`${pluginId}/${panel}/${segment}`] ?? LINK_ICONS[`${pluginId}/${panel}`] ?? "GridView";
 }
 
 /** The @ query being typed just before the caret, and where it starts. */

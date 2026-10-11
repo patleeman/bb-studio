@@ -32,6 +32,12 @@ importers:
       '@bb-studio/kit':
         specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
+      '@excalidraw/excalidraw':
+        specifier: ^0.18.1
+        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.18)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@resvg/resvg-wasm':
+        specifier: 2.6.2
+        version: 2.6.2
       zod:
         specifier: ^4.3.6
         version: 4.6.5
@@ -239,12 +245,6 @@ importers:
       '@bb-studio/kit':
         specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
-      '@excalidraw/excalidraw':
-        specifier: ^0.18.1
-        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.18)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@resvg/resvg-wasm':
-        specifier: 2.6.2
-        version: 2.6.2
       zod:
         specifier: ^4.3.6
         version: 4.6.5
@@ -258,21 +258,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.4
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.3.0(@types/react@19.3.0)
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
-      hono:
-        specifier: ^4.11.9
-        version: 4.13.11
-      sonner:
-        specifier: ^1.7.4
-        version: 1.7.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

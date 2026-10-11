@@ -1,7 +1,7 @@
-// Whiteboards: a Studio Draw drawing sketched on inline in a page. Pages
-// reads the drawing's Excalidraw scene through Draw's RPC, draws it as plain
-// SVG (no Excalidraw bundle in Pages), and saves pen strokes and erasures
-// back as ordinary Excalidraw elements. Draw merges them by element version,
+// Whiteboards: a Studio drawing sketched on inline in a page. Pages reads
+// the drawing's Excalidraw scene through Studio's `drawings.*` RPC, draws it
+// as plain SVG (no Excalidraw bundle in Pages), and saves pen strokes and
+// erasures back as ordinary Excalidraw elements. Studio merges them by element version,
 // so the full Draw editor and agents keep working on the same drawing.
 import { z } from "zod";
 

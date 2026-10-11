@@ -96,8 +96,8 @@ afterwards.
     transcript; click a line to play from there;
   - a drawing is an inline whiteboard: it shows the drawing, and **Sketch**
     (or a double-click) adds a pen, an eraser and five colors. Strokes save
-    to the Studio Draw drawing as ordinary Excalidraw elements, merged with
-    other edits, so **Open in Draw** shows them in the full editor. `/whiteboard`
+    to the Studio drawing as ordinary Excalidraw elements, merged with
+    other edits, so **Open drawing** shows them in the full editor. `/whiteboard`
     makes a new drawing in the page's project and opens it ready to draw.
     Pages draws the scene as plain SVG and doesn't load Excalidraw;
   - an artifact shows its content (images, HTML, PDFs, code, text).

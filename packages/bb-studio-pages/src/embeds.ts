@@ -7,7 +7,7 @@ import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { callProvider, indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { changesData, DRAW_PLUGIN_ID, parseScene, renderWhiteboard, whiteboardChanges, type WhiteboardStroke, type WhiteboardView } from "./whiteboard";
+import { changesData, parseScene, renderWhiteboard, whiteboardChanges, type WhiteboardStroke, type WhiteboardView } from "./whiteboard";
 import { PLUGIN_ID, type RecordingCard } from "./contract";
 
 const MAX_TEXT = 20_000;
@@ -82,19 +82,19 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
         }),
       };
     },
-    /** A drawing as the inline whiteboard shows it. */
+    /** A drawing as the inline whiteboard shows it. Drawings are built into Studio (its `drawings.*` methods). */
     async whiteboard(id: string): Promise<WhiteboardView | null> {
-      const { drawing } = await call(DRAW_PLUGIN_ID, "getDrawing", { id }, drawingSchema);
+      const { drawing } = await call("studio", "drawings.getDrawing", { id }, drawingSchema);
       if (!drawing) return null;
       return { id: drawing.id, name: drawing.name, updatedAt: drawing.updatedAt, ...renderWhiteboard(parseScene(drawing.data)) };
     },
     /** Adds pen strokes and erases elements; Draw merges them into what's there. */
     async saveWhiteboard(id: string, add: WhiteboardStroke[], erase: string[]): Promise<WhiteboardView> {
-      const { drawing } = await call(DRAW_PLUGIN_ID, "getDrawing", { id }, drawingSchema);
+      const { drawing } = await call("studio", "drawings.getDrawing", { id }, drawingSchema);
       if (!drawing) throw new Error("This drawing is gone.");
       const changes = whiteboardChanges(parseScene(drawing.data), add, erase);
       if (changes.length) {
-        await call(DRAW_PLUGIN_ID, "saveDrawing", { id, data: changesData(changes) }, z.object({ ok: z.boolean(), updatedAt: z.number() }));
+        await call("studio", "drawings.saveDrawing", { id, data: changesData(changes) }, z.object({ ok: z.boolean(), updatedAt: z.number() }));
         index.invalidate();
       }
       const view = await this.whiteboard(id);

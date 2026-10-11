@@ -26,7 +26,7 @@ use the CLI.
 | --- | --- | --- |
 | `pages/` | Studio Pages | Each page's row, its Yjs state (comments live inside it), the Markdown cache, saved versions and uploaded files. |
 | `talk/` | Studio Talk | Each recording with its segments, transcripts, meeting notes and the id of its notes page, and its audio files. |
-| `excalidraw/` | Studio Draw | Each drawing's scene, and its images as separate files. |
+| `excalidraw/` | Studio (built-in drawings) | Each drawing's scene, and its images as separate files. Studio writes this section itself, under the old Draw plugin's id, so backups from before the merge restore into it. |
 | `artifacts/` | Studio (built-in Artifacts) | Each artifact with every version's bytes. Studio writes this section itself, under the old plugin's id, so backups from before the merge restore into it. |
 | `design/` | Studio Design | Each design with its rounds, screens (as HTML files) and comments. |
 | `studio/` | Studio | Tags and which items have them, saved views, project leads (the personal project's lead is the Chief of Staff) and their Heartbeat settings, item links, item chats, comments, versions and activity. |

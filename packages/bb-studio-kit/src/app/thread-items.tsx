@@ -9,6 +9,7 @@ import { STUDIO_PLUGIN_ID, type StudioSchemas } from "../contract";
 import { errorMessage, relativeTime, untitled } from "../format";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
+import type { ProviderCall } from "./add-on";
 import { ItemTile, PRIMARY_BUTTON, THUMBNAIL } from "./pieces";
 import { studioItemProps } from "./studio-item";
 
@@ -27,6 +28,7 @@ export function ThreadItemsPanel({
   channel,
   initialId = null,
   linkedIds,
+  call: callProvider,
   renderItem,
 }: {
   threadId: string;
@@ -39,9 +41,15 @@ export function ThreadItemsPanel({
   initialId?: string | null;
   /** Items that belong to this thread besides the ones Studio links. */
   linkedIds?: readonly string[];
+  /**
+   * Calls the kind's `studio_*` methods; this plugin's own RPC by default. A
+   * kind built into Studio passes one that goes through Studio's provider.call.
+   */
+  call?: ProviderCall;
   renderItem(id: string, options: { backLabel: string; onBack(): void }): ReactNode;
 }) {
   const rpc = useRpc<Provider>();
+  const call: ProviderCall = callProvider ?? ((method, input) => rpc.call(method, input as never) as never);
   const sdk = useSdk();
   const [openId, setOpenId] = useState(initialId);
   // BB keeps this tab mounted when another tab of the same kind opens with a
@@ -84,7 +92,7 @@ export function ThreadItemsPanel({
 
   useEffect(() => {
     let live = true;
-    Promise.all([rpc.call("studio_describe", null), rpc.call("studio_list", null), linksFor()]).then(
+    Promise.all([call("studio_describe", null), call("studio_list", null), linksFor()]).then(
       ([info, list, links]) => {
         if (!live) return;
         setKind(info.kinds.find((each) => each.id === kindId) ?? null);
@@ -96,12 +104,12 @@ export function ThreadItemsPanel({
     return () => {
       live = false;
     };
-  }, [rpc, kindId, linksFor, refreshKey, openId]);
+  }, [rpc, callProvider, kindId, linksFor, refreshKey, openId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = async () => {
     setCreating(true);
     try {
-      const { item } = await rpc.call("studio_create", { kind: kindId, projectId });
+      const { item } = await call("studio_create", { kind: kindId, projectId });
       const now = Date.now();
       await sdk.plugins
         .callRpc({

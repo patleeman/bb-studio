@@ -1,6 +1,6 @@
 export { registerStudioProvider, createStudioNotifier, rpcErrorStatus, type StudioProviderHandlers } from "./core";
 export { createChangeBus } from "./change-bus";
-export { createStoreProvider, mustGet, storeSearch } from "./provider";
+export { createStoreProvider, mustGet, storeActions, storeSearch } from "./provider";
 export { defineItemMention } from "./mention";
 export { serveBytes } from "./bytes";
 export { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems, type ProviderDiscovery } from "./discovery";

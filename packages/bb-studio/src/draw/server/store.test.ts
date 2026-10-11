@@ -1,0 +1,82 @@
+import { describe, expect, it } from "vitest";
+import { element, memoryStore, scene } from "../test/db";
+import { displayName, toMeta } from "./store";
+
+describe("the drawing store", () => {
+  it("creates empty, untitled drawings in a project", () => {
+    const { store } = memoryStore(() => 1_000);
+    const row = store.create({ name: "", projectId: "proj_a", by: "app" });
+    expect(toMeta(row)).toMatchObject({ name: "", projectId: "proj_a", archived: false, elementCount: 0, updatedAt: 1_000 });
+    expect(displayName(row)).toBe("Untitled drawing");
+  });
+
+  it("gives every write a newer revision, even within one millisecond", () => {
+    const { store } = memoryStore(() => 5_000);
+    const row = store.create({ name: "Plan", projectId: null, by: "app" });
+    const first = store.write(row.id, scene([element("rectangle")]), "editor");
+    const second = store.write(row.id, scene([element("rectangle")]), "agent");
+    expect(first).toBeGreaterThan(row.updated_at);
+    expect(second).toBeGreaterThan(first);
+    expect(store.get(row.id)).toMatchObject({ updated_at: second, updated_by: "agent" });
+  });
+
+  it("keeps the name unless a write renames it", () => {
+    const { store } = memoryStore();
+    const row = store.create({ name: "Plan", projectId: null, by: "app" });
+    store.write(row.id, scene([]), "editor");
+    expect(store.get(row.id)!.name).toBe("Plan");
+    store.write(row.id, scene([]), "editor", { name: "Roadmap" });
+    expect(store.get(row.id)!.name).toBe("Roadmap");
+  });
+
+  it("leaves archived drawings out of the list unless asked", () => {
+    const { store } = memoryStore();
+    const kept = store.create({ name: "Kept", projectId: null, by: "app" });
+    const archived = store.create({ name: "Old", projectId: null, by: "app" });
+    store.setArchived(archived.id, true);
+    expect(store.list().map((row) => row.id)).toEqual([kept.id]);
+    expect(store.list({ includeArchived: true })).toHaveLength(2);
+    store.setArchived(archived.id, false);
+    expect(store.list()).toHaveLength(2);
+  });
+
+  it("moves and deletes drawings", () => {
+    const { store } = memoryStore();
+    const row = store.create({ name: "", projectId: "proj_a", by: "app" });
+    store.setProject(row.id, null);
+    expect(store.get(row.id)!.project_id).toBeNull();
+    expect(store.delete(row.id)).toBe(true);
+    expect(store.delete(row.id)).toBe(false);
+    expect(store.get(row.id)).toBeNull();
+  });
+});
+
+describe("the migrations", () => {
+  it("keep the released statements byte for byte", async () => {
+    const { createHash } = await import("node:crypto");
+    const { DRAWING_TABLES } = await import("./store");
+    // BB refuses to start a plugin whose recorded migrations changed.
+    expect(createHash("sha256").update(DRAWING_TABLES).digest("hex")).toBe(
+      "991b718c33627a35075e1a571c79901e3962c96132112e6733746fd6e204899c",
+    );
+  });
+});
+
+describe("atomic recovery copies", () => {
+  it("rolls back the empty drawing and retry key when saving its scene fails", () => {
+    const { db, store } = memoryStore();
+    const input = { key: "draft-token", name: "Recovered", data: scene([element("rectangle")]), projectId: "proj_a" };
+    try {
+      db.exec(`CREATE TRIGGER reject_recovery_scene BEFORE UPDATE OF data ON drawings
+        BEGIN SELECT RAISE(ABORT, 'disk failure'); END`);
+      expect(() => store.recoverCopy(input)).toThrow("disk failure");
+      expect(store.list()).toEqual([]);
+      expect(db.prepare("SELECT * FROM drawing_recovery_copies").all()).toEqual([]);
+      db.exec("DROP TRIGGER reject_recovery_scene");
+      const result = store.recoverCopy(input);
+      expect(result.created).toBe(true);
+      expect(result.row.data).toBe(input.data);
+      expect(store.recoverCopy(input)).toMatchObject({ row: { id: result.row.id }, created: false });
+    } finally { db.close(); }
+  });
+});

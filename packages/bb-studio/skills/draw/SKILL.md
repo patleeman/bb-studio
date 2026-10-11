@@ -1,0 +1,72 @@
+---
+name: draw
+description: Use when the user refers to a Studio drawing (Excalidraw) — a /plugins/studio/studio/drawings/<id> or older /plugins/excalidraw/drawings/<id> link, an @drawing mention, "the diagram", "sketch this" — or asks you to read, create, or change a drawing, or how drawings fit into BB Studio.
+---
+
+# Drawings
+
+Drawings are Excalidraw scenes stored in Studio. The user sketches in Studio,
+or in a thread's Drawings tab, while you edit the same scene through
+tools or the CLI. Writes merge element by element, so your changes and the
+user's in-progress sketching both survive; the user's open editor shows your
+changes live.
+
+Drawings belong to a project or are global. Link to one as
+`[Name](/plugins/studio/studio/drawings/<drawing-id>)`. Older links
+(`/plugins/excalidraw/drawings/<drawing-id>`) still open the same drawing.
+
+When you make or change a drawing, put its card on its own line in your reply:
+
+```
+::drawing{id="<drawing-id>"}
+```
+
+The card shows the drawing; clicking it opens the drawing in a tab beside the
+chat. The create and update tools print the line for you.
+
+## Agent tools
+
+| Tool | Use it to |
+| --- | --- |
+| `excalidraw_list_drawings` | List drawings with ids, names and element counts. |
+| `excalidraw_get_drawing` | Read a drawing's current scene before changing it. |
+| `excalidraw_create_drawing` | Create a drawing. Returns its id, a link and its card. |
+| `excalidraw_update_drawing` | Upsert elements, delete elements by id, or patch appState. An upsert of an existing id merges: send `id`, `type` and just the properties to change. |
+
+## CLI (works in every agent session)
+
+```sh
+bb studio drawings list
+bb studio drawings create <name>
+bb studio drawings show <id> [--raw]
+bb studio drawings rename <id> <name>
+bb studio drawings delete <id>
+bb studio drawings merge <id> <scene-file.json>      # array of elements or a full scene
+bb studio drawings remove-elements <id> <element-id…>
+```
+
+In a thread, `merge` reads the scene file from the thread's workspace or thread
+storage, on the thread's host.
+
+## Working on a drawing
+
+1. Read the latest scene first (`excalidraw_get_drawing` or `show`); the user
+   may have changed it since you last looked.
+2. Write only the elements you're adding or changing. Give new elements
+   fresh ids; to change one, send it with its existing id. Elements you send
+   win over the stored copy. The easiest way to get the shape right is to
+   copy an existing element and change its id, position and text.
+3. Delete with `deletedElementIds` / `remove-elements`, never by leaving
+   elements out: omitted elements are kept.
+4. Bind a label to a shape with the shape's `boundElements` and the text's
+   `containerId`, as Excalidraw does.
+5. Put the drawing's card on its own line in your reply so the user can open
+   it beside the chat.
+
+## Studio
+
+Drawings are built into Studio (they were the Studio Draw add-on, plugin id
+`excalidraw`, which items still use as their namespace). They appear in
+Studio's single collection next to pages and recordings, where they can be
+moved between projects, archived, searched by the words written on them, and
+deleted.

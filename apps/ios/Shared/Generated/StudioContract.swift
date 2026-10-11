@@ -78,6 +78,17 @@ public enum Studio {
     public static let artifacts_saveFiles = "artifacts.saveFiles"
     public static let artifacts_importFile = "artifacts.importFile"
     public static let artifacts_saveAsPage = "artifacts.saveAsPage"
+    public static let drawings_listDrawings = "drawings.listDrawings"
+    public static let drawings_createDrawing = "drawings.createDrawing"
+    public static let drawings_getDrawing = "drawings.getDrawing"
+    public static let drawings_getDrawingMeta = "drawings.getDrawingMeta"
+    public static let drawings_getDrawingUpdatedAt = "drawings.getDrawingUpdatedAt"
+    public static let drawings_saveDrawing = "drawings.saveDrawing"
+    public static let drawings_recoverDrawingCopy = "drawings.recoverDrawingCopy"
+    public static let drawings_renameDrawing = "drawings.renameDrawing"
+    public static let drawings_deleteDrawing = "drawings.deleteDrawing"
+    public static let drawings_attachDrawingImage = "drawings.attachDrawingImage"
+    public static let drawings_pickDrawing = "drawings.pickDrawing"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -247,6 +258,30 @@ public enum Studio {
   public typealias ArtifactsImportFile = ArtifactsImportFileOutput
 
   public typealias ArtifactsSaveAsPage = ArtifactsSaveAsPageOutput
+
+  public typealias DrawingsListDrawingsInput = StudioJSONValue
+
+  public typealias DrawingsListDrawings = DrawingsListDrawingsOutput
+
+  public typealias DrawingsCreateDrawing = DrawingsCreateDrawingOutput
+
+  public typealias DrawingsGetDrawing = DrawingsGetDrawingOutput
+
+  public typealias DrawingsGetDrawingMeta = DrawingsGetDrawingMetaOutput
+
+  public typealias DrawingsGetDrawingUpdatedAt = DrawingsGetDrawingUpdatedAtOutput
+
+  public typealias DrawingsSaveDrawing = DrawingsSaveDrawingOutput
+
+  public typealias DrawingsRecoverDrawingCopy = DrawingsRecoverDrawingCopyOutput
+
+  public typealias DrawingsRenameDrawing = DrawingsRenameDrawingOutput
+
+  public typealias DrawingsDeleteDrawing = DrawingsDeleteDrawingOutput
+
+  public typealias DrawingsAttachDrawingImage = DrawingsAttachDrawingImageOutput
+
+  public typealias DrawingsPickDrawing = DrawingsPickDrawingOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -5737,6 +5772,300 @@ public enum Studio {
 
     public init(href: String? = nil) {
       self.href = href
+    }
+  }
+
+  public struct DrawingsListDrawingsOutputDrawingsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var elementCount: Double?
+    public var projectId: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, elementCount: Double? = nil, projectId: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.elementCount = elementCount
+      self.projectId = projectId
+      self.archived = archived
+    }
+  }
+
+  public struct DrawingsListDrawingsOutput: Sendable, Hashable, Codable {
+    public var drawings: [DrawingsListDrawingsOutputDrawingsItem]?
+
+    public init(drawings: [DrawingsListDrawingsOutputDrawingsItem]? = nil) {
+      self.drawings = drawings
+    }
+  }
+
+  public struct DrawingsCreateDrawingInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var projectId: String?
+
+    public init(name: String? = nil, projectId: String? = nil) {
+      self.name = name
+      self.projectId = projectId
+    }
+  }
+
+  public struct DrawingsCreateDrawingOutputDrawing: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var elementCount: Double?
+    public var projectId: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, elementCount: Double? = nil, projectId: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.elementCount = elementCount
+      self.projectId = projectId
+      self.archived = archived
+    }
+  }
+
+  public struct DrawingsCreateDrawingOutput: Sendable, Hashable, Codable {
+    public var drawing: DrawingsCreateDrawingOutputDrawing?
+
+    public init(drawing: DrawingsCreateDrawingOutputDrawing? = nil) {
+      self.drawing = drawing
+    }
+  }
+
+  public struct DrawingsGetDrawingInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DrawingsGetDrawingOutputDrawing: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var projectId: String?
+    public var data: String?
+
+    public init(id: String? = nil, name: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, projectId: String? = nil, data: String? = nil) {
+      self.id = id
+      self.name = name
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.projectId = projectId
+      self.data = data
+    }
+  }
+
+  public struct DrawingsGetDrawingOutput: Sendable, Hashable, Codable {
+    public var drawing: DrawingsGetDrawingOutputDrawing?
+
+    public init(drawing: DrawingsGetDrawingOutputDrawing? = nil) {
+      self.drawing = drawing
+    }
+  }
+
+  public struct DrawingsGetDrawingMetaInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DrawingsGetDrawingMetaOutputDrawing: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var elementCount: Double?
+    public var projectId: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, elementCount: Double? = nil, projectId: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.elementCount = elementCount
+      self.projectId = projectId
+      self.archived = archived
+    }
+  }
+
+  public struct DrawingsGetDrawingMetaOutput: Sendable, Hashable, Codable {
+    public var drawing: DrawingsGetDrawingMetaOutputDrawing?
+
+    public init(drawing: DrawingsGetDrawingMetaOutputDrawing? = nil) {
+      self.drawing = drawing
+    }
+  }
+
+  public struct DrawingsGetDrawingUpdatedAtInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DrawingsGetDrawingUpdatedAtOutput: Sendable, Hashable, Codable {
+    public var updatedAt: Double?
+
+    public init(updatedAt: Double? = nil) {
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DrawingsSaveDrawingInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var data: String?
+    public var expectedUpdatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, data: String? = nil, expectedUpdatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.data = data
+      self.expectedUpdatedAt = expectedUpdatedAt
+    }
+  }
+
+  public struct DrawingsSaveDrawingOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var updatedAt: Double?
+
+    public init(ok: Bool? = nil, updatedAt: Double? = nil) {
+      self.ok = ok
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DrawingsRecoverDrawingCopyInput: Sendable, Hashable, Codable {
+    public var sourceDrawingId: String?
+    public var draftId: String?
+    public var draftToken: String?
+    public var name: String?
+    public var data: String?
+    public var projectId: String?
+
+    public init(sourceDrawingId: String? = nil, draftId: String? = nil, draftToken: String? = nil, name: String? = nil, data: String? = nil, projectId: String? = nil) {
+      self.sourceDrawingId = sourceDrawingId
+      self.draftId = draftId
+      self.draftToken = draftToken
+      self.name = name
+      self.data = data
+      self.projectId = projectId
+    }
+  }
+
+  public struct DrawingsRecoverDrawingCopyOutputDrawing: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var elementCount: Double?
+    public var projectId: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, elementCount: Double? = nil, projectId: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.elementCount = elementCount
+      self.projectId = projectId
+      self.archived = archived
+    }
+  }
+
+  public struct DrawingsRecoverDrawingCopyOutput: Sendable, Hashable, Codable {
+    public var drawing: DrawingsRecoverDrawingCopyOutputDrawing?
+
+    public init(drawing: DrawingsRecoverDrawingCopyOutputDrawing? = nil) {
+      self.drawing = drawing
+    }
+  }
+
+  public struct DrawingsRenameDrawingInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct DrawingsRenameDrawingOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var updatedAt: Double?
+
+    public init(ok: Bool? = nil, updatedAt: Double? = nil) {
+      self.ok = ok
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DrawingsDeleteDrawingInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DrawingsDeleteDrawingOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DrawingsAttachDrawingImageInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var drawingId: String?
+    public var pngBase64: String?
+
+    public init(threadId: String? = nil, drawingId: String? = nil, pngBase64: String? = nil) {
+      self.threadId = threadId
+      self.drawingId = drawingId
+      self.pngBase64 = pngBase64
+    }
+  }
+
+  public struct DrawingsAttachDrawingImageOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DrawingsPickDrawingInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct DrawingsPickDrawingOutput: Sendable, Hashable, Codable {
+    public var drawingId: String?
+
+    public init(drawingId: String? = nil) {
+      self.drawingId = drawingId
     }
   }
 

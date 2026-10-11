@@ -1,5 +1,6 @@
 import { registerChat } from "./src/chat/server";
 import { registerArtifacts } from "./src/artifacts/server";
+import { registerDraw } from "./src/draw/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
 import { subcommand, usage } from "@bb-studio/kit/cli";
@@ -78,7 +79,12 @@ export default async function plugin(bb: BbPluginApi) {
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
   const artifacts = registerArtifacts(bb, db);
   bb.onDispose(() => artifacts.dispose());
-  const hub = new StudioHub(bb.sdk, [{ pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider }]);
+  const drawings = registerDraw(bb, db);
+  bb.onDispose(() => drawings.dispose());
+  const hub = new StudioHub(bb.sdk, [
+    { pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider },
+    { pluginId: "excalidraw", name: "Drawings", handlers: drawings.provider },
+  ]);
   // Other add-ons reach built-in kinds' provider methods through Studio
   // (callProvider in the kit), as they reach an add-on's over RPC.
   bb.rpc.register(builtinProviderContract, {
@@ -843,7 +849,10 @@ export default async function plugin(bb: BbPluginApi) {
         void searchIndex.rebuild().catch((error) => bb.log.warn(`Reindex after restore failed: ${errorText(error)}`));
       },
     }),
-    builtins: { artifacts: { name: "Studio Artifacts", handlers: artifacts.backup } },
+    builtins: {
+      artifacts: { name: "Studio Artifacts", handlers: artifacts.backup },
+      excalidraw: { name: "Studio Draw", handlers: drawings.backup },
+    },
   });
   registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));
   /** A CLI path, relative to where the command ran. */
@@ -863,10 +872,12 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "backup", summary: "Save every Studio item, from every add-on, into one .zip file", usage: "bb studio backup [--out <file|folder>]" },
       { name: "restore", summary: "Restore a Studio backup; shows what would change first", usage: "bb studio restore <file> [--dry-run | --yes]" },
       { name: "artifacts", summary: "Save and read artifacts: save, list, show, export, delete", usage: "bb studio artifacts <save|list|show|export|delete> …" },
+      { name: "drawings", summary: "Create, read and edit Excalidraw drawings", usage: "bb studio drawings <list|create|show|rename|delete|merge|remove-elements> …" },
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
       if (argv[0] === "artifacts") return artifacts.cli(argv.slice(1), ctx);
+      if (argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
         list: "bb studio list [query…] [--all] [--json] [--kind <kind>] [--tag <tag>] [--query <text>]",
@@ -957,7 +968,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|artifacts> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|artifacts|drawings> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

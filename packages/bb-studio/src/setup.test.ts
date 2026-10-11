@@ -113,6 +113,17 @@ describe("retired plugins", () => {
     expect(compareVersions("0.10.0", "0.2.0")).toBe(1);
   });
 
+  it("keeps Studio Draw until its bridge has copied every drawing into Studio", async () => {
+    const blocker = async (entry: SetupPluginEntry, answer?: object) => {
+      const fake = fakeSdk([entry]);
+      if (answer) fake.raw.plugins.callRpc.mockResolvedValueOnce(answer as never);
+      return (await buildSetup(fake.sdk, health())).retired.find((each) => each.id === "excalidraw")!.blocker;
+    };
+    expect(await blocker(plugin("excalidraw", { version: "0.1.0" }))).toContain("bb plugin update excalidraw --yes");
+    expect(await blocker(plugin("excalidraw", { version: "0.2.0" }), { complete: false, total: 4, copied: 3, skipped: [], error: null })).toMatch(/3 of 4 drawings.*bb excalidraw migrate/);
+    expect(await blocker(plugin("excalidraw", { version: "0.2.0" }), { complete: true, total: 4, copied: 4, skipped: [], error: null })).toBeNull();
+  });
+
   it("lets Studio Navigation go without Studio Sidebar", async () => {
     const setup = await buildSetup(fakeSdk([plugin("studio-navigation")]).sdk, health());
     expect(setup.retired[0]!.blocker).toBeNull();

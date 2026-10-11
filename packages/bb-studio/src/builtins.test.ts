@@ -24,6 +24,12 @@ describe("built-in kinds' addresses", () => {
     expect(builtinSegment("browse")).toBeNull();
   });
 
+  it("maps drawings' old Draw address to Studio", () => {
+    expect(builtinItemAt("/plugins/excalidraw/drawings/drw_0123456789abcdef")).toMatchObject({ pluginId: "excalidraw", id: "drw_0123456789abcdef", href: "/plugins/studio/studio/drawings/drw_0123456789abcdef" });
+    expect(canonicalPath("/plugins/excalidraw/drawings/drw_1")).toBe("/plugins/studio/studio/drawings/drw_1");
+    expect(builtinSegment("drawings")).toMatchObject({ route: { kind: "drawing", pluginId: "excalidraw" }, rest: "" });
+  });
+
   it("moves saved workspace tabs off the old address", () => {
     const tab = { href: "/plugins/artifacts/artifacts/art_1", title: "Report" };
     const state = parseWorkspace({ layout: { kind: "pane", id: "p", tabs: [tab], active: tab.href }, focused: "p" });

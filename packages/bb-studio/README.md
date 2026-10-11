@@ -139,6 +139,75 @@ Files are stored as BLOBs in Studio's SQLite database. Contents come from
 real PDF carries a `sandbox allow-scripts` CSP, so HTML gets an opaque origin
 and can't call BB's API with your session.
 
+## Drawings
+
+Drawings are built into Studio: [Excalidraw](https://excalidraw.com) scenes
+you sketch with your agents. They used to be the separate Studio Draw plugin
+(`excalidraw`). Items keep that id as their namespace (`excalidraw:<id>`), so
+tags, tabs, links and chats carry over. If you had the plugin, see
+[its upgrade bridge](../bb-studio-draw/README.md) to copy your drawings in.
+
+![Live BB screenshot of a drawing open as a Studio tab](assets/drawings-preview.png)
+
+The seeded "Checkout flow" drawing open in the Excalidraw editor as a Studio
+tab, under Studio's item header: Cart, Payment and Confirmation boxes joined by
+arrows, with a "Retry payment on failure" note. Recapture with
+`BB_CAPTURE_ONLY=excalidraw`, which opens it from its old
+`/plugins/excalidraw/drawings/<id>` address and checks that it lands as a
+Studio tab.
+
+![The compact drawing header](assets/drawings-compact-header.png)
+
+The same editor at 390 pixels wide, with **Item actions** open.
+
+- **In the library.** Drawings list next to pages, recordings and artifacts:
+  thumbnails, projects, search over the words on a drawing, archive, move,
+  delete, duplicate, templates and **Copy text**. Drawings have no collection
+  page of their own: `/plugins/studio/studio/drawings` opens the library
+  filtered to the Drawing kind.
+- **Editor** (`/plugins/studio/studio/drawings/<id>`). Excalidraw loads the
+  first time a drawing opens, not with Studio. It autosaves as you work. The
+  header has an editable name, sync status, the drawing's chat, copy image,
+  and a menu with **Download PNG**, Move to and Delete. The editor follows
+  BB's active theme.
+- **Card in the agent's reply.** When an agent makes or changes a drawing,
+  its reply shows a card (`::drawing{id="…"}`) with the picture, name and
+  element count. It opens the drawing in the thread's **Drawings** tab beside
+  the chat, or in Studio without a workbench.
+- **Thread tab.** **Drawings** lists the drawings made or changed in that
+  thread, then the project's recent ones. **New** makes one in the thread's
+  project and links it to the thread. In the editor, **Attach** adds the
+  drawing to the conversation as an image. So does the composer's `+` menu,
+  **Drawing**. Neither sends a message.
+- **Agent tools and skill.** `excalidraw_list_drawings`,
+  `excalidraw_get_drawing` (elements, app state, a text summary, and image
+  files without their data; scenes over about 400,000 characters come back
+  as element ids), `excalidraw_create_drawing` and `excalidraw_update_drawing`
+  (upserts and deletes up to 500 elements by id; only the elements you send
+  change), and the `draw` skill. `@drawing` mentions give the agent the scene.
+- **Live co-editing.** Keep a drawing open and ask an agent to change it. Your
+  editor shows its edits live, and the agent's next read sees yours. Edits
+  merge per element; two edits to the same element resolve by Excalidraw's
+  `version`, higher wins. Deletions travel as tombstones (pruned after 30 days).
+- **Commands.** `bb studio drawings list`, `create <name>`,
+  `show <id> [--raw]`, `rename <id> <new-name>`, `delete <id>`,
+  `merge <id> <scene-file.json>` (an elements array or a full scene, with its
+  image files) and `remove-elements <id> <element-id…>`. A plugin registers
+  one CLI command, so the old `bb excalidraw …` moved under `bb studio`.
+- **Export.** **Download PNG** in the editor renders in your browser. Studio's
+  item menu exports PNG, SVG or the `.excalidraw` JSON, drawn on the server
+  with Excalidraw's fonts (resvg's WebAssembly build loads on the first PNG).
+  Embedded images are drawn if each is under 1.5 MB and all under 4 MB.
+
+Scenes are stored in Studio's SQLite database in Excalidraw's save-file
+format. The editor autosaves after a 1.2 second pause, in order, retries a
+failed save up to three times, then shows **Retry save**. Unsaved scenes are
+also kept in this browser's IndexedDB: on reopening, **Recover draft** merges
+one only if the server copy hasn't changed; otherwise **Save as copy**,
+**Download draft** or **Discard draft**. Thumbnails come from
+`GET /api/v1/plugins/studio/http/drawings/thumbnail`, an SVG with a CSP that
+runs nothing.
+
 ## What you get
 
 Everything opens in BB's main view, as a tab in Studio's workspace. ⌘/Ctrl-click an item or thread link, or choose **Open in split** from

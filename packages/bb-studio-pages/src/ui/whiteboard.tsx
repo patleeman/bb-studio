@@ -1,6 +1,6 @@
 // The inline whiteboard: a Studio Draw drawing shown as SVG in the page, with
 // a pen and an eraser for quick sketches. Strokes are saved to the drawing as
-// Excalidraw elements, so "Open in Draw" shows them in the full editor.
+// Excalidraw elements, so "Open drawing" shows them in the full editor.
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { errorMessage } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
@@ -177,7 +177,7 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
             <span className="flex-1" />
           </>
         )}
-        <ToolButton label="Open in Draw" icon="ArrowUpRight" onClick={onOpen} />
+        <ToolButton label="Open drawing" icon="ArrowUpRight" onClick={onOpen} />
       </div>
       <svg
         ref={svg}

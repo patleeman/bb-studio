@@ -1,26 +1,20 @@
 {
   "name": "@bb-studio/excalidraw",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
+  "description": "Upgrade bridge for Studio Draw, now built into Studio: copies your drawings into Studio and forwards older clients and mentions.",
   "engines": {
     "bb": ">=0.45",
     "bbPluginSdk": ">=0.6.15"
   },
   "bb": {
     "name": "Studio Draw",
-    "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations.",
+    "description": "Upgrade bridge for Studio Draw, now built into Studio: copies your drawings into Studio and forwards older clients and mentions.",
     "branding": {
-      "icon": "./assets/icon.svg",
-      "experimental_icons": {
-        "draw": "./assets/icon.svg"
-      }
+      "icon": "./assets/icon.svg"
     },
-    "server": "./server.ts",
-    "app": "./app.tsx",
-    "skills": [
-      "skills"
-    ]
+    "server": "./server.ts"
   },
   "scripts": {
     "test": "vitest run --config vitest.config.mts",
@@ -29,19 +23,13 @@
   },
   "dependencies": {
     "@bb-studio/kit": "file:../bb-studio-kit.tgz",
-    "@excalidraw/excalidraw": "^0.18.1",
-    "@resvg/resvg-wasm": "2.6.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.6.15",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "better-sqlite3": "^12.11.1",
-    "hono": "^4.11.9",
-    "sonner": "^1.7.4",
     "typescript": "^5.7.0",
     "vitest": "4.1.1"
   }
