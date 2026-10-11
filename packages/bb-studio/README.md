@@ -274,40 +274,6 @@ Pages and drawings can be saved as templates from an item's menu. The New menu l
 
 The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `exportItem`, and `exportBulk` RPCs. `exportBulk` returns a base64 ZIP containing the provider's files. Individual exports use the item's menu. Template fields use `{{name}}` style variables; unknown variables remain visible.
 
-## Space Command view
-
-Open **Command view** from a Space's ⋯ menu in the sidebar. It shows the
-Space's ordinary threads as native transcripts in a grid of panes.
-
-- **Panes.** With nothing opened, one pane follows whichever thread is working
-  (**Follow work**, ⚡). Open more threads from the list beside the composer;
-  each joins as a pane you can rearrange. Closing a pane only hides it.
-  **⌘N** or **+** opens a New thread pane with the Space's project picked.
-- **Status.** Working panes glow blue, idle ones dim, and a thread with
-  something new gets an orange ring and a **New** badge until you click into it.
-- **Aliases.** Each thread has a one-letter alias: type **@b** to address
-  thread B, @mention a title, or use @all. A thread keeps its letter while it
-  is in the Space.
-- **To.** "To" follows whoever the draft addresses. With nobody addressed, a
-  message goes to the lead, or to the thread you picked with ↩ or reacted to.
-  The lead forwards it if it is clearly meant for another thread. Files reach
-  every recipient and are copied to the threads the lead may forward to;
-  pasted images can't be forwarded, so the lead asks you to send those.
-- **Retries.** If a send misses some threads, the draft stays and "To"
-  becomes **Retry to** the ones it missed.
-
-Drafts, permissions and send modes use BB's composer.
-
-![One pane following the Space's working thread, with the thread list beside the composer](assets/command-follow.png)
-
-Captured in staged stable BB with the Launch work Space, ordinary Atlas and Scribe threads, and deterministic ORBIT-42 replies. Live assertions check thread membership, recipient selection, the breadcrumb, typed mention searches, draft retention, reactions, following a working thread, opening, closing and rearranging panes, starting a thread in a pane through to joining the Space, unread threads and reading them, the thread list beside the composer, and desktop and phone layouts. The fixture puts its standing instructions in agent-only context, so native transcripts show the conversation.
-
-![Three threads open side by side](assets/command-grid.png)
-
-![One thread on a phone, with the thread chips above the composer](assets/command-follow-mobile.png)
-
-The same run checks [the overview](assets/command.png), [rearranging panes](assets/command-grid-arrange.png), [closing and reopening a pane](assets/command-close.png), [starting a thread in a pane](assets/command-new-thread.png), [sending an image by alias](assets/command-attach.png), and [the grid on a phone](assets/command-grid-mobile.png).
-
 ## Item chat
 
 Studio owns each item's **Chat** action, conversation picker, linked thread and

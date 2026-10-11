@@ -78,25 +78,6 @@ function run(command, args, { cwd = stagedDir, quiet = false } = {}) {
 
 const bb = async (...args) => JSON.parse(await run(join(binDir, "bb"), [...args, "--json"], { quiet: true }));
 
-async function pluginRpc(pluginId, method, input) {
-  const response = await fetch(`${serverUrl}/api/v1/plugins/${pluginId}/rpc/${method}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  const payload = await response.json();
-  if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? `${pluginId}/${method} failed`);
-  return payload.result;
-}
-
-async function until(what, check, timeoutMs = 300000) {
-  const started = Date.now();
-  while (!(await check())) {
-    if (Date.now() - started > timeoutMs) throw new Error(`Timed out waiting for ${what}`);
-    await sleep(3000);
-  }
-}
-
 async function healthy() {
   try {
     return (await fetch(`${serverUrl}/health`)).ok;
@@ -151,69 +132,6 @@ async function seedWorkspaceThread(project, machine, orbitDir) {
   if (!/::next\{[^}]*SQLite[^}]*Postgres/.test(reply)) throw new Error(`The SQLite or Postgres reply has no Next row quick replies: ${reply}`);
   await bb("thread", "read", thread.id);
   return thread;
-}
-
-/** The Command view's deterministic fixture, in ordinary BB threads. */
-async function seedCommand(machine, project) {
-  const commandFixtures = join(fixturesDir, "command");
-  const makeThread = async (name, mission) => {
-    const text = await readFile(join(commandFixtures, mission), "utf8");
-    // Seed standing context as agent-only input so native transcripts show the conversation.
-    const response = await fetch(`${serverUrl}/api/v1/threads`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        projectId: project.id, origin: "app", environment: { type: "project-default" },
-        providerId: "codex", model: "gpt-6-luna", reasoningLevel: "low",
-        input: [
-          { type: "text", text: "Join the ORBIT-42 launch check.", mentions: [] },
-          { type: "text", visibility: "agent-only", mentions: [], text: text + "\n\nFor this initial setup message, reply only Ready to work. Do not use tools or change files." },
-        ],
-      }),
-    });
-    const thread = await response.json();
-    if (!response.ok || !thread.id) throw new Error(`Could not seed ${name}: ${JSON.stringify(thread)}`);
-    await bb("thread", "wait", thread.id, "--timeout", "180s");
-    // After the first reply, so BB's automatic title can't replace it.
-    const renamed = await fetch(`${serverUrl}/api/v1/threads/${thread.id}`, {
-      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: name }),
-    });
-    if (!renamed.ok) throw new Error(`Could not name the ${name} fixture`);
-    return thread.id;
-  };
-  const atlas = await makeThread("Atlas", "atlas-mission.md");
-  const scribe = await makeThread("Scribe", "scribe-mission.md");
-  const spaceId = await seedSpace("Launch work", [atlas, scribe]);
-  await seedLaunch(spaceId, atlas, scribe);
-  // BB's automatic title can land after the first rename; name them again.
-  for (const [id, name] of [[atlas, "Atlas"], [scribe, "Scribe"]]) {
-    const renamed = await fetch(`${serverUrl}/api/v1/threads/${id}`, {
-      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: name }),
-    });
-    if (!renamed.ok) throw new Error(`Could not name the ${name} fixture`);
-  }
-}
-
-/** A Studio Space holding these threads, the first one its lead. */
-async function seedSpace(name, threadIds) {
-  const { space } = await pluginRpc("studio", "createSpace", {name});
-  await pluginRpc("studio", "spaceMembers", {id:space.id, add:threadIds.map(id => ({pluginId:"bb-thread", id}))});
-  await pluginRpc("studio", "space_set_lead", {spaceId:space.id, threadId:threadIds[0]});
-  return space.id;
-}
-
-/** The Launch work conversation, sent from its Command view: each thread's fixed reply, from its instructions. */
-async function seedLaunch(spaceId, atlas, scribe) {
-  const send = (threadIds, text) => pluginRpc("studio","commandSend",{spaceId,threadIds,text});
-  const replied = start => async () => (await pluginRpc("studio","commandFeed",{spaceId})).entries.some(e=>e.role==="assistant"&&e.text.startsWith(start));
-  // Each reply takes 10 to 20 seconds when the turn works.
-  const timeout = 180000;
-  await send([atlas, scribe], "@atlas @scribe Here's the ORBIT-42 launch brief. The owner is Atlas, Scribe keeps the release-check log, and release is Friday. Are you both ready?");
-  await until("Atlas to read the brief",replied("Ready. I checked the brief"),timeout);
-  await until("Scribe to read the brief",replied("Ready. I'll keep the decision log"),timeout);
-  await send([atlas], "Please run the release check.");
-  await until("Atlas release check",replied("Release check passed:"),timeout);
-  await send([scribe], "@scribe Atlas asks you to log the release check.");
-  await until("Scribe release log",replied("Logged: release check passed."),timeout);
 }
 
 async function start() {
@@ -310,7 +228,6 @@ async function seed({ plugins, capturePlugin, ref, version }) {
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
   const workspaceThread = !capturePlugin || capturePlugin === "artifacts"
     ? await seedWorkspaceThread(project, machine, orbitDir) : null;
-  if (!capturePlugin || capturePlugin === "studio") await seedCommand(machine, project);
 
   const envFile = join(stagedDir, "capture.env");
   await writeFile(

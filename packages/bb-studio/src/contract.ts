@@ -1,4 +1,3 @@
-import { commandContract } from "./command/command-contract";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { conversationRequestSchema, studioSchemas, studioTagSchemas } from "@bb-studio/kit/contract";
 import { z } from "zod";
@@ -175,7 +174,6 @@ export type ChiefOfStaffView = z.infer<typeof chiefOfStaff>;
 const newThreadRequest = conversationRequestSchema(z);
 export type NewThreadRequestInput = z.output<typeof newThreadRequest>;
 export const rpcContract = defineRpcContract({
-  ...commandContract,
   home: {
     input: z.object({ projectId: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(7) }),
     output: z.object({

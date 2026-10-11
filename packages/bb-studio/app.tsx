@@ -3,7 +3,6 @@ import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
 import { ItemGestures } from "./src/ui/ItemGestures";
 import { ConversationPage } from "./src/chat/ui/ConversationComposer";
-import { CommandPage } from "./src/command/command-view";
 // bb-studio frontend: the Studio collection, one nav panel whose
 // sub-path filters it to a kind, the sidebar's Studio tabs and Spaces, the
 // Space dialogs other plugins open by window event, each thread's space
@@ -58,7 +57,6 @@ function StudioRoot({ subPath }: { subPath: string }) {
   // Studio opens on its tabbed workspace; the item list is only its new tab page.
   if (path === "") return <StudioWorkspace />;
   if (path === "browse") return <StudioPanel />;
-  if (path.startsWith("command/")) return <CommandPage subPath={path.slice("command/".length)} />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
   if (path === "activity") return <ActivityPanel />;
   return <ToWorkspace path={path} />;

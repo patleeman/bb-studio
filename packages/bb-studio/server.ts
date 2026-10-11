@@ -1,6 +1,4 @@
 import { registerChat } from "./src/chat/server";
-import { Command } from "./src/command/command";
-import { registerMentionProviders } from "./src/command/mention-providers";
 import { subcommand, usage } from "@bb-studio/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -85,16 +83,6 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
   const spaces = new SpaceStore(db);
-  // Space leads are set up below; Command only reads them after startup.
-  const command = new Command(bb, {
-    list: () => spaces.list(),
-    spaceOfThreads: () => spaceLeads.spaceOfThreads(),
-    lead: async (spaceId) => (await spaceLeads.get(spaceId)).leadThreadId,
-    join: (spaceId, threadId) => { spaces.add(spaceId, [{ pluginId: "bb-thread", id: threadId }]); tagsChanged(); },
-  });
-  registerMentionProviders(bb, command);
-  for (const event of ["thread.created", "thread.active", "thread.idle", "thread.failed", "thread.archived", "thread.unarchived", "thread.deleted"] as const)
-    bb.events.on(event, () => command.changed());
   spaces.reconcileProjects((await bb.sdk.projects.list({ includePersonal: true })).map((project) => project.id));
   // A new space gets its own catch-all project under ~/Spaces (src/space-folders.ts).
   // Staged and test BBs set BB_STUDIO_SPACES_DIR so they never write to the user's home.
@@ -379,7 +367,6 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   bb.rpc.register(rpcContract, {
-    ...command.handlers(),
     home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, providerComments, projectId, periodDays),
     homeRespond: async (input) => {
       await respondToNeed(bb.sdk, input);

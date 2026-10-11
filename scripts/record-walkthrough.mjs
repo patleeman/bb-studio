@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CdpClient, ensureChrome } from "./capture/driver.mjs";
-import { projectId, threadId, pluginRpc, bbCli, launchSpace, getLaunchSpaceId, sleep } from "./capture/bb.mjs";
+import { projectId, threadId, pluginRpc, bbCli, sleep } from "./capture/bb.mjs";
 import { seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc } from "./capture/seed.mjs";
 import { loadCaptures } from "./capture/entries.mjs";
 
@@ -75,7 +75,7 @@ const ownScenes = {
   },
 };
 
-const context = { projectId, threadId, pluginRpc, bbCli, launchSpace, getLaunchSpaceId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
+const context = { projectId, threadId, pluginRpc, bbCli, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
 const captures = loadCaptures(context);
 
 /** Scrolls the page's tallest scroller down a little and back, so long surfaces move. */

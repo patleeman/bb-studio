@@ -13,11 +13,10 @@ import {
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useComposer, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
 import { openSpaceItems } from "./StudioPanel";
-import { CommandDraftWatch, commandComposerSpace } from "../command/draft-recipients";
 
 const REFETCH_DEBOUNCE_MS = 300;
 const pendingKey = (projectId: string) => `studio:new-thread-spaces:${projectId}`;
@@ -117,18 +116,8 @@ export function SpacesMenuContent({ heading, othersHeading = "Add to space", hol
   );
 }
 
-/**
- * Studio's Command view embeds BB's new-thread composer to message existing
- * threads and to start them in its Space, so the picker stays out of both,
- * including its handoff.
- */
 export function ComposerSpaces() {
-  const probe = useRef<HTMLSpanElement>(null);
-  // null until placed; "" in a Command new-thread pane; the Space's ID in its Command composer.
-  const [inCommand, setInCommand] = useState<string | false | null>(null);
-  useLayoutEffect(() => setInCommand(probe.current?.closest("[data-command-composer], [data-command-new-thread]") ? commandComposerSpace(probe.current) ?? "" : false), []);
-  // Command's own composer reports its draft so "To" follows it, focused or not.
-  return inCommand === false ? <SpacePicker /> : inCommand === null ? <span ref={probe} hidden /> : inCommand ? <CommandDraftWatch spaceId={inCommand} /> : null;
+  return <SpacePicker />;
 }
 
 function SpacePicker() {
