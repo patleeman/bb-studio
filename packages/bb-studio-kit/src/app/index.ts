@@ -59,7 +59,7 @@ export {
   type StudioItemLink,
 } from "./studio-item";
 export { useOpenMain, useOpenTarget, type OpenPlace, type OpenTarget } from "./move";
-export { MoveToItems, MoveToSubmenu, moveToSpace, spaceOfProject, useMoveSpaces, type MoveSpace } from "./move-to";
+export { MoveToItems, MoveToSubmenu } from "./move-to";
 export { usePathname } from "./route";
 export { NewConversationComposer, type NewConversationProps, type ConversationSubmit } from "./new-conversation";
 export {

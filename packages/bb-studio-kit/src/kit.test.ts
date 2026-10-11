@@ -175,13 +175,13 @@ describe("sorting", () => {
 });
 
 describe("grouping", () => {
-  it("shows an item in each of its spaces, in the listed order, and spaceless items last", () => {
-    const items = [item("a", { spaces: ["s2", "s1"] }), item("b"), item("c", { spaces: ["s1"] })];
-    const groups = groupItems(items, "space", { label: (id) => id || "No space", order: ["s1", "s2"] });
+  it("shows an item under each of its tags, in the listed order, and untagged items last", () => {
+    const items = [item("a", { tags: ["s2", "s1"] }), item("b"), item("c", { tags: ["s1"] })];
+    const groups = groupItems(items, "tag", { label: (id) => id || "Untagged", order: ["s1", "s2"] });
     expect(groups.map((group) => [group.label, group.items.map((each) => each.id)])).toEqual([
       ["s1", ["a", "c"]],
       ["s2", ["a"]],
-      ["No space", ["b"]],
+      ["Untagged", ["b"]],
     ]);
   });
   it("orders unlisted groups by label", () => {

@@ -95,7 +95,7 @@ export interface CollectionFilter {
   bar: ReactNode;
   /** null while it loads, which keeps its room so the list doesn't jump. */
   rail?: ReactNode;
-  /** Shown at the start of the toolbar, e.g. a link to the filtered space. */
+  /** Shown at the start of the toolbar, e.g. filter menus. */
   toolbar?: ReactNode;
   /** The words searched for, to highlight. */
   text: string;
@@ -107,14 +107,7 @@ export interface CollectionFilter {
   empty: string;
 }
 
-/** A space items can belong to, for grouping and the Spaces column. */
-export interface CollectionSpace {
-  id: string;
-  name: string;
-  glyph?: ReactNode;
-}
-
-const GROUP_LABELS: Record<GroupBy, string> = { none: "None", kind: "Kind", project: "Project", space: "Space", tag: "Tag" };
+const GROUP_LABELS: Record<GroupBy, string> = { none: "None", kind: "Kind", project: "Project", tag: "Tag" };
 const ALL = "all";
 const GLOBAL = "global";
 const UNTAGGED = "untagged";
@@ -165,7 +158,6 @@ export function CollectionPage({
   defaultProjectId,
   storageKey,
   tags,
-  spaces,
   kind: kindFilter,
   onKindChange,
   isSelectable,
@@ -187,8 +179,6 @@ export function CollectionPage({
   storageKey: string;
   /** Every tag, or undefined when the collection has no tags. */
   tags?: readonly CollectionTag[];
-  /** Every space, when items carry `spaces`. */
-  spaces?: readonly CollectionSpace[];
   /** The kind filter; "all" or a kind id. */
   kind: string;
   onKindChange(kind: string): void;
@@ -288,9 +278,8 @@ export function CollectionPage({
   // Grouping by something with one value, or that this collection lacks, is no grouping.
   const tagged = tagging && !!items?.some((item) => item.tags?.length);
   const groupable = (by: GroupBy) =>
-    by === "none" || by === "project" || (by === "kind" && !single) || (by === "space" && !!spaces?.length) || (by === "tag" && tagged);
+    by === "none" || by === "project" || (by === "kind" && !single) || (by === "tag" && tagged);
   const grouping = groupable(groupChoice) ? groupChoice : "none";
-  const spaceById = useMemo(() => new Map((spaces ?? []).map((space) => [space.id, space])), [spaces]);
   const groups = useMemo<Group[] | null>(() => {
     if (grouping === "none") return null;
     const label = (id: string) =>
@@ -298,12 +287,10 @@ export function CollectionPage({
         ? (kinds.find((kind) => kind.id === id)?.plural ?? id)
         : grouping === "project"
           ? projectName(projects, id || null)
-          : grouping === "space"
-            ? (spaceById.get(id)?.name ?? "No space")
-            : (tagById.get(id)?.name ?? "Untagged");
-    const order = grouping === "kind" ? kinds.map((kind) => kind.id) : grouping === "space" ? spaces?.map((space) => space.id) : grouping === "tag" ? tags?.map((tag) => tag.id) : undefined;
+          : (tagById.get(id)?.name ?? "Untagged");
+    const order = grouping === "kind" ? kinds.map((kind) => kind.id) : grouping === "tag" ? tags?.map((tag) => tag.id) : undefined;
     return groupItems(shown, grouping, { label, order });
-  }, [grouping, shown, kinds, projects, spaceById, spaces, tagById, tags]);
+  }, [grouping, shown, kinds, projects, tagById, tags]);
   // Rows in the order they show, for shift-click ranges.
   const ordered = useMemo(
     () => (groups ? [...new Map(groups.flatMap((group) => group.items).map((item) => [itemKey(item), item])).values()] : shown),
@@ -529,11 +516,10 @@ export function CollectionPage({
   // A column the rows are grouped by would repeat the group header.
   const showKind = !single && grouping !== "kind";
   const showProject = grouping !== "project";
-  const showSpaces = grouping !== "space" && shown.some((item) => item.spaces?.some((id) => spaceById.has(id)));
-  // Below 48rem of list width the Kind and Spaces columns go (the tile shows
+  // Below 48rem of list width the Kind column goes (the tile shows
   // the kind); below 36rem rows stack into a name and a menu.
   const template = (wide: boolean) =>
-    `minmax(0,1fr)${wide && showKind ? " 110px" : ""}${showProject ? " minmax(0,160px)" : ""}${wide && showSpaces ? " minmax(0,140px)" : ""}${columns.map(() => " 90px").join("")} 130px`;
+    `minmax(0,1fr)${wide && showKind ? " 110px" : ""}${showProject ? " minmax(0,160px)" : ""}${columns.map(() => " 90px").join("")} 130px`;
   const gridTemplate = { "--cols": template(true), "--cols-narrow": template(false) } as CSSProperties;
   const gridColumns = "[grid-template-columns:var(--cols)] @max-3xl/list:[grid-template-columns:var(--cols-narrow)]";
 
@@ -561,7 +547,6 @@ export function CollectionPage({
   const noItemsAtAll = items !== null && !(items ?? []).some((item) => !item.archived);
   const subtitle = (item: CollectionItem) =>
     [showKind ? kindLabel(item) : null, showProject ? projectLabel(item) : null, relativeTime(item.updatedAt)].filter(Boolean).join(" · ");
-  const spaceNames = (item: CollectionItem) => (item.spaces ?? []).flatMap((id) => spaceById.get(id)?.name ?? []);
 
   const sortChoices: { key: SortKey; label: string }[] = [
     { key: "title", label: "Name" },
@@ -617,8 +602,6 @@ export function CollectionPage({
       <Icon name={kinds.find((kind) => kind.id === id)?.icon ?? "File"} className="size-3.5" />
     ) : grouping === "tag" ? (
       tagById.get(id) ? <TagDot color={tagById.get(id)!.color} /> : null
-    ) : grouping === "space" ? (
-      (spaceById.get(id)?.glyph ?? null)
     ) : (
       <Icon name={id ? "Folder" : "Globe"} className="size-3.5" />
     );
@@ -712,11 +695,6 @@ export function CollectionPage({
         {showProject ? (
           <div role="gridcell" className="truncate text-muted-foreground @max-xl/list:hidden">
             {projectLabel(item)}
-          </div>
-        ) : null}
-        {showSpaces ? (
-          <div role="gridcell" className="truncate text-muted-foreground @max-3xl/list:hidden" title={spaceNames(item).join(", ") || undefined}>
-            {spaceNames(item).join(", ") || "—"}
           </div>
         ) : null}
         {columns.map((column) => (
@@ -1020,7 +998,6 @@ export function CollectionPage({
                   </span>
                   {showKind ? header("Kind", "kind", "@max-3xl/list:hidden") : null}
                   {showProject ? header("Project", "project") : null}
-                  {showSpaces ? header("Spaces", null, "@max-3xl/list:hidden") : null}
                   {columns.map((column) => header(column.label, `fact:${column.id}`, "text-right"))}
                   {header("Last activity", "updatedAt")}
                 </div>

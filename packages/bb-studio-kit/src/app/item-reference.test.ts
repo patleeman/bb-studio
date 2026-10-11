@@ -46,6 +46,5 @@ it("finds the @ query before the caret", () => {
 
 it("picks an item's icon from its link", () => {
   expect(itemLinkIcon("/plugins/pages/pages/pg_1")).toBe("pages/pages");
-  expect(itemLinkIcon("/plugins/studio/spaces/spc_1")).toBe("Layers");
   expect(itemLinkIcon("/plugins/unknown/things/x_1")).toBe("GridView");
 });

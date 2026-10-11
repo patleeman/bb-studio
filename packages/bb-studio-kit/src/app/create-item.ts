@@ -1,5 +1,5 @@
 // Every Studio "New" menu makes items here, so each kind behaves the same
-// from the sidebar, a Space, a collection or Quick Open: the item is made in
+// from the sidebar, a collection or Quick Open: the item is made in
 // the project the menu chose, then opens in the main pane.
 import { toast } from "sonner";
 import type { StudioCreateEventDetail, StudioKind } from "../contract";

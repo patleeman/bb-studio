@@ -4,8 +4,8 @@ import type { StudioItem, StudioKind } from "../contract";
 import { untitled } from "../format";
 
 export type CollectionKind = StudioKind & { pluginId: string };
-/** `tags` holds tag ids, when the collection has tags; `spaces` space ids, when it has spaces. */
-export type CollectionItem = StudioItem & { pluginId: string; tags?: readonly string[]; spaces?: readonly string[] };
+/** `tags` holds tag ids, when the collection has tags. */
+export type CollectionItem = StudioItem & { pluginId: string; tags?: readonly string[] };
 
 /** Where an item's key is unique: ids are only unique within a plugin. */
 export const itemKey = (item: { pluginId: string; id: string }) => `${item.pluginId}:${item.id}`;
@@ -32,11 +32,11 @@ export function parseSort(text: string): Sort {
   return known && (direction === "asc" || direction === "desc") ? { key: key as SortKey, descending: direction === "desc" } : DEFAULT_SORT;
 }
 
-export type GroupBy = "none" | "kind" | "project" | "space" | "tag";
-export const GROUP_BYS: readonly GroupBy[] = ["none", "kind", "project", "space", "tag"];
+export type GroupBy = "none" | "kind" | "project" | "tag";
+export const GROUP_BYS: readonly GroupBy[] = ["none", "kind", "project", "tag"];
 
 export interface Group {
-  /** A kind, project, space or tag id; "" for items with none. */
+  /** A kind, project or tag id; "" for items with none. */
   id: string;
   label: string;
   items: CollectionItem[];
@@ -44,8 +44,8 @@ export interface Group {
 
 /**
  * Splits sorted items into groups, keeping their order within each. An item
- * in two spaces or with two tags shows in both groups. Groups follow `order`
- * (the kinds, spaces or tags as listed) or else their labels, and the group
+ * with two tags shows in both groups. Groups follow `order`
+ * (the kinds or tags as listed) or else their labels, and the group
  * of items with none comes last.
  */
 export function groupItems(
@@ -60,7 +60,7 @@ export function groupItems(
     else groups.set(id, [item]);
   };
   for (const item of items) {
-    const ids = by === "kind" ? [item.kind] : by === "project" ? [item.projectId ?? ""] : by === "space" ? (item.spaces ?? []) : (item.tags ?? []);
+    const ids = by === "kind" ? [item.kind] : by === "project" ? [item.projectId ?? ""] : (item.tags ?? []);
     if (!ids.length) add("", item);
     for (const id of ids) add(id, item);
   }

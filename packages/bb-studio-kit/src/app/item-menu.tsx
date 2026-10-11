@@ -45,8 +45,8 @@ export function ItemMenu({
   /** Adds Copy reference for this item. */
   reference?: StudioItemLink;
   /**
-   * This item, in this plugin. With `projectId`, Move to offers Studio's
-   * Spaces and every project, and moves through the plugin's `studio_move`
+   * This item, in this plugin. With `projectId`, Move to offers every
+   * project, and moves through the plugin's `studio_move`
    * unless `onMove` is given.
    */
   item?: ItemRef;

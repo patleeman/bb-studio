@@ -1,5 +1,5 @@
 // Links to Studio items in plain-text fields: comments, task descriptions,
-// space descriptions, table text cells. A link is a Markdown link to the item's view, the same
+// table text cells. A link is a Markdown link to the item's view, the same
 // text Copy reference puts on the clipboard, so pasting one works with no
 // extra handling. Typing @ in an ItemLinkTextarea searches Studio and inserts
 // one; ItemLinkText and ITEM_LINK_PILLS show them as pills.
@@ -79,7 +79,6 @@ const LINK_ICONS: Record<string, string> = {
   "artifacts/artifacts": "artifacts/artifact",
   "talk/recordings": "talk/talk",
   "studio-code/workspaces": "Code",
-  "studio/spaces": "Layers",
   "studio/chats": "MessageSquare",
 };
 
