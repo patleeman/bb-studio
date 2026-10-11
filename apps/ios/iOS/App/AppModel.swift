@@ -23,9 +23,13 @@ extension Route {
     /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
-        // Kinds built into Studio live under its panel: /plugins/studio/studio/artifacts/<id>.
-        if parts.count == 5, parts[0] == "plugins", parts[1] == "studio", parts[2] == "studio", parts[3] == "artifacts" {
-            self = .artifact(id: parts[4])
+        // Kinds built into Studio live under its panel: /plugins/studio/studio/<segment>/<id>.
+        if parts.count == 5, parts[0] == "plugins", parts[1] == "studio", parts[2] == "studio" {
+            switch parts[3] {
+            case "artifacts": self = .artifact(id: parts[4])
+            case "drawings": self = .drawing(id: parts[4])
+            default: return nil
+            }
             return
         }
         guard parts.count == 4, parts[0] == "plugins" else { return nil }

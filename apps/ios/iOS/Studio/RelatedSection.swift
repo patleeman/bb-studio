@@ -64,7 +64,8 @@ struct RelatedSection: View {
     private func relatedItem(_ plugin: String?, _ id: String?, label: String) -> some View {
         if let plugin, let id {
             let href = plugin == "artifacts" ? "/plugins/studio/studio/artifacts/\(id)"
-                : "/plugins/\(plugin)/\(plugin == "pages" ? "pages" : plugin == "talk" ? "recordings" : plugin == "excalidraw" ? "drawings" : "designs")/\(id)"
+                : plugin == "excalidraw" ? "/plugins/studio/studio/drawings/\(id)"
+                : "/plugins/\(plugin)/\(plugin == "pages" ? "pages" : plugin == "talk" ? "recordings" : "designs")/\(id)"
             if let route = Route(href: href) {
                 NavigationLink(value: route) { Label(label, systemImage: "link") }
             } else {

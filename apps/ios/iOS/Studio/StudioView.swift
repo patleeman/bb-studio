@@ -126,7 +126,9 @@ final class StudioStore: ObservableObject {
         }
         async let pages = Self.attempt(plugins.contains("pages")) { try await client.pages() }
         async let recordings = Self.attempt(plugins.contains("talk")) { try await client.recordings(limit: 200) }
-        async let drawings = Self.attempt(plugins.contains("excalidraw")) { try await client.drawings() }
+        // Drawings are built into Studio; an older Studio has them in the Draw plugin.
+        let hasDrawings = plugins.contains("studio") || plugins.contains("excalidraw")
+        async let drawings = Self.attempt(hasDrawings) { try await client.drawings() }
         let (p, r, d) = await (pages, recordings, drawings)
         let lists: [Result<[StudioItem], Error>] = [
             p.map { $0.map { $0.map(StudioItem.init(page:)) } },

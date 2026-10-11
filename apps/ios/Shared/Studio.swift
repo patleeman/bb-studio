@@ -142,9 +142,11 @@ extension StudioItem {
             pluginId: "excalidraw", itemId: drawing.id, kind: "drawing", title: drawing.name,
             createdAt: drawing.createdAt, updatedAt: drawing.updatedAt,
             facts: drawing.elementCount.map { [Fact(id: "elements", value: $0 == 1 ? "1 shape" : "\($0) shapes")] } ?? [],
-            href: "/plugins/excalidraw/drawings/\(drawing.id)")
+            href: "/plugins/studio/studio/drawings/\(drawing.id)")
         if drawing.elementCount ?? 0 > 0 {
-            thumbnailUrl = "/api/v1/plugins/excalidraw/http/thumbnail?drawing=\(drawing.id)&v=\(Int(drawing.updatedAt))"
+            thumbnailUrl = drawingsInStudio
+                ? "/api/v1/plugins/studio/http/drawings/thumbnail?drawing=\(drawing.id)&v=\(Int(drawing.updatedAt))"
+                : "/api/v1/plugins/excalidraw/http/thumbnail?drawing=\(drawing.id)&v=\(Int(drawing.updatedAt))"
         }
     }
 

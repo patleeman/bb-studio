@@ -90,4 +90,20 @@ final class RPCFallbackTests: XCTestCase {
         let paths = await calls.paths
         XCTAssertEqual(paths.count, 1)
     }
+
+    func testDrawingsGoToStudioAndFallBackOnlyWhenStudioPredatesTheMerge() async throws {
+        let found = Data(#"{"ok":true,"result":{"drawings":[]}}"#.utf8)
+        let (current, currentCalls) = client { _ in (200, found) }
+        _ = try await current.drawings()
+        let currentPaths = await currentCalls.paths
+        XCTAssertEqual(currentPaths, ["/api/v1/plugins/studio/rpc/drawings.listDrawings"])
+        XCTAssertTrue(current.drawingThumbnailPath("drw_1", updatedAt: 2).hasPrefix("/api/v1/plugins/studio/http/drawings/thumbnail"))
+
+        let (old, oldCalls) = client { path in path.contains("/studio/") ? (404, Self.missingMethod) : (200, found) }
+        _ = try await old.drawings()
+        let oldPaths = await oldCalls.paths
+        XCTAssertEqual(oldPaths, ["/api/v1/plugins/studio/rpc/drawings.listDrawings", "/api/v1/plugins/excalidraw/rpc/listDrawings"])
+        XCTAssertTrue(old.drawingThumbnailPath("drw_1", updatedAt: 2).hasPrefix("/api/v1/plugins/excalidraw/http/thumbnail"))
+        _ = try await current.drawings()
+    }
 }

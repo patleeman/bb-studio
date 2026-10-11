@@ -92,5 +92,7 @@ final class StudioDesignTests: XCTestCase {
         XCTAssertEqual(Route(href: "/plugins/pages/pages/pg_1"), .page(id: "pg_1"))
         XCTAssertEqual(Route(href: "/plugins/studio/studio/artifacts/art_1"), .artifact(id: "art_1"))
         XCTAssertEqual(Route(href: "/plugins/artifacts/artifacts/art_1"), .artifact(id: "art_1"))
+        XCTAssertEqual(Route(href: "/plugins/studio/studio/drawings/drw_1"), .drawing(id: "drw_1"))
+        XCTAssertEqual(Route(href: "/plugins/excalidraw/drawings/drw_1"), .drawing(id: "drw_1"))
     }
 }

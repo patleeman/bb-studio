@@ -147,9 +147,15 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+DrawingEditing.swift",
+      "plugin": "studio",
+      "method": "drawings.createDrawing",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+DrawingEditing.swift",
       "plugin": "excalidraw",
       "method": "createDrawing",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
@@ -303,33 +309,63 @@
     },
     {
       "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.listDrawings",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "excalidraw",
       "method": "listDrawings",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.getDrawing",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "excalidraw",
       "method": "getDrawing",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.getDrawingUpdatedAt",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "excalidraw",
       "method": "getDrawingUpdatedAt",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.renameDrawing",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "excalidraw",
       "method": "renameDrawing",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.deleteDrawing",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Drawings.swift",
       "plugin": "excalidraw",
       "method": "deleteDrawing",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Pages.swift",

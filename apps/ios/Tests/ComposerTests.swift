@@ -90,7 +90,7 @@ final class ComposerTests: XCTestCase {
             case "/api/v1/plugins/talk/rpc/recording_rename":
                 XCTAssertEqual(value["id"]?.stringValue, "rec_aaaaaaaaaaaa")
                 XCTAssertEqual(value["title"]?.stringValue, "QA recording")
-            case "/api/v1/plugins/excalidraw/rpc/renameDrawing":
+            case "/api/v1/plugins/studio/rpc/drawings.renameDrawing":
                 XCTAssertEqual(value["id"]?.stringValue, "drawing-id")
                 XCTAssertEqual(value["name"]?.stringValue, "QA drawing")
             case "/api/v1/plugins/studio/rpc/tagItems":
