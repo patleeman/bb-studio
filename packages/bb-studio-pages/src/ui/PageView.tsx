@@ -1,6 +1,6 @@
 import { untitled } from "@bb-studio/kit/format";
 import { ThreadTitle, useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, ITEM_TITLE, useStudioChatPresent, useOpenMain } from "@bb-studio/kit/app";
+import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, ITEM_TITLE, useOpenMain } from "@bb-studio/kit/app";
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DropdownMenu,
@@ -15,7 +15,6 @@ import { cn } from "@bb-studio/kit/ui";
 import type { PageMetaView, RequestView } from "../contract";
 import { PageConnection } from "./connection";
 import { HistoryDialog } from "./dialogs";
-import { PageChat } from "./PageChat";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import { PageEditor, type SidePanel } from "./PageEditor";
 import { actorName, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
@@ -383,7 +382,6 @@ export function PageView({
   const [dialog, setDialog] = useState<"history" | null>(null);
   const [requests, setRequests] = useState<RequestView[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
-  const [chatThread, setChatThread] = useState<string | null>(chatThreadId);
   const titleSave = usePageTitle(page, rpc);
   const { title } = titleSave;
   useEffect(() => {
@@ -396,15 +394,12 @@ export function PageView({
   useRealtime(REALTIME_CHANNEL, payload => {
     const event = payload as RealtimeEvent;
     if (event.type === "chats" && event.pageId === page.id) {
-      setChatThread(event.threadId);
       loadChats();
     }
   });
 
-  const studioChat = useStudioChatPresent();
   const open = useOpenMain();
   const openThread = useCallback((threadId: string) => {
-    setChatThread(threadId);
     open({ kind: "thread", threadId });
   }, [open]);
   const openedRoute = useRef<string | null>(null);
@@ -532,7 +527,6 @@ export function PageView({
           <Breadcrumbs page={shown} pages={pages} />
           <SavingDot connection={connection} titleSaving={titleSave.status === "pending" || titleSave.status === "saving"} />
         </>}
-        chatAction={studioChat === false ? <PageChat page={page} threadId={chatThread ?? chats[0]?.threadId ?? null} /> : undefined}
         trailing={
           <>
           <ActivityPill

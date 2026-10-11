@@ -23,7 +23,6 @@ import {
   SECTION_TITLE,
   openAppPath,
   studioPath,
-  useStudioPresent,
   useOpenMain,
   type ProviderCall,
 } from "@bb-studio/kit/app";
@@ -111,9 +110,7 @@ function UnsentNotice({ recordingId, className }: { recordingId?: string; classN
 
 function UnsentAudio() {
   const setAside = useTalkState().setAside ?? [];
-  const navigate = useBbNavigate();
   const open = useOpenMain();
-  const studio = useStudioPresent();
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState<readonly SetAsideSegment[] | null>(null);
   const act = (work: () => Promise<unknown>) => {
@@ -122,14 +119,10 @@ function UnsentAudio() {
       .catch((cause: unknown) => toast.error(errorMessage(cause)))
       .finally(() => setBusy(false));
   };
-  const toCollection = () => {
-    const path = studio ? studioPath("recording") : `/plugins/talk/${PANEL_PATH}`;
-    if (studio) openAppPath(path);
-    else navigate.toPluginPanel(PANEL_PATH);
-  };
+  const toCollection = () => openAppPath(studioPath("recording"));
   return (
     <div className="relative h-full">
-      <ItemHeader backLabel={studio ? "Studio" : "Recordings"} onBack={toCollection} />
+      <ItemHeader backLabel="Studio" onBack={toCollection} />
       <PageColumn className="max-w-3xl">
         <h1 className={PAGE_TITLE}>Unsent audio</h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -329,7 +322,6 @@ function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnTyp
 function RecordingDetail({ id }: { id: string }) {
   const { rpc, data, error, refetch } = useRecording(id);
   const navigate = useBbNavigate();
-  const studio = useStudioPresent();
   const state = useTalkState();
   const segments = data?.segments ?? [];
   const player = usePlayer(id, segments);
@@ -373,15 +365,8 @@ function RecordingDetail({ id }: { id: string }) {
     talk.setViewing(id);
     return () => talk.setViewing(null);
   }, [id]);
-  // With Studio installed, the collection is Studio's.
-  const toCollection = useCallback(
-    (replace = false) => {
-      const path = studio ? studioPath("recording") : `/plugins/talk/${PANEL_PATH}`;
-      if (studio) openAppPath(path, { replace });
-      else navigate.toPluginPanel(PANEL_PATH, { replace });
-    },
-    [navigate, studio],
-  );
+  // The collection is Studio's.
+  const toCollection = useCallback((replace = false) => openAppPath(studioPath("recording"), { replace }), []);
   // The recording went away while open: deleted elsewhere, or discarded
   // because it finished without a word.
   const gone = Boolean(data && error && /No recording/.test(error));
@@ -394,7 +379,7 @@ function RecordingDetail({ id }: { id: string }) {
     toCollection(true);
   }, [gone, wasEmpty, toCollection]);
 
-  const backLabel = studio ? "Studio" : "Recordings";
+  const backLabel = "Studio";
   if (error && !data) {
     return (
       <div className="relative h-full">

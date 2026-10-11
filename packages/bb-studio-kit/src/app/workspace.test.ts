@@ -4,7 +4,7 @@ import { canOpenWorkspaceItem, openWorkspaceItem, registerWorkspaceOpener, regis
 import { openAppPath } from "./nav";
 const disposers: (() => void)[] = [];
 afterEach(() => { disposers.splice(0).reverse().forEach(dispose => dispose()); document.body.replaceChildren(); });
-it("routes participating items into Studio and leaves add-ons standalone without Studio", () => {
+it("routes participating items into Studio's workspace once it opens them", () => {
   disposers.push(registerWorkspaceProvider("/plugins/pages/pages"));
   expect(openWorkspaceItem({ href: "/plugins/pages/pages/pg_one" })).toBe(false);
   const open = vi.fn();

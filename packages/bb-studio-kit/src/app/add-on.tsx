@@ -1,7 +1,7 @@
 // An add-on's own collection page. Built from the same `studio_*` methods
-// Studio calls, so it shows exactly what Studio would for this add-on. When
-// Studio is installed, the page hands over to Studio's collection instead,
-// unless the add-on keeps its own page (`handOver={false}`).
+// Studio calls, so it shows exactly what Studio would for this add-on. The
+// page hands over to Studio's collection unless the add-on keeps its own page
+// (`handOver={false}`).
 import { useBbContext, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { z as Zod } from "zod";
@@ -11,7 +11,6 @@ import { createStudioItem } from "./create-item";
 import { CollectionPage, type CollectionHandlers, type CollectionItem, type CollectionKind } from "./collection";
 import { openAppPath, studioPath } from "./nav";
 import { useProjects } from "./pieces";
-import { useStudioPresent } from "./presence";
 
 type Provider = StudioSchemas["provider"];
 
@@ -37,13 +36,12 @@ export function AddOnCollection({
   refreshKey?: unknown;
   /** The kind Studio opens filtered to when this page hands over. */
   kind?: string;
-  /** Hand over to Studio's collection when Studio is installed. */
+  /** Hand over to Studio's collection. */
   handOver?: boolean;
   /** Extra buttons beside New. */
   headerActions?: ReactNode;
 }) {
-  const present = useStudioPresent();
-  const studio = handOver ? present : false;
+  const studio = handOver;
   const navigate = useBbNavigate();
   const context = useBbContext();
   const projects = useProjects();
@@ -71,10 +69,10 @@ export function AddOnCollection({
   }, [call, pluginId]);
 
   useEffect(() => {
-    if (studio === false) refetch();
+    if (!studio) refetch();
   }, [studio, refetch, refreshKey]);
   useEffect(() => {
-    if (studio !== false) return;
+    if (studio) return;
     const onVisible = () => document.visibilityState === "visible" && refetch();
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -108,8 +106,8 @@ export function AddOnCollection({
     };
   }, [call, navigate, pluginId, refetch, title]);
 
-  // Blank while checking for Studio, so the page doesn't flash before handing over.
-  if (studio !== false) return <div className="h-full bg-background" />;
+  // Blank while handing over.
+  if (studio) return <div className="h-full bg-background" />;
   return (
     <CollectionPage
       title={title}

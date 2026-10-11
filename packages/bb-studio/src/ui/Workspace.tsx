@@ -59,12 +59,12 @@ function runCommand(value: unknown) {
   items.forEach((item, index) => update(current => index === 0
     ? openItem(current, item, command.placement === "right" || command.placement === "bottom" ? command.placement : "tab")
     : openItem(current, item, "tab", current.focused)));
-  if (items.length && command.show !== false) openAppPath(WORKSPACE_PATH, { standalone: true });
+  if (items.length && command.show !== false) openAppPath(WORKSPACE_PATH);
   // A command that changed nothing still answers, so the agent hears back.
   reportSoon();
 }
 
-/** Installed once by Studio; without Studio, add-ons keep their ordinary pages. */
+/** Installed once by Studio. */
 export function WorkspaceBridge() {
   const rpc = useRpc<typeof rpcContract>();
   const pathname = usePathname();
@@ -120,7 +120,7 @@ export function WorkspaceBridge() {
   // Opens an item as a tab and shows the workspace; `replace` drops the address that asked.
   const openTab = useCallback((item: WorkspaceItem, placement: WorkspacePlacement, replace = false) => {
     update(current => openItem(current, item, placement));
-    openAppPath(WORKSPACE_PATH, { standalone: true, replace });
+    openAppPath(WORKSPACE_PATH, { replace });
     // The server's item title takes precedence over IDs and stale link labels.
     void rpc.call("visitTab", { path: item.href }).then(({ tab }) => {
       if (!tab) return;
@@ -209,7 +209,7 @@ function EditorSlot({ tab, instance }: { tab: Tab; instance: string }) {
   }, [tab.href, instance]);
   // The item's tools go to its slot in the tab row (barSlot), not a bar of its own.
   return <div data-studio-workspace-frame={barSlot(instance, tab.href)} className="flex min-h-0 min-w-0 flex-1 flex-col">
-    {!available && <div className="p-6 text-sm text-muted-foreground">This item's plugin is unavailable. Enable it to reopen this tab. <button className="underline" onClick={() => openAppPath(tab.href, { standalone: true })}>Open item page</button></div>}
+    {!available && <div className="p-6 text-sm text-muted-foreground">This item's plugin is unavailable. Enable it to reopen this tab. <button className="underline" onClick={() => openAppPath(tab.href)}>Open item page</button></div>}
     <div ref={element} data-studio-workspace-editor={tab.href} className="flex min-h-0 min-w-0 flex-1 flex-col" />
   </div>;
 }

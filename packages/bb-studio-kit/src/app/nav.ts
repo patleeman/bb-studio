@@ -27,9 +27,9 @@ export function panelHref(pluginId: string, path: string, subPath = ""): string 
  * BB's links can't replace the current entry, so `replace` points it at the
  * same path first: back then skips the page being left.
  */
-export function openAppPath(path: string, options: { replace?: boolean; standalone?: boolean } = {}): void {
+export function openAppPath(path: string, options: { replace?: boolean } = {}): void {
   if (!path.startsWith("/")) return;
-  if (!options.standalone && openWorkspaceItem({ href: path })) return;
+  if (openWorkspaceItem({ href: path })) return;
   if (options.replace) window.history.replaceState(window.history.state, "", path);
   if (clickAppLink(path)) return;
   rewriteHistory(path, options);

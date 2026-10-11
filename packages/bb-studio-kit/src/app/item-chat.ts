@@ -74,13 +74,13 @@ function subscribe(listener: () => void): () => void {
 
 const revision = () => registry().revision;
 
-/** Studio Chat's host, or null when it isn't running. */
+/** Studio's item chat host, or null until it registers. */
 export function useItemChat(): ItemChatHost | null {
   useSyncExternalStore(subscribe, revision, revision);
   return registry().host;
 }
 
-/** `ref`'s home thread: null for none or without Studio Chat, undefined while loading. */
+/** `ref`'s home thread: null for none or no host, undefined while loading. */
 export function useHomeThread(ref: ItemChatRef | null): HomeThread | null | undefined {
   const host = useItemChat();
   const pluginId = ref?.pluginId;

@@ -1,4 +1,4 @@
-import { AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
+import { AddOnCollection, openAppPath, studioPath, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -6,7 +6,6 @@ import { PLUGIN_ID, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import type { PageMetaView, rpcContract, StudioEmbedItem } from "../contract";
 import { PagesUiContext, type PagesUi } from "./context";
 import { PageView } from "./PageView";
-import { PageConversation } from "./PageChat";
 import { MissingPageRecovery } from "./MissingPageRecovery";
 import { useProjects, type BotsState, type Rpc } from "./shared";
 
@@ -69,8 +68,6 @@ export function PagesPanel({ subPath }: { subPath: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const studioRpc = useRpc<StudioSchemas["provider"]>();
   const callStudio = useCallback<ProviderCall>((method, input) => studioRpc.call(method, input as never) as never, [studioRpc]);
-  const navigate = useBbNavigate();
-  const studio = useStudioPresent();
   const projects = useProjects();
   // `<page id>/chat/<thread id>` opens the page with that chat's card showing.
   const [pageId = null, section, chatThreadId = null] = subPath.split("/").filter(Boolean);
@@ -99,11 +96,8 @@ export function PagesPanel({ subPath }: { subPath: string }) {
     setPageMeta(null);
   }, []);
 
-  // With Studio installed, the collection is Studio's.
-  const toCollection = useCallback(
-    (replace = false) => (studio ? openAppPath(studioPath("page"), { replace }) : navigate.toPluginPanel("pages", { subPath: "", replace })),
-    [navigate, studio],
-  );
+  // The collection is Studio's.
+  const toCollection = useCallback((replace = false) => openAppPath(studioPath("page"), { replace }), []);
   const [requestsVersion, setRequestsVersion] = useState(0);
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = payload as RealtimeEvent;
@@ -126,8 +120,6 @@ export function PagesPanel({ subPath }: { subPath: string }) {
     <PagesUiContext.Provider value={ui}>
       {!pageId ? (
         <AddOnCollection pluginId="pages" title="Pages" kind="page" call={callStudio} refreshKey={pages} />
-      ) : pageMeta && section === "compose" ? (
-        <PageConversation key={pageId} page={pageMeta} rpc={rpc} />
       ) : pageMeta ? (
         <PageView
           key={pageId}
@@ -141,11 +133,11 @@ export function PagesPanel({ subPath }: { subPath: string }) {
           // A page inside another shares its project.
           onCreateInside={() => void createPage(pageMeta.projectId, pageMeta.id)}
           onDeleted={showMissingPage}
-          backLabel={studio ? "Studio" : "Pages"}
+          backLabel="Studio"
           onBack={() => toCollection()}
         />
       ) : pageMeta === null ? (
-        <MissingPageRecovery key={pageId} pageId={pageId} onRetryPage={fetchPage} onBack={() => toCollection()} backLabel={studio ? "Back to Studio" : "All pages"} />
+        <MissingPageRecovery key={pageId} pageId={pageId} onRetryPage={fetchPage} onBack={() => toCollection()} backLabel="Back to Studio" />
       ) : null}
     </PagesUiContext.Provider>
   );

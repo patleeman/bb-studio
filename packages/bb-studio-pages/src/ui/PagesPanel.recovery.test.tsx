@@ -15,11 +15,10 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 }));
 vi.mock("@bb-studio/kit/app", () => ({
   AddOnCollection: () => null,
-  openAppPath: vi.fn(), studioPath: vi.fn(), useStudioPresent: () => false,
+  openAppPath: vi.fn(), studioPath: vi.fn(),
 }));
 vi.mock("./shared", () => ({ useProjects: () => [] }));
 vi.mock("./PageView", () => ({ PageView: () => <div>Live editor</div> }));
-vi.mock("./PageChat", () => ({ PageConversation: () => null }));
 vi.mock("./MissingPageRecovery", () => ({ MissingPageRecovery: ({ pageId, onRetryPage }: { pageId: string; onRetryPage(): void }) => <div>Recovery for {pageId}<button onClick={onRetryPage}>Retry loading page</button></div> }));
 
 let root: Root;

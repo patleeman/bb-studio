@@ -17,7 +17,6 @@ export function DesignsPanel({ subPath }: { subPath: string }) {
       pluginId={PLUGIN_ID}
       title="Designs"
       kind="design"
-      panelPath={PANEL_PATH}
       channel={REALTIME_CHANNEL}
       isItemId={isDesignId}
       // Keep our own page: handing over rewrites the URL, which the desktop
@@ -37,7 +36,7 @@ export function DesignsPanel({ subPath }: { subPath: string }) {
 
 /** Starting points for a new design, as in Claude Design's home page. */
 function MakeSomethingNew() {
-  const { call } = useAddOnPanel(REALTIME_CHANNEL, PANEL_PATH, "design");
+  const { call } = useAddOnPanel(REALTIME_CHANNEL, "design");
   const context = useBbContext();
   const [busy, setBusy] = useState(false);
 

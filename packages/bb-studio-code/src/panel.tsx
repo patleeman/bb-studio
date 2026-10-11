@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { FileBrowser } from "./file-browser";
 import { FolderPicker } from "./folder-picker";
 import { themeChanges, useThemeSync } from "./theme-sync";
-import { CHANNEL, HIDDEN_RELEASE_MS, KIND_ID, PANEL_PATH, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
+import { CHANNEL, HIDDEN_RELEASE_MS, KIND_ID, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
 
 export function CodePanel({ subPath }: { subPath: string }) {
   return (
@@ -15,7 +15,6 @@ export function CodePanel({ subPath }: { subPath: string }) {
       pluginId={PLUGIN_ID}
       title="Workspaces"
       kind={KIND_ID}
-      panelPath={PANEL_PATH}
       channel={CHANNEL}
       isItemId={isWorkspaceId}
       renderItem={(id, back) => <WorkspaceView key={id} id={id} back={back} />}

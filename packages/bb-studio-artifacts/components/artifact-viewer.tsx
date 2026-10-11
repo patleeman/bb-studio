@@ -15,8 +15,6 @@ import {
   ItemHeader,
   ItemDeleteConfirm,
   ItemMenu,
-  openNewItemThread,
-  useStudioChatPresent,
   cn,
   openAppPath,
   projectName,
@@ -48,7 +46,6 @@ export function ArtifactViewer({
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   // Studio Chat's New in Float bar starts threads; the menu only offers it without one.
-  const studioChat = useStudioChatPresent();
   const projects = useProjects();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -211,11 +208,6 @@ export function ArtifactViewer({
       </a>
       <ItemMenu reference={thread} item={{ pluginId: PLUGIN_ID, id: artifactId }} projects={projects} projectId={artifact.projectId} onMove={(id) => void move(id)} onDelete={() => setConfirmDelete(true)} busy={busy}>
 
-          {studioChat === false ? (
-            <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
-              <Icon name="MessageSquarePlus" className="size-4" /> New thread
-            </DropdownMenuItem>
-          ) : null}
           {artifact.sourceThreadId ? (
             <DropdownMenuItem onSelect={() => navigate.toThread(artifact.sourceThreadId!)}>
               <Icon name="MessageSquare" className="size-4" /> Open source thread

@@ -31,7 +31,7 @@ function ToWorkspace({ path }: { path: string }) {
   const pathname = usePathname();
   const go = (replace: boolean) => {
     if (path !== "workspace") openCollection(path === "collection" ? null : decodeSegment(path));
-    openAppPath(WORKSPACE_PATH, { standalone: true, replace });
+    openAppPath(WORKSPACE_PATH, { replace });
   };
   // Either side may be percent-encoded; compare them decoded.
   const here = decodeSegment(pathname.replace(/\/+$/, "")) === decodeSegment(`${WORKSPACE_PATH}/${path}`);

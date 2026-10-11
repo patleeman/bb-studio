@@ -40,13 +40,13 @@ function loadSpaces(sdk: StudioRpc): Promise<MoveSpace[]> {
   const spaces = sdk.plugins
     .callRpc({ pluginId: STUDIO_PLUGIN_ID, method: "spaces", input: null as never, outputSchema: spacesSchema })
     .then((result) => (result as z.infer<typeof spacesSchema>).spaces)
-    // Without Studio there are no Spaces; the menu lists projects.
+    // If Studio can't answer, the menu lists projects.
     .catch(() => []);
   cached = { at: Date.now(), spaces };
   return spaces;
 }
 
-/** Studio's Spaces, or [] without Studio; null while loading. */
+/** Studio's Spaces, or [] if Studio can't answer; null while loading. */
 export function useMoveSpaces(): MoveSpace[] | null {
   const sdk = useSdk() as unknown as StudioRpc;
   const [spaces, setSpaces] = useState<MoveSpace[] | null>(null);

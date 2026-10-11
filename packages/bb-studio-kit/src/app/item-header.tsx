@@ -13,22 +13,13 @@ import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
 import { useOpenTarget } from "./move";
 import { useHomeThread, useItemChat, type ItemChatRef } from "./item-chat";
-import { BAR_BUTTON, ICON_BUTTON } from "./pieces";
-import { useStudioChatPresent } from "./presence";
+import { ICON_BUTTON } from "./pieces";
 
 export interface RelatedRef { pluginId: string; id: string }
 export type ItemThread = { title: string; href: string; ref?: RelatedRef };
 
 export function openNewItemThread(navigate: ReturnType<typeof useBbNavigate>, item: ItemThread) {
   navigate.toCompose({ initialPrompt: mentionPrompt([item]), focusPrompt: true });
-}
-
-/** The shared action used by item headers and narrow-screen menus. */
-function useNewItemThread(item: ItemThread | undefined) {
-  const navigate = useBbNavigate();
-  return () => {
-    if (item) openNewItemThread(navigate, item);
-  };
 }
 
 /** Opens the view on screen again in a split beside it. */
@@ -272,10 +263,8 @@ export function ItemHeader({
     window.addEventListener("resize", measure);
     return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
   }, [slot]);
-  const newThread = useNewItemThread(thread);
   const moved = item ?? thread;
-  // Studio Chat owns item links and conversation creation across item views.
-  const studioChat = useStudioChatPresent();
+  // Studio owns item links and conversation creation across item views.
   const chatItem = thread ?? item;
   const path = chatItem?.href.split(/[?#]/)[0]?.split("/") ?? [];
   const relatedRef = chatItem?.ref ?? (path[1] === "plugins" && path[2] && path[4]
@@ -295,12 +284,9 @@ export function ItemHeader({
         {leading && !inWorkspace ? <BarSeparator /> : null}
         {leading}
       </nav>
-      {!inWorkspace && chatAction !== null && (chatAction || thread || relatedRef) || tools ? <div className="flex shrink-0 items-center gap-0.5">
+      {!inWorkspace && chatAction !== null && (chatAction || relatedRef) || tools ? <div className="flex shrink-0 items-center gap-0.5">
         {inWorkspace ? null : chatAction}
-        {!inWorkspace && chatAction === undefined && thread && studioChat === false ? <button type="button" className={BAR_BUTTON} onClick={newThread}>
-          <Icon name="MessageSquare" /> Chat
-        </button> : null}
-        {!inWorkspace && chatAction === undefined && relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
+        {!inWorkspace && chatAction === undefined && relatedRef ? <HomeThreadChip item={relatedRef} /> : null}
         {tools ? <ItemActions compact={compact}>
           {splitHere ? <OpenInSplitButton item={splitHere} /> : null}
           {trailing && splitHere && !compact ? <span aria-hidden className="mx-1 h-4 w-px bg-border" /> : null}

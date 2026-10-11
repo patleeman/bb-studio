@@ -74,7 +74,7 @@ export function ThreadItemsPanel({
 
   const linksFor = useCallback(
     () =>
-      // Without Studio there are no links; the tab still lists recent items.
+      // If Studio can't answer, the tab still lists recent items.
       sdk.plugins
         .callRpc({ pluginId: STUDIO_PLUGIN_ID, method: "threadItems", input: { threadId }, outputSchema: threadLinks })
         .then(({ threads }) => new Set(threads.filter((each) => each.ref.pluginId === pluginId).map((each) => each.ref.id)))

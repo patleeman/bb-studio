@@ -25,15 +25,12 @@ import {
   ItemHeader,
   ItemDeleteConfirm,
   ItemMenu,
-  openNewItemThread,
-  useStudioChatPresent,
   useOpenMain,
   cn,
 } from "@bb-studio/kit/app";
 
 import { errorMessage } from "@bb-studio/kit/format";
 import {
-  useBbNavigate,
   useRealtime,
   useRealtimeConnectionState,
   useRpc,
@@ -68,10 +65,8 @@ export function DrawingEditor({
   onBack: (replace?: boolean) => void;
 }) {
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
   const openMain = useOpenMain();
   // Studio Chat's Chat button starts threads; the menu only offers it without one.
-  const studioChat = useStudioChatPresent();
   const isDark = useIsDark();
   const [name, setName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -510,11 +505,6 @@ export function DrawingEditor({
       </button>
       <ItemMenu reference={thread} item={{ pluginId: PLUGIN_ID, id: drawingId }} projectId={projectId.current} onMoved={() => void rpc.call("getDrawing", { id: drawingId }).then(({ drawing }) => { if (drawing) projectId.current = drawing.projectId; })} onDelete={() => setConfirmDelete(true)} className="w-52">
 
-          {threadId || studioChat !== false ? null : (
-            <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
-              <Icon name="MessageSquarePlus" className="size-4" /> New thread
-            </DropdownMenuItem>
-          )}
           <DropdownMenuItem onSelect={() => void downloadPng()}>
             <Icon name="Download" className="size-4" /> Download PNG
           </DropdownMenuItem>

@@ -14,7 +14,6 @@ vi.mock("./item-chat", () => ({
     choose: () => state.launch?.("choose"),
   }),
 }));
-vi.mock("./presence", () => ({ useStudioChatPresent: () => true, useStudioPresent: () => true }));
 vi.mock("./move", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
 vi.mock("../ui/icon", () => ({ Icon: () => null }));
 
