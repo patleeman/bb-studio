@@ -70,6 +70,7 @@ const PLUGINS = {
   },
   design: { surface: "/plugins/design/designs", labels: ["New design", "No designs yet"] },
   "studio-code": { surface: "/plugins/studio-code/workspaces", labels: ["No workspaces yet"] },
+  applets: { cli: ["applets", "doctor"], surface: "/settings/plugins/applets", labels: ["Studio Applets app", "No applets yet"] },
 };
 
 // Text BB or a plugin shows when a surface crashes or can't load.

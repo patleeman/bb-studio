@@ -21,6 +21,7 @@ agent.
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
+| [Studio Applets](packages/bb-studio-applets/) | `applets` | Experimental. Small native macOS apps your agents write as plain folders, such as a HUD of running threads, run by one signed app through an API you approve. |
 
 Every add-on works on its own. With Studio installed, their items also appear in
 Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
@@ -59,6 +60,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - design: Studio Design; UI prototypes designed with agents
    - studio-code: Studio Code; VS Code workspaces beside your threads (downloads code-server on first open)
    - mobile: push notifications for the BB Studio iOS app; only if I use it
+   - applets: Studio Applets; experimental native macOS mini-apps; only if I ask for it
 3. Install each one I choose with `bb plugin install <id>@bb-studio --yes`.
 4. Run `bb plugin list`, confirm each installed plugin is running, and report
    anything that failed with its error.

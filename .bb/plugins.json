@@ -50,6 +50,10 @@
     {
       "name": "studio-code",
       "source": "./packages/bb-studio-code"
+    },
+    {
+      "name": "applets",
+      "source": "./packages/bb-studio-applets"
     }
   ]
 }
