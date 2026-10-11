@@ -1,15 +1,16 @@
 # BB Studio
 
-A suite of [BB](https://getbb.app) plugins for writing, talking, drawing, and
-keeping what your agents make. Every
-item lives in one Studio collection that you can search, tag, and hand to an
-agent.
+[BB](https://getbb.app) plugins for writing, talking, drawing, designing and
+keeping what your agents make. Studio is one plugin with pages, recordings,
+drawings, designs and artifacts built in: every item lives in one collection
+that you can search, tag, and hand to an agent. Code, Reactions, Decisions,
+Mobile and Applets are separate plugins beside it.
 
 ![Live BB screenshot of the Studio collection](packages/bb-studio/assets/staged-preview.png)
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, designs and artifacts (pages, collaborative documents you write with your agents, with checklists you hand to agents, inline whiteboards and Explore's Next row; recordings, long-form dictation and recording that saves audio as you speak and transcribes it; drawings, Excalidraw scenes you sketch with your agents; designs, UI prototypes and slide decks on a canvas with a reviewer that checks the work; and artifacts, the files they make, are built in), with search, tags, project filters, templates, item chats and quotes, project leads with a Heartbeat, a Command view, a Setup page for the add-ons, plugin health and backup and restore. |
+| [Studio](packages/bb-studio/) | `studio` | The hub, with everything you make built in: pages (collaborative documents with checklists you hand to agents, inline whiteboards and Explore's Next row), recordings and dictation (audio saved as you speak, then transcribed), drawings (Excalidraw scenes), designs (UI prototypes and slide decks with a reviewer) and artifacts (the files agents make). One collection with search, tags, project filters, templates, item chats and quotes, plus project leads with a Heartbeat, a Setup page, plugin health and backup and restore. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Upgrade bridge only. Pages are built into Studio now; this copies an existing install's pages, their versions and files, the Next row's click stats and its settings into Studio. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Upgrade bridge only. Recording and dictation are built into Studio now; this copies an existing install's recordings, their audio and its settings into Studio. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Upgrade bridge only. Drawings are built into Studio now; this copies an existing install's drawings into Studio. |
@@ -21,9 +22,10 @@ agent.
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 | [Studio Applets](packages/bb-studio-applets/) | `applets` | Experimental. Small native macOS apps your agents write as plain folders, such as a HUD of running threads, run by one signed app through an API you approve. |
 
-Every add-on works on its own. With Studio installed, their items also appear in
-Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
-all.
+Install Studio first; the other plugins are built to run beside it. Studio
+Code's workspaces appear in Studio's collection. Studio Pages, Talk, Draw,
+Artifacts and Design are kept only as upgrade bridges for installs from before
+the merge; new installs don't need them.
 
 ## iOS app
 
@@ -46,7 +48,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    `bb marketplace refresh bb-studio` instead.
 2. Ask me whether to install all of these plugins or only some. List them with
    a one-line description each:
-   - studio: the Studio collection, project leads and Command view, with pages, dictation and recordings, drawings, designs and artifacts built in; recommended, since the others plug into it
+   - studio: the Studio collection and project leads, with pages, dictation and recordings, drawings, designs and artifacts built in; required, since the others run beside it
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
    - studio-code: Studio Code; VS Code workspaces beside your threads (downloads code-server on first open)
@@ -94,8 +96,9 @@ plugin deletes its settings and secrets, so note them first.
 
 ## Consolidation upgrades
 
-Chat, Pages, Artifacts, Draw, Design and Talk now ship in Studio, BB's own navigation replaces Studio Navigation, and Float,
-Studio Sidebar (`thread-list-plus`), Studio Tables and Studio Teams (`bot-teams`) are retired. New installs need at most 6 plugins.
+Chat, Pages, Artifacts, Draw, Design and Talk now ship in Studio, and Studio
+Sidebar (`thread-list-plus`) and Studio Tables (`studio-tables`) are retired.
+New installs need at most 6 plugins.
 If you had Studio Pages, Studio Artifacts, Studio Draw, Studio Design or Studio Talk, its
 last release copies your items into Studio, then Setup lets you remove it.
 **[Upgrading to unified Studio](docs/upgrade-unified-studio.md)** is the one
@@ -112,11 +115,12 @@ Without the page, `bb studio setup` prints the same list and the commands to
 run. The short version:
 
 ```sh
-bb plugin remove studio-navigation  # on BB 0.45, pick BB's own navigation in Appearance first; 0.46 has no such setting
-bb plugin remove float
-bb bots list --json                 # export the bots you want before removing Teams
-bb plugin remove bot-teams
+bb plugin remove thread-list-plus
+bb plugin remove studio-tables  # export any table you still need as CSV first
 ```
+
+Remove a bridge (`pages`, `talk`, `excalidraw`, `artifacts`, `design`) only
+after its `bb <id> migrate` reports Migration complete.
 
 ## Development
 
@@ -141,7 +145,7 @@ pnpm check:compat        # every plugin installs on the current stable BB
 node scripts/release.mjs --dry-run  # check a commit for release; without --dry-run it moves stable
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
-scripts/refresh-locks.sh bb-studio-pages  # refresh a plugin npm lock in a clean clone
+scripts/refresh-locks.sh bb-studio-code   # refresh a plugin npm lock in a clean clone
 node scripts/staged-bb.mjs start         # stage the suite; stop removes it
 node scripts/staged-bb.mjs start --plugin studio # all plugins, only this capture's fixtures
 ```

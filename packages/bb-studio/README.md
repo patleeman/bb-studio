@@ -1,9 +1,9 @@
 # Studio
 
-> **Studio** is the core of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make. See the [suite overview](../../README.md).
+> **Studio** is the core of **BB Studio**: pages, recordings, drawings, designs and artifacts are built in. See the [suite overview](../../README.md).
 
-Studio opens on the collection: everything Studio and its add-ons make, including pages, Talk
-recordings and dictations, drawings, designs and saved artifacts. Search across all of them, filter by
+Studio opens on the collection: everything you and your agents make, including pages, Talk
+recordings and dictations, drawings, designs and saved artifacts, and other plugins' items such as Studio Code's workspaces. Search across all of them, filter by
 kind, project and tag, and hand any of them to an agent. Each BB project can have a lead thread
 woken by a Heartbeat.
 
@@ -883,9 +883,9 @@ open in the background, so it's as you left it when you come back.
   "Copy text", appear when the selection is all that kind.
 - **New ▾** creates any kind an installed add-on offers, in the current
   project. It always opens the full menu, even with a kind filter active.
-- **Takes over from the add-ons.** Each add-on's own collection hands over
-  to Studio filtered to its kind, and item pages lead back to Studio. Studio's
-  ⋯ menu can hide the add-ons' sidebar rows, so Studio is the only entry.
+- **One entry.** Studio Code's workspace list hands over to Studio filtered
+  to workspaces, and item pages lead back to Studio. Studio's ⋯ menu can hide
+  other plugins' sidebar rows, so Studio is the only entry.
 - **The BB Studio theme**: the app icon's colors for all of BB, light and
   dark. Teal-black and pale-teal surfaces, a coral accent, teal file paths.
   Pick **BB Studio** in Settings → Appearance, or run `bb theme set

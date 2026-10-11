@@ -3,12 +3,12 @@
   "schemaVersion": 1,
   "name": "bb-studio",
   "displayName": "BB Studio",
-  "description": "Studio for BB: pages, voice recordings, drawings, artifacts and a sidebar, in one collection your agents can use.",
+  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs and artifacts built in, plus Code, Reactions, Decisions, Mobile and Applets beside it.",
   "plugins": [
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio: one collection for pages, recordings, drawings, designs and artifacts, with search, tags, project leads, item conversations and quotes.",
+      "description": "The home of BB Studio, with pages, recordings, drawings, designs and artifacts built in: one collection with search, tags, project leads, item conversations and quotes.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },
@@ -16,9 +16,11 @@
         "productivity",
         "documents",
         "drawing",
-        "collaboration",
+        "design",
         "voice",
         "dictation",
+        "files",
+        "collaboration",
         "bb-studio"
       ],
       "author": {
@@ -41,6 +43,7 @@
         "url": "./packages/bb-studio-pages/assets/icon.svg"
       },
       "tags": [
+        "upgrade-bridge",
         "documents",
         "bb-studio"
       ],
@@ -64,6 +67,7 @@
         "url": "./packages/bb-studio-talk/assets/icon.svg"
       },
       "tags": [
+        "upgrade-bridge",
         "voice",
         "bb-studio"
       ],
@@ -87,6 +91,7 @@
         "url": "./packages/bb-studio-draw/assets/icon.svg"
       },
       "tags": [
+        "upgrade-bridge",
         "drawing",
         "bb-studio"
       ],
@@ -110,6 +115,7 @@
         "url": "./packages/bb-studio-artifacts/assets/icon.svg"
       },
       "tags": [
+        "upgrade-bridge",
         "files",
         "artifacts",
         "bb-studio"
@@ -205,6 +211,7 @@
         "url": "./packages/bb-studio-design/assets/icon.svg"
       },
       "tags": [
+        "upgrade-bridge",
         "design",
         "bb-studio"
       ],

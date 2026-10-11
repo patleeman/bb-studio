@@ -16,7 +16,7 @@ export interface AddOn {
 }
 
 export const ADDONS: readonly AddOn[] = [
-  { id: "studio", displayName: "Studio", description: "The home of BB Studio: one collection for pages, recordings, drawings, designs and artifacts, with search, tags, project leads, item conversations and quotes." },
+  { id: "studio", displayName: "Studio", description: "The home of BB Studio, with pages, recordings, drawings, designs and artifacts built in: one collection with search, tags, project leads, item conversations and quotes." },
   { id: "mobile", displayName: "Studio Mobile", description: "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads." },
   { id: "emoji-react", displayName: "Studio Reactions", description: "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer." },
   { id: "smart-decisions", displayName: "Studio Decisions", description: "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and other plugins can ask it for quick decisions." },
