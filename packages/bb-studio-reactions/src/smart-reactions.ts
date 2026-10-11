@@ -1,13 +1,10 @@
-// Smart reactions — the assistant suggests the reactions for each reply.
-//
-// When the `smartReactions` setting is on, the server adds instructions that
-// ask the assistant to end a reply that needs an answer with one directive
-// line:
+// Legacy smart reactions. Agents no longer write them (Studio Pages' Next row
+// offers quick replies now), but older replies may end with
 //
 //   ::reactions{items="👍 Ship it|🧪 Add tests first|❓ Why this approach"}
 //
-// The frontend renders that directive as a row of reaction buttons under the
-// message. Items are separated by `|` because labels often contain commas.
+// and the frontend still renders that line as reaction buttons, so it never
+// shows as raw text. Items are separated by `|` because labels often contain commas.
 // Directive attributes come from the model, so they are untrusted: parsing
 // caps the count and length and drops anything that is not "emoji label".
 import { parseEmojiItem, type EmojiItem } from "./emoji-items";
@@ -23,9 +20,6 @@ export const MAX_SMART_REACTION_LENGTH = 60;
 
 /** An emoji glyph: pictographs, flags (regional indicators), and keycaps. */
 const EMOJI = /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u;
-
-/** Cap on the preferred-reactions list in the instructions. */
-const MAX_PREFERRED_LENGTH = 600;
 
 /** Parse the directive's `items` attribute into reaction items. */
 export function parseSmartReactions(raw: string | undefined): EmojiItem[] {
@@ -44,33 +38,4 @@ export function parseSmartReactions(raw: string | undefined): EmojiItem[] {
     if (items.length >= MAX_SMART_REACTIONS) break;
   }
   return items;
-}
-
-/**
- * Instructions for the assistant. The user's configured reactions are the
- * preferred set, but the assistant writes its own when the reply offers
- * specific choices.
- */
-export function smartReactionInstructions(configured: readonly EmojiItem[]): string {
-  // Saved items go into the prompt and may be copied into the directive, so
-  // strip the directive's delimiters and keep only items the parser accepts.
-  // The total cap keeps the host's 4096-character limit from cutting the list.
-  const preferredItems: string[] = [];
-  let length = 0;
-  for (const item of configured) {
-    const text = item.text.replace(/["|]/g, "").replace(/\s+/g, " ").trim();
-    if (text.length === 0 || text.length > MAX_SMART_REACTION_LENGTH) continue;
-    if (length + text.length + 3 > MAX_PREFERRED_LENGTH) break;
-    preferredItems.push(text);
-    length += text.length + 3;
-  }
-  const preferred = preferredItems.join(" | ");
-  return [
-    "Smart reactions are on. When your reply ends by asking the user to decide, choose, approve, or answer something, finish it with one extra line that offers quick replies:",
-    `::${SMART_REACTIONS_DIRECTIVE}{items="👍 Looks good|🔁 Try another way|❓ Explain more"}`,
-    `Rules: put the line last, on its own line. Give 2 to ${MAX_SMART_REACTIONS} items separated by |. Each item is one emoji, a space, and a label of at most 5 words. Each item must make sense as the user's whole reply to your message. Do not use double quotes or | inside a label. Leave the line out when your reply needs no answer, and never put it inside a code block.`,
-    preferred.length > 0
-      ? `Use these reactions from the user's settings when they fit: ${preferred}. Write specific ones when your reply offers distinct options.`
-      : "Write reactions that match the options in your reply.",
-  ].join("\n");
 }

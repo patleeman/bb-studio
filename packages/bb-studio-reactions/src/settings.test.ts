@@ -7,9 +7,9 @@ it("keeps explicit empty menus while falling back to defaults for unavailable se
   expect(menuSettings({ emojiItems: "" }).emojiItems).toBe("");
 });
 
-it("distinguishes saved menu changes from server-only smart reaction changes", () => {
+it("distinguishes saved menu changes from unrelated values", () => {
   const applied = menuSettings();
-  expect(needsMenuReload(applied, menuSettings({ smartReactions: true }))).toBe(false);
+  expect(needsMenuReload(applied, menuSettings({ unrelated: true }))).toBe(false);
   expect(needsMenuReload(applied, menuSettings({ quoteSelection: false }))).toBe(true);
   expect(needsMenuReload(applied, menuSettings({ emojiItems: "✅ Go" }))).toBe(true);
   expect(needsMenuReload(applied, menuSettings({ showInSelectionMenu: false }))).toBe(true);

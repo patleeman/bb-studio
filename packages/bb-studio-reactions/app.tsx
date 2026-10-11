@@ -9,9 +9,10 @@
 //    below it. Both surfaces render the emoji itself, not the plugin icon —
 //    see the content script at the bottom.
 //
-// 2. Smart reactions (off by default) — the assistant ends a reply that needs
-//    an answer with `::reactions{items="…"}`; a messageDirective renders it as
-//    reaction buttons under that message. Clicking one drafts the reaction.
+// 2. Legacy smart reactions — older replies may end with
+//    `::reactions{items="…"}`; a messageDirective still renders it as reaction
+//    buttons so it never shows as raw text. Agents no longer write it: Studio
+//    Pages' Next row offers quick replies.
 //
 // 3. Settings — BB owns the single settings form. A read-only preview shows
 //    whether saved menu settings need a window reload. Applying never disables
@@ -92,10 +93,9 @@ function draftReaction(
 }
 
 // ---------------------------------------------------------------------------
-// Smart reactions: `::reactions{items="👍 Ship it|❓ Why"}` in an assistant
-// message renders as a row of reaction buttons. The buttons stay on older
-// messages too, and still render if the setting is later turned off, so the
-// raw directive line never shows.
+// Legacy smart reactions: `::reactions{items="👍 Ship it|❓ Why"}` in an
+// older assistant message renders as a row of reaction buttons, so the raw
+// directive line never shows.
 // ---------------------------------------------------------------------------
 
 function SmartReactions({ attributes, message }: PluginMessageDirectiveProps) {
@@ -153,7 +153,6 @@ function ReactionsPreview({ applied }: { applied: MenuSettings }) {
       ? "Your changes are saved. Reload this window to apply them to message menus."
       : "Saved menu settings are applied in this window."}</p>
     {pending && !isLoading && values && <Button type="button" size="sm" onClick={() => window.location.reload()}>Reload window to apply</Button>}
-    <p className="text-xs text-muted-foreground">Smart reactions use saved settings when a thread starts or resumes.</p>
   </div>;
 }
 
@@ -213,8 +212,7 @@ export default definePluginApp((app) => {
     ],
   });
 
-  // Registered even when smart reactions are off, so replies that already
-  // carry the directive keep rendering as buttons.
+  // Older replies may still carry the directive.
   app.slots.messageDirective({
     id: SMART_REACTIONS_DIRECTIVE,
     component: SmartReactions,

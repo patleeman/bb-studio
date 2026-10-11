@@ -4,11 +4,9 @@ Select any text in an agent's reply. The selection menu shows one emoji button f
 
 The same reactions also appear as buttons in the bar under messages. Choose which places show them: the selection menu, the bar under assistant messages, and the bar under your own messages.
 
-## Smart reactions
+## Quick replies
 
-Smart reactions are off by default. When you turn them on, the agent ends a reply that asks you something with a few reactions that fit it. If it asks "SQLite or Postgres?", you get SQLite, Postgres, and Clarify buttons inside the reply. It uses your own reactions when they fit. Replies that need no answer get no buttons. Click one, and it drafts that reply.
-
-Smart reactions add a short instruction to each thread, so they use a few more tokens. They apply to threads that start or resume after you turn them on. Replies show at most 5 suggestions.
+For quick replies the agent suggests, use Studio Pages' Next row. Older replies with smart reactions still show their buttons.
 
 ## Settings
 

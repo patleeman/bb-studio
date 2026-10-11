@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { parseEmojiItems } from "./emoji-items";
 import {
   MAX_SMART_REACTIONS,
   parseSmartReactions,
-  smartReactionInstructions,
 } from "./smart-reactions";
 
 describe("parseSmartReactions", () => {
@@ -40,35 +38,5 @@ describe("parseSmartReactions", () => {
   it("caps the number of items", () => {
     const raw = Array.from({ length: 9 }, (_, i) => `🔢 Option ${i + 1}`).join("|");
     expect(parseSmartReactions(raw)).toHaveLength(MAX_SMART_REACTIONS);
-  });
-});
-
-describe("smartReactionInstructions", () => {
-  it("lists the configured reactions as the preferred set", () => {
-    const text = smartReactionInstructions(parseEmojiItems("👍 Agree, 👎 Disagree"));
-    expect(text).toContain('::reactions{items="');
-    expect(text).toContain("👍 Agree | 👎 Disagree");
-  });
-
-  it("still explains the directive with no configured reactions", () => {
-    const text = smartReactionInstructions([]);
-    expect(text).toContain("::reactions{");
-    expect(text).not.toContain("from the user's settings");
-  });
-
-  it("strips quotes and | from saved reactions and drops overlong ones", () => {
-    const text = smartReactionInstructions(
-      parseEmojiItems(`💬 Say "yes" | now, 🐢 ${"slow ".repeat(300)}, 👍 Agree`),
-    );
-    expect(text).toContain("settings when they fit: 💬 Say yes now | 👍 Agree.");
-    expect(text).not.toContain("slow slow");
-    expect(text.length).toBeLessThan(2000);
-  });
-
-  it("stays well under the host's 4096-character limit", () => {
-    const many = parseEmojiItems(
-      Array.from({ length: 8 }, (_, i) => `🔢 A long configured label ${i}`).join(", "),
-    );
-    expect(smartReactionInstructions(many).length).toBeLessThan(2000);
   });
 });

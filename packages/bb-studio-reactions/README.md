@@ -28,37 +28,14 @@ reaction. With `after` the reaction comes first, then the quote. If you
 already typed a draft, `after` puts the reaction between your text and the
 quote.
 
-## Smart reactions
+## Quick replies from the agent
 
-Off by default. When on, the assistant ends a reply that needs an answer with
-suggested reactions, such as `🪶 SQLite` and `🐘 Postgres`, shown as buttons
-under the message. Clicking one drafts it, with no quote. Replies that need no
-answer get no buttons.
-
-The plugin asks the assistant for one last line:
-
-```
-::reactions{items="🪶 SQLite|🐘 Postgres|❓ Clarify"}
-```
-
-- The assistant prefers your saved reactions and writes specific ones when a
-  reply offers distinct choices. It is asked for 2 to 5 items, each an emoji
-  and a label of up to 5 words.
-- The line comes from the model, so the plugin checks it. It keeps at most 5
-  items, drops items over 60 characters, items without an emoji and a label,
-  and duplicates. In the instructions, your saved items lose `"` and `|`, and
-  the list is capped.
-- Instructions apply when a thread's agent session starts or resumes. Turn the
-  setting on before you start a thread.
-- Buttons still render if you later turn the setting off, so old replies never
-  show the raw line. If you disable the plugin, the line shows as plain text.
-- **Studio Pages' [Next row](../bb-studio-pages/README.md#next-row)** offers
-  quick replies too. While Pages is running with the Next row on, smart
-  reactions add no instructions, so agents aren't asked for two lines. The
-  Next row then uses your saved reactions when smart reactions are on. If Pages
-  is missing, off, failed, or slow to answer, smart reactions apply as usual.
-  The plugin rechecks Pages on system changes, at each session start, and every
-  15 seconds.
+Studio Reactions no longer asks agents to suggest reactions. Studio Pages'
+[Next row](../bb-studio-pages/README.md#next-row) offers quick replies instead;
+set them with **Explore: Offer quick replies** and **Explore: Preferred quick
+replies** in Pages' settings. Older replies that end with a
+`::reactions{items="…"}` line still render it as reaction buttons, so the raw
+line never shows while the plugin is enabled.
 
 ## Staged preview
 
@@ -66,22 +43,10 @@ The plugin asks the assistant for one last line:
 
 Captured from a staged stable BB at commit `306c841`. The native settings
 form is the only reaction editor. It shows the default reaction list (Agree,
-Disagree, Do it, Clarify), quoting before the reaction, all three location
-toggles enabled, and Smart reactions on, as the staged BB sets it for the
-live reply below. The saved preview
-below confirms these menu settings are applied in this window. Live checks
-also verified the pending reload notice, each location toggle independently,
-emoji-only selection entries, and cleanup when the plugin is disabled.
-
-![Smart reactions under a live assistant reply](assets/smart-reactions.png)
-
-A live thread in the staged BB, run on GPT-6.1-Sol with smart reactions on. It
-asked whether to use SQLite or Postgres for a small todo app, and the
-assistant's reply ends with its suggested reactions, SQLite and Postgres. With
-Pages installed, as here, they show as the **Reply** row of Pages' "What next?"
-card; without it, as Studio Reactions' own buttons. The capture accepts either,
-then clicks SQLite and checks that the reply was drafted in the composer. The staged BB passes the thread's ID as
-`BB_CAPTURE_SMART_REACTIONS_THREAD_ID`.
+Disagree, Do it, Clarify), quoting before the reaction, and all three location
+toggles enabled. The saved preview below confirms these menu settings are
+applied in this window. This capture predates the removal of smart reactions
+and still shows the old **Smart reactions** switch; it needs a recapture.
 
 ## Settings
 
@@ -95,7 +60,6 @@ Edit these in BB's settings form for the plugin, or with the CLI.
 | In the text selection menu (and the right-click menu) | `showInSelectionMenu` | on |
 | Under assistant messages | `showInAssistantBar` | on |
 | Under your messages | `showInUserBar` | on |
-| Smart reactions | `smartReactions` | off |
 
 If all three location toggles are off, no reactions show.
 
@@ -103,7 +67,6 @@ If all three location toggles are off, no reactions show.
 bb plugin config emoji-react set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
 bb plugin config emoji-react set quotePosition after
 bb plugin config emoji-react set showInUserBar false
-bb plugin config emoji-react set smartReactions true
 bb plugin reload emoji-react
 ```
 
@@ -113,8 +76,7 @@ Message menus read the settings once when the plugin's frontend loads. The
 **Saved reactions** section previews the stored list and says whether this
 window still uses older settings; **Reload window to apply** refreshes the
 menus without disabling the plugin. Other open windows update on their next
-reload. Smart-reaction instructions use saved settings when a thread starts or
-resumes.
+reload.
 
 ## How it works
 
@@ -125,9 +87,8 @@ resumes.
 - `src/action-decoration.ts` swaps the plugin's icon for the emoji in message
   bars and removes it from the selection menu. It targets only this plugin's
   actions and restores everything when the plugin generation ends.
-- `server.ts` returns the smart-reaction instructions from
-  `bb.agents.configure`. `src/next-row.ts` tracks Pages' Next row.
-  `src/smart-reactions.ts` parses and builds the directive.
+- `server.ts` defines the settings. `src/smart-reactions.ts` parses legacy
+  `::reactions` lines, which `app.tsx` renders as buttons.
 
 ## Develop
 

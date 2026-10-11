@@ -53,7 +53,6 @@ const SCENES = [
   ["studio-tables", "Real *tables*.", "Typed columns, views, CSV and agent tools.", 3],
   ["artifacts", "Keep what they *make*.", "Reports, images and files, all saved.", 3],
   ["bots", "Bots that work as a *team*.", "A Command view, delegation and memory.", 4, 900],
-  ["reactions-smart", "Answer in *one tap*.", "Replies come with suggested answers.", 3.5],
   ["studio-item-chat", "Chat about *what you see*.", "The agent knows what's on screen.", 3.5],
 ];
 const INTRO = ["Your agents make *a lot*.", "BB Studio keeps it all in one place.", 2.5];

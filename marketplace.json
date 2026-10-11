@@ -179,7 +179,7 @@
     {
       "id": "emoji-react",
       "displayName": "Studio Reactions",
-      "description": "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer. Optional smart reactions let the assistant suggest the ones that fit each reply.",
+      "description": "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer.",
       "icon": {
         "url": "./packages/bb-studio-reactions/assets/icon.svg"
       },

@@ -133,13 +133,12 @@ async function pushedRef(ref) {
 }
 
 /**
- * A thread that asks "SQLite or Postgres?" with smart reactions on, so its
- * reply ends with suggested reactions. Running it also gives the thread a
+ * A thread that asks "SQLite or Postgres?", so its reply ends with Pages'
+ * Next row offering both as quick replies. Running it also gives the thread a
  * workspace in the Orbit repository, where the artifact capture stages its
- * report. GPT-6-Luna leaves the reactions out, so this uses GPT-6.1-Sol.
+ * report. GPT-6-Luna leaves the quick replies out, so this uses GPT-6.1-Sol.
  */
-async function seedSmartReactionsThread(project, machine, orbitDir) {
-  await bb("plugin", "config", "emoji-react", "set", "smartReactions", "true");
+async function seedWorkspaceThread(project, machine, orbitDir) {
   const thread = await bb(
     "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
     "--provider", "codex", "--model", "gpt-6.1-sol", "--reasoning-level", "low",
@@ -149,8 +148,7 @@ async function seedSmartReactionsThread(project, machine, orbitDir) {
   await bb("thread", "wait", thread.id, "--timeout", "5m");
   const events = await bb("thread", "messages", thread.id);
   const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
-  // Smart reactions arrive as ::reactions, or as the Next row's quick replies when Pages is installed.
-  if (!/::(?:reactions|next)\{[^}]*SQLite[^}]*Postgres/.test(reply)) throw new Error(`The SQLite or Postgres reply has no smart reactions: ${reply}`);
+  if (!/::next\{[^}]*SQLite[^}]*Postgres/.test(reply)) throw new Error(`The SQLite or Postgres reply has no Next row quick replies: ${reply}`);
   await bb("thread", "read", thread.id);
   return thread;
 }
@@ -310,8 +308,8 @@ async function seed({ plugins, capturePlugin, ref, version }) {
   // Talk's meeting notes and Studio Decisions fall back to this model.
   await bb("smart-decisions", "fallback", "codex", "gpt-6-luna", "low");
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
-  const smartReactionsThread = !capturePlugin || ["emoji-react", "artifacts"].includes(capturePlugin)
-    ? await seedSmartReactionsThread(project, machine, orbitDir) : null;
+  const workspaceThread = !capturePlugin || capturePlugin === "artifacts"
+    ? await seedWorkspaceThread(project, machine, orbitDir) : null;
   if (!capturePlugin || capturePlugin === "studio") await seedCommand(machine, project);
 
   const envFile = join(stagedDir, "capture.env");
@@ -322,10 +320,9 @@ async function seed({ plugins, capturePlugin, ref, version }) {
       `export BB_SERVER_URL=${serverUrl}`,
       `export BB_CAPTURE_PROJECT_ID=${project.id}`,
       `export BB_CAPTURE_THREAD_ID=${threads[0].id}`,
-      "unset BB_CAPTURE_SMART_REACTIONS_THREAD_ID BB_CAPTURE_WORKSPACE_THREAD_ID",
-      ...(smartReactionsThread ? [
-        `export BB_CAPTURE_SMART_REACTIONS_THREAD_ID=${smartReactionsThread.id}`,
-        `export BB_CAPTURE_WORKSPACE_THREAD_ID=${smartReactionsThread.id}`,
+      "unset BB_CAPTURE_WORKSPACE_THREAD_ID",
+      ...(workspaceThread ? [
+        `export BB_CAPTURE_WORKSPACE_THREAD_ID=${workspaceThread.id}`,
       ] : []),
       "unset BB_CAPTURE_ONLY BB_CAPTURE_PLUGIN",
       ...(capturePlugin ? [`export BB_CAPTURE_PLUGIN=${capturePlugin}`] : []),
