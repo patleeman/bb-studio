@@ -1,0 +1,13 @@
+{
+  "id": "hud",
+  "name": "Thread HUD",
+  "version": "0.1.0",
+  "api": 1,
+  "entry": "index.html",
+  "description": "An always-on-top overlay of the threads that need you and the ones running.",
+  "windows": {
+    "main": { "kind": "overlay", "width": 340, "height": 260, "position": "top-right" }
+  },
+  "capabilities": ["window.overlay", "shortcut.global", "notify", "bb.threads.read", "bb.threads.tell", "bb.open"],
+  "shortcuts": { "toggle": "Alt+Shift+Space" }
+}

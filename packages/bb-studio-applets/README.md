@@ -21,8 +21,8 @@ This plugin is the BB side:
 - `bb applets list | logs <id> | doctor`.
 
 The plugin works without the app. Agents can still create and check applets,
-and the settings page says the app isn't installed. The app itself
-(`apps/applets`) isn't built yet.
+and the settings page says the app isn't installed. The app lives in
+[`apps/applets`](../../apps/applets/); it isn't published for download yet.
 
 ## Staged preview
 

@@ -8,4 +8,4 @@ An applet can't run commands or read your files. It asks for capabilities, such 
 
 ## Experimental
 
-The app that runs applets is still being built. Until then, agents can create and check applets, and settings shows each one's capabilities.
+The app that runs applets isn't published for download yet. Until it is, agents can create and check applets, and settings shows each one's capabilities.

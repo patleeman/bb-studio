@@ -14,7 +14,7 @@ type Thread = {
   hasPendingInteraction?: boolean;
 };
 
-const ACTIVE = new Set(["active", "starting", "pending"]);
+const ACTIVE = new Set(["active", "starting"]);
 
 export function summarize(thread: Thread): ThreadSummary {
   return {
