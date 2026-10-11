@@ -3,8 +3,12 @@
 // app, the iOS app and the Artifacts upgrade bridge
 // (packages/bb-studio-artifacts) share one set of shapes. The kit holds them
 // because the bridge is a separate package and can't import Studio.
-import { defineRpcContract } from "@get-bb/plugin-sdk";
+import type { defineRpcContract as sdkDefineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+
+// Studio's frontend imports this file, and a plugin's frontend bundle can't
+// resolve the root SDK. The SDK's helper only returns its argument.
+const defineRpcContract: typeof sdkDefineRpcContract = (contract) => contract;
 
 /** BB's download cap; larger files are refused at save time. */
 export const MAX_ARTIFACT_BYTES = 25 * 1024 * 1024;
