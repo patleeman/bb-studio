@@ -295,6 +295,336 @@ sandbox CSP, so a screen gets an opaque origin with no access to BB.
 `bb studio backup` includes each design with its rounds, screens and
 comments; saved styles aren't in backups yet.
 
+## Recordings
+
+Talk is built into Studio: long-form, durable dictation and recording. It
+saves audio as you speak and transcribes it with the voice service in
+**Settings → AI services** (your ChatGPT subscription through Codex by
+default). Every dictation and recording becomes a titled, searchable item you
+can link to and @-mention. It used to be the separate Studio Talk plugin
+(`talk`). Recordings keep that id as their namespace (`talk:<id>`), so tags,
+tabs, links and chats carry over. If you had the plugin, see
+[its upgrade bridge](../bb-studio-talk/README.md) to copy your recordings,
+their audio and your settings in.
+
+![Live BB screenshot of a recording open as a Studio tab, with playback and the cleaned transcript](assets/recordings-preview.png)
+
+A seeded "Weekly product sync" recording, opened from its old
+`/plugins/talk/recordings/<id>` address, lands as a Studio tab. Its audio was
+spoken with macOS `say`, uploaded in two sessions and transcribed by BB's
+voice service; the capture then makes a summary, a saved cleaned transcript
+and a notes page, plays the audio, seeks to the second section and pauses.
+Recapture with `BB_CAPTURE_ONLY=talk-page`.
+
+![Talk models settings with a cleanup model selected](assets/recordings-model-settings.png)
+
+**Talk models** on Studio's settings page: Codex's 6-Luna for cleanup and
+Studio Decisions for titles and summaries, chosen through the real controls.
+
+![Dictation controls inline at the active input](assets/recordings-inline-dictation.png)
+
+The composer's microphone dictating with Talk: timer, level meter, cleanup
+toggle, pause, cancel and finish in place of the microphone.
+
+![Inline dictation controls on mobile](assets/recordings-inline-dictation-mobile.png)
+
+At a 390-pixel viewport the controls use a second toolbar row.
+
+![Talk playback and transcript controls on mobile](assets/recordings-staged-mobile.png)
+
+The staged recording at a 390-pixel viewport.
+
+![Dictated message with its saved Talk source](assets/recordings-dictation-message.png)
+
+A dictated message with a clickable **Launch brain dump** mention of its
+saved source.
+
+![Dictated message and saved source on mobile](assets/recordings-dictation-message-mobile.png)
+
+![The compact recording header](assets/recordings-compact-header.png)
+
+The compact recording header at 390 pixels, with **Chat** and **Item actions**.
+
+### What you get
+
+- **Replaces built-in dictation.** The composer's microphone starts a Talk
+  dictation. Pressing it again, or ✓ in the pill, stops recording, waits for
+  the transcript, and types it into that composer. ✕ stops without inserting.
+- **The source stays with the message.** Chat dictation adds a native Talk
+  mention beside the text, attaching the saved item for the agent. Click the
+  pill in the sent message to open the original Studio item. The reference
+  survives finishing away from the thread and returning later. **Keep as a
+  recording** preserves it. Dictation into document fields inserts the text as usual.
+- **One dictation, one thread.** While Talk is dictating, the mics in other
+  threads are dimmed. Pressing one says where the dictation is, with a **Go
+  back** button. The thread being dictated into shows a mic in the sidebar.
+- **Finish from anywhere.** Press ✓ from another thread and Talk holds the
+  text. It types the text into the dictation's thread when you go back. BB
+  keeps unsent composer text on the device, so Talk can't safely write into a
+  thread that isn't open. A Studio or page new-conversation composer also
+  holds its dictation until you go back to it. **Go back** returns to the
+  thread or composer the dictation came from, in the main view or a split.
+- **Hold to talk.** Hold Right Option (or the key set in settings) by itself
+  to dictate into the focused composer or field, and let go to insert. A
+  quick tap does nothing, and Option+key shortcuts and AltGr characters still
+  type as usual.
+- **Clean-up before inserting.** Talk asks Studio Decisions to drop filler
+  words and false starts, and to fix punctuation, without rewording. The
+  dictation keeps the raw transcript. Turn it on or off with the ✦ button on
+  the dictation pill; the choice is kept per device. If Decisions is missing,
+  slow, or returns something that isn't a clean-up, Talk inserts the text as
+  spoken.
+- **Dictation in other plugins.** Plugins can mark a text surface as a
+  dictation field, as [Pages](../bb-studio-pages) does for its editor. Talk
+  dictates into it with the same pill, durability, and **Go back** handling
+  as a composer. *Talk: Start or finish dictation* works in a focused field.
+- **Recordings as spoken notes.** **New → Recording** in any Studio menu (the
+  sidebar, the library, or Quick Open) starts one in that
+  project and opens its page in the main pane, as a new page would. The
+  command *Talk: Start or stop a recording* records for as long as you
+  need without inserting anywhere. Use recordings for brain dumps, ideas,
+  personal notes, or meetings. **Send to agent** opens a thread with the
+  recording attached; mentions include its saved cleaned version when available.
+- **A card in the agent's reply.** An agent can show a recording with
+  `::recording{id="rec_…"}` on its own line: the summary and the first lines
+  of the transcript, read-only. Clicking the title or the arrow opens the
+  recording's page.
+- **Clean up a recording.** **Clean up transcript** on a finished recording
+  creates a saved cleaned version while retaining the original transcript and
+  audio. Switch between **Cleaned** and **Original**; copy and text downloads
+  use the version shown. Cleanup works section by section, so long recordings
+  keep their audio alignment. If it stops, press the button again to continue.
+- **Audio playback.** Play or pause, scrub across the recording, skip 10 seconds,
+  change speed, and adjust volume. Click a timestamp or transcript section to
+  play from there. Highlighting follows the audio; **Follow transcript** keeps
+  the current section visible. Timing is per audio section, rather than per word.
+- **Dictations stay in the background.** Every dictation is saved in case
+  something goes wrong, but Studio's All view and Home leave them out. Pick
+  the **Dictations** filter, or search, to find one. Recordings you start
+  from Studio show up as usual.
+- **Keep a long dictation as a recording.** After a dictation of five
+  minutes or 800 words, a toast offers **Keep**. **Keep as a recording** on
+  the dictation's page does the same. It moves the dictation out of the
+  background and gives it a title; you can summarize it from its page. The text is still
+  inserted.
+- **Dictation audio expires.** After a day, a dictation's audio is
+  deleted and its transcript is kept. Recordings keep their audio. A
+  dictation with a piece still waiting or failed keeps its audio.
+- **In the library.** Recordings and dictations list in Studio's library
+  next to pages, drawings, designs and artifacts: search, filter to
+  recordings or dictations, sort by title, date, length or word count, and
+  tick rows to start one thread that mentions them all, copy their
+  transcripts as one document, or delete them together. There is no
+  Recordings page of its own: `/plugins/studio/studio/recordings` opens the
+  library filtered to recordings, and audio this device kept unsent shows as
+  a banner there.
+- **Dictation at its input.** While its chat input is on screen, a dictation's
+  compact controls replace the mic. Expand to read the transcript and it
+  becomes a floating pill. Collapse it to dock again. Navigating away also
+  floats the controls; returning to the input docks them. Each new dictation
+  starts collapsed. Dictation into other plugins' fields uses the floating pill.
+- **A pill that follows you.** Recordings and dictations away from their input
+  use a small overlay at the top of the window. It stays
+  put as you move between threads and pages. Everything else stays clickable.
+  Drag it anywhere in the window and it stays there, even after a reload.
+  Away from where you started, a back arrow returns you to that thread or
+  recording. Click a recording's pill to open its page in the main view. Expand the pill to read the transcript as it arrives; the pill
+  remembers whether you left it expanded or collapsed.
+- **Streaming transcript.** Audio is cut into pieces of about 25 seconds at
+  natural pauses. Each piece is transcribed as soon as it is uploaded, so text
+  appears while you are still talking.
+- **Linkable and mentionable.** Each recording opens as a Studio tab at
+  `/plugins/studio/studio/recordings/<id>` (old `/plugins/talk/recordings/<id>`
+  links open there too). It shows up in the composer's @ menu, and
+  mentioning it gives the agent its transcript. Its **Chat** button opens the
+  linked thread in a split beside the recording.
+- **Auto titles.** Studio Decisions uses its configured fallback model to
+  title each recording from its transcript. If Decisions is missing or reports
+  that no model is available, Talk uses the transcript's first words and the
+  recording date. Titles update as the transcript grows and never replace a
+  title you typed.
+- **Optional summary.** Choose **Generate summary** in the recording menu
+  for a concise paragraph covering the recording's main ideas. It works for
+  brain dumps, personal notes, ideas, conversations, and meetings. Enable
+  **Automatically summarize recordings** in settings to summarize when a
+  recording finishes. Saved summaries stay collapsed until you open them and
+  can be regenerated.
+- **Notes pages.** On a finished recording, **Make notes** writes a Studio
+  Page with a short summary, the decisions made, and the action items as a
+  checklist, so you can hand any item to an agent from the page. The page
+  links back to the recording, and the recording shows **Open notes**.
+  Running it again shows **Update notes** and rewrites the same page: Pages
+  saves a version first, and action items you checked off or handed to an
+  agent keep their state. Notes use the Summaries model through Studio
+  Decisions. Long transcripts are read in parts of about 30,000 characters
+  and combined; past six parts, the page says the notes cover the first part.
+  Without Studio Pages, the button is disabled and says
+  "Install Studio Pages to make notes."
+- **Exports.** Download a finished transcript as Markdown or plain text, or
+  download its original audio segments together as a tar archive.
+- **Agent tools.** `talk_list`, `talk_read`, and `talk_search` let agents find
+  and read bounded portions of recordings and summaries. `talk_make_notes`
+  makes or updates a recording's notes page.
+- **Mobile layout.** The pill, recording pages, and composer mic all work in
+  the BB mobile app, with larger touch targets on small screens.
+- **Commands.** *Talk: Start or finish dictation*, *Talk: Start or stop a
+  recording* and *Talk: Pause or resume* are Studio commands now. A keyboard
+  shortcut set on the Talk plugin's command has to be set again on Studio's
+  (BB keys custom shortcuts by plugin).
+- **CLI.** `bb studio recordings list [--query <text>] [--json]`,
+  `show <id> [--json]`, `transcript <id> [--cleaned] [--offset <chars>] [--limit <chars>]`
+  and `notes <id> [--json]`. The bundled `talk` skill documents them for
+  agents.
+
+### Durability
+
+- **Saved on the device.** Every few seconds, audio goes into IndexedDB.
+  Audio leaves the device store only after the server confirms it is on disk
+  (written to a temp file, fsynced, then renamed). While local writes succeed,
+  reload/crash recovery keeps committed chunks; the current few-second chunk
+  can still be lost.
+- **Local storage failure.** Capture stops and keeps the full affected segment
+  in this window. Retry saving or download it before closing. If the window
+  closes first, that memory-only audio cannot be recovered. Before capture starts,
+  Talk writes and reads back a small recovery marker; it refuses capture if this
+  fails. The marker remains conservative if later audio and metadata writes both
+  fail. On return, interrupted capture requires acknowledgement of a potentially
+  missing tail before continuing with saved audio; automatic insertion stays off.
+  Clearing browser data can still remove both the audio and its recovery marker.
+- **Survives reloads.** Saved chunks stay available after reload. Review an
+  interrupted capture before resuming it in a new session; the transcript starts
+  a new paragraph. Download uploaded audio remains available before completion.
+- **Offline.** While offline, audio keeps saving locally. It uploads with
+  backoff when the connection returns.
+- **One capture at a time.** A Web Lock makes sure only one window captures.
+  Every window shows the pill. Other windows leave the capturing window's
+  unsaved audio alone, and upload it only once that window is gone.
+- **Refused pieces don't block the rest.** If the server rejects a piece as
+  invalid, Talk keeps its audio on the device, says so, and uploads the
+  pieces after it. A recording or dictation with a refused piece stays
+  paused, and a dictation isn't inserted, since its text would have a gap.
+  Retry or discard the piece, then finish it from its page. **Unsent audio** (the toast's *Review*, or the notice on
+  the recording's page and the banner in Studio's library filtered to recordings) lists what the device kept:
+  retry each piece or all of them (after a Talk update, say), download one
+  as an audio file, or discard it. A laptop that sleeps mid-recording doesn't count the
+  sleep as recorded time.
+- **Deleting.** A recording that a window is still capturing can't be
+  deleted. Stop it first.
+- **Interrupted recordings.** If a capture stops reporting for two minutes,
+  for example because the laptop closed or the app was killed, the recording
+  is marked *Interrupted*. **Resume recording** on its page continues it, and
+  **Finish** ends a paused or interrupted recording no window is capturing.
+  Finish waits until none of its audio is left on this device.
+- **Failed transcription.** Failed pieces retry with backoff for about nine hours.
+  If the voice service is off, they retry every 10 minutes. **Retry** requeues
+  pieces that gave up and retries waiting ones at once. When a dictation you
+  finished hits a failure, the pill says *Transcription failed*, shows the
+  service's error, and offers **Retry**. Talk inserts nothing until every
+  piece is transcribed, so a failure never leaves a gap in the text. Audio is
+  never discarded because of a failure.
+- **Empty recordings aren't kept.** A dictation or recording that finishes
+  with no words is deleted along with its audio, and Talk says so. This
+  covers a mic tapped by accident, silence, and noise. A recording with a
+  failed piece is kept, because a retry may still find speech.
+- **Updating from the Talk plugin.** The recorder belongs to whichever
+  plugin is running. Finish or stop any recording or dictation first, and let
+  its audio upload (the pill goes away), then update. Audio set aside in the
+  browser carries over: Studio uses the same browser store, and its uploads
+  go to Studio once the bridge has copied the recording.
+
+### Settings
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| Replace built-in dictation | on | The composer mic starts Talk. Off restores BB's one-shot dictation. |
+| Segment length (seconds) | 25 | Target piece length, 8–60. Shorter pieces show text sooner. |
+| Auto-title recordings | on | Titles recordings from their transcripts. |
+| Automatically summarize recordings | off | Summarizes on completion; the recording menu can summarize on demand. |
+| Cleanup model | Studio Decisions | Provider, model, reasoning, and supported service tier for dictation and saved-transcript cleanup. |
+| Titles model | Studio Decisions | Model for automatic recording titles. |
+| Summaries model | Studio Decisions | Model for automatic and on-demand summaries, and for notes pages. |
+| Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
+| Keep dictation audio (days) | 1 | Deletes a finished dictation's audio after this many days. 0 keeps it. |
+
+They are on Studio's settings page: **Settings → Studio**, with **Talk models** below them. Open **Talk models** for the three model choices. Each job can follow Studio Decisions
+or use **A specific model**, selected with BB's provider and model picker.
+Choices apply to the next request and persist across devices and restarts.
+Studio Decisions must be enabled to run either choice. Existing cleaned text,
+titles, and summaries stay as saved. Voice transcription is configured in
+**Settings → AI services**.
+
+### Dictation fields for other plugins
+
+Other plugins can use Talk without importing its code. The contract is plain
+DOM, defined in [src/talk/ui/fields.ts](src/talk/ui/fields.ts):
+
+- **Mark the field.** Put `data-talk-field="<key>"` on the element that wraps
+  the text surface, with a key that stays the same across reloads, for example
+  `pages:pg_123`. Add `data-talk-field-label` with a name for toasts, such as
+  `“Launch plan”`.
+- **Start or finish.** Dispatch a bubbling `bb-talk:toggle` event from inside
+  the field. If Talk is already busy elsewhere, it shows where instead.
+- **Receive the text.** Talk dispatches a cancelable `bb-talk:insert` event
+  on the field, with the detail `{ text }`. Insert the text and call
+  `preventDefault()`. If no field takes it, Talk keeps the text and delivers
+  it once the field has been back on screen for a moment. Text whose field
+  hasn't come back within three days is dropped, with a toast; it's still in
+  Talk recordings.
+- **Go back.** Talk dispatches a cancelable `bb-talk:open-field` on `window`,
+  with the detail `{ field }`. The plugin that owns the key navigates to it
+  and calls `preventDefault()`. If no plugin does, for example because the
+  owner was disabled, Talk copies the waiting text to the clipboard instead.
+- **Show state.** While Talk is loaded, `<html data-bb-talk>` is `idle`,
+  `dictating`, or `busy`. `data-bb-talk-field` names the field being dictated
+  into, and `data-bb-talk-phase` holds the capture phase. `bb-talk:state`
+  fires on `window` when any of them change. If `data-bb-talk` is missing,
+  Talk isn't installed, so hide dictation controls.
+
+### Limitations
+
+- **First-message context.** Stable BB expands a Talk mention into its saved
+  transcript on follow-up messages. A thread's first message keeps the dictated
+  text, native mention, and source link; the agent can read the saved item with
+  Talk tools.
+- **Mic swap can break.** BB has no API for replacing its microphone. A
+  content script claims presses on the composer's "Start voice input" button.
+  If BB changes that markup, the mic falls back to built-in dictation. Talk
+  stays reachable from its commands and Studio.
+- **Held text stays on the device.** A dictation finished away from its
+  thread or Studio composer waits on the device you dictated on. A main
+  new-thread dictation without a Studio route is copied to the clipboard
+  after you leave that page. Either way, the dictation is also in Studio's library.
+- **Mobile backgrounding.** On mobile, the microphone stops when the BB app
+  goes to the background. Talk resumes when the app returns, or shows
+  **Resume** when the system needs a tap first.
+- **Voice service required.** Transcription needs BB's voice service turned
+  on. Audio recorded without it is kept and transcribed once it is available.
+- **Speaker labels.** BB's current voice transcription API returns text only.
+  Talk does not assign speaker labels without a diarization result.
+- **Summaries.** They need Studio Decisions and its configured fallback
+  model. If generation fails, use **Generate** or **Regenerate** in the
+  recording menu after the model is available.
+- **Notes pages.** They need Studio Pages and Studio Decisions. Updating
+  notes replaces the page's text with fresh notes; restore an earlier version
+  from the page's history to get your edits back.
+- **Backup and restore.** BB Studio backups include every recording: its
+  title, transcript, summary, segment audio (hard-linked when possible) and the
+  id of its notes page. Restoring is safe to repeat and never overwrites a copy
+  that is newer here or a recording still being recorded or transcribed. A
+  restored recording comes back finished, with pieces that were not
+  transcribed marked failed so **Retry** can pick them up. It does not keep the
+  BB thread it was started from. The notes page reconnects when Studio Pages
+  restores the same page; otherwise **Update notes** finds or makes it again.
+- **Personal project threads.** Titling runs hidden agent threads in BB's
+  Personal project.
+
+Recordings, segments and transcripts are stored in Studio's SQLite database;
+segment audio is in `<dataDir>/plugins/studio/talk/audio/<recording>/`. Audio
+plays from `GET /api/v1/plugins/studio/http/recordings/audio`. The Studio
+provider exports a recording's transcript as Markdown, its audio segments, or
+both (`markdown`, `audio`, `bundle`); recordings can't be duplicated, since
+copying the metadata without its audio would make a misleading recording.
+
 ## What you get
 
 Everything opens in BB's main view, as a tab in Studio's workspace. ⌘/Ctrl-click an item or thread link, or choose **Open in split** from

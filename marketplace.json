@@ -17,6 +17,8 @@
         "documents",
         "drawing",
         "collaboration",
+        "voice",
+        "dictation",
         "bb-studio"
       ],
       "author": {
@@ -61,14 +63,12 @@
     {
       "id": "talk",
       "displayName": "Studio Talk",
-      "description": "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
+      "description": "Upgrade bridge for Studio Talk, now built into Studio: copies your recordings, their audio and your Talk settings into Studio and forwards older clients and mentions.",
       "icon": {
-        "url": "./packages/bb-studio-talk/icons/talk.svg"
+        "url": "./packages/bb-studio-talk/assets/icon.svg"
       },
       "tags": [
-        "productivity",
         "voice",
-        "dictation",
         "bb-studio"
       ],
       "author": {

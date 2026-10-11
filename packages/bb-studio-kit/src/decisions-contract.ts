@@ -1,5 +1,10 @@
-import { defineRpcContract } from "@get-bb/plugin-sdk";
+import type { defineRpcContract as sdkDefineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+
+// Studio's frontend imports this file (through the recording contract), and a
+// plugin's frontend bundle can't resolve the root SDK. The SDK's helper only
+// returns its argument.
+const defineRpcContract: typeof sdkDefineRpcContract = (contract) => contract;
 
 const probability = z.number().min(0).max(1);
 const questionId = z.string().trim().min(1).max(120);

@@ -11,7 +11,6 @@ import { changesData, parseScene, renderWhiteboard, whiteboardChanges, type Whit
 import { PLUGIN_ID, type RecordingCard } from "./contract";
 
 const MAX_TEXT = 20_000;
-const TALK_PLUGIN_ID = "talk";
 
 const drawingSchema = z.object({ drawing: z.object({ id: z.string(), name: z.string(), updatedAt: z.number(), data: z.string() }).nullable() });
 
@@ -22,7 +21,7 @@ const recordingSchema = z.object({
     status: z.string(),
     durationMs: z.number(),
     createdAt: z.number(),
-    meetingNotes: z.object({ summary: z.string(), decisions: z.array(z.string()) }).nullable().optional(),
+    meetingNotes: z.object({ summary: z.string(), decisions: z.array(z.string()).optional() }).nullable().optional(),
   }),
   segments: z.array(z.object({ id: z.string(), offsetMs: z.number(), durationMs: z.number(), status: z.string(), text: z.string().nullable() })),
 });
@@ -60,8 +59,9 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       return indexItem(pluginId, item, info);
     },
 
+    /** A recording as its embed shows it. Talk is built into Studio (its `recordings.*` methods). */
     async recording(id: string): Promise<RecordingCard | null> {
-      const result = await call(TALK_PLUGIN_ID, "recording_get", { id }, recordingSchema).catch(() => null);
+      const result = await call("studio", "recordings.recording_get", { id }, recordingSchema).catch(() => null);
       if (!result) return null;
       const { recording, segments } = result;
       let budget = MAX_TEXT;
@@ -78,7 +78,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
           if (!text || budget <= 0) return [];
           budget -= text.length;
           const query = `recording=${encodeURIComponent(recording.id)}&segment=${encodeURIComponent(segment.id)}`;
-          return [{ id: segment.id, offsetMs: segment.offsetMs, durationMs: segment.durationMs, text, url: `/api/v1/plugins/talk/http/audio?${query}` }];
+          return [{ id: segment.id, offsetMs: segment.offsetMs, durationMs: segment.durationMs, text, url: `/api/v1/plugins/studio/http/recordings/audio?${query}` }];
         }),
       };
     },

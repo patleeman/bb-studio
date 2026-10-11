@@ -243,7 +243,7 @@ struct ReplyItemCard: View {
         case .recording(let id):
             let output: Talk.RecordingGetOutput
             do {
-                output = try await client.rpc("talk", Talk.Method.recording_get, ["id": .string(id)])
+                output = try await client.recordingOutput(id)
             } catch let error as BBError where error.message.hasPrefix("No recording") {
                 // Talk's answer for a deleted recording.
                 return nil

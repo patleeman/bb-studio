@@ -500,33 +500,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.4
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.3.0(@types/react@19.3.0)
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
-      cron-parser:
-        specifier: ^5.5.0
-        version: 5.10.1
-      hono:
-        specifier: ^4.11.9
-        version: 4.13.11
-      jsdom:
-        specifier: 29.0.1
-        version: 29.0.1
-      react:
-        specifier: 19.2.4
-        version: 19.2.4
-      react-dom:
-        specifier: 19.2.4
-        version: 19.2.4(react@19.2.4)
-      sonner:
-        specifier: ^1.7.4
-        version: 1.7.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -5574,6 +5550,7 @@ snapshots:
   cron-parser@5.10.1:
     dependencies:
       luxon: 3.7.2
+    optional: true
 
   cross-env@7.0.3:
     dependencies:
@@ -6156,7 +6133,8 @@ snapshots:
     dependencies:
       react: 19.2.4
 
-  luxon@3.7.2: {}
+  luxon@3.7.2:
+    optional: true
 
   lz-string@1.5.0:
     optional: true

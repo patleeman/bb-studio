@@ -92,11 +92,26 @@ final class StudioDesignTests: XCTestCase {
         XCTAssertEqual(form.allDecided, ["layout": ["decide": true], "mood": ["decide": true]])
     }
 
+    func testRecordingsFallBackToTheTalkPluginOnAnOlderServer() async throws {
+        let client = BBClient(baseURL: URL(string: "http://localhost")!)
+        var paths: [String] = []
+        client.transport = { _, path, _ in
+            paths.append(path)
+            if path.hasPrefix("/api/v1/plugins/studio/") { return (404, Data(#"{"ok":false,"error":{"message":"No such method"}}"#.utf8)) }
+            return (200, Data(#"{"ok":true,"result":{}}"#.utf8))
+        }
+        try await client.renameRecording("rec_aaaaaaaaaaaa", title: "QA")
+        XCTAssertEqual(paths, ["/api/v1/plugins/studio/rpc/recordings.recording_rename", "/api/v1/plugins/talk/rpc/recording_rename"])
+        recordingsInStudio = true
+    }
+
     func testItemPathsOpenTheItem() {
         XCTAssertEqual(Route(href: "/plugins/pages/pages/pg_1"), .page(id: "pg_1"))
         XCTAssertEqual(Route(href: "/plugins/studio/studio/artifacts/art_1"), .artifact(id: "art_1"))
         XCTAssertEqual(Route(href: "/plugins/artifacts/artifacts/art_1"), .artifact(id: "art_1"))
         XCTAssertEqual(Route(href: "/plugins/studio/studio/drawings/drw_1"), .drawing(id: "drw_1"))
         XCTAssertEqual(Route(href: "/plugins/excalidraw/drawings/drw_1"), .drawing(id: "drw_1"))
+        XCTAssertEqual(Route(href: "/plugins/studio/studio/recordings/rec_1"), .recording(id: "rec_1"))
+        XCTAssertEqual(Route(href: "/plugins/talk/recordings/rec_1"), .recording(id: "rec_1"))
     }
 }

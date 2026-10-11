@@ -43,7 +43,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.evaluate(`document.querySelector('[aria-label="New tab"]').click()`);
         await openRow("Weekly product sync");
         await client.waitForText("Weekly product sync");
-        const href = `/plugins/talk/recordings/${recording}`;
+        const href = `/plugins/studio/studio/recordings/${recording}`;
         await client.waitForSelector(`[data-studio-workspace-editor="${href}"] [aria-label="Recording position"]`);
         const destination = await client.evaluate(`(() => { const rect = [...document.querySelectorAll('[data-workspace-pane]')].find(element => element.checkVisibility()).getBoundingClientRect(); return { x: rect.right - 20, y: rect.top + rect.height / 2 }; })()`);
         for (const type of ["dragEnter", "dragOver", "drop"]) await client.command("Input.dispatchDragEvent", { type, ...destination, data: { items: [{ mimeType: "application/x-bb-studio-item", data: JSON.stringify({ href, title: "Weekly product sync" }) }], dragOperationsMask: 1 } });

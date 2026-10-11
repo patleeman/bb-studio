@@ -10,13 +10,19 @@ extension BBClient {
         ]))
     }
 
+    /// A recording with its segments, in the generated shape.
+    public func recordingOutput(_ id: String) async throws -> Talk.RecordingGetOutput {
+        let input: JSONValue = ["id": .string(id)]
+        return try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_get, input) }, else: { try await self.rpc("talk", Talk.Method.recording_get, input) })
+    }
+
     public func recordingNotes(_ id: String) async throws -> Talk.RecordingGetOutputRecordingMeetingNotes? {
-        let result: Talk.RecordingGetOutput = try await rpc("talk", Talk.Method.recording_get, ["id": .string(id)])
-        return result.recording?.meetingNotes
+        try await recordingOutput(id).recording?.meetingNotes
     }
 
     public func regenerateRecordingNotes(_ id: String) async throws {
-        let _: Talk.MeetingRegenerateOutput = try await rpc("talk", Talk.Method.meeting_regenerate, ["id": .string(id)])
+        let input: JSONValue = ["id": .string(id)]
+        let _: Talk.MeetingRegenerateOutput = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_meeting_regenerate, input) }, else: { try await self.rpc("talk", Talk.Method.meeting_regenerate, input) })
     }
 
     public func studioLinks(pluginId: String, id: String) async throws -> Studio.LinksOutput {

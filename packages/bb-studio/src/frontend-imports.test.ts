@@ -54,6 +54,10 @@ describe("frontend bundle", () => {
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(design-view|canvas|play-view|comments)$/.test(spec))).toEqual([]);
   });
 
+  it("loads a recording's page only when one opens", () => {
+    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(recordings-panel|playback)$/.test(spec))).toEqual([]);
+  });
+
   it("loads Excalidraw only when a drawing opens", () => {
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => spec.startsWith("@excalidraw/"))).toEqual([]);
   });

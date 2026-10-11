@@ -9,9 +9,9 @@ agent.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, designs and artifacts (drawings, Excalidraw scenes you sketch with your agents; designs, UI prototypes and slide decks on a canvas with a reviewer that checks the work; and artifacts, the files they make, are built in), with search, tags, project filters, templates, item chats and quotes, project leads with a Heartbeat, a Command view, a Setup page for the add-ons, plugin health and backup and restore. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, designs and artifacts (recordings, long-form dictation and recording that saves audio as you speak and transcribes it; drawings, Excalidraw scenes you sketch with your agents; designs, UI prototypes and slide decks on a canvas with a reviewer that checks the work; and artifacts, the files they make, are built in), with search, tags, project filters, templates, item chats and quotes, project leads with a Heartbeat, a Command view, a Setup page for the add-ons, plugin health and backup and restore. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents, with checklists you hand to agents, inline whiteboards, and Explore: pages explaining what an agent noticed along the way. |
-| [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
+| [Studio Talk](packages/bb-studio-talk/) | `talk` | Upgrade bridge only. Recording and dictation are built into Studio now; this copies an existing install's recordings, their audio and its settings into Studio. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Upgrade bridge only. Drawings are built into Studio now; this copies an existing install's drawings into Studio. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Upgrade bridge only. Artifacts are built into Studio now; this copies an existing install's artifacts into Studio. |
 | [Studio Design](packages/bb-studio-design/) | `design` | Upgrade bridge only. Designs are built into Studio now; this copies an existing install's designs and saved styles into Studio. |
@@ -46,9 +46,8 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    `bb marketplace refresh bb-studio` instead.
 2. Ask me whether to install all of these plugins or only some. List them with
    a one-line description each:
-   - studio: the Studio collection, project leads and Command view, with drawings, designs and artifacts built in; recommended, since the others plug into it
+   - studio: the Studio collection, project leads and Command view, with dictation and recordings, drawings, designs and artifacts built in; recommended, since the others plug into it
    - pages: collaborative pages
-   - talk: dictation and voice recordings with transcripts
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
    - studio-code: Studio Code; VS Code workspaces beside your threads (downloads code-server on first open)
@@ -87,8 +86,8 @@ for now, with the same IDs. BB won't move an installed plugin to a new source,
 so to switch one, remove it and install it from here:
 
 ```sh
-bb plugin remove talk
-bb plugin install talk@bb-studio --yes
+bb plugin remove pages
+bb plugin install pages@bb-studio --yes
 ```
 
 Your items (pages, recordings, drawings, designs and artifacts) are kept, but removing a
@@ -96,11 +95,13 @@ plugin deletes its settings and secrets, so note them first.
 
 ## Consolidation upgrades
 
-Chat, Artifacts, Draw and Design now ship in Studio, BB's own navigation replaces Studio Navigation, and Float and
+Chat, Artifacts, Draw, Design and Talk now ship in Studio, BB's own navigation replaces Studio Navigation, and Float and
 Studio Teams (`bot-teams`) are retired. New installs need at most 11 plugins.
-If you had Studio Artifacts, Studio Draw or Studio Design, update it too and
-run `bb artifacts migrate`, `bb excalidraw migrate` or `bb design migrate`: its
+If you had Studio Artifacts, Studio Draw, Studio Design or Studio Talk, update it too and
+run `bb artifacts migrate`, `bb excalidraw migrate`, `bb design migrate` or `bb talk migrate`: its
 last release copies your items into Studio, then Setup lets you remove it.
+For Talk, finish any recording or dictation in progress first: the recorder
+belongs to the Talk plugin until it's updated.
 To upgrade an existing install, update Studio and open **Studio → Setup**. It
 lists the add-ons you're missing, flags installed retired plugins, says what
 removing each keeps and deletes, and removes one only after you confirm. See

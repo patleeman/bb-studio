@@ -3,8 +3,9 @@
 Studio is one plugin with one rail icon (`studio/studio`). Its content kinds
 are moving into it one at a time. Artifacts went first (`packages/bb-studio/src/artifacts`),
 then Draw (`packages/bb-studio/src/draw`), then Design
-(`packages/bb-studio/src/design`); Talk and Pages follow the same steps. This
-is the checklist, with what Artifacts, Draw and Design taught.
+(`packages/bb-studio/src/design`), then Talk (`packages/bb-studio/src/talk`);
+Pages follows the same steps. This is the checklist, with what Artifacts,
+Draw, Design and Talk taught.
 
 ## Rules
 
@@ -232,9 +233,54 @@ commit, run `bb <old> migrate`, and check the items in Studio
     `frontend-imports.test.ts` checks the canvas stays out.
   - Design had no CLI; Studio adds `bb studio designs …`, and the bridge
     registers only `bb design migrate`.
-- **Talk** keeps its own page only to show "set aside" unsent recordings.
-  When Talk merges, show those as a banner in Studio's library when it's
-  filtered to recordings.
+- **Talk** (done) brought files, settings, commands and a recorder that
+  runs in the browser. What it added to the pattern:
+  - **Files outside SQLite.** Segment audio lived beside the plugin's
+    database (`<dataDir>/plugins/talk/audio/<rec>/<seg>`). Studio keeps its
+    own copy beside its database (`<dataDir>/plugins/studio/talk/audio/`,
+    same relative paths, so rows import unchanged) and serves it at
+    `/http/recordings/audio`. The bridge copies files first, through
+    `recordings.missingAudio` (which files Studio lacks, how much of each a
+    stopped copy already wrote, and the free space) and
+    `recordings.importAudio` (4 MB pieces at an offset, read from disk a piece
+    at a time; Studio fsyncs each piece into `<file>.part` and renames it into
+    place only when the size and SHA-256 match). A rerun resumes from the
+    `.part` size and never resends a file Studio has. The copy checks free
+    space for everything left plus a 256 MB reserve before sending anything.
+    `recordings.importRows` refuses (throws, so the bridge retries) a row whose
+    copied audio isn't in place yet. The originals stay until the bridge is
+    removed. Files the old plugin had lost, or deleted on purpose (expired
+    dictation audio), go as `audio: false`.
+  - **Rows the old plugin was still working on.** A segment left pending
+    stays pending and Studio's transcriber picks it up (`importRows` wakes
+    it); a recording left `recording` is marked interrupted by Studio's
+    watchdog. Nothing is "settled" the way a restored backup is.
+  - **Settings.** BB takes one `bb.settings.define` per plugin, so Studio's
+    settings are Talk's (kit `TALK_SETTINGS`; merge any later kind's into the
+    same call). The bridge defines them again only to read the user's values
+    (labelled "moved to Studio") and sends them with its KV model choices to
+    `recordings.importSettings`, which applies each one the user hasn't
+    changed in Studio, once (a KV marker). Studio's KV keys are namespaced
+    (`talk:model:<purpose>`).
+  - **Commands.** Command ids are scoped by plugin, so `talk` commands become
+    `studio` commands with the same ids and titles. A user's custom shortcut
+    on the old command doesn't carry over; Setup and the READMEs say to set
+    it again. `data-bb-plugin="talk"` selectors in a content script's CSS
+    become `studio`.
+  - **The recorder.** It runs in the old plugin's frontend until that plugin
+    is updated, so the safe order is: finish recordings, update Studio and
+    the plugin together, `bb talk migrate`. Browser storage is per origin and
+    Studio keeps the same IndexedDB and localStorage names, so pieces the
+    browser set aside carry over and upload to Studio once the bridge has
+    copied their recording. Forwarded legacy RPCs (`segment_put` from an old
+    iOS build or a stale tab) wait for the copy, like every forwarded call.
+  - **A page that isn't an item.** The unsent-audio page lives at
+    `recordings/unsent`; `BuiltinRoute.pages` keeps `builtinItemAt` from
+    taking it for an item, and the library shows a banner pointing at it
+    when filtered to recordings.
+  - **Kit contracts in the frontend.** A kit contract the app imports at
+    runtime must not import the root SDK, including through another kit
+    contract (`decisions-contract` now uses the local `defineRpcContract`).
 - **Pages** is called by other add-ons and calls them (embeds, `itemAt`);
   move those calls to `callProvider` and Studio's prefixed methods. Its
   whiteboard already calls Studio's `drawings.getDrawing`/`saveDrawing`.

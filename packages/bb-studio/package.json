@@ -29,7 +29,8 @@
         "artifact-audio": "./icons/artifact-audio.svg",
         "artifact-video": "./icons/artifact-video.svg",
         "draw": "./icons/draw.svg",
-        "design": "./icons/design.svg"
+        "design": "./icons/design.svg",
+        "talk": "./icons/talk.svg"
       }
     },
     "server": "./server.ts",

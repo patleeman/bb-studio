@@ -219,12 +219,13 @@ export async function seedArtifact() {
   return { artifactId, cleanup };
 }
 
+/** Talk's methods, built into Studio as `recordings.<method>`. */
 export async function talkRpc(method, input) {
   const dir = await mkdtemp(join(tmpdir(), "bb-talk-capture-"));
   const file = join(dir, "input.json");
   await writeFile(file, JSON.stringify(input));
   try {
-    return JSON.parse(await bbCli(["plugin", "rpc", "call", "talk", method, "--input-file", file, "--json"]));
+    return JSON.parse(await bbCli(["plugin", "rpc", "call", "studio", `recordings.${method}`, "--input-file", file, "--json"]));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -243,7 +244,7 @@ export async function runText(command, args) {
 
 /**
  * Seeds a finished Talk recording from speech synthesized with macOS `say`,
- * uploaded and transcribed through the live plugin and BB's voice service.
+ * uploaded and transcribed through Studio and BB's voice service.
  * `transcribe: false` uploads the audio and pauses the recording instead, for
  * captures that only need it listed where no voice service is configured.
  */
@@ -288,7 +289,7 @@ export async function seedTalkRecording(projectId, { transcribe = true, kind = "
     await talkRpc("recording_state", { id: recording.id, status: "finishing" });
     const started = Date.now();
     for (;;) {
-      const current = JSON.parse(await bbCli(["talk", "show", recording.id, "--json"]));
+      const current = JSON.parse(await bbCli(["studio", "recordings", "show", recording.id, "--json"]));
       if (current.status === "done" && current.pendingCount === 0) {
         if (current.failedCount > 0) throw new Error(`Talk could not transcribe ${current.failedCount} seeded pieces.`);
         break;

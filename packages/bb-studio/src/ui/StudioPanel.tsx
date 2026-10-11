@@ -3,6 +3,7 @@
 // workspace's new tab page, never a page of its own: openCollection starts it
 // on a kind, so /plugins/studio/studio/recording opens it on recordings.
 import { showBrowse } from "./Workspace";
+import { UnsentNotice } from "../talk/ui/unsent-notice";
 import {
   CollectionPage,
   createStudioItem,
@@ -399,6 +400,8 @@ export function StudioPanel() {
 
   const notice = (
     <>
+      {/* Talk kept its own page for these; recordings are Studio's now. */}
+      {onlyKind?.id === "recording" || onlyKind?.id === "dictation" ? <UnsentNotice className="mb-2" /> : null}
       {searchText ? <SearchFreshness {...freshness} /> : null}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">

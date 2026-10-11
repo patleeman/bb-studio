@@ -1,0 +1,638 @@
+// One recording's page: /plugins/studio/studio/recordings/<id> is its durable
+// home — the link target for mentions and the CLI — in a Studio workspace tab
+// or the main view. /plugins/studio/studio/recordings/unsent lists audio this
+// device kept because the server refused it. The list of recordings is
+// Studio's library filtered to them, with the unsent-audio banner
+// (unsent-notice.tsx).
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import {
+  BarCrumb,
+  Badge,
+  DANGER_BUTTON,
+  DropdownMenuItem,
+  EditableTitle,
+  GHOST_BUTTON,
+  ICON_BUTTON,
+  ItemHeader,
+  ItemDeleteConfirm,
+  ItemMenu,
+  openNewItemThread,
+  OUTLINE_BUTTON,
+  PageColumn,
+  PAGE_TITLE,
+  SECTION_TITLE,
+  openAppPath,
+  WORKSPACE_PATH,
+  useOpenMain,
+} from "@bb-studio/kit/app";
+import { errorMessage, formatBytes, shortDateTime, untitled } from "@bb-studio/kit/format";
+import {
+  useBbNavigate,
+  useRealtime,
+  useRpc,
+} from "@get-bb/plugin-sdk/app";
+import type { Recording, Segment, TalkRpcContract } from "../shared/contract";
+import {
+  HTTP_ROOT,
+  PLUGIN_ID,
+  RECORDING_CHANGED,
+  formatClock,
+  formatLength,
+  joinTranscript,
+  recordingBadge,
+  recordingHref,
+} from "../shared/format";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
+import { talk, useTalkState } from "./controller";
+import { sameKey, type SetAsideSegment } from "./outbox";
+import { RecordingPlayer, type PlaybackState } from "./playback";
+import { UnsentNotice } from "./unsent-notice";
+import { useRecordingProvider } from "./provider";
+import { openCollection } from "../../ui/StudioPanel";
+
+function useChangedSignal(onChange: (id: string) => void): void {
+  useRealtime(RECORDING_CHANGED, (payload) => {
+    const id = (payload as { id?: unknown } | null)?.id;
+    if (typeof id === "string") onChange(id);
+  });
+}
+
+// ── Unsent audio ─────────────────────────────────────────────────────────
+
+/** Audio the server refused, kept on this device. */
+export function UnsentAudio() {
+  const setAside = useTalkState().setAside ?? [];
+  const open = useOpenMain();
+  const [busy, setBusy] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState<readonly SetAsideSegment[] | null>(null);
+  const act = (work: () => Promise<unknown>) => {
+    setBusy(true);
+    void work()
+      .catch((cause: unknown) => toast.error(errorMessage(cause)))
+      .finally(() => setBusy(false));
+  };
+  const toCollection = () => toRecordings(false);
+  return (
+    <div className="relative h-full">
+      <ItemHeader backLabel="Studio" onBack={toCollection} />
+      <PageColumn className="max-w-3xl">
+        <h1 className={PAGE_TITLE}>Unsent audio</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The server refused these pieces of audio, so Talk kept them on this device instead of losing them. Retry
+          after updating Talk, download them, or discard them.
+        </p>
+        {setAside.length === 0 ? (
+          <p className="mt-8 text-sm text-muted-foreground">Nothing here: every piece of audio was uploaded.</p>
+        ) : (
+          <>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button type="button" className={OUTLINE_BUTTON} disabled={busy} onClick={() => act(() => talk.retrySetAside(setAside))}>
+                <Icon name="RotateCcw" /> Retry all
+              </button>
+              <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={() => setConfirmDiscard(setAside)}>
+                <Icon name="Trash2" /> Discard all…
+              </button>
+            </div>
+            {confirmDiscard ? (
+              <div className="mt-4 flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm max-md:flex-wrap">
+                <span className="min-w-0 flex-1">
+                  Delete {confirmDiscard.length === 1 ? "this audio" : `these ${confirmDiscard.length} pieces of audio`} from this
+                  device? This can't be undone.
+                </span>
+                <button
+                  type="button"
+                  className={DANGER_BUTTON}
+                  onClick={() => {
+                    const keys = confirmDiscard;
+                    setConfirmDiscard(null);
+                    act(() => talk.discardSetAside(keys));
+                  }}
+                >
+                  Discard
+                </button>
+                <button type="button" className={GHOST_BUTTON} onClick={() => setConfirmDiscard(null)}>
+                  Cancel
+                </button>
+              </div>
+            ) : null}
+            <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+              {setAside.map((segment) => (
+                <li key={`${segment.recordingId}:${segment.sessionId}:${segment.index}`} className="flex items-center gap-3 px-4 py-3 text-sm max-md:flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      className="font-medium hover:underline"
+                      onClick={() => open({ kind: "path", path: recordingHref(segment.recordingId) })}
+                    >
+                      {shortDateTime(segment.startedAt)}
+                    </button>
+                    <span className="text-muted-foreground">
+                      {" · "}
+                      {segment.durationMs === null ? "unknown length" : formatLength(segment.durationMs)} · {formatBytes(segment.bytes)}
+                    </span>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground" title={segment.reason}>
+                      {segment.reason}
+                    </p>
+                  </div>
+                  <button type="button" aria-label="Retry" title="Retry" className={ICON_BUTTON} disabled={busy} onClick={() => act(() => talk.retrySetAside([segment]))}>
+                    <Icon name="RotateCcw" className="size-4" />
+                  </button>
+                  <button type="button" aria-label="Download" title="Download" className={ICON_BUTTON} onClick={() => act(() => talk.downloadSetAside(segment))}>
+                    <Icon name="Download" className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Discard"
+                    title="Discard"
+                    className={ICON_BUTTON}
+                    disabled={busy}
+                    onClick={() => setConfirmDiscard(setAside.filter((other) => sameKey(other, segment)))}
+                  >
+                    <Icon name="Trash2" className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </PageColumn>
+    </div>
+  );
+}
+
+/** Studio's library filtered to recordings, in the workspace. */
+function toRecordings(replace: boolean): void {
+  openCollection("recording");
+  openAppPath(WORKSPACE_PATH, { replace });
+}
+
+// ── One recording ────────────────────────────────────────────────────────
+function useRecording(id: string) {
+  const rpc = useRpc<TalkRpcContract>();
+  const [data, setData] = useState<{ recording: Recording; segments: Segment[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Only the latest request may land; an older one can answer after a newer one.
+  const latest = useRef(0);
+  const refetch = useCallback(() => {
+    const request = ++latest.current;
+    rpc.call("recordings.recording_get", { id }).then(
+      (result) => {
+        if (request !== latest.current) return;
+        setData(result);
+        setError(null);
+      },
+      (cause) => {
+        if (request === latest.current) setError(errorMessage(cause));
+      },
+    );
+  }, [rpc, id]);
+  useEffect(() => {
+    setData(null);
+    refetch();
+  }, [refetch]);
+  useChangedSignal((changed) => {
+    if (changed === id) refetch();
+  });
+  return { rpc, data, error, refetch };
+}
+
+function usePlayer(recordingId: string, segments: readonly Segment[]) {
+  const [state, setState] = useState<PlaybackState>({ positionMs: 0, segmentId: null, playing: false, rate: 1, volume: 1 });
+  const player = useMemo(() => new RecordingPlayer(recordingId, setState,
+    (cause) => toast.error(`Could not play audio: ${errorMessage(cause)}`)), [recordingId]);
+  player.segments = segments;
+  useEffect(() => { setState(player.state); return () => player.dispose(); }, [player]);
+  return { ...state, durationMs: player.durationMs, seek: (ms: number, play?: boolean) => player.seek(ms, play),
+    toggle: () => player.toggle(), pause: () => player.pause(), setRate: (rate: number) => player.setRate(rate), setVolume: (volume: number) => player.setVolume(volume) };
+}
+
+// ── Notes page ───────────────────────────────────────────────────────────
+function useNotes(id: string, refetch: () => void) {
+  const rpc = useRpc<TalkRpcContract>();
+  // null while checking.
+  const [pagesAvailable, setPagesAvailable] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
+  useEffect(() => {
+    let live = true;
+    rpc.call("recordings.notes_status", null).then(
+      (result) => live && setPagesAvailable(result.pagesAvailable),
+      () => live && setPagesAvailable(false),
+    );
+    return () => { live = false; };
+  }, [rpc]);
+  const make = useCallback(() => {
+    // The server also shares one run per recording; this keeps a double click to one request.
+    if (running.current) return;
+    running.current = true;
+    setBusy(true);
+    rpc.call("recordings.notes_make", { id }).then(
+      ({ pageId, created }) => {
+        toast.success(created ? "Notes page made" : "Notes page updated", { action: { label: "Open", onClick: () => openAppPath(notesPath(pageId)) } });
+        refetch();
+      },
+      (cause) => {
+        const message = errorMessage(cause);
+        if (message.includes(PAGES_MISSING)) setPagesAvailable(false);
+        toast.error(message);
+      },
+    ).finally(() => {
+      running.current = false;
+      setBusy(false);
+    });
+  }, [rpc, id, refetch]);
+  const canMake = (recording: Recording) =>
+    recording.status === "done" && recording.pendingCount === 0 && recording.failedCount === 0 && recording.wordCount > 0;
+  return { pagesAvailable, busy, make, canMake };
+}
+
+const PAGES_MISSING = "Install Studio Pages to make notes.";
+const notesPath = (pageId: string) => `/plugins/pages/pages/${pageId}`;
+
+function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnType<typeof useNotes> }) {
+  const pageId = recording.notesPageId ?? null;
+  if (!notes.canMake(recording) && !pageId) return null;
+  const missing = notes.pagesAvailable === false;
+  return (
+    <section aria-label="Notes" className="mt-6 flex flex-wrap items-center gap-2">
+      {pageId && !missing ? (
+        <button type="button" className={OUTLINE_BUTTON} onClick={() => openAppPath(notesPath(pageId))}>
+          <Icon name="FileText" /> Open notes
+        </button>
+      ) : null}
+      {notes.canMake(recording) ? (
+        <button
+          type="button"
+          className={OUTLINE_BUTTON}
+          disabled={notes.busy || notes.pagesAvailable !== true}
+          title={missing ? PAGES_MISSING : "Summary, decisions and action items as a Studio Page"}
+          onClick={notes.make}
+        >
+          {notes.busy ? <Icon name="Loading" className="animate-spin motion-reduce:animate-none" /> : <Icon name="ListTodo" />}
+          {notes.busy ? (pageId ? "Updating notes…" : "Making notes…") : pageId ? "Update notes" : "Make notes"}
+        </button>
+      ) : null}
+      {missing ? <span className="text-sm text-muted-foreground">{PAGES_MISSING}</span> : null}
+    </section>
+  );
+}
+
+export function RecordingDetail({ id }: { id: string }) {
+  const { rpc, data, error, refetch } = useRecording(id);
+  const provider = useRecordingProvider();
+  const move = async (target: string | null) => {
+    try {
+      const { failed } = await provider("studio_move", { ids: [id], projectId: target });
+      if (failed.length) throw new Error(failed[0]!.error);
+      toast.success("Moved");
+      refetch();
+    } catch (cause) {
+      toast.error(`Couldn't move: ${errorMessage(cause)}`);
+    }
+  };
+  const navigate = useBbNavigate();
+  const state = useTalkState();
+  const segments = data?.segments ?? [];
+  const player = usePlayer(id, segments);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [version, setVersion] = useState<"original" | "cleaned">("cleaned");
+  const [cleaning, setCleaning] = useState<string | null>(null);
+  const cleanupRun = useRef(0);
+  const notes = useNotes(id, refetch);
+  useEffect(() => { setVersion("cleaned"); setCleaning(null); return () => { cleanupRun.current++; }; }, [id]);
+  const spoken = segments.filter((segment) => segment.status !== "empty");
+  const hasCleaned = spoken.length > 0 && spoken.every((segment) => segment.status === "done" && segment.cleanedText != null);
+  const showCleaned = version === "cleaned" && hasCleaned;
+  const shownSegments = useMemo(() => showCleaned ? segments.map((segment) => ({ ...segment, text: segment.cleanedText ?? segment.text })) : segments, [segments, showCleaned]);
+  const transcript = useMemo(() => joinTranscript(shownSegments), [shownSegments]);
+  const cleanUp = async () => {
+    if (cleaning !== null) return;
+    const runId = ++cleanupRun.current;
+    const pending = segments.filter((segment) => segment.status === "done" && segment.text && segment.cleanedText == null);
+    try {
+      for (let index = 0; index < pending.length; index++) {
+        if (cleanupRun.current !== runId) return;
+        setCleaning(`Cleaning section ${index + 1} of ${pending.length}…`);
+        await rpc.call("recordings.recording_cleanup", { id, segmentId: pending[index]!.id });
+      }
+      if (cleanupRun.current === runId) { setVersion("cleaned"); toast.success("Cleaned transcript saved. Original text and audio kept."); }
+    } catch (cause) {
+      if (cleanupRun.current === runId) toast.error(errorMessage(cause));
+    } finally {
+      if (cleanupRun.current === runId) { setCleaning(null); refetch(); }
+    }
+  };
+  const [follow, setFollow] = useState(true);
+  const transcriptRows = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (follow && player.playing && player.segmentId) {
+      transcriptRows.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: "nearest" });
+    }
+  }, [follow, player.playing, player.segmentId]);
+  // Tells the recording pill this page is where the recording lives.
+  useEffect(() => {
+    talk.setViewing(id);
+    return () => talk.setViewing(null);
+  }, [id]);
+  // The collection is Studio's.
+  const toCollection = useCallback((replace = false) => toRecordings(replace), []);
+  // The recording went away while open: deleted elsewhere, or discarded
+  // because it finished without a word.
+  const gone = Boolean(data && error && /No recording/.test(error));
+  const wasEmpty = data?.recording.wordCount === 0;
+  const leaving = useRef(false);
+  useEffect(() => {
+    if (!gone || leaving.current) return;
+    leaving.current = true;
+    toast.info(wasEmpty ? "Talk heard nothing, so it didn't keep this recording." : "This recording was deleted.");
+    toCollection(true);
+  }, [gone, wasEmpty, toCollection]);
+
+  const backLabel = "Studio";
+  if (error && !data) {
+    return (
+      <div className="relative h-full">
+        <ItemHeader backLabel={backLabel} onBack={() => toCollection()} />
+        <PageColumn className="max-w-3xl">
+          <p className="text-sm text-destructive">{error}</p>
+        </PageColumn>
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div className="relative h-full">
+        <ItemHeader backLabel={backLabel} onBack={() => toCollection()} />
+        <PageColumn className="max-w-3xl">
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        </PageColumn>
+      </div>
+    );
+  }
+  const { recording } = data;
+  const activeHere = state.recordingId === id && state.phase !== "idle";
+  const badge = recordingBadge(recording, activeHere && state.phase === "recording");
+  const run = (work: () => Promise<unknown>) => {
+    void work().then(refetch, (cause) => toast.error(errorMessage(cause)));
+  };
+  const copy = () =>
+    void navigator.clipboard.writeText(transcript).then(
+      () => toast.success("Transcript copied"),
+      (cause: unknown) => toast.error(errorMessage(cause)),
+    );
+  const downloadTranscript = (format: "markdown" | "text") => {
+    window.open(`${HTTP_ROOT}/transcript?recording=${encodeURIComponent(id)}&format=${format}${showCleaned ? "&version=cleaned" : ""}`, "_blank", "noopener");
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <ItemHeader
+        backLabel={backLabel}
+        onBack={() => toCollection()}
+        thread={{ title: recording.title, href: recordingHref(recording.id) }}
+        leading={<>
+          <BarCrumb current><span className="truncate">{untitled(recording.title)}</span></BarCrumb>
+          {badge ? <span className="ml-1 shrink-0"><Badge label={badge.label} tone={badge.tone} /></span> : null}
+        </>}
+        trailing={
+          <>
+            <button type="button" aria-label="Copy transcript" title="Copy transcript" className={ICON_BUTTON} disabled={transcript === ""} onClick={copy}>
+              <Icon name="Copy" className="size-4" />
+            </button>
+            <ItemMenu reference={{ title: recording.title, href: recordingHref(recording.id) }} item={{ pluginId: PLUGIN_ID, id: recording.id }} projectId={recording.projectId} onMove={(target) => void move(target)} onDelete={() => setConfirmDelete(true)} deleteDisabled={activeHere || recording.status === "recording"}>
+
+                <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, { title: recording.title, href: recordingHref(recording.id) })}>
+                  <Icon name="MessageSquarePlus" className="size-4" /> New thread
+                </DropdownMenuItem>
+                {recording.kind === "dictation" && recording.status === "done" ? (
+                  <DropdownMenuItem
+                    onSelect={() => run(() => rpc.call("recordings.recording_keep", { id }).then(() => toast.success("Kept as a recording.")))}
+                  >
+                    <Icon name="Mic" className="size-4" /> Keep as a recording
+                  </DropdownMenuItem>
+                ) : null}
+                {recording.failedCount > 0 ? (
+                  <DropdownMenuItem onSelect={() => run(() => rpc.call("recordings.recording_retry", { id }))}>
+                    <Icon name="RotateCcw" className="size-4" /> Retry {recording.failedCount} failed
+                  </DropdownMenuItem>
+                ) : null}
+                {recording.kind === "recording" && recording.status === "done" ? (
+                  <DropdownMenuItem onSelect={() => run(() => rpc.call("recordings.meeting_regenerate", { id }))}>
+                    <Icon name="AiContentGenerator01" className="size-4" /> {recording.meetingNotes ? "Regenerate summary" : "Generate summary"}
+                  </DropdownMenuItem>
+                ) : null}
+                {notes.canMake(recording) && notes.pagesAvailable ? (
+                  <DropdownMenuItem disabled={notes.busy} onSelect={notes.make}>
+                    <Icon name="ListTodo" className="size-4" /> {recording.notesPageId ? "Update notes" : "Make notes"}
+                  </DropdownMenuItem>
+                ) : null}
+                {recording.status === "done" ? (
+                  <>
+                    <DropdownMenuItem onSelect={() => downloadTranscript("markdown")}><Icon name="Download" className="size-4" /> Download Markdown</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => downloadTranscript("text")}><Icon name="Download" className="size-4" /> Download text</DropdownMenuItem>
+                    {recording.audioRemoved ? null : (
+                      <DropdownMenuItem onSelect={() => window.open(`${HTTP_ROOT}/audio-export?recording=${encodeURIComponent(id)}`, "_blank", "noopener")}><Icon name="Download" className="size-4" /> Download audio</DropdownMenuItem>
+                    )}
+                  </>
+                ) : null}
+            </ItemMenu>
+          </>
+        }
+      />
+      <PageColumn className="max-w-3xl">
+        <EditableTitle
+          title={recording.title}
+          placeholder="Untitled recording"
+          onRename={(title) =>
+            void rpc.call("recordings.recording_rename", { id, title }).then(refetch, (cause: unknown) => toast.error(errorMessage(cause)))
+          }
+        />
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <span>{shortDateTime(recording.createdAt)}</span>
+          <span aria-hidden>·</span>
+          <span>{formatLength(recording.durationMs)}</span>
+          <span aria-hidden>·</span>
+          <span>{recording.wordCount.toLocaleString()} words</span>
+          {recording.kind === "dictation" ? (
+            <>
+              <span aria-hidden>·</span>
+              <span>Dictation</span>
+            </>
+          ) : null}
+        </div>
+
+        {recording.audioRemoved ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Talk deleted this dictation's audio to save space. The transcript is kept.
+          </p>
+        ) : null}
+
+        <UnsentNotice recordingId={id} className="mt-6" />
+
+        {recording.kind === "recording" && recording.meetingNotes ? (
+          <details className="mt-6 rounded-lg border border-border p-4" aria-label="Summary">
+            <summary className="cursor-pointer font-semibold">Summary</summary>
+            <div className="mt-3 flex items-center justify-end gap-3">
+              <button type="button" className={OUTLINE_BUTTON} onClick={() => run(() => rpc.call("recordings.meeting_regenerate", { id }))}>
+                <Icon name="AiContentGenerator01" /> {recording.meetingNotes ? "Regenerate" : "Generate"}
+              </button>
+            </div>
+            <p className="mt-3 whitespace-pre-wrap text-sm">{recording.meetingNotes.summary}</p>
+          </details>
+        ) : null}
+
+        <NotesRow recording={recording} notes={notes} />
+
+        {confirmDelete ? (
+          <div className="mt-6">
+            <ItemDeleteConfirm
+              label="Delete this recording and its audio? This can't be undone."
+              onDelete={() => {
+                player.pause();
+                void rpc.call("recordings.recording_delete", { id }).then(
+                  () => toCollection(true),
+                  (cause) => toast.error(errorMessage(cause)),
+                );
+              }}
+              onCancel={() => setConfirmDelete(false)}
+            />
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          {activeHere ? (
+            <>
+              {state.phase === "recording" ? (
+                <button type="button" className={OUTLINE_BUTTON} onClick={() => void talk.pause()}>
+                  <Icon name="Pause" /> Pause
+                </button>
+              ) : null}
+              {state.phase === "paused" || state.phase === "needs-resume" ? (
+                <button type="button" className={OUTLINE_BUTTON} onClick={() => void talk.resume()}>
+                  <Icon name="Mic" /> Resume
+                </button>
+              ) : null}
+              {state.phase === "recording" || state.phase === "paused" || state.phase === "needs-resume" ? (
+                <button type="button" className={DANGER_BUTTON} onClick={() => void talk.stop(false)}>
+                  <Icon name="Square" /> Stop
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {recording.status !== "finishing" && !recording.audioRemoved ? (
+                <button
+                  type="button"
+                  className={OUTLINE_BUTTON}
+                  disabled={state.phase !== "idle"}
+                  onClick={() => void talk.continueRecording(recording)}
+                >
+                  <Icon name="Mic" /> {recording.status === "interrupted" ? "Resume recording" : "Record more"}
+                </button>
+              ) : null}
+              {recording.status === "paused" || recording.status === "interrupted" ? (
+                <button type="button" className={OUTLINE_BUTTON} onClick={() => run(() => talk.finishRecording(id))}>
+                  <Icon name="Square" /> Finish
+                </button>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        {segments.length > 0 && !recording.audioRemoved ? (
+          <section aria-label="Audio playback" className="sticky top-14 z-10 mt-6 border-y border-border bg-background py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" className={OUTLINE_BUTTON} aria-label={player.playing ? "Pause playback" : "Play recording"} onClick={player.toggle}>
+                <Icon name={player.playing ? "Pause" : "Play"} /> {player.playing ? "Pause" : "Play"}
+              </button>
+              <button type="button" className={OUTLINE_BUTTON} aria-label="Back 10 seconds" title="Back 10 seconds" onClick={() => player.seek(player.positionMs - 10_000)}>−10s</button>
+              <button type="button" className={OUTLINE_BUTTON} aria-label="Forward 10 seconds" title="Forward 10 seconds" onClick={() => player.seek(player.positionMs + 10_000)}>+10s</button>
+              <span className="ml-auto text-sm tabular-nums">{formatClock(player.positionMs)} / {formatClock(player.durationMs)}</span>
+              <select aria-label="Playback speed" className="rounded border border-border bg-background px-1 py-1 text-sm" value={player.rate} onChange={(event) => player.setRate(Number(event.target.value))}>
+                {[0.75, 1, 1.25, 1.5, 2].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+              </select>
+            </div>
+            <input type="range" aria-label="Recording position" aria-valuetext={`${formatClock(player.positionMs)} of ${formatClock(player.durationMs)}`} min={0} max={player.durationMs} step={100} value={player.positionMs} onChange={(event) => player.seek(Number(event.target.value))} className="mt-3 block w-full cursor-pointer accent-primary" />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> Follow transcript</label>
+              <label className="flex items-center gap-2">Volume <input type="range" aria-label="Playback volume" min={0} max={1} step={0.05} value={player.volume} onChange={(event) => player.setVolume(Number(event.target.value))} className="w-24 accent-primary" /></label>
+            </div>
+          </section>
+        ) : null}
+
+        <div className="mt-8 flex flex-wrap items-center gap-2">
+          <h2 className={cn("mr-auto", SECTION_TITLE)}>Transcript</h2>
+          <button type="button" className={OUTLINE_BUTTON} disabled={cleaning !== null || recording.status !== "done" || recording.pendingCount > 0 || recording.failedCount > 0 || !recording.wordCount || hasCleaned} onClick={() => void cleanUp()}>
+            {cleaning !== null ? <Icon name="Loading" className="animate-spin motion-reduce:animate-none" /> : null} {cleaning !== null ? "Cleaning…" : hasCleaned ? "Cleanup saved" : "Clean up transcript"}
+          </button>
+          <button type="button" className={OUTLINE_BUTTON} disabled={!transcript} onClick={() => openNewItemThread(navigate, { title: recording.title, href: recordingHref(recording.id) })}><Icon name="MessageSquarePlus" /> Send to agent</button>
+        </div>
+        {cleaning !== null ? <p role="status" className="mt-2 text-sm text-muted-foreground">{cleaning}</p> : null}
+        {hasCleaned ? (
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <button type="button" aria-pressed={showCleaned} className={showCleaned ? OUTLINE_BUTTON : GHOST_BUTTON} onClick={() => setVersion("cleaned")}>Cleaned</button>
+            <button type="button" aria-pressed={!showCleaned} className={!showCleaned ? OUTLINE_BUTTON : GHOST_BUTTON} onClick={() => setVersion("original")}>Original</button>
+            <span className="text-xs text-muted-foreground">Original text and audio kept</span>
+          </div>
+        ) : null}
+        {segments.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">{activeHere ? "Text appears here as each piece is transcribed." : "This recording has no audio."}</p>
+        ) : (
+          <div ref={transcriptRows} className="mt-4 flex flex-col gap-3">
+            {shownSegments.map((segment) => (
+              <section key={segment.id} aria-current={player.segmentId === segment.id ? "true" : undefined} className={cn("flex scroll-mt-40 gap-3 rounded px-2 py-2", player.segmentId === segment.id && "bg-primary/10")}>
+                {recording.audioRemoved ? (
+                  <span className="mt-0.5 shrink-0 font-mono text-xs leading-6 tabular-nums text-muted-foreground">{formatClock(segment.offsetMs)}</span>
+                ) : (
+                  <button type="button" onClick={() => player.seek(segment.offsetMs, true)} className="mt-0.5 h-6 shrink-0 rounded px-1 font-mono text-xs tabular-nums text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2" aria-label={`Play from ${formatClock(segment.offsetMs)}`} title="Play from here">{formatClock(segment.offsetMs)}</button>
+                )}
+                <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+                  <SegmentText segment={segment} onPlay={recording.audioRemoved ? undefined : () => player.seek(segment.offsetMs, true)} />
+                </p>
+              </section>
+            ))}
+          </div>
+        )}
+      </PageColumn>
+    </div>
+  );
+}
+
+/** Without `onPlay` (the audio is gone) the text is plain. */
+function SegmentText({ segment, onPlay }: { segment: Segment; onPlay?: () => void }) {
+  const at = formatClock(segment.offsetMs);
+  if (segment.status === "empty") return <span className="text-sm text-muted-foreground">No speech detected</span>;
+  if (segment.status === "pending") {
+    return (
+      <span className="mr-1 inline-flex items-center gap-1 text-sm text-muted-foreground" title={`${at} — transcribing`}>
+        <Icon name="Loading" className="size-3.5 animate-spin motion-reduce:animate-none" />
+        {segment.attempts > 0 ? "retrying…" : "…"}
+      </span>
+    );
+  }
+  if (segment.status === "failed") {
+    return (
+      <button
+        type="button"
+        onClick={onPlay}
+        title={segment.error ?? "Transcription failed"}
+        className="mr-1 cursor-pointer rounded bg-destructive/10 px-1 text-sm text-destructive"
+      >
+        [{at} not transcribed]
+      </button>
+    );
+  }
+  if (!onPlay) return <span>{segment.text} </span>;
+  return (
+    <button
+      type="button"
+      onClick={onPlay}
+      title={`${at} — play`}
+      className="cursor-pointer rounded-sm text-left hover:bg-state-hover focus-visible:outline focus-visible:outline-2"
+    >
+      {segment.text}{" "}
+    </button>
+  );
+}

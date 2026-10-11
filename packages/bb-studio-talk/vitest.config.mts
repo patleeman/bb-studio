@@ -1,6 +1,6 @@
 export default {
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["**/*.test.ts"],
     passWithNoTests: false,
   },
 };

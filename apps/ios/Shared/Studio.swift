@@ -134,7 +134,7 @@ extension StudioItem {
             projectId: recording.projectId, createdAt: recording.createdAt,
             updatedAt: recording.updatedAt ?? recording.createdAt,
             preview: recording.preview.isEmpty ? nil : recording.preview, facts: facts, badge: badge,
-            href: "/plugins/talk/recordings/\(recording.id)")
+            href: "/plugins/studio/studio/recordings/\(recording.id)")
     }
 
     init(drawing: DrawingSummary) {
@@ -384,16 +384,19 @@ extension BBClient {
     }
 
     public func renameRecording(_ id: String, title: String) async throws {
-        let _: JSONValue = try await rpc("talk", "recording_rename", ["id": .string(id), "title": .string(String(title.prefix(160)))])
+        let input: JSONValue = ["id": .string(id), "title": .string(String(title.prefix(160)))]
+        let _: JSONValue = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_rename, input) }, else: { try await self.rpc("talk", Talk.Method.recording_rename, input) })
     }
 
     /// Transcribes a recording's failed segments again.
     public func retryRecording(_ id: String) async throws {
-        let _: JSONValue = try await rpc("talk", "recording_retry", ["id": .string(id)])
+        let input: JSONValue = ["id": .string(id)]
+        let _: JSONValue = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_retry, input) }, else: { try await self.rpc("talk", Talk.Method.recording_retry, input) })
     }
 
     public func deleteRecording(_ id: String) async throws {
-        let _: JSONValue = try await rpc("talk", "recording_delete", ["id": .string(id)])
+        let input: JSONValue = ["id": .string(id)]
+        let _: JSONValue = try await recordingsViaStudio({ try await self.rpc("studio", Studio.Method.recordings_recording_delete, input) }, else: { try await self.rpc("talk", Talk.Method.recording_delete, input) })
     }
 
     public func deletePage(_ id: String) async throws {

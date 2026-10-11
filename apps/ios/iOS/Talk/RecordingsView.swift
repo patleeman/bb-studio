@@ -25,6 +25,7 @@ struct RecordingDetailView: View {
     @State private var showingRelated = false
     @State private var meetingNotes: Talk.RecordingGetOutputRecordingMeetingNotes?
     @State private var generatingNotes = false
+    @State private var listener: UUID?
 
     var body: some View {
         ScrollView {
@@ -118,7 +119,23 @@ struct RecordingDetailView: View {
                 Task { await perform { try await $0.renameRecording(id, title: title) } }
             }
         }
-        .task { await load() }
+        .task(id: id) {
+            // Transcription lands a piece at a time; the server says when this recording changes.
+            if let listener { app.realtime.removeListener(listener) }
+            listener = app.realtime.listen { event in
+                switch event {
+                // Studio sends it on its `recording-changed` channel; the Talk plugin did before the merge.
+                case .pluginSignal("studio", "recording-changed", let payload) where payload["id"]?.stringValue == id: Task { await load() }
+                case .pluginSignal("talk", _, let payload) where payload["id"]?.stringValue == id: Task { await load() }
+                default: break
+                }
+            }
+            await load()
+        }
+        .onDisappear {
+            if let listener { app.realtime.removeListener(listener) }
+            listener = nil
+        }
     }
 
     private func perform(_ action: (BBClient) async throws -> Void) async {

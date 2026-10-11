@@ -1,6 +1,7 @@
 import { ARTIFACT_TABLES } from "./artifacts/server/store";
 import { DRAWING_TABLES } from "./draw/server/store";
 import { DESIGN_MIGRATIONS } from "./design/server/store";
+import { TALK_MIGRATIONS } from "./talk/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
 // (src/search-index.ts) and project leads (src/project-lead.ts). The space
@@ -192,4 +193,6 @@ export const MIGRATIONS = [
   DRAWING_TABLES,
   // Designs are built in (src/design): the Design plugin's statements in order, filled by its upgrade bridge.
   ...DESIGN_MIGRATIONS,
+  // Recordings are built in (src/talk): the Talk plugin's statements in order, filled by its upgrade bridge.
+  ...TALK_MIGRATIONS,
 ];

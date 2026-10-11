@@ -18,6 +18,8 @@ final class StudioStore: ObservableObject {
     @Published private(set) var supportsTags = false
     @Published private(set) var projectNames: [String: String] = [:]
     @Published private(set) var plugins: Set<String> = []
+    /// Recording and dictation: built into Studio, or the Talk plugin on an older server.
+    var hasTalk: Bool { plugins.contains("studio") || plugins.contains("talk") }
     /// Listed by the Studio plugin, which can also search content and delete anything.
     @Published private(set) var viaStudio = false
     @Published var error: String?
@@ -125,7 +127,8 @@ final class StudioStore: ObservableObject {
             }
         }
         async let pages = Self.attempt(plugins.contains("pages")) { try await client.pages() }
-        async let recordings = Self.attempt(plugins.contains("talk")) { try await client.recordings(limit: 200) }
+        // Recordings are built into Studio; an older Studio has them in the Talk plugin.
+        async let recordings = Self.attempt(hasTalk) { try await client.recordings(limit: 200) }
         // Drawings are built into Studio; an older Studio has them in the Draw plugin.
         let hasDrawings = plugins.contains("studio") || plugins.contains("excalidraw")
         async let drawings = Self.attempt(hasDrawings) { try await client.drawings() }
@@ -539,7 +542,7 @@ struct StudioView: View {
                     }
                 }
             }
-            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["talk", "pages"]) {
+            if query.isEmpty, !selecting, store.hasTalk || store.plugins.contains("pages") {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -577,9 +580,9 @@ struct StudioView: View {
 
     /// Capture first, file later: each tile opens straight into typing or recording.
     private var quickActions: some View {
-        let count = store.plugins.contains("talk") || dynamicTypeSize.isAccessibilitySize ? 2 : 1
+        let count = store.hasTalk || dynamicTypeSize.isAccessibilitySize ? 2 : 1
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
-            if store.plugins.contains("talk") {
+            if store.hasTalk {
                 tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
                     if store.plugins.contains("pages") {
                         Button("Dictate a Page", systemImage: "doc.badge.plus") { dictatingPage = true }

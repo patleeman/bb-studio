@@ -15,12 +15,15 @@ export interface BuiltinRoute {
   kind: string;
   /** The add-on's own item route before the merge, without a trailing slash. */
   legacyRoot: string;
+  /** Sub-paths under the route that are pages of Studio's, not items (Talk's `unsent`). */
+  pages?: readonly string[];
 }
 
 export const BUILTIN_ROUTES: readonly BuiltinRoute[] = [
   { pluginId: "artifacts", segment: "artifacts", kind: "artifact", legacyRoot: "/plugins/artifacts/artifacts" },
   { pluginId: "excalidraw", segment: "drawings", kind: "drawing", legacyRoot: "/plugins/excalidraw/drawings" },
   { pluginId: "design", segment: "designs", kind: "design", legacyRoot: "/plugins/design/designs" },
+  { pluginId: "talk", segment: "recordings", kind: "recording", legacyRoot: "/plugins/talk/recordings", pages: ["unsent"] },
 ];
 
 export const BUILTIN_PLUGIN_IDS: ReadonlySet<string> = new Set(BUILTIN_ROUTES.map((route) => route.pluginId));
@@ -41,7 +44,7 @@ export function builtinItemAt(path: string): { route: BuiltinRoute; pluginId: st
       if (!clean.startsWith(`${root}/`)) continue;
       const [raw, ...rest] = clean.slice(root.length + 1).split("/");
       const id = raw ? decode(raw) : null;
-      if (!id) return null;
+      if (!id || route.pages?.includes(id)) return null;
       return { route, pluginId: route.pluginId, id, href: [`${STUDIO_ROOT}/${route.segment}`, encodeURIComponent(id), ...rest].join("/") };
     }
   }

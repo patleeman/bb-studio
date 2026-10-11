@@ -260,20 +260,20 @@ final class TalkRecoveryTests: XCTestCase {
         // Another server never sees rec_a.
         let otherCalls = Calls()
         await outbox.deleteDiscarded(using: f.client(other, calls: otherCalls, ok: true))
-        XCTAssertEqual(otherCalls.methods, ["recording_state:rec_b", "recording_delete:rec_b"])
+        XCTAssertEqual(otherCalls.methods, ["recordings.recording_state:rec_b", "recordings.recording_delete:rec_b"])
         XCTAssertEqual(outbox.pendingDeletions(serverURL: other), [])
         XCTAssertEqual(outbox.pendingDeletions(serverURL: f.origin), ["rec_a"])
 
         // Offline: it stays pending, including across a relaunch.
         let failing = Calls()
         await outbox.deleteDiscarded(using: f.client(f.origin, calls: failing, ok: false))
-        XCTAssertEqual(failing.methods, ["recording_state:rec_a"])
+        XCTAssertEqual(failing.methods, ["recordings.recording_state:rec_a"])
         let relaunched = f.outbox()
         XCTAssertEqual(relaunched.pendingDeletions(serverURL: f.origin), ["rec_a"])
 
         let calls = Calls()
         await relaunched.deleteDiscarded(using: f.client(f.origin, calls: calls, ok: true))
-        XCTAssertEqual(calls.methods, ["recording_state:rec_a", "recording_delete:rec_a"])
+        XCTAssertEqual(calls.methods, ["recordings.recording_state:rec_a", "recordings.recording_delete:rec_a"])
         XCTAssertEqual(relaunched.pendingDeletions(serverURL: f.origin), [])
     }
 
@@ -301,7 +301,7 @@ final class TalkRecoveryTests: XCTestCase {
         XCTAssertTrue(outbox.recoveryFiles.isEmpty)
         let calls = Calls()
         await outbox.deleteDiscarded(using: f.client(f.origin, calls: calls, ok: true))
-        XCTAssertEqual(calls.methods, ["recording_state:rec_a", "recording_delete:rec_a"])
+        XCTAssertEqual(calls.methods, ["recordings.recording_state:rec_a", "recordings.recording_delete:rec_a"])
     }
 
     private final class Calls: @unchecked Sendable {

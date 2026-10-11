@@ -30,6 +30,13 @@ describe("built-in kinds' addresses", () => {
     expect(builtinSegment("drawings")).toMatchObject({ route: { kind: "drawing", pluginId: "excalidraw" }, rest: "" });
   });
 
+  it("maps recordings' old Talk address to Studio, leaving the unsent-audio page alone", () => {
+    expect(builtinItemAt("/plugins/talk/recordings/rec_0123456789")).toMatchObject({ pluginId: "talk", id: "rec_0123456789", href: "/plugins/studio/studio/recordings/rec_0123456789" });
+    expect(builtinItemAt("/plugins/studio/studio/recordings/unsent")).toBeNull();
+    expect(builtinItemAt("/plugins/talk/recordings/unsent")).toBeNull();
+    expect(builtinSegment("recordings/unsent")).toMatchObject({ route: { kind: "recording", pluginId: "talk" }, rest: "unsent" });
+  });
+
   it("moves saved workspace tabs off the old address", () => {
     const tab = { href: "/plugins/artifacts/artifacts/art_1", title: "Report" };
     const state = parseWorkspace({ layout: { kind: "pane", id: "p", tabs: [tab], active: tab.href }, focused: "p" });

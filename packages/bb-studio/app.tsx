@@ -18,6 +18,8 @@ import { createExcalidrawComposerCustomization } from "./src/draw/ui/composer-re
 import { DESIGN_ICON, DESIGN_TAB, isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
 import { QuestionFormView } from "./src/design/ui/question-form";
+import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
+import { registerTalkApp } from "./src/talk/ui/register";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
@@ -62,6 +64,8 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   // Excalidraw is big: it loads when a drawing first opens, not with Studio.
   drawings: { isId: isDrawingId, View: lazy(() => import("./src/draw/ui/route")) },
   designs: { isId: isDesignId, View: lazy(() => import("./src/design/ui/route")) },
+  // A recording's page, and the audio this device kept (`recordings/unsent`).
+  recordings: { isId: (id) => isRecordingId(id) || id === UNSENT_PATH, View: lazy(() => import("./src/talk/ui/route")) },
 };
 
 /** The thread's Drawings tab; it brings Excalidraw, so it loads when first opened. */
@@ -142,6 +146,10 @@ export default definePluginApp((app) => {
   });
   app.slots.messageDirective({ id: "design", component: DesignCard });
   app.slots.pendingInteraction({ id: QUESTIONS_RENDERER, component: QuestionFormView });
+  // Recordings (built in): the recorder overlay and pill, the composer's
+  // microphone, hold-to-talk, dictation into other plugins' fields, the
+  // `::recording{id="rec_…"}` card, Talk's commands and its Models settings.
+  registerTalkApp(app);
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));

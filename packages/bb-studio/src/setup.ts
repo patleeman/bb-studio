@@ -6,6 +6,7 @@
 import { ARTIFACTS_BRIDGE_VERSION, bridgeStatusContract } from "@bb-studio/kit/artifacts-contract";
 import { DRAW_BRIDGE_VERSION } from "@bb-studio/kit/draw-contract";
 import { DESIGN_BRIDGE_VERSION } from "@bb-studio/kit/design-contract";
+import { TALK_BRIDGE_VERSION } from "@bb-studio/kit/talk-contract";
 import type { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
 import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
@@ -145,6 +146,19 @@ export const RETIRED: readonly RetiredPlugin[] = [
       step("Copy its designs into Studio, and wait for Migration complete.", "bb design migrate"),
     ],
     blocker: bridgeBlocker("designs", DESIGN_BRIDGE_VERSION),
+  },
+  {
+    id: "talk",
+    name: "Studio Talk",
+    why: "Recording and dictation are built into Studio now. This last release is only an upgrade bridge: it copies your recordings, their audio and your Talk settings into Studio and forwards older clients.",
+    kept: "Every recording and dictation it copied into Studio, with its audio, transcripts, summaries, tags, links and chats, and your Talk settings and models. Links to /plugins/talk/recordings/<id> still open them in Studio.",
+    deleted: `${REMOVED} That includes its copy of the audio under its data folder (Studio has its own copy). Any recordings \`bb talk migrate\` listed as skipped are lost; copy what you need from them first. A keyboard shortcut you set on a Talk command has to be set again on Studio's. iOS app builds from before the merge stop opening recordings.`,
+    before: [
+      step("Finish or stop any recording or dictation in progress, and let its audio upload (the pill disappears).", null),
+      step("Update Studio and Studio Talk.", "bb plugin update studio --yes && bb plugin update talk --yes"),
+      step("Copy its recordings, audio and settings into Studio, and wait for Migration complete.", "bb talk migrate"),
+    ],
+    blocker: bridgeBlocker("recordings", TALK_BRIDGE_VERSION),
   },
   {
     id: "studio-navigation",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BROWSE, closeTab, emptyWorkspace, openItem, panes, parseWorkspace } from "./workspace-state";
 const page = { href: "/plugins/pages/pages/pg_one", title: "Notes" };
-const recording = { href: "/plugins/talk/recordings/rec_one", title: "Interview" };
+const recording = { href: "/plugins/studio/studio/recordings/rec_one", title: "Interview" };
 const drawing = { href: "/plugins/excalidraw/drawings/draw_one", title: "Diagram" };
 describe("Studio workspace", () => {
   it("focuses an existing tab without reordering or duplicating it", () => {

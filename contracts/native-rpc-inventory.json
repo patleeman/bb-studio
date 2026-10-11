@@ -165,8 +165,20 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "talk",
       "method": "recording_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "recordings.meeting_regenerate",
       "coverage": "generated method"
     },
     {
@@ -243,39 +255,75 @@
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "talk",
       "method": "recording_create",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.segment_put",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "talk",
       "method": "segment_put",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_state",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "talk",
       "method": "recording_state",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_heartbeat",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "talk",
       "method": "recording_heartbeat",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_get",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "talk",
       "method": "recording_get",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recordings_list",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "talk",
       "method": "recordings_list",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/ChiefOfStaff.swift",
@@ -585,21 +633,39 @@
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_rename",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
       "plugin": "talk",
       "method": "recording_rename",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_retry",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
       "plugin": "talk",
       "method": "recording_retry",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_delete",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
       "plugin": "talk",
       "method": "recording_delete",
-      "coverage": "literal method checked against contract"
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
@@ -648,12 +714,6 @@
       "plugin": "inline-vis",
       "method": "preparePreview",
       "coverage": "external host plugin; contract maintained outside this repository"
-    },
-    {
-      "file": "apps/ios/iOS/Thread/ItemCard.swift",
-      "plugin": "talk",
-      "method": "recording_get",
-      "coverage": "generated method"
     },
     {
       "file": "apps/ios/iOS/Thread/MutedThreads.swift",

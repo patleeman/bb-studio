@@ -1,3 +1,6 @@
+// Talk, built into Studio: its Models settings, dictation at the composer, a
+// dictated message's saved source, a recording page as a Studio tab, the
+// unsent-audio banner in the library, and the Talk bridge on Setup.
 import { resolve } from "node:path";
 
 const scrollToTop = `(() => {
@@ -7,11 +10,19 @@ const scrollToTop = `(() => {
   window.scrollTo(0, 0);
 })()`;
 
+/** Opens a recording from its old Talk address and checks it lands as a Studio tab. */
+async function openRecording(client, id) {
+  await client.navigate(`/plugins/talk/recordings/${id}`);
+  await client.waitForSelector(`[data-studio-workspace-editor="/plugins/studio/studio/recordings/${id}"]`, 30000);
+  const path = await client.evaluate("location.pathname");
+  if (path !== "/plugins/studio/studio") throw new Error(`The old recording address didn't open in Studio's workspace: ${path}`);
+}
+
 export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, pluginRpc, talkRpc, sleep }) => [
   {
     id: "talk-settings",
-    packageDir: "bb-studio-talk",
-    fileName: "model-settings.png",
+    packageDir: "bb-studio",
+    fileName: "recordings-model-settings.png",
     setup: async (client) => {
       const original = await talkRpc("models.get", null);
       const choice = { providerId: "codex", model: "gpt-6-luna", reasoningLevel: "low" };
@@ -20,7 +31,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
       };
       try {
         await talkRpc("models.set", { purpose: "cleanup", selection: null });
-        await client.navigate("/settings/plugins/talk");
+        await client.navigate("/settings/plugins/studio");
         await client.waitForSelector("[data-talk-model-settings]");
         await client.waitForText("Studio Decisions");
         await client.evaluate(`document.querySelector('[aria-label="Cleanup model source"]').click()`);
@@ -36,7 +47,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         }
         if (!selected?.providerId || !selected?.model) throw new Error("Talk's model source picker did not save a catalog choice.");
         await talkRpc("models.set", { purpose: "cleanup", selection: choice });
-        await client.navigate("/settings/plugins/talk");
+        await client.navigate("/settings/plugins/studio");
         await client.waitForText("6-Luna");
         await client.evaluate(`document.querySelector('[data-talk-model-settings]').scrollIntoView({ block: 'center' })`);
         const text = await client.evaluate(`document.querySelector('[data-talk-model-settings]').innerText`);
@@ -52,8 +63,8 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
   },
   {
     id: "talk-inline",
-    packageDir: "bb-studio-talk",
-    fileName: "inline-dictation.png",
+    packageDir: "bb-studio",
+    fileName: "recordings-inline-dictation.png",
     privateSidebar: true,
     setup: async (client) => {
       let recordingId;
@@ -109,7 +120,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await sleep(500);
         await checkInline();
-        await client.capture(resolve("packages/bb-studio-talk/assets/inline-dictation-mobile.png"));
+        await client.capture(resolve("packages/bb-studio/assets/recordings-inline-dictation-mobile.png"));
         await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
         await sleep(500);
@@ -124,8 +135,8 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
   },
   {
     id: "talk-composer",
-    packageDir: "bb-studio-talk",
-    fileName: "dictation-message.png",
+    packageDir: "bb-studio",
+    fileName: "recordings-dictation-message.png",
     privateSidebar: true,
     setup: async (client) => {
       const recordingId = await seedTalkRecording(projectId, { kind: "dictation", title: "Launch brain dump" });
@@ -159,16 +170,16 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         await client.navigate(`/projects/${projectId}/threads/${threadId}`);
         const mentionSelector = `[data-promptbox] [data-prompt-mention-resource*="${recordingId}"]`;
         await client.waitForSelector(mentionSelector);
-        if (await client.evaluate(`document.querySelector('[data-promptbox] [contenteditable="true"]').textContent.includes('/plugins/talk/recordings/')`)) throw new Error("Dictation injected a separate recording link into the draft.");
+        if (await client.evaluate(`document.querySelector('[data-promptbox] [contenteditable="true"]').textContent.includes('/recordings/rec_')`)) throw new Error("Dictation injected a separate recording link into the draft.");
         const source = await client.evaluate(`JSON.parse(document.querySelector(${JSON.stringify(mentionSelector)}).getAttribute('data-prompt-mention-resource'))`);
-        if (source?.pluginId !== "talk" || source.itemId !== `recordings:${recordingId}`) throw new Error("Recovered dictation did not attach its native Talk mention.");
+        if (source?.pluginId !== "studio" || source.itemId !== `recordings:${recordingId}`) throw new Error("Recovered dictation did not attach its native Talk mention.");
         // The delivery toast otherwise covers the submit button while hovered.
         await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1, buttons: 0 });
         await sleep(5000);
         await client.clickAriaButtonWithPointer("Submit (Enter)");
-        const linkSelector = `[data-talk-recording-link="/plugins/talk/recordings/${recordingId}"]`;
+        const linkSelector = `[data-talk-recording-link="/plugins/studio/studio/recordings/${recordingId}"]`;
         await client.waitForSelector(linkSelector);
-        if (await client.evaluate(`!!document.querySelector('a[href="/plugins/talk/recordings/${recordingId}"]')`)) throw new Error("Dictation injected a separate recording link into the message.");
+        if (await client.evaluate(`!!document.querySelector('a[href*="/recordings/${recordingId}"]')`)) throw new Error("Dictation injected a separate recording link into the message.");
         await bbCli(["thread", "wait", threadId, "--timeout", "60s", "--json"]);
         const events = JSON.parse(await bbCli(["thread", "messages", threadId, "--json"]));
         const input = events.findLast(event => event.type === "client/turn/requested")?.data.input;
@@ -200,7 +211,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
           return pill.left >= 0 && pill.right <= innerWidth;
         })()`);
         if (!fits) throw new Error("Dictation source pill overflows the mobile message.");
-        await client.capture(resolve("packages/bb-studio-talk/assets/dictation-message-mobile.png"));
+        await client.capture(resolve("packages/bb-studio/assets/recordings-dictation-message-mobile.png"));
         await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
         await sleep(350);
@@ -212,8 +223,9 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
     },
   },
   {
-    id: "talk",
-    packageDir: "bb-studio-talk",
+    id: "talk-page",
+    packageDir: "bb-studio",
+    fileName: "recordings-preview.png",
     privateSidebar: true,
     setup: async (client) => {
       const recordingId = await seedTalkRecording(projectId);
@@ -226,7 +238,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
       try {
         // Summaries are optional. Generate this fixture's summary explicitly.
         await talkRpc("meeting_regenerate", { id: recordingId });
-        await client.navigate(`/plugins/talk/recordings/${recordingId}`);
+        await openRecording(client, recordingId);
         await client.waitForText("Weekly product sync");
         await client.waitForText("offline mode beta");
         await client.waitForText("guided import spec");
@@ -312,7 +324,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         })()`;
         await client.evaluate(setPausedPosition);
         await sleep(350);
-        await client.capture(resolve('packages/bb-studio-talk/assets/staged-mobile.png'));
+        await client.capture(resolve('packages/bb-studio/assets/recordings-staged-mobile.png'));
         await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await sleep(350);
         await client.evaluate(setPausedPosition);
@@ -325,5 +337,80 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
       }
       return cleanup;
     },
-  }
+  },
+  {
+    // The library filtered to recordings, with the banner for audio this
+    // device kept unsent. The piece is set aside in the browser's store the
+    // way the uploader leaves one the server refused.
+    id: "talk-unsent",
+    packageDir: "bb-studio",
+    fileName: "recordings-unsent.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const recordingId = await seedTalkRecording(projectId, { transcribe: false, title: "Standup on the train" });
+      const outbox = (body) => `new Promise((done, fail) => {
+        const req = indexedDB.open("bb-plugin-talk", 1);
+        req.onupgradeneeded = () => req.result.createObjectStore("segments", { keyPath: ["recordingId", "sessionId", "index"] });
+        req.onerror = () => fail(req.error);
+        req.onsuccess = () => {
+          const tx = req.result.transaction("segments", "readwrite");
+          const store = tx.objectStore("segments");
+          ${body}
+          tx.oncomplete = () => { req.result.close(); done(true); };
+          tx.onerror = () => fail(tx.error);
+        };
+      })`;
+      const key = { recordingId, sessionId: "unsentseed1", index: 0 };
+      const cleanup = async () => {
+        await client.evaluate(outbox(`store.delete([${JSON.stringify(recordingId)}, "unsentseed1", 0]);`)).catch(() => {});
+        await talkRpc("recording_delete", { id: recordingId }).catch(() => {});
+      };
+      try {
+        await client.navigate("/plugins/studio/studio");
+        await client.waitForSelector("[data-studio-workspace-editor]", 30000);
+        const segment = { ...key, startedAt: Date.now() - 5 * 60_000, mimeType: "audio/webm;codecs=opus", lastPartAt: Date.now() - 5 * 60_000, durationMs: 21_000, complete: true, rejected: "The server refused this piece: durationMs is longer than 10 minutes.", parts: [] };
+        await client.evaluate(outbox(`store.put({ ...${JSON.stringify(segment)}, parts: [new Uint8Array(48000).buffer] });`));
+        // A fresh load reads the store, as after a refusal and a reload.
+        await client.navigate("/plugins/studio/studio/recordings");
+        await client.waitForSelector("[data-talk-unsent-notice]", 30000);
+        await client.waitForText("A piece of audio couldn't be uploaded and is kept on this device.");
+        await client.waitForText("Standup on the train");
+        const filtered = await client.evaluate(`[...document.querySelectorAll('button, [role="combobox"]')].some((each) => /Recordings?/.test(each.textContent ?? ""))`);
+        if (!filtered) throw new Error("The library isn't filtered to recordings.");
+        // Review opens the unsent-audio page, which lists the piece; then back to the library for the frame.
+        await client.clickButtonText("Review");
+        await client.waitForText("Unsent audio");
+        await client.waitForText("durationMs is longer than 10 minutes");
+        await client.navigate("/plugins/studio/studio/recordings");
+        await client.waitForSelector("[data-talk-unsent-notice]", 30000);
+        await sleep(500);
+      } catch (error) {
+        await client.capture(`${process.env.TMPDIR ?? "/tmp/"}talk-unsent-error.png`);
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
+    // Run after `bb talk migrate` copied a recording made with the 0.1.0 plugin.
+    id: "talk-bridge",
+    packageDir: "bb-studio-talk",
+    setup: async (client) => {
+      const migrated = await bbCli(["talk", "migrate"]);
+      if (!migrated.includes("Migration complete")) throw new Error(`bb talk migrate didn't finish: ${migrated}`);
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Set up BB Studio", 30000);
+      await client.waitForText("Retired plugins");
+      await client.waitForText("Recording and dictation are built into Studio now");
+      await client.waitForText("bb talk migrate");
+      await client.waitForText("Finish or stop any recording or dictation in progress");
+      // Copied: nothing blocks removal.
+      const blocked = await client.evaluate(`[...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Not yet:") && p.closest("li,div")?.textContent.includes("Studio Talk"))`);
+      if (blocked) throw new Error("Setup still blocks removing Studio Talk after Migration complete");
+      // Other bridges may be listed first; show Studio Talk's entry.
+      await client.evaluate(`[...document.querySelectorAll("p")].find((p) => p.textContent.startsWith("Recording and dictation are built into Studio now"))?.closest("li,section,div")?.scrollIntoView({ block: "start" })`);
+      await sleep(400);
+    },
+  },
 ];

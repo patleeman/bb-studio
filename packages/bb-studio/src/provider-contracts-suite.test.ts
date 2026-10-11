@@ -4,8 +4,8 @@ import { registerStudio as registerPages } from "../../bb-studio-pages/src/studi
 import { PageStore, MIGRATIONS as PAGE_MIGRATIONS } from "../../bb-studio-pages/src/store";
 import { PagesService } from "../../bb-studio-pages/src/service";
 import { readMarkdown } from "../../bb-studio-pages/src/doc";
-import { registerStudio as registerTalk } from "../../bb-studio-talk/src/server/studio";
-import { memoryStore as talkStore, addSegment } from "../../bb-studio-talk/src/test/db";
+import { recordingProvider } from "./talk/server/studio";
+import { memoryStore as talkStore, addSegment } from "./talk/test/db";
 import { artifactProvider } from "./artifacts/server/provider";
 import { memoryStore as artifactStore, bytes } from "./artifacts/test/db";
 import { schemas } from "./contract";
@@ -43,12 +43,11 @@ providerConformance("Pages", () => {
 
 for (const kind of ["recording", "dictation"] as const) providerConformance(`Talk ${kind}`, () => {
   const { db, store } = talkStore();
-  const { handlers, bb } = registration();
   const changed: string[] = [];
   const removedAudio: string[] = [];
-  registerTalk(bb as never, schemas, {
+  const handlers = recordingProvider({
     store, changed: (id) => { changed.push(id); }, removeAudio: async (id) => { removedAudio.push(id); }, readAudio: async () => Buffer.alloc(0),
-  });
+  }) as unknown as ProviderHarness["handlers"];
   return {
     pluginId: "talk", kind, handlers, expectedContent: "Conformance transcript content",
     seed: (projectId) => {
