@@ -34,8 +34,11 @@ applet folders, keeps approvals, and serves the API applets use to reach BB.
 
 ## Writing an applet
 
-`examples/hud` is the Thread HUD: an always-on-top overlay of the threads
-that need you, with replies. The smallest applet:
+`examples/hud` is the Thread HUD: one thread floating above your work, with
+its live conversation and a composer. Alt+Shift+Space brings it to the
+pointer, Esc hides it, Enter sends (queued while the thread works), ⌘Enter
+steers the running turn. `examples/thread-list` is an overlay of every thread
+that needs you or is running. The smallest applet:
 
 ```html
 <!-- index.html -->
@@ -50,10 +53,10 @@ render(html`<div className="p-4"><${Button} onClick=${() => studio.notify({ titl
 ```
 
 `window.studio` (API 1): `applet`, `log`, `on(event, fn)`,
-`storage.get/set`, `window.open/close/hide/toggle/setBounds/setClickThrough/setOpacity`,
+`storage.get/set`, `window.open/close/hide/toggle/summon/isFocused/setBounds/setClickThrough/setOpacity`,
 `tray.set`, `notify`, `clipboard.readText/writeText`, `fs.read/write/list`
 (the applet's `data/` folder), `open(url)`,
-`bb.threads.list/get/tell`, `bb.open(threadId)`, `bb.rpc(plugin, method, input)`.
+`bb.threads.list/get/timeline/tell/stop`, `bb.open(threadId)`, `bb.rpc(plugin, method, input)`.
 Events: `shortcut:<name>`, `notify:action`, `window:shown|hidden|focus`,
 `tray:click`, `bb:threads`, `bb:connected`, `bb:disconnected`.
 

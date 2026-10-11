@@ -99,6 +99,17 @@ const METHODS: Record<string, { capability: string | null | ((args: unknown[], c
       else ctx.runtime.openWindow(ctx.id, windowName);
     },
   },
+  "window.summon": {
+    capability: ([name], ctx) => windowKind(ctx, str(name ?? ctx.window, "name")),
+    run: ([name], ctx) => ctx.runtime.summon(ctx.id, str(name ?? ctx.window, "name")),
+  },
+  "window.isFocused": {
+    capability: null,
+    run: ([name], ctx) => {
+      const window = ctx.runtime.running.get(ctx.id)?.windows.get(str(name ?? ctx.window, "name"));
+      return Boolean(window && !window.isDestroyed() && window.isVisible() && window.isFocused());
+    },
+  },
   "window.setBounds": {
     capability: ([name], ctx) => windowKind(ctx, str(name, "name")),
     run: ([name, rect], ctx) => {
@@ -173,9 +184,21 @@ const METHODS: Record<string, { capability: string | null | ((args: unknown[], c
 
   "bb.threads.list": { capability: "bb.threads.read", run: ([filter]) => appletsRpc("threads.list", filter ?? null) },
   "bb.threads.get": { capability: "bb.threads.read", run: ([threadId]) => appletsRpc("threads.get", { threadId: str(threadId, "threadId") }) },
+  "bb.threads.timeline": {
+    capability: "bb.threads.read",
+    run: ([threadId, limit]) => appletsRpc("threads.timeline", { threadId: str(threadId, "threadId"), ...(typeof limit === "number" ? { limit } : {}) }),
+  },
   "bb.threads.tell": {
     capability: "bb.threads.tell",
-    run: async ([threadId, text]) => (await appletsRpc("threads.tell", { threadId: str(threadId, "threadId"), text: str(text, "text") }), null),
+    run: async ([threadId, text, options]) => {
+      const mode = obj(options).mode === "steer" ? "steer" : "queue";
+      await appletsRpc("threads.tell", { threadId: str(threadId, "threadId"), text: str(text, "text"), mode });
+      return null;
+    },
+  },
+  "bb.threads.stop": {
+    capability: "bb.threads.tell",
+    run: async ([threadId]) => (await appletsRpc("threads.stop", { threadId: str(threadId, "threadId") }), null),
   },
   "bb.open": { capability: "bb.open", run: async ([threadId]) => (await appletsRpc("threads.open", { threadId: str(threadId, "threadId") }), null) },
   "bb.rpc": {

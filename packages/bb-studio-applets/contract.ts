@@ -35,6 +35,15 @@ export const threadSummarySchema = z.object({
 });
 export type ThreadSummary = z.infer<typeof threadSummarySchema>;
 
+export const timelineItemSchema = z.object({
+  id: z.string(),
+  type: z.enum(["user", "assistant", "tool"]),
+  text: z.string(),
+  status: z.string().nullable(),
+  createdAt: z.number().nullable(),
+});
+export type TimelineItem = z.infer<typeof timelineItemSchema>;
+
 const appletId = z.object({ id: z.string() });
 
 export const rpcContract = defineRpcContract({
@@ -52,6 +61,20 @@ export const rpcContract = defineRpcContract({
     output: z.array(threadSummarySchema),
   },
   "threads.get": { input: z.object({ threadId: z.string() }), output: threadSummarySchema },
-  "threads.tell": { input: z.object({ threadId: z.string(), text: z.string().min(1).max(20_000) }), output: z.null() },
+  /** The thread and its recent messages and tool calls, oldest first. */
+  "threads.timeline": {
+    input: z.object({ threadId: z.string(), limit: z.number().int().min(1).max(200).optional() }),
+    output: z.object({ thread: threadSummarySchema, items: z.array(timelineItemSchema), waitingOnYou: z.boolean() }),
+  },
+  "threads.tell": {
+    input: z.object({
+      threadId: z.string(),
+      text: z.string().min(1).max(20_000),
+      /** While the thread works: "queue" waits for its turn to end (default), "steer" joins the running turn. */
+      mode: z.enum(["queue", "steer"]).optional(),
+    }),
+    output: z.null(),
+  },
+  "threads.stop": { input: z.object({ threadId: z.string() }), output: z.null() },
   "threads.open": { input: z.object({ threadId: z.string() }), output: z.null() },
 });

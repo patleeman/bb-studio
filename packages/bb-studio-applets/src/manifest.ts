@@ -38,6 +38,8 @@ const windowSchema = z
     width: z.number().int().min(80).max(4000).optional(),
     height: z.number().int().min(40).max(4000).optional(),
     position: z.enum(["center", "top-left", "top-right", "bottom-left", "bottom-right"]).optional(),
+    /** Overlays and popovers are a fixed size unless this is true. The shell remembers where you leave a window. */
+    resizable: z.boolean().optional(),
   })
   .strict();
 

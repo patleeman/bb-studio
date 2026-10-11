@@ -11,11 +11,12 @@ import { rpcContract, type AppletRow } from "./contract";
 import { APPLET_API, CAPABILITIES } from "./src/manifest";
 import { shellStatus } from "./src/shell";
 import { AppletStore, defaultRoot, type AppletInfo } from "./src/store";
-import { getThread, listThreads, openThread, tellThread } from "./src/threads";
+import { getThread, listThreads, openThread, stopThread, tellThread, threadTimeline } from "./src/threads";
 
 const AGENT_INSTRUCTIONS = [
   "Studio Applets (experimental) are small native macOS apps: a folder with manifest.json and HTML/JS/CSS, run by the signed Studio Applets shell. Create one with applets_create and change it with applets_update.",
   `An applet has no Node or Electron. It reaches the desktop and BB only through \`window.studio\` (API ${APPLET_API}), and only for capabilities its manifest lists and the user approved. Capabilities: ${CAPABILITIES.join(", ")}, and bb.rpc:<plugin-id>:<method>.`,
+  "`window.studio.bb.threads` has list, get, timeline (recent messages and tool calls), tell (with { mode: \"steer\" } to join a running turn) and stop (needs bb.threads.tell). Load studio://kit/boot.js for BB's look and import React, html, render and the Studio kit components from studio://kit/ui.js; inline scripts are blocked.",
   "Every window in `windows` needs the matching window.<kind> capability; shortcuts need shortcut.global. Ask for as few capabilities as the applet needs. New capabilities wait for the user's approval in the Studio Applets settings page.",
 ].join("\n");
 
@@ -67,7 +68,9 @@ export default async function plugin(bb: BbPluginApi) {
     "applets.logs": async ({ id }) => ({ text: await store.logs(id) }),
     "threads.list": (input) => listThreads(bb.sdk, input),
     "threads.get": ({ threadId }) => getThread(bb.sdk, threadId),
-    "threads.tell": async ({ threadId, text }) => (await tellThread(bb.sdk, threadId, text), null),
+    "threads.timeline": ({ threadId, limit }) => threadTimeline(bb.sdk, threadId, limit),
+    "threads.tell": async ({ threadId, text, mode }) => (await tellThread(bb.sdk, threadId, text, mode), null),
+    "threads.stop": async ({ threadId }) => (await stopThread(bb.sdk, threadId), null),
     "threads.open": async ({ threadId }) => (await openThread(bb.sdk, threadId), null),
   });
 

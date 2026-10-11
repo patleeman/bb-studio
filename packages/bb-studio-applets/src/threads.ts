@@ -1,7 +1,8 @@
 // Thread access for applets, in a small stable shape (ThreadSummary) so
 // applets don't depend on BB's full thread records.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import type { ThreadSummary } from "../contract";
+import type { ThreadSummary, TimelineItem } from "../contract";
+import { timelineItems } from "./timeline";
 
 type Sdk = BbPluginApi["sdk"];
 /** The fields both `threads.get` and `threads.list` return. */
@@ -48,8 +49,25 @@ export async function getThread(sdk: Sdk, threadId: string): Promise<ThreadSumma
   return summarize(await sdk.threads.get({ threadId }));
 }
 
-export async function tellThread(sdk: Sdk, threadId: string, text: string): Promise<void> {
-  await sdk.threads.send({ threadId, input: [{ type: "text", text, mentions: [] }], mode: "queue-if-active" });
+export async function tellThread(sdk: Sdk, threadId: string, text: string, mode: "queue" | "steer" = "queue"): Promise<void> {
+  await sdk.threads.send({ threadId, input: [{ type: "text", text, mentions: [] }], mode: mode === "steer" ? "steer-if-active" : "queue-if-active" });
+}
+
+export async function stopThread(sdk: Sdk, threadId: string): Promise<void> {
+  await sdk.threads.stop({ threadId });
+}
+
+export async function threadTimeline(
+  sdk: Sdk,
+  threadId: string,
+  limit = 60,
+): Promise<{ thread: ThreadSummary; items: TimelineItem[]; waitingOnYou: boolean }> {
+  const [thread, timeline] = await Promise.all([
+    sdk.threads.get({ threadId }),
+    sdk.threads.timeline({ threadId, includeNestedRows: "true", segmentLimit: String(Math.min(100, Math.max(10, limit))) }),
+  ]);
+  const summary = summarize(thread);
+  return { thread: summary, items: timelineItems(timeline.rows, limit), waitingOnYou: Boolean((thread as Thread).hasPendingInteraction) };
 }
 
 export async function openThread(sdk: Sdk, threadId: string): Promise<void> {

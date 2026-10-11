@@ -1,13 +1,13 @@
 {
   "id": "hud",
   "name": "Thread HUD",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "api": 1,
   "entry": "index.html",
-  "description": "An always-on-top overlay of the threads that need you and the ones running.",
+  "description": "One thread floating above your work: its live conversation and a composer. Alt+Shift+Space brings it to your pointer.",
   "windows": {
-    "main": { "kind": "overlay", "width": 340, "height": 260, "position": "top-right" }
+    "main": { "kind": "overlay", "width": 400, "height": 520, "position": "top-right", "resizable": true }
   },
   "capabilities": ["window.overlay", "shortcut.global", "notify", "bb.threads.read", "bb.threads.tell", "bb.open"],
-  "shortcuts": { "toggle": "Alt+Shift+Space" }
+  "shortcuts": { "summon": "Alt+Shift+Space" }
 }

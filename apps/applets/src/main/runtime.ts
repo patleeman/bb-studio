@@ -2,10 +2,13 @@
 // renderer belongs to which applet. An applet runs only once every capability
 // its manifest asks for is approved; until then it's listed as waiting.
 import { BrowserWindow, globalShortcut, nativeImage, screen, Tray, type WebContents } from "electron";
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Applet } from "./registry";
-import { logsDir } from "./paths";
+import { logsDir, root } from "./paths";
+
+type Bounds = { x: number; y: number; width: number; height: number };
+const boundsPath = (id: string) => join(root, ".storage", `${id}.windows.json`);
 
 type WindowSpec = Applet["manifest"]["windows"][string];
 
@@ -97,10 +100,43 @@ export class Runtime {
       window.on("blur", () => window.hide());
       return window;
     }
-    placeWindow(window, spec);
+    void this.restoreBounds(run.applet.id, name, window, spec);
     // An overlay appears without taking focus from what you're doing.
     window.once("ready-to-show", () => (spec.kind === "overlay" ? window.showInactive() : window.show()));
     return window;
+  }
+
+  /** Show a window under the mouse pointer, on whichever screen it's on, and focus it. */
+  summon(id: string, name: string): void {
+    const window = this.openWindow(id, name);
+    const cursor = screen.getCursorScreenPoint();
+    const area = screen.getDisplayNearestPoint(cursor).workArea;
+    const { width, height } = window.getBounds();
+    const x = Math.min(Math.max(cursor.x - Math.round(width / 2), area.x + 8), area.x + area.width - width - 8);
+    const y = Math.min(Math.max(cursor.y - 24, area.y + 8), area.y + area.height - height - 8);
+    window.setPosition(x, y);
+    window.show();
+    window.focus();
+  }
+
+  private async restoreBounds(id: string, name: string, window: BrowserWindow, spec: WindowSpec): Promise<void> {
+    const saved = await readFile(boundsPath(id), "utf8").then((text) => (JSON.parse(text) as Record<string, Bounds>)[name], () => undefined);
+    const onScreen = saved && screen.getAllDisplays().some(({ workArea: a }) => saved.x < a.x + a.width - 40 && saved.x + saved.width > a.x + 40 && saved.y >= a.y - 10 && saved.y < a.y + a.height - 40);
+    if (saved && onScreen && !window.isDestroyed()) window.setBounds(spec.resizable ? saved : { x: saved.x, y: saved.y, width: window.getBounds().width, height: window.getBounds().height });
+    else if (!window.isDestroyed()) placeWindow(window, spec);
+    let timer: NodeJS.Timeout | null = null;
+    const save = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(async () => {
+        if (window.isDestroyed()) return;
+        const all = await readFile(boundsPath(id), "utf8").then((text) => JSON.parse(text) as Record<string, Bounds>, () => ({}) as Record<string, Bounds>);
+        all[name] = window.getBounds();
+        await mkdir(join(root, ".storage"), { recursive: true });
+        await writeFile(boundsPath(id), JSON.stringify(all)).catch(() => {});
+      }, 400);
+    };
+    window.on("moved", save);
+    window.on("resized", save);
   }
 
   closeWindow(id: string, name: string): void {
@@ -189,9 +225,21 @@ export function windowOptions(spec: WindowSpec): Electron.BrowserWindowConstruct
   const size = { width: spec.width ?? 480, height: spec.height ?? 360 };
   switch (spec.kind) {
     case "overlay":
-      return { ...size, show: false, frame: false, transparent: true, resizable: false, hasShadow: false, skipTaskbar: true, focusable: true, backgroundColor: "#00000000" };
+      return {
+        ...size,
+        show: false,
+        frame: false,
+        transparent: true,
+        resizable: spec.resizable ?? false,
+        minWidth: 240,
+        minHeight: 120,
+        hasShadow: false,
+        skipTaskbar: true,
+        focusable: true,
+        backgroundColor: "#00000000",
+      };
     case "popover":
-      return { ...size, show: false, frame: false, resizable: false, skipTaskbar: true, fullscreenable: false, vibrancy: "popover", visualEffectState: "active" };
+      return { ...size, show: false, frame: false, resizable: spec.resizable ?? false, skipTaskbar: true, fullscreenable: false, vibrancy: "popover", visualEffectState: "active" };
     case "panel":
       return { ...size, show: false, type: "panel", titleBarStyle: "hiddenInset", fullscreenable: false };
     default:

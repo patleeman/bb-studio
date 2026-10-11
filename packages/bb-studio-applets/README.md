@@ -14,8 +14,9 @@ This plugin is the BB side:
   `applets_logs`. They write and check applet folders and reject a bad
   manifest before anything is written.
 - The applets API (`bb plugin rpc call applets <method>`): `status`,
-  `applets.*`, and `threads.list`, `threads.get`, `threads.tell` and
-  `threads.open`. The app relays an applet's `window.studio.bb.*` calls to it.
+  `applets.*`, and `threads.list`, `threads.get`, `threads.timeline` (recent
+  messages and tool calls), `threads.tell` (queue or steer), `threads.stop`
+  and `threads.open`. The app relays an applet's `window.studio.bb.*` calls to it.
 - The settings page: whether the app is installed and running, each applet's
   capabilities, and Approve and Revoke.
 - `bb applets list | logs <id> | doctor`.
@@ -50,7 +51,8 @@ Applets live in `~/.bb-studio/applets/<id>/`. Change the folder in settings
 ```
 
 Window kinds are `normal`, `panel`, `overlay` and `popover`, and each needs
-its `window.<kind>` capability. Other capabilities: `shortcut.global`,
+its `window.<kind>` capability. `"resizable": true` lets you resize an overlay
+or popover; the app remembers where you leave each window. Other capabilities: `shortcut.global`,
 `notify`, `clipboard.read`, `clipboard.write`, `fs.applet` (only the applet's
 own `data/` folder), `open.url`, `bb.threads.read`, `bb.threads.tell`,
 `bb.threads.spawn`, `bb.studio.read`, `bb.open`, and
