@@ -1,10 +1,10 @@
 # BB Studio
 
-BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages keeps its own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`. Artifacts, drawings, designs and recordings are built into Studio: they implement the same contract in-process, keep `artifacts`, `excalidraw`, `design` and `talk` as their item namespaces, and open at `/plugins/studio/studio/artifacts/<id>`, `/plugins/studio/studio/drawings/<id>`, `/plugins/studio/studio/designs/<id>` and `/plugins/studio/studio/recordings/<id>`. Other add-ons reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes the pattern.
+BB Studio collects every item in one searchable, tagged collection. Pages, recordings, drawings, designs and artifacts are built into Studio: they implement the shared contract in `packages/bb-studio-kit/src/contract.ts` in-process, keep `pages`, `talk`, `excalidraw`, `design` and `artifacts` as their item namespaces, and open at `/plugins/studio/studio/<segment>/<id>` (`pages`, `recordings`, `drawings`, `designs`, `artifacts`). Separate plugins with items, such as Studio Code, publish `studio_describe` and Studio discovers them. Other plugins reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes how the kinds moved in.
 
 ## Provider contract
 
-A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accepts versions 1 and 2. Version 2 describes each kind's `capabilities` (`create`, `move`, `archive`, `delete`, `rename`, `duplicate`, `export`, `comments`, `versions`, `links`) and `mentionProviderId`. The collection hides actions disabled by capabilities. For version 1, Studio infers the capabilities that the old collection offered and uses no mention provider id. A kind may set `background: true` for items kept only as a safety net, such as Talk's dictations: the collection's All view and Studio Home skip them, while the kind's own pill and search still find them.
+A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accepts versions 1 and 2. Version 2 describes each kind's `capabilities` (`create`, `move`, `archive`, `delete`, `rename`, `duplicate`, `export`, `comments`, `versions`, `links`) and `mentionProviderId`. The collection hides actions disabled by capabilities. For version 1, Studio infers the capabilities that the old collection offered and uses no mention provider id. A kind may set `background: true` for items kept only as a safety net, such as Talk's dictations: the collection's All view skips them, while the kind's own pill and search still find them.
 
 A kind can set `hasOwnChat: true` when it owns its conversation UI. Studio Chat then skips automatic chat discovery for that kind, while explicit item mentions remain available. Its header can pass `chatAction` to `ItemHeader` to supply its primary Chat button, or `null` to omit one. Wrap its nav panel with `retainPanel` and render `RetainedPanels` for the same path from an `experimental_appOverlay`, so an editor stays alive when the user navigates away and back.
 
@@ -40,7 +40,7 @@ The Studio hub stores links, item threads, activity, comments, and content versi
 
 `recordActivity` accepts a kit `Actor`, verb, item ref, time, and summary. `activity` reads a bounded feed, optionally filtered by item and cursor. Comments use `comments`, `commentCreate`, and `commentResolve`; Pages keeps its Yjs comments and maps them to this interface. Other item comments live in Studio. Versions use `versions`, `versionCreate`, and `versionRead`. Studio deduplicates new drawing blobs by SHA-256. Pages snapshots stay in Pages and are read through an adapter; artifact versions are read from Studio's own artifact tables.
 
-## Search and Home
+## Search
 
 Studio keeps an SQLite FTS index of every provider's titles and `studio_read` text, updated from the change feed; `bb studio reindex` rebuilds it. `searchAll { query, kinds?, limit }` merges that index with live BB thread search and returns ranked hits with highlighted snippets. Cmd/Ctrl+Shift+K opens it as a quick-open palette; Cmd/Ctrl+K stays BB's thread search.
 

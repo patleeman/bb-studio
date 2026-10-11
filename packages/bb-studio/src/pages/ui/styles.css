@@ -257,14 +257,3 @@
   content: "Chat";
   color: var(--muted-foreground);
 }
-
-/* The conversation dialog is the composer's frame, so BB's prompt box inside
-   it drops its own border and shadow. */
-.pages-composer form {
-  border-color: transparent;
-  box-shadow: none;
-  background: transparent;
-}
-.pages-composer {
-  padding-bottom: 10px;
-}

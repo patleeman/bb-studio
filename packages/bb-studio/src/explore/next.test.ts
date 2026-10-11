@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MAX_NOTE_LENGTH, NEXT_LIMITS, parseNextItems, preferredReplies } from "./next";
 import { MAX_LABEL_LENGTH, parseExploreItem } from "./shared";
 import { INSTRUCTIONS_LIMIT, nextInstructions } from "./prompt";
-import { ExploreStore, MIGRATIONS, NEXT_LOG_DAYS } from "./store";
+import { ExploreStore, NEXT_LOG_DAYS, NEXT_LOG_MIGRATIONS } from "./store";
 import { appendDraft } from "./ui/composer";
 
 describe("the ::next directive", () => {
@@ -107,7 +107,7 @@ describe("the click log", () => {
   function store() {
     let at = 1_000;
     const db = new Database(":memory:");
-    for (const statement of MIGRATIONS) db.exec(statement);
+    for (const statement of NEXT_LOG_MIGRATIONS) db.exec(statement);
     return { store: new ExploreStore(db, () => at), tick: (ms: number) => (at += ms) };
   }
 
@@ -152,7 +152,7 @@ describe("the click log's size", () => {
   it("forgets suggestions older than its window", () => {
     let at = 1_000;
     const db = new Database(":memory:");
-    for (const statement of MIGRATIONS) db.exec(statement);
+    for (const statement of NEXT_LOG_MIGRATIONS) db.exec(statement);
     const log = new ExploreStore(db, () => at);
     log.nextShown({ threadId: "thr_1", messageId: "msg_1", items: item("Old") });
     at += (NEXT_LOG_DAYS + 1) * DAY;
@@ -164,7 +164,7 @@ describe("the click log's size", () => {
   it("keeps at most its row cap, newest first", () => {
     let at = 1_000;
     const db = new Database(":memory:");
-    for (const statement of MIGRATIONS) db.exec(statement);
+    for (const statement of NEXT_LOG_MIGRATIONS) db.exec(statement);
     const log = new ExploreStore(db, () => at, { days: NEXT_LOG_DAYS, maxRows: 2 });
     for (const label of ["a", "b", "c"]) {
       log.nextShown({ threadId: "thr_1", messageId: `msg_${label}`, items: item(label) });

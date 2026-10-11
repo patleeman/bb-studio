@@ -45,7 +45,6 @@ export function ArtifactViewer({
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
-  // Studio Chat's New in Float bar starts threads; the menu only offers it without one.
   const projects = useProjects();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);

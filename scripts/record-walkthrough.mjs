@@ -51,8 +51,6 @@ const SCENES = [
   ["talk", "Talk. It *transcribes*.", "Long recordings, saved as you speak.", 3.5],
   ["excalidraw", "*Sketch* it together.", "Excalidraw, shared with your agents.", 3],
   ["artifacts", "Keep what they *make*.", "Reports, images and files, all saved.", 3],
-  ["bots", "Bots that work as a *team*.", "A Command view, delegation and memory.", 4, 900],
-  ["studio-item-chat", "Chat about *what you see*.", "The agent knows what's on screen.", 3.5],
 ];
 const INTRO = ["Your agents make *a lot*.", "BB Studio keeps it all in one place.", 2.5];
 const OUTRO = ["BB *Studio*", "Plugins for BB · github.com/patleeman/bb-studio", 3.5];

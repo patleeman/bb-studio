@@ -1,72 +1,14 @@
-// Explore's database: the Next row's click log. Explainers (and their jobs and
-// parent pages) were removed; their tables stay, since migrations only append.
+// Explore's store: the Next row's click log, in Studio's database.
 import type Database from "better-sqlite3";
 import { NEXT_KINDS, suggestionKey, type NextKind } from "./next";
 
-// The schema as of the 2026-10-04 reset. Append new statements; never edit or
-// reorder these, since each database records the hash of every one it ran.
-export const MIGRATIONS = [
-  `CREATE TABLE IF NOT EXISTS explore_explainers (
-     id TEXT PRIMARY KEY,
-     key TEXT NOT NULL UNIQUE,
-     parent_id TEXT,
-     thread_id TEXT NOT NULL,
-     message_id TEXT NOT NULL,
-     turn_id TEXT,
-     emoji TEXT NOT NULL,
-     label TEXT NOT NULL,
-     page_id TEXT,
-     project_id TEXT,
-     status TEXT NOT NULL,
-     follow_ups TEXT NOT NULL DEFAULT '[]',
-     generated_at INTEGER,
-     regenerated_at INTEGER,
-     error TEXT,
-     created_at INTEGER NOT NULL,
-     updated_at INTEGER NOT NULL
-   )`,
-  `CREATE TABLE IF NOT EXISTS explore_jobs (
-     id TEXT PRIMARY KEY,
-     explainer_id TEXT NOT NULL,
-     kind TEXT NOT NULL,
-     status TEXT NOT NULL,
-     label TEXT NOT NULL,
-     detail TEXT NOT NULL,
-     progress INTEGER NOT NULL,
-     worker_thread_id TEXT,
-     error TEXT,
-     created_at INTEGER NOT NULL,
-     updated_at INTEGER NOT NULL
-   )`,
-  `CREATE TABLE IF NOT EXISTS explore_parents (
-     project_key TEXT PRIMARY KEY,
-     page_id TEXT NOT NULL,
-     created_at INTEGER NOT NULL
-   )`,
-  `CREATE TABLE IF NOT EXISTS explore_findings (
-     id TEXT PRIMARY KEY,
-     key TEXT NOT NULL UNIQUE,
-     thread_id TEXT NOT NULL,
-     message_id TEXT NOT NULL,
-     turn_id TEXT,
-     emoji TEXT NOT NULL,
-     label TEXT NOT NULL,
-     project_id TEXT,
-     thread_title TEXT NOT NULL DEFAULT '',
-     created_at INTEGER NOT NULL,
-     post_id TEXT,
-     linked_page_id TEXT,
-     digested_at INTEGER
-   )`,
-  `CREATE TABLE IF NOT EXISTS explore_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-  `CREATE INDEX IF NOT EXISTS explore_explainers_message ON explore_explainers (thread_id, message_id)`,
-  `CREATE INDEX IF NOT EXISTS explore_explainers_page ON explore_explainers (page_id)`,
-  `CREATE INDEX IF NOT EXISTS explore_jobs_explainer ON explore_jobs (explainer_id, created_at)`,
-  `CREATE INDEX IF NOT EXISTS explore_findings_digest ON explore_findings (digested_at, created_at)`,
-  `CREATE INDEX IF NOT EXISTS explore_findings_post ON explore_findings (post_id)`,
-  // Findings were kept for Studio Feed, which is gone.
-  `DROP TABLE IF EXISTS explore_findings`,
-  // The Next row's suggestions: when each was first shown and clicked.
+/**
+ * The Next row's click log, which Studio keeps in its own database (Explore
+ * kept explore.db beside Pages' database; the upgrade bridge copies it in).
+ * Each statement is exactly as Explore ran it, since a database records the
+ * hash of every statement it ran; never edit or reorder them.
+ */
+export const NEXT_LOG_MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS next_suggestions (
      key TEXT PRIMARY KEY,
      thread_id TEXT NOT NULL,
@@ -79,16 +21,7 @@ export const MIGRATIONS = [
      clicks INTEGER NOT NULL DEFAULT 0
    )`,
   `CREATE INDEX IF NOT EXISTS next_suggestions_shown ON next_suggestions (shown_at)`,
-  // What the user was told about a finding in the Next row, for its explainer's writer.
-  `ALTER TABLE explore_explainers ADD COLUMN note TEXT`,
 ];
-
-/**
- * The Next row's click log, which Studio keeps in its own database (Explore
- * kept explore.db beside Pages' database; the upgrade bridge copies it in).
- * These are the statements above, unchanged; the rest are retired tables.
- */
-export const NEXT_LOG_MIGRATIONS = MIGRATIONS.filter((sql) => sql.includes("next_suggestions"));
 
 /** The click log keeps this many days, enough for `bb studio pages explore stats --days 180`. */
 export const NEXT_LOG_DAYS = 180;
