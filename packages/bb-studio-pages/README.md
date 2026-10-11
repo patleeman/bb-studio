@@ -50,7 +50,7 @@ and an unchanged page body. The reply microphone also fits in the
 
 The **Pages** nav item opens Studio's new tab on pages. It shows:
 - Studio search, filtered to `Kind: Pages`, with **Clear filters**
-- the Space, Kind and **More filters** menus and **Save view**
+- the Project, Kind and **More filters** menus and **Save view**
 - **New** in the header
 - the three seeded pages, with their project and last activity
 

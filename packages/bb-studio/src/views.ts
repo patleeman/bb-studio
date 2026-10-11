@@ -1,5 +1,4 @@
-// Saved views: named collection queries (src/query.ts). A space holds
-// members; a view is a filter, so it can reach across spaces.
+// Saved views: named collection queries (src/query.ts).
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 

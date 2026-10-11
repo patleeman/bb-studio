@@ -1,7 +1,7 @@
 # Backup and restore
 
 One file holds every Studio item: pages, Talk recordings, drawings,
-artifacts and designs, plus Studio's own data (tags, Spaces, saved
+artifacts and designs, plus Studio's own data (tags, project leads, saved
 views, item links, comments and versions). Restoring it on another BB adds
 what's missing. A second restore changes nothing, and work that is newer on
 the BB you restore to is never overwritten.
@@ -29,7 +29,7 @@ use the CLI.
 | `excalidraw/` | Studio Draw | Each drawing's scene, and its images as separate files. |
 | `artifacts/` | Studio (built-in Artifacts) | Each artifact with every version's bytes. Studio writes this section itself, under the old plugin's id, so backups from before the merge restore into it. |
 | `design/` | Studio Design | Each design with its rounds, screens (as HTML files) and comments. |
-| `studio/` | Studio | Tags and which items have them, saved views, Spaces with their projects, threads, leads (the default space's lead is the Chief of Staff) and check-in settings, item links, item chats, comments, versions and activity. |
+| `studio/` | Studio | Tags and which items have them, saved views, project leads (the personal project's lead is the Chief of Staff) and their Heartbeat settings, item links, item chats, comments, versions and activity. |
 
 ## What isn't
 
@@ -90,7 +90,7 @@ Section layouts:
 - `excalidraw/`: `items/<id>.json`, `files/<id>/<n>`; each image's path and MIME type are in the item JSON.
 - `artifacts/`: `items/<id>.json`, `files/<id>/<version id>`.
 - `design/`: `items/<id>.json`, `files/<id>/screens/<screen id>.html`.
-- `studio/`: `tags.json`, `item-tags.json`, `views.json`, `spaces.json`, `links.json`, `item-chats.json`, `comments.json`, `versions.json`, `activity.json`, `blobs/<sha256>`.
+- `studio/`: `tags.json`, `item-tags.json`, `views.json`, `project-leads.json`, `links.json`, `item-chats.json`, `comments.json`, `versions.json`, `activity.json`, `blobs/<sha256>`.
 
 ## How it works
 
@@ -141,14 +141,12 @@ Restore runs in this order:
    they restore, so Studio then finds a few rows already here that the dry
    run counted as new.
 5. **Studio's data.** Tags and saved views are matched by id, then by name.
-   Spaces are matched by id, then the default space, then by name; a missing
-   space is created. A project joins its restored space, unless you have
-   already put it in another space here. Item chats, space threads and leads
-   are restored only when their BB thread exists here. A lead, including the
-   Chief of Staff (the default space's lead), is restored only into a space
-   that has none here. Older backups kept the Chief of Staff in
-   `chief-of-staff.json`; it is restored as the default space's lead the same
-   way. Check-ins come back switched off. The search index is rebuilt afterwards.
+   Item chats and leads are restored only when their BB thread exists here,
+   and leads only for projects on this BB. A lead, including the Chief of
+   Staff (the personal project's lead), is restored only into a project that
+   has none here. Older backups' `spaces.json` is ignored; their
+   `chief-of-staff.json` is restored as the personal project's lead the same
+   way. Heartbeats come back switched off. The search index is rebuilt afterwards.
 
 If an add-on isn't installed on the BB you restore to, its section is skipped
 with a note. Install the add-on and restore the same file again; items that

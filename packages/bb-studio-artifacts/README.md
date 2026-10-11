@@ -38,7 +38,7 @@ mention and the `::artifact` card under the same names. BB refuses a tool name
 that two plugins register. The CLI moved to `bb studio artifacts …`, because a
 plugin registers only one CLI command.
 
-Your tags, Spaces, tabs, links and item chats need no copy: Studio keeps them,
+Your tags, tabs, links and item chats need no copy: Studio keeps them,
 and artifacts keep their `artifacts:<id>` identity.
 
 ## Staged preview

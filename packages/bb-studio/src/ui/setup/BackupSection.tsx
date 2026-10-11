@@ -52,7 +52,7 @@ export function BackupView({ api }: { api: BackupApi }) {
     <section className="flex flex-col gap-2">
       <h2 className="text-sm font-medium text-foreground">Backup and restore</h2>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        One file with every page, recording, drawing, artifact, table and design, plus your tags and Spaces. Restoring it on another BB adds what's missing and never overwrites newer work there; running it twice changes nothing.
+        One file with every page, recording, drawing, artifact, table and design, plus your tags and project leads. Restoring it on another BB adds what's missing and never overwrites newer work there; running it twice changes nothing.
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         <Button size="sm" variant="outline" disabled={busy} onClick={() => void api.backup()}>{state.step === "backing-up" ? "Backing up…" : "Back up"}</Button>

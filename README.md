@@ -9,13 +9,13 @@ agent.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings and artifacts (built in: the files your agents make), with search, tags, project filters, templates, item chats and quotes, Spaces (areas of work with a lead thread and a Command view), a Setup page for the add-ons, plugin health and backup and restore. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings and artifacts (built in: the files your agents make), with search, tags, project filters, templates, item chats and quotes, project leads with a Heartbeat, a Command view, a Setup page for the add-ons, plugin health and backup and restore. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents, with checklists you hand to agents, inline whiteboards, and Explore: pages explaining what an agent noticed along the way. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Upgrade bridge only. Artifacts are built into Studio now; this copies an existing install's artifacts into Studio. |
 | [Studio Design](packages/bb-studio-design/) | `design` | UI prototypes you design with your agents: HTML screens on a canvas, a few options per round, and a reviewer that checks the work. |
-| [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces in your Spaces: one or more folders in a full editor beside your threads, run by a local code-server. |
+| [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces for your projects: one or more folders in a full editor beside your threads, run by a local code-server. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
@@ -46,7 +46,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    `bb marketplace refresh bb-studio` instead.
 2. Ask me whether to install all of these plugins or only some. List them with
    a one-line description each:
-   - studio: the Studio collection, Spaces and Command view; recommended, since the others plug into it
+   - studio: the Studio collection, project leads and Command view; recommended, since the others plug into it
    - pages: collaborative pages
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings

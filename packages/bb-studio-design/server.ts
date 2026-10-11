@@ -185,7 +185,7 @@ export default async function plugin(bb: BbPluginApi) {
   // Agents write a screen at a time; Studio only needs to hear about it now and then.
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DESIGN_UPDATE_TYPE, designId: id, updatedAt, by }), delayMs: 1000 });
   const changed = (id: string, updatedAt: number, by: Writer | "studio") => changeBus.changed(id, updatedAt, by);
-  /** Tells Studio an agent made a design, so it joins the thread's spaces. */
+  /** Tells Studio an agent made a design, so it is linked to the thread. */
   const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Studio is optional. */ });
 
   // ---------------------------------------------------------------------

@@ -20,7 +20,7 @@ export const ARTIFACTS_BACKUP_VERSION = 1;
 
 export const BACKUP_NOTES = [
   "Source thread ids and file paths are kept with each artifact, but they don't point at threads on another BB.",
-  "Not included: Studio spaces and tags (Studio's own section), and artifact cards already posted in threads.",
+  "Not included: Studio tags and project leads (Studio's own section), and artifact cards already posted in threads.",
 ];
 
 const RESTORE_NOTE = "Restored artifacts keep their source thread ids and paths as data; on another BB, those threads aren't there.";

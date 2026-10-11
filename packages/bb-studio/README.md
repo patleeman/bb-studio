@@ -4,8 +4,8 @@
 
 Studio opens on the collection: everything the Studio add-ons make, including pages, Talk
 recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
-kind, project and tag, and hand any of them to an agent. Spaces gather projects and
-threads into one place, each with an optional lead thread.
+kind, project and tag, and hand any of them to an agent. Each BB project can have a lead thread
+woken by a Heartbeat.
 
 ## Workspace
 
@@ -27,8 +27,7 @@ the item's own tools and status, such as a page saving or a recording paused;
 the tab names the item, so its title isn't repeated, and Chat isn't offered.
 Each tab row carries the active item's tools, such as Chat, beside its tabs.
 With one pane, the tab row takes BB's title bar, so the item sits under a
-single bar. Open items live here, not in the sidebar; a Space's Browse menu
-opens any of its items as a tab.
+single bar. Open items live here, not in the sidebar.
 Conversation-side item views continue to work independently. At phone widths, a
 pane picker shows one pane at a time while preserving the desktop arrangement.
 
@@ -51,9 +50,9 @@ viewport change.
 ![Live BB screenshot of the Studio collection](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): the Studio
-collection as the workspace's new tab, a list with search and compact Space and
+collection as the workspace's new tab, a list with search and compact Project and
 Kind menus above it.
-Project, Tags and Status are available under **More filters**. The rows show
+Tags and Status are available under **More filters**. The rows show
 a paused Talk recording, a drawing and three Orbit pages.
 
 ![Live BB screenshot of Studio with active filters](assets/filters.png)
@@ -75,12 +74,6 @@ The New menu stays open to every available kind with a Pages filter active.
 The capture checks that Drawings and Pages filters offer the same menu as the
 unfiltered collection.
 
-![Live BB screenshot of the Studio sidebar plus menu](assets/sidebar-new-menu.png)
-
-The **+** beside Studio opens a menu of the installed add-ons' creation actions.
-The staged capture checks keyboard opening, creates a page in the open thread's
-project, and checks that the plus stays visible while its menu is open.
-
 ![Live BB screenshot of Studio search](assets/search.png)
 
 Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
@@ -92,7 +85,7 @@ content, each showing the matching text with the match in bold.
 Artifacts are built into Studio: the images, pages, reports and files your
 agents make, kept with every version. They used to be the separate Studio
 Artifacts plugin (`artifacts`). Items keep that id as their namespace
-(`artifacts:<id>`), so tags, Spaces, tabs, links and chats carry over. If you
+(`artifacts:<id>`), so tags, tabs, links and chats carry over. If you
 had the plugin, see [its upgrade bridge](../bb-studio-artifacts/README.md) to
 copy your artifacts in.
 
@@ -148,8 +141,7 @@ and can't call BB's API with your session.
 
 ## What you get
 
-Everything opens in BB's main view, and the Studio sidebar lists what you
-open. ⌘/Ctrl-click an item or thread link, or choose **Open in split** from
+Everything opens in BB's main view, as a tab in Studio's workspace. ⌘/Ctrl-click an item or thread link, or choose **Open in split** from
 its menu, to open it in a split instead. Right-click any Studio item or
 thread link, anywhere, for **Open**, **Open in split**, **Copy reference**
 (**Copy link** for a thread) and **New thread with this**. Item and collection
@@ -157,12 +149,11 @@ headers have an **Open in split** button. An editor you leave stays
 open in the background, so it's as you left it when you come back.
 
 - **One collection** (sidebar → Studio): every add-on's items in one list,
-  with search over titles and content, filters by kind, project, space and
-  tag, and an Archived view. **Display** groups the list by kind, project,
-  space or tag (collapsible, and an item in two spaces shows in both) and
+  with search over titles and content, filters by kind, project and
+  tag, and an Archived view. **Display** groups the list by kind, project
+  or tag (collapsible) and
   sorts it by name, kind, project, created or last activity, either way; both
-  choices are remembered. The column you group by drops out, and a Spaces
-  column appears once items belong to spaces. Drawings show thumbnails;
+  choices are remembered. The column you group by drops out. Drawings show thumbnails;
   recordings show their length and word count. Background kinds, such as Talk's dictations, stay
   out of All and Home; the Kind menu and search still show them.
 - **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search everything**
@@ -174,27 +165,14 @@ open in the background, so it's as you left it when you come back.
   be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
   The tag menu also renames and deletes the active tag.
-- **Spaces** are areas of work. Each BB project belongs to one space, and
-  items and threads follow their project; projects nobody filed, and items
-  with no project, are in the default space, Personal. A new space gets its
-  own catch-all folder under `~/Spaces`, where its new threads and items go.
-  A thread can also be added to a space by itself, which moves it there.
-  A space can have a lead, one of its threads, which a Heartbeat wakes on a
-  schedule. [Studio Sidebar](../bb-studio-sidebar) shows one Space at a
-  time with its lead (a star), pinned threads and a **Browse** menu; without
-  it, Studio's own **Spaces** section lists them. Nothing is made for a space but its folder. Deleting a space
-  hands its projects and threads back to Personal. See
-  [`docs/spaces.md`](../../docs/spaces.md).
+- **Project leads.** A BB project can have a lead thread, which a
+  Heartbeat wakes on a schedule; the personal project's lead is the Chief of
+  Staff. Set them in Setup under **Project leads**. BB's own sidebar groups
+  threads by project. See [`docs/project-leads.md`](../../docs/project-leads.md).
 - **Shared actions**: select items (shift-click for a range) to start a
   **New thread** that mentions them, move them to a project, archive, or
   delete. Actions an add-on defines, like Talk's "Copy transcripts" or Draw's
   "Copy text", appear when the selection is all that kind.
-- **Tabs in the sidebar.** With [Studio Sidebar](../bb-studio-sidebar)
-  as the thread list, each Studio item you open gets a tab in a Studio section
-  above your threads. Tabs can be pinned. × or middle-click closes a tab; closing the one on
-  screen opens the next. The section's ⋯ menu groups tabs by app, sorts them,
-  and closes other or all tabs. Studio keeps the tabs, so every window shows
-  the same ones, and closes tabs of deleted items.
 - **New ▾** creates any kind an installed add-on offers, in the current
   project. It always opens the full menu, even with a kind filter active.
 - **Takes over from the add-ons.** Each add-on's own collection hands over
@@ -214,18 +192,17 @@ open in the background, so it's as you left it when you come back.
 - **Automations badge.** A thread that automations wake shows a clock with
   their count in its header; click it to open the Automations tab. It uses
   BB's experimental thread header slot, so Studio still loads without it.
-- **For agents**: the `studio_list_items`, `studio_list_spaces`,
-  `studio_tag_items`, `studio_delete_items`, `studio_space_items` and
+- **For agents**: the `studio_list_items`,
+  `studio_tag_items`, `studio_delete_items` and
   `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill. With
   `studio_workspace`, `studio_open_items` and `studio_close_tabs` an agent sees
   the tabs you have open in the BB window you're using, opens items beside
   them, and closes tabs.
 
 ```sh
-bb studio list [query…] [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--space <name>] [--json]
+bb studio list [query…] [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
 bb studio tags
-bb studio spaces
-bb studio move <item-link|plugin:id|thread-id>… (--space <name|id> | --project <name|id|global>)
+bb studio move <item-link|plugin:id>… --project <name|id|global>
 bb studio providers
 bb studio health [--json]
 bb studio reindex
@@ -249,7 +226,7 @@ bb studio reindex
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the
   collection.
-- Studio stores tags, open tabs, saved views and spaces itself, keyed by
+- Studio stores tags, open tabs, saved views and project leads itself, keyed by
   `<plugin id>:<item id>` where items are involved, so add-ons don't need to
   know about them. Tags on items an add-on no longer lists are
   dropped. Each add-on owns its data, editors, tools, CLI and mentions.
@@ -283,7 +260,7 @@ commands left to run; `--json` prints the whole summary.
 
 `bb studio backup [--out <file|folder>]` saves every Studio item into one
 `.zip`. That covers pages, recordings with their audio, drawings, artifacts,
-designs, and Studio's tags, Spaces, views, links, comments and
+designs, and Studio's tags, project leads, views, links, comments and
 versions. `bb studio restore <file>` shows what would change, and `--yes`
 restores it. Restore matches each item by its original id, so running it
 again changes nothing, and it never overwrites a copy that is newer here.

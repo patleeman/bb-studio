@@ -110,7 +110,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
     id: "artifacts",
     name: "Studio Artifacts",
     why: "Artifacts are built into Studio now. This last release is only an upgrade bridge: it copies your artifacts into Studio and forwards older clients.",
-    kept: "Every artifact it copied into Studio, with its versions, files, tags, Spaces, links and chats. Links to /plugins/artifacts/artifacts/<id> still open them in Studio.",
+    kept: "Every artifact it copied into Studio, with its versions, files, tags, links and chats. Links to /plugins/artifacts/artifacts/<id> still open them in Studio.",
     deleted: `${REMOVED} Any rows \`bb artifacts migrate\` listed as skipped (malformed) are lost; copy what you need from them first. iOS app builds from before the merge stop opening artifacts.`,
     before: [
       step("Update Studio and Studio Artifacts.", "bb plugin update studio --yes && bb plugin update artifacts --yes"),
@@ -148,7 +148,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
   {
     id: "bot-teams",
     name: "Studio Teams",
-    why: "Studio Teams is retired and gets no more updates. Space Command now ships in Studio. An installed copy keeps running until you remove it.",
+    why: "Studio Teams is retired and gets no more updates. An installed copy keeps running until you remove it.",
     kept: "Threads that worked as a bot stay ordinary BB threads.",
     deleted: `${REMOVED} Copy any bot home, MISSION.md or MEMORY.md you still need first.`,
     before: [

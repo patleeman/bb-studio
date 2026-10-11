@@ -138,7 +138,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const store = new DrawingStore(db);
   const services = studioServices(bb.sdk);
-  /** Tells Studio an agent made a drawing, so it joins the thread's spaces. */
+  /** Tells Studio an agent made a drawing, so it is linked to the thread. */
   // In a thread, the file is on the thread's host, inside its workspace or
   // thread storage; from a terminal with no thread, it's a local file.
   async function readSceneFile(filePath: string, ctx: { threadId?: string | null; cwd?: string | null }): Promise<string> {

@@ -85,7 +85,7 @@ the old plugin's data. Copy it.
 - Studio migration: export the old plugin's `CREATE` statement unchanged
   (`ARTIFACT_TABLES`) and append it to Studio's `MIGRATIONS`. Never edit a
   recorded statement. Tests that slice `MIGRATIONS` from the end break;
-  find the statement by content instead (`space-lead.test.ts`).
+  find the statement by content instead (`project-lead.test.ts`).
 - Import RPCs on Studio: `<segment>.missingBlobs`, `<segment>.importBlob`
   (hash-checked, one per call: a blob can be 25 MB), and
   `<segment>.importRows` (batches of 100). Import keeps ids and times. A

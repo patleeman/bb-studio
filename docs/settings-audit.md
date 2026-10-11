@@ -28,7 +28,7 @@ do not have to maintain competing defaults.
 
 | Plugin | Important controls and location | Outcome |
 | --- | --- | --- |
-| Studio | Saved views, query filters, spaces, tags, Command layout and approval mode, and sidebar item visibility/order; theme in BB Appearance | Existing controls cover the hub. Saved content and version history remain until explicitly removed. |
+| Studio | Saved views, query filters, project leads, tags, Command layout and approval mode, and sidebar item visibility/order; theme in BB Appearance | Existing controls cover the hub. Saved content and version history remain until explicitly removed. |
 | Studio item chat | BB's new-conversation composer selects project, environment, provider/model, reasoning, and permissions; existing chats use native thread controls | Existing controls cover execution choices. |
 | Float | Resize/dock/reorder on each panel; show/hide command; shortcuts in BB Keyboard | Existing controls cover layout and access. |
 | Pages | Page location, icon, chat, history and restore | Added global version-retention setting. |

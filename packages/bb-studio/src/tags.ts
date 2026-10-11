@@ -1,6 +1,5 @@
 // Tags group Studio items across add-ons. Studio keeps them, keyed by
 // `<plugin>:<id>`, so every add-on's items can be tagged without the add-on
-// knowing about tags. Spaces are separate (src/spaces.ts).
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 
@@ -96,7 +95,7 @@ export class TagStore {
     })();
   }
 
-  /** Forgets deleted items' tags and space memberships. */
+  /** Forgets deleted items' tags. */
   forget(pluginId: string, ids: readonly string[]): void {
     const drop = this.db.prepare("DELETE FROM item_tags WHERE plugin_id = ? AND item_id = ?");
     this.db.transaction(() => {

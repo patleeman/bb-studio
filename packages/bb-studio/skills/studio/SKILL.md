@@ -22,21 +22,20 @@ Items belong to a BB project or are global. Every item has a link
 ## Finding items
 
 - Agent tool `studio_list_items`: newest first, each with its kind and link.
-  In a thread that belongs to a space it lists that space's items (the first
-  line names the space); otherwise this project's and global items.
-  `allProjects: true` looks everywhere. `query` takes filters and words:
-  `kind:page project:"Q4 launch" tag:draft -tag:done space:Launch notes`.
+  It lists this thread's project's items and global items; a `project:`
+  filter or `allProjects: true` widens that. The Chief of Staff sees every
+  project. `query` takes filters and words:
+  `kind:page project:"Q4 launch" tag:draft -tag:done notes`.
   Fields are `kind:`, `project:` (a name, or `global`), `tag:` (a name, or
-  `none`), `space:` and `is:archived` / `is:template`; `-` excludes, a repeated
+  `none`) and `is:archived` / `is:template`; `-` excludes, a repeated
   field matches any of its values, and the remaining words match titles and
-  content. A `space:` or `project:` filter replaces the default scope.
+  content. A `project:` filter replaces the default scope.
   Archived items show only with `is:archived`. Each line shows the item's
   `#tags`; an item that matched on its content has the matching text on a `>`
   line below it (`snippet` in `--json`).
 - CLI: `bb studio list [query…] [--all] [--json]`, with the same query, e.g.
   `bb studio list kind:page -tag:done`;
-  `bb studio tags` lists the tags and how many items each has, and
-  `bb studio spaces` lists the spaces.
+  `bb studio tags` lists the tags and how many items each has,.
 - `bb studio providers` shows which add-ons are installed and whether each is
   ready; an add-on that's stopped contributes nothing to the list.
 
@@ -57,44 +56,24 @@ user asks to group, file or label items; don't invent tags on your own.
 recordings, drawings, artifacts and other add-on items.
 A page takes its sub-pages with it. There's no undo, so delete only what the user asked
 to remove, and confirm first when the request is vague, like "clean up old
-stuff". It doesn't delete spaces.
+stuff".
 
-## Spaces
+## Moving items and project leads
 
-A space gathers whole BB projects, with their Studio items, and threads into
-one place, like a "Q4 launch" space with two repos, a few pages and a board. A BB
-project is where code lives and threads run; a space is how the user groups
-work. A project in a space brings in all of its items and open threads, now
-and later. A thread is in a space when it was added to it or its project is.
-
-- `studio_list_spaces` lists the spaces and marks the ones this thread is in.
-- `studio_space_items` with `space` (a name), `threads` (thread ids),
-  `items` (item links) and `thisThread` (`add` or `remove`) files threads and
-  items in a space. A thread is in one space at a time, so filing it moves
-  it. Items follow their project, so an item not in the space yet moves to
-  the space's own project; items already in it stay put.
 - `studio_move_items` with `items` and `project` (a name, an id, or
-  `global`) moves items to another project, and so to that project's space.
-- In a shell, `bb studio move <link|plugin:id|thread-id>… --space <name>` or
-  `--project <name|global>` does the same.
-- Only the user makes, renames or deletes spaces. Spaces aren't tags:
-  `studio_tag_items` can't touch them. File things in a space when the user
-  asks to.
-- What a thread in a space makes in the space's projects is in the space by
-  itself. Don't file those again.
-- A space may have a lead: one of its threads, which the user picks. A
-  Heartbeat can wake the lead on a schedule. Nothing else is made for a
-  space: no page, no lead thread.
+  `global`) moves items to another project. In a shell,
+  `bb studio move <link|plugin:id>… --project <name|global>` does the same.
+- A BB project may have a lead: one thread, which the user picks in Studio's
+  Setup page under **Project leads**. A Heartbeat can wake the lead on a
+  schedule. A thread leads at most one project. The personal project's lead
+  is the Chief of Staff. A handoff keeps the successor the lead.
 
 ## In the app
 
-Spaces show in the sidebar with their threads and Studio items; the user
-makes, edits and deletes them there, and picks a space's lead and Heartbeat
-from its ⋯ menu. Each thread's
-header shows its space, links back to it, and moves the thread to another.
-Each Studio item's ⋯ menu, the collection's row menu and its bulk **Move**
-offer **Move to** a space or a project. The Studio panel
-is the collection. Search, space, kind, project and tag filters, list or
+BB's sidebar groups threads by project. Each Studio item's ⋯ menu, the
+collection's row menu and its bulk **Move** offer **Move to** Global or a
+project. The Studio panel
+is the collection. Search, kind, project and tag filters, list or
 grid, archive, move to project, delete, **New ▾** for any kind, and
 **New thread** to start a conversation that mentions the selected items. With
 Studio installed, each add-on's own collection hands over to Studio filtered
