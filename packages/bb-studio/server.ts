@@ -7,6 +7,7 @@ import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { AGENT_INSTRUCTIONS as PAGE_INSTRUCTIONS } from "./src/pages/tools";
 import { registerExploreBuiltin } from "./src/explore/server";
 import { PAGES_SETTINGS } from "@bb-studio/kit/pages-contract";
+import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
 import { subcommand, usage } from "@bb-studio/kit/cli";
@@ -90,8 +91,8 @@ export default async function plugin(bb: BbPluginApi) {
   const designs = registerDesign(bb, db);
   bb.onDispose(() => designs.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
-  // Pages' and Explore's, under the keys they had in their own plugins.
-  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS });
+  // Pages', Explore's and Reactions', under the keys they had in their own plugins.
+  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS });
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
   let settingValues: Record<string, unknown> = await settings.get();
@@ -100,6 +101,10 @@ export default async function plugin(bb: BbPluginApi) {
     settingValues = next;
     explore.update(next);
   });
+  // Reactions keep only settings: copy the old plugin's once, in the background.
+  const reactionsImport = { plugins: bb.sdk.plugins, kv: bb.storage.kv, settings: settings as never };
+  void importReactionsSettings(reactionsImport).then((applied) => { if (applied) bb.log.info(`Copied Studio Reactions settings (${applied.join(", ") || "none changed"}).`); })
+    .catch((error) => bb.log.warn(`Couldn't copy Studio Reactions settings: ${errorText(error)}`));
   const pages = registerPages(bb, db, {
     snapshotsPerPage: () => Number(settingValues.snapshotsPerPage ?? PAGES_SETTINGS.snapshotsPerPage.default),
   });
@@ -857,7 +862,16 @@ export default async function plugin(bb: BbPluginApi) {
   const healthTimer = setInterval(() => void health.check().catch((error) => bb.log.warn(`Plugin health check failed: ${errorText(error)}`)), HEALTH_INTERVAL_MS);
   bb.onDispose(() => { clearInterval(healthTimer); health.dispose(); });
   // BB Studio setup: add-ons, retired plugins and what to run; see src/setup.ts.
-  const setup = new SetupService({ sdk: bb.sdk, health: (maxAgeMs) => (maxAgeMs ? health.summary(maxAgeMs) : health.check()) });
+  const setup = new SetupService({
+    sdk: bb.sdk,
+    health: (maxAgeMs) => (maxAgeMs ? health.summary(maxAgeMs) : health.check()),
+    // Setup's Retired plugins: Studio Reactions can go once its settings are copied.
+    settingsCopied: async (pluginId) => {
+      if (pluginId !== REACTIONS_PLUGIN_ID) return true;
+      await importReactionsSettings(reactionsImport).catch(() => null);
+      return Boolean(await bb.storage.kv.get(REACTIONS_SETTINGS_IMPORTED));
+    },
+  });
   bb.rpc.register(setupContract, {
     "setup.summary": ({ maxAgeMs }) => setup.summary(maxAgeMs),
     "setup.install": ({ pluginIds }) => setup.install(pluginIds),

@@ -24,10 +24,11 @@ public struct ReactionSettings: Sendable {
     }
 }
 
+/// Reactions are built into Studio, so their settings are Studio's.
 extension BBClient {
     public func reactionSettings() async throws -> ReactionSettings {
         struct Response: Decodable { var values: [String: JSONValue] }
-        let response: Response = try await get("/api/v1/plugins/emoji-react/settings")
+        let response: Response = try await get("/api/v1/plugins/studio/settings")
         let values = response.values
         let quoteSelection: Bool
         if case .bool(let enabled)? = values["quoteSelection"] { quoteSelection = enabled }

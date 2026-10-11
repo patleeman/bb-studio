@@ -62,7 +62,7 @@ describe("classify", () => {
 
 describe("buildSetup", () => {
   it("lists every add-on with its status, checks and the commands left", async () => {
-    const plugins = allInstalled().filter((each) => !["applets", "mobile"].includes(each.id)).map((each) => (each.id === "emoji-react" ? { ...each, enabled: false } : each));
+    const plugins = allInstalled().filter((each) => !["applets", "mobile"].includes(each.id)).map((each) => (each.id === "studio" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("other")]);
     const summary = await buildSetup(sdk, health({
       problems: [problem("smart-decisions", "degraded", "No Jev provider is set up"), problem("other", "broken", "Stopped")],
@@ -71,11 +71,11 @@ describe("buildSetup", () => {
     const byId = Object.fromEntries(summary.addOns.map((addOn) => [addOn.id, addOn]));
     expect(byId.applets).toMatchObject({ status: "not-installed", command: "bb plugin install applets@bb-studio --yes", summary: expect.stringMatching(/^Experimental/) });
     expect(byId.mobile).toMatchObject({ status: "not-installed", optional: expect.stringContaining("iOS") });
-    expect(byId["emoji-react"]).toMatchObject({ status: "disabled", command: "bb plugin enable emoji-react" });
+    expect(byId.studio).toMatchObject({ status: "disabled", command: "bb plugin enable studio" });
     expect(byId["smart-decisions"]).toMatchObject({ status: "needs-setup", command: null });
     expect(byId["smart-decisions"]!.problems.map((each) => each.title)).toEqual(["No Jev provider is set up"]);
     expect(byId["studio-code"]).toMatchObject({ status: "installed", passed: ["code-server found"] });
-    expect(summary.commands).toEqual(["bb plugin install applets@bb-studio --yes", "bb plugin enable emoji-react"]);
+    expect(summary.commands).toEqual(["bb plugin install applets@bb-studio --yes", "bb plugin enable studio"]);
     expect(summary.installAll).toBe("bb plugin install applets@bb-studio --yes");
     expect(summary.otherProblems.map((each) => each.pluginId)).toEqual(["other"]);
     expect(summary.checkedAt).toBe(1000);
@@ -103,10 +103,10 @@ describe("SetupService", () => {
   const service = (fake: ReturnType<typeof fakeSdk>) => new SetupService({ sdk: fake.sdk, health: async () => health() });
 
   it("installs from the bb-studio marketplace with the source BB resolved, and reports failures", async () => {
-    const fake = fakeSdk([plugin("studio")], { installFails: ["emoji-react"] });
-    const result = await service(fake).install(["applets", "emoji-react"]);
+    const fake = fakeSdk([plugin("studio")], { installFails: ["studio-code"] });
+    const result = await service(fake).install(["applets", "studio-code"]);
     expect(fake.calls).toEqual(["install applets@bb-studio confirmed"]);
-    expect(result.failures).toEqual([{ id: "emoji-react", error: "permission denied" }]);
+    expect(result.failures).toEqual([{ id: "studio-code", error: "permission denied" }]);
     await expect(service(fake).install(["not-ours"])).resolves.toMatchObject({ failures: [{ id: "not-ours", error: expect.stringContaining("isn't a BB Studio add-on") }] });
   });
 
@@ -119,28 +119,44 @@ describe("SetupService", () => {
   });
 
   it("enables only add-ons and removes only retired plugins that nothing blocks", async () => {
-    const fake = fakeSdk([plugin("emoji-react", { enabled: false }), plugin("studio-tables")]);
-    await service(fake).enable("emoji-react");
+    const fake = fakeSdk([plugin("studio-code", { enabled: false }), plugin("studio-tables")]);
+    await service(fake).enable("studio-code");
     await expect(service(fake).enable("studio-tables")).rejects.toThrow("isn't a BB Studio add-on");
-    await expect(service(fake).remove("emoji-react")).rejects.toThrow("isn't a retired");
+    await expect(service(fake).remove("studio-code")).rejects.toThrow("isn't a retired");
     await service(fake).remove("studio-tables");
-    expect(fake.calls.filter((call) => !call.startsWith("rpc"))).toEqual(["enable emoji-react", "remove studio-tables"]);
+    expect(fake.calls.filter((call) => !call.startsWith("rpc"))).toEqual(["enable studio-code", "remove studio-tables"]);
+  });
+});
+
+describe("retired Studio Reactions", () => {
+  it("can be removed only once Studio has copied its settings", async () => {
+    const fake = fakeSdk([plugin("emoji-react")]);
+    let copied = false;
+    const settingsCopied = vi.fn(async (id: string) => id === "emoji-react" && copied);
+    const setup = new SetupService({ sdk: fake.sdk, health: async () => health(), settingsCopied });
+    const blocked = await setup.remove("emoji-react");
+    expect(blocked.failures).toEqual([{ id: "emoji-react", error: expect.stringContaining("hasn't copied its settings") }]);
+    expect(fake.calls).not.toContain("remove emoji-react");
+    copied = true;
+    expect((await setup.summary(0)).retired[0]).toMatchObject({ id: "emoji-react", blocker: null, removeCommand: "bb plugin remove emoji-react" });
+    await setup.remove("emoji-react");
+    expect(fake.calls).toContain("remove emoji-react");
   });
 });
 
 describe("formatSetup", () => {
   it("prints the status, retired plugins and the commands to run", async () => {
-    const plugins = allInstalled().filter((each) => each.id !== "applets").map((each) => (each.id === "emoji-react" ? { ...each, enabled: false } : each));
+    const plugins = allInstalled().filter((each) => each.id !== "applets").map((each) => (each.id === "studio-code" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("studio-tables")]);
     const text = formatSetup(await buildSetup(sdk, health({ problems: [{ ...problem("smart-decisions", "degraded", "No Jev provider is set up"), detail: "Add a key" }] })));
     expect(text).toContain("BB Studio add-ons\n");
     expect(text).toMatch(/ {2}not installed +applets +Studio Applets: Experimental/);
-    expect(text).toMatch(/ {2}disabled +emoji-react +Studio Reactions:/);
+    expect(text).toMatch(/ {2}disabled +studio-code +Studio Code:/);
     expect(text).toMatch(/ {2}needs setup +smart-decisions +Studio Decisions:.*\n +degraded: No Jev provider is set up\. Add a key/);
     expect(text).toMatch(/ {2}ok +studio +Studio:/);
     expect(text).toContain("Retired plugins still installed\n  studio-tables");
     expect(text).toContain("Then remove it: bb plugin remove studio-tables");
-    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin install applets@bb-studio --yes\n  bb plugin enable emoji-react")).toBe(true);
+    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin install applets@bb-studio --yes\n  bb plugin enable studio-code")).toBe(true);
   });
 
   it("says when there's nothing left to run", async () => {
@@ -165,10 +181,10 @@ describe("SetupService install", () => {
       active--;
     });
     const service = new SetupService({ sdk, health: async () => health() });
-    const [first, second] = await Promise.all([service.install(["studio", "applets"]), service.install(["applets", "emoji-react"])]);
+    const [first, second] = await Promise.all([service.install(["studio", "applets"]), service.install(["applets", "studio-code"])]);
     expect(first.failures).toEqual([]);
     expect(second.failures).toEqual([]);
-    expect(calls).toEqual(["install applets", "install emoji-react"]);
+    expect(calls).toEqual(["install applets", "install studio-code"]);
     expect(overlapped).toBe(false);
   });
 });

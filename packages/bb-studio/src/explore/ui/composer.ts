@@ -1,5 +1,5 @@
 // What a Next suggestion adds to the draft. Picking the composer is the
-// kit's (`@bb-studio/kit/composer`), shared with Studio Reactions.
+// kit's (`@bb-studio/kit/composer`), shared with Reactions (`src/reactions`).
 
 /** Adds `text` to the draft, after anything already there. */
 export function appendDraft(current: string, text: string): string {

@@ -37,7 +37,7 @@ do not have to maintain competing defaults.
 | Draw | Excalidraw's canvas controls and item-level title, project, export, and deletion | Existing controls cover drawing preferences. There is no background model job to configure. |
 | Artifacts | Explicit save/upload, project placement, item versions, preview/download/export, archive/delete | Existing item controls cover storage actions; no automatic expiry is imposed. |
 | Mobile | APNs credentials/environment/bundle and Expo endpoint in plugin settings; mute per thread; notification permission and presentation in BB/iOS | Relay configuration already exists. BB's Push notifications plugin owns event selection. |
-| Reactions | Reaction list, quoting/quote placement, selection/message-bar visibility | Existing plugin settings cover its behavior. |
+| Reactions (in Studio) | Reaction list, quoting/quote placement, selection/message-bar visibility in Studio's settings | Moved from the retired `emoji-react` plugin; Studio copies its values once. |
 | Decisions | Jev providers/keys/models/timeout, Smart Queue confidence thresholds, connection check, fallback provider/model/reasoning/off | Added service-tier persistence and the explicit-model RPC used by Talk. |
 
 ## Boundaries

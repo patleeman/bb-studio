@@ -3,16 +3,16 @@
 [BB](https://getbb.app) plugins for writing, talking, drawing, designing and
 keeping what your agents make. Studio is one plugin with pages, recordings,
 drawings, designs and artifacts built in: every item lives in one collection
-that you can search, tag, and hand to an agent. Code, Reactions, Decisions,
-Mobile and Applets are separate plugins beside it.
+that you can search, tag, and hand to an agent. Emoji reactions on replies
+are built in too. Code, Decisions, Mobile and Applets are separate plugins
+beside it.
 
 ![Live BB screenshot of the Studio collection](packages/bb-studio/assets/staged-preview.png)
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub, with everything you make built in: pages (collaborative documents with checklists you hand to agents, inline whiteboards and Explore's Next row), recordings and dictation (audio saved as you speak, then transcribed), drawings (Excalidraw scenes), designs (UI prototypes and slide decks with a reviewer) and artifacts (the files agents make). One collection with search, tags, project filters, templates, item chats and quotes, plus project leads with a Heartbeat, a Setup page, plugin health and backup and restore. |
+| [Studio](packages/bb-studio/) | `studio` | The hub, with everything you make built in: pages (collaborative documents with checklists you hand to agents, inline whiteboards and Explore's Next row), recordings and dictation (audio saved as you speak, then transcribed), drawings (Excalidraw scenes), designs (UI prototypes and slide decks with a reviewer) and artifacts (the files agents make). One collection with search, tags, project filters, templates, item chats, quotes and emoji reactions on replies, plus project leads with a Heartbeat, a Setup page, plugin health and backup and restore. |
 | [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces for your projects: one or more folders in a full editor beside your threads, run by a local code-server. |
-| [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 | [Studio Applets](packages/bb-studio-applets/) | `applets` | Experimental. Small native macOS apps your agents write as plain folders, such as a HUD of running threads, run by one signed app through an API you approve. |
@@ -42,7 +42,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
 2. Ask me whether to install all of these plugins or only some. List them with
    a one-line description each:
    - studio: the Studio collection and project leads, with pages, dictation and recordings, drawings, designs and artifacts built in; required, since the others run beside it
-   - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
    - studio-code: Studio Code; VS Code workspaces beside your threads (downloads code-server on first open)
    - mobile: push notifications for the BB Studio iOS app; only if I use it

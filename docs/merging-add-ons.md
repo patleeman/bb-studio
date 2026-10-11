@@ -342,9 +342,11 @@ commit, run `bb <old> migrate`, and check the items in Studio
 - Done: the bridge packages (`bb-studio-pages`, `-talk`, `-draw`,
   `-artifacts`, `-design`), their marketplace entries, Setup's `RETIRED`
   entries for them, the import RPCs and the iOS fallbacks are deleted.
-- The kit stays a packed tarball (`packages/bb-studio-kit.tgz`): Code,
-  Reactions and Decisions install alone from Git and can't import its
-  sources. It could shrink to what those three use.
+- The kit stays a packed tarball (`packages/bb-studio-kit.tgz`): Code and Decisions install alone from Git and can't import its
+  sources. It could shrink to what those two use. Reactions had no items, so
+  it moved without a bridge: Studio defines its settings and copies the
+  old plugin's once on start (`src/reactions/server.ts`), and Setup lists
+  `emoji-react` as retired.
 
 Done: the kit's `AddOnCollection`, `AddOnPanel` and `handOver` are gone (Code
 hands its collection path to Studio itself), and provider discovery no longer

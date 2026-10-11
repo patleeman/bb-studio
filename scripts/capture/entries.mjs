@@ -4,7 +4,7 @@ import bb_studio_talk from "./captures/bb-studio-talk.mjs";
 import bb_studio_pages from "./captures/bb-studio-pages.mjs";
 import bb_studio from "./captures/bb-studio.mjs";
 import bb_studio_artifacts from "./captures/bb-studio-artifacts.mjs";
-import bb_studio_reactions from "./captures/bb-studio-reactions.mjs";
+import bb_studio_reactions from "./captures/bb-studio-reactions-settings.mjs";
 import bb_studio_decisions from "./captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./captures/bb-studio-mobile.mjs";
 import design from "./captures/design.mjs";

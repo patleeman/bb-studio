@@ -3,12 +3,12 @@
   "schemaVersion": 1,
   "name": "bb-studio",
   "displayName": "BB Studio",
-  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs and artifacts built in, plus Code, Reactions, Decisions, Mobile and Applets beside it.",
+  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs and artifacts built in, plus Code, Decisions, Mobile and Applets beside it.",
   "plugins": [
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio, with pages, recordings, drawings, designs and artifacts built in: one collection with search, tags, project leads, item conversations and quotes.",
+      "description": "The home of BB Studio, with pages, recordings, drawings, designs and artifacts built in: one collection with search, tags, project leads, item conversations, quotes and emoji reactions on replies.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },
@@ -54,30 +54,6 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-mobile",
-          "ref": "stable"
-        }
-      }
-    },
-    {
-      "id": "emoji-react",
-      "displayName": "Studio Reactions",
-      "description": "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer.",
-      "icon": {
-        "url": "./packages/bb-studio-reactions/assets/icon.svg"
-      },
-      "tags": [
-        "interface",
-        "threads",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-reactions",
           "ref": "stable"
         }
       }

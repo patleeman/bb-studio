@@ -66,6 +66,16 @@ export function classify(plugin: SetupPluginEntry | undefined, problems: readonl
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const REMOVED = "Its settings, secrets and schedules, and its installed files.";
 
+export interface SetupOptions {
+  /** Whether Studio has copied a retired plugin's settings (it tries again first). */
+  settingsCopied?(pluginId: string): Promise<boolean>;
+}
+
+interface RetiredContext extends SetupOptions {
+  sdk: SetupSdk;
+  plugins: ReadonlyMap<string, SetupPluginEntry>;
+}
+
 interface RetiredPlugin {
   id: string;
   name: string;
@@ -74,7 +84,7 @@ interface RetiredPlugin {
   deleted: string;
   before: RetiredEntry["before"];
   /** Why it can't be removed yet, or null. */
-  blocker(plugin: SetupPluginEntry, ctx: { sdk: SetupSdk; plugins: ReadonlyMap<string, SetupPluginEntry> }): Promise<string | null>;
+  blocker(plugin: SetupPluginEntry, ctx: RetiredContext): Promise<string | null>;
 }
 
 export const RETIRED: readonly RetiredPlugin[] = [
@@ -87,6 +97,19 @@ export const RETIRED: readonly RetiredPlugin[] = [
     before: [],
     blocker: async () => null,
   },
+  {
+    id: "emoji-react",
+    name: "Studio Reactions",
+    why: "Reactions are built into Studio now: the same emoji buttons on messages, with their settings on Studio's settings page.",
+    kept: "Your reaction list and options: Studio copied them on its first start, except any you had already changed in Studio.",
+    deleted: REMOVED,
+    before: [],
+    // Studio copies the settings on start; removing the plugin first would lose them.
+    blocker: async (plugin, ctx) => {
+      if (!ctx.settingsCopied || (await ctx.settingsCopied(plugin.id))) return null;
+      return "Studio hasn't copied its settings yet. Run bb plugin reload studio, then check again.";
+    },
+  },
 ];
 
 const RETIRED_IDS = new Set(RETIRED.map((plugin) => plugin.id));
@@ -94,7 +117,7 @@ const RETIRED_IDS = new Set(RETIRED.map((plugin) => plugin.id));
 const ADDON_IDS = new Set(ADDONS.map((addOn) => addOn.id));
 
 /** One pass: BB's plugin list and marketplaces, joined with a health result. */
-export async function buildSetup(sdk: SetupSdk, health: HealthSummary): Promise<SetupSummary> {
+export async function buildSetup(sdk: SetupSdk, health: HealthSummary, options: SetupOptions = {}): Promise<SetupSummary> {
   const [{ plugins }, marketplaces] = await Promise.all([
     sdk.plugins.list(),
     sdk.plugins.marketplaces.list().catch(() => null),
@@ -124,7 +147,7 @@ export async function buildSetup(sdk: SetupSdk, health: HealthSummary): Promise<
     const plugin = byId.get(def.id)!;
     return {
       id: def.id, name: plugin.name ?? def.name, enabled: plugin.enabled, why: def.why, kept: def.kept, deleted: def.deleted, before: def.before,
-      blocker: await def.blocker(plugin, { sdk, plugins: byId }).catch((error) => `Couldn't check: ${message(error)}`),
+      blocker: await def.blocker(plugin, { ...options, sdk, plugins: byId }).catch((error) => `Couldn't check: ${message(error)}`),
       removeCommand: removeCommand(def.id),
     };
   }));
@@ -171,10 +194,10 @@ export class SetupService {
     sdk: SetupSdk;
     /** A health result at most this old, or a fresh check with 0. */
     health(maxAgeMs: number): Promise<HealthSummary>;
-  }) {}
+  } & SetupOptions) {}
 
   async summary(maxAgeMs: number): Promise<SetupSummary> {
-    return buildSetup(this.deps.sdk, await this.deps.health(maxAgeMs));
+    return buildSetup(this.deps.sdk, await this.deps.health(maxAgeMs), this.deps);
   }
 
   private async after(failures: SetupActionResult["failures"]): Promise<SetupActionResult> {

@@ -24,6 +24,7 @@ import { isPageId, PAGE_TAB, PageCard } from "./src/pages/ui/PageCard";
 import { ThreadPageLink } from "./src/pages/ui/ThreadPageLink";
 import { TalkBridge } from "./src/pages/ui/talk-bridge";
 import { registerExploreApp } from "./src/explore/app";
+import { registerReactionsApp } from "./src/reactions/app";
 import "./src/pages/ui/styles.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
@@ -184,6 +185,9 @@ export default definePluginApp((app) => {
   // microphone, hold-to-talk, dictation into other plugins' fields, the
   // `::recording{id="rec_…"}` card, Talk's commands and its Models settings.
   registerTalkApp(app);
+  // Reactions (built in; was Studio Reactions): emoji message actions that
+  // draft a reply, the old `::reactions` line, and their settings preview.
+  registerReactionsApp(app);
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));

@@ -1,46 +1,46 @@
-// @bb-studio/emoji-react — frontend.
+// Reactions (built in; was the Studio Reactions plugin, `emoji-react`).
 //
-// Port of NeonPilot's system-reply-actions extension for bb:
-//
-// 1. Reactions — one `messageAction` per configured emoji item, shown in the
+// 1. Reactions: one `messageAction` per configured emoji item, shown in the
 //    assistant-message text-selection menu (next to "Add to chat") and as an
 //    icon button in the per-message action bar. Clicking one drafts a reply:
 //    the highlighted text quoted first, the reaction text (e.g. "👍 Agree")
-//    below it. Both surfaces render the emoji itself, not the plugin icon —
-//    see the content script at the bottom.
+//    below it. Both surfaces render the emoji itself, not Studio's icon; see
+//    the content script at the bottom.
 //
-// 2. Legacy smart reactions — older replies may end with
+// 2. Legacy smart reactions: older replies may end with
 //    `::reactions{items="…"}`; a messageDirective still renders it as reaction
-//    buttons so it never shows as raw text. Agents no longer write it: Studio
-//    Pages' Next row offers quick replies.
+//    buttons so it never shows as raw text. Agents no longer write it.
 //
-// 3. Settings — BB owns the single settings form. A read-only preview shows
-//    whether saved menu settings need a window reload. Applying never disables
-//    the plugin. Static action registrations read one snapshot at setup.
+// 3. Settings: Studio's settings form holds them (./server.ts). A read-only
+//    preview shows whether saved menu settings need a window reload. Static
+//    action registrations read one snapshot at setup.
+//
+// Drafting goes through the kit's composer bridge, which Explore's
+// registration mounts in every composer (registerExploreApp).
 import { toast } from "sonner";
 import {
-  definePluginApp,
   useSettings,
+  type PluginAppBuilder,
   type PluginComposerApi,
   type PluginMessageActionContext,
   type PluginMessageDirectiveProps,
 } from "@get-bb/plugin-sdk/app";
 import { Button } from "@bb-studio/kit/ui";
-import { parseEmojiItems } from "./src/emoji-items";
-import { menuSettings, needsMenuReload, type MenuSettings } from "./src/settings";
-import { mountActionDecoration } from "./src/action-decoration";
-import { ComposerBridge, composerFor } from "@bb-studio/kit/composer";
+import { parseEmojiItems } from "./emoji-items";
+import { menuSettings, needsMenuReload, type MenuSettings } from "./settings";
+import { mountActionDecoration } from "./action-decoration";
+import { composerFor } from "@bb-studio/kit/composer";
 import {
   appendQuote,
   composeReactionDraft,
   type QuotePosition,
-} from "./src/draft";
+} from "./draft";
 import {
   parseSmartReactions,
   SMART_REACTIONS_DIRECTIVE,
-} from "./src/smart-reactions";
+} from "./smart-reactions";
 
-const PLUGIN_ID = "emoji-react";
+const PLUGIN_ID = "studio";
 
 // ---------------------------------------------------------------------------
 // Settings snapshot read synchronously at setup (slot registrations are
@@ -59,14 +59,6 @@ function readSettingsSnapshot(): MenuSettings {
     return menuSettings();
   }
 }
-
-// ---------------------------------------------------------------------------
-// Composer bridge: `messageAction` runs are host chrome (plain callbacks, no
-// hooks), so the kit's `ComposerBridge`, mounted as a banner, registers each
-// composer, and `composerFor` finds the one for the reacted-to message's
-// thread. Banners mount in every composer layout (actions do not mount in
-// compact).
-// ---------------------------------------------------------------------------
 
 /** Draft the reaction: quote and reaction text in the configured order. */
 function draftReaction(
@@ -157,10 +149,10 @@ function ReactionsPreview({ applied }: { applied: MenuSettings }) {
 }
 
 // ---------------------------------------------------------------------------
-// Plugin app setup
+// Registration
 // ---------------------------------------------------------------------------
 
-export default definePluginApp((app) => {
+export function registerReactionsApp(app: PluginAppBuilder) {
   const snapshot = readSettingsSnapshot();
   const items = parseEmojiItems(snapshot.emojiItems);
   const quoteSelection = snapshot.quoteSelection;
@@ -203,15 +195,6 @@ export default definePluginApp((app) => {
     });
   }
 
-  // Keeps `useComposer()` available to the messageAction runs above. Mounts
-  // in every composer layout and renders nothing.
-  app.composer.customize({
-    id: "emoji-react-composer",
-    banners: [
-      { id: "composer-bridge", chrome: "bare", component: ComposerBridge },
-    ],
-  });
-
   // Older replies may still carry the directive.
   app.slots.messageDirective({
     id: SMART_REACTIONS_DIRECTIVE,
@@ -228,4 +211,4 @@ export default definePluginApp((app) => {
     id: "emoji-glyph-actions",
     mount: ({ signal }) => mountActionDecoration(snapshot, signal),
   });
-});
+}
