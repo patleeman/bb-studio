@@ -3046,12 +3046,6 @@
               "null"
             ]
           },
-          "originSpaceId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "run": {
             "anyOf": [
               {
@@ -3100,7 +3094,6 @@
         },
         "required": [
           "threadId",
-          "originSpaceId",
           "run"
         ],
         "additionalProperties": false
@@ -3138,12 +3131,6 @@
               "null"
             ]
           },
-          "originSpaceId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "run": {
             "anyOf": [
               {
@@ -3192,7 +3179,6 @@
         },
         "required": [
           "threadId",
-          "originSpaceId",
           "run"
         ],
         "additionalProperties": false
@@ -3246,12 +3232,6 @@
               "null"
             ]
           },
-          "originSpaceId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "run": {
             "anyOf": [
               {
@@ -3300,7 +3280,6 @@
         },
         "required": [
           "threadId",
-          "originSpaceId",
           "run"
         ],
         "additionalProperties": false

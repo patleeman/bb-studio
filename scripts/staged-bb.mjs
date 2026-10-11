@@ -170,7 +170,7 @@ async function start() {
   const launcher = spawn(
     join(binDir, "bb-app"),
     ["--bundled", "--data-dir", dataDir, "--server-port", String(port), "--host-daemon-port", String(port + 1)],
-    { cwd: stagedDir, detached: true, stdio: ["ignore", log.fd, log.fd], env: stagedEnv({ BB_TELEMETRY: "0", BB_STUDIO_SPACES_DIR: join(stagedDir, "Spaces") }) },
+    { cwd: stagedDir, detached: true, stdio: ["ignore", log.fd, log.fd], env: stagedEnv({ BB_TELEMETRY: "0" }) },
   );
   launcher.unref();
   await log.close();

@@ -119,8 +119,6 @@ const leadProjectId = z.string().min(1).max(200);
 /** The user's Chief of Staff: the personal project's lead, with its heartbeat. Same data as project_lead for proj_personal. */
 const chiefOfStaff = z.object({
   threadId: z.string().nullable(),
-  /** Deprecated: always null. */
-  originSpaceId: z.string().nullable(),
   run: heartbeatRunSchema.nullable(),
 });
 export type ChiefOfStaffView = z.infer<typeof chiefOfStaff>;

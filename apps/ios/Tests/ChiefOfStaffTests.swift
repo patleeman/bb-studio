@@ -113,10 +113,4 @@ final class ChiefOfStaffTests: XCTestCase {
         XCTAssertEqual(ChiefOfStaffModel.chiefLabel, "Chief of Staff · personal project")
         XCTAssertFalse(ChiefOfStaffModel().isChief("thr_x"))
     }
-
-    func testHeartbeatLabels() {
-        XCTAssertEqual(ThreadLead.cadenceLabel("every15minutes"), "every 15 min")
-        XCTAssertEqual(ThreadLead.cadenceLabel("daily"), "daily")
-        XCTAssertEqual(ThreadLead.cadenceLabel("weekdays"), "weekdays")
-    }
 }

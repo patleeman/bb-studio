@@ -75,7 +75,7 @@ it("needs a lead for a heartbeat, and the personal project's lead is the Chief o
   await expect(x.leads.setRun("p", { enabled: true, cadence: "daily" })).rejects.toThrow(/lead/);
   await expect(x.leads.setChiefRun({ enabled: true, cadence: "daily" })).rejects.toThrow(/Chief of Staff/);
   const chief = await x.spawn({ projectId: "p" });
-  expect(await x.leads.setChief(chief.id)).toEqual({ threadId: chief.id, originSpaceId: null, run: null });
+  expect(await x.leads.setChief(chief.id)).toEqual({ threadId: chief.id, run: null });
   expect(await x.leads.get(PERSONAL_PROJECT_ID)).toMatchObject({ leadThreadId: chief.id });
   await x.leads.setChiefRun({ enabled: true, cadence: "hourly" });
   expect(created(x)[0]).toMatchObject({ name: `Studio project heartbeat ${PERSONAL_PROJECT_ID}`, execution: { prompt: CHIEF_HEARTBEAT, targetThreadId: chief.id } });
@@ -135,7 +135,7 @@ it("moves the default Space's lead (the Chief of Staff) to the personal project,
   x.lead("spc_personal", chief.id);
   x.run("spc_personal", 1, "old");
   await x.finish();
-  expect(await x.leads.chief()).toEqual({ threadId: chief.id, originSpaceId: null, run: { enabled: true, cadence: "weekdays", time: "08:30" } });
+  expect(await x.leads.chief()).toEqual({ threadId: chief.id, run: { enabled: true, cadence: "weekdays", time: "08:30" } });
   // The Space heartbeat is retired and a project one made, aimed at the same thread.
   expect(x.automations.map((each) => each.name)).toEqual([`Studio project heartbeat ${PERSONAL_PROJECT_ID}`]);
   expect(x.callRpc.mock.calls.some(([arg]) => arg.method === "automations_delete" && (arg.input as { automationId: string }).automationId === "old")).toBe(true);

@@ -2626,12 +2626,10 @@ public enum Studio {
 
   public struct ChiefOfStaffOutput: Sendable, Hashable, Codable {
     public var threadId: String?
-    public var originSpaceId: String?
     public var run: ChiefOfStaffOutputRun?
 
-    public init(threadId: String? = nil, originSpaceId: String? = nil, run: ChiefOfStaffOutputRun? = nil) {
+    public init(threadId: String? = nil, run: ChiefOfStaffOutputRun? = nil) {
       self.threadId = threadId
-      self.originSpaceId = originSpaceId
       self.run = run
     }
   }
@@ -2708,12 +2706,10 @@ public enum Studio {
 
   public struct ChiefOfStaffSetOutput: Sendable, Hashable, Codable {
     public var threadId: String?
-    public var originSpaceId: String?
     public var run: ChiefOfStaffSetOutputRun?
 
-    public init(threadId: String? = nil, originSpaceId: String? = nil, run: ChiefOfStaffSetOutputRun? = nil) {
+    public init(threadId: String? = nil, run: ChiefOfStaffSetOutputRun? = nil) {
       self.threadId = threadId
-      self.originSpaceId = originSpaceId
       self.run = run
     }
   }
@@ -2844,12 +2840,10 @@ public enum Studio {
 
   public struct ChiefOfStaffSetRunOutput: Sendable, Hashable, Codable {
     public var threadId: String?
-    public var originSpaceId: String?
     public var run: ChiefOfStaffSetRunOutputRun?
 
-    public init(threadId: String? = nil, originSpaceId: String? = nil, run: ChiefOfStaffSetRunOutputRun? = nil) {
+    public init(threadId: String? = nil, run: ChiefOfStaffSetRunOutputRun? = nil) {
       self.threadId = threadId
-      self.originSpaceId = originSpaceId
       self.run = run
     }
   }

@@ -147,7 +147,7 @@ export class ProjectLeads {
   }
 
   private chiefView(view: ProjectLeadView): ChiefOfStaffView {
-    return { threadId: view.leadThreadId, originSpaceId: null, run: view.run };
+    return { threadId: view.leadThreadId, run: view.run };
   }
 
   /** The personal project's lead, in the Chief of Staff shape. */

@@ -87,16 +87,4 @@ public struct ThreadLead: Hashable, Sendable {
         ("hourly", "Hourly"), ("every2hours", "Every 2 hours"), ("every6hours", "Every 6 hours"),
         ("daily", "Daily"), ("weekdays", "Weekdays"), ("weekly", "Weekly"), ("custom", "Custom"),
     ]
-
-    /// "every 15 min", "daily" and the like, as the web sidebar's Lead label says it.
-    public static func cadenceLabel(_ cadence: String) -> String {
-        switch cadence {
-        case "every5minutes": "every 5 min"
-        case "every15minutes": "every 15 min"
-        case "every30minutes": "every 30 min"
-        case "every2hours": "every 2 h"
-        case "every6hours": "every 6 h"
-        default: cadences.first { $0.id == cadence }?.label.lowercased() ?? cadence
-        }
-    }
 }
