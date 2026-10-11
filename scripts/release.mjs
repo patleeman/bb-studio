@@ -81,11 +81,20 @@ try {
     for (const name of packages) {
       const dir = join(tree, "packages", name);
       const bin = (tool) => join(dir, "node_modules", ".bin", tool);
-      if (existsSync(bin("tsc"))) step(`${name} typecheck`, bin("tsc"), ["--noEmit"], dir);
       const config = readdirSync(dir).find((file) => /^vitest\.config\.[cm]?[jt]s$/.test(file));
-      if (existsSync(bin("vitest")) && (config || existsSync(join(dir, "test")) || readdirSync(dir).some((file) => file.endsWith(".test.ts")))) {
-        step(`${name} tests`, bin("vitest"), ["run", ...(config ? ["--config", config] : [])], dir);
-      }
+      const hasTests = Boolean(config) || existsSync(join(dir, "test")) || readdirSync(dir).some((file) => file.endsWith(".test.ts"));
+      // A package whose dependencies this checkout never installed (a new
+      // package before `pnpm install`) would otherwise skip its checks silently.
+      if (existsSync(join(dir, "tsconfig.json")) && !existsSync(bin("tsc"))) {
+        failed = true;
+        results.push({ label: `${name} typecheck`, ok: false });
+        console.log(`FAIL  ${name} typecheck: its dependencies aren't installed in this checkout; run pnpm install, then release again`);
+      } else if (existsSync(bin("tsc"))) step(`${name} typecheck`, bin("tsc"), ["--noEmit"], dir);
+      if (hasTests && !existsSync(bin("vitest"))) {
+        failed = true;
+        results.push({ label: `${name} tests`, ok: false });
+        console.log(`FAIL  ${name} tests: its dependencies aren't installed in this checkout; run pnpm install, then release again`);
+      } else if (hasTests) step(`${name} tests`, bin("vitest"), ["run", ...(config ? ["--config", config] : [])], dir);
     }
   }
   // Build each plugin the way BB installs it from Git: its package directory
