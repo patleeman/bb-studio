@@ -316,6 +316,15 @@ voice service; the capture then makes a summary, a saved cleaned transcript
 and a notes page, plays the audio, seeks to the second section and pauses.
 Recapture with `BB_CAPTURE_ONLY=talk-page`.
 
+![Live BB screenshot of Studio's library filtered to recordings, with the unsent-audio banner](assets/recordings-unsent.png)
+
+Studio's library filtered to recordings, with the banner for audio this
+device kept because the server refused it (a piece set aside in the browser's
+store by the capture). "Weekly product sync" was copied in from the Talk
+plugin by `bb talk migrate`. **Review** opens
+`/plugins/studio/studio/recordings/unsent` as an "Unsent audio" tab, where each piece can be retried,
+downloaded or discarded. Recapture with `BB_CAPTURE_ONLY=talk-unsent`.
+
 ![Talk models settings with a cleanup model selected](assets/recordings-model-settings.png)
 
 Studio's settings page after `bb talk migrate`: Talk's settings, with the
