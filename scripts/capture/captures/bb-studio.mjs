@@ -353,6 +353,35 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     })()`),
   },
   {
+    // Setup → Kinds with Designs turned off for the shot (restored after).
+    id: "studio-kinds",
+    packageDir: "bb-studio",
+    fileName: "kinds.png",
+    setup: async (client) => {
+      await pluginRpc("studio", "kinds.update", { kind: "design", on: false });
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Set up BB Studio", 30000);
+      await client.waitForText("Kinds");
+      for (const label of ["Pages", "Drawings", "Recordings and dictation", "Artifacts", "Designs"]) await client.waitForText(label);
+      await client.waitForText("Your designs are kept.");
+      await client.evaluate(`(() => {
+        const section = document.querySelector('section[aria-label="Kinds"]');
+        if (!section) throw new Error("The Kinds section is missing");
+        const switches = [...section.querySelectorAll('[role="switch"]')].map((each) => each.getAttribute("aria-label") + "=" + each.getAttribute("aria-checked"));
+        const want = ["Pages: turn off=true", "Drawings: turn off=true", "Recordings and dictation: turn off=true", "Artifacts: turn off=true", "Designs: turn on=false"];
+        if (JSON.stringify(switches) !== JSON.stringify(want)) throw new Error("Kind switches: " + switches.join(", "));
+        section.scrollIntoView({ block: "start" });
+        return true;
+      })()`);
+      await sleep(400);
+      return async () => { await pluginRpc("studio", "kinds.update", { kind: "design", on: true }); };
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      const box = document.querySelector('section[aria-label="Kinds"]').getBoundingClientRect();
+      return { x: Math.max(0, box.left - 24), y: Math.max(0, box.top - 24), width: box.width + 48, height: box.height + 48, scale: 2 };
+    })()`),
+  },
+  {
     id: "studio-setup",
     packageDir: "bb-studio",
     fileName: "plugin-setup.png",

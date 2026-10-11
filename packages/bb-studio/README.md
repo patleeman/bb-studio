@@ -1019,6 +1019,13 @@ commands left to run; `--json` prints the whole summary.
 **Setup → Kinds** lists the kinds built into Studio: pages, drawings,
 recordings and dictation, artifacts and designs.
 
+![Live BB screenshot of the Kinds section in Studio's Setup page](assets/kinds.png)
+
+Captured from a staged BB: the Kinds section of Studio's Setup page with
+Designs turned off for the shot. Each kind shows what it covers and its
+On/Off switch; the off one says its designs are kept. No plugin in the
+staged BB replaces a kind, so no "Open and create with" menu shows.
+
 - **On/Off.** Off hides the kind: Studio's collection, search and New menus
   leave its items out, agents don't get its tools or instructions, and its
   thread tab, composer entries and reply cards go away. Nothing is deleted;
