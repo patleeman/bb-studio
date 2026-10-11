@@ -1,7 +1,8 @@
 // Quoting an artifact into its thread. Select text in the viewer, including
 // inside an HTML preview (its quote script reports the selection), or drag
 // over an image, then send it with a note. It goes to the artifact's home
-// thread through Studio Chat; without Studio Chat, BB's composer opens with it.
+// thread through Studio's item chat; with no home thread, BB's composer opens
+// with it.
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { toast } from "sonner";
 import { GHOST_BUTTON, Icon, PRIMARY_BUTTON, useHomeThread, useItemChat } from "@bb-studio/kit/app";

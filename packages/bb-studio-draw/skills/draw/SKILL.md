@@ -67,5 +67,4 @@ storage, on the thread's host.
 Draw is a BB Studio add-on. With the Studio plugin installed, drawings appear
 in Studio's single collection next to pages and recordings, where they can be
 moved between projects, archived, searched by the words written on them, and
-deleted. Without Studio, the Drawings panel shows the same collection on its
-own.
+deleted.

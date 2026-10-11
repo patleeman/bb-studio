@@ -34,7 +34,7 @@ Tag schemas live in the kit's `studioTagSchemas`. A kind's `mentionProviderId` i
 
 ## Shared item services
 
-The Studio hub stores links, item threads, activity, comments, and content versions. Add-ons call it through `studioServices(bb.sdk)` from `@bb-studio/kit/server`; they remain usable when Studio is absent. `RelatedPanel` in the kit shows backlinks, outgoing links, threads, comments, and versions from item headers.
+The Studio hub stores links, item threads, activity, comments, and content versions. Add-ons call it through `studioServices(bb.sdk)` from `@bb-studio/kit/server`; `RelatedPanel` in the kit shows backlinks, outgoing links, threads, comments, and versions from item headers.
 
 `replaceLinks` replaces one source's outgoing edges for an item. Pages sends mentions and item links. `links` returns outgoing edges and backlinks. `spawnForItem` creates and records a thread; `linkItemThread` records threads created by existing workflows, and `threadItems` lists a thread's linked items. The Pages and Drawings thread panel tabs use both: they list the thread's items first, and link each item they create to the thread with the `created` role. Studio also links the first accepted composer input's item refs, including multiple selected items, while keeping the composer's model and workspace choices. Studio reconciles thread states at startup and tracks lifecycle events. Pages chats and Studio Chat links are linked the same way.
 
@@ -89,8 +89,7 @@ in one workspace. Narrow screens show one pane at a time with a pane picker, kee
 `workspace.ts` in the kit owns a versioned cross-bundle registry of editor providers
 and destination elements. Each add-on's `RetainedPanels` renders through its own
 React tree into the destination, preserving SDK identity and editor state. Studio
-owns only the layout. Missing providers show an unavailable state; without Studio's
-workspace opener, navigation falls back to the add-on's ordinary page. The existing
+owns only the layout. Missing providers show an unavailable state. The existing
 BB tab bars, thread panes and split drop targets are unchanged.
 
 ### Agents and the workspace
@@ -110,5 +109,4 @@ item address (`/plugins/<plugin>/<panel>/<id>`) from an add-on that opens in
 the workspace becomes a tab, and the address is replaced with the
 workspace's, so Back doesn't return to it. A sub-view, such as a page's chat
 (`/plugins/pages/pages/<id>/chat/<thread>`), keeps its own page. Item cards and
-**Open in Pages** call `openAppPath`, which opens the tab directly, or the
-item's page without Studio.
+**Open in Pages** call `openAppPath`, which opens the tab directly.

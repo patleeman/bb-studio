@@ -31,7 +31,7 @@ Source toggle, Copy, Download and the ⋯ menu.
 
 ## What you get
 
-- **Artifacts in Studio.** With [Studio](../bb-studio) installed, artifacts join its collection next to pages, recordings and drawings. They get type, size and version columns, image thumbnails, projects, archive, move and delete. Studio search matches titles, descriptions and the text of text files up to 1 MB (HTML is searched by its words). Saving to an archived artifact brings it back. Studio can't create an artifact, because artifacts come from threads. Without Studio, the **Artifacts** panel shows the same collection.
+- **Artifacts in Studio.** With [Studio](../bb-studio) installed, artifacts join its collection next to pages, recordings and drawings. They get type, size and version columns, image thumbnails, projects, archive, move and delete. Studio search matches titles, descriptions and the text of text files up to 1 MB (HTML is searched by its words). Saving to an archived artifact brings it back. Studio can't create an artifact, because artifacts come from threads.
 - **Viewer** (`/plugins/artifacts/artifacts/<id>`):
   - Images fit the window. Click to switch to actual size.
   - HTML runs in a sandboxed frame.

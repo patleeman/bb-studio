@@ -371,7 +371,6 @@ export function PageView({
   chatThreadId: string | null;
   onCreateInside(): void;
   onDeleted(): void;
-  /** "Studio" when Studio is installed, else "Pages". */
   backLabel: string;
   onBack(): void;
 }) {

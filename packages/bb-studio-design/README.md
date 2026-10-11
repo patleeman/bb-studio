@@ -47,7 +47,7 @@ opened at `#why`.
 
 ## What you get
 
-- **Designs in Studio.** With [Studio](../bb-studio) installed, designs are a Studio kind next to pages and drawings: create, move, rename, duplicate, archive, delete and export. Without Studio, the **Designs** panel lists them.
+- **Designs in Studio.** With [Studio](../bb-studio) installed, designs are a Studio kind next to pages and drawings: create, move, rename, duplicate, archive, delete and export. The **Designs** panel also lists them.
 - **Card in the agent's reply.** When an agent makes or changes a design, its reply shows a card (`::design{id="…"}`) with the newest round's first screens. The name or arrow opens the design in the thread's **Design** tab beside the chat. Opened without a design, the tab lists the thread's designs.
 - **Full-screen view** (`/plugins/design/designs/<id>`): the design under Studio's item header, with an editable name and the design's chat.
 - **Canvas.** Drag the background or hold Space to pan. Pinch, or hold ⌘ and scroll, to zoom. Rounds stack newest first, each with a title and intro. Each option is a live frame at its real size (desktop 1280×800, tablet 834×1112, mobile 390×844, slide 1920×1080, square, story, A4, Letter, email, or any `WIDTHxHEIGHT` from 200 to 4000 px a side) that you can click and type in. Screens update as the agent writes them.

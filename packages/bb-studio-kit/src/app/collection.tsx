@@ -1,6 +1,6 @@
 // The Studio collection: one searchable, filterable list of items of any
-// kind, sorted and optionally grouped. Studio renders it for every installed add-on; an add-on renders
-// it alone for its own kind when Studio isn't installed.
+// kind, sorted and optionally grouped. Studio renders it for every installed add-on; an add-on that
+// keeps its own page renders it alone for its own kind.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { StudioAction } from "../contract";

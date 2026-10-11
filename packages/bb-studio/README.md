@@ -138,10 +138,9 @@ open in the background, so it's as you left it when you come back.
   the same ones, and closes tabs of deleted items.
 - **New ▾** creates any kind an installed add-on offers, in the current
   project. It always opens the full menu, even with a kind filter active.
-- **Takes over from the add-ons.** With Studio installed, each add-on's own
-  collection hands over to Studio filtered to its kind, and item pages lead
-  back to Studio. Studio's ⋯ menu can hide the add-ons' sidebar rows, so
-  Studio is the only entry. Without Studio, each add-on works on its own.
+- **Takes over from the add-ons.** Each add-on's own collection hands over
+  to Studio filtered to its kind, and item pages lead back to Studio. Studio's
+  ⋯ menu can hide the add-ons' sidebar rows, so Studio is the only entry.
 - **The BB Studio theme**: the app icon's colors for all of BB, light and
   dark. Teal-black and pale-teal surfaces, a coral accent, teal file paths.
   Pick **BB Studio** in Settings → Appearance, or run `bb theme set
@@ -286,9 +285,7 @@ new-conversation composer, and sending turns that pane into the new thread.
 conversation keeps the item's context, project and draft; a quote goes to its
 linked thread, or opens the composer with the quote when there is none. Where
 BB doesn't split (a small screen, or splits turned off), these open in the
-main view. Pages keeps its
-page-chat history; standalone Pages still provides its own chat when Studio is
-absent.
+main view. Pages keeps its page-chat history.
 
 Existing Studio Chat installs must migrate their links (`bb studio-chat migrate`)
 before removing the old plugin; the [Setup page](#setup) checks this for you.

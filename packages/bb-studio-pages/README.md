@@ -16,8 +16,7 @@ the cursor, then review it and post when ready. The page body stays separate.
 
 The live 390-pixel "Offline mode launch" page keeps **Chat** visible while
 **Item actions** is open with Related, Open in split, Dictate, Comments and the
-page menu. The standalone phone capture
-also checks that Version history remains reachable through Page actions.
+page menu.
 These compact captures run on stable BB 0.45.0 with the full suite installed
 from pushed commit 306c841. They check viewport bounds, button hit targets,
 and the Related popover before capture.
@@ -39,28 +38,6 @@ The launch page is open. It holds:
 At the top left is the **Studio** / "Offline mode launch" breadcrumb. At the
 top right are **Chat**, Related, Open in split, **Dictate**, **Version
 history**, **Comments** and the page menu. **Dictate** appears because Talk is installed in the staged app.
-
-![Standalone Pages Chat with its retained draft](assets/standalone-chat.png)
-
-The capture shows Pages' own **Chat about "Offline mode launch"** composer in
-the main view, holding its retained draft and `release-review.txt`. The
-standalone Chat check temporarily disables Studio in the isolated
-staged app. It resumes a legacy page conversation without creating another
-thread, then opens **New conversation** in the main view. Its draft and
-file survive navigation to another page and back, and a browser reload. The
-desktop check also schedules a second page's conversation, opens the new
-thread in the main view, and verifies its page context, edited prompt,
-attachment, and updated Chat action. The
-[phone capture](assets/standalone-chat-mobile.png) keeps every composer
-control inside the viewport. All fixture sends are scheduled and their threads
-are deleted before any agent runs. The capture restores Studio and
-removes its pages and files.
-
-```sh
-BB_CAPTURE_STANDALONE_CHAT=1 \
-  BB_CAPTURE_ONLY=pages-standalone-chat,pages-standalone-chat-mobile \
-  node scripts/capture-plugin-screenshots.mjs --plugin pages
-```
 
 ![The Pages Comments panel with a microphone in the reply box](assets/comments.png)
 
@@ -141,13 +118,10 @@ afterwards.
 - **Projects and nesting.** Pages belong to a project or are global, and
   nest to any depth, with a breadcrumb back up. Give a page an emoji icon,
   move it, archive it, or delete it from its ⋯ menu.
-- **Chat about a page.** With [Studio](../bb-studio) installed, **Chat**
-  opens beside the page, in a split: the page's linked thread, or a new
-  conversation with the page as context. **Choose conversation…** picks
-  another. Without Studio, Pages keeps its own composer and history, and
-  conversations open in BB's main view at
-  `/plugins/pages/pages/<id>/compose`, with drafts and attachments kept as you
-  move between pages. Sending starts an agent thread in the page's project.
+- **Chat about a page.** **Chat** opens beside the page, in a split: the
+  page's linked thread, or a new conversation with the page as context.
+  **Choose conversation…** picks another. Sending starts an agent thread in
+  the page's project.
 - **Version history.** Pages saves a version before an agent's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.

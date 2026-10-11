@@ -27,7 +27,7 @@ own tools.
 
 ## What you get
 
-- **Drawings in Studio.** With [Studio](../bb-studio) installed, drawings join its collection next to pages and recordings: thumbnails, projects, search over the words on a drawing, archive, move, delete, duplicate, templates and "Copy text". Without Studio, the **Drawings** panel shows the same collection.
+- **Drawings in Studio.** With [Studio](../bb-studio) installed, drawings join its collection next to pages and recordings: thumbnails, projects, search over the words on a drawing, archive, move, delete, duplicate, templates and "Copy text".
 - **Editor** (`/plugins/excalidraw/drawings/<id>`). It autosaves as you work. The header has a back button, an editable name, sync status, the drawing's thread (with [Studio chat](../bb-studio); otherwise **New thread**), copy image, and a menu with **Download PNG** and Delete. The editor follows BB's active theme.
 - **Card in the agent's reply.** When an agent makes or changes a drawing, its reply shows a card (`::drawing{id="…"}`) with the picture, name and element count. The chevron hides the picture. The name or arrow opens the drawing in the thread's **Drawings** tab beside the chat, or in the main area without a workbench.
 - **Thread tab.** **Drawings** lists the drawings made or changed in that thread, then the project's recent ones. **New** makes one in the thread's project and links it to the thread. In the editor, **Attach** adds the drawing to the conversation as an image. So does the composer's `+` menu, **Drawing**. Neither sends a message.
