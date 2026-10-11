@@ -250,12 +250,16 @@ struct CaptureSheet: View {
                 guard file.data.count <= 25 * 1024 * 1024 else {
                     throw BBError(status: 413, message: "\(file.name) is over 25 MB.")
                 }
-                let result: Artifacts.ImportFileOutput = try await client.rpc("artifacts", Artifacts.Method.importFile, [
+                let input: JSONValue = [
                     "name": .string(file.name),
                     "mime": .string(file.mimeType),
                     "bytes": .string(file.data.base64EncodedString()),
                     "projectId": project.map { .string($0) } ?? .null,
-                ])
+                ]
+                // Artifacts are built into Studio; an older Studio falls back to the Artifacts plugin.
+                let result: Studio.ArtifactsImportFileOutput = try await client.viaStudio(
+                    { try await client.rpc("studio", Studio.Method.artifacts_importFile, input) },
+                    else: { try await client.rpc("artifacts", Artifacts.Method.importFile, input) })
                 guard let id = result.id else { throw BBError(status: 500, message: "Unexpected artifact response.") }
                 savedArtifactId = id
                 files.removeAll { $0.id == file.id }

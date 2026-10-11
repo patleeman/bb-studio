@@ -25,6 +25,11 @@ extension Route {
     /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
+        // Kinds built into Studio live under its panel: /plugins/studio/studio/artifacts/<id>.
+        if parts.count == 5, parts[0] == "plugins", parts[1] == "studio", parts[2] == "studio", parts[3] == "artifacts" {
+            self = .artifact(id: parts[4])
+            return
+        }
         guard parts.count == 4, parts[0] == "plugins" else { return nil }
         let id = parts[3]
         switch (parts[1], parts[2]) {

@@ -82,4 +82,29 @@ final class RPCFallbackTests: XCTestCase {
         await store.load(client)
         XCTAssertEqual(store.error, "tree exploded")
     }
+
+    func testArtifactsGoToStudioAndFallBackOnlyWhenStudioPredatesTheMerge() async throws {
+        let found = Data(#"{"ok":true,"result":{"artifact":null,"versions":[]}}"#.utf8)
+        let (current, currentCalls) = client { _ in (200, found) }
+        _ = try await current.artifact("art_1")
+        let currentPaths = await currentCalls.paths
+        XCTAssertEqual(currentPaths, ["/api/v1/plugins/studio/rpc/artifacts.get"])
+
+        let (old, oldCalls) = client { path in path.contains("/studio/") ? (404, Self.missingMethod) : (200, found) }
+        _ = try await old.artifact("art_1")
+        let oldPaths = await oldCalls.paths
+        XCTAssertEqual(oldPaths, ["/api/v1/plugins/studio/rpc/artifacts.get", "/api/v1/plugins/artifacts/rpc/get"])
+    }
+
+    func testArtifactFailureInStudioDoesNotFallBack() async throws {
+        let (failing, calls) = client { _ in (500, Data(#"{"ok":false,"error":{"message":"boom"}}"#.utf8)) }
+        do {
+            _ = try await failing.artifact("art_1")
+            XCTFail("A failing Studio must throw")
+        } catch {
+            XCTAssertEqual((error as? BBError)?.message, "boom")
+        }
+        let paths = await calls.paths
+        XCTAssertEqual(paths.count, 1)
+    }
 }

@@ -55,7 +55,8 @@ struct ThreadView: View {
     /// Permissions chosen in Model & permissions, waiting for the next message.
     @AppStorage private var pendingPermission: String?
 
-    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("artifacts") }
+    /// Artifacts are built into Studio; an older Studio needs the Artifacts plugin.
+    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains { $0 == "studio" || $0 == "artifacts" } }
 
     /// Hides the tab bar on iPhone, for a thread pushed from a list; a tab's
     /// own thread keeps it.

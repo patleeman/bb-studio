@@ -4,6 +4,8 @@ import XCTest
 final class SpacesTests: XCTestCase {
     func testItemPathsOpenTheItem() {
         XCTAssertEqual(Route(href: "/plugins/pages/pages/pg_1"), .page(id: "pg_1"))
+        XCTAssertEqual(Route(href: "/plugins/studio/studio/artifacts/art_1"), .artifact(id: "art_1"))
+        XCTAssertEqual(Route(href: "/plugins/artifacts/artifacts/art_1"), .artifact(id: "art_1"))
         XCTAssertNil(Route(href: "/plugins/studio/spaces/sp_1"))
     }
 

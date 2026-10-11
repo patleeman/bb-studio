@@ -3,9 +3,21 @@
   "calls": [
     {
       "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "artifacts",
       "method": "get",
       "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.text",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
@@ -15,9 +27,21 @@
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "artifacts",
       "method": "update",
       "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.move",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
@@ -27,9 +51,21 @@
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.delete",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "artifacts",
       "method": "delete",
       "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.saveAsPage",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
@@ -39,15 +75,33 @@
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.threadArtifacts",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "artifacts",
       "method": "threadArtifacts",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.candidates",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
       "plugin": "artifacts",
       "method": "candidates",
       "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.saveFiles",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
@@ -630,6 +684,12 @@
       "plugin": "pages",
       "method": "create",
       "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
+      "plugin": "studio",
+      "method": "artifacts.importFile",
+      "coverage": "generated method"
     },
     {
       "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
