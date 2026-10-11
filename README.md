@@ -100,8 +100,9 @@ Studio Teams (`bot-teams`) are retired. New installs need at most 11 plugins.
 If you had Studio Artifacts, Studio Draw, Studio Design or Studio Talk, update it too and
 run `bb artifacts migrate`, `bb excalidraw migrate`, `bb design migrate` or `bb talk migrate`: its
 last release copies your items into Studio, then Setup lets you remove it.
-For Talk, finish any recording or dictation in progress first: the recorder
-belongs to the Talk plugin until it's updated.
+For Talk, finish any recording or dictation in progress first (the recorder
+belongs to the Talk plugin until it's updated), and update Talk before Studio
+so Studio can take over its agent tools.
 To upgrade an existing install, update Studio and open **Studio → Setup**. It
 lists the add-ons you're missing, flags installed retired plugins, says what
 removing each keeps and deletes, and removes one only after you confirm. See

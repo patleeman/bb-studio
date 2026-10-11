@@ -155,7 +155,7 @@ export const RETIRED: readonly RetiredPlugin[] = [
     deleted: `${REMOVED} That includes its copy of the audio under its data folder (Studio has its own copy). Any recordings \`bb talk migrate\` listed as skipped are lost; copy what you need from them first. A keyboard shortcut you set on a Talk command has to be set again on Studio's. iOS app builds from before the merge stop opening recordings.`,
     before: [
       step("Finish or stop any recording or dictation in progress, and let its audio upload (the pill disappears).", null),
-      step("Update Studio and Studio Talk.", "bb plugin update studio --yes && bb plugin update talk --yes"),
+      step("Update Studio Talk, then Studio, so Studio can take over Talk's agent tools. (Updated Studio first? Reload it: bb plugin reload studio.)", "bb plugin update talk --yes && bb plugin update studio --yes"),
       step("Copy its recordings, audio and settings into Studio, and wait for Migration complete.", "bb talk migrate"),
     ],
     blocker: bridgeBlocker("recordings", TALK_BRIDGE_VERSION),

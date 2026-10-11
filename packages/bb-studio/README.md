@@ -528,7 +528,8 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
   failed piece is kept, because a retry may still find speech.
 - **Updating from the Talk plugin.** The recorder belongs to whichever
   plugin is running. Finish or stop any recording or dictation first, and let
-  its audio upload (the pill goes away), then update. Audio set aside in the
+  its audio upload (the pill goes away), then update Talk and then Studio
+  (see [the bridge](../bb-studio-talk/README.md)). Audio set aside in the
   browser carries over: Studio uses the same browser store, and its uploads
   go to Studio once the bridge has copied the recording.
 

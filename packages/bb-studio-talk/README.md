@@ -13,12 +13,18 @@ New installs don't need it. If you had Studio Talk installed, in this order:
 1. Finish or stop any recording or dictation in progress, and wait for the
    pill to go away (its audio has uploaded). The recorder is in the Talk
    plugin until it's updated.
-2. Update both, together:
+2. Update both, Talk first:
 
    ```sh
-   bb plugin update studio --yes
    bb plugin update talk --yes
+   bb plugin update studio --yes
    ```
+
+   In that order Studio takes over the `talk_*` agent tools when it starts.
+   BB lets only one plugin register a tool name, so a Studio that starts
+   while the old Talk still holds them runs without them (its status says
+   `tool "talk_make_notes" is already registered by plugin "talk"`) until
+   it's reloaded: `bb plugin reload studio`.
 
 3. Copy, and wait for "Migration complete":
 

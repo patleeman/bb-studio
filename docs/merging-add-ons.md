@@ -268,8 +268,14 @@ commit, run `bb <old> migrate`, and check the items in Studio
     it again. `data-bb-plugin="talk"` selectors in a content script's CSS
     become `studio`.
   - **The recorder.** It runs in the old plugin's frontend until that plugin
-    is updated, so the safe order is: finish recordings, update Studio and
-    the plugin together, `bb talk migrate`. Browser storage is per origin and
+    is updated, so the safe order is: finish recordings, update the plugin,
+    then Studio, then `bb talk migrate`.
+  - **Update order and agent tools.** In the staged migration, Studio updated
+    first started while the old Talk still held `talk_*`, and ran without
+    them (`tool "talk_make_notes" is already registered by plugin "talk"`)
+    until `bb plugin reload studio`. A plugin can't register a tool later, so
+    Setup and the bridge README say to update the old plugin first. The
+    earlier bridges have the same window. Browser storage is per origin and
     Studio keeps the same IndexedDB and localStorage names, so pieces the
     browser set aside carry over and upload to Studio once the bridge has
     copied their recording. Forwarded legacy RPCs (`segment_put` from an old
