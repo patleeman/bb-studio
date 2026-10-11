@@ -98,12 +98,13 @@ copy your artifacts in.
 
 ![Live BB screenshot of an artifact open as a Studio tab](assets/artifacts-preview.png)
 
-Captured from a staged BB. The seeded HTML report "Q3 usage report", saved
-twice from a staged thread's workspace, opened from its old
-`/plugins/artifacts/artifacts/<id>` address. Studio rewrote it and opened the
-artifact as a workspace tab at `/plugins/studio/studio/artifacts/<id>`. The
-viewer shows version 2 (`HTML · 2.1 KB · v2`) in its sandboxed frame, with
-**Chat**, Related, Open in split, the Source toggle, Copy, Download and the ⋯ menu.
+Captured from a staged BB before the merge, when this viewer was the
+Artifacts plugin's page; it now opens as a Studio tab. The seeded HTML
+report "Q3 usage report", saved twice from a staged thread's workspace, at
+version 2 (`HTML · 2.1 KB · v2`) in its sandboxed frame, with **Chat**,
+Related, Open in split, the Source toggle, Copy, Download and the ⋯ menu.
+Recapture with `BB_CAPTURE_ONLY=studio-artifacts`, which also checks that the
+old address opens it as a tab.
 
 ![The compact artifact header](assets/artifacts-compact-header.png)
 

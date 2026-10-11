@@ -1,0 +1,183 @@
+# Merging an add-on into Studio
+
+Studio is one plugin with one rail icon (`studio/studio`). Its content kinds
+are moving into it one at a time. Artifacts went first (`packages/bb-studio/src/artifacts`);
+Draw, Design, Talk and Pages follow the same steps. This is the checklist,
+with what Artifacts taught.
+
+## Rules
+
+- **Keep the old plugin id as the item namespace.** Items stay
+  `<old id>:<item id>` (`artifacts:art_…`). Studio's tables (tags, tabs, item
+  links, threads, activity, comments, versions, search index) are keyed by it
+  and need no rewrite. The built-in answers to its old provider id.
+- **No collection page of its own.** A kind's collection is Studio's library
+  filtered to that kind. `/plugins/studio/studio/<segment>` opens the library
+  with the Kind filter; every item opens as a Studio tab at
+  `/plugins/studio/studio/<segment>/<id>`. Drop `AddOnPanel`,
+  `AddOnCollection` and `handOver` for the kind.
+- **Keep names users and agents already know.** Agent tools, skill name,
+  mention provider id, message directive id, thread panel action and composer
+  entries keep their names. The CLI can't: BB allows one CLI command per
+  plugin (`cli command is already registered`), so `bb <old> …` becomes
+  `bb studio <segment> …`. The bridge keeps `bb <old> migrate`.
+- **Old addresses keep working.** Map `/plugins/<old>/<panel>/<id>` to the
+  Studio address everywhere a path comes in.
+
+## Checklist
+
+### 1. Move the code
+
+- Move server code to `packages/bb-studio/src/<segment>/server/` and UI to
+  `src/<segment>/ui/` with `git mv`, so history follows.
+- Write `src/<segment>/server.ts` exporting `register<Kind>(bb, db)`. It
+  registers the kind's RPC, HTTP routes, agent tools and mention provider on
+  Studio, and returns `{ store, provider, backup, cli, dispose }`. Studio's
+  `server.ts` calls it after `bb.storage.migrate`.
+- Turn the `registerStudio`/`createStoreProvider` call into a function that
+  returns `StudioProviderHandlers` (see `artifactProvider`). Set
+  `panel: null` in `studio_describe`. Point `href`s at the Studio address.
+- Prefix the kind's RPC methods: `<segment>.<method>` (`artifacts.get`).
+  Put the contract in the kit (`packages/bb-studio-kit/src/<segment>-contract.ts`),
+  because the bridge is a separate package and can't import Studio. Add it
+  to `src/public-contract.ts` so iOS gets generated names.
+- HTTP routes move under `/<segment>/…`, so content URLs become
+  `/api/v1/plugins/studio/http/<segment>/…`.
+- Icons: copy the SVGs into `packages/bb-studio/icons/` and add them to
+  Studio's `experimental_icons`. Icon names are namespaced by plugin id, so
+  `artifacts/image` becomes `studio/artifact-image`.
+- Move the skill directory to `packages/bb-studio/skills/` and update its
+  CLI and link examples.
+- Tests: plugin-level tests use a fake host with `pluginId: "studio"` (see
+  `src/artifacts/test/host.ts`). Update URLs, RPC names and CLI calls.
+
+### 2. Wire the built-in into Studio
+
+- `src/builtins.ts`: add a `BUILTIN_ROUTES` entry (`pluginId`, `segment`,
+  `kind`, `legacyRoot`). `builtinItemAt` and `canonicalPath` then cover
+  `itemAt`, `visitTab`, saved workspace tabs (`workspace-state.ts`) and the
+  workspace's route-to-tab effect.
+- Kit `contract.ts`: add the id to `STUDIO_BUILTINS`. `builtins.test.ts`
+  fails when it and `BUILTIN_ROUTES` disagree. Kit `references.ts`: add the
+  mention provider to `STUDIO_BUILTIN_MENTIONS`, and the Studio route next
+  to the old one in `STUDIO_REFERENCE_ROUTES`.
+- `server.ts`: add `{ pluginId, name, handlers }` to the `StudioHub`
+  built-ins. The hub calls them in-process with the same input and output
+  parsing as RPC. It doesn't discover an installed plugin with the same id
+  (the old copy or its bridge), so items never list twice.
+- Other add-ons that called the old plugin's `studio_*` methods use the kit's
+  `callProvider`, which routes built-ins through Studio's `provider.call`.
+  `studioIndex` already does. Kind-specific calls (Pages called
+  `artifacts.get`) go to Studio's prefixed methods.
+- `app.tsx`: add the lazy item view to `BUILTIN_VIEWS`, and register the
+  kind's thread panel actions, message directives and composer entries.
+  `BuiltinRoutes` registers the Studio and old roots with the workspace.
+  BB's app bundle is one file, so `lazy` defers rendering, not download.
+- Version history (`provider-history.ts`) and backup (`BackupService`
+  `builtins`) read the kind in-process. The backup section keeps the old
+  plugin id, so old backups restore into Studio.
+
+### 3. Copy the data
+
+BB scopes SQLite, KV, settings and files per plugin id, so Studio can't read
+the old plugin's data. Copy it.
+
+- Studio migration: export the old plugin's `CREATE` statement unchanged
+  (`ARTIFACT_TABLES`) and append it to Studio's `MIGRATIONS`. Never edit a
+  recorded statement. Tests that slice `MIGRATIONS` from the end break;
+  find the statement by content instead (`space-lead.test.ts`).
+- Import RPCs on Studio: `<segment>.missingBlobs`, `<segment>.importBlob`
+  (hash-checked, one per call: a blob can be 25 MB), and
+  `<segment>.importRows` (batches of 100). Import keeps ids and times. A
+  row Studio already has is left alone, so reruns are no-ops. A conflicting
+  row (same source file saved again after the update) is skipped with a
+  reason.
+- Check the old plugin for data outside SQLite: KV, settings, files under
+  its data dir, thread storage. Artifacts kept everything in SQLite blobs.
+
+### 4. Turn the old package into a bridge release
+
+Precedent: the studio-chat bridge (`git show d3df3ceb^:packages/bb-studio-chat/server.ts`)
+and `packages/bb-studio-artifacts`.
+
+- Bump the version (`0.2.0`), drop `app`, `skills` and experimental icons,
+  and describe it as the upgrade bridge in `package.json` and
+  `marketplace.json`. Keep the old `MIGRATIONS` statement byte for byte.
+- `src/migrate.ts`: blobs first (only the ones Studio lacks), then rows in
+  batches. Write a `migrated:<id>` KV marker per row Studio has. Validate
+  each row with the kit's import schema; list malformed rows with the
+  reason and keep them. The bridge never writes rows, so once every row has
+  a marker or is skipped, the copy is complete.
+- `server.ts`: run the copy on start, retrying with backoff while Studio is
+  down. Expose `migrationStatus` and `bb <old> migrate` (prints "Migration
+  complete"). Forward the old client RPCs and HTTP routes to Studio, waiting
+  for a complete copy first. Keep the old mention provider id, forwarding
+  `resolve` to Studio, because old pills name the old plugin.
+- Register no agent tools, skill or UI. BB rejects a tool name a second
+  plugin registers: the first registration wins and the other plugin shows
+  `tool "…" is already registered by plugin "…" — not registered` as its
+  status detail, without failing. While the pre-bridge plugin is still
+  installed next to the new Studio, load order decides which tools work and
+  Studio doesn't list the old plugin's items. Updating both together (Setup
+  says so) ends that window, and the bridge copies anything written in it.
+  Mention providers are scoped per plugin, so both can register the same id.
+- Studio `setup.ts`: add a `RETIRED` entry whose blocker checks the version
+  (`<BRIDGE_VERSION`: update it), that it's enabled, and `migrationStatus`.
+  Remove the id from `ADDONS` in `setup-addons.ts`. Its test skips retired
+  ids when comparing with `marketplace.json`.
+- Marketplace: keep the bridge listed in `marketplace.json` and
+  `.bb/plugins.json` with the bridge description, so `bb plugin update <old>`
+  resolves for existing installs. Unlist it when the bridge package is
+  deleted (as studio-chat was), keeping its `RETIRED` entry.
+
+### 5. Clients, docs and captures
+
+- iOS (`apps/ios`): call Studio's `<segment>.*` first and fall back to the
+  old plugin only on a missing method (`viaStudio` in
+  `Shared/Artifacts.swift`), for one release. Parse the Studio address in
+  `Route(href:)`. `scripts/gen-contracts.mjs` generates the old namespace
+  from the bridge's `legacyContract`, so the fallback's method names stay
+  checked. Run `pnpm gen:contracts`. Xcode isn't available to agents here;
+  `swiftc -typecheck -enable-bare-slash-regex Shared/*.swift Shared/Generated/*.swift`
+  checks the shared code.
+- Captures: move the kind's capture to `packageDir: "bb-studio"` with a
+  `fileName`, open it from the old address, and assert it lands as a Studio
+  tab. The bridge's README shows Studio's Setup page after
+  `bb <old> migrate`. `staged-bb.mjs --plugin studio` seeds the workspace
+  thread the artifact seeder needs.
+- Docs: Studio README section for the kind, bridge README with the upgrade
+  commands, root README table and install list, `docs/studio.md`,
+  `docs/backup.md`.
+- Kit changed: `sh scripts/refresh-locks.sh` with every package that has a
+  `package-lock.json`, then `pnpm install --lockfile-only`.
+
+### 6. Verify
+
+```sh
+pnpm -r typecheck && pnpm -r test
+pnpm check:compat && pnpm check:contracts && pnpm check:native-payloads && pnpm check:kit
+node scripts/check-marketplace.mjs && node scripts/check-docs.mjs && node scripts/check-icons.mjs
+git diff --check
+```
+
+End to end in a staged BB: start at the commit before the merge
+(`node scripts/staged-bb.mjs start --ref <old> --plugin studio`), seed
+items with the old plugin, install Studio and the bridge from the new pushed
+commit, run `bb <old> migrate`, and check the items in Studio
+(`bb studio list kind:<kind>`).
+
+## Notes for the next merges
+
+- **Design** sets `handOver={false}` only because cross-plugin URL rewrites
+  broke the desktop tab router. Inside Studio there's no cross-plugin
+  rewrite, so that goes away.
+- **Talk** keeps its own page only to show "set aside" unsent recordings.
+  When Talk merges, show those as a banner in Studio's library when it's
+  filtered to recordings.
+- **Pages** is called by other add-ons and calls them (embeds, `itemAt`);
+  move those calls to `callProvider` and Studio's prefixed methods.
+- When every add-on is merged, delete `AddOnCollection`, `AddOnPanel` and
+  `handOver` from the kit.
+- After the bridge's release cycle, delete the bridge package and its iOS
+  fallback the way studio-chat went (commits `d3df3ceb`, `f4f1ae22`). Keep
+  the old-address mapping; it costs nothing.
