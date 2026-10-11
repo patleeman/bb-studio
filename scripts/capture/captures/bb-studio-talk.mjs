@@ -367,7 +367,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
       };
       try {
         await client.navigate("/plugins/studio/studio");
-        await client.waitForSelector("[data-studio-workspace-editor]", 30000);
+        await client.waitForSelector("[data-studio-workspace]", 30000);
         const segment = { ...key, startedAt: Date.now() - 5 * 60_000, mimeType: "audio/webm;codecs=opus", lastPartAt: Date.now() - 5 * 60_000, durationMs: 21_000, complete: true, rejected: "The server refused this piece: durationMs is longer than 10 minutes.", parts: [] };
         await client.evaluate(outbox(`store.put({ ...${JSON.stringify(segment)}, parts: [new Uint8Array(48000).buffer] });`));
         // A fresh load reads the store, as after a refusal and a reload.
@@ -380,9 +380,14 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         // Review opens the unsent-audio page, which lists the piece; then back to the library for the frame.
         await client.clickButtonText("Review");
         await client.waitForText("Unsent audio");
+        await client.waitForSelector('[data-studio-workspace-tabs] button[aria-label="Close Unsent audio"]');
         await client.waitForText("durationMs is longer than 10 minutes");
+        // Close the unsent-audio tab Review opened, back to the filtered library.
+        await client.evaluate(`document.querySelector('button[aria-label="Close Unsent audio"]')?.click()`);
         await client.navigate("/plugins/studio/studio/recordings");
         await client.waitForSelector("[data-talk-unsent-notice]", 30000);
+        const tabs = await client.evaluate(`[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].map((tab) => tab.textContent.trim())`);
+        if (tabs.some((tab) => /unsent/i.test(tab))) throw new Error(`The unsent-audio tab stayed open: ${JSON.stringify(tabs)}`);
         await sleep(500);
       } catch (error) {
         await client.capture(`${process.env.TMPDIR ?? "/tmp/"}talk-unsent-error.png`);

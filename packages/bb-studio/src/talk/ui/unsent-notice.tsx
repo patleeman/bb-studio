@@ -2,7 +2,7 @@
 // library shows it when filtered to recordings (Talk's own Recordings page
 // did before Talk was built into Studio), and a recording's page shows it
 // for that recording.
-import { OUTLINE_BUTTON, useOpenMain } from "@bb-studio/kit/app";
+import { OUTLINE_BUTTON, openWorkspaceItem, useOpenMain } from "@bb-studio/kit/app";
 import { Icon, cn } from "@bb-studio/kit/ui";
 import { RECORDINGS_ROOT, UNSENT_PATH } from "../shared/format";
 import { useTalkState } from "./controller";
@@ -20,7 +20,15 @@ export function UnsentNotice({ recordingId, className }: { recordingId?: string;
         {what}
         {recordingId ? " from this recording" : ""} couldn't be uploaded and {count === 1 ? "is" : "are"} kept on this device.
       </span>
-      <button type="button" className={OUTLINE_BUTTON} onClick={() => open({ kind: "path", path: `${RECORDINGS_ROOT}/${UNSENT_PATH}` })}>
+      <button
+        type="button"
+        className={OUTLINE_BUTTON}
+        onClick={() => {
+          const href = `${RECORDINGS_ROOT}/${UNSENT_PATH}`;
+          // A Studio tab with a proper title; the main view where there's no workspace.
+          if (!openWorkspaceItem({ href, title: "Unsent audio" })) open({ kind: "path", path: href });
+        }}
+      >
         Review
       </button>
     </div>

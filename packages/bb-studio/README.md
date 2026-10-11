@@ -318,8 +318,10 @@ Recapture with `BB_CAPTURE_ONLY=talk-page`.
 
 ![Talk models settings with a cleanup model selected](assets/recordings-model-settings.png)
 
-**Talk models** on Studio's settings page: Codex's 6-Luna for cleanup and
-Studio Decisions for titles and summaries, chosen through the real controls.
+Studio's settings page after `bb talk migrate`: Talk's settings, with the
+segment length and hold-to-talk key the staged user had set in the Talk
+plugin, and **Talk models** with Codex's 6-Luna for cleanup and Studio
+Decisions for titles and summaries, chosen through the real controls.
 
 ![Dictation controls inline at the active input](assets/recordings-inline-dictation.png)
 

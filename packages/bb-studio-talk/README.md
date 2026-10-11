@@ -96,8 +96,10 @@ store and shows it as a banner in its library filtered to recordings.
 ![Studio's Setup page listing the Studio Talk bridge as retired](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`) after
-`bb talk migrate` reported Migration complete for a recording with spoken
-audio made with the 0.1.0 plugin. Studio's Setup page lists Studio Talk
+`bb talk migrate` reported Migration complete for a recording and a
+dictation with spoken, transcribed audio and changed settings, made with the
+0.1.0 plugin. Their audio came over byte for byte, plays from Studio's
+route, and the old audio URL redirects there. Studio's Setup page lists Studio Talk
 under **Retired plugins** with what removing it keeps and deletes, the
 finish-recordings, update and `bb talk migrate` steps, and **Remove…**
 available. Recapture with `BB_CAPTURE_ONLY=talk-bridge`.
