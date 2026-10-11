@@ -55,8 +55,6 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
     public var archived: Bool
     /// Studio tag ids, from the Studio plugin's overview.
     public var tags: [String]?
-    /// Studio space ids it's in, directly or through its project.
-    public var spaces: [String]?
 
     public var id: String { "\(pluginId):\(itemId)" }
 
@@ -69,7 +67,7 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case pluginId, itemId = "id", kind, title, icon, projectId, parentId, createdAt, updatedAt
-        case preview, facts, badge, thumbnailUrl, href, archived, tags, spaces
+        case preview, facts, badge, thumbnailUrl, href, archived, tags
     }
 
     public init(from decoder: Decoder) throws {
@@ -90,7 +88,6 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
         href = try? c.decode(String.self, forKey: .href)
         archived = (try? c.decode(Bool.self, forKey: .archived)) ?? false
         tags = try? c.decode([String].self, forKey: .tags)
-        spaces = try? c.decode([String].self, forKey: .spaces)
     }
 
     public init(
@@ -231,8 +228,6 @@ public struct StudioOverview: Sendable {
     public var kinds: [StudioKindInfo]
     /// Nil when the Studio plugin predates tags.
     public var tags: [StudioTag]?
-    /// Nil when the Studio plugin predates spaces.
-    public var spaces: [StudioSpace]?
 }
 
 /// The last Studio list, for opening instantly and offline.
@@ -241,7 +236,6 @@ public struct StudioSnapshot: Codable, Sendable {
     public var items: [StudioItem]
     public var kinds: [StudioKindInfo]?
     public var tags: [StudioTag]?
-    public var spaces: [StudioSpace]?
 }
 
 extension BBClient {
@@ -268,16 +262,14 @@ extension BBClient {
             var items: [StudioItem]
             var providers: [Provider]?
             var tags: [StudioTag]?
-            var spaces: [StudioSpace]?
 
-            enum CodingKeys: String, CodingKey { case items, providers, tags, spaces }
+            enum CodingKeys: String, CodingKey { case items, providers, tags }
 
             init(from decoder: Decoder) throws {
                 let c = try decoder.container(keyedBy: CodingKeys.self)
                 items = try c.decode(LossyArray<StudioItem>.self, forKey: .items).elements
                 providers = (try? c.decodeIfPresent(LossyArray<Provider>.self, forKey: .providers))?.elements
                 tags = (try? c.decodeIfPresent(LossyArray<StudioTag>.self, forKey: .tags))?.elements
-                spaces = (try? c.decodeIfPresent(LossyArray<StudioSpace>.self, forKey: .spaces))?.elements
             }
         }
         let overview: Overview = try await rpc("studio", "overview")
@@ -290,7 +282,7 @@ extension BBClient {
                     createMode: $0.create?.mode, background: $0.background)
             }
         }
-        return StudioOverview(items: overview.items, kinds: kinds, tags: overview.tags, spaces: overview.spaces)
+        return StudioOverview(items: overview.items, kinds: kinds, tags: overview.tags)
     }
 
     /// A new, empty item of a kind whose `createMode` is "rpc".

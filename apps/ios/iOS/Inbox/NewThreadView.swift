@@ -16,10 +16,6 @@ struct NewThreadView: View {
     @State private var focused = false
     @State private var creating = false
     @State private var error: String?
-    /// Studio's Spaces; empty without Studio.
-    @State private var spaces: [StudioSpace] = []
-    /// The Space the thread goes in; empty for its project's.
-    @State private var spaceId: String
 
     // Execution options. Empty means the project default.
     @State private var defaults: ExecutionChoice?
@@ -29,12 +25,9 @@ struct NewThreadView: View {
     @State private var reasoning = ""
     @State private var permissionMode = ""
 
-    init(text: String = "", spaceId: String? = nil) {
+    init(text: String = "") {
         _text = State(initialValue: text)
-        _spaceId = State(initialValue: spaceId ?? "")
     }
-
-    private var space: StudioSpace? { spaces.first { $0.id == spaceId } }
 
     /// A chat, not a form: an empty conversation with the composer at the
     /// bottom. Where it runs and which agent are chips above the field, set to
@@ -43,7 +36,7 @@ struct NewThreadView: View {
         NavigationStack {
             VStack {
                 Spacer()
-                Text(space.map { "What should we do in \($0.name)?" } ?? "What should we work on?")
+                Text("What should we work on?")
                     .font(.title2.weight(.semibold))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
@@ -64,16 +57,8 @@ struct NewThreadView: View {
                 DictationView(threadId: nil, autoStart: true) { text += (text.isEmpty ? "" : " ") + $0 }
             }
             .task {
-                async let listed = try? client.studioSpaces()
                 projects = (try? await client.projects()) ?? []
-                spaces = await listed ?? []
-                if !spaceId.isEmpty, space == nil { spaceId = "" }
-                // A Space's new threads start in its default project, as its + does on the web.
-                if let project = space?.defaultProjectId, projects.contains(where: { $0.id == project }) { projectId = project }
                 if !projects.contains(where: { $0.id == projectId }) { projectId = projects.first?.id ?? "" }
-            }
-            .onChange(of: spaceId) {
-                if let project = space?.defaultProjectId, projects.contains(where: { $0.id == project }) { projectId = project }
             }
             .task(id: projectId) {
                 guard !projectId.isEmpty else { return }
@@ -136,18 +121,9 @@ struct NewThreadView: View {
         (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty) && !projectId.isEmpty && !creating
     }
 
-    /// The Space and project the thread starts in.
+    /// The project the thread starts in.
     private var placeChip: some View {
         Menu {
-            if spaces.count > 1 {
-                Picker(selection: $spaceId) {
-                    Text("Project's Space").tag("")
-                    ForEach(spaces) { Text($0.label).tag($0.id) }
-                } label: {
-                    Label("Space: \(space?.label ?? "Project's")", systemImage: "square.grid.2x2")
-                }
-                .pickerStyle(.menu)
-            }
             Section("Project") {
                 Picker("Project", selection: $projectId) {
                     ForEach(projects) { Text($0.name).tag($0.id) }
@@ -161,8 +137,7 @@ struct NewThreadView: View {
     }
 
     private var placeLabel: String {
-        let project = projects.first { $0.id == projectId }?.name ?? "Project"
-        return space.map { "\($0.label) · \(project)" } ?? project
+        projects.first { $0.id == projectId }?.name ?? "Project"
     }
 
     private var workspaceChip: some View {
@@ -291,7 +266,6 @@ struct NewThreadView: View {
                 let text = self.text
                 let attachments = self.attachments
                 let selectedWorkspace = self.selectedWorkspace
-                let space = self.space
                 let choice = ExecutionChoice(
                     providerId: providerId.isEmpty ? nil : providerId,
                     model: modelId.isEmpty ? nil : modelId,
@@ -301,21 +275,10 @@ struct NewThreadView: View {
                 let thread = try await client.createThread(
                     projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
                     options: choice, workspace: selectedWorkspace)
-                // A thread is in its project's Space unless added to another. The thread
-                // exists either way, so a failed move is a notice, not a failed create.
-                var notice: String?
-                if let space, !space.projectIds.contains(projectId) {
-                    do {
-                        try await client.moveThreads([thread.id], toSpace: space.id)
-                    } catch {
-                        notice = "Couldn't add the thread to \(space.name): \(BBClient.describe(error, server: client.baseURL))"
-                    }
-                }
-                return (thread, notice)
+                return thread
             }, completion: { created in
                 dismiss()
-                app.openThread(created.0.id)
-                if let notice = created.1 { app.flash(notice) }
+                app.openThread(created.id)
             })
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

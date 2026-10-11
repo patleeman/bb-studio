@@ -16,7 +16,7 @@ final class ChiefOfStaffTests: XCTestCase {
 
     private func chief(_ id: String?) -> String {
         let value = id.map { "\"\($0)\"" } ?? "null"
-        return #"{"ok":true,"result":{"threadId":\#(value),"originSpaceId":null}}"#
+        return #"{"ok":true,"result":{"threadId":\#(value)}}"#
     }
 
     func testChiefIsRememberedPerServerAndClearedWhenRemoved() async throws {
@@ -53,7 +53,7 @@ final class ChiefOfStaffTests: XCTestCase {
         client.transport = { _, path, body in
             XCTAssertTrue(path.hasSuffix("chief_of_staff_set"), path)
             XCTAssertTrue(String(decoding: body ?? Data(), as: UTF8.self).contains(#""threadId":null"#))
-            return (200, Data(#"{"ok":true,"result":{"threadId":null,"originSpaceId":null}}"#.utf8))
+            return (200, Data(#"{"ok":true,"result":{"threadId":null}}"#.utf8))
         }
         try await client.setChiefOfStaff(nil)
         XCTAssertNil(client.cachedChiefOfStaffThreadId)
@@ -68,10 +68,10 @@ final class ChiefOfStaffTests: XCTestCase {
         let client = BBClient(baseURL: a)
         client.transport = { _, path, _ in
             XCTAssertTrue(path.hasSuffix("chief_of_staff"), path)
-            return (200, Data(#"{"ok":true,"result":{"threadId":"thr_c","originSpaceId":null,"run":{"enabled":true,"cadence":"every15minutes","time":"09:30"}}}"#.utf8))
+            return (200, Data(#"{"ok":true,"result":{"threadId":"thr_c","run":{"enabled":true,"cadence":"every15minutes","time":"09:30"}}}"#.utf8))
         }
         let chief = try await client.chiefOfStaff()
-        XCTAssertEqual(chief, SpaceLead(threadId: "thr_c", heartbeat: "every15minutes", time: "09:30"))
+        XCTAssertEqual(chief, ThreadLead(threadId: "thr_c", heartbeat: "every15minutes", time: "09:30"))
         XCTAssertEqual(client.cachedChiefOfStaffThreadId, "thr_c")
     }
 
@@ -90,7 +90,7 @@ final class ChiefOfStaffTests: XCTestCase {
             XCTAssertTrue(sent.contains(#""enabled":false"#), sent)
             XCTAssertTrue(sent.contains(#""cadence":"daily""#), sent)
             XCTAssertFalse(sent.contains("cron"), sent)
-            return (200, Data(#"{"ok":true,"result":{"threadId":"thr_c","originSpaceId":null,"run":{"enabled":false,"cadence":"daily","time":"08:00"}}}"#.utf8))
+            return (200, Data(#"{"ok":true,"result":{"threadId":"thr_c","run":{"enabled":false,"cadence":"daily","time":"08:00"}}}"#.utf8))
         }
         let chief = try await client.setChiefOfStaffHeartbeat(enabled: false, cadence: "daily", time: "08:00", cron: nil)
         XCTAssertEqual(chief.threadId, "thr_c")
@@ -98,9 +98,9 @@ final class ChiefOfStaffTests: XCTestCase {
     }
 
     func testCadenceIdKeepsUnknownValues() {
-        XCTAssertEqual(SpaceLead.cadenceId(Studio.ChiefOfStaffOutputRunCadence.every2hours), "every2hours")
-        XCTAssertEqual(SpaceLead.cadenceId(Studio.ChiefOfStaffOutputRunCadence.unknown("every10minutes")), "every10minutes")
-        XCTAssertNil(SpaceLead.cadenceId(Optional<Studio.ChiefOfStaffOutputRunCadence>.none))
+        XCTAssertEqual(ThreadLead.cadenceId(Studio.ChiefOfStaffOutputRunCadence.every2hours), "every2hours")
+        XCTAssertEqual(ThreadLead.cadenceId(Studio.ChiefOfStaffOutputRunCadence.unknown("every10minutes")), "every10minutes")
+        XCTAssertNil(ThreadLead.cadenceId(Optional<Studio.ChiefOfStaffOutputRunCadence>.none))
     }
 
     func testHeartbeatTimeRoundTrips() {
@@ -109,8 +109,14 @@ final class ChiefOfStaffTests: XCTestCase {
         XCTAssertNil(HeartbeatFields.date("bad"))
     }
 
-    @MainActor func testChiefMenuLabelSaysTopLevel() {
-        XCTAssertEqual(ThreadSpacesModel.chiefLabel, "Chief of Staff · top level")
-        XCTAssertFalse(ThreadSpacesModel().isChief("thr_x"))
+    @MainActor func testChiefMenuLabelSaysPersonalProject() {
+        XCTAssertEqual(ChiefOfStaffModel.chiefLabel, "Chief of Staff · personal project")
+        XCTAssertFalse(ChiefOfStaffModel().isChief("thr_x"))
+    }
+
+    func testHeartbeatLabels() {
+        XCTAssertEqual(ThreadLead.cadenceLabel("every15minutes"), "every 15 min")
+        XCTAssertEqual(ThreadLead.cadenceLabel("daily"), "daily")
+        XCTAssertEqual(ThreadLead.cadenceLabel("weekdays"), "weekdays")
     }
 }

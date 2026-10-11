@@ -16,9 +16,6 @@ final class StudioStore: ObservableObject {
     /// Studio's tags, in name order.
     @Published private(set) var tags: [StudioTag] = []
     @Published private(set) var supportsTags = false
-    /// Studio's spaces, in name order.
-    @Published private(set) var spaces: [StudioSpace] = []
-    @Published private(set) var supportsSpaces = false
     @Published private(set) var projectNames: [String: String] = [:]
     @Published private(set) var plugins: Set<String> = []
     /// Listed by the Studio plugin, which can also search content and delete anything.
@@ -65,8 +62,6 @@ final class StudioStore: ObservableObject {
             kindInfo = snapshot.kinds ?? []
             tags = snapshot.tags ?? []
             supportsTags = snapshot.tags != nil
-            spaces = snapshot.spaces ?? []
-            supportsSpaces = snapshot.spaces != nil
             loaded = true
         }
         if let inbox = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey, serverURL: serverURL) {
@@ -94,13 +89,11 @@ final class StudioStore: ObservableObject {
             kindInfo = listing.kinds
             tags = listing.tags ?? []
             supportsTags = listing.tags != nil
-            spaces = Self.sorted(listing.spaces ?? [])
-            supportsSpaces = listing.spaces != nil
             self.items = listing.items.sorted { $0.updatedAt > $1.updatedAt }
             Spotlight.indexStudio(self.items, serverURL: serverURL)
             error = nil
             DiskCache.save(
-                StudioSnapshot(items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil, spaces: supportsSpaces ? spaces : nil),
+                StudioSnapshot(items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil),
                 as: StudioSnapshot.cacheKey, serverURL: serverURL)
         } catch where BBClient.isCancellation(error) {
         } catch {
@@ -111,22 +104,21 @@ final class StudioStore: ObservableObject {
         loaded = true
     }
 
-    /// What one load found. Nil tags or spaces: the source doesn't have them.
+    /// What one load found. Nil tags: the source doesn't have them.
     private struct Listing {
         var items: [StudioItem]
         var viaStudio = false
         var kinds: [StudioKindInfo] = []
         var tags: [StudioTag]?
-        var spaces: [StudioSpace]?
     }
 
     private func fetch(_ client: BBClient) async throws -> Listing {
         if plugins.contains("studio") {
             do {
                 let overview = try await client.studioOverview()
-                return Listing(items: overview.items, viaStudio: true, kinds: overview.kinds, tags: overview.tags, spaces: overview.spaces)
+                return Listing(items: overview.items, viaStudio: true, kinds: overview.kinds, tags: overview.tags)
             } catch where BBClient.isCancellation(error) {
-                // A superseded reload: keep Studio's tags, Spaces and kinds rather than falling back.
+                // A superseded reload: keep Studio's tags and kinds rather than falling back.
                 throw error
             } catch {
                 // Studio failed; list the add-ons directly below.
@@ -289,32 +281,6 @@ final class StudioStore: ObservableObject {
         for index in items.indices { items[index].tags?.removeAll { $0 == tag.id } }
     }
 
-    // MARK: Spaces
-
-    func space(_ id: String) -> StudioSpace? { spaces.first { $0.id == id } }
-
-    /// Puts a changed or new space in the list.
-    func saved(_ space: StudioSpace) {
-        spaces = Self.sorted(spaces.filter { $0.id != space.id } + [space])
-    }
-
-    func deleteSpace(_ space: StudioSpace, client: BBClient) async throws {
-        try await client.deleteSpace(space.id)
-        spaces.removeAll { $0.id == space.id }
-        removed(pluginId: "studio", id: space.id)
-        for index in items.indices { items[index].spaces?.removeAll { $0 == space.id } }
-    }
-
-    func reloadSpaces(_ client: BBClient) async {
-        guard let spaces = try? await client.studioSpaces() else { return }
-        self.spaces = Self.sorted(spaces)
-        supportsSpaces = true
-    }
-
-    private static func sorted(_ spaces: [StudioSpace]) -> [StudioSpace] {
-        spaces.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
     private func update(_ item: StudioItem, _ change: (inout StudioItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         change(&items[index])
@@ -343,7 +309,6 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
-        StudioKind(id: "space", label: "Space", plural: "Spaces", symbol: "square.stack.3d.up", tint: .mint),
     ]
 
     static func other(_ id: String) -> StudioKind {
@@ -378,8 +343,6 @@ struct StudioView: View {
     @State private var taggingSelected = false
     @State private var renamingTag: StudioTag?
     @State private var deletingTag: StudioTag?
-    /// The space settings sheet: `.new` for a new space.
-    @State private var spaceSheet: SpaceSheet?
 
     private var selecting: Bool { editMode.isEditing }
     private var selected: [StudioItem] { store.items.filter { selection.contains($0.id) } }
@@ -422,7 +385,7 @@ struct StudioView: View {
                     Button("Done") { endSelecting() }.fontWeight(.semibold)
                 }
             } else {
-                if !store.creatable.isEmpty || store.supportsSpaces {
+                if !store.creatable.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) { newMenu }
                 }
                 ToolbarItem(placement: .topBarTrailing) { projectMenu }
@@ -439,14 +402,6 @@ struct StudioView: View {
             store.restore()
             store.attach(app)
             await store.load(client)
-        }
-        .sheet(item: $spaceSheet) { sheet in
-            SpaceSettingsSheet(space: sheet.space) { saved in
-                if let saved, sheet.space == nil { operation.complete(on: app) { app.studioSpace = saved.id } }
-            }
-        }
-        .onChange(of: store.spaces) {
-            if let id = app.studioSpace, store.loaded, store.supportsSpaces, store.space(id) == nil { app.studioSpace = nil }
         }
         .sheet(item: $recordingKind) { kind in
             DictationView(threadId: nil, autoStart: true, kind: kind)
@@ -530,7 +485,7 @@ struct StudioView: View {
     // MARK: Pages
 
     /// Each kind is a page, All first, in the chips' order: a horizontal swipe
-    /// moves between them, as By space does on Home. Search is one list.
+    /// moves between them, as a pager. Search is one list.
     @ViewBuilder
     private var studioPages: some View {
         if query.isEmpty {
@@ -562,7 +517,7 @@ struct StudioView: View {
     }
 
     private var showsFilter: Bool {
-        store.kinds.count > 1 || hasArchived || !usedTags.isEmpty || !store.spaces.isEmpty
+        store.kinds.count > 1 || hasArchived || !usedTags.isEmpty
     }
 
     private func studioList(kind: String?, chips: Bool) -> some View {
@@ -672,15 +627,6 @@ struct StudioView: View {
                         }
                         .id(kind.id)
                     }
-                    ForEach(store.spaces) { space in
-                        chip(space.emoji.map { "\($0) \(space.name)" } ?? space.name, space.emoji == nil ? "square.stack.3d.up" : nil,
-                            selected: app.studioSpace == space.id, tint: Color(hex: space.color)) {
-                            app.studioSpace = app.studioSpace == space.id ? nil : space.id
-                        }
-                        .contextMenu {
-                            Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
-                        }
-                    }
                     ForEach(usedTags) { tag in
                         chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {
                             tagFilter = tagFilter == tag.id ? nil : tag.id
@@ -726,11 +672,6 @@ struct StudioView: View {
             ForEach(store.creatable, id: \.id) { kind in
                 Button { Task { await create(kind) } } label: {
                     Label("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol)
-                }
-            }
-            if store.supportsSpaces {
-                Button { spaceSheet = SpaceSheet(space: nil) } label: {
-                    Label("New Space…", systemImage: StudioKind.of("space").symbol)
                 }
             }
         } label: {
@@ -830,16 +771,6 @@ struct StudioView: View {
                         }
                     }
                 } label: { Label("Move to Project", systemImage: "folder") }
-                if store.spaces.count > 1 {
-                    Menu {
-                        ForEach(store.spaces) { space in
-                            Button { Task { await move(item, toSpace: space) } } label: {
-                                if item.spaces?.contains(space.id) == true { Label(space.label, systemImage: "checkmark") } else { Text(space.label) }
-                            }
-                            .disabled(item.spaces?.contains(space.id) == true)
-                        }
-                    } label: { Label("Move to Space", systemImage: "square.stack.3d.up") }
-                }
                 if store.info(item)?.canArchive == true {
                     Button { Task { await archive(item) } } label: {
                         Label(item.archived ? "Restore from Archive" : "Archive", systemImage: item.archived ? "tray.and.arrow.up" : "archivebox")
@@ -889,7 +820,6 @@ struct StudioView: View {
             if let kind, item.kind != kind { return false }
             if kind == nil, query.isEmpty, store.info(item)?.background == true { return false }
             if let tagFilter, item.tags?.contains(tagFilter) != true { return false }
-            if let space = app.studioSpace, item.spaces?.contains(space) != true { return false }
             switch project {
             case "": break
             case "none": if item.projectId != nil { return false }
@@ -931,16 +861,12 @@ struct StudioView: View {
     }
 
     private func emptyText(_ kind: String?) -> String {
-        if let space = app.studioSpace.flatMap(store.space) {
-            return "Nothing in \(space.name) yet. Make one with New, or move items here from their menus."
-        }
-        return switch kind {
+        switch kind {
         case "page": "Pages you and your agents write show up here."
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
         case "design": "Ask an agent to design a screen, and its rounds of options show up here."
-        case "space": "Spaces gather threads and Studio items. Make one with New."
         default: "Pages, recordings, dictations, drawings and artifacts show up here."
         }
     }
@@ -982,30 +908,9 @@ struct StudioView: View {
 
     private func create(_ kind: StudioKindInfo) async {
         let projectId = project.isEmpty || project == "none" ? nil : project
-        // Filtered to a Space, a new item goes in its folder so it shows there.
-        if projectId == nil, let space = app.studioSpace {
-            do {
-                let href = try await client.createInSpace(space, pluginId: kind.pluginId, kind: kind.id)
-                if let route = Route(href: href) { operation.complete(on: app) { app.studioPath.append(route) } }
-                await store.load(client)
-            } catch {
-                flash(BBClient.describe(error, server: client.baseURL))
-            }
-            return
-        }
         do {
             let item = try await store.create(kind, projectId: projectId, client: client)
             if let route = route(item) { operation.complete(on: app) { app.studioPath.append(route) } }
-        } catch {
-            flash(BBClient.describe(error, server: client.baseURL))
-        }
-    }
-
-    private func move(_ item: StudioItem, toSpace space: StudioSpace) async {
-        do {
-            try await client.moveItems([(pluginId: item.pluginId, id: item.itemId)], toSpace: space.id)
-            flash("Moved to \(space.name)")
-            await store.load(client)
         } catch {
             flash(BBClient.describe(error, server: client.baseURL))
         }

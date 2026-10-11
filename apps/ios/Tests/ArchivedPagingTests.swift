@@ -1,14 +1,14 @@
 import XCTest
 @testable import BBStudio
 
-/// A Space's archived threads are filtered on the phone, so loading more keeps going past pages with none of them.
+/// When archived threads are filtered on the phone, loading more keeps going past pages with none of them.
 final class ArchivedPagingTests: XCTestCase {
     private func thread(_ id: String, project: String) throws -> ThreadEntry {
         let json = #"{"id":"\#(id)","projectId":"\#(project)","status":"idle","parentThreadId":null,"createdAt":1,"updatedAt":1}"#
         return try JSONDecoder().decode(ThreadEntry.self, from: Data(json.utf8))
     }
 
-    /// Pages of two; only the last thread is in the Space.
+    /// Pages of two; only the last thread matches.
     private func archive() throws -> [ThreadEntry] {
         try [thread("a", project: "other"), thread("b", project: "other"), thread("c", project: "other"),
              thread("d", project: "other"), thread("e", project: "mine")]

@@ -1,8 +1,7 @@
 import XCTest
 @testable import BBStudio
 
-/// The web's latest Studio changes on the phone: Studio Design, reply cards,
-/// and By space's headingless Space lists.
+/// The web's latest Studio changes on the phone: Studio Design and reply cards.
 @MainActor
 final class StudioDesignTests: XCTestCase {
     /// Viewports are a preset or a custom "WIDTHxHEIGHT"; screens decode them as plain strings.
@@ -89,43 +88,9 @@ final class StudioDesignTests: XCTestCase {
         XCTAssertEqual(form.allDecided, ["layout": ["decide": true], "mood": ["decide": true]])
     }
 
-    private func thread(_ id: String, parent: String? = nil, pinned: Bool = false, unread: Bool = false,
-                        status: String = "idle", asks: Bool = false, at: Double = 1) throws -> ThreadEntry {
-        var json: [String: Any] = ["id": id, "projectId": "p", "status": status, "createdAt": at, "updatedAt": at,
-                                   "latestAttentionAt": at, "lastReadAt": unread ? 0 : at, "hasPendingInteraction": asks]
-        if let parent { json["parentThreadId"] = parent }
-        if pinned { json["pinnedAt"] = at }
-        return try JSONDecoder().decode(ThreadEntry.self, from: JSONSerialization.data(withJSONObject: json))
-    }
-
-    /// Lead, then pins in their own Space, then threads that wait on you (or
-    /// whose sub-thread does): questions, failures, results; the rest keep order.
-    func testSpaceListsTheLeadThenPinsThenWaitingThreadsFirst() throws {
-        let model = InboxModel()
-        model.spaces = try [JSONDecoder().decode(StudioSpace.self, from: Data(
-            #"{"id":"s","isDefault":true,"name":"S","description":"","projectIds":[],"threadIds":[]}"#.utf8))]
-        model.leads = ["s": SpaceLead(threadId: "lead")]
-        model.threads = try [
-            thread("lead", at: 9),
-            thread("pin", pinned: true, at: 8),
-            thread("quiet", at: 7),
-            thread("done", unread: true, at: 6),
-            thread("failed", unread: true, status: "error", at: 5),
-            thread("parent", at: 4),
-            thread("asks", asks: true, at: 3),
-        ]
-        model.children = ["parent": [try thread("child", parent: "parent", asks: true, at: 2)]]
-
-        let section = try XCTUnwrap(model.spaceSections.first)
-        XCTAssertEqual(section.lead?.id, "lead")
-        XCTAssertEqual(section.pinned.map(\.id), ["pin"])
-        XCTAssertEqual(section.threads.map(\.id), ["parent", "asks", "failed", "done", "quiet"])
-    }
-
-    func testWaitingRowsSwapTheirAgeForAPill() throws {
-        XCTAssertEqual(SpaceThreadRow.state(of: try thread("a", asks: true)).pill?.label, "NEEDS YOU")
-        XCTAssertEqual(SpaceThreadRow.state(of: try thread("b", unread: true, status: "error")).pill?.label, "FAILED")
-        XCTAssertEqual(SpaceThreadRow.state(of: try thread("c", unread: true)).pill?.label, "DONE")
-        XCTAssertNil(SpaceThreadRow.state(of: try thread("d")).pill)
+    func testItemPathsOpenTheItem() {
+        XCTAssertEqual(Route(href: "/plugins/pages/pages/pg_1"), .page(id: "pg_1"))
+        XCTAssertEqual(Route(href: "/plugins/studio/studio/artifacts/art_1"), .artifact(id: "art_1"))
+        XCTAssertEqual(Route(href: "/plugins/artifacts/artifacts/art_1"), .artifact(id: "art_1"))
     }
 }

@@ -6,7 +6,7 @@ final class RefreshRaceTests: XCTestCase {
     private let server = URL(string: "https://refresh-race.invalid")!
 
     @MainActor
-    func testCancelledStudioReloadKeepsTagsAndSpacesInsteadOfFallingBack() async {
+    func testCancelledStudioReloadKeepsTagsInsteadOfFallingBack() async {
         let original = BBClient.storedServerURL
         defer { BBClient.storedServerURL = original }
         BBClient.storedServerURL = server

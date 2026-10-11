@@ -6,7 +6,7 @@ struct ThreadView: View {
     private var client: BBClient { operation.client }
     @StateObject private var model: ThreadModel
     @StateObject private var talk: HoldToTalk
-    @StateObject private var spaces = ThreadSpacesModel()
+    @StateObject private var chief = ChiefOfStaffModel()
     @State private var draft = ""
     @State private var mentions: [Mention] = []
     @ObservedObject private var outbox = Outbox.shared
@@ -203,7 +203,7 @@ struct ThreadView: View {
                 Task { sourcePage = try? await client.chatPage(model.threadId) }
             }
             if runningPlugins.split(separator: ",").contains("studio") {
-                Task { await spaces.load(model.threadId, client: client) }
+                Task { await chief.load(client: client) }
             }
             await model.load()
         }
@@ -329,8 +329,8 @@ struct ThreadView: View {
                             Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
                         }
                     }
-                    ThreadSpacesMenu(
-                        model: spaces, threadId: model.threadId, projectId: model.thread?.projectId,
+                    ChiefOfStaffMenu(
+                        model: chief, threadId: model.threadId,
                         isChild: model.thread?.parentThreadId != nil,
                         editHeartbeat: { editingChiefHeartbeat = true }
                     ) { model.error = $0 }

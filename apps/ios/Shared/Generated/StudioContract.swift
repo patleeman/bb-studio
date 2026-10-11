@@ -26,26 +26,11 @@ public enum Studio {
     public static let renameTag = "renameTag"
     public static let deleteTag = "deleteTag"
     public static let tagItems = "tagItems"
-    public static let spaces = "spaces"
-    public static let createSpace = "createSpace"
-    public static let updateSpace = "updateSpace"
-    public static let deleteSpace = "deleteSpace"
-    public static let spaceMembers = "spaceMembers"
-    public static let addSpaceFolder = "addSpaceFolder"
-    public static let spacesForThread = "spacesForThread"
-    public static let pendingThreadSpaces = "pendingThreadSpaces"
-    public static let moveToSpace = "moveToSpace"
-    public static let createInSpace = "createInSpace"
-    public static let spaceProject = "spaceProject"
-    public static let spaceWorktrees = "spaceWorktrees"
-    public static let spaceFiles = "spaceFiles"
-    public static let spaceFile = "spaceFile"
     public static let recentThreads = "recentThreads"
-    public static let space_lead = "space_lead"
-    public static let thread_lines = "thread_lines"
-    public static let space_set_lead = "space_set_lead"
-    public static let space_of_threads = "space_of_threads"
-    public static let space_set_run = "space_set_run"
+    public static let project_leads = "project_leads"
+    public static let project_lead = "project_lead"
+    public static let project_set_lead = "project_set_lead"
+    public static let project_set_run = "project_set_run"
     public static let chief_of_staff = "chief_of_staff"
     public static let chief_of_staff_set = "chief_of_staff_set"
     public static let chief_of_staff_set_run = "chief_of_staff_set_run"
@@ -54,7 +39,6 @@ public enum Studio {
     public static let deleteView = "deleteView"
     public static let studio_changed = "studio_changed"
     public static let sidebar = "sidebar"
-    public static let spaceTree = "spaceTree"
     public static let tabs = "tabs"
     public static let visitTab = "visitTab"
     public static let closeTabs = "closeTabs"
@@ -152,49 +136,17 @@ public enum Studio {
 
   public typealias TagItems = TagItemsOutput
 
-  public typealias SpacesInput = StudioJSONValue
-
-  public typealias Spaces = SpacesOutput
-
-  public typealias CreateSpace = CreateSpaceOutput
-
-  public typealias UpdateSpace = UpdateSpaceOutput
-
-  public typealias DeleteSpace = DeleteSpaceOutput
-
-  public typealias SpaceMembers = SpaceMembersOutput
-
-  public typealias AddSpaceFolder = AddSpaceFolderOutput
-
-  public typealias SpacesForThread = SpacesForThreadOutput
-
-  public typealias PendingThreadSpaces = PendingThreadSpacesOutput
-
-  public typealias MoveToSpace = MoveToSpaceOutput
-
-  public typealias CreateInSpace = CreateInSpaceOutput
-
-  public typealias SpaceProject = SpaceProjectOutput
-
-  public typealias SpaceWorktrees = SpaceWorktreesOutput
-
-  public typealias SpaceFiles = SpaceFilesOutput
-
-  public typealias SpaceFile = SpaceFileOutput
-
   public typealias RecentThreadsInput = StudioJSONValue
 
   public typealias RecentThreads = RecentThreadsOutput
 
-  public typealias SpaceLead = SpaceLeadOutput
+  public typealias ProjectLeads = ProjectLeadsOutput
 
-  public typealias ThreadLines = ThreadLinesOutput
+  public typealias ProjectLead = ProjectLeadOutput
 
-  public typealias SpaceSetLead = SpaceSetLeadOutput
+  public typealias ProjectSetLead = ProjectSetLeadOutput
 
-  public typealias SpaceOfThreads = SpaceOfThreadsOutput
-
-  public typealias SpaceSetRun = SpaceSetRunOutput
+  public typealias ProjectSetRun = ProjectSetRunOutput
 
   public typealias ChiefOfStaff = ChiefOfStaffOutput
 
@@ -213,8 +165,6 @@ public enum Studio {
   public typealias SidebarInput = StudioJSONValue
 
   public typealias Sidebar = SidebarOutput
-
-  public typealias SpaceTree = SpaceTreeOutput
 
   public typealias TabsInput = StudioJSONValue
 
@@ -551,9 +501,8 @@ public enum Studio {
     public var template: Bool?
     public var pluginId: String?
     public var tags: [String]?
-    public var spaces: [String]?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: OverviewOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [OverviewOutputItemsItemFactsItem]? = nil, badge: OverviewOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil, spaces: [String]? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: OverviewOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [OverviewOutputItemsItemFactsItem]? = nil, badge: OverviewOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -572,7 +521,6 @@ public enum Studio {
       self.template = template
       self.pluginId = pluginId
       self.tags = tags
-      self.spaces = spaces
     }
   }
 
@@ -585,32 +533,6 @@ public enum Studio {
       self.id = id
       self.name = name
       self.color = color
-    }
-  }
-
-  public struct OverviewOutputSpacesItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var isDefault: Bool?
-    public var name: String?
-    public var color: String?
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var projectIds: [String]?
-    public var threadIds: [String]?
-    public var itemKeys: [String]?
-
-    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
-      self.id = id
-      self.isDefault = isDefault
-      self.name = name
-      self.color = color
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.projectIds = projectIds
-      self.threadIds = threadIds
-      self.itemKeys = itemKeys
     }
   }
 
@@ -630,14 +552,12 @@ public enum Studio {
     public var providers: [OverviewOutputProvidersItem]?
     public var items: [OverviewOutputItemsItem]?
     public var tags: [OverviewOutputTagsItem]?
-    public var spaces: [OverviewOutputSpacesItem]?
     public var views: [OverviewOutputViewsItem]?
 
-    public init(providers: [OverviewOutputProvidersItem]? = nil, items: [OverviewOutputItemsItem]? = nil, tags: [OverviewOutputTagsItem]? = nil, spaces: [OverviewOutputSpacesItem]? = nil, views: [OverviewOutputViewsItem]? = nil) {
+    public init(providers: [OverviewOutputProvidersItem]? = nil, items: [OverviewOutputItemsItem]? = nil, tags: [OverviewOutputTagsItem]? = nil, views: [OverviewOutputViewsItem]? = nil) {
       self.providers = providers
       self.items = items
       self.tags = tags
-      self.spaces = spaces
       self.views = views
     }
   }
@@ -753,9 +673,8 @@ public enum Studio {
     public var template: Bool?
     public var pluginId: String?
     public var tags: [String]?
-    public var spaces: [String]?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil, spaces: [String]? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -774,7 +693,6 @@ public enum Studio {
       self.template = template
       self.pluginId = pluginId
       self.tags = tags
-      self.spaces = spaces
     }
   }
 
@@ -2008,500 +1926,6 @@ public enum Studio {
     }
   }
 
-  public struct SpacesOutputSpacesItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var isDefault: Bool?
-    public var name: String?
-    public var color: String?
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var projectIds: [String]?
-    public var threadIds: [String]?
-    public var itemKeys: [String]?
-
-    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
-      self.id = id
-      self.isDefault = isDefault
-      self.name = name
-      self.color = color
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.projectIds = projectIds
-      self.threadIds = threadIds
-      self.itemKeys = itemKeys
-    }
-  }
-
-  public struct SpacesOutput: Sendable, Hashable, Codable {
-    public var spaces: [SpacesOutputSpacesItem]?
-
-    public init(spaces: [SpacesOutputSpacesItem]? = nil) {
-      self.spaces = spaces
-    }
-  }
-
-  public struct CreateSpaceInput: Sendable, Hashable, Codable {
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var defaultProjectPath: String?
-    public var name: String?
-
-    public init(icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, defaultProjectPath: String? = nil, name: String? = nil) {
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.defaultProjectPath = defaultProjectPath
-      self.name = name
-    }
-  }
-
-  public struct CreateSpaceOutputSpace: Sendable, Hashable, Codable {
-    public var id: String?
-    public var isDefault: Bool?
-    public var name: String?
-    public var color: String?
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var projectIds: [String]?
-    public var threadIds: [String]?
-    public var itemKeys: [String]?
-
-    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
-      self.id = id
-      self.isDefault = isDefault
-      self.name = name
-      self.color = color
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.projectIds = projectIds
-      self.threadIds = threadIds
-      self.itemKeys = itemKeys
-    }
-  }
-
-  public struct CreateSpaceOutput: Sendable, Hashable, Codable {
-    public var space: CreateSpaceOutputSpace?
-
-    public init(space: CreateSpaceOutputSpace? = nil) {
-      self.space = space
-    }
-  }
-
-  public struct UpdateSpaceInput: Sendable, Hashable, Codable {
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var defaultProjectPath: String?
-    public var id: String?
-    public var name: String?
-
-    public init(icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, defaultProjectPath: String? = nil, id: String? = nil, name: String? = nil) {
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.defaultProjectPath = defaultProjectPath
-      self.id = id
-      self.name = name
-    }
-  }
-
-  public struct UpdateSpaceOutputSpace: Sendable, Hashable, Codable {
-    public var id: String?
-    public var isDefault: Bool?
-    public var name: String?
-    public var color: String?
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var projectIds: [String]?
-    public var threadIds: [String]?
-    public var itemKeys: [String]?
-
-    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
-      self.id = id
-      self.isDefault = isDefault
-      self.name = name
-      self.color = color
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.projectIds = projectIds
-      self.threadIds = threadIds
-      self.itemKeys = itemKeys
-    }
-  }
-
-  public struct UpdateSpaceOutput: Sendable, Hashable, Codable {
-    public var space: UpdateSpaceOutputSpace?
-
-    public init(space: UpdateSpaceOutputSpace? = nil) {
-      self.space = space
-    }
-  }
-
-  public struct DeleteSpaceInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct DeleteSpaceOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
-  public struct SpaceMembersInputAddItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-
-    public init(pluginId: String? = nil, id: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-    }
-  }
-
-  public struct SpaceMembersInputRemoveItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-
-    public init(pluginId: String? = nil, id: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-    }
-  }
-
-  public struct SpaceMembersInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var add: [SpaceMembersInputAddItem]?
-    public var remove: [SpaceMembersInputRemoveItem]?
-
-    public init(id: String? = nil, add: [SpaceMembersInputAddItem]? = nil, remove: [SpaceMembersInputRemoveItem]? = nil) {
-      self.id = id
-      self.add = add
-      self.remove = remove
-    }
-  }
-
-  public struct SpaceMembersOutputSpace: Sendable, Hashable, Codable {
-    public var id: String?
-    public var isDefault: Bool?
-    public var name: String?
-    public var color: String?
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var projectIds: [String]?
-    public var threadIds: [String]?
-    public var itemKeys: [String]?
-
-    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
-      self.id = id
-      self.isDefault = isDefault
-      self.name = name
-      self.color = color
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.projectIds = projectIds
-      self.threadIds = threadIds
-      self.itemKeys = itemKeys
-    }
-  }
-
-  public struct SpaceMembersOutput: Sendable, Hashable, Codable {
-    public var space: SpaceMembersOutputSpace?
-
-    public init(space: SpaceMembersOutputSpace? = nil) {
-      self.space = space
-    }
-  }
-
-  public struct AddSpaceFolderInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var path: String?
-
-    public init(id: String? = nil, path: String? = nil) {
-      self.id = id
-      self.path = path
-    }
-  }
-
-  public struct AddSpaceFolderOutputSpace: Sendable, Hashable, Codable {
-    public var id: String?
-    public var isDefault: Bool?
-    public var name: String?
-    public var color: String?
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var projectIds: [String]?
-    public var threadIds: [String]?
-    public var itemKeys: [String]?
-
-    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
-      self.id = id
-      self.isDefault = isDefault
-      self.name = name
-      self.color = color
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.projectIds = projectIds
-      self.threadIds = threadIds
-      self.itemKeys = itemKeys
-    }
-  }
-
-  public struct AddSpaceFolderOutputProject: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-
-    public init(id: String? = nil, name: String? = nil) {
-      self.id = id
-      self.name = name
-    }
-  }
-
-  public struct AddSpaceFolderOutput: Sendable, Hashable, Codable {
-    public var space: AddSpaceFolderOutputSpace?
-    public var project: AddSpaceFolderOutputProject?
-
-    public init(space: AddSpaceFolderOutputSpace? = nil, project: AddSpaceFolderOutputProject? = nil) {
-      self.space = space
-      self.project = project
-    }
-  }
-
-  public struct SpacesForThreadInput: Sendable, Hashable, Codable {
-    public var threadId: String?
-
-    public init(threadId: String? = nil) {
-      self.threadId = threadId
-    }
-  }
-
-  public struct SpacesForThreadOutputSpacesItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var isDefault: Bool?
-    public var name: String?
-    public var color: String?
-    public var icon: String?
-    public var description: String?
-    public var defaultProjectId: String?
-    public var projectIds: [String]?
-    public var threadIds: [String]?
-    public var itemKeys: [String]?
-
-    public init(id: String? = nil, isDefault: Bool? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
-      self.id = id
-      self.isDefault = isDefault
-      self.name = name
-      self.color = color
-      self.icon = icon
-      self.description = description
-      self.defaultProjectId = defaultProjectId
-      self.projectIds = projectIds
-      self.threadIds = threadIds
-      self.itemKeys = itemKeys
-    }
-  }
-
-  public struct SpacesForThreadOutput: Sendable, Hashable, Codable {
-    public var spaces: [SpacesForThreadOutputSpacesItem]?
-    public var inherited: [String]?
-
-    public init(spaces: [SpacesForThreadOutputSpacesItem]? = nil, inherited: [String]? = nil) {
-      self.spaces = spaces
-      self.inherited = inherited
-    }
-  }
-
-  public struct PendingThreadSpacesInput: Sendable, Hashable, Codable {
-    public var projectId: String?
-    public var ids: [String]?
-
-    public init(projectId: String? = nil, ids: [String]? = nil) {
-      self.projectId = projectId
-      self.ids = ids
-    }
-  }
-
-  public struct PendingThreadSpacesOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
-  public struct MoveToSpaceInputItemsItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-
-    public init(pluginId: String? = nil, id: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-    }
-  }
-
-  public struct MoveToSpaceInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var items: [MoveToSpaceInputItemsItem]?
-
-    public init(id: String? = nil, items: [MoveToSpaceInputItemsItem]? = nil) {
-      self.id = id
-      self.items = items
-    }
-  }
-
-  public struct MoveToSpaceOutputFailedItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-    public var title: String?
-    public var error: String?
-
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, error: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-      self.title = title
-      self.error = error
-    }
-  }
-
-  public struct MoveToSpaceOutput: Sendable, Hashable, Codable {
-    public var moved: Double?
-    public var unchanged: Double?
-    public var failed: [MoveToSpaceOutputFailedItem]?
-
-    public init(moved: Double? = nil, unchanged: Double? = nil, failed: [MoveToSpaceOutputFailedItem]? = nil) {
-      self.moved = moved
-      self.unchanged = unchanged
-      self.failed = failed
-    }
-  }
-
-  public struct CreateInSpaceInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var pluginId: String?
-    public var kind: String?
-
-    public init(id: String? = nil, pluginId: String? = nil, kind: String? = nil) {
-      self.id = id
-      self.pluginId = pluginId
-      self.kind = kind
-    }
-  }
-
-  public struct CreateInSpaceOutput: Sendable, Hashable, Codable {
-    public var href: String?
-    public var title: String?
-
-    public init(href: String? = nil, title: String? = nil) {
-      self.href = href
-      self.title = title
-    }
-  }
-
-  public struct SpaceProjectInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct SpaceProjectOutput: Sendable, Hashable, Codable {
-    public var projectId: String?
-
-    public init(projectId: String? = nil) {
-      self.projectId = projectId
-    }
-  }
-
-  public struct SpaceWorktreesInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct SpaceWorktreesOutputWorktreesItem: Sendable, Hashable, Codable {
-    public var threadId: String?
-    public var title: String?
-    public var updatedAt: Double?
-    public var path: String?
-
-    public init(threadId: String? = nil, title: String? = nil, updatedAt: Double? = nil, path: String? = nil) {
-      self.threadId = threadId
-      self.title = title
-      self.updatedAt = updatedAt
-      self.path = path
-    }
-  }
-
-  public struct SpaceWorktreesOutput: Sendable, Hashable, Codable {
-    public var worktrees: [SpaceWorktreesOutputWorktreesItem]?
-
-    public init(worktrees: [SpaceWorktreesOutputWorktreesItem]? = nil) {
-      self.worktrees = worktrees
-    }
-  }
-
-  public struct SpaceFilesInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var threadId: String?
-
-    public init(id: String? = nil, threadId: String? = nil) {
-      self.id = id
-      self.threadId = threadId
-    }
-  }
-
-  public struct SpaceFilesOutput: Sendable, Hashable, Codable {
-    public var root: String?
-    public var files: [String]?
-    public var truncated: Bool?
-
-    public init(root: String? = nil, files: [String]? = nil, truncated: Bool? = nil) {
-      self.root = root
-      self.files = files
-      self.truncated = truncated
-    }
-  }
-
-  public struct SpaceFileInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var threadId: String?
-    public var path: String?
-
-    public init(id: String? = nil, threadId: String? = nil, path: String? = nil) {
-      self.id = id
-      self.threadId = threadId
-      self.path = path
-    }
-  }
-
-  public struct SpaceFileOutput: Sendable, Hashable, Codable {
-    public var text: String?
-    public var reason: String?
-
-    public init(text: String? = nil, reason: String? = nil) {
-      self.text = text
-      self.reason = reason
-    }
-  }
-
   public struct RecentThreadsOutputThreadsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
@@ -2526,258 +1950,13 @@ public enum Studio {
     }
   }
 
-  public struct SpaceLeadInput: Sendable, Hashable, Codable {
-    public var spaceId: String?
-
-    public init(spaceId: String? = nil) {
-      self.spaceId = spaceId
-    }
-  }
-
-  public enum SpaceLeadOutputRunCadence: Sendable, Hashable, Codable {
-    case hourly
-    case daily
-    case weekdays
-    case every5minutes
-    case every15minutes
-    case every30minutes
-    case every2hours
-    case every6hours
-    case weekly
-    case custom
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "hourly": self = .hourly
-      case "daily": self = .daily
-      case "weekdays": self = .weekdays
-      case "every5minutes": self = .every5minutes
-      case "every15minutes": self = .every15minutes
-      case "every30minutes": self = .every30minutes
-      case "every2hours": self = .every2hours
-      case "every6hours": self = .every6hours
-      case "weekly": self = .weekly
-      case "custom": self = .custom
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .hourly: try container.encode("hourly")
-      case .daily: try container.encode("daily")
-      case .weekdays: try container.encode("weekdays")
-      case .every5minutes: try container.encode("every5minutes")
-      case .every15minutes: try container.encode("every15minutes")
-      case .every30minutes: try container.encode("every30minutes")
-      case .every2hours: try container.encode("every2hours")
-      case .every6hours: try container.encode("every6hours")
-      case .weekly: try container.encode("weekly")
-      case .custom: try container.encode("custom")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceLeadOutputRun: Sendable, Hashable, Codable {
-    public var enabled: Bool?
-    public var cadence: SpaceLeadOutputRunCadence?
-    public var time: String?
-    public var cron: String?
-
-    public init(enabled: Bool? = nil, cadence: SpaceLeadOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
-      self.enabled = enabled
-      self.cadence = cadence
-      self.time = time
-      self.cron = cron
-    }
-  }
-
-  public struct SpaceLeadOutput: Sendable, Hashable, Codable {
-    public var spaceId: String?
-    public var name: String?
-    public var icon: String?
-    public var color: String?
-    public var leadThreadId: String?
-    public var defaultProjectId: String?
-    public var run: SpaceLeadOutputRun?
-
-    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, defaultProjectId: String? = nil, run: SpaceLeadOutputRun? = nil) {
-      self.spaceId = spaceId
-      self.name = name
-      self.icon = icon
-      self.color = color
-      self.leadThreadId = leadThreadId
-      self.defaultProjectId = defaultProjectId
-      self.run = run
-    }
-  }
-
-  public struct ThreadLinesInput: Sendable, Hashable, Codable {
-    public var threadIds: [String]?
-
-    public init(threadIds: [String]? = nil) {
-      self.threadIds = threadIds
-    }
-  }
-
-  public enum ThreadLinesOutputLinesValueKind: Sendable, Hashable, Codable {
-    case progress
-    case failure
-    case blocked
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "progress": self = .progress
-      case "failure": self = .failure
-      case "blocked": self = .blocked
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .progress: try container.encode("progress")
-      case .failure: try container.encode("failure")
-      case .blocked: try container.encode("blocked")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct ThreadLinesOutputLinesValue: Sendable, Hashable, Codable {
-    public var text: String?
-    public var kind: ThreadLinesOutputLinesValueKind?
-    public var at: Double?
-
-    public init(text: String? = nil, kind: ThreadLinesOutputLinesValueKind? = nil, at: Double? = nil) {
-      self.text = text
-      self.kind = kind
-      self.at = at
-    }
-  }
-
-  public struct ThreadLinesOutput: Sendable, Hashable, Codable {
-    public var lines: [String: ThreadLinesOutputLinesValue]?
-
-    public init(lines: [String: ThreadLinesOutputLinesValue]? = nil) {
-      self.lines = lines
-    }
-  }
-
-  public struct SpaceSetLeadInput: Sendable, Hashable, Codable {
-    public var spaceId: String?
-    public var threadId: String?
-
-    public init(spaceId: String? = nil, threadId: String? = nil) {
-      self.spaceId = spaceId
-      self.threadId = threadId
-    }
-  }
-
-  public enum SpaceSetLeadOutputRunCadence: Sendable, Hashable, Codable {
-    case hourly
-    case daily
-    case weekdays
-    case every5minutes
-    case every15minutes
-    case every30minutes
-    case every2hours
-    case every6hours
-    case weekly
-    case custom
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "hourly": self = .hourly
-      case "daily": self = .daily
-      case "weekdays": self = .weekdays
-      case "every5minutes": self = .every5minutes
-      case "every15minutes": self = .every15minutes
-      case "every30minutes": self = .every30minutes
-      case "every2hours": self = .every2hours
-      case "every6hours": self = .every6hours
-      case "weekly": self = .weekly
-      case "custom": self = .custom
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .hourly: try container.encode("hourly")
-      case .daily: try container.encode("daily")
-      case .weekdays: try container.encode("weekdays")
-      case .every5minutes: try container.encode("every5minutes")
-      case .every15minutes: try container.encode("every15minutes")
-      case .every30minutes: try container.encode("every30minutes")
-      case .every2hours: try container.encode("every2hours")
-      case .every6hours: try container.encode("every6hours")
-      case .weekly: try container.encode("weekly")
-      case .custom: try container.encode("custom")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceSetLeadOutputRun: Sendable, Hashable, Codable {
-    public var enabled: Bool?
-    public var cadence: SpaceSetLeadOutputRunCadence?
-    public var time: String?
-    public var cron: String?
-
-    public init(enabled: Bool? = nil, cadence: SpaceSetLeadOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
-      self.enabled = enabled
-      self.cadence = cadence
-      self.time = time
-      self.cron = cron
-    }
-  }
-
-  public struct SpaceSetLeadOutput: Sendable, Hashable, Codable {
-    public var spaceId: String?
-    public var name: String?
-    public var icon: String?
-    public var color: String?
-    public var leadThreadId: String?
-    public var defaultProjectId: String?
-    public var run: SpaceSetLeadOutputRun?
-
-    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, defaultProjectId: String? = nil, run: SpaceSetLeadOutputRun? = nil) {
-      self.spaceId = spaceId
-      self.name = name
-      self.icon = icon
-      self.color = color
-      self.leadThreadId = leadThreadId
-      self.defaultProjectId = defaultProjectId
-      self.run = run
-    }
-  }
-
-  public struct SpaceOfThreadsInput: Sendable, Hashable, Codable {
+  public struct ProjectLeadsInput: Sendable, Hashable, Codable {
 
 
     public init() {}
   }
 
-  public struct SpaceOfThreadsOutput: Sendable, Hashable, Codable {
-    public var threads: [String: String]?
-
-    public init(threads: [String: String]? = nil) {
-      self.threads = threads
-    }
-  }
-
-  public enum SpaceSetRunInputCadence: Sendable, Hashable, Codable {
+  public enum ProjectLeadsOutputLeadsItemRunCadence: Sendable, Hashable, Codable {
     case hourly
     case daily
     case weekdays
@@ -2825,77 +2004,13 @@ public enum Studio {
     }
   }
 
-  public struct SpaceSetRunInput: Sendable, Hashable, Codable {
+  public struct ProjectLeadsOutputLeadsItemRun: Sendable, Hashable, Codable {
     public var enabled: Bool?
-    public var cadence: SpaceSetRunInputCadence?
-    public var cron: String?
-    public var spaceId: String?
-    public var time: String?
-
-    public init(enabled: Bool? = nil, cadence: SpaceSetRunInputCadence? = nil, cron: String? = nil, spaceId: String? = nil, time: String? = nil) {
-      self.enabled = enabled
-      self.cadence = cadence
-      self.cron = cron
-      self.spaceId = spaceId
-      self.time = time
-    }
-  }
-
-  public enum SpaceSetRunOutputRunCadence: Sendable, Hashable, Codable {
-    case hourly
-    case daily
-    case weekdays
-    case every5minutes
-    case every15minutes
-    case every30minutes
-    case every2hours
-    case every6hours
-    case weekly
-    case custom
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "hourly": self = .hourly
-      case "daily": self = .daily
-      case "weekdays": self = .weekdays
-      case "every5minutes": self = .every5minutes
-      case "every15minutes": self = .every15minutes
-      case "every30minutes": self = .every30minutes
-      case "every2hours": self = .every2hours
-      case "every6hours": self = .every6hours
-      case "weekly": self = .weekly
-      case "custom": self = .custom
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .hourly: try container.encode("hourly")
-      case .daily: try container.encode("daily")
-      case .weekdays: try container.encode("weekdays")
-      case .every5minutes: try container.encode("every5minutes")
-      case .every15minutes: try container.encode("every15minutes")
-      case .every30minutes: try container.encode("every30minutes")
-      case .every2hours: try container.encode("every2hours")
-      case .every6hours: try container.encode("every6hours")
-      case .weekly: try container.encode("weekly")
-      case .custom: try container.encode("custom")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceSetRunOutputRun: Sendable, Hashable, Codable {
-    public var enabled: Bool?
-    public var cadence: SpaceSetRunOutputRunCadence?
+    public var cadence: ProjectLeadsOutputLeadsItemRunCadence?
     public var time: String?
     public var cron: String?
 
-    public init(enabled: Bool? = nil, cadence: SpaceSetRunOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(enabled: Bool? = nil, cadence: ProjectLeadsOutputLeadsItemRunCadence? = nil, time: String? = nil, cron: String? = nil) {
       self.enabled = enabled
       self.cadence = cadence
       self.time = time
@@ -2903,22 +2018,326 @@ public enum Studio {
     }
   }
 
-  public struct SpaceSetRunOutput: Sendable, Hashable, Codable {
-    public var spaceId: String?
-    public var name: String?
-    public var icon: String?
-    public var color: String?
+  public struct ProjectLeadsOutputLeadsItem: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var leadThreadId: String?
-    public var defaultProjectId: String?
-    public var run: SpaceSetRunOutputRun?
+    public var run: ProjectLeadsOutputLeadsItemRun?
 
-    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, defaultProjectId: String? = nil, run: SpaceSetRunOutputRun? = nil) {
-      self.spaceId = spaceId
-      self.name = name
-      self.icon = icon
-      self.color = color
+    public init(projectId: String? = nil, leadThreadId: String? = nil, run: ProjectLeadsOutputLeadsItemRun? = nil) {
+      self.projectId = projectId
       self.leadThreadId = leadThreadId
-      self.defaultProjectId = defaultProjectId
+      self.run = run
+    }
+  }
+
+  public struct ProjectLeadsOutput: Sendable, Hashable, Codable {
+    public var leads: [ProjectLeadsOutputLeadsItem]?
+
+    public init(leads: [ProjectLeadsOutputLeadsItem]? = nil) {
+      self.leads = leads
+    }
+  }
+
+  public struct ProjectLeadInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+
+    public init(projectId: String? = nil) {
+      self.projectId = projectId
+    }
+  }
+
+  public enum ProjectLeadOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ProjectLeadOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: ProjectLeadOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: ProjectLeadOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct ProjectLeadOutput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var leadThreadId: String?
+    public var run: ProjectLeadOutputRun?
+
+    public init(projectId: String? = nil, leadThreadId: String? = nil, run: ProjectLeadOutputRun? = nil) {
+      self.projectId = projectId
+      self.leadThreadId = leadThreadId
+      self.run = run
+    }
+  }
+
+  public struct ProjectSetLeadInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var threadId: String?
+
+    public init(projectId: String? = nil, threadId: String? = nil) {
+      self.projectId = projectId
+      self.threadId = threadId
+    }
+  }
+
+  public enum ProjectSetLeadOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ProjectSetLeadOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: ProjectSetLeadOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: ProjectSetLeadOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct ProjectSetLeadOutput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var leadThreadId: String?
+    public var run: ProjectSetLeadOutputRun?
+
+    public init(projectId: String? = nil, leadThreadId: String? = nil, run: ProjectSetLeadOutputRun? = nil) {
+      self.projectId = projectId
+      self.leadThreadId = leadThreadId
+      self.run = run
+    }
+  }
+
+  public enum ProjectSetRunInputCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ProjectSetRunInput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: ProjectSetRunInputCadence?
+    public var cron: String?
+    public var projectId: String?
+    public var time: String?
+
+    public init(enabled: Bool? = nil, cadence: ProjectSetRunInputCadence? = nil, cron: String? = nil, projectId: String? = nil, time: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.cron = cron
+      self.projectId = projectId
+      self.time = time
+    }
+  }
+
+  public enum ProjectSetRunOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ProjectSetRunOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: ProjectSetRunOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: ProjectSetRunOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct ProjectSetRunOutput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var leadThreadId: String?
+    public var run: ProjectSetRunOutputRun?
+
+    public init(projectId: String? = nil, leadThreadId: String? = nil, run: ProjectSetRunOutputRun? = nil) {
+      self.projectId = projectId
+      self.leadThreadId = leadThreadId
       self.run = run
     }
   }
@@ -3553,90 +2972,6 @@ public enum Studio {
 
     public init(panels: [SidebarOutputPanelsItem]? = nil) {
       self.panels = panels
-    }
-  }
-
-  public struct SpaceTreeInput: Sendable, Hashable, Codable {
-
-
-    public init() {}
-  }
-
-  public struct SpaceTreeOutputSpacesItemItemsItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-    public var title: String?
-    public var icon: String?
-    public var kindIcon: String?
-    public var href: String?
-    public var updatedAt: Double?
-    public var parentId: String?
-    public var depth: Double?
-
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil, updatedAt: Double? = nil, parentId: String? = nil, depth: Double? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-      self.title = title
-      self.icon = icon
-      self.kindIcon = kindIcon
-      self.href = href
-      self.updatedAt = updatedAt
-      self.parentId = parentId
-      self.depth = depth
-    }
-  }
-
-  public struct SpaceTreeOutputSpacesItemOpenItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-    public var title: String?
-    public var icon: String?
-    public var kindIcon: String?
-    public var href: String?
-    public var pinned: Bool?
-    public var kindLabel: String?
-    public var updatedAt: Double?
-    public var preview: String?
-
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil, pinned: Bool? = nil, kindLabel: String? = nil, updatedAt: Double? = nil, preview: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-      self.title = title
-      self.icon = icon
-      self.kindIcon = kindIcon
-      self.href = href
-      self.pinned = pinned
-      self.kindLabel = kindLabel
-      self.updatedAt = updatedAt
-      self.preview = preview
-    }
-  }
-
-  public struct SpaceTreeOutputSpacesItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var icon: String?
-    public var color: String?
-    public var items: [SpaceTreeOutputSpacesItemItemsItem]?
-    public var itemCount: Double?
-    public var `open`: [SpaceTreeOutputSpacesItemOpenItem]?
-
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, items: [SpaceTreeOutputSpacesItemItemsItem]? = nil, itemCount: Double? = nil, `open`: [SpaceTreeOutputSpacesItemOpenItem]? = nil) {
-      self.id = id
-      self.name = name
-      self.icon = icon
-      self.color = color
-      self.items = items
-      self.itemCount = itemCount
-      self.`open` = `open`
-    }
-  }
-
-  public struct SpaceTreeOutput: Sendable, Hashable, Codable {
-    public var spaces: [SpaceTreeOutputSpacesItem]?
-
-    public init(spaces: [SpaceTreeOutputSpacesItem]? = nil) {
-      self.spaces = spaces
     }
   }
 

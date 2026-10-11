@@ -1,11 +1,8 @@
 import SwiftUI
 
-/// Archived threads, newest first, with swipe to restore; with `spaceId`, only that Space's.
+/// Archived threads, newest first, with swipe to restore.
 struct ArchivedView: View {
-    var spaceId: String?
     @EnvironmentObject private var app: AppModel
-    /// Which Space each thread is in, for `spaceId`.
-    @State private var assignment: SpaceAssignment?
     @State private var threads: [ThreadEntry] = []
     @State private var loaded = false
     @State private var more = true
@@ -61,25 +58,14 @@ struct ArchivedView: View {
             }
         }
         .searchable(text: $query, prompt: "Search loaded threads")
-        .navigationTitle(spaceId == nil ? "Archived" : "Archived in \(spaceName)")
+        .navigationTitle("Archived")
         .refreshable { await load() }
         .task { if !loaded { await load() } }
         .sensoryFeedback(.success, trigger: done)
     }
 
-    private var spaceName: String {
-        assignment?.spaces.first { $0.id == spaceId }?.name ?? "Space"
-    }
-
     private var shown: [ThreadEntry] {
-        let list = Self.inSpace(threads, spaceId, assignment)
-        return query.isEmpty ? list : list.filter { $0.displayTitle.localizedCaseInsensitiveContains(query) }
-    }
-
-    static func inSpace(_ threads: [ThreadEntry], _ spaceId: String?, _ assignment: SpaceAssignment?) -> [ThreadEntry] {
-        guard let spaceId, let assignment else { return threads }
-        let byId = Dictionary(threads.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        return threads.filter { assignment.spaceId(of: $0, among: byId) == spaceId }
+        query.isEmpty ? threads : threads.filter { $0.displayTitle.localizedCaseInsensitiveContains(query) }
     }
 
     struct Pages: Equatable {
@@ -89,8 +75,8 @@ struct ArchivedView: View {
     }
 
     /// Reads pages from `offset` until one adds a row `shown` keeps, or BB has no more.
-    /// A Space's threads are filtered here, so a page can add nothing to show; stopping
-    /// there would leave the spinner row, whose task already ran, spinning for good.
+    /// When `shown` filters, a page can add nothing to show; stopping there would
+    /// leave the spinner row, whose task already ran, spinning for good.
     static func fetch(
         after existing: [ThreadEntry], offset: Int, pageSize: Int, shown: ([ThreadEntry]) -> Int,
         page: (_ offset: Int) async throws -> [ThreadEntry]
@@ -109,16 +95,10 @@ struct ArchivedView: View {
 
     private func load(more: Bool = false) async {
         do {
-            if spaceId != nil, !more || assignment == nil {
-                async let spaces = app.client.studioSpaces()
-                async let spaceOf = app.client.spaceOfThreads()
-                assignment = try await SpaceAssignment(spaces: spaces, spaceOf: spaceOf)
-            }
             let client = app.client
-            let (spaceId, assignment) = (spaceId, assignment)
             let pages = try await Self.fetch(
                 after: more ? threads : [], offset: more ? fetched : 0, pageSize: Self.page,
-                shown: { Self.inSpace($0, spaceId, assignment).count }
+                shown: { $0.count }
             ) { try await client.archivedThreads(limit: Self.page, offset: $0) }
             threads = pages.threads
             fetched = pages.offset

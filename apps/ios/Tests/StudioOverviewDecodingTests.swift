@@ -19,8 +19,7 @@ final class StudioOverviewDecodingTests: XCTestCase {
                 ]},
                 {"kinds":"broken"}
               ],
-              "tags":[{"id":"t","name":"Work"},{"name":"no id"}],
-              "spaces":{"not":"a list"}
+              "tags":[{"id":"t","name":"Work"},{"name":"no id"}]
             }}
             """#.utf8))
         }
@@ -33,6 +32,5 @@ final class StudioOverviewDecodingTests: XCTestCase {
         XCTAssertEqual(overview.kinds.first?.actions.first?.result, "toast")
         XCTAssertEqual(overview.tags?.map(\.id), ["t"])
         XCTAssertEqual(overview.tags?.first?.color, "#64748b")
-        XCTAssertNil(overview.spaces)
     }
 }

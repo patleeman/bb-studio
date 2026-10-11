@@ -198,26 +198,11 @@ extension BBClient {
         try await get("/api/v1/sidebar-bootstrap")
     }
 
-    /// Studio Sidebar's (`thread-list-plus`) when it runs, which is what the web
-    /// sidebar shows then; otherwise BB's own Thread List's. Only a missing Studio
-    /// Sidebar falls back: a timeout or failure throws, so callers keep what they had.
+    /// BB's own Thread List's layout choices, which the web sidebar follows.
     public func sidebarPreferences() async throws -> SidebarPreferences {
         struct Envelope: Decodable { var preferences: SidebarPreferences }
-        do {
-            let envelope: Envelope = try await rpc(Self.studioSidebarPlugin, "listPreferences")
-            return envelope.preferences
-        } catch where Self.isMissingRPC(error) {
-            let envelope: Envelope = try await rpc("thread-list", "listPreferences")
-            return envelope.preferences
-        }
-    }
-
-    /// Studio Sidebar's plugin id, kept from when it was Thread List Plus.
-    public static let studioSidebarPlugin = "thread-list-plus"
-
-    /// Sets one of Studio Sidebar's synced preferences, like `hiddenThreads`.
-    public func setSidebarPreference(_ key: String, _ value: JSONValue) async throws {
-        let _: JSONValue = try await rpc(Self.studioSidebarPlugin, "setPreference", ["key": .string(key), "value": value])
+        let envelope: Envelope = try await rpc("thread-list", "listPreferences")
+        return envelope.preferences
     }
 
     public func thread(_ id: String) async throws -> ThreadEntry {

@@ -11,8 +11,6 @@ enum Route: Hashable {
     case automation(Automation)
     case usage
     case archived
-    /// A Space's archived threads.
-    case spaceArchived(id: String)
     case drawings
     case drawing(id: String)
     case recording(id: String)
@@ -78,14 +76,6 @@ final class AppModel: ObservableObject {
     @Published var chiefTalkPending = false
     /// The Studio tab's kind filter; nil for everything.
     @Published var studioKind: String?
-    /// The Studio tab's space filter; nil for every space.
-    @Published var studioSpace: String?
-    /// The Space Home shows in By space: a Space id, `all`, or nil to follow the web sidebar's.
-    @Published var homeSpace: String? {
-        didSet { UserDefaults.standard.set(homeSpace, forKey: ServerScope.key("homeSpace", serverURL: serverURL)) }
-    }
-    /// The project New Thread starts in, set by a Space's New Thread Here.
-    @Published var newThreadSpace: String?
     @Published var sheet: Sheet?
     @Published var notificationError: String?
     /// A brief message over the whole app for something that went partly wrong, like Studio's flash.
@@ -105,7 +95,6 @@ final class AppModel: ObservableObject {
         let client = BBClient()
         self.client = client
         realtime = BBRealtime(client: client)
-        homeSpace = UserDefaults.standard.string(forKey: ServerScope.key("homeSpace", serverURL: client.baseURL))
         // Started when the scene becomes active, so a background launch (a watch
         // relay, a Live Activity token) doesn't open a socket.
         realtime.subscribeThreadList()
@@ -128,12 +117,10 @@ final class AppModel: ObservableObject {
         StatusWidgets.reset()
         PhoneRelay.shared.pushStatus([])
         studioKind = nil
-        studioSpace = nil
         sheet = nil
         chiefTalkPending = false
         realtime.stop()
         client = BBClient(baseURL: url)
-        homeSpace = UserDefaults.standard.string(forKey: ServerScope.key("homeSpace", serverURL: url))
         realtime = BBRealtime(client: client)
         realtime.start()
         realtime.subscribeThreadList()
@@ -141,7 +128,6 @@ final class AppModel: ObservableObject {
         path = []
         studioPath = []
         newThreadDraft = nil
-        newThreadSpace = nil
         replyThreadId = nil
         Outbox.shared.flush()
         TalkOutbox.shared.kick()
@@ -184,7 +170,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://space/<id>`,
+    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://chief` (also the old `web`), `bbstudio://chief-talk`.
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
@@ -206,7 +192,6 @@ final class AppModel: ObservableObject {
         case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
         case "design", "designs": openStudio(kind: "design", id.map { .design(id: $0) })
-        case "space": if let id { openSpace(id) }
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
@@ -221,50 +206,9 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `space` starts it in that Space's project and puts it in the Space.
-    func newThread(text: String = "", space: String? = nil) {
+    func newThread(text: String = "") {
         tab = .inbox
-        newThreadSpace = space
         newThreadDraft = text
-    }
-
-    /// The Space in By space Home (its lead, open items and threads); otherwise Studio
-    /// filtered to it, since Home shows Spaces only in By space. An id Studio doesn't
-    /// know opens Home without remembering it.
-    func openSpace(_ id: String) {
-        let client = client
-        spaceLink?.cancel()
-        spaceLink = Task {
-            async let preferences = try? client.sidebarPreferences()
-            async let spaces = try? client.studioSpaces()
-            let target = Self.spaceLinkTarget(id, organizationMode: await preferences?.organizationMode, spaces: await spaces)
-            guard !Task.isCancelled, client.baseURL == serverURL else { return }
-            switch target {
-            case .home(let id):
-                tab = .inbox
-                path = []
-                homeSpace = id
-            case .studio(let id):
-                openStudio(space: id)
-            case .unknown:
-                tab = .inbox
-                path = []
-            }
-        }
-    }
-
-    private var spaceLink: Task<Void, Never>?
-
-    enum SpaceLinkTarget: Equatable {
-        case home(String), studio(String), unknown
-    }
-
-    /// Home in By space (as the web sidebar decides), Studio otherwise; nil `spaces` means Studio didn't answer.
-    static func spaceLinkTarget(_ id: String, organizationMode: String?, spaces: [StudioSpace]?) -> SpaceLinkTarget {
-        guard let spaces, !spaces.isEmpty else { return .unknown }
-        let known = spaces.contains { $0.id == id }
-        if organizationMode == "space" { return known || id == "all" ? .home(id) : .unknown }
-        return known ? .studio(id) : .unknown
     }
 
     func openThread(_ id: String) {
@@ -295,13 +239,6 @@ final class AppModel: ObservableObject {
         tab = .studio
         if let kind { studioKind = kind }
         studioPath = route.map { [$0] } ?? []
-    }
-
-    /// Studio's collection, showing only what a space holds.
-    func openStudio(space id: String) {
-        studioKind = nil
-        studioSpace = id
-        openStudio(kind: nil)
     }
 
     /// Shows `message` at the bottom of the app for a few seconds.

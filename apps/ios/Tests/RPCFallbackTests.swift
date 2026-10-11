@@ -28,30 +28,13 @@ final class RPCFallbackTests: XCTestCase {
         XCTAssertFalse(BBClient.isMissingRPC(URLError(.timedOut)))
     }
 
-    func testSidebarPreferencesFallBackOnlyWhenStudioSidebarIsMissing() async throws {
+    func testSidebarPreferencesComeFromBBsThreadList() async throws {
         let prefs = Data(#"{"ok":true,"result":{"preferences":{"organizationMode":"project"}}}"#.utf8)
-        let (missing, calls) = client { path in
-            path.contains("thread-list-plus") ? (404, Self.missingPlugin) : (200, prefs)
-        }
-        let fallback = try await missing.sidebarPreferences()
-        XCTAssertEqual(fallback.organizationMode, "project")
+        let (client, calls) = client { _ in (200, prefs) }
+        let read = try await client.sidebarPreferences()
+        XCTAssertEqual(read.organizationMode, "project")
         let paths = await calls.paths
-        XCTAssertEqual(paths.last, "/api/v1/plugins/thread-list/rpc/listPreferences")
-    }
-
-    func testSidebarPreferencesTimeoutThrowsWithoutFallingBack() async throws {
-        let (slow, calls) = client { path in
-            if path.contains("thread-list-plus") { throw URLError(.timedOut) }
-            return (200, Data(#"{"ok":true,"result":{"preferences":{"organizationMode":"project"}}}"#.utf8))
-        }
-        do {
-            _ = try await slow.sidebarPreferences()
-            XCTFail("A timeout must not fall back to BB's Thread List")
-        } catch {
-            XCTAssertEqual((error as? URLError)?.code, .timedOut)
-        }
-        let paths = await calls.paths
-        XCTAssertEqual(paths.count, 1)
+        XCTAssertEqual(paths, ["/api/v1/plugins/thread-list/rpc/listPreferences"])
     }
 
     func testItemChatFailureSurfacesStudiosError() async throws {

@@ -100,7 +100,6 @@ struct RouteDestination: View {
         case .automation(let automation): AutomationView(automation: automation).id(automation.id)
         case .usage: UsageView()
         case .archived: ArchivedView()
-        case .spaceArchived(let id): ArchivedView(spaceId: id).id(id)
         case .drawings: DrawingsView()
         case .drawing(let id): DrawingView(id: id)
         case .recording(let id): RecordingDetailView(id: id)
@@ -129,7 +128,7 @@ private struct ChiefOfStaffTab: View {
                 case .none:
                     ContentUnavailableView("No chief of staff",
                                            systemImage: "person.crop.circle.badge.questionmark",
-                                           description: Text("No Chief of Staff is set. Open a thread, then choose Space > Make Chief of Staff from its menu."))
+                                           description: Text("No Chief of Staff is set. The Chief of Staff leads your personal project: open a thread, then choose Make Chief of Staff from its ⋯ menu."))
                 case .unavailable(let message):
                     ContentUnavailableView {
                         Label("Chief of Staff unavailable", systemImage: "exclamationmark.triangle")

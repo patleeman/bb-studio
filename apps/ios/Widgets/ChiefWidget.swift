@@ -2,7 +2,7 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-/// The Chief of Staff, Studio's slot above every Space: its latest message, a mic,
+/// The Chief of Staff, the lead of BB's personal project: its latest message, a mic,
 /// and Approve and Deny when it is waiting on an approval.
 struct ChiefEntry: TimelineEntry {
     var serverURL: URL = ServerScope.selectedURL

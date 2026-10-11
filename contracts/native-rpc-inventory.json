@@ -231,21 +231,9 @@
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "Self.studioSidebarPlugin",
-      "method": "\"listPreferences\"",
-      "coverage": "dynamic dispatch; runtime validation required"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "thread-list",
       "method": "listPreferences",
       "coverage": "external host plugin; contract maintained outside this repository"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "Self.studioSidebarPlugin",
-      "method": "\"setPreference\"",
-      "coverage": "dynamic dispatch; runtime validation required"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
@@ -486,90 +474,6 @@
       "plugin": "side-chat",
       "method": "createSideChat",
       "coverage": "external host plugin; contract maintained outside this repository"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "spaces",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "createSpace",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "updateSpace",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "deleteSpace",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "spaceMembers",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "space_of_threads",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "space_lead",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "space_set_lead",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "space_set_run",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "moveToSpace",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "thread_lines",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "spaceTree",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "closeTabs",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "createInSpace",
-      "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
