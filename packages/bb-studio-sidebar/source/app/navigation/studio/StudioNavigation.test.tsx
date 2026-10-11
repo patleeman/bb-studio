@@ -95,7 +95,6 @@ describe("Studio Navigation", () => {
 
   it("leaves out retired Studio panels, visible or hidden", () => {
     const retired = [
-      item("pages/explainers", "Explore"),
       item("float/companions", "Companions"),
       item("studio-chat/chats", "Chat", { isVisible: false }),
     ];

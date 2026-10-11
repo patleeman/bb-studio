@@ -25,7 +25,7 @@ describe("the ::next directive", () => {
     expect(items.do).toHaveLength(NEXT_LIMITS.do);
   });
 
-  it("keeps a note's whole text, and cuts its explainer's label", () => {
+  it("keeps a note's whole text, and cuts its label", () => {
     const sentence = `I noticed ${"something long ".repeat(12)}here.`;
     const [note] = parseNextItems({ btw: `🔗 ${sentence}` }).btw;
     expect(note.text).toBe(sentence.replace(/\s+/g, " "));
@@ -62,6 +62,7 @@ describe("the Next instructions", () => {
     expect(items.do).toHaveLength(1);
     expect(text).toContain("Prefer these when they fit: 👍 Agree | ❓ Clarify");
     expect(text).toContain("Don't also write ::reactions or ::explore lines");
+    expect(text).not.toMatch(/Visual explainer|explore_explain|Studio Page/);
   });
 
   it("keeps notes apart when they start the same, and the first keeps its old label", () => {

@@ -1,21 +1,19 @@
 // The Next row at the end of a reply (`::next{reply="…" btw="…" do="…"}`):
 // quick replies and actions as buttons that draft into the composer, then
 // notes about what the agent noticed, each with Tell me more (asks this
-// agent), Visual explainer (an explainer page) and, for 🐛 notes, Fix this. Each message logs its suggestions once
-// as shown, and every click, so `bb pages explore stats` can tell which kinds
+// agent) and, for 🐛 notes, Fix this. Each message logs its suggestions
+// once as shown, and every click, so `bb pages explore stats` can tell which kinds
 // earn their place.
 import type { PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
-import { cn, Icon } from "@bb-studio/kit/ui";
+import { Icon } from "@bb-studio/kit/ui";
 import { useExploreRpc } from "../../client";
 import { PLUGIN_ID } from "../constants";
 import { BUG_EMOJI, nextItemCount, parseNextItems, type BtwNote, type NextKind } from "../next";
 import { labelKey, type ExploreItem } from "../shared";
 import { composerFor } from "@bb-studio/kit/composer";
 import { appendDraft } from "./composer";
-import { rowState } from "./explore";
-import { useExplainers, type ExplainerTarget } from "./rows";
 
 const SETTINGS_HREF = `/settings/plugins/${PLUGIN_ID}`;
 
@@ -32,7 +30,6 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
     () => [
       ...items.reply.map((item) => ({ kind: "reply" as const, emoji: item.emoji, label: item.label })),
       ...items.do.map((item) => ({ kind: "do" as const, emoji: item.emoji, label: item.label })),
-      ...items.btw.map((note) => ({ kind: "explore" as const, emoji: note.emoji, label: note.label })),
       ...items.btw.filter(isBug).map((note) => ({ kind: "fix" as const, emoji: note.emoji, label: note.label })),
       ...items.btw.map((note) => ({ kind: "more" as const, emoji: note.emoji, label: note.label })),
     ],
@@ -103,12 +100,8 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
         <NextSection label="By the way" hint="Things the agent noticed outside what you asked about.">
           <BtwNotes
             notes={items.btw}
-            threadId={threadId}
-            messageId={messageId}
-            turnId={message.turnId}
-            onExplore={(item) => logClick("explore", item)}
             onFix={(note) => draft("fix", note, `${BUG_EMOJI} Fix this: ${note.text}`)}
-          onMore={(note) => draft("more", note, `${MORE_EMOJI} Tell me more: ${note.text}`)}
+            onMore={(note) => draft("more", note, `${MORE_EMOJI} Tell me more: ${note.text}`)}
           />
         </NextSection>
       ) : null}
@@ -133,22 +126,12 @@ const isBug = (note: BtwNote) => note.emoji === BUG_EMOJI;
 /** Drafted by Tell me more; matches the iOS app. */
 const MORE_EMOJI = "💬";
 
-/**
- * Notes back to the user, each with Tell me more (asks this agent), Fix this
- * for 🐛 notes, and Visual explainer (shows its explainer page's state).
- */
-function BtwNotes({ notes, onFix, onMore, ...target }: ExplainerTarget & { notes: readonly BtwNote[]; onFix(note: BtwNote): void; onMore(note: BtwNote): void }) {
-  const { byLabel, busy, errors, act } = useExplainers(target);
+/** Notes back to the user, each with Tell me more (asks this agent) and Fix this for 🐛 notes. */
+function BtwNotes({ notes, onFix, onMore }: { notes: readonly BtwNote[]; onFix(note: BtwNote): void; onMore(note: BtwNote): void }) {
   return (
     <ul className="space-y-1.5" aria-label="Things the agent noticed">
       {notes.map((note) => {
         const key = labelKey(note.label);
-        const explainer = byLabel.get(key);
-        const error = errors[key] ?? null;
-        const state = error ? "error" : rowState(explainer);
-        const progress = Math.round(explainer?.job?.progress ?? 0);
-        const explainerLabel =
-          state === "running" ? `Writing explainer · ${progress}%` : state === "ready" ? "Open explainer" : state === "error" ? "Retry explainer" : "Visual explainer";
         return (
           <li key={key} className="flex gap-2 pt-0.5 text-sm">
             <span aria-hidden className="w-4 shrink-0 text-center leading-5">
@@ -167,21 +150,6 @@ function BtwNotes({ notes, onFix, onMore, ...target }: ExplainerTarget & { notes
                     <span>Fix this</span>
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => void act(note, explainer, false, note.text)}
-                  disabled={Boolean(busy[key])}
-                  title={error ?? explainer?.job?.detail ?? "Write a page that explains this with diagrams, in the background"}
-                  className={cn(
-                    ACTION_CHIP,
-                    "disabled:cursor-progress",
-                    state === "error" && "border-destructive/60 text-destructive",
-                    state === "running" && "animate-pulse motion-reduce:animate-none",
-                  )}
-                >
-                  <span aria-hidden="true">{state === "ready" ? "↗" : state === "running" ? "⏳" : state === "error" ? "↻" : "🖼️"}</span>
-                  <span>{explainerLabel}</span>
-                </button>
               </div>
             </div>
           </li>

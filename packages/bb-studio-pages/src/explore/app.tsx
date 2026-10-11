@@ -1,8 +1,5 @@
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
-import { RetainedPanels, retainPanel } from "@bb-studio/kit/app";
-import { DIRECTIVE, PANEL_ACTION } from "./src/shared";
-import { EXPLAINERS_PATH, EXPLORE_ICON } from "./src/ui/explore";
-import { ExplainersPage, ExplainerTab } from "./src/ui/panel";
+import { DIRECTIVE } from "./src/shared";
 import { ExploreDirective } from "./src/ui/rows";
 import { ComposerBridge } from "@bb-studio/kit/composer";
 import { NextDirective } from "./src/ui/next";
@@ -15,11 +12,4 @@ export function registerExploreApp(app: PluginAppBuilder) {
   app.slots.messageDirective({ id: NEXT_DIRECTIVE, component: NextDirective });
   // Lets the Next row draft into the composer of the message's thread. Renders nothing.
   app.composer.customize({ id: "next-composer", banners: [{ id: "composer-bridge", chrome: "bare", component: ComposerBridge }] });
-  // An explainer next to its thread, opened with `{ explainerId }`.
-  app.slots.threadPanelAction({ id: PANEL_ACTION, title: "Explore", icon: EXPLORE_ICON, layout: "flush",
-    component: ExplainerTab,
-    run: ({ openPanel }) => { openPanel(); },
-  });
-  app.slots.navPanel({ id: EXPLAINERS_PATH, path: EXPLAINERS_PATH, title: "Explore", icon: EXPLORE_ICON, component: retainPanel(EXPLAINERS_PATH, ExplainersPage) });
-  app.slots.experimental_appOverlay({ id: "retained-explainers", component: () => <RetainedPanels path={EXPLAINERS_PATH} render={subPath => <ExplainersPage subPath={subPath} />} /> });
 }

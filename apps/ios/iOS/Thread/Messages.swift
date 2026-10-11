@@ -224,8 +224,7 @@ struct ImageViewer: View {
 /// Pages' Next row as a "What next?" card, as in BB web: labeled rows of
 /// replies, requests, and notes on what the agent noticed. Every tap drafts
 /// text. A note's Tell me more and Fix this draft the same requests as on the
-/// web; the web's Visual explainer is left out, since the app doesn't show
-/// explainer pages.
+/// web.
 struct NextCard: View {
     let next: Directive.Next
     let react: (String) -> Void

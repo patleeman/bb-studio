@@ -14,8 +14,8 @@ automatic work, data retention, notifications, and persistent view preferences.
   list removed title-provider fields.
 - **Decisions:** accepts a caller's explicit model without changing the global
   fallback. Its fallback picker also retains the service-tier choice.
-- **Explore (inside Pages):** maximum duration for each new explainer, default
-  20 minutes. Feed findings and the daily digest have been removed.
+- **Explore (inside Pages):** Feed findings, the daily digest and explainer
+  pages (with their time limit) have been removed.
 - **Pages:** saved-version retention, previously fixed at 50. It accepts
   1 to 1000 versions or 0 to keep all. Lowering the limit prunes history on the
   next snapshot of that page. Equal-time snapshots retain the newest insertion.
@@ -32,7 +32,7 @@ do not have to maintain competing defaults.
 | Studio item chat | BB's new-conversation composer selects project, environment, provider/model, reasoning, and permissions; existing chats use native thread controls | Existing controls cover execution choices. |
 | Float | Resize/dock/reorder on each panel; show/hide command; shortcuts in BB Keyboard | Existing controls cover layout and access. |
 | Pages | Page location, icon, chat, history and restore | Added global version-retention setting. |
-| Explore | Suggestions switch and explainer time limit in Pages settings | The digest is retired. The explainer inherits its source thread's model. |
+| Explore | Next row and suggestions switches in Pages settings | The digest and explainers are retired. |
 | Talk | Microphone replacement, segment length, automatic titles/summaries, hold key, audio retention; cleanup toggle per device in the recorder; playback controls on recordings | Added the 3 model pickers and numeric validation. Transcription still uses BB AI services. |
 | Draw | Excalidraw's canvas controls and item-level title, project, export, and deletion | Existing controls cover drawing preferences. There is no background model job to configure. |
 | Artifacts | Explicit save/upload, project placement, item versions, preview/download/export, archive/delete | Existing item controls cover storage actions; no automatic expiry is imposed. |

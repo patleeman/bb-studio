@@ -25,9 +25,9 @@ async function fixture() {
 
 it("runs Explore inside Pages with its own database, prefixed RPC and nested CLI", async () => {
   const { host, dataDir } = await fixture();
-  expect(await host.harness.behavior.callRpc("explore_explainers", {})).toEqual({ explainers: [] });
+  expect(await host.harness.behavior.callRpc("explore_nextShown", { threadId: "thr_1", messageId: "msg_1", items: [] })).toEqual({ ok: true });
   expect(await host.harness.behavior.callRpc("read", null)).toBe("page");
   expect(existsSync(join(dataDir, "plugins/pages/explore.db"))).toBe(true);
-  expect((await host.harness.registrations.cli!.run(["explore", "list"], {} as never)).exitCode).toBe(0);
+  expect((await host.harness.registrations.cli!.run(["explore", "stats"], {} as never)).exitCode).toBe(0);
   expect((await host.harness.registrations.cli!.run(["list"], {} as never)).stdout).toBe("pages");
 });

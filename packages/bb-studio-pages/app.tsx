@@ -26,7 +26,7 @@ function TalkBridge() {
 }
 
 export default definePluginApp((app) => {
-  // Explore: "Along the way" findings and their explainer pages.
+  // Explore: "Along the way" findings and the Next row.
   registerExploreApp(app);
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="pages" render={(subPath) => <PagesPanel subPath={subPath} />} /> });

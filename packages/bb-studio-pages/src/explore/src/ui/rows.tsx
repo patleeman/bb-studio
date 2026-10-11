@@ -1,251 +1,70 @@
-// Explore's findings as full-width rows: "Along the way" at the bottom of a
-// reply (the `::explore{items="🐛 …|🏗️ …"}` directive), and "Explore next"
-// under an explainer. A row shows its explainer's state (Explore →
-// Generating · 45% → Open · generated 2h ago, or Retry) from what's saved,
-// so it survives a reload. Clicking one opens it in Explore's side-panel tab.
-import { errorMessage } from "@bb-studio/kit/format";
-import { useBbNavigate, useRealtime, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Icon } from "@bb-studio/kit/ui";
-import { cn } from "@bb-studio/kit/ui";
-import { relativeTime } from "@bb-studio/kit/format";
-import { PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
-import { useExploreRpc } from "../../client";
+// "Along the way" at the bottom of a reply (the `::explore{items="🐛 …|🏗️ …"}`
+// directive): what the agent noticed, as full-width rows. Clicking one drafts
+// "Tell me more" about it in the thread's composer.
+import type { PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { useMemo } from "react";
+import { toast } from "sonner";
+import { composerFor } from "@bb-studio/kit/composer";
+import { cn, Icon } from "@bb-studio/kit/ui";
+import { PLUGIN_ID } from "../constants";
 import { labelKey, parseExploreItems, type ExploreItem } from "../shared";
-import { EXPLORE_ICON, explainerEvent, openExplainer, rowState, useMinuteTick, type ExplainerView } from "./explore";
+import { appendDraft } from "./composer";
 
-const POLL_MS = 2_500;
 /** Where the Explore setting lives: this plugin's page in Settings. */
 const SETTINGS_HREF = `/settings/plugins/${PLUGIN_ID}`;
+const EXPLORE_ICON = "pages/explore";
+/** Drafted by Tell me more; matches the Next row and the iOS app. */
+const MORE_EMOJI = "💬";
 
 /** `::explore{items="…"}` at the end of a reply. */
 export function ExploreDirective({ attributes, message }: PluginMessageDirectiveProps) {
   const raw = attributes.items;
   const items = useMemo(() => parseExploreItems(raw), [raw]);
   if (!items.length) return null;
-  return <ExploreRows items={items} threadId={message.threadId} messageId={message.id} turnId={message.turnId} settingsHint />;
+  return <ExploreRows items={items} threadId={message.threadId} />;
 }
 
-export interface ExploreRowsProps {
-  items: readonly ExploreItem[];
-  threadId: string;
-  messageId: string;
-  turnId: string | null;
-  /** Follow-ups of an explainer: explored from the same message, under it. */
-  parentId?: string | null;
-  /** The header's title, or null for no header (inside the Next row). */
-  title?: string | null;
-  /** Tighter rows, for the Next row. */
-  dense?: boolean;
-  /** Says, quietly, where to turn Explore off. Only for the end-of-reply rows the setting controls. */
-  settingsHint?: boolean;
-  /** A finding was clicked to open or write its explainer (not to regenerate it). */
-  onExplore?(item: ExploreItem): void;
-  className?: string;
-}
-
-export interface ExplainerTarget {
-  threadId: string;
-  messageId: string;
-  turnId: string | null;
-  parentId?: string | null;
-  /** A finding was clicked to open or write its explainer (not to regenerate it). */
-  onExplore?(item: ExploreItem): void;
-}
-
-/** The explainers for one message's findings, kept current, and what clicking a finding does. */
-export function useExplainers({ threadId, messageId, turnId, parentId = null, onExplore }: ExplainerTarget) {
-  const rpc = useExploreRpc();
-  const navigate = useBbNavigate();
-  useMinuteTick();
-  const [explainers, setExplainers] = useState<ExplainerView[]>([]);
-  /** Labels whose click is in flight, and clicks that failed before a job existed. */
-  const [busy, setBusy] = useState<Record<string, boolean>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const load = useCallback(() => {
-    rpc.call("explainersForMessage", { threadId, messageId, parentId }).then(
-      (result) => setExplainers(result.explainers),
-      () => undefined,
-    );
-  }, [rpc, threadId, messageId, parentId]);
-  useEffect(load, [load]);
-  useRealtime(REALTIME_CHANNEL, (payload) => {
-    const event = explainerEvent(payload);
-    if (event && event.threadId === threadId && event.messageId === messageId && event.parentId === parentId) load();
-  });
-
-  const byLabel = useMemo(() => new Map(explainers.map((explainer) => [labelKey(explainer.label), explainer])), [explainers]);
-  const running = explainers.some((explainer) => rowState(explainer) === "running");
-  // Realtime is the fast path; polling covers a dropped connection while a job runs.
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
-  }, [running, load]);
-
-  const replace = (next: ExplainerView) => setExplainers((current) => [...current.filter((each) => each.id !== next.id), next]);
-
-  /** `note` is what the user was told about the finding, for the explainer's writer. */
-  async function act(item: ExploreItem, explainer: ExplainerView | undefined, regenerate: boolean, note?: string) {
-    const key = labelKey(item.label);
-    if (busy[key]) return;
-    if (!regenerate) onExplore?.(item);
-    setErrors(({ [key]: _, ...rest }) => rest);
-    const state = rowState(explainer);
-    // Written or being written: just open it.
-    if (explainer && !regenerate && (state === "ready" || state === "running")) {
-      openExplainer(navigate, explainer);
+function ExploreRows({ items, threadId }: { items: readonly ExploreItem[]; threadId: string }) {
+  const more = (item: ExploreItem) => {
+    const composer = composerFor(threadId);
+    if (!composer) {
+      toast.error("Open this thread's composer to use it, in the main view or a split.");
       return;
     }
-    setBusy((current) => ({ ...current, [key]: true }));
-    try {
-      const next =
-        regenerate && explainer
-          ? (await rpc.call("exploreRegenerate", { explainerId: explainer.id })).explainer
-          : (await rpc.call("explore", { threadId, messageId, turnId, emoji: item.emoji, label: item.label, parentId, ...(note ? { note } : {}) })).explainer;
-      replace(next);
-      openExplainer(navigate, next);
-    } catch (error) {
-      setErrors((current) => ({ ...current, [key]: errorMessage(error) }));
-    } finally {
-      setBusy(({ [key]: _, ...rest }) => rest);
-    }
-  }
-
-  return { byLabel, busy, errors, act };
-}
-
-export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, dense = false, onExplore, className }: ExploreRowsProps) {
-  const { byLabel, busy, errors, act } = useExplainers({ threadId, messageId, turnId, parentId, onExplore });
-
-  if (!items.length) return null;
+    composer.replace((current) => ({ text: appendDraft(current.text, `${MORE_EMOJI} Tell me more: ${item.emoji} ${item.label}`), mentions: current.mentions }));
+    composer.focus();
+  };
   return (
-    <section aria-label={title ?? "Things you might want to look at"} className={cn("my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background", className)}>
-      {title === null ? null : <header className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-xs text-muted-foreground">
+    <section aria-label="Along the way" className="my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background">
+      <header className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-xs text-muted-foreground">
         <Icon name={EXPLORE_ICON} fallback="Search" className="size-3.5" />
-        {title}
-        {settingsHint ? (
-          <a
-            href={SETTINGS_HREF}
-            title="Stop agents from ending answers with things to explore. Applies to new agent sessions."
-            className="ml-auto text-[11px] text-muted-foreground/60 hover:text-foreground hover:underline"
-          >
-            Turn off in settings
-          </a>
-        ) : null}
-      </header>}
-      <ul className={cn("divide-y divide-border/60", title !== null && "border-t border-border/60")}>
-        {items.map((item) => {
-          const key = labelKey(item.label);
-          const explainer = byLabel.get(key);
-          return (
-            <ExploreRow
-              key={key}
-              item={item}
-              explainer={explainer}
-              dense={dense}
-              pending={Boolean(busy[key])}
-              clickError={errors[key] ?? null}
-              onOpen={() => void act(item, explainer, false)}
-              onRegenerate={() => void act(item, explainer, true)}
-            />
-          );
-        })}
+        Along the way
+        <a
+          href={SETTINGS_HREF}
+          title="Stop agents from ending answers with things to explore. Applies to new agent sessions."
+          className="ml-auto text-[11px] text-muted-foreground/60 hover:text-foreground hover:underline"
+        >
+          Turn off in settings
+        </a>
+      </header>
+      <ul className="divide-y divide-border/60 border-t border-border/60">
+        {items.map((item) => (
+          <li key={labelKey(item.label)}>
+            <button
+              type="button"
+              onClick={() => more(item)}
+              title="Ask the agent to explain this here, in the thread"
+              className={cn("group flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left hover:bg-state-hover")}
+            >
+              <span aria-hidden className="w-5 shrink-0 text-center text-base leading-none">
+                {item.emoji}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.label}</span>
+              <span className="shrink-0 text-xs text-muted-foreground group-hover:text-foreground">Tell me more</span>
+            </button>
+          </li>
+        ))}
       </ul>
     </section>
-  );
-}
-
-function ExploreRow({
-  item,
-  explainer,
-  dense,
-  pending,
-  clickError,
-  onOpen,
-  onRegenerate,
-}: {
-  item: ExploreItem;
-  explainer: ExplainerView | undefined;
-  dense: boolean;
-  pending: boolean;
-  clickError: string | null;
-  onOpen(): void;
-  onRegenerate(): void;
-}) {
-  const state = clickError ? "error" : rowState(explainer);
-  const progress = Math.round(explainer?.job?.progress ?? 0);
-  const error = clickError ?? explainer?.job?.error ?? explainer?.error ?? null;
-  const writtenAt = explainer?.regeneratedAt ?? explainer?.generatedAt ?? null;
-  const regenerating = state === "running" && explainer?.job?.kind === "regenerate";
-
-  let status: string;
-  let title: string | undefined;
-  if (state === "running") {
-    status = `${regenerating ? "Regenerating" : "Generating"} · ${progress}%`;
-    title = explainer?.job ? `${explainer.job.label}: ${explainer.job.detail}` : undefined;
-  } else if (state === "ready") {
-    status = writtenAt ? `Open · ${explainer?.regeneratedAt ? "regenerated" : "generated"} ${relativeTime(writtenAt)}` : "Open";
-  } else if (state === "error") {
-    status = "Retry";
-    title = error ?? undefined;
-  } else {
-    status = "Explore";
-  }
-
-  return (
-    <li className="group relative flex flex-wrap items-stretch">
-      <button
-        type="button"
-        onClick={onOpen}
-        disabled={pending}
-        title={title}
-        className={cn("flex min-w-0 flex-1 items-center gap-3 px-3 text-left hover:bg-state-hover disabled:cursor-progress", dense ? "py-1.5" : "py-2")}
-      >
-        <span aria-hidden className="w-5 shrink-0 text-center text-base leading-none">
-          {item.emoji}
-        </span>
-        {item.why ? (
-          <span className="line-clamp-2 min-w-0 flex-1 text-sm text-foreground">
-            {item.label}
-            <span className="text-muted-foreground"> · {item.why}</span>
-          </span>
-        ) : (
-          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.label}</span>
-        )}
-        <span
-          className={cn(
-            "flex shrink-0 items-center gap-1.5 text-xs tabular-nums",
-            state === "error" ? "text-destructive" : state === "idle" ? "text-muted-foreground group-hover:text-foreground" : "text-muted-foreground",
-            state === "running" && "animate-pulse motion-reduce:animate-none",
-          )}
-        >
-          {pending ? <Icon name="Loading" fallback="Spinner" className="size-3.5 animate-spin motion-reduce:animate-none" /> : null}
-          {status}
-          {state === "ready" ? <Icon name="ArrowUpRight" className="size-3.5" /> : null}
-          {state === "error" ? <Icon name="RotateCcw" className="size-3.5" /> : null}
-        </span>
-      </button>
-      {state === "ready" ? (
-        <button
-          type="button"
-          onClick={onRegenerate}
-          disabled={pending}
-          aria-label={`Regenerate "${item.label}"`}
-          title="Regenerate"
-          className="flex w-9 shrink-0 items-center justify-center text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-40"
-        >
-          <Icon name="RotateCcw" className="size-3.5" />
-        </button>
-      ) : null}
-      {state === "running" ? (
-        <>
-          <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-foreground/[0.06]">
-            <span className="block h-full bg-foreground/40 transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${Math.max(progress, 3)}%` }} />
-          </span>
-          <span role="progressbar" aria-label={`${item.label}: ${status}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="sr-only" />
-        </>
-      ) : null}
-    </li>
   );
 }

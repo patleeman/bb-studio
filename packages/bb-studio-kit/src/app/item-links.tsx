@@ -82,7 +82,6 @@ const LINK_ICONS: Record<string, string> = {
   "studio-code/workspaces": "Code",
   "studio/spaces": "Layers",
   "studio/chats": "MessageSquare",
-  "pages/explainers": "pages/explore",
 };
 
 /** The icon for the item a link opens, read from the link itself: /plugins/<plugin>/<panel>/<id>. */
