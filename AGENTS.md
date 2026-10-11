@@ -65,7 +65,7 @@ Stable BB then refuses the plugin with "requires bb plugin SDK ...".
 
 ## Studio is required
 
-Add-ons (Pages, Draw, Talk, Tables, Artifacts and the rest) are built to run
+Add-ons (Pages, Draw, Talk, Artifacts and the rest) are built to run
 with Studio installed. They may rely on Studio, and don't need to work or
 degrade when it's absent.
 
