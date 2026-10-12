@@ -98,6 +98,11 @@ export const codeContract = defineRpcContract({
     input: z.object({ id }),
     output: z.object({ status: serverStatusSchema }),
   },
+  /** The workspace Code's page opens: the latest, or a new one for a project's folder. */
+  recent: {
+    input: z.null(),
+    output: z.object({ workspace: workspaceSchema }),
+  },
   stop: {
     input: z.object({ id }),
     output: z.object({ status: serverStatusSchema }),

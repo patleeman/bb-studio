@@ -1,9 +1,9 @@
 // bb-studio-code — frontend entry.
 //
 // Surfaces:
-//   - navPanel "Workspaces": Studio's collection of VS Code workspaces, and
-//     the editor at workspaces/<id>. With Studio installed, Studio's page
-//     takes over the collection.
+//   - navPanel "Workspaces": opens the last used VS Code workspace (making one
+//     for a project if there is none), and the editor at workspaces/<id>.
+//     Studio lists every workspace.
 //   - threadPanelAction "VS Code": the workbench tab beside a conversation,
 //     open to the thread's own worktree, or the workspace a card names.
 //   - messageDirective `::workspace{id="cws_…"}`: a card in a reply that

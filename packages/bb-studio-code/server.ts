@@ -205,7 +205,22 @@ export default function plugin(bb: BbPluginApi) {
       changes.changed(id);
       return { workspace };
     },
-    open: async ({ id }) => ({ status: await servers.open(must(id)) }),
+    open: async ({ id }) => {
+      const workspace = must(id);
+      store.markOpened(id);
+      return { status: await servers.open(workspace) };
+    },
+    recent: async () => {
+      const existing = store.recent();
+      if (existing) return { workspace: existing };
+      const project = (await projects())[0];
+      const empty = store.list().find((workspace) => !workspace.archived);
+      if (!project && empty) return { workspace: empty };
+      const folders = project ? await checkFolders([project.path]).catch(() => []) : [];
+      const workspace = store.create({ title: project?.name ?? "Workspace", projectId: project?.id ?? null, folders });
+      changes.changed(workspace.id);
+      return { workspace };
+    },
     stop: ({ id }) => ({ status: servers.stop(must(id).id) }),
     threadWorkspace: ({ threadId }) => ({ workspace: store.forThread(threadId) ?? null }),
     forThread: async ({ threadId }) => ({ workspace: await forThread(threadId) }),

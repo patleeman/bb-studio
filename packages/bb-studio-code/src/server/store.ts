@@ -14,6 +14,8 @@ export const MIGRATIONS = [
   `ALTER TABLE code_workspaces ADD COLUMN trusted INTEGER NOT NULL DEFAULT 1;`,
   // Whether agents may see what the user has open in this workspace.
   `ALTER TABLE code_workspaces ADD COLUMN share INTEGER NOT NULL DEFAULT 1;`,
+  // When the user last opened the workspace's editor: Code's page opens the latest.
+  `ALTER TABLE code_workspaces ADD COLUMN opened_at INTEGER;`,
 ];
 
 type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; trusted: number; share: number; folders: string; archived: number; created_at: number; updated_at: number };
@@ -49,6 +51,21 @@ export class WorkspaceStore {
   forThread(threadId: string): Workspace | null {
     const row = this.db.prepare("SELECT * FROM code_workspaces WHERE thread_id = ? AND archived = 0 ORDER BY created_at DESC LIMIT 1").get(threadId) as Row | undefined;
     return row ? decode(row) : null;
+  }
+
+  /**
+   * The workspace Code's page opens: the one last opened (or else changed),
+   * live and with folders. A thread's worktree workspace only when nothing else.
+   */
+  recent(): Workspace | null {
+    const row = this.db
+      .prepare("SELECT * FROM code_workspaces WHERE archived = 0 AND folders != '[]' ORDER BY thread_id IS NOT NULL, COALESCE(opened_at, updated_at) DESC LIMIT 1")
+      .get() as Row | undefined;
+    return row ? decode(row) : null;
+  }
+
+  markOpened(id: string): void {
+    this.db.prepare("UPDATE code_workspaces SET opened_at = ? WHERE id = ?").run(Date.now(), id);
   }
 
   create(input: { title: string; projectId: string | null; folders: string[]; threadId?: string | null; trusted?: boolean }): Workspace {

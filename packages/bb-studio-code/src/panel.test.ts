@@ -35,3 +35,35 @@ describe("BB shortcuts replayed from VS Code", () => {
     expect(seen).toEqual([{ key: "k", meta: true, ctrl: false, shift: false }, { key: "O", meta: false, ctrl: true, shift: true }]);
   });
 });
+
+describe("Code's page", () => {
+  it("opens a workspace at its link, and the latest one from the root", async () => {
+    const { panelRoute } = await import("./panel");
+    expect(panelRoute("cws_abc")).toEqual({ kind: "workspace", id: "cws_abc" });
+    expect(panelRoute("")).toEqual({ kind: "root" });
+    expect(panelRoute("/")).toEqual({ kind: "root" });
+    expect(panelRoute("other")).toEqual({ kind: "root" });
+  });
+
+  it("picks the workspace last opened, skipping archived, empty and thread worktrees", async () => {
+    const Database = (await import("better-sqlite3")).default;
+    const { MIGRATIONS, WorkspaceStore } = await import("./server/store");
+    const db = new Database(":memory:");
+    for (const statement of MIGRATIONS) db.exec(statement);
+    const store = new WorkspaceStore(db);
+    expect(store.recent()).toBeNull();
+    store.create({ title: "Empty", projectId: null, folders: [] });
+    expect(store.recent()).toBeNull();
+    const thread = store.create({ title: "Thread", projectId: null, folders: ["/t"], threadId: "thr_1" });
+    expect(store.recent()?.id).toBe(thread.id);
+    const a = store.create({ title: "A", projectId: null, folders: ["/a"] });
+    const b = store.create({ title: "B", projectId: null, folders: ["/b"] });
+    db.prepare("UPDATE code_workspaces SET updated_at = ? WHERE id = ?").run(1, b.id);
+    db.prepare("UPDATE code_workspaces SET updated_at = ? WHERE id = ?").run(2, a.id);
+    expect(store.recent()?.id).toBe(a.id);
+    store.markOpened(b.id);
+    expect(store.recent()?.id).toBe(b.id);
+    store.update(b.id, { archived: true });
+    expect(store.recent()?.id).toBe(a.id);
+  });
+});

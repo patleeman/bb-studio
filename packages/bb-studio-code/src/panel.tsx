@@ -8,17 +8,60 @@ import { FolderPicker } from "./folder-picker";
 import { themeChanges, useThemeSync } from "./theme-sync";
 import { CHANNEL, HIDDEN_RELEASE_MS, KIND_ID, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
 
-/** A workspace, or Studio's collection filtered to workspaces. */
-export function CodePanel({ subPath }: { subPath: string }) {
+/** What Code's page shows for a path: a workspace, or the root, which opens the latest one. */
+export function panelRoute(subPath: string): { kind: "workspace"; id: string } | { kind: "root" } {
   const [id = ""] = subPath.split("/").filter(Boolean);
-  const workspace = isWorkspaceId(id);
+  return isWorkspaceId(id) ? { kind: "workspace", id } : { kind: "root" };
+}
+
+/** A workspace; Code's own page opens the one last used, so clicking Code opens VS Code. */
+export function CodePanel({ subPath }: { subPath: string }) {
+  const route = panelRoute(subPath);
+  const toCollection = useCallback(() => openAppPath(studioPath(KIND_ID)), []);
+  if (route.kind === "root") return <RecentWorkspace />;
+  return <WorkspaceView key={route.id} id={route.id} back={{ backLabel: "Studio", onBack: toCollection }} />;
+}
+
+/**
+ * Finds (or makes) the workspace to open and moves to its page. The view is
+ * retained, so it comes back without remounting each time Code is clicked:
+ * whenever it's on screen, it moves on again.
+ */
+function RecentWorkspace() {
+  const rpc = useRpc<CodeContract>();
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!workspace) openAppPath(studioPath(KIND_ID), { replace: true });
-  }, [workspace]);
-  const toCollection = useCallback((replace = false) => openAppPath(studioPath(KIND_ID), { replace }), []);
-  // Blank while handing over to Studio.
-  if (!workspace) return <div className="h-full bg-background" />;
-  return <WorkspaceView key={id} id={id} back={{ backLabel: "Studio", onBack: toCollection }} />;
+    let live = true;
+    let asking = false;
+    setError("");
+    const go = () => {
+      if (asking || !live || !(root.current?.getClientRects().length)) return;
+      asking = true;
+      rpc.call("recent", null).then(
+        ({ workspace }) => { setTimeout(() => { asking = false; }, 1000); if (live) openAppPath(workspaceHref(workspace.id), { replace: true }); },
+        (cause) => { if (live) { live = false; setError(errorMessage(cause)); } },
+      );
+    };
+    go();
+    const timer = setInterval(go, 250);
+    return () => { live = false; clearInterval(timer); };
+  }, [rpc, attempt]);
+  return (
+    <div ref={root} className="studio-root flex h-full flex-col items-center justify-center gap-3 bg-background p-6 text-center text-foreground">
+      {error ? (
+        <>
+          <p role="alert" className="text-sm text-destructive">{error}</p>
+          <button type="button" className={BAR_BUTTON} onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+        </>
+      ) : (
+        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Icon name="Loading" className="size-4 animate-spin motion-reduce:animate-none" /> Opening VS Code…
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
