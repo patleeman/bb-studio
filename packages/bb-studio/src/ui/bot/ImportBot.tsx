@@ -12,6 +12,12 @@ import { BOT_COLORS, BOT_SHAPES, BotAvatar, ProviderLogo } from "./BotAvatar";
 import { botPath } from "./selection";
 
 export const STUDIO_AGENTS_SETTINGS_PATH = `/settings/plugins/${EXTERNAL_AGENTS_PLUGIN_ID}`;
+type Permission = ExternalProvidersView["providers"][number]["permissionModes"][number];
+export const PERMISSION_LABEL: Record<Permission, string> = { "accept-edits": "Accept edits", auto: "Auto", full: "Full access" };
+/** The import's default permission: accept edits where the provider supports it, else its first mode. */
+export function defaultPermission(modes: readonly Permission[]): Permission {
+  return !modes.length || modes.includes("accept-edits") ? "accept-edits" : modes[0]!;
+}
 const STATUS_LABEL = { ready: "Ready", disabled: "Not configured", offline: "Offline", unauthenticated: "Needs a key", missing: "Not installed" } as const;
 
 export function ImportBotDialog({ onClose }: { onClose(): void }) {
@@ -20,6 +26,7 @@ export function ImportBotDialog({ onClose }: { onClose(): void }) {
   const providers = options.data?.providers ?? [];
   const [providerId, setProviderId] = useState<string | null>(null);
   const [model, setModel] = useState("");
+  const [permission, setPermission] = useState<Permission>("accept-edits");
   const [name, setName] = useState("");
   const [shape, setShape] = useState<string>(BOT_SHAPES[1] ?? "circle");
   const [color, setColor] = useState<string>(BOT_COLORS[5] ?? BOT_COLORS[0]);
@@ -36,6 +43,7 @@ export function ImportBotDialog({ onClose }: { onClose(): void }) {
     const next = providers.find((each) => each.id === id);
     if (!next || next.status !== "ready") return;
     setProviderId(id);
+    setPermission(defaultPermission(next.permissionModes ?? []));
     setModel((next.models.find((each) => each.isDefault) ?? next.models[0])?.id ?? "");
     setName((current) => !current || providers.some((each) => each.displayName === current) ? next.displayName : current);
   }
@@ -44,7 +52,7 @@ export function ImportBotDialog({ onClose }: { onClose(): void }) {
     setBusy(true);
     setError(null);
     try {
-      const made = await call("bot_create", { name: name.trim(), avatar: "🤖", shape, color, external: { providerId: provider.id, model } }) as BotView;
+      const made = await call("bot_create", { name: name.trim(), avatar: "🤖", shape, color, external: { providerId: provider.id, model, permissionMode: permission } }) as BotView;
       onClose();
       if (made.bot) openAppPath(botPath(made.bot.id, made.bot.primary !== false));
     } catch (cause) {
@@ -95,6 +103,14 @@ export function ImportBotDialog({ onClose }: { onClose(): void }) {
               </select>
             </label>
           ) : null}
+          {provider && (provider.permissionModes ?? []).length > 1 ? (
+            <label className="flex flex-col gap-1">
+              <span className="font-medium">Permissions</span>
+              <select aria-label="Permissions" value={permission} onChange={(event) => setPermission(event.target.value as Permission)} className="h-8 rounded-md border border-border bg-background px-2">
+                {provider.permissionModes.map((each) => <option key={each} value={each}>{PERMISSION_LABEL[each]}</option>)}
+              </select>
+            </label>
+          ) : provider ? <p className="text-xs text-muted-foreground">Permissions: {PERMISSION_LABEL[permission]} (the only mode {provider.displayName} supports)</p> : null}
           <div className="flex items-center gap-3">
             <BotAvatar shape={shape} color={color} emoji="🤖" size={44} provider={provider ? { id: provider.id, logoUrl: provider.logoUrl } : null} />
             <label className="flex min-w-0 flex-1 flex-col gap-1">

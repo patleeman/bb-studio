@@ -21,6 +21,7 @@ import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
+import { BotModelControl } from "./BotModel";
 import { useOpenInfo, useOpenSubThread, useOpenSubThreadRequests } from "./workspace";
 import { BOT_PATH, botPath, forBot, useBotSelection } from "./selection";
 
@@ -262,6 +263,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
           </button>
         ) : null}
         <span className="min-w-0 flex-1" />
+        <BotModelControl bot={bot} onChanged={refresh} />
         <div className="flex shrink-0 items-center gap-0.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

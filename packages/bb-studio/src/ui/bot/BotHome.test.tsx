@@ -31,6 +31,12 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_useFixedTabTarget: () => state.target,
   useSdk: () => sdk,
   experimental_ProviderIcon: ({ provider }: { provider: { id: string } }) => React.createElement("i", { "data-logo": provider.id }),
+  experimental_useProviders: () => ({ status: "ready", providers: [{ id: "claude", displayName: "Claude" }, { id: "codex", displayName: "Codex" }] }),
+  // The picker shows its value; its buttons pick Sonnet (same provider) or Codex (another).
+  experimental_ProviderModelPicker: ({ value, onChange }: { value: { providerId: string; model: string }; onChange(next: unknown): void }) => React.createElement("span", { "data-picker": `${value.providerId}/${value.model}` },
+    React.createElement("button", { type: "button", onClick: () => onChange({ providerId: "claude", model: "sonnet", reasoningLevel: "high" }) }, "pick sonnet"),
+    React.createElement("button", { type: "button", onClick: () => onChange({ providerId: "codex", model: "gpt-5", reasoningLevel: "high" }) }, "pick codex")),
+  experimental_PermissionModePicker: ({ value }: { value: string }) => React.createElement("span", { "data-permission": value }),
 }));
 const sdk = { system: { uiPreferences: {
   list: async () => ({ preferences: { "sidebar.threadListProvider": state.prefs } }),
@@ -315,9 +321,9 @@ test("New bot: the create flow greets as a new bot and the first message makes a
 });
 
 const providers = { installed: true, providers: [
-  { id: "hermes", displayName: "Hermes", logoUrl: null, status: "ready", message: "ok", models: [{ id: "hermes-agent", displayName: "hermes-agent", isDefault: true }] },
+  { id: "hermes", displayName: "Hermes", logoUrl: null, status: "ready", message: "ok", models: [{ id: "hermes-agent", displayName: "hermes-agent", isDefault: true }], permissionModes: ["accept-edits", "full"] },
   { id: "openclaw", displayName: "OpenClaw", logoUrl: null, status: "disabled", message: "OpenClaw is off. Turn it on in Studio Agents settings.", models: [] },
-  { id: "grok", displayName: "Grok", logoUrl: null, status: "ready", message: "ok", models: [{ id: "grok-4", displayName: "grok-4", isDefault: true }, { id: "grok-3", displayName: "grok-3", isDefault: false }] },
+  { id: "grok", displayName: "Grok", logoUrl: null, status: "ready", message: "ok", models: [{ id: "grok-4", displayName: "grok-4", isDefault: true }, { id: "grok-3", displayName: "grok-3", isDefault: false }], permissionModes: ["full"] },
 ] };
 
 test("Import bot: picks a ready provider and model, shows the rest as not configured, and creates an external bot", async () => {
@@ -327,6 +333,8 @@ test("Import bot: picks a ready provider and model, shows the rest as not config
   await act(async () => click(container.querySelector('[data-testid="bot-import"]')));
   const radio = (id: string) => container.querySelector(`[data-provider="${id}"][role="radio"]`) as HTMLButtonElement;
   expect(radio("hermes").getAttribute("aria-checked")).toBe("true");
+  // Hermes takes accept edits (the default) or full access.
+  expect((container.querySelector('select[aria-label="Permissions"]') as HTMLSelectElement).value).toBe("accept-edits");
   expect(radio("openclaw").disabled).toBe(true);
   expect(radio("openclaw").textContent).toContain("Not configured");
   await act(async () => click(radio("grok")));
@@ -334,7 +342,7 @@ test("Import bot: picks a ready provider and model, shows the rest as not config
   expect(model.value).toBe("grok-4");
   expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement).value).toBe("Grok");
   await act(async () => button("Import").click());
-  expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "Grok", external: { providerId: "grok", model: "grok-4" } }));
+  expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "Grok", external: { providerId: "grok", model: "grok-4", permissionMode: "full" } }));
   state.call.mockImplementation((async () => ({})) as never);
 });
 
@@ -355,7 +363,28 @@ test("an external bot shows its provider's logo and hides Memory, skills and run
   await show(<BotInfoTab />);
   expect(container.querySelector('[data-logo="hermes"]')).not.toBeNull();
   expect(container.textContent).toContain("Runs on Hermes — its memory and tools live there.");
-  expect(container.textContent).toContain("hermes-agent");
+  expect(container.querySelector('[data-picker="hermes/hermes-agent"]')).not.toBeNull();
   expect(button("Open")).toBeUndefined();
   expect(container.textContent).not.toContain("Procedures it saved");
+});
+
+test("the Model control switches in place on the same provider and hands off to another, saying so", async () => {
+  const { modelChangeKind, pendingLabel } = await import("./BotModel");
+  expect(modelChangeKind({ providerId: "claude", model: "opus", reasoningLevel: "high" }, { providerId: "claude", model: "sonnet", reasoningLevel: "high" })).toBe("in-place");
+  expect(modelChangeKind({ providerId: "claude", model: "opus", reasoningLevel: "high" }, { providerId: "codex", model: "gpt-5", reasoningLevel: "high" })).toBe("handoff");
+  expect(modelChangeKind({ providerId: "claude", model: "opus", reasoningLevel: "high" }, { providerId: "claude", model: "opus", reasoningLevel: "high" })).toBe("unchanged");
+  expect(pendingLabel("handoff", "Codex", "gpt-5")).toBe("Handing off to Codex…");
+  const claude = { ...dot, providerId: "claude", model: "opus", reasoningLevel: "high", permissionMode: "accept-edits" };
+  state.data = { bot_get: { bot: claude, run: null }, bot_activity: empty };
+  let finish: () => void = () => {};
+  state.call.mockImplementation((() => new Promise<void>((resolve) => { finish = resolve; })) as never);
+  await show(<BotInfoTab />);
+  expect(container.querySelector('[data-picker="claude/opus"]')).not.toBeNull();
+  expect(container.querySelector('[data-permission="accept-edits"]')).not.toBeNull();
+  await act(async () => button("pick codex").click());
+  expect(state.call).toHaveBeenCalledWith("bot_set_model", { botId: dot.id, providerId: "codex", model: "gpt-5", reasoning: "high" });
+  expect(container.querySelector('[data-testid="bot-model-pending"]')!.textContent).toBe("Handing off to Codex…");
+  await act(async () => finish());
+  expect(container.querySelector('[data-testid="bot-model-pending"]')).toBeNull();
+  state.call.mockImplementation((async () => ({})) as never);
 });
