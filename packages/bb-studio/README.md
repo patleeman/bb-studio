@@ -38,6 +38,9 @@ then **Saved views**, **Tags** (with their colors and counts), **Pinned**
 view or tag opens the new tab page filtered by it; an item opens as a tab.
 The row for the current filter or tab is highlighted, and each group
 collapses from its heading.
+
+![The Studio sidebar on the Studio page: kinds with counts (Pages selected and filtering the new tab page), a saved view, a colored tag and recent items](assets/studio-sidebar.png)
+
 Conversation-side item views continue to work independently. At phone widths, a
 pane picker shows one pane at a time while preserving the desktop arrangement.
 
