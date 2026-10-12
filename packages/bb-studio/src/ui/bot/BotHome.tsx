@@ -1,7 +1,7 @@
 // The Bot's own page (nav panel `bot`, /plugins/studio/bot), chat-first like
 // a messaging app: its drawn avatar, name and live status centered on top,
-// its own chat (BotChat) filling the page with Needs-you right above the
-// composer, and Activity as a side panel that pushes the chat over. The ⋯
+// BB's own thread view (ThreadChat) of its current thread filling the page,
+// and Activity as a side panel that pushes the chat over. The ⋯
 // menu holds the rest. With no Bot yet, the page greets the user as one and
 // the first message makes it. Studio's old address redirects here.
 import { errorMessage } from "@bb-studio/kit/format";
@@ -11,14 +11,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   Icon, Input, Textarea,
 } from "@bb-studio/kit/ui";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ThreadChat } from "@get-bb/plugin-sdk/app";
+import { useEffect, useState, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
-import type { ChildStatus } from "./chat-model";
-import BotChat, { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./BotChat";
+import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
 export const BOT_PANEL = "bot";
@@ -103,14 +103,14 @@ export function BotRedirect() {
 type Profile = { name: string; shape: string | null; color: string | null; role: string };
 
 /** The centered top of the page: avatar (its pencil edits the profile), name and live status. */
-function Identity({ avatar, profile, status, dot, onEdit, working = false }: { avatar: string; profile: Profile; status: string; dot: string; onEdit(): void; working?: boolean }) {
+function Identity({ avatar, profile, status, dot, onEdit, working = false, compact = false }: { avatar: string; profile: Profile; status: string; dot: string; onEdit(): void; working?: boolean; compact?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <button type="button" className="group relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Edit profile" onClick={onEdit}>
-        <BotAvatar shape={profile.shape} color={profile.color} emoji={avatar} size={48} working={working} />
+        <BotAvatar shape={profile.shape} color={profile.color} emoji={avatar} size={compact ? 36 : 48} working={working} />
         <span className="absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground group-hover:text-foreground" aria-hidden><Icon name="Edit" className="size-3" /></span>
       </button>
-      <h1 className="mt-1.5 max-w-full truncate text-sm font-semibold">{profile.name}</h1>
+      <h1 className={`${compact ? "mt-1" : "mt-1.5"} max-w-full truncate text-sm font-semibold`}>{profile.name}</h1>
       <span className="flex max-w-full items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-status">
         <span className={`size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
         <span className="truncate">{status}</span>
@@ -151,7 +151,7 @@ function CreateBot({ onCreated }: { onCreated(): void }) {
         </div>
         <div className="mx-auto w-full max-w-[44rem] shrink-0 px-4 pb-4">
           {error ? <p role="alert" className="mb-2 px-1 text-xs text-destructive">{error}</p> : null}
-          <ChatComposer name={profile.name} working={false} onSend={(text) => make(text)} onStop={() => {}} />
+          <ChatComposer name={profile.name} onSend={(text) => make(text)} />
         </div>
       </>
       {editing ? <ProfileDialog value={profile} onClose={() => setEditing(false)} onSave={(next) => { setProfile(next); setEditing(false); }} /> : null}
@@ -179,41 +179,26 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const { run, busy, error } = useAction(refreshAll);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [activityOpen, setActivityOpen] = useActivityOpen();
-  const [chatWorking, setChatWorking] = useState(false);
   const data = activity.data;
   const needsYou = data?.needsYou ?? [];
+  // ThreadChat shows the Bot's own pending question inline; the banner is for threads it started.
+  const startedNeedsYou = needsYou.filter((thread) => thread.relation === "started");
   const running = data?.inProgress.filter((thread) => thread.relation === "started").length ?? 0;
   const profile: Profile = { name: bot.name, shape: bot.shape ?? null, color: bot.color ?? null, role: bot.role ?? "" };
-  const status = chatWorking ? "Working…" : statusLabel(view.run, bot.state, running);
-  const identity = { name: bot.name, avatar: bot.avatar, shape: profile.shape, color: profile.color };
-  // The chain ends at the Bot's thread; until bot_chain answers, the thread alone.
-  const threadIds = useMemo(() => {
-    const ids = chain.data?.threadIds ?? [];
-    return bot.threadId ? (ids.at(-1) === bot.threadId ? ids : [bot.threadId]) : [];
-  }, [chain.data, bot.threadId]);
-  const childStatus = useMemo(() => {
-    const map = new Map<string, ChildStatus>();
-    for (const thread of data?.completed ?? []) map.set(thread.id, "finished");
-    for (const thread of data?.inProgress ?? []) map.set(thread.id, "running");
-    for (const thread of data?.waiting ?? []) map.set(thread.id, "waiting");
-    for (const thread of needsYou) map.set(thread.id, "needs-you");
-    return map;
-  }, [data, needsYou]);
+  const status = statusLabel(view.run, bot.state, running);
+  // The thread it handed off from, when the chain has one (bot_chain ends at its thread).
+  const ids = chain.data?.threadIds ?? [];
+  const earlier = bot.threadId && ids.at(-1) === bot.threadId && ids.length > 1 ? ids.at(-2)! : null;
 
   const openMemory = async () => {
     const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null;
     if (memory?.pageId) openAppPath(pagePath(memory.pageId));
   };
-  const onStarter = (starter: Starter) => {
-    if (starter.kind === "customize") setSheet("profile");
-    else if (starter.kind === "preset") void run("bot_checkin_preset", { preset: starter.preset });
-  };
-
   return (
     <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
       <style>{BOT_STYLES}</style>
-      <header className="relative shrink-0 px-24 pt-4 pb-2">
-        <Identity avatar={bot.avatar} profile={profile} status={status} dot={chatWorking ? "bg-success animate-pulse motion-reduce:animate-none" : STATE_DOT[bot.state]} working={chatWorking} onEdit={() => setSheet("profile")} />
+      <header className="relative shrink-0 border-b border-border px-24 pt-2 pb-1.5">
+        <Identity avatar={bot.avatar} profile={profile} status={status} dot={STATE_DOT[bot.state]} working={running > 0} compact onEdit={() => setSheet("profile")} />
         <div className="absolute top-3 right-3 flex items-center gap-0.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -241,16 +226,34 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
 
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
-          {error ? <p role="alert" className="mx-auto w-full max-w-[44rem] shrink-0 px-4 pb-2 text-sm text-destructive">{error}</p> : null}
+          {error ? <p role="alert" className="shrink-0 px-4 py-1.5 text-sm text-destructive">{error}</p> : null}
           {bot.state !== "active" ? (
-            <div className="mx-auto mb-2 flex w-full max-w-[44rem] shrink-0 items-center gap-3 px-4 text-sm text-muted-foreground">
-              <span className="min-w-0 flex-1">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
+            <div className="flex shrink-0 items-center justify-center gap-3 border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
+              <span className="min-w-0">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
               <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>
             </div>
           ) : null}
-          {threadIds.length ? (
+          {startedNeedsYou.length ? (
+            <div role="status" aria-label="Needs you" className="flex shrink-0 items-center gap-2 border-b border-border bg-warning/10 px-4 py-1.5 text-sm">
+              <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden />
+              <span className="shrink-0 font-medium">Needs you</span>
+              <span className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+                {startedNeedsYou.map((thread) => (
+                  <button key={thread.id} type="button" className="max-w-64 shrink-0 truncate rounded-md px-1.5 py-0.5 hover:bg-state-hover" onClick={() => openAppPath(threadPath(thread.id))}>{thread.title}</button>
+                ))}
+              </span>
+            </div>
+          ) : null}
+          {earlier ? (
+            <div className="flex shrink-0 justify-center pt-1.5">
+              <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => openAppPath(threadPath(earlier))}>
+                <Icon name="ArrowUp" className="size-3.5" />Earlier conversation
+              </button>
+            </div>
+          ) : null}
+          {bot.threadId ? (
             <section aria-label="Chat" className="min-h-0 flex-1">
-              <BotChat threadIds={threadIds} bot={identity} childStatus={childStatus} needsYou={needsYou} onWorkingChange={setChatWorking} onStarter={onStarter} />
+              <ThreadChat key={bot.threadId} threadId={bot.threadId} variant="full" className="h-full" />
             </section>
           ) : (
             <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. Make a thread your Bot from its ⋯ menu.</p>

@@ -970,13 +970,7 @@ bb studio reindex
 
 ## Bot
 
-![The Bot's page in a staged BB: Dot's avatar, name and status on top; its chat with your messages as soft bubbles, its replies beside its avatar with quick-reply chips, cards for threads it started, a Needs-you card above the pill composer, and Activity open beside the chat with Needs you, Waiting to start, Scheduled and Recent](assets/bot.png)
-
-![The same page in dark mode](assets/bot-dark.png)
-
-![The Bot at work: its avatar's eyes move beside the thinking dots or its steps fold into one Working line, and the composer's button is Stop](assets/bot-working.png)
-
-![A question from the Bot's own thread, answered right above the composer with one click](assets/bot-needs-you.png)
+![The Bot's page in a staged BB: Dot's avatar, name and status in a compact header; below it BB's own thread view of its chat, the same as any thread, with a Needs-you banner for a thread it started and Activity open beside the chat with Needs you, Waiting to start, Scheduled and Recent](assets/bot.png)
 
 ![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
 
@@ -986,7 +980,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
 
 - **Page**: its own nav panel, **Bot** in the rail (`/plugins/studio/bot`;
   the old `/plugins/studio/studio/bot` redirects there). The page is its
-  chat, Studio's own (below). On top, centered: its
+  chat: BB's own thread view (below). On top, a compact centered header: its
   avatar (the pencil opens **Edit profile**), name, and live status
   (Working on N threads, Checks in …, Idle, Paused, Stopped). Top right: ⋯
   (Edit profile, Memory, Skills, Check-ins, Open as thread, Pause / Resume,
@@ -996,39 +990,22 @@ of Staff", with the same thread and check-ins; rename it from its page.
   sentence or two on its role ("You are my chief of staff."), which it's
   told. **Advanced** lists its skills. A Bot made before drawn avatars shows
   its emoji until you pick a shape; the emoji stays for older clients.
-- **Chat**: Studio draws it over BB's thread APIs instead of embedding
-  `ThreadChat`. It reads the Bot's whole handoff chain (`bot_chain`) as one
-  conversation: the current thread's newest page first, older pages and
-  earlier threads as you scroll up, without the handoff request between
-  them. It stays live through BB's realtime `thread:changed` signal
-  (`threads.timeline`, `threads.get`, `threads.interactions.list`).
-  - Your messages are soft bubbles on the right; the Bot's replies are plain
-    text (BB's `Markdown`, so code, links and Studio cards like `::page`
-    render as in any chat) beside its avatar, shown on the first of a run.
-    Day separators split days.
-  - A reply's trailing `::next{reply="…" do="…"}` line becomes chips under
-    the latest reply; a chip sends its text.
-  - Tool steps fold into one quiet line, **Working… · N steps** while it runs
-    and **Worked · N steps** after; click it for the steps.
-  - Threads it starts, and their outcomes (finished, failed, stopped, needs
-    you), are compact cards that open the thread, with live status from
-    Activity. BB's raw child-thread rows never show.
-  - While it works, its avatar's eyes look around beside three thinking
-    dots. Motion stops under reduced motion.
-- **Composer**: a pill at the bottom that grows with the text. **+** (or
-  paste) attaches images, the mic dictates through Studio Talk into the box,
-  and the round button sends, or stops the Bot while it works. Enter sends,
-  Shift+Enter is a new line, Esc stops, ⌘K (Ctrl+K) focuses the box.
-  Messages go with `threads.send` mode `auto`, so Smart Queue decides
-  whether one steers the running turn or waits as a follow-up; a waiting one
-  shows **Queued**. There's no hands-free voice call on desktop: Talk
-  dictates but doesn't speak replies, so voice stays with the iOS app.
-- **Needs you**: a card right above the composer. A question from the
-  Bot's own thread with one choice (a provider question, or Studio's
-  one-question `design_ask` form) is answered there; an approval has
-  **Deny**, **Always allow** (when offered) and **Approve**. Anything else,
-  and threads it started that wait on you, have **Open**.
-- **Starting out**: with no messages yet, the Bot says hello with four
+- **Chat**: BB's `ThreadChat` for the Bot's current thread, filling the
+  page, so it looks and works exactly like any thread: the same timeline,
+  composer, queued messages, questions and approvals inline. When the Bot
+  has handed off, **Earlier conversation** above the chat opens the thread
+  before (`bot_chain`, which the iOS app also reads for its history).
+- **Needs you**: a banner under the header, only when a thread the Bot
+  started waits on you; it lists them and opens one in a click. The Bot's
+  own questions show inline in the chat, so they aren't repeated.
+- **Quiet**: the Bot is told its chat is your inbox. With nothing new (a
+  check-in with nothing to report, a notice that a thread it started
+  finished fine, an automation result like `[PASS]`) it finishes without a
+  reply, never a "✓". On check-ins it does the checks itself or reuses the
+  worker thread it used before instead of starting a new one each time.
+  BB's own "thread completed" notices for threads it started still show in
+  the chat: the plugin SDK has no way to turn them off.
+- **Starting out**: with no Bot yet, the page says hello as one with four
   chips: **Plan my week**, **What needs me today?** (both send), **Set up a
   morning brief** (the Morning brief preset) and **Customize me** (Edit
   profile).

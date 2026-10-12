@@ -9,11 +9,13 @@ vi.mock("../live", () => ({
   useLive: (method: string) => ({ data: state.data[method] ?? null, error: null, loading: false, refresh: () => {} }),
 }));
 vi.mock("../ProjectLeads", () => ({ HeartbeatFields: () => null, useHeartbeatForm: () => ({ input: () => ({}) }) }));
-vi.mock("./BotChat", () => ({
-  default: ({ threadIds }: { threadIds: string[] }) => React.createElement("div", { "data-chat": threadIds.join(",") }),
+vi.mock("@get-bb/plugin-sdk/app", () => ({
+  ThreadChat: ({ threadId }: { threadId: string }) => React.createElement("div", { "data-chat": threadId }),
+}));
+vi.mock("./Onboarding", () => ({
   Greeting: ({ lines, onStarter }: { lines: string[]; onStarter(starter: unknown): void }) => React.createElement("div", null, lines.join(" "),
     React.createElement("button", { onClick: () => onStarter({ kind: "customize" }) }, "Customize me")),
-  Composer: ({ onSend }: { onSend(text: string, images: string[]): void }) => React.createElement("button", { "aria-label": "Send", onClick: () => onSend("", []) }),
+  Composer: ({ onSend }: { onSend(text: string): void }) => React.createElement("button", { "aria-label": "Send", onClick: () => onSend("") }),
 }));
 vi.mock("@bb-studio/kit/app", () => ({
   PageColumn: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
@@ -145,10 +147,22 @@ test("Edit profile saves shape, color and role; Skills (Share/Delete) live under
   expect(state.call).toHaveBeenCalledWith("bot_set", { shape: "star", color: "#e5484d", role: "You are my chief of staff." });
 });
 
-test("the chat spans the Bot's handoff chain once bot_chain answers", async () => {
+test("BB's thread view shows the current thread; Earlier conversation opens the one it handed off from", async () => {
+  const { openAppPath } = await import("@bb-studio/kit/app");
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, bot_chain: { threadIds: ["thr_old", "thr_bot"] } };
   await show(<BotHome />);
-  expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("thr_old,thr_bot");
+  expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("thr_bot");
+  act(() => button("Earlier conversation").click());
+  expect(openAppPath).toHaveBeenCalledWith("/threads/thr_old");
+});
+
+test("Needs you banner: only for threads the Bot started, not its own (ThreadChat shows that inline)", async () => {
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, needsYou: [{ ...thread("thr_bot", "Its chat"), relation: "self", needsYou: true }] } };
+  await show(<BotHome />);
+  expect(container.querySelector('[role=status][aria-label="Needs you"]')).toBeNull();
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }] } };
+  await show(<BotHome key="again" />);
+  expect(container.querySelector('[role=status][aria-label="Needs you"]')?.textContent).toContain("Approve deploy");
 });
 
 test("Check-ins offers presets, marks the current one, and applies one in a click", async () => {
