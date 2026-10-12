@@ -336,7 +336,7 @@ export default async function plugin(bb: BbPluginApi) {
       addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
-    runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId) => runners.pauseAll(botId) },
+    runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
   });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
@@ -792,11 +792,11 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.agents.registerTool({ name: "bot_pause", description: "Pause the user's Bot: its check-ins stop and it takes on no new work until resumed. Only when the user asks.", parameters: z.object({}), execute: async (_input, ctx) => (await runnerCantControl(ctx.threadId)) ?? describeBot(await bots.pause(await selfBot(ctx.threadId))) });
   bb.agents.registerTool({
-    name: "bot_resume", description: "Resume the user's paused or stopped Bot, and its check-ins if they were on. Only when the user asks; the Bot can't resume itself.", parameters: z.object({}),
+    name: "bot_resume", description: "Resume the user's paused or stopped Bot, its check-ins if they were on, and the automations and runners Stop paused. Only when the user asks; the Bot can't resume itself.", parameters: z.object({}),
     execute: async (_input, ctx) => (await acting(ctx.threadId)) ? "Only the user can resume their Bot: Studio → Bot → Resume." : describeBot(await bots.resume()),
   });
   bb.agents.registerTool({
-    name: "bot_stop", description: "Stop the user's Bot: pause it, stop the running threads it started and pause automations that wake it. Data is kept. Only when the user explicitly asks to stop it.", parameters: z.object({}),
+    name: "bot_stop", description: "Stop the user's Bot: pause it, stop the running threads it spawned (its sub-threads, not forks of its chat) and pause automations that wake it and its runners. Data is kept. Only when the user explicitly asks to stop it.", parameters: z.object({}),
     execute: async (_input, ctx) => { const refused = await runnerCantControl(ctx.threadId); if (refused) return refused; const result = await bots.stop(await selfBot(ctx.threadId)); return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n"); },
   });
   bb.agents.registerTool({

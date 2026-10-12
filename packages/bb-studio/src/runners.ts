@@ -252,15 +252,29 @@ export class Runners {
     return this.one(row.id);
   }
 
-  /** Pauses every active runner (the Bot was stopped). */
-  async pauseAll(botId?: string): Promise<string[]> {
+  /** Pauses every active runner (the Bot was stopped); `onPaused` hears each as it goes, so a failure midway loses none. */
+  async pauseAll(botId?: string, onPaused?: (id: string) => void): Promise<string[]> {
     const paused: string[] = [];
     for (const row of this.rows(botId)) {
       if (row.state !== "active") continue;
       await this.setState(row.id, "paused");
       paused.push(row.id);
+      onPaused?.(row.id);
     }
     return paused;
+  }
+
+  /**
+   * Turns a runner the Bot's Stop paused back on, while the Bot resumes (so
+   * before it is active again). False when the runner was deleted since.
+   */
+  async restore(id: string): Promise<boolean> {
+    const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
+    if (!row) return false;
+    if (row.state === "active") return true;
+    if (row.automation_id) await this.call("automations_resume", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown());
+    this.changedRow(row.id, { state: "active" });
+    return true;
   }
 
   /** Runs it now, through its automation (so the run counts like a scheduled one). */

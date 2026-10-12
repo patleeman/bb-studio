@@ -61,7 +61,14 @@ it("keeps each Bot's runners apart: listing, names, reports and pausing", async 
   expect(x.runners.instructions(x.runners.forThread(theirs.threadId)!)).toContain('"Scout"');
   await x.runners.report(theirs.threadId!, { level: "tell", summary: "v2 is out" });
   expect(x.send).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "bot2" }));
-  expect(await x.runners.pauseAll()).toHaveLength(1);
+  const heard: string[] = [];
+  expect(await x.runners.pauseAll(undefined, (id) => heard.push(id))).toHaveLength(1);
+  expect(heard).toHaveLength(1);
+  x.bot.state = "stopped";
+  expect(await x.runners.restore(heard[0]!)).toBe(true);
+  expect((await x.runners.list())[0]).toMatchObject({ state: "active" });
+  expect(await x.runners.restore("run_gone")).toBe(false);
+  x.bot.state = "active";
   expect(x.runners.threads("bot_two").has(theirs.threadId!)).toBe(true);
   expect(x.runners.threads().has(theirs.threadId!)).toBe(false);
 });

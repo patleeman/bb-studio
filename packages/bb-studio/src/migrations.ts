@@ -250,4 +250,10 @@ export const MIGRATIONS = [
    ALTER TABLE bots DROP COLUMN model;
    ALTER TABLE bots DROP COLUMN permission_mode;
    ALTER TABLE bots DROP COLUMN reasoning_level;`,
+  // What a Bot's Stop paused (src/bot.ts): its automations and runners, so
+  // Resume turns back on exactly those and leaves ones already off alone.
+  `CREATE TABLE bot_stop_paused (
+       bot_id TEXT NOT NULL, kind TEXT NOT NULL, item_id TEXT NOT NULL, project_id TEXT,
+       PRIMARY KEY (bot_id, kind, item_id)
+     );`,
 ];

@@ -4,7 +4,7 @@ import { MIGRATIONS } from "./migrations";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, startedBy } from "./bot";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, spawnedBy, startedBy } from "./bot";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -207,6 +207,60 @@ it("pauses, resumes and stops", async () => {
   expect(x.stop).toHaveBeenCalledTimes(1);
   expect(x.threads.get("mine")!.status).toBe("active");
   expect(await x.bots.resume()).toMatchObject({ bot: { state: "active" }, run: { enabled: true } });
+});
+
+it("Stop stops only threads the Bot spawned, not forks or continuations of its chat", async () => {
+  const x = await setup();
+  x.add({ id: "bot0", status: "idle" });
+  x.add({ id: "bot1" });
+  x.db.prepare("INSERT INTO project_thread_handoffs (old_thread_id, new_thread_id, project_id, lead, archived) VALUES ('bot0', 'bot1', NULL, 0, 0)").run();
+  await x.bots.setThread("bot1");
+  x.add({ id: "child", parentThreadId: "bot1", status: "active" });
+  x.add({ id: "owned", lifecycleOwnerThreadId: "bot0", status: "active" });
+  x.add({ id: "fork", sourceThreadId: "bot1", originKind: "fork", status: "active" });
+  x.add({ id: "continued", sourceThreadId: "bot0", originKind: "fork", status: "active" });
+  expect(spawnedBy({ parentThreadId: null, lifecycleOwnerThreadId: null }, new Set(["bot1"]))).toBe(false);
+  const stopped = await x.bots.stop();
+  expect(stopped.stoppedThreadIds.sort()).toEqual(["child", "owned"]);
+  expect(x.threads.get("fork")!.status).toBe("active");
+  expect(x.threads.get("continued")!.status).toBe("active");
+});
+
+it("Resume turns back on only the automations and runners Stop paused", async () => {
+  const x = await setup();
+  const runnerStates = new Map([["run_on", "active"], ["run_off", "paused"]]);
+  const restore = vi.fn(async (id: string) => { if (!runnerStates.has(id)) return false; runnerStates.set(id, "active"); return true; });
+  const runners = {
+    threads: () => new Map<string, { urgent: boolean }>(),
+    pauseAll: async (_botId?: string, onPaused?: (id: string) => void) => {
+      const paused = [...runnerStates].filter(([, state]) => state === "active").map(([id]) => id);
+      for (const id of paused) { runnerStates.set(id, "paused"); onPaused?.(id); }
+      return paused;
+    },
+    restore,
+  };
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, runners });
+  x.add({ id: "bot1" });
+  await bots.setThread("bot1");
+  x.automations.push(
+    { id: "on", name: "Inbox sweep", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: "bot1" } },
+    { id: "gone", name: "Old sweep", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: "bot1" } },
+    { id: "off", name: "Weekly", enabled: false, trigger: { cron: "0 9 * * 1" }, execution: { targetThreadId: "bot1" } },
+  );
+  expect((await bots.stop()).pausedAutomationIds).toEqual(["on", "gone"]);
+  x.automations.splice(x.automations.findIndex((a) => a.id === "gone"), 1);
+  // One re-enable fails: the Bot stays stopped and keeps what's left to restore.
+  const real = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => { if (args.method === "automations_resume" && args.input.automationId === "on") throw new Error("down"); return real(args); });
+  await expect(bots.resume()).rejects.toThrow("down");
+  expect((await bots.get()).bot?.state).toBe("stopped");
+  expect(runnerStates.get("run_on")).toBe("active");
+  x.callRpc.mockImplementation(real);
+  expect(await bots.resume()).toMatchObject({ bot: { state: "active" } });
+  expect(x.automations.map((a) => [a.id, a.enabled])).toEqual([["on", true], ["off", false]]);
+  expect(runnerStates.get("run_off")).toBe("paused");
+  expect(restore.mock.calls.map(([id]) => id)).toEqual(["run_on"]);
+  expect(x.db.prepare("SELECT COUNT(*) AS n FROM bot_stop_paused").get()).toEqual({ n: 0 });
 });
 
 it("lists heartbeat and automations aimed at the Bot as Scheduled", async () => {

@@ -15,6 +15,13 @@
 // sourceThreadId, parentThreadId or lifecycleOwnerThreadId is the Bot's thread,
 // or one of the threads it handed off from. originPluginId only says which
 // plugin spawned a thread, not which thread, so it isn't used.
+//
+// Stop is narrower (spawnedBy): it stops only threads an agent in the Bot's
+// thread spawned, a BB child (parentThreadId) or one that archives with it
+// (lifecycleOwnerThreadId). A fork or "continue in new thread" only sets
+// sourceThreadId and is often the user's own work, so Stop leaves it running.
+// Stop records the automations and runners it paused (bot_stop_paused), and
+// Resume turns back on exactly those.
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -188,7 +195,17 @@ export function descendants<T extends Pick<ListedThread, "id" | "sourceThreadId"
   return found;
 }
 
-/** Whether BB's metadata says one of `botThreads` started this thread. */
+/**
+ * Whether an agent in one of `botThreads` spawned this thread: BB's child
+ * (parentThreadId, set only by an explicit parent) or a dependent that
+ * archives with it (lifecycleOwnerThreadId). A fork's sourceThreadId alone
+ * doesn't count: the user forks or continues a Bot's chat too. Stop uses it.
+ */
+export function spawnedBy(thread: Partial<Pick<ListedThread, "parentThreadId" | "lifecycleOwnerThreadId">>, botThreads: ReadonlySet<string>): boolean {
+  return [thread.parentThreadId, thread.lifecycleOwnerThreadId].some((id) => !!id && botThreads.has(id));
+}
+
+/** Whether BB's metadata says one of `botThreads` started this thread, forks included (Activity and history). */
 export function startedBy(thread: Pick<ListedThread, "sourceThreadId" | "parentThreadId" | "lifecycleOwnerThreadId">, botThreads: ReadonlySet<string>): boolean {
   return [thread.sourceThreadId, thread.parentThreadId, thread.lifecycleOwnerThreadId].some((id) => !!id && botThreads.has(id));
 }
@@ -221,7 +238,12 @@ export interface BotDeps {
   /** BB's user skills directory (`<data dir>/skills`), where a shared skill goes. */
   userSkillsDir?: string;
   /** Runner threads (src/runners.ts): kept out of Activity's thread lists; an urgent one is in Needs you. */
-  runners?: { threads(botId?: string): Map<string, { urgent: boolean }>; pauseAll(botId?: string): Promise<string[]> };
+  runners?: {
+    threads(botId?: string): Map<string, { urgent: boolean }>;
+    pauseAll(botId?: string, onPaused?: (id: string) => void): Promise<string[]>;
+    /** Turns a runner Stop paused back on; false when it was deleted since. */
+    restore(id: string): Promise<boolean>;
+  };
 }
 
 export class Bots {
@@ -586,12 +608,54 @@ export class Bots {
       // The heartbeat comes back first: if that fails the Bot stays paused and remembers it, so Resume can be retried.
       const run = this.deps.leads.runs.get(this.runKey(row));
       if (row.heartbeat_was_on && run && this.view(row).threadId) await this.writeRun(row, { ...run, enabled: true });
+      // Then what Stop paused; one that fails stays recorded and the Bot stays as it was.
+      await this.restorePaused(row.id);
       this.update(this.need(row.id), { state: "active", heartbeat_was_on: 0 });
     }
     return this.get(row.id);
   }
 
-  /** Pause, stop the running threads it started, and pause automations that wake its thread. */
+  /**
+   * Turns back on the automations and runners Stop paused, forgetting each
+   * one restored. Ones deleted since are forgotten quietly. Tries them all,
+   * then throws the first failure, keeping the failed ones for a retry.
+   */
+  private async restorePaused(botId: string): Promise<void> {
+    const rows = this.deps.db.prepare("SELECT kind, item_id, project_id FROM bot_stop_paused WHERE bot_id = ? ORDER BY rowid").all(botId) as { kind: string; item_id: string; project_id: string | null }[];
+    const forget = this.deps.db.prepare("DELETE FROM bot_stop_paused WHERE bot_id = ? AND kind = ? AND item_id = ?");
+    const listed = new Map<string, Promise<Map<string, boolean>>>();
+    const failures: unknown[] = [];
+    for (const each of rows) {
+      try {
+        if (each.kind === "automation") {
+          const projectId = each.project_id ?? PERSONAL_PROJECT_ID;
+          if (!listed.has(projectId)) listed.set(projectId, this.automationStates(projectId));
+          const enabled = (await listed.get(projectId)!).get(each.item_id);
+          if (enabled === false) await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_resume", input: { projectId, automationId: each.item_id } as never, outputSchema: z.unknown() });
+        } else if (each.kind === "runner") {
+          await this.deps.runners?.restore(each.item_id);
+        }
+        forget.run(botId, each.kind, each.item_id);
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length) throw failures[0];
+  }
+
+  /** Every automation in a project and whether it's on. Throws when the list fails, so nothing is taken for deleted. */
+  private async automationStates(projectId: string): Promise<Map<string, boolean>> {
+    const raw = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_list", input: { projectId } as never, outputSchema: z.unknown() });
+    const rows = z.array(z.object({ id: z.string(), enabled: z.boolean() }).passthrough()).parse(raw);
+    return new Map(rows.map((row) => [row.id, row.enabled]));
+  }
+
+  /** Records what Stop paused, for Resume. */
+  private rememberPaused(botId: string, kind: "automation" | "runner", itemId: string, projectId: string | null = null): void {
+    this.deps.db.prepare("INSERT OR IGNORE INTO bot_stop_paused (bot_id, kind, item_id, project_id) VALUES (?, ?, ?, ?)").run(botId, kind, itemId, projectId);
+  }
+
+  /** Pause, stop the running threads it spawned (spawnedBy; not forks of its chat), and pause automations that wake its thread and its runners; Resume restores those. */
   async stop(botId?: string): Promise<BotView & { stoppedThreadIds: string[]; pausedAutomationIds: string[] }> {
     const id = this.need(botId).id;
     await this.pause(id);
@@ -599,8 +663,10 @@ export class Bots {
     const pausedAutomationIds: string[] = [];
     const bot = this.stored(id);
     if (bot?.threadId) {
+      const chain = new Set(this.threadChain(bot.threadId));
       for (const thread of await this.startedThreads(bot.threadId)) {
-        if (thread.id === bot.threadId || thread.archivedAt || !RUNNING.has(thread.status)) continue;
+        // startedThreads merges overlapping lists: stop each thread once.
+        if (thread.id === bot.threadId || stoppedThreadIds.includes(thread.id) || thread.archivedAt || !RUNNING.has(thread.status) || !spawnedBy(thread, chain)) continue;
         await this.deps.sdk.threads.stop({ threadId: thread.id });
         stoppedThreadIds.push(thread.id);
       }
@@ -608,10 +674,11 @@ export class Bots {
       for (const automation of rows) {
         if (!automation.enabled) continue;
         await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_pause", input: { projectId, automationId: automation.id } as never, outputSchema: z.unknown() });
+        this.rememberPaused(id, "automation", automation.id, projectId);
         pausedAutomationIds.push(automation.id);
       }
     }
-    await this.deps.runners?.pauseAll(id);
+    await this.deps.runners?.pauseAll(id, (runnerId) => this.rememberPaused(id, "runner", runnerId));
     this.update(this.need(id), { state: "stopped" });
     return { ...(await this.get(id)), stoppedThreadIds, pausedAutomationIds };
   }

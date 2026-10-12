@@ -1127,8 +1127,14 @@ of Staff", with the same thread and check-ins; rename it from its page.
   from, counts. `originPluginId` only names a plugin, so it isn't used.
 - **Pause** turns check-ins off; the Bot is told it's paused and gets no
   Studio tools but its own. **Resume** turns check-ins back on if they were
-  on. **Stop** (confirmed) pauses it, stops the running threads it started,
-  and pauses automations that wake it. Nothing is deleted.
+  on. **Stop** (confirmed) pauses it, stops the running threads it spawned
+  itself, and pauses automations that wake it and its runners. A spawned
+  thread is a BB child of the Bot's thread (`parentThreadId`) or one that
+  archives with it (`lifecycleOwnerThreadId`); a fork or "continue in new
+  thread" only has `sourceThreadId`, is often your own work, and keeps
+  running. Resume after Stop turns back on exactly the automations and
+  runners Stop paused, not ones that were already off; if one fails, the
+  Bot stays stopped and Resume retries the rest. Nothing is deleted.
 - **No Bot yet**: the page greets you as your bot, with the same four chips
   (**Customize me** opens Edit profile) and a message box; your first
   message, or a chip, makes it
