@@ -47,8 +47,8 @@ export const MEMORY_TEMPLATE = `## Check-in
 `;
 
 /** Instructions for the Bot's own thread, given at each session start. Short: they point at the page and tools. */
-export function botInstructions(bot: { name: string; state: BotState; memoryPageId?: string | null; skills?: readonly string[] }): string {
-  const who = `You are ${JSON.stringify(bot.name)}, the user's Bot: an always-on agent that leads their personal project and sees every project. The user can rename, pause or stop you in Studio.`;
+export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly string[] }): string {
+  const who = `You are ${JSON.stringify(bot.name)}, the user's Bot: an always-on agent that leads their personal project and sees every project. The user can rename, pause or stop you in Studio.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
   if (bot.state === "active") {
     const memory = bot.memoryPageId ? `Your Memory page is ${bot.memoryPageId}: read it with pages_read when you wake up, keep it short and edit it yourself with pages_edit; its "## Check-in" section is your check-in list.` : "";
     const skills = `Save a reusable procedure as your own skill with bot_skill_write${bot.skills?.length ? `; yours: ${bot.skills.join(", ")} (bot_skill_read)` : ""}. Search your past threads with bot_history_search.`;
@@ -65,7 +65,7 @@ export function skillMarkdown(skill: { name: string; description: string; body: 
   return `---\nname: ${skill.name}\ndescription: ${JSON.stringify(skill.description)}\n---\n\n${skill.body.trim()}\n`;
 }
 
-type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; memory_page_id: string | null; created_at: number; updated_at: number };
+type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; memory_page_id: string | null; shape: string | null; color: string | null; role: string | null; created_at: number; updated_at: number };
 type SkillRow = { bot_id: string; name: string; description: string; body: string; created_at: number; updated_at: number };
 
 /** Sorts threads into the Bot's Activity. Pending interactions win; then running; then queued; the rest are done. */
@@ -137,7 +137,7 @@ export class Bots {
     const threadId = this.deps.leads.storedLead(PERSONAL_PROJECT_ID);
     if (threadId !== row.thread_id) this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
     const memoryPageId = row.memory_page_id && this.deps.memory?.exists(row.memory_page_id) ? row.memory_page_id : null;
-    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, createdAt: row.created_at, updatedAt: row.updated_at };
   }
 
   /** The heartbeat prompt for the personal project. */
@@ -163,24 +163,24 @@ export class Bots {
     return { bot: this.stored(), run: lead.run };
   }
 
-  private insert(name: string, avatar: string) {
+  private insert(name: string, avatar: string, shape: string | null = null, color: string | null = null) {
     const now = Date.now();
-    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, ?, ?, 'active', NULL, 0, ?, ?)").run(BOT_ID, name, avatar, now, now);
+    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, shape, color, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'active', NULL, 0, ?, ?)").run(BOT_ID, name, avatar, shape, color, now, now);
   }
 
-  private update(fields: Partial<Pick<BotRow, "name" | "avatar" | "state" | "heartbeat_was_on">>) {
+  private update(fields: Partial<Pick<BotRow, "name" | "avatar" | "shape" | "color" | "role" | "state" | "heartbeat_was_on">>) {
     const row = this.row();
     if (!row) throw new Error("Make your Bot first.");
     const next = { ...row, ...fields };
-    this.deps.db.prepare("UPDATE bots SET name = ?, avatar = ?, state = ?, heartbeat_was_on = ?, updated_at = ? WHERE id = ?").run(next.name, next.avatar, next.state, next.heartbeat_was_on, Date.now(), row.id);
+    this.deps.db.prepare("UPDATE bots SET name = ?, avatar = ?, shape = ?, color = ?, role = ?, state = ?, heartbeat_was_on = ?, updated_at = ? WHERE id = ?").run(next.name, next.avatar, next.shape ?? null, next.color ?? null, next.role ?? null, next.state, next.heartbeat_was_on, Date.now(), row.id);
     this.deps.changed();
   }
 
   /** Makes the Bot from a thread, or a new chat in the personal project. */
-  async create(input: { name: string; avatar: string; threadId?: string; prompt?: string }): Promise<BotView> {
+  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string }): Promise<BotView> {
     if (this.row()) throw new Error("You already have a Bot.");
     // The row comes first, so the new thread's first turn gets the Bot's instructions (forThread).
-    this.insert(input.name, input.avatar);
+    this.insert(input.name, input.avatar, input.shape ?? null, input.color ?? null);
     let threadId = input.threadId;
     try {
       if (!threadId) {
@@ -203,9 +203,13 @@ export class Bots {
     return this.get();
   }
 
-  async set(input: { name?: string; avatar?: string }): Promise<BotView> {
+  async set(input: { name?: string; avatar?: string; shape?: string | null; color?: string; role?: string }): Promise<BotView> {
     const before = this.row();
-    this.update({ ...(input.name ? { name: input.name } : {}), ...(input.avatar ? { avatar: input.avatar } : {}) });
+    this.update({
+      ...(input.name ? { name: input.name } : {}), ...(input.avatar ? { avatar: input.avatar } : {}),
+      ...(input.shape !== undefined ? { shape: input.shape } : {}), ...(input.color ? { color: input.color } : {}),
+      ...(input.role !== undefined ? { role: input.role.trim() || null } : {}),
+    });
     // The heartbeat's prompt carries the name.
     const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
     if (input.name && input.name !== before?.name && run?.enabled) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, run);

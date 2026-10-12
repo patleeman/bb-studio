@@ -217,4 +217,9 @@ export const MIGRATIONS = [
        bot_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL, body TEXT NOT NULL,
        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (bot_id, name)
      );`,
+  // Step 3 (src/bot.ts): a drawn avatar (shape and color; the emoji stays as
+  // a fallback for clients that predate it) and a short role it's given.
+  `ALTER TABLE bots ADD COLUMN shape TEXT;
+   ALTER TABLE bots ADD COLUMN color TEXT;
+   ALTER TABLE bots ADD COLUMN role TEXT;`,
 ];

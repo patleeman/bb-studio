@@ -734,8 +734,8 @@ export default async function plugin(bb: BbPluginApi) {
   const listThreads = (label: string, threads: { id: string; title: string; status: string }[]) => threads.length ? [`${label}:`, ...threads.map((thread) => `- [${thread.title}](/threads/${thread.id}) (${thread.status})`)] : [];
   bb.agents.registerTool({ name: "bot_get", description: "Show the user's Bot (their always-on agent, formerly the Chief of Staff): name, avatar, state (active, paused, stopped), its thread and check-ins.", parameters: z.object({}), execute: async () => describeBot(await bots.get()) });
   bb.agents.registerTool({
-    name: "bot_set", description: "Rename the user's Bot or change its avatar emoji. Only when the user asks.",
-    parameters: z.object({ name: z.string().trim().min(1).max(60).optional(), avatar: z.string().trim().min(1).max(16).optional().describe("One emoji") }),
+    name: "bot_set", description: "Rename the user's Bot, change its avatar emoji, or set its role (a sentence or two it's given). Only when the user asks.",
+    parameters: z.object({ name: z.string().trim().min(1).max(60).optional(), avatar: z.string().trim().min(1).max(16).optional().describe("One emoji"), role: z.string().trim().max(400).optional().describe("Its role in the user's words; empty clears it") }),
     execute: async (input) => describeBot(await bots.set(input)),
   });
   bb.agents.registerTool({ name: "bot_pause", description: "Pause the user's Bot: its check-ins stop and it takes on no new work until resumed. Only when the user asks.", parameters: z.object({}), execute: async () => describeBot(await bots.pause()) });

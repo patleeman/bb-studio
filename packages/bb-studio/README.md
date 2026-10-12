@@ -922,10 +922,9 @@ open in the background, so it's as you left it when you come back.
   be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
   The tag menu also renames and deletes the active tag.
-- **Bot.** Your always-on agent (it replaces the Chief of Staff): a name,
-  an emoji, and a home at Studio → Bot with its chat, **Needs you**, and
-  **Activity** (In progress, Scheduled, Completed). Pause, resume or stop it
-  there. See [Bot](#bot).
+- **Bot.** Your always-on agent (it replaces the Chief of Staff): a name, a
+  drawn avatar, and a page of its own (the **Bot** rail item) that is its
+  chat, with **Needs you** and **Activity** a click away. See [Bot](#bot).
 - **Project leads.** A BB project can have a lead thread, which a
   Heartbeat wakes on a schedule; the personal project's lead is your Bot.
   Set them in Setup under **Project leads**. BB's own sidebar groups
@@ -971,27 +970,40 @@ bb studio reindex
 
 ## Bot
 
-![The Bot's home in a staged BB: Dot with its chat and Memory button, Needs you, In progress, Waiting to start (a thread queued for next week), Scheduled (its check-in and a Friday automation), two completed threads it started, and Skills with one skill it saved (Share, Delete)](assets/bot.png)
+![The Bot's page in a staged BB: Dot's avatar, name and status centered on top, a Needs-you banner for a plan waiting on approval, its chat, and the Activity card open with Waiting to start (a thread queued for next week), Running, Scheduled (its check-in and a Friday automation) and Recent (threads it started)](assets/bot.png)
 
-![Create your bot: name, emoji and an optional first message](assets/bot-create.png)
+![A new Bot with nothing going on: its chat, and the Activity card with one quiet line per section](assets/bot-empty.png)
+
+![No Bot yet: the page greets you as one, with Customize your bot and a message box; the first message makes it](assets/bot-create.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
 the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
-of Staff", with the same thread and check-ins; rename it in its home.
+of Staff", with the same thread and check-ins; rename it from its page.
 
-- **Home**: `/plugins/studio/studio/bot`, or the Bot card at the top of
-  Studio's home. The header has its avatar, name (click to rename), state,
-  and Pause / Resume / Stop. Its chat shows inside the home (BB's
-  `ThreadChat`); **Open chat** opens the thread.
+- **Page**: its own nav panel, **Bot** in the rail (`/plugins/studio/bot`;
+  the old `/plugins/studio/studio/bot` redirects there). The page is its
+  chat (BB's `ThreadChat`, full width and height). On top, centered: its
+  avatar (the pencil opens **Edit profile**), name, and live status
+  (Working on N threads, Checks in …, Idle, Paused, Stopped). Top right: ⋯
+  (Edit profile, Memory, Skills, Check-ins, Open as thread, Pause / Resume,
+  Stop…) and the Activity button.
+- **Edit profile**: a drawn avatar (one of nine shapes with two eyes, in one
+  of twelve colors, or **Match the name**), its name, and a Description: a
+  sentence or two on its role ("You are my chief of staff."), which it's
+  told. **Advanced** lists its skills. A Bot made before drawn avatars shows
+  its emoji until you pick a shape; the emoji stays for older clients.
 - **Needs you**: its thread, or a thread it started, waiting on you (a
-  question or an approval).
-- **Activity**: **In progress** (running), **Waiting to start** (queued, or
-  a message scheduled for later), **Scheduled** (its check-in and any
-  automation that wakes its thread, with the next run), **Completed**
-  (threads it started that finished).
+  question or an approval), as a banner above the chat only when there is
+  one; **Answer** opens the thread.
+- **Activity**: a floating card (closed by default; remembered per device)
+  with its avatar and status, **Open thread** and **Check-ins**, and **Needs
+  you**, **Waiting to start** (only when something waits), **Running**,
+  **Scheduled** (its check-in and any automation that wakes its thread,
+  with the next run) and **Recent** (threads it started that finished; the
+  last three, then Show all). An empty section is one quiet line.
 - **Memory**: one Studio page per Bot, "<name>'s Memory" in the personal
   project, made the first time it's needed (its thread starts, or
-  **Memory** in the home). Its top section, `## Check-in`, is what the Bot
+  **Memory** in the ⋯ menu). Its top section, `## Check-in`, is what the Bot
   looks at on each check-in; the rest is what it remembers. The Bot keeps
   it short and edits it with the Pages tools; you can edit it too. The Bot
   is told only the page's id, not its text, and the check-in prompt says:
@@ -1002,8 +1014,8 @@ of Staff", with the same thread and check-ins; rename it in its home.
   Bot's thread has these: they live in Studio's `bot_skills` table and it
   reads one with `bot_skill_read` (its instructions list their names). BB
   selects plugin skills only from a plugin's manifest, so a skill a plugin
-  makes at runtime can't be a native per-thread skill. The home's
-  **Skills** list has **Share**, which moves the skill to BB's user skills
+  makes at runtime can't be a native per-thread skill. **Skills** (⋯, or
+  Edit profile → Advanced) has **Share**, which moves the skill to BB's user skills
   (`<BB data dir>/skills/<name>/SKILL.md`, scope `bb-user`; see
   `bb skill list`), where every agent finds it; it refuses a name that's
   already there. **Delete** removes it.
@@ -1021,22 +1033,24 @@ of Staff", with the same thread and check-ins; rename it in its home.
   Studio tools but its own. **Resume** turns check-ins back on if they were
   on. **Stop** (confirmed) pauses it, stops the running threads it started,
   and pauses automations that wake it. Nothing is deleted.
-- **No Bot yet**: the home offers **Create your bot**: a name, an emoji and
-  an optional first message start its chat in your personal project. Its
+- **No Bot yet**: the page greets you as your bot, with **Customize your
+  bot** (Edit profile) and a message box; your first message makes it
+  ("Bot", a blob, unless you customized it) and starts its chat in your
+  personal project. Its
   instructions come from Studio's agent configuration for its thread, not a
   first message, so its title isn't the instructions.
 - Its thread is an implementation detail. A handoff (`thread_handoff`)
   moves the Bot to the new thread. It is the personal project's lead, so it
   sees every project.
-- RPCs: `bot_get`, `bot_create`, `bot_set` (name, avatar), `bot_set_thread`,
+- RPCs: `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
   `bot_activity`, `bot_memory`, `bot_skills`, `bot_skill_write`, `bot_skill_share`,
   `bot_skill_delete`. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
   `bot_skill_write`, `bot_skill_read`, `bot_skill_delete` and
   `bot_history_search`.
-- **Backup**: a Studio backup includes the Bot (name, avatar, state, Memory
-  page id) and its skills; they're restored only on a BB without a Bot. The
+- **Backup**: a Studio backup includes the Bot (name, avatar, shape, color,
+  role, state, Memory page id) and its skills; they're restored only on a BB without a Bot. The
   Memory page itself comes back with Pages.
 - No per-action rules or approval gates: the Bot works like any agent. `chief_of_staff`,
   `chief_of_staff_set` and `chief_of_staff_set_run` remain as deprecated

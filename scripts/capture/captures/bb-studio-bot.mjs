@@ -1,8 +1,11 @@
-// The Bot's home (/plugins/studio/studio/bot): first its onboarding, while the
-// staged BB has no Bot, then the Bot with real activity: threads it started
-// that ran on the staged provider, one waiting to start, its check-in and an
-// automation that wakes it, its Memory page and a skill it saved.
-const BOT_PATH = "/plugins/studio/studio/bot";
+// The Bot's own page (/plugins/studio/bot): first its onboarding, while the
+// staged BB has no Bot; then the new Bot with nothing going on (Activity
+// open, one quiet line per section); then real activity: threads it started
+// that ran on the staged provider, one waiting to start, one whose plan waits
+// for the user's approval (the Needs-you banner), its check-in and an
+// automation that wakes it.
+const BOT_PATH = "/plugins/studio/bot";
+const openActivity = `localStorage.setItem("studio.bot.activity", "open")`;
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
   { title: "Check the launch checklist for blockers", prompt: "Reply with one short sentence: no blockers on the launch checklist." },
@@ -19,11 +22,34 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         const { bot } = await pluginRpc("studio", "bot_get", {});
         if (bot) throw new Error("The staged BB already has a Bot; capture onboarding on a fresh staging (stop, then start).");
         await client.navigate(BOT_PATH);
-        await client.waitForText("Create your bot", 30000);
-        await client.waitForText("First message");
-        await client.waitForSelector('input[aria-label="Bot name"]');
-        await client.waitForSelector('button[aria-label="Avatar 🧭"]');
+        await client.waitForText("Hey! I'm your bot.", 30000);
+        await client.waitForText("Customize your bot");
+        await client.waitForSelector('textarea[aria-label="First message"]');
+        await client.waitForSelector("svg[data-shape=blob]");
         await sleep(400);
+      },
+    },
+    {
+      id: "studio-bot-empty",
+      packageDir: "bb-studio",
+      fileName: "bot-empty.png",
+      setup: async (client) => {
+        let { bot } = await pluginRpc("studio", "bot_get", {});
+        if (!bot) {
+          ({ bot } = await pluginRpc("studio", "bot_create", {
+            name: "Dot", avatar: "🟣", shape: "blob", color: "#7c66dc",
+            prompt: "Hi Dot. In one short sentence, say you'll keep an eye on the ORBIT-42 launch and tell me what needs me.",
+          }));
+        }
+        await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "180"]).catch(() => {});
+        const activity = await pluginRpc("studio", "bot_activity", {});
+        if (activity.needsYou.length || activity.inProgress.length || activity.completed.length) throw new Error("The staged Bot already has activity; capture the empty state on a fresh staging.");
+        await client.evaluate(openActivity);
+        await client.navigate(BOT_PATH);
+        await client.waitForText("Dot", 30000);
+        for (const text of ["Nothing needs you", "Nothing running", "No recent activity"]) await client.waitForText(text, 30000);
+        await client.evaluate(`(() => { if (document.querySelector('section[aria-label="Needs you"]:not(aside *)')) throw new Error("Needs-you banner on an empty Bot"); const chat = document.querySelector('section[aria-label="Chat"]'); if (!chat || chat.textContent.length < 40) throw new Error("The Bot's chat is empty"); return true; })()`);
+        await sleep(1000);
       },
     },
     {
@@ -49,7 +75,10 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
           }
           const nextWeek = new Date(Date.now() + 7 * 24 * 3600_000).toISOString();
           await json(["thread", "spawn", "--project", projectId, "--parent-thread", botThread, "--title", "Draft Monday's status update", "--prompt", "Draft Monday's ORBIT-42 status update.", "--send-at", nextWeek]);
+          // A plan waiting for the user's approval: the Needs-you banner.
+          await json(["thread", "spawn", "--project", projectId, "--parent-thread", botThread, "--title", "Rotate the ORBIT-42 deploy key", "--plan", "--prompt", "Plan how to rotate the ORBIT-42 deploy key. Propose the plan only."]);
         }
+        for (let i = 0; i < 60 && !(await pluginRpc("studio", "bot_activity", {})).needsYou.length; i++) await sleep(3000);
         // Its check-in, and an automation that wakes it.
         await pluginRpc("studio", "bot_set_run", { enabled: true, cadence: "weekdays", time: "09:00" });
         const { thread } = await json(["thread", "show", botThread]);
@@ -68,9 +97,10 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
           name: "release-readiness", description: "Before a release: check the checklist, open blockers and the lead's last update",
           body: "1. Read the launch checklist page.\n2. List open blockers.\n3. Ask the project's lead for status if it's older than a day.",
         });
+        await client.evaluate(openActivity);
         await client.navigate(BOT_PATH);
         await client.waitForText("Dot", 30000);
-        for (const text of ["Active", "Chat", "Memory", "Needs you", "In progress", "Waiting to start", "Draft Monday's status update", "Scheduled", "Completed", "Skills", "release-readiness", "Share", "Check-in (heartbeat)", "Friday release check", ...CHILDREN.map((child) => child.title)]) {
+        for (const text of ["Checks in", "Needs you · Rotate the ORBIT-42 deploy key", "Answer", "Waiting to start", "Draft Monday's status update", "Scheduled", "Recent", "Check-in (heartbeat)", "Friday release check", ...CHILDREN.map((child) => child.title)]) {
           await client.waitForText(text, 30000);
         }
         // The Bot's own chat renders inside the home.

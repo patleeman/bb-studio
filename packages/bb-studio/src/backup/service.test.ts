@@ -236,7 +236,7 @@ it("backs up the Bot and its skills, and restores them only when this BB has no 
   const sourceDir = await temp();
   const sourceDb = studioDb();
   sourceDb.prepare("INSERT INTO project_leads (project_id, lead_thread_id, created_at, updated_at) VALUES ('proj_personal', 'thr_bot', 1, 5)").run();
-  sourceDb.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, memory_page_id, created_at, updated_at) VALUES ('bot_main', 'Dot', '🟣', 'paused', 'thr_bot', 1, 'pg_memory', 1, 2)").run();
+  sourceDb.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, memory_page_id, shape, color, role, created_at, updated_at) VALUES ('bot_main', 'Dot', '🟣', 'paused', 'thr_bot', 1, 'pg_memory', 'star', '#e5484d', 'My chief of staff.', 1, 2)").run();
   sourceDb.prepare("INSERT INTO bot_skills VALUES ('bot_main', 'weekly-review', 'Fridays', 'Steps', 1, 2)").run();
   const service = (dir: string, db: Database.Database) => new BackupService({
     dataDir: dir, sdk: bb({ dataDir: dir, projects: [], addOns: {}, installed: [] }), bbVersion: async () => null,
@@ -247,7 +247,7 @@ it("backs up the Bot and its skills, and restores them only when this BB has no 
 
   const targetDb = studioDb();
   await service(await temp(), targetDb).restore(file, { dryRun: false });
-  expect(targetDb.prepare("SELECT name, avatar, state, thread_id, memory_page_id FROM bots").get()).toEqual({ name: "Dot", avatar: "🟣", state: "paused", thread_id: "thr_bot", memory_page_id: "pg_memory" });
+  expect(targetDb.prepare("SELECT name, avatar, state, thread_id, memory_page_id, shape, color, role FROM bots").get()).toEqual({ name: "Dot", avatar: "🟣", state: "paused", thread_id: "thr_bot", memory_page_id: "pg_memory", shape: "star", color: "#e5484d", role: "My chief of staff." });
   expect(targetDb.prepare("SELECT name, description, body FROM bot_skills").all()).toEqual([{ name: "weekly-review", description: "Fridays", body: "Steps" }]);
 
   const takenDb = studioDb();

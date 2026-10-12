@@ -94,6 +94,16 @@ it("creates a Bot with a new chat in the personal project and names it in the he
   expect(prompts(x)).toEqual([botHeartbeat("Penny")]);
 });
 
+it("keeps a drawn avatar and a role it's told, with the emoji as a fallback", async () => {
+  const x = await setup();
+  const view = await x.bots.create({ name: "Dot", avatar: "🤖", shape: "blob", color: "#5b8def" });
+  expect(view.bot).toMatchObject({ avatar: "🤖", shape: "blob", color: "#5b8def", role: null });
+  const set = await x.bots.set({ shape: "hexagon", color: "#e5484d", role: "  You are my chief of staff.  " });
+  expect(set.bot).toMatchObject({ shape: "hexagon", color: "#e5484d", role: "You are my chief of staff." });
+  expect(x.bots.instructions(set.bot!)).toContain("Your role, in the user's words: You are my chief of staff.");
+  expect((await x.bots.set({ role: "" })).bot?.role).toBeNull();
+});
+
 it("keeps the Bot across a handoff, and counts threads its old thread started", async () => {
   const x = await setup();
   x.add({ id: "bot1" });

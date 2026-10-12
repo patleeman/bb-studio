@@ -31,7 +31,7 @@ import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
-import { BOT_SUBPATH, BotHome } from "./src/ui/bot/BotHome";
+import { BOT_PANEL, BOT_SUBPATH, BotHome, BotRedirect } from "./src/ui/bot/BotHome";
 import { registerThreadAutomations } from "./src/ui/automations/register";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 
@@ -91,8 +91,8 @@ function StudioRoot({ subPath }: { subPath: string }) {
   if (path === "") return <StudioWorkspace />;
   if (path === "browse") return <StudioPanel />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
-  // The user's Bot: its chat, what needs them, and its Activity.
-  if (path === BOT_SUBPATH) return <BotHome />;
+  // The Bot has its own panel now; its old address goes there.
+  if (path === BOT_SUBPATH) return <BotRedirect />;
   // Conversations about items: chats/item/…, chats/choose/…, chats/quote/….
   if (path === CHATS_PATH || path.startsWith(`${CHATS_PATH}/`)) return <ConversationPage subPath={path.slice(CHATS_PATH.length + 1)} />;
   // A built-in kind: <segment>/<id> is one item; <segment> alone is the
@@ -136,6 +136,8 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "item-gestures", component: ItemGestures });
   app.slots.experimental_appOverlay({ id: "legacy-chats", component: LegacyChats });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
+  // The user's Bot, on a page of its own: its chat, what needs them, its Activity.
+  app.slots.navPanel({ id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotHome });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });

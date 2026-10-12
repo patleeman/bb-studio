@@ -27,7 +27,7 @@ const viewRow = z.object({ id, name: z.string().min(1).max(60), query: z.string(
 const runRow = z.object({ cadence: z.string().max(50), time: z.string().max(50), cron: nullable(z.string().max(200)) });
 const leadRow = z.object({ project_id: id, lead_thread_id: nullable(id), created_at: time, updated_at: time, run: nullable(runRow) });
 const chiefRow = z.object({ thread_id: id, origin_space_id: nullable(id), updated_at: time, run: nullable(runRow) });
-const botRow = z.object({ id, name: z.string().min(1).max(60), avatar: z.string().min(1).max(16), state: z.enum(["active", "paused", "stopped"]), memory_page_id: nullable(id), created_at: time, updated_at: time });
+const botRow = z.object({ id, name: z.string().min(1).max(60), avatar: z.string().min(1).max(16), state: z.enum(["active", "paused", "stopped"]), memory_page_id: nullable(id), shape: z.string().max(20).nullable().optional(), color: z.string().max(20).nullable().optional(), role: z.string().max(400).nullable().optional(), created_at: time, updated_at: time });
 const botSkillRow = z.object({ bot_id: id, name: z.string().min(1).max(64), description: z.string().max(500), body: z.string().max(20_000), created_at: time, updated_at: time });
 const linkRow = z.object({ from_plugin: id, from_id: id, to_plugin: id, to_id: id, kind: z.string().max(50), source: z.string().max(300) });
 const threadRow = z.object({ thread_id: id, plugin_id: id, item_id: id, role: z.string().max(50), state: z.string().max(50), created_at: time, updated_at: time, metadata: text });
@@ -82,7 +82,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
         views: all("SELECT id, name, query, position, created_at FROM views ORDER BY position, id"),
         leads: all<{ project_id: string; lead_thread_id: string | null; created_at: number; updated_at: number }>("SELECT project_id, lead_thread_id, created_at, updated_at FROM project_leads ORDER BY project_id")
           .map((lead) => ({ ...lead, run: (db.prepare("SELECT cadence, time, cron FROM project_runs WHERE project_id = ?").get(lead.project_id) as Data["leads"][number]["run"] | undefined) ?? null })),
-        bots: all("SELECT id, name, avatar, state, memory_page_id, created_at, updated_at FROM bots ORDER BY created_at, id"),
+        bots: all("SELECT id, name, avatar, state, memory_page_id, shape, color, role, created_at, updated_at FROM bots ORDER BY created_at, id"),
         botSkills: all("SELECT bot_id, name, description, body, created_at, updated_at FROM bot_skills ORDER BY bot_id, name"),
         links: all("SELECT * FROM item_links ORDER BY from_plugin, from_id, to_plugin, to_id"),
         threads: all("SELECT * FROM item_threads ORDER BY created_at, thread_id"),
@@ -221,8 +221,8 @@ function apply(
       continue;
     }
     const thread = (db.prepare("SELECT lead_thread_id FROM project_leads WHERE project_id = ?").get(PERSONAL_PROJECT_ID) as { lead_thread_id: string | null } | undefined)?.lead_thread_id ?? null;
-    db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, memory_page_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)")
-      .run(bot.id, bot.name, bot.avatar, bot.state, thread, bot.memory_page_id, bot.created_at, bot.updated_at);
+    db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, memory_page_id, shape, color, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)")
+      .run(bot.id, bot.name, bot.avatar, bot.state, thread, bot.memory_page_id, bot.shape ?? null, bot.color ?? null, bot.role ?? null, bot.created_at, bot.updated_at);
     tally.record("created", item);
   }
   const skill = db.prepare("INSERT OR IGNORE INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");

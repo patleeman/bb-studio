@@ -2932,16 +2932,22 @@ public enum Studio {
     public var state: BotGetOutputBotState?
     public var threadId: String?
     public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
       self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3019,15 +3025,64 @@ public enum Studio {
     }
   }
 
+  public enum BotCreateInputShape: Sendable, Hashable, Codable {
+    case blob
+    case circle
+    case triangle
+    case hexagon
+    case cloud
+    case droplet
+    case square
+    case star
+    case pill
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "blob": self = .blob
+      case "circle": self = .circle
+      case "triangle": self = .triangle
+      case "hexagon": self = .hexagon
+      case "cloud": self = .cloud
+      case "droplet": self = .droplet
+      case "square": self = .square
+      case "star": self = .star
+      case "pill": self = .pill
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .blob: try container.encode("blob")
+      case .circle: try container.encode("circle")
+      case .triangle: try container.encode("triangle")
+      case .hexagon: try container.encode("hexagon")
+      case .cloud: try container.encode("cloud")
+      case .droplet: try container.encode("droplet")
+      case .square: try container.encode("square")
+      case .star: try container.encode("star")
+      case .pill: try container.encode("pill")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotCreateInput: Sendable, Hashable, Codable {
     public var name: String?
     public var avatar: String?
+    public var shape: BotCreateInputShape?
+    public var color: String?
     public var threadId: String?
     public var prompt: String?
 
-    public init(name: String? = nil, avatar: String? = nil, threadId: String? = nil, prompt: String? = nil) {
+    public init(name: String? = nil, avatar: String? = nil, shape: BotCreateInputShape? = nil, color: String? = nil, threadId: String? = nil, prompt: String? = nil) {
       self.name = name
       self.avatar = avatar
+      self.shape = shape
+      self.color = color
       self.threadId = threadId
       self.prompt = prompt
     }
@@ -3067,16 +3122,22 @@ public enum Studio {
     public var state: BotCreateOutputBotState?
     public var threadId: String?
     public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
       self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3154,13 +3215,64 @@ public enum Studio {
     }
   }
 
+  public enum BotSetInputShape: Sendable, Hashable, Codable {
+    case blob
+    case circle
+    case triangle
+    case hexagon
+    case cloud
+    case droplet
+    case square
+    case star
+    case pill
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "blob": self = .blob
+      case "circle": self = .circle
+      case "triangle": self = .triangle
+      case "hexagon": self = .hexagon
+      case "cloud": self = .cloud
+      case "droplet": self = .droplet
+      case "square": self = .square
+      case "star": self = .star
+      case "pill": self = .pill
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .blob: try container.encode("blob")
+      case .circle: try container.encode("circle")
+      case .triangle: try container.encode("triangle")
+      case .hexagon: try container.encode("hexagon")
+      case .cloud: try container.encode("cloud")
+      case .droplet: try container.encode("droplet")
+      case .square: try container.encode("square")
+      case .star: try container.encode("star")
+      case .pill: try container.encode("pill")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSetInput: Sendable, Hashable, Codable {
     public var name: String?
     public var avatar: String?
+    public var shape: BotSetInputShape?
+    public var color: String?
+    public var role: String?
 
-    public init(name: String? = nil, avatar: String? = nil) {
+    public init(name: String? = nil, avatar: String? = nil, shape: BotSetInputShape? = nil, color: String? = nil, role: String? = nil) {
       self.name = name
       self.avatar = avatar
+      self.shape = shape
+      self.color = color
+      self.role = role
     }
   }
 
@@ -3198,16 +3310,22 @@ public enum Studio {
     public var state: BotSetOutputBotState?
     public var threadId: String?
     public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
       self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3327,16 +3445,22 @@ public enum Studio {
     public var state: BotSetThreadOutputBotState?
     public var threadId: String?
     public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
       self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3510,16 +3634,22 @@ public enum Studio {
     public var state: BotSetRunOutputBotState?
     public var threadId: String?
     public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
       self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3637,16 +3767,22 @@ public enum Studio {
     public var state: BotPauseOutputBotState?
     public var threadId: String?
     public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
       self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3764,16 +3900,22 @@ public enum Studio {
     public var state: BotResumeOutputBotState?
     public var threadId: String?
     public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
       self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3891,16 +4033,22 @@ public enum Studio {
     public var state: BotStopOutputBotState?
     public var threadId: String?
     public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
       self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }

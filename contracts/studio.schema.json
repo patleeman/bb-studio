@@ -3334,6 +3334,24 @@
                       "null"
                     ]
                   },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -3425,6 +3443,24 @@
             "minLength": 1,
             "maxLength": 16
           },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "blob",
+              "circle",
+              "triangle",
+              "hexagon",
+              "cloud",
+              "droplet",
+              "square",
+              "star",
+              "pill"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
           "threadId": {
             "type": "string",
             "minLength": 1,
@@ -3474,6 +3510,24 @@
                     ]
                   },
                   "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
                     "type": [
                       "string",
                       "null"
@@ -3569,6 +3623,35 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 16
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "blob",
+                  "circle",
+                  "triangle",
+                  "hexagon",
+                  "cloud",
+                  "droplet",
+                  "square",
+                  "star",
+                  "pill"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 400
           }
         }
       },
@@ -3605,6 +3688,24 @@
                     ]
                   },
                   "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
                     "type": [
                       "string",
                       "null"
@@ -3734,6 +3835,24 @@
                     ]
                   },
                   "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
                     "type": [
                       "string",
                       "null"
@@ -3891,6 +4010,24 @@
                       "null"
                     ]
                   },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -4006,6 +4143,24 @@
                     ]
                   },
                   "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
                     "type": [
                       "string",
                       "null"
@@ -4131,6 +4286,24 @@
                       "null"
                     ]
                   },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -4246,6 +4419,24 @@
                     ]
                   },
                   "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
                     "type": [
                       "string",
                       "null"

@@ -1,4 +1,5 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
+import { BOT_SHAPES } from "./bot-shapes";
 import { conversationRequestSchema, studioSchemas, studioTagSchemas } from "@bb-studio/kit/contract";
 import { z } from "zod";
 
@@ -132,6 +133,11 @@ const bot = z.object({
   threadId: z.string().nullable(),
   /** Its Memory page (a Studio page), once made. */
   memoryPageId: z.string().nullable().optional(),
+  /** Its drawn avatar, a shape with eyes in a color; null shows the emoji. */
+  shape: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
+  /** A sentence or two on its role, given to it ("You are my chief of staff."). */
+  role: z.string().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -143,6 +149,9 @@ const botView = z.object({ bot: bot.nullable(), run: heartbeatRunSchema.nullable
 export type BotView = z.infer<typeof botView>;
 const botName = z.string().trim().min(1).max(60);
 const botAvatar = z.string().trim().min(1).max(16);
+const botShape = z.enum(BOT_SHAPES);
+const botColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const botRole = z.string().trim().max(400);
 /** A thread in the Bot's Activity: its own thread ("self") or one it started. */
 const botThread = z.object({
   id: z.string(),
@@ -252,9 +261,9 @@ export const rpcContract = defineRpcContract({
   /** The user's Bot and its heartbeat; bot null before one is made. */
   bot_get: { input: z.object({}), output: botView },
   /** Makes the Bot: from an existing thread, or a new chat in the personal project started with `prompt`. */
-  bot_create: { input: z.object({ name: botName, avatar: botAvatar, threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional() }), output: botView },
+  bot_create: { input: z.object({ name: botName, avatar: botAvatar, shape: botShape.optional(), color: botColor.optional(), threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional() }), output: botView },
   /** Renames the Bot or changes its avatar. */
-  bot_set: { input: z.object({ name: botName.optional(), avatar: botAvatar.optional() }), output: botView },
+  bot_set: { input: z.object({ name: botName.optional(), avatar: botAvatar.optional(), shape: botShape.nullable().optional(), color: botColor.optional(), role: botRole.optional() }), output: botView },
   /** Makes a thread the Bot's thread ("Make this my Bot"); makes the Bot if there is none. */
   bot_set_thread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: botView },
   /** The Bot's heartbeat (check-ins); on needs an active Bot. */
