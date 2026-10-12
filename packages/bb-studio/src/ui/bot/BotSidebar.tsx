@@ -3,8 +3,8 @@
 // A "Bots" list: every Bot (the primary first), the selected one (the Bot
 // page's route, selection.ts) expanded under it into the threads it started: Needs you, Running,
 // Runners, Recurring, Recent (each nested under the thread that started it) and its
-// earlier conversations. A sub-thread opens in the Bot page's Threads tab;
-// the bot itself opens its main thread, the page.
+// earlier conversations. A thread opens as a BB thread in the main pane, as
+// from BB's own list; the bot itself opens its main thread, the page.
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
@@ -12,12 +12,12 @@ import { botPath, forBot, NEW_BOT_PATH, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
 import { useLive } from "../live";
-import { openThreadPage, runningCount, statusLabel } from "./BotHome";
+import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
 import { isBotPath, syncThreadList } from "./threadListSwitch";
 import { ImportBotDialog } from "./ImportBot";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
-import { sidebarGroups, useOpenSubThread, useStrip, type TreeNode } from "./workspace";
+import { forgetThreadStrips, sidebarGroups, useOpenThread, type TreeNode } from "./workspace";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
 type Layout = { closed: string[] };
@@ -74,13 +74,13 @@ function age(at: number, now = Date.now()): string {
  * mid-switch, a second window): it puts BB's list back at once and shows a
  * quiet placeholder for that moment.
  */
-export function BotThreadList({ onNavigate }: PluginThreadListProps) {
+export function BotThreadList({ onNavigate, activeThreadId }: PluginThreadListProps) {
   const sdk = useSdk();
   const pathname = usePathname();
   const onBotPage = isBotPath(pathname);
   useEffect(() => { if (!onBotPage) void syncThreadList(sdk, pathname); }, [sdk, onBotPage, pathname]);
   if (!onBotPage) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
-  return <BotsList onNavigate={onNavigate} />;
+  return <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} />;
 }
 
 /**
@@ -102,7 +102,9 @@ export function ThreadListSwitcher() {
 
 type BotSummary = NonNullable<BotView["bot"]>;
 
-function BotsList({ onNavigate }: { onNavigate(): void }) {
+function BotsList({ onNavigate, activeThreadId }: { onNavigate(): void; activeThreadId: string | null }) {
+  // The removed Threads tab kept its opened threads in localStorage; drop them once.
+  useEffect(() => forgetThreadStrips(), []);
   const { botId, creating } = useBotSelection();
   const list = useLive<{ bots: BotSummary[] }>("bot_list", {}, { pollMs: 30_000 });
   const view = useLive<BotView>("bot_get", forBot(botId), { pollMs: 30_000 });
@@ -127,7 +129,7 @@ function BotsList({ onNavigate }: { onNavigate(): void }) {
         </div>
       ) : null}
       {bots.length ? bots.map((bot) => bot.id === selected?.id
-        ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} />
+        ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} active={activeThreadId} />
         : <BotRow key={bot.id} bot={bot} onNavigate={onNavigate} />)
         : <p className="px-2 text-xs text-muted-foreground">{list.loading || view.loading ? "Loading…" : list.error ?? view.error ?? "No bot yet. Say hi to make one."}</p>}
     </nav>
@@ -148,13 +150,12 @@ function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
 }
 
 /** One bot: its row, and (it's the selected bot) its threads under it. */
-function BotEntry({ view, onNavigate }: { view: BotView; onNavigate(): void }) {
+function BotEntry({ view, onNavigate, active }: { view: BotView; onNavigate(): void; active: string | null }) {
   const bot = view.bot!;
   const activity = useLive<BotActivityView>("bot_activity", { botId: bot.id }, { pollMs: 15_000 });
   const chain = useLive<{ threadIds: string[] }>("bot_chain", { botId: bot.id }, { pollMs: 120_000 });
   const [layout, setLayout] = useLayout();
-  const [strip] = useStrip(bot.id);
-  const openSub = useOpenSubThread(bot.id, openThreadPage);
+  const openThread = useOpenThread();
   const running = runningCount(activity.data);
   const status = statusLabel(view.run, bot.state, running);
   const groups = sidebarGroups(activity.data);
@@ -163,8 +164,7 @@ function BotEntry({ view, onNavigate }: { view: BotView; onNavigate(): void }) {
   const color = bot.color ?? colorForName(bot.name);
   const accent = { "--bot-accent": color } as CSSProperties;
   const toggle = (id: string) => setLayout({ closed: layout.closed.includes(id) ? layout.closed.filter((each) => each !== id) : [...layout.closed, id] });
-  const active = strip.active;
-  const onOpen = (threadId: string) => { openSub(threadId); onNavigate(); };
+  const onOpen = (threadId: string) => { openThread(threadId); onNavigate(); };
   const runners = useRunners(bot.id);
   const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
   const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} />;

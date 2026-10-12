@@ -22,7 +22,7 @@ import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
 import { SwitchModelDialog } from "./BotModel";
-import { useOpenInfo, useOpenSubThread, useOpenSubThreadRequests } from "./workspace";
+import { useOpenInfo, useOpenThread } from "./workspace";
 import { BOT_PATH, botPath, forBot, useBotSelection } from "./selection";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
@@ -229,7 +229,7 @@ export const openThreadPage = (threadId: string) => openAppPath(threadPath(threa
 
 /**
  * The Bot's workspace: its main thread filling the page (the Bots list
- * replaces BB's sidebar list), and the right panel's Info and Threads tabs (src/ui/bot/BotTabs.tsx).
+ * replaces BB's sidebar list), and the right panel's Info tab (src/ui/bot/BotTabs.tsx).
  */
 function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const activity = useLive<BotActivityView>("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
@@ -237,8 +237,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const controls = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
   const { bot, profile, run, busy, error, setSheet } = controls;
   const openInfo = useOpenInfo();
-  const openSub = useOpenSubThread(bot.id, openThreadPage);
-  useOpenSubThreadRequests(bot.id);
+  const openSub = useOpenThread();
   const startedNeedsYou = (activity.data?.needsYou ?? []).filter((thread) => thread.relation === "started");
   const status = statusLabel(view.run, bot.state, running);
   const [switching, setSwitching] = useState(false);

@@ -1,41 +1,11 @@
 import { expect, test } from "vitest";
 import type { BotActivityView, BotThreadView } from "../../contract";
-import { EMPTY_STRIP, parseStrip, sidebarGroups, STRIP_LIMIT, type Strip, stripClose, stripMove, stripOpen, THREADS_TAB } from "./workspace";
+import { forgetThreadStrips, sidebarGroups } from "./workspace";
 
-test("the strip opens, focuses, closes to the right-hand neighbor, and reorders", () => {
-  let strip = stripOpen(stripOpen(stripOpen(EMPTY_STRIP, "a"), "b"), "c");
-  expect(strip).toEqual({ open: ["a", "b", "c"], active: "c" });
-  expect(stripOpen(strip, "a")).toEqual({ open: ["a", "b", "c"], active: "a" });
-  strip = stripClose({ ...strip, active: "b" }, "b");
-  expect(strip).toEqual({ open: ["a", "c"], active: "c" });
-  expect(stripClose(strip, "c")).toEqual({ open: ["a"], active: "a" });
-  expect(stripClose({ open: ["a"], active: "a" }, "a")).toEqual({ open: [], active: null });
-  expect(stripMove({ open: ["a", "b", "c"], active: "a" }, "c", 0).open).toEqual(["c", "a", "b"]);
-  expect(stripMove({ open: ["a", "b", "c"], active: "a" }, "a", 99).open).toEqual(["b", "c", "a"]);
-});
-
-test("the strip keeps at most STRIP_LIMIT, dropping the oldest it isn't showing", () => {
-  let strip: Strip = { open: Array.from({ length: STRIP_LIMIT }, (_, i) => `t${i}`), active: "t0" };
-  strip = stripOpen(strip, "new");
-  expect(strip.open).toHaveLength(STRIP_LIMIT);
-  expect(strip.open).toContain("t0");
-  expect(strip.open).not.toContain("t1");
-  expect(strip.active).toBe("new");
-});
-
-test("a saved strip is read defensively and stable for the same text", () => {
-  expect(parseStrip("")).toBe(EMPTY_STRIP);
-  expect(parseStrip("{bad")).toBe(EMPTY_STRIP);
-  expect(parseStrip('{"open":["a",3,"b"],"active":"zz"}')).toEqual({ open: ["a", "b"], active: "b" });
-  expect(parseStrip('{"open":["a"],"active":"a"}')).toBe(parseStrip('{"open":["a"],"active":"a"}'));
-});
-
-test("the Threads tab only accepts a thread id as its target", () => {
-  const { validate } = THREADS_TAB.experimental_target;
-  expect(validate({ threadId: "thr_1" })).toBe(true);
-  expect(validate({ threadId: 3 })).toBe(false);
-  expect(validate({ threadId: "../x" })).toBe(false);
-  expect(validate(null)).toBe(false);
+test("the removed Threads tab's saved strips are forgotten, nothing else", () => {
+  const store = new Map([["studio.bot.bot_main.threads", "{}"], ["studio.bot.bot_x.threads", "{}"], ["studio.bot.sidebar", "{}"], ["studio.bot.previousThreadList", "x"]]);
+  forgetThreadStrips({ get length() { return store.size; }, key: (i) => [...store.keys()][i] ?? null, removeItem: (key) => { store.delete(key); } });
+  expect([...store.keys()]).toEqual(["studio.bot.sidebar", "studio.bot.previousThreadList"]);
 });
 
 const t = (id: string, extra: Partial<BotThreadView> = {}): BotThreadView => ({ id, title: id, status: "idle", projectId: null, updatedAt: 1, relation: "started", needsYou: false, parentId: null, ...extra });

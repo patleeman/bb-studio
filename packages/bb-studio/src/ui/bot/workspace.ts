@@ -1,140 +1,33 @@
-// The Bot's workspace: its right-panel tabs (Info, and Threads holding any
-// number of opened sub-threads), the sub-thread strip's saved state, and how
-// its sidebar groups the threads it started. No React components here, so
-// app.tsx, the page and the tabs can share it without import cycles.
-import { experimental_useAppPanel, type JsonValue } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+// The Bot's workspace: its right-panel Info tab, how its threads open (as
+// BB threads, in the main pane), and how its sidebar groups the threads it
+// started. No React components here, so app.tsx, the page and the tabs can
+// share it without import cycles.
+import { experimental_useAppPanel, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { useCallback } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
 
 /** The Bot's nav panel id (also BOT_PANEL in BotHome). */
 const PANEL = "bot";
 
-export type ThreadsTarget = { threadId: string };
-const isThreadsTarget = (value: JsonValue): value is ThreadsTarget =>
-  !!value && typeof value === "object" && !Array.isArray(value)
-  && typeof (value as Record<string, unknown>).threadId === "string"
-  && /^[\w-]{1,128}$/.test((value as Record<string, string>).threadId);
-
 /** Info: the Bot's profile, controls, check-ins and activity. */
 export const INFO_TAB = { panelId: PANEL, id: "info" } as const;
-/** Threads: sub-threads the user opened, one strip of them; a target adds and focuses one. */
-export const THREADS_TAB = { panelId: PANEL, id: "threads", experimental_target: { validate: isThreadsTarget } } as const;
 
-// --- The Threads tab's strip of opened sub-threads -------------------------
-
-export interface Strip { open: string[]; active: string | null }
-export const EMPTY_STRIP: Strip = { open: [], active: null };
-/** At most this many stay open; the oldest unfocused one closes first. */
-export const STRIP_LIMIT = 12;
-
-/** Opens a thread (or focuses it when already open). */
-export function stripOpen(strip: Strip, threadId: string): Strip {
-  if (strip.open.includes(threadId)) return strip.active === threadId ? strip : { ...strip, active: threadId };
-  let open = [...strip.open, threadId];
-  while (open.length > STRIP_LIMIT) {
-    const drop = open.find((id) => id !== threadId && id !== strip.active) ?? open[0]!;
-    open = open.filter((id) => id !== drop);
-  }
-  return { open, active: threadId };
+/** Opens one of the Bot's threads the way BB's own thread list does: as the thread, in the main pane. */
+export function useOpenThread(): (threadId: string) => void {
+  const navigate = useBbNavigate();
+  return useCallback((threadId: string) => navigate.toThread(threadId), [navigate]);
 }
 
-/** Closes a thread; focus moves to its right-hand neighbor, else its left. */
-export function stripClose(strip: Strip, threadId: string): Strip {
-  const index = strip.open.indexOf(threadId);
-  if (index < 0) return strip;
-  const open = strip.open.filter((id) => id !== threadId);
-  const active = strip.active !== threadId ? strip.active : open[index] ?? open[index - 1] ?? null;
-  return { open, active };
-}
-
-/** Moves a thread to `to` (clamped). */
-export function stripMove(strip: Strip, threadId: string, to: number): Strip {
-  const from = strip.open.indexOf(threadId);
-  if (from < 0) return strip;
-  const open = strip.open.filter((id) => id !== threadId);
-  open.splice(Math.max(0, Math.min(to, open.length)), 0, threadId);
-  return { ...strip, open };
-}
-
-export function stripFocus(strip: Strip, threadId: string): Strip {
-  return strip.open.includes(threadId) ? { ...strip, active: threadId } : strip;
-}
-
-const stripKey = (botId: string) => `studio.bot.${botId}.threads`;
-
-export function readStrip(botId: string): Strip {
-  try { return parseStrip(localStorage.getItem(stripKey(botId)) ?? ""); } catch { return EMPTY_STRIP; }
-}
-
-const parsed = new Map<string, Strip>();
-/** A saved strip; the same object for the same text, as useSyncExternalStore wants. */
-export function parseStrip(text: string): Strip {
-  const hit = parsed.get(text);
-  if (hit) return hit;
-  let strip = EMPTY_STRIP;
+/** Drops the strips the removed Threads tab saved (`studio.bot.<botId>.threads`). */
+export function forgetThreadStrips(storage: Pick<Storage, "length" | "key" | "removeItem"> = localStorage): void {
   try {
-    const raw = JSON.parse(text || "null") as Partial<Strip> | null;
-    const open = Array.isArray(raw?.open) ? raw.open.filter((id): id is string => typeof id === "string").slice(-STRIP_LIMIT) : [];
-    const active = typeof raw?.active === "string" && open.includes(raw.active) ? raw.active : open.at(-1) ?? null;
-    strip = open.length ? { open, active } : EMPTY_STRIP;
-  } catch { /* unreadable: start empty */ }
-  if (parsed.size > 50) parsed.clear();
-  parsed.set(text, strip);
-  return strip;
-}
-
-const listeners = new Set<() => void>();
-/** Saves the strip and tells every mounted strip (both split panes, the sidebar). */
-export function writeStrip(botId: string, strip: Strip) {
-  try { localStorage.setItem(stripKey(botId), JSON.stringify(strip)); } catch { /* private mode */ }
-  for (const listener of listeners) listener();
-}
-export function subscribeStrip(listener: () => void): () => void {
-  listeners.add(listener);
-  const onStorage = (event: StorageEvent) => { if (event.key?.startsWith("studio.bot.")) listener(); };
-  window.addEventListener("storage", onStorage);
-  return () => { listeners.delete(listener); window.removeEventListener("storage", onStorage); };
-}
-
-/** The strip, live: every mounted reader updates when any writer saves. */
-export function useStrip(botId: string): [Strip, (next: (strip: Strip) => Strip) => void] {
-  const raw = useSyncExternalStore(subscribeStrip, () => { try { return localStorage.getItem(stripKey(botId)) ?? ""; } catch { return ""; } });
-  const strip = parseStrip(raw);
-  const update = useCallback((next: (strip: Strip) => Strip) => writeStrip(botId, next(readStrip(botId))), [botId]);
-  return [strip, update];
-}
-
-/**
- * Opens a sub-thread in the right panel's Threads tab: saves it into the
- * strip (so it's there however the tab mounts) and selects the tab with it
- * as the target. Falls back to BB's thread page when the host declines.
- */
-export function useOpenSubThread(botId: string, fallback: (threadId: string) => void): (threadId: string) => void {
-  const panel = experimental_useAppPanel();
-  return useCallback((threadId: string) => {
-    writeStrip(botId, stripOpen(readStrip(botId), threadId));
-    if (panel.openFixedTab({ surface: { kind: "current" }, tab: THREADS_TAB, target: { threadId } })) return;
-    // BB's sidebar (the Bots list) has no panel of its own: ask the Bot page.
-    const request = new CustomEvent<OpenSubRequest>(OPEN_SUB_EVENT, { detail: { botId, threadId }, cancelable: true });
-    if (window.dispatchEvent(request)) fallback(threadId);
-  }, [botId, panel, fallback]);
-}
-
-const OPEN_SUB_EVENT = "studio-bot:open-sub-thread";
-type OpenSubRequest = { botId: string; threadId: string };
-
-/** On the Bot page: opens sub-threads the Bots list in BB's sidebar asks for in this page's Threads tab. */
-export function useOpenSubThreadRequests(botId: string): void {
-  const panel = experimental_useAppPanel();
-  useEffect(() => {
-    const onRequest = (event: Event) => {
-      const { detail } = event as CustomEvent<OpenSubRequest>;
-      if (detail?.botId !== botId) return;
-      if (panel.openFixedTab({ surface: { kind: "current" }, tab: THREADS_TAB, target: { threadId: detail.threadId } })) event.preventDefault();
-    };
-    window.addEventListener(OPEN_SUB_EVENT, onRequest);
-    return () => window.removeEventListener(OPEN_SUB_EVENT, onRequest);
-  }, [botId, panel]);
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key && /^studio\.bot\.[^.]+\.threads$/.test(key)) keys.push(key);
+    }
+    for (const key of keys) storage.removeItem(key);
+  } catch { /* private mode */ }
 }
 
 /** Selects the Info tab. */

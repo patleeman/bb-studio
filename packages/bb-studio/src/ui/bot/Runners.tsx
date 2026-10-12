@@ -2,7 +2,7 @@
 // runner's name, schedule, next run, state and last report; pause or resume,
 // Run now, edit (name, job, schedule), delete; New runner; and Adopt as
 // runner for threads the Bot started that an automation wakes. Opening a
-// runner shows its thread in the Threads tab.
+// runner opens its thread as a BB thread.
 import { errorMessage } from "@bb-studio/kit/format";
 import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input } from "@bb-studio/kit/ui";

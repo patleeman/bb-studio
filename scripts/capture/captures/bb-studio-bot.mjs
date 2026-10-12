@@ -3,12 +3,12 @@
 // the Bots list in BB's sidebar (it replaces BB's thread list on the Bot page)
 // with the threads it started (one needing the user, one running,
 // a nested follow-up, a recurring automation), its main thread in BB's own
-// thread view, and the right panel's Info tab; then two sub-threads open in
-// the right panel's Threads tab; then a normal thread page, where BB's own
-// thread list is back. Last, two runners (src/runners.ts): one that logs,
-// one that tells and then raises something urgent; the Bots sidebar's
-// Runners group, the Info tab's Runners section, and a runner's thread in
-// the Threads tab, with the Bot's chat holding only the runner's lines.
+// thread view, and the right panel's Info tab; then a normal thread page,
+// where BB's own thread list is back. Last, two runners (src/runners.ts): one
+// that logs, one that tells and then raises something urgent; the Bots
+// sidebar's Runners group, the Info tab's Runners section, and a runner's
+// thread opened from the sidebar as BB's thread page, with the Bot's chat
+// holding only the runner's lines.
 // Then several bots: New bot opening the create flow, and a second bot,
 // Scout, selected, with Dot listed above it. Where BB has a sidebar
 // navigation provider preference, the navigation row says New bot (Studio's
@@ -26,13 +26,6 @@ const dismissProblems = (client) => client.evaluate(`(() => { [...document.query
 const SIDEBAR = 'nav[aria-label="Bots"]';
 const LIST_PREF = "sidebar.threadListProvider";
 const SCOUT = { name: "Scout", avatar: "🛰️", shape: "hexagon", color: "#2ba59a", prompt: "Hi Scout. In one short sentence, say you'll watch competitors' release notes for anything that affects ORBIT-42." };
-/** Clicks a sidebar row by its title. */
-const openRow = (client, title) => client.evaluate(`(() => {
-  const row = [...document.querySelectorAll('${SIDEBAR} button[data-thread]')].find((each) => each.textContent.includes(${JSON.stringify(title)}));
-  if (!row) throw new Error("No sidebar row " + ${JSON.stringify(title)});
-  row.click();
-  return true;
-})()`);
 const assertChat = (client) => client.evaluate(`(() => {
   const chat = document.querySelector('section[aria-label="Chat"]');
   if (!chat) throw new Error("No Bot chat");
@@ -120,25 +113,6 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
-  const threads = async (client) => {
-    await workspace(client);
-    await openRow(client, CHILDREN[0].title);
-    await client.waitForSelector('[role=tablist][aria-label="Open threads"]', 30000);
-    await openRow(client, "Rotate the ORBIT-42 deploy key");
-    await client.evaluate(`(() => new Promise((resolve, reject) => {
-      const started = Date.now();
-      const tick = () => {
-        const tabs = document.querySelectorAll('[role=tablist][aria-label="Open threads"] [role=tab]');
-        const chat = document.querySelector('section[aria-label="Thread"]');
-        if (tabs.length === 2 && chat && /vault|1Password|deploy key/i.test(chat.textContent)) return resolve(true);
-        if (Date.now() - started > 60000) return reject(new Error("The Threads tab doesn't show two sub-threads with the deploy-key question"));
-        setTimeout(tick, 300);
-      };
-      tick();
-    }))()`);
-    await sleep(1500);
-  };
-
   /**
    * Two runners on short schedules. Inbox watch only logs; Deploy watch tells
    * on its first run and raises an urgent report on its second (Run now).
@@ -200,15 +174,11 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
-  /** A runner's thread in the Threads tab, opened from the sidebar's Runners group. */
+  /** A runner's thread, opened from the sidebar's Runners group as BB's thread page. */
   const runnerThread = async (client) => {
     await seededRunners();
     await workspace(client);
     await client.waitForText("Deploy watch", 60000);
-    await client.waitForSelector('button[aria-label="Bot info"]', 30000);
-    // The right panel is open (Info) before the runner opens in its Threads tab.
-    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
-    await client.waitForSelector('[aria-label$=" info"] section[aria-label=Automations]', 30000);
     await client.evaluate(`(() => {
       const row = [...document.querySelectorAll('${SIDEBAR} section[aria-label="Runners"] button[data-runner]')].find((each) => each.textContent.includes("Deploy watch"));
       if (!row) throw new Error("No Deploy watch row under Runners");
@@ -218,12 +188,10 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await client.evaluate(`(() => new Promise((resolve, reject) => {
       const started = Date.now();
       const tick = () => {
-        // The Threads tab, or BB's thread page where the host declines a fixed-tab target (stable BB 0.46 does).
-        const tab = document.querySelector('[role=tablist][aria-label="Open threads"]') && document.querySelector('section[aria-label="Thread"]');
+        // BB's own thread page, as from BB's thread list.
         const page = location.pathname.includes("/threads/thr_") ? document.body : null;
-        const chat = tab ?? page;
-        if (chat && /Deploy watch/.test(chat.textContent) && /runner_report/.test(chat.textContent)) return resolve(true);
-        if (Date.now() - started > 60000) return reject(new Error("The Threads tab doesn't show the Deploy watch runner's thread"));
+        if (page && /Deploy watch/.test(page.textContent) && /runner_report/.test(page.textContent)) return resolve(true);
+        if (Date.now() - started > 60000) return reject(new Error("The Deploy watch runner's thread didn't open as BB's thread page"));
         setTimeout(tick, 300);
       };
       tick();
@@ -545,7 +513,6 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
       },
     },
     { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: info },
-    { id: "studio-bot-threads", packageDir: "bb-studio", fileName: "bot-threads.png", setup: threads },
     { id: "studio-bot-leave", packageDir: "bb-studio", fileName: "bot-leave.png", setup: leave },
     { id: "studio-bot-runners", packageDir: "bb-studio", fileName: "bot-runners.png", setup: runnersInfo },
     { id: "studio-bot-automations", packageDir: "bb-studio", fileName: "bot-automations.png", setup: automationsList },
