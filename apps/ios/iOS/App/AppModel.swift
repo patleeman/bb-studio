@@ -71,6 +71,11 @@ enum Sheet: Identifiable, Hashable {
     }
 }
 
+/// Where the Bots tab goes: its list, the primary bot, or one bot by id.
+enum BotRoute: Hashable {
+    case list, primary, bot(String)
+}
+
 enum Tab: Hashable {
     case inbox, studio, bot, settings
 }
@@ -86,8 +91,8 @@ final class AppModel: ObservableObject {
     @Published var studioPath: [Route] = []
     /// Set by the Action button until the Bot tab starts or stops talking.
     @Published var botTalkPending = false
-    /// The Bot's name and emoji for its tab, as last loaded for this server.
-    @Published var botTitle: String?
+    /// What the Bots tab should show next, set by links and the Action button.
+    @Published var botRoute: BotRoute?
     /// The Studio tab's kind filter; nil for everything.
     @Published var studioKind: String?
     @Published var sheet: Sheet?
@@ -185,7 +190,7 @@ final class AppModel: ObservableObject {
     }
 
     /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`,
-    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://bot` (also `chief` and the old `web`), `bbstudio://bot-talk` (also `chief-talk`).
+    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`).
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
@@ -212,7 +217,9 @@ final class AppModel: ObservableObject {
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
-        case "bot", "chief", "web": tab = .bot
+        case "bots": openBots(.list)
+        case "bot": openBots(id.map { .bot($0) } ?? .primary)
+        case "chief", "web": openBots(.primary)
         case "bot-talk", "chief-talk": toggleBotTalk()
         case "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
@@ -270,8 +277,13 @@ final class AppModel: ObservableObject {
 
     func toggleBotTalk() {
         sheet = nil
-        tab = .bot
+        openBots(.primary)
         botTalkPending = true
+    }
+
+    func openBots(_ route: BotRoute) {
+        botRoute = route
+        tab = .bot
     }
 
     func startVoiceChat(threadId: String? = nil) {

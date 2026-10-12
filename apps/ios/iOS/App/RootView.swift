@@ -15,8 +15,8 @@ struct RootView: View {
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)
 
-            BotTab()
-                .tabItem { Label(model.botTitle ?? BotInfo.defaultName, systemImage: "person.crop.circle.badge.checkmark") }
+            BotsTab()
+                .tabItem { Label("Bots", systemImage: "face.smiling") }
                 .tag(Tab.bot)
 
             NavigationStack { SettingsView() }

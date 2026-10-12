@@ -6,10 +6,16 @@ import SwiftUI
 /// the sections with something in them.
 struct BotActivitySheet: View {
     let bot: BotInfo?
+    var botId: String? = nil
     let activity: BotActivity?
     var open: (String) -> Void
     var refresh: () async -> Void
+    @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
+    /// Its runners (`bot_runners`); external bots have none.
+    @State private var runners: [BotRunner] = []
+    @State private var runnerBusy: String?
+    @State private var runnerError: String?
 
     private var name: String { bot?.name ?? BotInfo.defaultName }
 
@@ -38,11 +44,18 @@ struct BotActivitySheet: View {
                         }
                     }
                 }
+                if !runners.isEmpty {
+                    Section {
+                        ForEach(runners) { runnerRow($0) }
+                    } header: { Text("Runners") } footer: {
+                        if let runnerError { Text(runnerError).foregroundStyle(.red) }
+                    }
+                }
             }
             .overlay {
                 if activity == nil {
                     ProgressView()
-                } else if sections.isEmpty {
+                } else if sections.isEmpty && runners.isEmpty {
                     ContentUnavailableView {
                         Label { Text("All quiet") } icon: { if let bot { BotAvatar(bot.look, size: 56) } }
                     } description: {
@@ -50,7 +63,8 @@ struct BotActivitySheet: View {
                     }
                 }
             }
-            .refreshable { await refresh() }
+            .refreshable { await refresh(); await loadRunners() }
+            .task { await loadRunners() }
             .navigationTitle("Activity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
@@ -76,6 +90,66 @@ struct BotActivitySheet: View {
         }
         .foregroundStyle(.primary)
         .accessibilityHint("Opens the thread")
+    }
+
+    private func runnerRow(_ runner: BotRunner) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: runner.paused ? "pause.fill" : "figure.run")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(runner.paused ? Color.secondary : Color.purple)
+                .frame(width: 30, height: 30)
+                .background((runner.paused ? Color.secondary : Color.purple).opacity(0.14), in: .circle)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(runner.name).lineLimit(1)
+                Text(runnerSubtitle(runner)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if let report = runner.lastReport, !report.isEmpty {
+                    Text(report).font(.caption).foregroundStyle(runner.urgent == true ? AnyShapeStyle(.orange) : AnyShapeStyle(.primary)).lineLimit(2)
+                }
+            }
+            Spacer(minLength: 0)
+            if runnerBusy == runner.id {
+                ProgressView().frame(width: 30, height: 30)
+            } else {
+                Button { act(runner) { try await $0.runRunnerNow(runner.id, botId: botId) } } label: {
+                    Image(systemName: "play.fill").frame(width: 30, height: 30)
+                }
+                .disabled(runner.paused)
+                .accessibilityLabel("Run \(runner.name) now")
+                Button { act(runner) { try await $0.setRunnerPaused(runner.id, paused: !runner.paused, botId: botId) } } label: {
+                    Image(systemName: runner.paused ? "playpause.fill" : "pause").frame(width: 30, height: 30)
+                }
+                .accessibilityLabel(runner.paused ? "Resume \(runner.name)" : "Pause \(runner.name)")
+            }
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private func runnerSubtitle(_ runner: BotRunner) -> String {
+        if runner.paused { return "Paused · \(runner.scheduleLabel)" }
+        let last = (runner.lastReportAt ?? runner.lastRunAt).flatMap(BotChatEntry.date).map { "Last \($0.formatted(.relative(presentation: .named)))" }
+        return [runner.scheduleLabel, last].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private func loadRunners() async {
+        #if DEBUG
+        if BotDemo.current != nil { runners = BotDemo.runners; return }
+        #endif
+        guard bot?.external != true, bot != nil else { runners = []; return }
+        if let next = try? await app.client.botRunners(botId: botId) { runners = next }
+    }
+
+    private func act(_ runner: BotRunner, _ work: @escaping (BBClient) async throws -> Void) {
+        runnerBusy = runner.id
+        Task {
+            defer { runnerBusy = nil }
+            do {
+                try await work(app.client)
+                runnerError = nil
+                await loadRunners()
+            } catch {
+                runnerError = BBClient.describe(error, server: app.client.baseURL)
+            }
+        }
     }
 
     private func scheduledRow(_ item: BotActivity.Scheduled) -> some View {
@@ -130,11 +204,16 @@ struct BotActivitySheet: View {
 /// there is none.
 struct BotProfileSheet: View {
     let bot: BotInfo?
+    /// The bot being edited; nil for the primary.
+    var botId: String? = nil
+    /// Making another bot (the Bots list's +): asks for its first message.
+    var adding = false
     var saved: (BotInfo?) -> Void
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var role = ""
+    @State private var prompt = ""
     @State private var shape: BotShape = .default
     @State private var color = BotPalette.hexes[0]
     /// The color follows the name until one is picked.
@@ -219,6 +298,14 @@ struct BotProfileSheet: View {
                     .sensoryFeedback(.selection, trigger: color)
                     Toggle("Match the name", isOn: $matchName)
                 } header: { Text("Color") }
+                if adding {
+                    Section {
+                        TextField("What should it start on?", text: $prompt, axis: .vertical)
+                            .lineLimit(2...6)
+                    } header: { Text("First message") } footer: {
+                        Text("Bots that run on another provider can't be added here yet. Import them on desktop.")
+                    }
+                }
                 Section {
                     TextField("You are my chief of staff. Keep me on top of…", text: $role, axis: .vertical)
                         .lineLimit(2...5)
@@ -245,7 +332,7 @@ struct BotProfileSheet: View {
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
             .tint(tint)
-            .navigationTitle(bot == nil ? "Make your Bot" : "Edit profile")
+            .navigationTitle(adding ? "New bot" : bot == nil ? "Make your Bot" : "Edit profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -257,7 +344,7 @@ struct BotProfileSheet: View {
             .onChange(of: name) { _, value in if matchName { color = BotPalette.hex(forName: value) } }
             .onChange(of: matchName) { _, on in if on { color = BotPalette.hex(forName: name) } }
             .onAppear {
-                name = bot?.name ?? BotInfo.defaultName
+                name = bot?.name ?? (adding ? "" : BotInfo.defaultName)
                 role = bot?.role ?? ""
                 shape = bot?.shape.flatMap(BotShape.init(rawValue:)) ?? .default
                 color = bot?.color ?? BotPalette.hex(forName: name)
@@ -273,18 +360,20 @@ struct BotProfileSheet: View {
         let client = app.client
         do {
             var next: BotInfo?
+            var target = botId
             if bot == nil {
-                next = try await client.createBot(name: trimmedName, shape: shape, color: color, prompt: nil)
+                let first = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                next = try await client.createBot(name: trimmedName, shape: shape, color: color, prompt: first.isEmpty ? nil : first)
+                if next?.primary == false { target = next?.id }
                 if !role.trimmingCharacters(in: .whitespaces).isEmpty {
-                    next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role) ?? next
+                    next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role, botId: target) ?? next
                 }
             } else {
-                next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role)
+                next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role, botId: target)
             }
             if case .preset(let preset) = checkIn, next?.state == .active, preset != BotCheckinPreset.of(next?.lead) {
-                next = try await client.setBotCheckinPreset(preset) ?? next
+                next = try await client.setBotCheckinPreset(preset, botId: target) ?? next
             }
-            app.botTitle = next?.name
             saved(next)
             dismiss()
         } catch {
@@ -298,6 +387,7 @@ struct BotProfileSheet: View {
 /// The procedures the Bot saved for itself.
 struct BotSkillsSheet: View {
     let name: String
+    var botId: String? = nil
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var skills: [BotSkill]?
@@ -328,7 +418,7 @@ struct BotSkillsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task {
-                do { skills = try await app.client.botSkills() } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+                do { skills = try await app.client.botSkills(botId: botId) } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
             }
         }
         .presentationDetents([.medium, .large])

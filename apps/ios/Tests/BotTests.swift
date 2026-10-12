@@ -106,6 +106,73 @@ final class BotTests: XCTestCase {
         XCTAssertEqual(activity.scheduled.first?.kind, "heartbeat")
     }
 
+    func testBotListPutsPrimaryFirstThenByName() async throws {
+        func item(_ id: String, _ name: String, primary: Bool, kind: String = "studio") -> String {
+            #"{"id":"\#(id)","name":"\#(name)","avatar":"🤖","state":"active","threadId":"thr_\#(id)","primary":\#(primary),"kind":"\#(kind)","createdAt":1,"updatedAt":1}"#
+        }
+        let list = client(a, ["bot_list": (200, #"{"ok":true,"result":{"bots":["# + [item("z", "zed", primary: false), item("m", "Main", primary: true),
+                                                                                 item("a", "Atlas", primary: false, kind: "external")].joined(separator: ",") + "]}}")])
+        let bots = try await list.bots()
+        XCTAssertEqual(bots.map(\.name), ["Main", "Atlas", "zed"])
+        XCTAssertEqual(bots.map(\.primary), [true, false, false])
+        XCTAssertEqual(bots.map(\.external), [false, true, false])
+        // Only the primary is remembered for widgets, Siri and the watch.
+        XCTAssertEqual(BBClient(baseURL: a).cachedBotThreadId, "thr_m")
+
+        // A Studio without bot_list: its one Bot.
+        let older = try await client(b, ["bot_get": bot("thr_b")]).bots()
+        XCTAssertEqual(older.map(\.lead.threadId), ["thr_b"])
+        XCTAssertEqual(older.first?.primary, true)
+    }
+
+    func testBotIdScopesEveryCall() async throws {
+        let calls = Calls()
+        let other = (200, #"{"ok":true,"result":{"bot":{"id":"bot_2","name":"Scout","avatar":"🔭","state":"active","threadId":"thr_2","primary":false},"run":null}}"#)
+        let client = client(a, [
+            "bot_get": other, "bot_pause": other, "bot_set": other, "bot_checkin_preset": other, "bot_set_run": other,
+            "bot_activity": (200, #"{"ok":true,"result":{"needsYou":[],"inProgress":[],"scheduled":[],"completed":[]}}"#),
+            "bot_chain": (200, #"{"ok":true,"result":{"threadIds":["thr_2"]}}"#),
+            "bot_memory": (200, #"{"ok":true,"result":{"pageId":"pg_1"}}"#),
+            "bot_skills": (200, #"{"ok":true,"result":{"skills":[]}}"#),
+            "bot_runners": (200, #"{"ok":true,"result":{"runners":[{"id":"r1","name":"Sweep","state":"paused","schedule":{"cadence":"weekdays","time":"09:00"},"lastReport":"ok"}]}}"#),
+            "bot_runner_resume": (200, #"{"ok":true,"result":{"id":"r1"}}"#),
+            "bot_runner_run_now": (200, #"{"ok":true,"result":{"id":"r1"}}"#),
+        ], sent: { method, body in calls.add(method, body) })
+        let before = BBClient(baseURL: a).cachedBotThreadId
+        _ = try await client.bot("bot_2")
+        _ = try await client.setBotState(.pause, botId: "bot_2")
+        _ = try await client.setBotProfile(name: "Scout", shape: nil, color: nil, role: "", botId: "bot_2")
+        _ = try await client.setBotCheckinPreset(.morning, botId: "bot_2")
+        _ = try await client.setBotHeartbeat(enabled: false, cadence: "daily", time: nil, cron: nil, botId: "bot_2")
+        _ = try await client.botActivity(botId: "bot_2")
+        _ = try await client.botChain(botId: "bot_2")
+        _ = try await client.botMemoryPageId(botId: "bot_2")
+        _ = try await client.botSkills(botId: "bot_2")
+        let runners = try await client.botRunners(botId: "bot_2")
+        try await client.setRunnerPaused("r1", paused: false, botId: "bot_2")
+        try await client.runRunnerNow("r1", botId: "bot_2")
+        XCTAssertEqual(runners.first?.paused, true)
+        XCTAssertEqual(runners.first?.scheduleLabel, "Weekdays at 09:00")
+        XCTAssertEqual(calls.all.count, 13)
+        for (method, body) in calls.all {
+            XCTAssertTrue(body.contains(#""botId":"bot_2""#), "\(method) without botId: \(body)")
+        }
+        // Another bot never replaces the primary's cache.
+        XCTAssertEqual(BBClient(baseURL: a).cachedBotThreadId, before)
+
+        // The primary is called without a botId.
+        let primaryCalls = Calls()
+        _ = try await self.client(b, ["bot_get": bot("thr_b")], sent: { primaryCalls.add($0, $1) }).bot()
+        XCTAssertEqual(primaryCalls.all.first?.1, "{}")
+    }
+
+    func testListPreviewIsPlainText() {
+        XCTAssertEqual(BotSummary.plain("**Hi** there\n\n- see [docs](https://x)\n::next{reply=\"a|b\"}"), "Hi there - see docs")
+        let bot = BotInfo(name: "B", avatar: "🤖", state: .active, lead: ThreadLead(threadId: nil))
+        XCTAssertEqual(bot.status(running: true), "Working…")
+        XCTAssertEqual(bot.key, "primary")
+    }
+
     func testBotLeadFromOptionalBot() {
         XCTAssertEqual(BotLead(nil), .none)
         let info = BotInfo(name: "Bot", avatar: "🤖", state: .active, lead: ThreadLead(threadId: "thr_1"))

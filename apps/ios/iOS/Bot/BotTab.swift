@@ -1,9 +1,13 @@
 import SwiftUI
 
-/// Studio's Bot: its chat, with its status, Activity, voice, profile, check-ins
-/// and Pause / Resume / Stop. Without a Bot, it greets you and the first
-/// message makes it.
+/// One bot's chat, with its status, Activity, voice, profile, check-ins and
+/// Pause / Resume / Stop. Without a Bot, it greets you and the first message
+/// makes it. Every call is scoped to `botId`; nil is the primary bot.
 struct BotTab: View {
+    /// The bot to show; nil for the primary.
+    var botId: String? = nil
+    /// Back to the Bots list.
+    var back: (() -> Void)? = nil
     @EnvironmentObject private var model: AppModel
     @State private var path: [Route] = []
     @State private var lead = BotLead.loading
@@ -16,7 +20,7 @@ struct BotTab: View {
     @State private var sheet: BotSheet?
     @State private var confirmingStop = false
     @State private var error: String?
-    private struct LoadKey: Hashable { let visible: Bool; let server: URL; let attempt: Int }
+    private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
 
     private var bot: BotInfo? { if case .bot(let bot) = lead { bot } else { nil } }
     private var needsYou: Int { activity?.needsYou.count ?? 0 }
@@ -29,18 +33,18 @@ struct BotTab: View {
                 .sheet(item: $sheet, onDismiss: { attempt += 1 }) { sheet in
                     switch sheet {
                     case .activity:
-                        BotActivitySheet(bot: bot, activity: activity) { id in
+                        BotActivitySheet(bot: bot, botId: botId, activity: activity) { id in
                             self.sheet = nil
                             path.append(.thread(id: id))
                         } refresh: { await loadActivity() }
                     case .profile:
-                        BotProfileSheet(bot: bot) { next in
+                        BotProfileSheet(bot: bot, botId: botId) { next in
                             if let next { lead = .bot(next) }
                         }
                     case .checkIns:
-                        BotHeartbeatSheet()
+                        BotHeartbeatSheet(botId: botId)
                     case .skills:
-                        BotSkillsSheet(name: bot?.name ?? BotInfo.defaultName)
+                        BotSkillsSheet(name: bot?.name ?? BotInfo.defaultName, botId: botId)
                     }
                 }
                 .confirmationDialog("Stop \(bot?.name ?? BotInfo.defaultName)?", isPresented: $confirmingStop, titleVisibility: .visible) {
@@ -52,7 +56,7 @@ struct BotTab: View {
                     Button("OK", role: .cancel) { error = nil }
                 } message: { Text(error ?? "") }
         }
-        .task(id: LoadKey(visible: model.tab == .bot, server: model.serverURL, attempt: attempt)) {
+        .task(id: LoadKey(visible: model.tab == .bot, server: model.serverURL, botId: botId, attempt: attempt)) {
             guard model.tab == .bot else { return }
             await load()
             // Live status for the threads it started, as the desktop polls it.
@@ -69,7 +73,7 @@ struct BotTab: View {
         switch lead {
         case .bot(let bot):
             if let id = bot.lead.threadId {
-                ThreadView(threadId: id, hidesTabBar: false, answersActionButton: true, botChrome: chrome(bot))
+                ThreadView(threadId: id, hidesTabBar: false, answersActionButton: botId == nil, botChrome: chrome(bot))
                     .id("\(model.serverURL.absoluteString)|\(id)")
                     .safeAreaInset(edge: .top, spacing: 0) { banner(bot) }
             } else {
@@ -107,6 +111,13 @@ struct BotTab: View {
 
     @ToolbarContentBuilder
     private func toolbar(_ bot: BotInfo) -> some ToolbarContent {
+        if let back {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: back) { Image(systemName: "chevron.backward") }
+                    .accessibilityLabel("Bots")
+                    .accessibilityHint("Shows all your bots")
+            }
+        }
         ToolbarItemGroup(placement: .topBarTrailing) {
             if let id = bot.lead.threadId {
                 Button { model.startVoiceChat(threadId: id) } label: { Image(systemName: "phone.fill") }
@@ -129,8 +140,12 @@ struct BotTab: View {
         Menu {
             Section {
                 Button { sheet = .profile } label: { Label("Edit profile", systemImage: "person.crop.circle") }
-                Button { openMemory() } label: { Label("Memory", systemImage: "brain") }
-                Button { sheet = .skills } label: { Label("Skills", systemImage: "wand.and.stars") }
+                if bot.external {
+                    Text("Runs on another provider, so it has no memory, skills or runners.")
+                } else {
+                    Button { openMemory() } label: { Label("Memory", systemImage: "brain") }
+                    Button { sheet = .skills } label: { Label("Skills", systemImage: "wand.and.stars") }
+                }
                 Button { sheet = .checkIns } label: { Label("Check-ins", systemImage: "alarm") }
                     .disabled(bot.state != .active)
             }
@@ -180,7 +195,6 @@ struct BotTab: View {
             activity = demo.bot == nil ? nil : demo.activity
             chain = demo.chain
             startedThreads = demo.startedThreads
-            model.botTitle = demo.bot?.name
             if sheet == nil, attempt == 0, let shown = BotDemo.sheet.flatMap(BotSheet.init(rawValue:)) {
                 try? await Task.sleep(for: .milliseconds(800))
                 sheet = shown
@@ -190,20 +204,20 @@ struct BotTab: View {
         #endif
         let client = model.client
         // Another server's Bot is never shown for this one.
-        if case .bot(let shown) = lead, client.cachedBotThreadId != shown.lead.threadId {
+        if botId == nil, case .bot(let shown) = lead, client.cachedBotThreadId != shown.lead.threadId {
             lead = .loading
             chain = []
             startedThreads = [:]
         }
         do {
-            lead = BotLead(try await client.bot())
+            lead = BotLead(try await client.bot(botId))
         } catch where BBClient.isCancellation(error) {
             return
         } catch {
             guard client.baseURL == model.serverURL else { return }
             // Offline or a server without Studio: keep what this server last said.
             if case .bot = lead {
-            } else if let cached = client.cachedBotThreadId {
+            } else if botId == nil, let cached = client.cachedBotThreadId {
                 let look = client.cachedBotLook
                 lead = .bot(BotInfo(name: client.cachedBotName, avatar: look.emoji, state: .active, lead: ThreadLead(threadId: cached),
                                     shape: look.shape?.rawValue, color: look.color))
@@ -211,17 +225,16 @@ struct BotTab: View {
                 lead = .unavailable(BBClient.describe(error, server: client.baseURL))
             }
         }
-        model.botTitle = bot?.name
-        if bot?.lead.threadId != nil, let ids = try? await client.botChain() { chain = ids }
+        if bot?.lead.threadId != nil, let ids = try? await client.botChain(botId: botId) { chain = ids }
         // An Action button press with nothing to talk to must not start recording later.
-        if bot?.lead.threadId == nil { model.botTalkPending = false }
+        if botId == nil, bot?.lead.threadId == nil { model.botTalkPending = false }
         await loadActivity()
     }
 
     private func loadActivity() async {
         guard bot != nil else { activity = nil; return }
         let client = model.client
-        guard let next = try? await client.botActivity() else { return }
+        guard let next = try? await client.botActivity(botId: botId) else { return }
         activity = next
         let ids = Set((next.needsYou + (next.waiting ?? []) + next.inProgress + next.completed).filter { $0.relation == "started" }.map(\.id))
         let missing = ids.subtracting(startedThreads.keys)
@@ -240,13 +253,12 @@ struct BotTab: View {
         let name = BotInfo.defaultName
         let made = try await model.client.createBot(name: name, shape: .default, color: BotPalette.hex(forName: name), prompt: prompt)
         lead = BotLead(made)
-        model.botTitle = made?.name
     }
 
     private func openMemory() {
         Task {
             do {
-                if let id = try await model.client.botMemoryPageId() {
+                if let id = try await model.client.botMemoryPageId(botId: botId) {
                     path.append(.page(id: id))
                 } else {
                     error = "\(bot?.name ?? BotInfo.defaultName) hasn't written any memory yet."
@@ -260,7 +272,7 @@ struct BotTab: View {
     private func change(_ action: BotInfo.Action) {
         Task {
             do {
-                if let next = try await model.client.setBotState(action) { lead = .bot(next) }
+                if let next = try await model.client.setBotState(action, botId: botId) { lead = .bot(next) }
                 await loadActivity()
             } catch {
                 self.error = BBClient.describe(error, server: model.client.baseURL)

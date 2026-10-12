@@ -1,7 +1,7 @@
 #if DEBUG
 import Foundation
 
-/// Debug builds: `-qaBotDemo chat|working|needs|onboarding` fills the Bot tab
+/// Debug builds: `-qaBotDemo chat|working|needs|onboarding|list` fills the Bot tab
 /// with a deterministic local Bot, chat and Activity, for screenshots without
 /// a server. `-qaBotSheet activity|profile` opens a sheet over it.
 enum BotDemo {
@@ -45,6 +45,36 @@ enum BotDemo {
             shape: "blob", color: "#2ba59a", role: "My chief of staff. Keeps the week on track and chases loose ends.")
         return Fixture(bot: bot, activity: activity(needs: variant == "needs"), thread: thread(running: running, needs: variant == "needs"),
                        rows: rows(variant), interactions: variant == "needs" ? interactions : [])
+    }
+
+    /// The Bots list: Juniper alone, or with two more for `-qaBotDemo list`.
+    static var bots: [BotInfo]? {
+        guard let fixture = current else { return nil }
+        guard let juniper = fixture.bot.map({ $0.with(id: "bot_juniper", primary: true, external: false) }) else { return [] }
+        guard variant == "list" else { return [juniper] }
+        let scout = BotInfo(name: "Scout", avatar: "🔭", state: .active, lead: ThreadLead(threadId: "thr_scout01"),
+                            shape: "star", color: "#e0803a", role: "Watches competitors and the news.")
+            .with(id: "bot_scout", primary: false, external: false)
+        let ledger = BotInfo(name: "Ledger", avatar: "🧾", state: .paused, lead: ThreadLead(threadId: "thr_ledger01"),
+                             shape: "hexagon", color: "#5b6ee1", role: "Keeps the books.")
+            .with(id: "bot_ledger", primary: false, external: true)
+        return [juniper, scout, ledger]
+    }
+
+    static var summaries: [String: BotSummary] {
+        [
+            "bot_juniper": BotSummary(preview: "Just one thing: the Lisbon offsite budget needs your sign-off by 3pm.", needsYou: 1, running: false, updatedAt: now - 600_000),
+            "bot_scout": BotSummary(preview: "Two competitors shipped pricing changes this week. Summary is on your Pages.", needsYou: 0, running: true, updatedAt: now - 120_000),
+            "bot_ledger": BotSummary(preview: "October invoices are reconciled. Three receipts are still missing.", needsYou: 0, running: false, updatedAt: now - 86_400_000 * 2),
+        ]
+    }
+
+    static var runners: [BotRunner] {
+        decode(#"""
+        [{"id":"run_inbox","name":"Inbox sweep","state":"active","schedule":{"cadence":"every2hours"},"lastReport":"4 new threads, none urgent.","lastReportAt":\#(now - 1_800_000)},
+         {"id":"run_prs","name":"PR watcher","state":"active","schedule":{"cadence":"weekdays","time":"09:00"},"lastReport":"Release PR is waiting on CI.","lastReportAt":\#(now - 7_200_000),"urgent":true},
+         {"id":"run_news","name":"Industry news","state":"paused","schedule":{"cadence":"daily","time":"07:30"},"lastReport":"Quiet day.","lastReportAt":\#(now - 86_400_000 * 3)}]
+        """#)
     }
 
     fileprivate static func decode<T: Decodable>(_ json: String) -> T {

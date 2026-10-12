@@ -9,13 +9,14 @@ extension BBClient {
     /// The Bot, or nil when there is none, or when Studio is absent. A Studio that
     /// predates the Bot answers through `chief_of_staff` as a Bot named "Chief of
     /// Staff". Remembers the answer per server so widgets can draw while offline.
-    public func bot() async throws -> BotInfo? {
+    /// With a `botId`, that bot instead of the primary one.
+    public func bot(_ botId: String? = nil) async throws -> BotInfo? {
         do {
-            let output: BotWire = try await rpc("studio", Studio.Method.bot_get, .object([:]))
+            let output: BotWire = try await rpc("studio", Studio.Method.bot_get, Self.scoped(botId))
             let info = output.info
-            remember(info)
+            if botId == nil || info?.primary == true { remember(info) }
             return info
-        } catch where Self.isMissingRPC(error) {
+        } catch where Self.isMissingRPC(error) && botId == nil {
             do {
                 let output: Studio.ChiefOfStaffOutput = try await rpc("studio", Studio.Method.chief_of_staff, .object([:]))
                 let run = output.run
@@ -37,7 +38,30 @@ extension BBClient {
         try await bot()?.lead.threadId
     }
 
+    /// Every bot (`bot_list`), primary first, then the others by name. A Studio
+    /// with one Bot answers through `bot_get`.
+    public func bots() async throws -> [BotInfo] {
+        do {
+            struct Output: Decodable { var bots: [BotWire.Bot] }
+            let output: Output = try await rpc("studio", Studio.Method.bot_list, .object([:]))
+            let list = BotInfo.ordered(output.bots.map { BotWire(bot: $0, run: nil).info! })
+            if let primary = list.first(where: \.primary) { remember(primary) }
+            return list
+        } catch where Self.isMissingRPC(error) {
+            return try await bot().map { [$0] } ?? []
+        }
+    }
+
+    /// An RPC input with `botId` added when it names a bot other than the primary.
+    static func scoped(_ botId: String?, _ fields: [String: JSONValue?] = [:]) -> JSONValue {
+        var fields = fields
+        if let botId { fields["botId"] = .string(botId) }
+        return .object(omittingNil: fields)
+    }
+
+    /// Only the primary bot is remembered: widgets, Siri and the watch use it.
     private func remember(_ info: BotInfo?) {
+        if let info, !info.primary { return }
         AppGroup.defaults.set(info?.lead.threadId, forKey: ServerScope.key("botThreadId", serverURL: baseURL))
         AppGroup.defaults.set(info?.name, forKey: ServerScope.key("botName", serverURL: baseURL))
         AppGroup.defaults.set(info?.avatar, forKey: ServerScope.key("botAvatar", serverURL: baseURL))
@@ -61,14 +85,14 @@ extension BBClient {
             "prompt": prompt.map(JSONValue.string),
         ]))
         let info = output.info
-        remember(info)
+        if info?.primary == true { remember(info) }
         return info
     }
 
     /// Changes the Bot's name, look or role (`bot_set`).
     @discardableResult
-    public func setBotProfile(name: String, shape: BotShape?, color: String?, role: String) async throws -> BotInfo? {
-        let output: BotWire = try await rpc("studio", Studio.Method.bot_set, .object(omittingNil: [
+    public func setBotProfile(name: String, shape: BotShape?, color: String?, role: String, botId: String? = nil) async throws -> BotInfo? {
+        let output: BotWire = try await rpc("studio", Studio.Method.bot_set, Self.scoped(botId, [
             "name": .string(name), "shape": shape.map { .string($0.rawValue) } ?? .null,
             "color": color.map(JSONValue.string), "role": .string(role),
         ]))
@@ -78,16 +102,16 @@ extension BBClient {
     }
 
     /// The Bot's Memory page, made on first use.
-    public func botMemoryPageId() async throws -> String? {
+    public func botMemoryPageId(botId: String? = nil) async throws -> String? {
         struct Output: Decodable { var pageId: String? }
-        let output: Output = try await rpc("studio", Studio.Method.bot_memory, .object([:]))
+        let output: Output = try await rpc("studio", Studio.Method.bot_memory, Self.scoped(botId))
         return output.pageId
     }
 
     /// The Bot's own skills.
-    public func botSkills() async throws -> [BotSkill] {
+    public func botSkills(botId: String? = nil) async throws -> [BotSkill] {
         struct Output: Decodable { var skills: [BotSkill] }
-        let output: Output = try await rpc("studio", Studio.Method.bot_skills, .object([:]))
+        let output: Output = try await rpc("studio", Studio.Method.bot_skills, Self.scoped(botId))
         return output.skills
     }
 
@@ -113,20 +137,20 @@ extension BBClient {
 
     /// Pauses, resumes or stops the Bot. Stop also stops the threads it started and its automations.
     @discardableResult
-    public func setBotState(_ action: BotInfo.Action) async throws -> BotInfo? {
+    public func setBotState(_ action: BotInfo.Action, botId: String? = nil) async throws -> BotInfo? {
         let method = switch action {
         case .pause: Studio.Method.bot_pause
         case .resume: Studio.Method.bot_resume
         case .stop: Studio.Method.bot_stop
         }
-        let _: BotWire = try await rpc("studio", method, .object([:]))
-        return try await bot()
+        let _: BotWire = try await rpc("studio", method, Self.scoped(botId))
+        return try await bot(botId)
     }
 
     /// Turns the Bot's check-ins (heartbeat) on or off; on needs an active Bot.
     @discardableResult
-    public func setBotHeartbeat(enabled: Bool, cadence: String, time: String?, cron: String?) async throws -> ThreadLead {
-        let output: BotWire = try await rpc("studio", Studio.Method.bot_set_run, .object(omittingNil: [
+    public func setBotHeartbeat(enabled: Bool, cadence: String, time: String?, cron: String?, botId: String? = nil) async throws -> ThreadLead {
+        let output: BotWire = try await rpc("studio", Studio.Method.bot_set_run, Self.scoped(botId, [
             "enabled": .bool(enabled), "cadence": .string(cadence),
             "time": time.map(JSONValue.string), "cron": cron.map(JSONValue.string),
         ]))
@@ -136,28 +160,46 @@ extension BBClient {
 
     /// The Bot's handoff chain, oldest thread first; it ends at the Bot's thread.
     /// A Studio without `bot_chain` answers with the Bot's thread alone.
-    public func botChain() async throws -> [String] {
+    public func botChain(botId: String? = nil) async throws -> [String] {
         struct Output: Decodable { var threadIds: [String] }
         do {
-            let output: Output = try await rpc("studio", Studio.Method.bot_chain, .object([:]))
+            let output: Output = try await rpc("studio", Studio.Method.bot_chain, Self.scoped(botId))
             return output.threadIds
         } catch where Self.isMissingRPC(error) {
-            return try await botThreadId().map { [$0] } ?? []
+            return try await bot(botId)?.lead.threadId.map { [$0] } ?? []
         }
     }
 
     /// Sets the Bot's check-ins to a preset (`bot_checkin_preset`): one schedule and one line on its Memory page.
     @discardableResult
-    public func setBotCheckinPreset(_ preset: BotCheckinPreset) async throws -> BotInfo? {
-        let output: BotWire = try await rpc("studio", Studio.Method.bot_checkin_preset, preset.input)
+    public func setBotCheckinPreset(_ preset: BotCheckinPreset, botId: String? = nil) async throws -> BotInfo? {
+        let output: BotWire = try await rpc("studio", Studio.Method.bot_checkin_preset, Self.scoped(botId, ["preset": .string(preset.rawValue)]))
         let info = output.info
-        remember(info)
+        if botId == nil || info?.primary == true { remember(info) }
         return info
     }
 
     /// What the Bot is doing: Needs you, In progress, Scheduled, Completed.
-    public func botActivity() async throws -> BotActivity {
-        try await rpc("studio", Studio.Method.bot_activity, .object([:]))
+    public func botActivity(botId: String? = nil) async throws -> BotActivity {
+        try await rpc("studio", Studio.Method.bot_activity, Self.scoped(botId))
+    }
+
+    /// The bot's runners (`bot_runners`): scheduled jobs that report back to it.
+    public func botRunners(botId: String? = nil) async throws -> [BotRunner] {
+        struct Output: Decodable { var runners: [BotRunner]? }
+        let output: Output = try await rpc("studio", Studio.Method.bot_runners, Self.scoped(botId))
+        return output.runners ?? []
+    }
+
+    /// Pauses or resumes a runner.
+    public func setRunnerPaused(_ id: String, paused: Bool, botId: String? = nil) async throws {
+        let _: JSONValue = try await rpc("studio", paused ? Studio.Method.bot_runner_pause : Studio.Method.bot_runner_resume,
+                                         Self.scoped(botId, ["id": .string(id)]))
+    }
+
+    /// Runs a runner now, off its schedule.
+    public func runRunnerNow(_ id: String, botId: String? = nil) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.bot_runner_run_now, Self.scoped(botId, ["id": .string(id)]))
     }
 }
 
@@ -213,6 +255,12 @@ public struct BotInfo: Hashable, Sendable {
     public static let defaultName = "Bot"
     public static let defaultAvatar = "🤖"
 
+    /// Studio's id for it; nil from a Studio that predates bot ids.
+    public var id: String?
+    /// The primary bot, which widgets, Siri and the watch use. Older Studios have only it.
+    public var primary: Bool = true
+    /// Runs on another provider (`kind: "external"`): no memory, skills or runners.
+    public var external: Bool = false
     public var name: String
     public var avatar: String
     public var state: State
@@ -236,6 +284,15 @@ public struct BotInfo: Hashable, Sendable {
 
     public var look: BotLook { BotLook(shape: shape, color: color, emoji: avatar) }
 
+    /// Primary first, then the others by name.
+    public static func ordered(_ bots: [BotInfo]) -> [BotInfo] {
+        bots.enumerated().sorted { l, r in
+            if l.element.primary != r.element.primary { return l.element.primary }
+            let order = l.element.name.localizedStandardCompare(r.element.name)
+            return order == .orderedSame ? l.offset < r.offset : order == .orderedAscending
+        }.map(\.element)
+    }
+
     /// "🧭 Chief of Staff".
     public var title: String { "\(avatar) \(name)" }
 }
@@ -243,6 +300,7 @@ public struct BotInfo: Hashable, Sendable {
 /// `bot_get` and the other Bot RPCs' shared answer.
 struct BotWire: Decodable {
     struct Bot: Decodable {
+        var id: String?; var primary: Bool?; var kind: String?
         var name: String; var avatar: String; var state: String; var threadId: String?
         var shape: String?; var color: String?; var role: String?
     }
@@ -255,7 +313,42 @@ struct BotWire: Decodable {
             BotInfo(name: bot.name, avatar: bot.avatar, state: BotInfo.State(rawValue: bot.state) ?? .active,
                     lead: ThreadLead(threadId: bot.threadId, enabled: run?.enabled, cadence: run?.cadence, time: run?.time, cron: run?.cron),
                     shape: bot.shape, color: bot.color, role: bot.role)
+                .with(id: bot.id, primary: bot.primary ?? true, external: bot.kind == "external")
         }
+    }
+}
+
+extension BotInfo {
+    func with(id: String?, primary: Bool, external: Bool) -> BotInfo {
+        var copy = self
+        copy.id = id
+        copy.primary = primary
+        copy.external = external
+        return copy
+    }
+}
+
+/// One of a bot's runners: a scheduled job that reports back to it.
+public struct BotRunner: Decodable, Hashable, Sendable, Identifiable {
+    public struct Schedule: Decodable, Hashable, Sendable { public var cadence: String?; public var time: String?; public var cron: String? }
+    public var id: String
+    public var name: String
+    public var state: String?
+    public var schedule: Schedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public var paused: Bool { state == "paused" }
+
+    /// "Weekdays at 08:00", "Every 2 hours", or the cron line.
+    public var scheduleLabel: String {
+        guard let cadence = schedule?.cadence else { return "Manual" }
+        if cadence == "custom" { return schedule?.cron ?? "Custom" }
+        let label = ThreadLead.cadences.first { $0.id == cadence }?.label ?? cadence
+        return schedule?.time.map { "\(label) at \($0)" } ?? label
     }
 }
 

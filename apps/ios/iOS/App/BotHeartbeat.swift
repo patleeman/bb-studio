@@ -35,6 +35,8 @@ struct HeartbeatFields: View {
 
 /// Sets the check-ins (heartbeat) that wake the Bot (`bot_set_run`).
 struct BotHeartbeatSheet: View {
+    /// The bot whose check-ins these are; nil for the primary.
+    var botId: String? = nil
     var saved: () async -> Void = {}
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
@@ -95,7 +97,7 @@ struct BotHeartbeatSheet: View {
             if let demo = BotDemo.current { bot = demo.bot; loaded = true; return }
             #endif
             do {
-                bot = try await app.client.bot()
+                bot = try await app.client.bot(botId)
             } catch {
                 self.error = BBClient.describe(error, server: app.client.baseURL)
             }
@@ -113,7 +115,7 @@ struct BotHeartbeatSheet: View {
         defer { busy = false }
         do {
             try await operation.run(currentServer: { app.serverURL }, work: { client in
-                try await client.setBotCheckinPreset(preset)
+                try await client.setBotCheckinPreset(preset, botId: botId)
             }, completion: { _ in
                 Task { await saved() }
                 dismiss()
@@ -129,7 +131,7 @@ struct BotHeartbeatSheet: View {
         do {
             try await operation.run(currentServer: { app.serverURL }, work: { client in
                 let custom = cadence == "custom" ? cron.trimmingCharacters(in: .whitespaces) : nil
-                try await client.setBotHeartbeat(enabled: beating, cadence: cadence, time: HeartbeatFields.text(time), cron: custom)
+                try await client.setBotHeartbeat(enabled: beating, cadence: cadence, time: HeartbeatFields.text(time), cron: custom, botId: botId)
             }, completion: { _ in
                 Task { await saved() }
                 dismiss()
