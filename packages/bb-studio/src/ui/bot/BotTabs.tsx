@@ -1,5 +1,6 @@
 // The Bot page's right-panel fixed tabs (nav panel `bot`, app.tsx):
-// Info — its profile, controls, check-ins, Memory, skills, runners and activity;
+// Info — its profile, controls, Memory, skills, automations (check-ins,
+// reminders, watchers, runners) and activity;
 // Threads — the sub-threads the user opened, a strip of them over BB's
 // thread view. Fixed tabs are a fixed set, so Threads keeps its own strip.
 import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON } from "@bb-studio/kit/app";
@@ -8,10 +9,11 @@ import { experimental_useFixedTabTarget, ThreadChat, ThreadTitle } from "@get-bb
 import { useEffect, useState } from "react";
 import type { BotActivityView, BotThreadView, BotView } from "../../contract";
 import { useLive } from "../live";
-import { ActivityPanel, openThreadPage, PRESETS, presetOf, runningCount, statusLabel, useBotControls } from "./BotHome";
+import { ActivityPanel, openThreadPage, runningCount, statusLabel, useBotControls } from "./BotHome";
 import { BotAvatar, botProvider } from "./BotAvatar";
 import { externalName, externalNote } from "../../external-providers";
 import { RunnersSection } from "./Runners";
+import { AutomationsSection } from "./Automations";
 import { forBot, useBotSelection } from "./selection";
 import { stripClose, stripFocus, stripMove, stripOpen, THREADS_TAB, useOpenSubThread, useStrip } from "./workspace";
 
@@ -35,8 +37,6 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
   const running = runningCount(activity.data);
   const { bot, profile, run, busy, error, setSheet, openMemory, sheets } = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
   const openSub = useOpenSubThread(bot.id, openThreadPage);
-  const preset = presetOf(view.run);
-  const checkins = preset ? PRESETS.find((each) => each.id === preset)!.label : "Custom schedule";
   return (
     <div className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground" aria-label={`${bot.name} info`}>
       <header className="flex items-start gap-3 px-4 pt-4 pb-3">
@@ -61,16 +61,16 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
       {error ? <p role="alert" className="px-4 pb-2 text-xs text-destructive">{error}</p> : null}
 
       <dl className="mx-4 flex flex-col divide-y divide-border border-y border-border text-sm">
-        <InfoRow label="Check-ins" value={bot.state === "active" ? checkins : "Off while " + bot.state} action={bot.state === "active" ? { label: "Change", run: () => setSheet("checkins") } : null} />
         {bot.kind === "external" ? <InfoRow label="Runs on" value={`${externalName(bot.providerId)}${bot.model ? ` · ${bot.model}` : ""}`} action={null} /> : <>
           <InfoRow label="Memory" value="What it keeps in mind" action={{ label: "Open", run: () => void openMemory() }} />
           <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: () => setSheet("skills") }} />
         </>}
       </dl>
 
+      <AutomationsSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} external={bot.kind === "external"} />
       {bot.kind === "external"
         ? <p className="px-4 pt-3 text-xs text-muted-foreground" data-testid="bot-external-note">{externalNote(bot.providerId)} Studio's Memory page, skills and runners don't reach it; chat, threads, check-ins and pause work as usual.</p>
-        : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} />}
+        : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} adoptOnly />}
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
       <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} />

@@ -209,15 +209,20 @@ test("Threads tab: a target adds and focuses the thread, then clears; tabs close
   expect(JSON.parse(localStorage.getItem("studio.bot.bot_main.threads")!)).toEqual({ open: ["t2"], active: "t2" });
 });
 
-test("Info tab: profile, controls, check-ins, and activity whose rows open the Threads tab", async () => {
+test("Info tab: profile, controls, automations, and activity whose rows open the Threads tab", async () => {
   state.data = {
     bot_get: { bot: { ...dot, role: "You are my chief of staff." }, run: { enabled: true, cadence: "weekdays", time: "08:00" } },
     bot_activity: { ...empty, needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }] },
+    bot_automations: { automations: [
+      { id: "heartbeat", kind: "checkin", name: "Check-in", original: true, instruction: "Memory", schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["08:00"] }, scheduleText: "Weekdays 8:00", state: "active", nextRunAt: null, lastRunAt: null, lastOutcome: null, model: null, script: null, target: "main", targetName: "Dot", threadId: "thr_bot" },
+      { id: "aut_w", kind: "watcher", name: "Release watch", original: false, instruction: "", schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6] }, scheduleText: "Every 15 min, every day", state: "paused", nextRunAt: null, lastRunAt: null, lastOutcome: null, model: null, script: { body: "echo hi", interpreter: "bash", timeoutMs: 60000, workingDirectory: null, envKeys: [] }, target: "main", targetName: "Dot", threadId: "thr_bot" },
+    ] },
   };
   await show(<BotInfoTab />);
   expect(container.querySelector("h2")?.textContent).toBe("Dot");
   expect(container.textContent).toContain("You are my chief of staff.");
-  expect(container.textContent).toContain("Morning brief");
+  expect(container.querySelector("[data-automation=heartbeat]")?.textContent).toContain("Weekdays 8:00");
+  expect(container.querySelector("[data-automation=aut_w]")?.textContent).toContain("Paused");
   await act(async () => [...container.querySelectorAll("button")].find((each) => each.textContent?.startsWith("Approve deploy"))!.click());
   expect(state.openFixedTab).toHaveBeenCalledWith(expect.objectContaining({ target: { threadId: "t1" } }));
   await act(async () => button("Pause").click());

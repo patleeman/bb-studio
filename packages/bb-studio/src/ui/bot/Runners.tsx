@@ -60,7 +60,7 @@ export function useOpenRunner(botId: string, open: (threadId: string) => void, r
 type Sheet = { kind: "new" } | { kind: "edit"; runner: RunnerView } | { kind: "delete"; runner: RunnerView } | { kind: "adopt"; candidate: RunnerAdoptableView } | null;
 
 /** The Info tab's Runners section. */
-export function RunnersSection({ botId, botName, onOpen, disabled }: { botId: string; botName: string; onOpen(threadId: string): void; disabled: boolean }) {
+export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = false }: { botId: string; botName: string; onOpen(threadId: string): void; disabled: boolean; adoptOnly?: boolean }) {
   const data = useRunners(botId);
   const call = useCall();
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -73,6 +73,17 @@ export function RunnersSection({ botId, botName, onOpen, disabled }: { botId: st
   };
   const runners = data.data?.runners ?? [];
   const adoptable = data.data?.adoptable ?? [];
+  // Runners are in Automations now; this keeps Adopt as runner.
+  if (adoptOnly) {
+    if (!adoptable.length && sheet?.kind !== "adopt") return null;
+    return (
+      <section aria-label="Adopt as runner" className="px-4 pt-3">
+        {error && !sheet ? <p role="alert" className="pb-1 text-xs text-destructive">{error}</p> : null}
+        <Adoptable adoptable={adoptable} busy={busy} disabled={disabled} onOpen={onOpen} onAdopt={(candidate) => { setError(null); setSheet({ kind: "adopt", candidate }); }} />
+        {sheet?.kind === "adopt" ? <AdoptConfirm candidate={sheet.candidate} botName={botName} busy={busy} error={error} onClose={() => setSheet(null)} onConfirm={() => void run("bot_runner_adopt", { threadId: sheet.candidate.threadId, automationId: sheet.candidate.automationId })} /> : null}
+      </section>
+    );
+  }
   return (
     <section aria-label="Runners" data-testid="bot-runners" className="px-4 pt-4">
       <div className="flex items-center gap-2">
@@ -106,18 +117,7 @@ export function RunnersSection({ botId, botName, onOpen, disabled }: { botId: st
       ) : (
         <p className="pt-1 text-xs text-muted-foreground">{data.loading ? "Loading…" : `Recurring jobs ${botName} hands off. They stay quiet unless they have something to tell you.`}</p>
       )}
-      {adoptable.length ? (
-        <div className="mt-3 flex flex-col gap-1">
-          <p className="text-xs text-muted-foreground">Woken by an automation, not runners yet:</p>
-          {adoptable.map((candidate) => (
-            <div key={candidate.threadId} className="flex min-w-0 items-center gap-2 text-sm">
-              <Icon name="Repeat" className="size-3.5 shrink-0 text-muted-foreground" />
-              <button type="button" className="min-w-0 flex-1 truncate text-left hover:underline" onClick={() => onOpen(candidate.threadId)}>{candidate.title}</button>
-              <button type="button" className={OUTLINE_BUTTON} disabled={busy || disabled} onClick={() => { setError(null); setSheet({ kind: "adopt", candidate }); }}>Adopt as runner</button>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <Adoptable adoptable={adoptable} busy={busy} disabled={disabled} onOpen={onOpen} onAdopt={(candidate) => { setError(null); setSheet({ kind: "adopt", candidate }); }} />
       {sheet?.kind === "new" || sheet?.kind === "edit" ? (
         <RunnerDialog runner={sheet.kind === "edit" ? sheet.runner : null} busy={busy} error={error} onClose={() => setSheet(null)}
           onSave={(input) => void run(sheet.kind === "edit" ? "bot_runner_update" : "bot_runner_create", sheet.kind === "edit" ? { id: sheet.runner.id, ...input } : input)} />
@@ -126,12 +126,31 @@ export function RunnersSection({ botId, botName, onOpen, disabled }: { botId: st
         <Confirm title={`Delete ${sheet.runner.name}?`} busy={busy} error={error} action="Delete" danger onClose={() => setSheet(null)} onConfirm={() => void run("bot_runner_delete", { id: sheet.runner.id })}
           text={sheet.runner.adopted ? "It stops being a runner. Its thread and automation stay as they were before you adopted it." : "Its schedule is deleted and its thread archived; the history is kept."} />
       ) : null}
-      {sheet?.kind === "adopt" ? (
-        <Confirm title={`Adopt ${sheet.candidate.title}?`} busy={busy} error={error} action="Adopt" onClose={() => setSheet(null)}
-          onConfirm={() => void run("bot_runner_adopt", { threadId: sheet.candidate.threadId, automationId: sheet.candidate.automationId })}
-          text={`It becomes a runner on its automation "${sheet.candidate.automationName}"${sheet.candidate.cron ? ` (${sheet.candidate.cron})` : ""}, which stays. Its prompt gets one note: report with runner_report instead of messaging ${botName}. It's no longer nested under ${botName}, so BB stops posting its "completed" notices there. Delete undoes it.`} />
-      ) : null}
+      {sheet?.kind === "adopt" ? <AdoptConfirm candidate={sheet.candidate} botName={botName} busy={busy} error={error} onClose={() => setSheet(null)} onConfirm={() => void run("bot_runner_adopt", { threadId: sheet.candidate.threadId, automationId: sheet.candidate.automationId })} /> : null}
     </section>
+  );
+}
+
+function Adoptable({ adoptable, busy, disabled, onOpen, onAdopt }: { adoptable: RunnerAdoptableView[]; busy: boolean; disabled: boolean; onOpen(threadId: string): void; onAdopt(candidate: RunnerAdoptableView): void }) {
+  if (!adoptable.length) return null;
+  return (
+    <div className="mt-3 flex flex-col gap-1">
+      <p className="text-xs text-muted-foreground">Woken by an automation, not runners yet:</p>
+      {adoptable.map((candidate) => (
+        <div key={candidate.threadId} className="flex min-w-0 items-center gap-2 text-sm">
+          <Icon name="Repeat" className="size-3.5 shrink-0 text-muted-foreground" />
+          <button type="button" className="min-w-0 flex-1 truncate text-left hover:underline" onClick={() => onOpen(candidate.threadId)}>{candidate.title}</button>
+          <button type="button" className={OUTLINE_BUTTON} disabled={busy || disabled} onClick={() => onAdopt(candidate)}>Adopt as runner</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdoptConfirm({ candidate, botName, busy, error, onClose, onConfirm }: { candidate: RunnerAdoptableView; botName: string; busy: boolean; error: string | null; onClose(): void; onConfirm(): void }) {
+  return (
+    <Confirm title={`Adopt ${candidate.title}?`} busy={busy} error={error} action="Adopt" onClose={onClose} onConfirm={onConfirm}
+      text={`It becomes a runner on its automation "${candidate.automationName}"${candidate.cron ? ` (${candidate.cron})` : ""}, which stays. Its prompt gets one note: report with runner_report instead of messaging ${botName}. It's no longer nested under ${botName}, so BB stops posting its "completed" notices there. Delete undoes it.`} />
   );
 }
 
