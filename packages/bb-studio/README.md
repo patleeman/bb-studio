@@ -1140,15 +1140,58 @@ of Staff", with the same thread and check-ins; rename it from its page.
   read the page, do its `## Check-in`, and stay silent unless something
   matters.
 - **Skills**: when the Bot learns a reusable procedure it saves a skill with
-  `bot_skill_write` (name, one-line description, Markdown steps). Only the
-  Bot's thread has these: they live in Studio's `bot_skills` table and it
-  reads one with `bot_skill_read` (its instructions list their names). BB
+  `bot_skill_write` (name, one-line description, Markdown steps) and fixes
+  one in place with `bot_skill_patch` (exact text → new text). Only the
+  Bot's thread has these: they live in Studio's `bot_skills` table. Its
+  instructions list each skill's name and one-line description, and it
+  loads the full skill with `bot_skill_view` (`bot_skill_list` lists them).
+  Writes and patches return advisory notes, never blocking: a body that
+  reads like a log of one session (dates, PR numbers, "we tried"), one over
+  about 8,000 characters, or a name close to another skill's. BB
   selects plugin skills only from a plugin's manifest, so a skill a plugin
   makes at runtime can't be a native per-thread skill. **Skills** (⋯, or
   Edit profile → Advanced) has **Share**, which moves the skill to BB's user skills
   (`<BB data dir>/skills/<name>/SKILL.md`, scope `bb-user`; see
   `bb skill list`), where every agent finds it; it refuses a name that's
-  already there. **Delete** removes it.
+  already there. **Delete** removes it. See "Skills that learn" below.
+- **Skills that learn** (`src/skill-learning.ts`; after Hermes Agent's
+  background review and curator). A Studio bot reviews its own work in the
+  background and keeps its skills current. External bots learn on their own
+  provider, so none of this runs or shows for them.
+  - **Counting.** When the bot's thread goes idle (`thread.idle`), Studio
+    reads its new events (`threads.events.list` after the last sequence it
+    counted). A `turn/completed` whose turn had any tool item
+    (`commandExecution`, `toolCall`, `mcpToolCall`, `fileChange`, ...)
+    counts as a tool turn; a `client/turn/requested` from the user counts as
+    a user turn. A `bot_skill_write`, `_patch` or `_delete` call resets the
+    tool count. The first look at a thread only takes a baseline, so old
+    history never trips it.
+  - **Review.** When either count reaches the interval (10 by default) and
+    the bot is active and idle, Studio forks its thread (`threads.fork`,
+    hidden, so no notice reaches the bot), switches the fork to the cheapest
+    model of the same provider (a price in the model's description, else a
+    name like haiku or luna; or the model you pick) and sends it a review
+    prompt: lessons, not logs; one skill per kind of task; merge a repeated
+    lesson into one rule; fix wrong lines in place; your corrections and
+    "remember this" first; facts about you go on the Memory page. It has
+    only the skill tools plus `pages_read` and `pages_edit`, and replies
+    `[PASS]` when there's nothing to save. When it goes idle Studio records
+    the result ("Saved 1 skill", "Nothing to save") and archives the fork.
+    One review per bot at a time; a new turn in the bot's thread, Pause or
+    Stop stops it, and so do 20 minutes. Review forks stay out of Activity.
+  - **Curator.** Weekly, once the bot's thread has been idle for 2 hours:
+    a skill unused for 30 days (not loaded or saved) becomes stale, for 90
+    days archived. Archived skills leave the bot's list but are kept;
+    **Restore** brings one back. Pinned skills are exempt; nothing is
+    deleted. It's listed in Automations as **Skill curator** (Pause, Run
+    now). With **Curator merges overlapping skills** on (off by default) it
+    also starts a fork that merges overlapping skills.
+  - **Approval.** With **Review skills before saving** on, a review's
+    writes wait in Skills with a line diff and **Approve** / **Reject**.
+  - **Settings** (Skills, ⋯ or Edit profile → Advanced): **Learn from
+    work** on or off, every N turns, review model, approval, the last
+    review's result with **Review now**, pins, and a collapsed **Archived**
+    list.
 - **Recall**: `bot_history_search` searches BB's thread search, keeping
   only the Bot's threads (its handoff chain and threads it started).
 - **Phone**: questions and approvals it, or a thread it started, raises push
@@ -1184,12 +1227,14 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_activity`, `bot_memory`, `bot_chain` (its thread and the ones it
   handed off from, oldest first), `bot_checkin_preset` (`morning`,
   `evening`, `working` or `off`), `bot_skills`, `bot_skill_write`, `bot_skill_share`,
-  `bot_skill_delete`, and the runner RPCs below. Each takes an optional
+  `bot_skill_delete`, `bot_skill_pin`, `bot_skill_restore`, `bot_learning`,
+  `bot_learning_set`, `bot_learning_review`, `bot_skill_curate` (`dryRun`
+  lists what it would change), `bot_skill_pending_resolve`, and the runner RPCs below. Each takes an optional
   `botId` (the primary when absent); `bot_create` makes the primary first,
   then additional bots. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
-  `bot_skill_write`, `bot_skill_read`, `bot_skill_delete` and
-  `bot_history_search`.
+  `bot_skill_list`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
+  `bot_skill_delete` and `bot_history_search`.
 - **Watchers**, for script authors. Studio creates a BB script automation
   (bash, sh, node or python3; timeout up to 15 minutes; working directory
   the automation's storage by default, so files like `last.txt` persist

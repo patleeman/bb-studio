@@ -125,6 +125,12 @@ export interface AutomationDeps {
     delete(id: string, botId: string): Promise<unknown>;
     automation(id: string): { id: string; projectId: string } | null;
   };
+  /** The weekly skill curator (src/skill-learning.ts), listed as "Skill curator"; null for an external bot. */
+  curator?: {
+    get(botId: string): { paused: boolean; lastRunAt: number | null; lastOutcome: string | null; nextRunAt: number | null } | null;
+    setPaused(botId: string, paused: boolean): Promise<void>;
+    run(botId: string): Promise<void>;
+  };
 }
 
 export type ScriptInput = { body: string; interpreter: Interpreter; timeoutMs?: number; env?: Record<string, string>; workingDirectory?: string | null };
@@ -138,6 +144,8 @@ export type CreateInput = {
 export type UpdateInput = Partial<Omit<CreateInput, "kind">> & { id: string };
 
 const HEARTBEAT_ID = "heartbeat";
+const CURATOR_ID = "skill-curator";
+const CURATOR_SCHEDULE: Schedule = { type: "cron", cron: "0 3 * * 0" };
 const HEARTBEAT_NAME = "Check-in";
 
 /** A Bot's runner schedule from a compiled schedule: one cron in the server's timezone. */
@@ -282,6 +290,16 @@ export class Automations {
         lastOutcome: automation?.lastRunStatus ?? null, model: null, script: null, target: "main", targetName: bot.name, threadId: bot.threadId,
       });
     }
+    const curator = bot.kind === "external" ? null : this.deps.curator?.get(bot.id) ?? null;
+    if (curator) {
+      views.push({
+        id: CURATOR_ID, kind: "checkin", name: "Skill curator", original: false,
+        instruction: "Weekly, once the bot has been idle 2 hours: skills unused for 30 days go stale, for 90 days archived (restorable). Pinned skills stay.",
+        schedule: CURATOR_SCHEDULE, scheduleText: "Weekly, when idle", state: curator.paused ? "paused" : "active",
+        nextRunAt: curator.paused ? null : curator.nextRunAt, lastRunAt: curator.lastRunAt, lastOutcome: curator.lastOutcome,
+        model: null, script: null, target: "main", targetName: bot.name, threadId: null,
+      });
+    }
     for (const row of rows) {
       const automations = this.ids(row).map((id) => bb.get(id)).filter((each): each is BbAutomation => !!each);
       const next = automations.map((each) => each.nextRunAt ?? Infinity).reduce((a, b) => Math.min(a, b), Infinity);
@@ -391,6 +409,7 @@ export class Automations {
 
   async update(input: UpdateInput, botId?: string): Promise<BotAutomationView> {
     const bot = this.bot(botId);
+    if (input.id === CURATOR_ID) throw new Error("The skill curator runs weekly when the bot is idle; pause it or run it now. Its settings are in Skills.");
     if (input.id === HEARTBEAT_ID) {
       const run = this.deps.heartbeat.get(bot.id);
       if (!run) throw new Error("This Bot has no original check-in.");
@@ -431,6 +450,7 @@ export class Automations {
   async setState(id: string, state: "active" | "paused", botId?: string): Promise<BotAutomationView> {
     const bot = this.bot(botId);
     if (state === "active" && bot.state !== "active") throw new Error(`${bot.name} is ${bot.state}. Resume it first.`);
+    if (id === CURATOR_ID && this.deps.curator) { await this.deps.curator.setPaused(bot.id, state === "paused"); return this.one(CURATOR_ID, bot.id); }
     if (id === HEARTBEAT_ID) {
       const run = this.deps.heartbeat.get(bot.id);
       if (!run) throw new Error("This Bot has no original check-in.");
@@ -454,6 +474,7 @@ export class Automations {
   async runNow(id: string, botId?: string): Promise<BotAutomationView> {
     const bot = this.bot(botId);
     if (bot.state !== "active") throw new Error(`${bot.name} is ${bot.state}. Resume it first.`);
+    if (id === CURATOR_ID && this.deps.curator) { await this.deps.curator.run(bot.id); return this.one(CURATOR_ID, bot.id); }
     let target: { id: string; projectId: string } | null = null;
     if (id === HEARTBEAT_ID) target = this.deps.heartbeat.automation(bot.id);
     else {
@@ -470,6 +491,7 @@ export class Automations {
 
   async delete(id: string, botId?: string): Promise<{ deleted: true }> {
     const bot = this.bot(botId);
+    if (id === CURATOR_ID) throw new Error("The skill curator can't be deleted; pause it instead.");
     if (id === HEARTBEAT_ID) {
       const run = this.deps.heartbeat.get(bot.id);
       if (run?.enabled) await this.deps.heartbeat.set(bot.id, { ...run, enabled: false });
@@ -489,6 +511,10 @@ export class Automations {
     const bot = this.bot(botId);
     let kind: AutomationKind = "checkin";
     let targets: { id: string; projectId: string }[] = [];
+    if (id === CURATOR_ID) {
+      const curator = this.deps.curator?.get(bot.id);
+      return curator?.lastRunAt ? [{ id: `${CURATOR_ID}-${curator.lastRunAt}`, at: curator.lastRunAt, status: "succeeded", manual: false, outcome: curator.lastOutcome ?? "Ran", threadId: null }] : [];
+    }
     if (id === HEARTBEAT_ID) { const one = this.deps.heartbeat.automation(bot.id); targets = one ? [one] : []; }
     else {
       const runnerId = this.isRunner(id, bot.id);

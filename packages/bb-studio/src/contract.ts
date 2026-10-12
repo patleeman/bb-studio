@@ -151,7 +151,26 @@ const bot = z.object({
   updatedAt: z.number(),
 });
 /** One of the Bot's own skills: only its thread loads them, until shared. */
-const botSkill = z.object({ name: z.string(), description: z.string(), updatedAt: z.number() });
+const botSkill = z.object({
+  name: z.string(), description: z.string(), updatedAt: z.number(),
+  /** The curator moves unused skills active → stale (30 days) → archived (90 days, hidden from the Bot, restorable). */
+  state: z.enum(["active", "stale", "archived"]).optional(),
+  /** Pinned skills are exempt from the curator. */
+  pinned: z.boolean().optional(),
+  /** When the Bot last loaded or saved it. */
+  usedAt: z.number().nullable().optional(),
+});
+/** A Bot's skill learning (src/skill-learning.ts): background reviews, the curator and staged changes. */
+const botLearning = z.object({
+  enabled: z.boolean(), interval: z.number(), reviewModel: z.string().nullable(), defaultModel: z.string().nullable(), models: z.array(z.string()),
+  approval: z.boolean(), consolidate: z.boolean(), curatorPaused: z.boolean(),
+  toolTurns: z.number(), userTurns: z.number(), reviewing: z.boolean(),
+  lastReview: z.object({ at: z.number(), result: z.string() }).nullable(),
+  lastCurator: z.object({ at: z.number(), result: z.string() }).nullable(),
+  nextCuratorAt: z.number().nullable(),
+  pending: z.array(z.object({ id: z.string(), name: z.string(), action: z.enum(["write", "delete"]), description: z.string().nullable(), diff: z.string(), createdAt: z.number() })),
+});
+export type BotLearningView = z.infer<typeof botLearning>;
 export type BotSkillView = z.infer<typeof botSkill>;
 /** The Bot, or null before one is made, and its heartbeat. */
 const botView = z.object({ bot: bot.nullable(), run: heartbeatRunSchema.nullable() });
@@ -410,6 +429,20 @@ export const rpcContract = defineRpcContract({
   bot_skill_share: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },
   /** Deletes a Bot skill. */
   bot_skill_delete: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ deleted: z.boolean() }) },
+  /** Pins a skill (the curator leaves it alone) or unpins it. */
+  bot_skill_pin: { input: z.object({ botId, name: z.string().min(1).max(100), pinned: z.boolean() }), output: z.object({ changed: z.boolean() }) },
+  /** Brings an archived (or stale) skill back to active. */
+  bot_skill_restore: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ changed: z.boolean() }) },
+  /** The Bot's skill learning: settings, counters, the last review and curator run, staged changes. */
+  bot_learning: { input: forBot, output: botLearning },
+  /** Changes the Bot's skill learning settings. */
+  bot_learning_set: { input: z.object({ botId, enabled: z.boolean().optional(), interval: z.number().int().min(2).max(200).optional(), reviewModel: z.string().max(200).nullable().optional(), approval: z.boolean().optional(), consolidate: z.boolean().optional(), curatorPaused: z.boolean().optional() }), output: botLearning },
+  /** Starts a skill review now (a fork of the Bot's idle thread); started is false when one is running or the Bot is busy. */
+  bot_learning_review: { input: forBot, output: z.object({ started: z.boolean() }) },
+  /** Runs the skill curator now; dryRun lists what it would change. */
+  bot_skill_curate: { input: z.object({ botId, dryRun: z.boolean().optional() }), output: z.object({ changes: z.array(z.object({ name: z.string(), from: z.string(), to: z.string() })), consolidating: z.boolean(), result: z.string() }) },
+  /** Approves or rejects a review's staged skill change. */
+  bot_skill_pending_resolve: { input: z.object({ botId, id: z.string().min(1).max(100), approve: z.boolean() }), output: botLearning },
   /** The Bot's runners, and threads it started that an automation wakes (Adopt as runner). */
   bot_runners: { input: forBot, output: z.object({ runners: z.array(runner), adoptable: z.array(runnerAdoptable) }) },
   /** Makes a runner: its thread (first run now) and its schedule. */

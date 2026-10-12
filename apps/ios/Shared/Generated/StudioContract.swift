@@ -53,6 +53,13 @@ public enum Studio {
     public static let bot_skill_write = "bot_skill_write"
     public static let bot_skill_share = "bot_skill_share"
     public static let bot_skill_delete = "bot_skill_delete"
+    public static let bot_skill_pin = "bot_skill_pin"
+    public static let bot_skill_restore = "bot_skill_restore"
+    public static let bot_learning = "bot_learning"
+    public static let bot_learning_set = "bot_learning_set"
+    public static let bot_learning_review = "bot_learning_review"
+    public static let bot_skill_curate = "bot_skill_curate"
+    public static let bot_skill_pending_resolve = "bot_skill_pending_resolve"
     public static let bot_runners = "bot_runners"
     public static let bot_runner_create = "bot_runner_create"
     public static let bot_runner_update = "bot_runner_update"
@@ -295,6 +302,20 @@ public enum Studio {
   public typealias BotSkillShare = BotSkillShareOutput
 
   public typealias BotSkillDelete = BotSkillDeleteOutput
+
+  public typealias BotSkillPin = BotSkillPinOutput
+
+  public typealias BotSkillRestore = BotSkillRestoreOutput
+
+  public typealias BotLearning = BotLearningOutput
+
+  public typealias BotLearningSet = BotLearningSetOutput
+
+  public typealias BotLearningReview = BotLearningReviewOutput
+
+  public typealias BotSkillCurate = BotSkillCurateOutput
+
+  public typealias BotSkillPendingResolve = BotSkillPendingResolveOutput
 
   public typealias BotRunners = BotRunnersOutput
 
@@ -5298,15 +5319,48 @@ public enum Studio {
     }
   }
 
+  public enum BotSkillsOutputSkillsItemState: Sendable, Hashable, Codable {
+    case active
+    case stale
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "stale": self = .stale
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .stale: try container.encode("stale")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSkillsOutputSkillsItem: Sendable, Hashable, Codable {
     public var name: String?
     public var description: String?
     public var updatedAt: Double?
+    public var state: BotSkillsOutputSkillsItemState?
+    public var pinned: Bool?
+    public var usedAt: Double?
 
-    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil) {
+    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil, state: BotSkillsOutputSkillsItemState? = nil, pinned: Bool? = nil, usedAt: Double? = nil) {
       self.name = name
       self.description = description
       self.updatedAt = updatedAt
+      self.state = state
+      self.pinned = pinned
+      self.usedAt = usedAt
     }
   }
 
@@ -5332,15 +5386,48 @@ public enum Studio {
     }
   }
 
+  public enum BotSkillWriteOutputState: Sendable, Hashable, Codable {
+    case active
+    case stale
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "stale": self = .stale
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .stale: try container.encode("stale")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSkillWriteOutput: Sendable, Hashable, Codable {
     public var name: String?
     public var description: String?
     public var updatedAt: Double?
+    public var state: BotSkillWriteOutputState?
+    public var pinned: Bool?
+    public var usedAt: Double?
 
-    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil) {
+    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil, state: BotSkillWriteOutputState? = nil, pinned: Bool? = nil, usedAt: Double? = nil) {
       self.name = name
       self.description = description
       self.updatedAt = updatedAt
+      self.state = state
+      self.pinned = pinned
+      self.usedAt = usedAt
     }
   }
 
@@ -5377,6 +5464,428 @@ public enum Studio {
 
     public init(deleted: Bool? = nil) {
       self.deleted = deleted
+    }
+  }
+
+  public struct BotSkillPinInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var name: String?
+    public var pinned: Bool?
+
+    public init(botId: String? = nil, name: String? = nil, pinned: Bool? = nil) {
+      self.botId = botId
+      self.name = name
+      self.pinned = pinned
+    }
+  }
+
+  public struct BotSkillPinOutput: Sendable, Hashable, Codable {
+    public var changed: Bool?
+
+    public init(changed: Bool? = nil) {
+      self.changed = changed
+    }
+  }
+
+  public struct BotSkillRestoreInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var name: String?
+
+    public init(botId: String? = nil, name: String? = nil) {
+      self.botId = botId
+      self.name = name
+    }
+  }
+
+  public struct BotSkillRestoreOutput: Sendable, Hashable, Codable {
+    public var changed: Bool?
+
+    public init(changed: Bool? = nil) {
+      self.changed = changed
+    }
+  }
+
+  public struct BotLearningInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotLearningOutputLastReview: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var result: String?
+
+    public init(at: Double? = nil, result: String? = nil) {
+      self.at = at
+      self.result = result
+    }
+  }
+
+  public struct BotLearningOutputLastCurator: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var result: String?
+
+    public init(at: Double? = nil, result: String? = nil) {
+      self.at = at
+      self.result = result
+    }
+  }
+
+  public enum BotLearningOutputPendingItemAction: Sendable, Hashable, Codable {
+    case write
+    case delete
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "write": self = .write
+      case "delete": self = .delete
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .write: try container.encode("write")
+      case .delete: try container.encode("delete")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotLearningOutputPendingItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var action: BotLearningOutputPendingItemAction?
+    public var description: String?
+    public var diff: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, action: BotLearningOutputPendingItemAction? = nil, description: String? = nil, diff: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.action = action
+      self.description = description
+      self.diff = diff
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct BotLearningOutput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var interval: Double?
+    public var reviewModel: String?
+    public var defaultModel: String?
+    public var models: [String]?
+    public var approval: Bool?
+    public var consolidate: Bool?
+    public var curatorPaused: Bool?
+    public var toolTurns: Double?
+    public var userTurns: Double?
+    public var reviewing: Bool?
+    public var lastReview: BotLearningOutputLastReview?
+    public var lastCurator: BotLearningOutputLastCurator?
+    public var nextCuratorAt: Double?
+    public var pending: [BotLearningOutputPendingItem]?
+
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, curatorPaused: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotLearningOutputPendingItem]? = nil) {
+      self.enabled = enabled
+      self.interval = interval
+      self.reviewModel = reviewModel
+      self.defaultModel = defaultModel
+      self.models = models
+      self.approval = approval
+      self.consolidate = consolidate
+      self.curatorPaused = curatorPaused
+      self.toolTurns = toolTurns
+      self.userTurns = userTurns
+      self.reviewing = reviewing
+      self.lastReview = lastReview
+      self.lastCurator = lastCurator
+      self.nextCuratorAt = nextCuratorAt
+      self.pending = pending
+    }
+  }
+
+  public struct BotLearningSetInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var enabled: Bool?
+    public var interval: Int?
+    public var reviewModel: String?
+    public var approval: Bool?
+    public var consolidate: Bool?
+    public var curatorPaused: Bool?
+
+    public init(botId: String? = nil, enabled: Bool? = nil, interval: Int? = nil, reviewModel: String? = nil, approval: Bool? = nil, consolidate: Bool? = nil, curatorPaused: Bool? = nil) {
+      self.botId = botId
+      self.enabled = enabled
+      self.interval = interval
+      self.reviewModel = reviewModel
+      self.approval = approval
+      self.consolidate = consolidate
+      self.curatorPaused = curatorPaused
+    }
+  }
+
+  public struct BotLearningSetOutputLastReview: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var result: String?
+
+    public init(at: Double? = nil, result: String? = nil) {
+      self.at = at
+      self.result = result
+    }
+  }
+
+  public struct BotLearningSetOutputLastCurator: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var result: String?
+
+    public init(at: Double? = nil, result: String? = nil) {
+      self.at = at
+      self.result = result
+    }
+  }
+
+  public enum BotLearningSetOutputPendingItemAction: Sendable, Hashable, Codable {
+    case write
+    case delete
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "write": self = .write
+      case "delete": self = .delete
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .write: try container.encode("write")
+      case .delete: try container.encode("delete")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotLearningSetOutputPendingItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var action: BotLearningSetOutputPendingItemAction?
+    public var description: String?
+    public var diff: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, action: BotLearningSetOutputPendingItemAction? = nil, description: String? = nil, diff: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.action = action
+      self.description = description
+      self.diff = diff
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct BotLearningSetOutput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var interval: Double?
+    public var reviewModel: String?
+    public var defaultModel: String?
+    public var models: [String]?
+    public var approval: Bool?
+    public var consolidate: Bool?
+    public var curatorPaused: Bool?
+    public var toolTurns: Double?
+    public var userTurns: Double?
+    public var reviewing: Bool?
+    public var lastReview: BotLearningSetOutputLastReview?
+    public var lastCurator: BotLearningSetOutputLastCurator?
+    public var nextCuratorAt: Double?
+    public var pending: [BotLearningSetOutputPendingItem]?
+
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, curatorPaused: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotLearningSetOutputPendingItem]? = nil) {
+      self.enabled = enabled
+      self.interval = interval
+      self.reviewModel = reviewModel
+      self.defaultModel = defaultModel
+      self.models = models
+      self.approval = approval
+      self.consolidate = consolidate
+      self.curatorPaused = curatorPaused
+      self.toolTurns = toolTurns
+      self.userTurns = userTurns
+      self.reviewing = reviewing
+      self.lastReview = lastReview
+      self.lastCurator = lastCurator
+      self.nextCuratorAt = nextCuratorAt
+      self.pending = pending
+    }
+  }
+
+  public struct BotLearningReviewInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotLearningReviewOutput: Sendable, Hashable, Codable {
+    public var started: Bool?
+
+    public init(started: Bool? = nil) {
+      self.started = started
+    }
+  }
+
+  public struct BotSkillCurateInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var dryRun: Bool?
+
+    public init(botId: String? = nil, dryRun: Bool? = nil) {
+      self.botId = botId
+      self.dryRun = dryRun
+    }
+  }
+
+  public struct BotSkillCurateOutputChangesItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var from: String?
+    public var to: String?
+
+    public init(name: String? = nil, from: String? = nil, to: String? = nil) {
+      self.name = name
+      self.from = from
+      self.to = to
+    }
+  }
+
+  public struct BotSkillCurateOutput: Sendable, Hashable, Codable {
+    public var changes: [BotSkillCurateOutputChangesItem]?
+    public var consolidating: Bool?
+    public var result: String?
+
+    public init(changes: [BotSkillCurateOutputChangesItem]? = nil, consolidating: Bool? = nil, result: String? = nil) {
+      self.changes = changes
+      self.consolidating = consolidating
+      self.result = result
+    }
+  }
+
+  public struct BotSkillPendingResolveInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+    public var approve: Bool?
+
+    public init(botId: String? = nil, id: String? = nil, approve: Bool? = nil) {
+      self.botId = botId
+      self.id = id
+      self.approve = approve
+    }
+  }
+
+  public struct BotSkillPendingResolveOutputLastReview: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var result: String?
+
+    public init(at: Double? = nil, result: String? = nil) {
+      self.at = at
+      self.result = result
+    }
+  }
+
+  public struct BotSkillPendingResolveOutputLastCurator: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var result: String?
+
+    public init(at: Double? = nil, result: String? = nil) {
+      self.at = at
+      self.result = result
+    }
+  }
+
+  public enum BotSkillPendingResolveOutputPendingItemAction: Sendable, Hashable, Codable {
+    case write
+    case delete
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "write": self = .write
+      case "delete": self = .delete
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .write: try container.encode("write")
+      case .delete: try container.encode("delete")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotSkillPendingResolveOutputPendingItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var action: BotSkillPendingResolveOutputPendingItemAction?
+    public var description: String?
+    public var diff: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, action: BotSkillPendingResolveOutputPendingItemAction? = nil, description: String? = nil, diff: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.action = action
+      self.description = description
+      self.diff = diff
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct BotSkillPendingResolveOutput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var interval: Double?
+    public var reviewModel: String?
+    public var defaultModel: String?
+    public var models: [String]?
+    public var approval: Bool?
+    public var consolidate: Bool?
+    public var curatorPaused: Bool?
+    public var toolTurns: Double?
+    public var userTurns: Double?
+    public var reviewing: Bool?
+    public var lastReview: BotSkillPendingResolveOutputLastReview?
+    public var lastCurator: BotSkillPendingResolveOutputLastCurator?
+    public var nextCuratorAt: Double?
+    public var pending: [BotSkillPendingResolveOutputPendingItem]?
+
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, curatorPaused: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotSkillPendingResolveOutputLastReview? = nil, lastCurator: BotSkillPendingResolveOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotSkillPendingResolveOutputPendingItem]? = nil) {
+      self.enabled = enabled
+      self.interval = interval
+      self.reviewModel = reviewModel
+      self.defaultModel = defaultModel
+      self.models = models
+      self.approval = approval
+      self.consolidate = consolidate
+      self.curatorPaused = curatorPaused
+      self.toolTurns = toolTurns
+      self.userTurns = userTurns
+      self.reviewing = reviewing
+      self.lastReview = lastReview
+      self.lastCurator = lastCurator
+      self.nextCuratorAt = nextCuratorAt
+      self.pending = pending
     }
   }
 

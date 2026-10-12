@@ -44,6 +44,7 @@ import { MIGRATIONS } from "./src/migrations";
 import { Bots, SKILL_NAME } from "./src/bot";
 import { parseSchedule, Runners } from "./src/runners";
 import { Automations } from "./src/automations";
+import { lintSkill, patchText, REVIEW_TOOLS, SkillLearning } from "./src/skill-learning";
 import { parseDuration, type Schedule } from "./src/schedule";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { formatWorkspace, openHrefs, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
@@ -150,7 +151,7 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_skill_write", "bot_skill_read", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
+  const BOT_OWN_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
   const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS };
@@ -162,6 +163,8 @@ export default async function plugin(bb: BbPluginApi) {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     const off = new Set(kindSettings.current.off);
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
+    // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
+    if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS], skills: [], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     const bot = bots.forThread(context.thread.id, context.pluginMetadata);
     // An external bot's agent has its own memory and tools; Studio's don't reach it.
@@ -338,6 +341,7 @@ export default async function plugin(bb: BbPluginApi) {
       addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
+    hiddenThreads: () => learning.reviewThreads(),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
@@ -371,9 +375,40 @@ export default async function plugin(bb: BbPluginApi) {
       delete: (id, botId) => runners.delete(id, botId),
       automation: (id) => runners.automation(id),
     },
+    curator: {
+      get: (botId) => {
+        const bot = bots.stored(botId);
+        if (!bot || bot.kind === "external") return null;
+        const row = learning.curatorState(botId);
+        return row;
+      },
+      setPaused: async (botId, paused) => { await learning.set(botId, { curatorPaused: paused }); },
+      run: async (botId) => { await learning.curate(botId); },
+    },
   });
-  // Watchers' findings and end dates, once a minute.
-  const automationTimer = setInterval(() => void automations.tick().catch((error) => bb.log.warn(`Automations tick failed: ${errorText(error)}`)), 60_000);
+  // Skills that learn (src/skill-learning.ts): background reviews of a Bot's work and the weekly curator.
+  const learningBot = (bot: NonNullable<ReturnType<typeof bots.stored>>) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, kind: bot.kind ?? "studio" });
+  const learning: SkillLearning = new SkillLearning({
+    db, sdk: bb.sdk, changed: tagsChanged,
+    bots: () => bots.list().map(learningBot),
+    bot: (botId) => { const bot = bots.stored(botId); return bot ? learningBot(bot) : null; },
+    memoryPage: (botId) => { try { return bots.memoryPage(botId); } catch { return null; } },
+    skills: (botId) => bots.skills(botId).map((skill) => ({ name: skill.name, description: skill.description, body: bots.skill(skill.name, botId)?.body ?? "", state: skill.state ?? "active", pinned: !!skill.pinned, usedAt: skill.usedAt ?? null, updatedAt: skill.updatedAt })),
+    setState: (botId, name, state) => { bots.setSkillState(name, state, botId); },
+    writeSkill: (botId, input) => { bots.writeSkill(input, botId); },
+    deleteSkill: (botId, name) => bots.deleteSkill(name, botId),
+    log: (message) => bb.log.warn(message),
+  });
+  /** A Studio bot's id for its learning settings (the primary without one). */
+  const learnerId = (botId?: string) => { const bot = bots.stored(botId); if (!bot) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first."); bots.requireStudio(bot.id, "skill learning"); return bot.id; };
+  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => void learning.idle(thread, lastAssistantText).catch((error) => bb.log.warn(`Skill learning: ${errorText(error)}`)));
+  bb.events.on("thread.active", ({ thread }) => void learning.active(thread.id).catch(() => {}));
+  bb.events.on("thread.failed", ({ thread, error }) => void learning.failed(thread.id, error).catch(() => {}));
+  // Watchers' findings and end dates, once a minute; the skill curator and stuck reviews too.
+  const automationTimer = setInterval(() => {
+    void automations.tick().catch((error) => bb.log.warn(`Automations tick failed: ${errorText(error)}`));
+    void learning.tick().catch((error) => bb.log.warn(`Skill learning tick failed: ${errorText(error)}`));
+  }, 60_000);
   // Moves Spaces' leads to projects, retires old heartbeat automations and turns
   // migrated heartbeats back on; whatever fails is retried next startup.
   void projectLeads.finishMoves()
@@ -550,6 +585,13 @@ export default async function plugin(bb: BbPluginApi) {
     bot_skill_write: ({ botId, ...input }) => { bots.requireStudio(botId, "skills"); return bots.writeSkill(input, botId); },
     bot_skill_share: ({ botId, name }) => bots.shareSkill(name, botId),
     bot_skill_delete: ({ botId, name }) => ({ deleted: bots.deleteSkill(name, botId) }),
+    bot_skill_pin: ({ botId, name, pinned }) => ({ changed: bots.pinSkill(name, pinned, botId) }),
+    bot_skill_restore: ({ botId, name }) => ({ changed: bots.setSkillState(name, "active", botId) }),
+    bot_learning: ({ botId }) => learning.view(learnerId(botId)),
+    bot_learning_set: ({ botId, ...input }) => learning.set(learnerId(botId), input),
+    bot_learning_review: async ({ botId }) => ({ started: await learning.start(learnerId(botId), "review", "manual") }),
+    bot_skill_curate: ({ botId, dryRun }) => learning.curate(learnerId(botId), { dryRun }),
+    bot_skill_pending_resolve: ({ botId, id, approve }) => { const bot = learnerId(botId); learning.resolve(bot, id, approve); return learning.view(bot); },
     bot_automations: async ({ botId }) => ({ automations: await automations.list(botId) }),
     bot_automation_create: ({ botId, ...input }) => automations.create(input as never, botId),
     bot_automation_update: ({ botId, ...input }) => automations.update(input as never, botId),
@@ -849,25 +891,93 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
-  // The Bot's own tools: given only to its thread (agents.configure above).
-  const ownBot = (threadId: string | undefined): string => { const bot = bots.forThread(threadId); if (!bot) throw new Error("Only the user's Bot has its own skills and history."); return bot.id; };
+  // The Bot's own tools: given only to its thread and its skill review forks (agents.configure above).
+  const ownBot = (threadId: string | undefined): string => {
+    const review = learning.review(threadId);
+    if (review) return review.bot_id;
+    const bot = bots.forThread(threadId);
+    if (!bot) throw new Error("Only the user's Bot has its own skills and history.");
+    return bot.id;
+  };
+  /** The lint's advisory notes, after a tool's result line. */
+  const withNotes = (line: string, skill: { name: string; body: string }, botId: string) => {
+    const notes = lintSkill(skill, bots.skills(botId).filter((each) => each.state !== "archived").map((each) => each.name));
+    return notes.length ? `${line}\nNotes (advisory, nothing was blocked):\n${notes.map((note) => `- ${note}`).join("\n")}` : line;
+  };
+  /** A skill as the caller sees it: a review with approval on sees its own staged version. */
+  const currentSkill = (name: string, botId: string, threadId: string | undefined) => {
+    const staged = learning.staging(threadId) ? learning.staged(botId, name) : null;
+    if (staged?.action === "delete") return null;
+    const saved = bots.skill(name, botId);
+    if (staged) return { name, description: staged.description ?? saved?.description ?? name, body: staged.body ?? "", state: "active" as const, pinned: !!saved?.pinned };
+    return saved ? { ...saved, state: saved.state ?? "active", pinned: !!saved.pinned } : null;
+  };
+  const saveSkill = (input: { name: string; description: string; body: string }, botId: string, threadId: string | undefined, verb: string) => {
+    if (learning.staging(threadId)) {
+      learning.stage(botId, threadId, { name: input.name, action: "write", description: input.description, body: input.body });
+      return withNotes(`Staged ${input.name} (${verb}) for the user to approve.`, input, botId);
+    }
+    bots.writeSkill(input, botId);
+    learning.noteWrite(threadId, "saved");
+    return withNotes(`${verb === "patched" ? "Patched" : "Saved"} your skill ${input.name}.`, input, botId);
+  };
+  bb.agents.registerTool({
+    name: "bot_skill_list", description: "List your own skills: name, one-line description, and whether it's stale or pinned. Archived skills are left out.", parameters: z.object({}),
+    execute: (_input, ctx) => {
+      const list = bots.skills(ownBot(ctx.threadId)).filter((skill) => skill.state !== "archived");
+      return list.map((skill) => `- ${skill.name}${skill.pinned ? " (pinned)" : ""}${skill.state === "stale" ? " (stale)" : ""}: ${skill.description}`).join("\n") || "No skills yet.";
+    },
+  });
+  bb.agents.registerTool({
+    name: "bot_skill_view", description: "Load one of your own skills in full. Do it before you follow a skill: your instructions list only names and descriptions.", parameters: z.object({ name: z.string().min(1).max(64) }),
+    execute: ({ name }, ctx) => {
+      const botId = ownBot(ctx.threadId);
+      const skill = currentSkill(name, botId, ctx.threadId);
+      if (!skill || skill.state === "archived") return `No skill "${name}". Yours: ${bots.skills(botId).filter((each) => each.state !== "archived").map((each) => each.name).join(", ") || "none"}.`;
+      // A review reading skills isn't the Bot using them.
+      if (!learning.review(ctx.threadId)) bots.touchSkill(name, botId);
+      return `# ${skill.name}\n${skill.description}\n\n${skill.body}`;
+    },
+  });
   bb.agents.registerTool({
     name: "bot_skill_write",
-    description: "Save a reusable procedure you learned as one of your own skills (only you load them; the user can share one with every agent). Same name replaces it. Keep it short: when to use it, then the steps.",
+    description: "Create or rewrite one of your own skills (only you load them; the user can share one with every agent). Same name replaces it; for a small fix use bot_skill_patch. Write the rule a future run follows, not a log of today: when to use it, then the steps and pitfalls.",
     parameters: z.object({
-      name: z.string().regex(SKILL_NAME).max(64).describe("lowercase-with-hyphens"),
+      name: z.string().regex(SKILL_NAME).max(64).describe("lowercase-with-hyphens, named for the kind of task"),
       description: z.string().trim().min(1).max(500).describe("When to use it, in one sentence"),
       body: z.string().min(1).max(20_000).describe("Markdown instructions"),
     }),
-    execute: (input, ctx) => { const skill = bots.writeSkill(input, ownBot(ctx.threadId)); return `Saved your skill ${skill.name}.`; },
+    execute: (input, ctx) => { const botId = ownBot(ctx.threadId); return saveSkill(input, botId, ctx.threadId, bots.skill(input.name, botId) ? "rewritten" : "new"); },
   });
   bb.agents.registerTool({
-    name: "bot_skill_read", description: "Read one of your own skills.", parameters: z.object({ name: z.string().min(1).max(64) }),
-    execute: ({ name }, ctx) => { const botId = ownBot(ctx.threadId); const skill = bots.skill(name, botId); return skill ? `# ${skill.name}\n${skill.description}\n\n${skill.body}` : `No skill "${name}". Yours: ${bots.skills(botId).map((each) => each.name).join(", ") || "none"}.`; },
+    name: "bot_skill_patch",
+    description: "Make a targeted edit to one of your own skills: replace exact text (copy it from bot_skill_view) with new text, and optionally its description. Use it to fix a wrong step in place or add a pitfall.",
+    parameters: z.object({
+      name: z.string().min(1).max(64),
+      find: z.string().min(1).max(20_000).describe("Exact text now in the skill; it must occur once unless all is set"),
+      replace: z.string().max(20_000).describe("What replaces it (empty removes it)"),
+      all: z.boolean().optional().describe("Replace every occurrence"),
+      description: z.string().trim().min(1).max(500).optional(),
+    }),
+    execute: ({ name, find, replace, all, description }, ctx) => {
+      const botId = ownBot(ctx.threadId);
+      const skill = currentSkill(name, botId, ctx.threadId);
+      if (!skill) return `No skill "${name}". Make it with bot_skill_write.`;
+      return saveSkill({ name, description: description ?? skill.description, body: patchText(skill.body, find, replace, all) }, botId, ctx.threadId, "patched");
+    },
   });
   bb.agents.registerTool({
     name: "bot_skill_delete", description: "Delete one of your own skills.", parameters: z.object({ name: z.string().min(1).max(64) }),
-    execute: ({ name }, ctx) => { return bots.deleteSkill(name, ownBot(ctx.threadId)) ? `Deleted ${name}.` : `No skill "${name}".`; },
+    execute: ({ name }, ctx) => {
+      const botId = ownBot(ctx.threadId);
+      const skill = bots.skill(name, botId);
+      if (!skill) return `No skill "${name}".`;
+      if (learning.review(ctx.threadId) && skill.pinned) return `${name} is pinned by the user; leave it.`;
+      if (learning.staging(ctx.threadId)) { learning.stage(botId, ctx.threadId, { name, action: "delete" }); return `Staged deleting ${name} for the user to approve.`; }
+      bots.deleteSkill(name, botId);
+      learning.noteWrite(ctx.threadId, "saved");
+      return `Deleted ${name}.`;
+    },
   });
   // The Bot's runners: its tools (its thread only) and the runner's one report tool.
   const scheduleParam = z.object({

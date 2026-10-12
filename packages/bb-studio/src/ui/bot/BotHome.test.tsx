@@ -393,3 +393,36 @@ test("Switch model hands off to another provider, saying so, and switches in pla
   expect(switched).toHaveBeenCalledWith("t2");
   state.call.mockImplementation((async () => ({})) as never);
 });
+
+test("Skills: learn from work, the last review, approvals, pins and archived skills with Restore", async () => {
+  state.data = {
+    bot_get: { bot: dot, run: null },
+    bot_activity: empty,
+    bot_skills: { skills: [
+      { name: "deploy-check", description: "Before a deploy", updatedAt: 1, state: "active", pinned: false, usedAt: 1 },
+      { name: "inbox-sweep", description: "Sort mail", updatedAt: 1, state: "stale", pinned: true, usedAt: 1 },
+      { name: "old-report", description: "Gone quiet", updatedAt: 1, state: "archived", pinned: false, usedAt: 1 },
+    ] },
+    bot_learning: {
+      enabled: true, interval: 10, reviewModel: null, defaultModel: "claude-haiku-5-5", models: ["claude-opus-5-5", "claude-haiku-5-5"], approval: true, consolidate: false, curatorPaused: false,
+      toolTurns: 3, userTurns: 1, reviewing: false, lastReview: { at: Date.now() - 2 * 3_600_000, result: "Saved 1 skill" }, lastCurator: null, nextCuratorAt: null,
+      pending: [{ id: "pend_1", name: "deploy-check", action: "write", description: "Before a deploy", diff: "- old\n+ new", createdAt: 1 }],
+    },
+  };
+  act(() => root.render(<BotHome />));
+  act(() => button("Skills…").click());
+  expect(container.textContent).toContain("Saved 1 skill · 2h ago");
+  expect(container.textContent).toContain("Cheapest (claude-haiku-5-5)");
+  expect(container.textContent).toContain("stale");
+  expect(container.textContent).toContain("- old\n+ new");
+  expect(container.textContent).not.toContain("old-report");
+  await act(async () => button("Approve").click());
+  expect(state.call).toHaveBeenCalledWith("bot_skill_pending_resolve", { id: "pend_1", approve: true, botId: "bot_main" });
+  await act(async () => click(container.querySelector('[aria-label="Pin deploy-check"]')));
+  expect(state.call).toHaveBeenCalledWith("bot_skill_pin", { name: "deploy-check", pinned: true, botId: "bot_main" });
+  act(() => button("Archived (1)").click());
+  await act(async () => button("Restore").click());
+  expect(state.call).toHaveBeenCalledWith("bot_skill_restore", { name: "old-report", botId: "bot_main" });
+  await act(async () => click(container.querySelector('input[aria-label="Learn from work"]')));
+  expect(state.call).toHaveBeenCalledWith("bot_learning_set", { enabled: false, botId: "bot_main" });
+});

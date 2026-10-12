@@ -5,7 +5,7 @@
 // and the ⋯ menu sit in the panel's title bar. With no Bot yet, the page greets the user as one and
 // the first message makes it; "New bot" (/plugins/studio/bot/new) does the same for another Bot.
 // The route picks the Bot (selection.ts); Studio's old address redirects here.
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage, relativeTime } from "@bb-studio/kit/format";
 import { DANGER_BUTTON, GHOST_BUTTON, ICON_BUTTON, openAppPath, OUTLINE_BUTTON, PageColumn, PRIMARY_BUTTON, StudioBar } from "@bb-studio/kit/app";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -14,7 +14,7 @@ import {
 } from "@bb-studio/kit/ui";
 import { ThreadChat } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState, type ReactNode } from "react";
-import type { BotActivityView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
+import type { BotActivityView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
 import { externalNote } from "../../external-providers";
 import { useCall, useLive } from "../live";
@@ -479,26 +479,109 @@ function ProfileDialog({ value, advanced, advancedOpen = false, onClose, onSave 
 /** The Bot's own skills: only its thread loads them. Share moves one into BB's user skills, for every agent. */
 function SkillsList({ botId, name }: { botId: string; name: string }) {
   const skills = useLive<{ skills: BotSkillView[] }>("bot_skills", { botId }, { pollMs: 30_000 });
-  const { run, busy, error } = useAction(skills.refresh, botId);
-  const list = skills.data?.skills ?? [];
+  const learning = useLive<BotLearningView>("bot_learning", { botId }, { pollMs: 30_000 });
+  const refresh = () => { skills.refresh(); learning.refresh(); };
+  const { run, busy, error } = useAction(refresh, botId);
+  const [showArchived, setShowArchived] = useState(false);
+  const all = skills.data?.skills ?? [];
+  const list = all.filter((skill) => skill.state !== "archived");
+  const archived = all.filter((skill) => skill.state === "archived");
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Procedures {name} saved. Only it uses them until you share one with every agent.</p>
+      {learning.data ? <LearnSettings value={learning.data} busy={!!busy} run={run} /> : null}
+      {learning.data?.pending.length ? (
+        <div className="flex flex-col gap-1" aria-label="Waiting for approval">
+          <span className="text-xs font-medium">Waiting for your approval</span>
+          {learning.data.pending.map((change) => (
+            <div key={change.id} className="flex flex-col gap-1 rounded-md border border-border p-2">
+              <span className="flex items-center gap-1">
+                <span className="min-w-0 flex-1 truncate font-medium">{change.action === "delete" ? `Delete ${change.name}` : change.name}</span>
+                <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => void run("bot_skill_pending_resolve", { id: change.id, approve: true })}>Approve</button>
+                <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => void run("bot_skill_pending_resolve", { id: change.id, approve: false })}>Reject</button>
+              </span>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">{change.diff}</pre>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {!list.length ? <p className="text-sm text-muted-foreground/70">{skills.loading && !skills.data ? "Loading…" : "No skills yet"}</p> : (
         <ul className="flex flex-col divide-y divide-border">
           {list.map((skill) => (
             <li key={skill.name} className="flex min-w-0 items-center gap-1 py-1.5">
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{skill.name}</span>
+                <span className="block truncate font-medium">{skill.name}{skill.state === "stale" ? <span className="ml-1.5 text-xs font-normal text-muted-foreground" title="Not used for 30 days; archived after 90">stale</span> : null}</span>
                 <span className="block truncate text-xs text-muted-foreground">{skill.description}</span>
               </span>
+              <button type="button" className={GHOST_BUTTON} disabled={!!busy} aria-pressed={!!skill.pinned} aria-label={`${skill.pinned ? "Unpin" : "Pin"} ${skill.name}`} title={skill.pinned ? "Pinned: the curator leaves it alone" : "Pin: the curator leaves it alone"} onClick={() => void run("bot_skill_pin", { name: skill.name, pinned: !skill.pinned })}>
+                <Icon name={skill.pinned ? "PinOff" : "Pin"} className="size-3.5" />
+              </button>
               <button type="button" className={GHOST_BUTTON} disabled={!!busy} title="Make it a skill every agent can use" onClick={() => void run("bot_skill_share", { name: skill.name })}>Share</button>
               <button type="button" className={GHOST_BUTTON} disabled={!!busy} aria-label={`Delete ${skill.name}`} onClick={() => { if (confirm(`Delete the skill ${skill.name}?`)) void run("bot_skill_delete", { name: skill.name }); }}>Delete</button>
             </li>
           ))}
         </ul>
       )}
+      {archived.length ? (
+        <div className="flex flex-col gap-1">
+          <button type="button" aria-expanded={showArchived} className="flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowArchived(!showArchived)}>
+            <Icon name={showArchived ? "ChevronDown" : "ChevronRight"} className="size-3.5" />Archived ({archived.length})
+          </button>
+          {showArchived ? (
+            <ul className="flex flex-col divide-y divide-border">
+              {archived.map((skill) => (
+                <li key={skill.name} className="flex min-w-0 items-center gap-1 py-1.5 text-muted-foreground">
+                  <span className="min-w-0 flex-1 truncate">{skill.name}</span>
+                  <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => void run("bot_skill_restore", { name: skill.name })}>Restore</button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  );
+}
+
+const LEARN_INTERVALS = [5, 10, 20, 30, 50];
+
+/** Learn from work: the background review's switch, interval and model, approval, and the last result. */
+function LearnSettings({ value, busy, run }: { value: BotLearningView; busy: boolean; run(method: string, input?: object): Promise<unknown> }) {
+  const intervals = LEARN_INTERVALS.includes(value.interval) ? LEARN_INTERVALS : [...LEARN_INTERVALS, value.interval].sort((a, b) => a - b);
+  const status = value.reviewing ? "Reviewing now…" : value.lastReview ? `${value.lastReview.result} · ${relativeTime(value.lastReview.at)}` : "No review yet";
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md bg-muted/40 p-2 text-xs" aria-label="Learn from work">
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={value.enabled} disabled={busy} aria-label="Learn from work" onChange={(event) => void run("bot_learning_set", { enabled: event.target.checked })} />
+        <span className="font-medium text-foreground">Learn from work</span>
+        {value.enabled ? (
+          <span className="flex items-center gap-1 text-muted-foreground">every
+            <select aria-label="Turns between reviews" className="rounded border border-border bg-transparent px-1" value={value.interval} disabled={busy} onChange={(event) => void run("bot_learning_set", { interval: Number(event.target.value) })}>
+              {intervals.map((each) => <option key={each} value={each}>{each}</option>)}
+            </select>turns</span>
+        ) : null}
+      </label>
+      {value.enabled ? (
+        <>
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate" aria-label="Last review">{status}</span>
+            <button type="button" className={GHOST_BUTTON} disabled={busy || value.reviewing} onClick={() => void run("bot_learning_review")}>Review now</button>
+          </span>
+          <label className="flex items-center gap-2 text-muted-foreground">Review model
+            <select aria-label="Review model" className="min-w-0 flex-1 rounded border border-border bg-transparent px-1" value={value.reviewModel ?? ""} disabled={busy} onChange={(event) => void run("bot_learning_set", { reviewModel: event.target.value || null })}>
+              <option value="">Cheapest{value.defaultModel ? ` (${value.defaultModel})` : ""}</option>
+              {value.models.map((model) => <option key={model} value={model}>{model}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-muted-foreground">
+            <input type="checkbox" checked={value.approval} disabled={busy} onChange={(event) => void run("bot_learning_set", { approval: event.target.checked })} />Review skills before saving
+          </label>
+        </>
+      ) : null}
+      <label className="flex items-center gap-2 text-muted-foreground">
+        <input type="checkbox" checked={value.consolidate} disabled={busy} onChange={(event) => void run("bot_learning_set", { consolidate: event.target.checked })} />Curator merges overlapping skills
+      </label>
     </div>
   );
 }

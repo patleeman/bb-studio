@@ -268,4 +268,27 @@ export const MIGRATIONS = [
        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
      );
    CREATE INDEX bot_automations_bot ON bot_automations (bot_id);`,
+  // Skills that learn (src/skill-learning.ts): a skill's state (active, stale,
+  // archived; the curator moves unused ones, never deletes), pin and last use;
+  // each Bot's learning settings and counters, its review forks, and review
+  // changes waiting for approval.
+  `ALTER TABLE bot_skills ADD COLUMN state TEXT NOT NULL DEFAULT 'active';
+   ALTER TABLE bot_skills ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE bot_skills ADD COLUMN used_at INTEGER;
+   CREATE TABLE bot_learning (
+       bot_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, every_turns INTEGER NOT NULL DEFAULT 10, review_model TEXT,
+       approval INTEGER NOT NULL DEFAULT 0, consolidate INTEGER NOT NULL DEFAULT 0, curator_paused INTEGER NOT NULL DEFAULT 0,
+       thread_id TEXT, seen_seq INTEGER NOT NULL DEFAULT 0, tool_turns INTEGER NOT NULL DEFAULT 0, user_turns INTEGER NOT NULL DEFAULT 0,
+       last_review_at INTEGER, last_review_result TEXT, curator_since INTEGER, curator_last_at INTEGER, curator_last_result TEXT
+     );
+   CREATE TABLE bot_skill_reviews (
+       thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
+       saved INTEGER NOT NULL DEFAULT 0, staged INTEGER NOT NULL DEFAULT 0, memory INTEGER NOT NULL DEFAULT 0,
+       started_at INTEGER NOT NULL, finished_at INTEGER, result TEXT
+     );
+   CREATE INDEX bot_skill_reviews_bot ON bot_skill_reviews (bot_id, status);
+   CREATE TABLE bot_skill_pending (
+       id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, name TEXT NOT NULL, action TEXT NOT NULL,
+       description TEXT, body TEXT, review_thread_id TEXT, created_at INTEGER NOT NULL
+     );`,
 ];

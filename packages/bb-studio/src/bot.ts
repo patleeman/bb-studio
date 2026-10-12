@@ -90,11 +90,15 @@ export function externalBotInstructions(bot: { name: string; state: BotState; ro
 }
 
 /** Instructions for the Bot's own thread, given at each session start. Short: they point at the page and tools. */
-export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly string[]; primary?: boolean }): string {
+export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly { name: string; description: string }[]; primary?: boolean }): string {
   const who = `You are ${JSON.stringify(bot.name)}, ${bot.primary === false ? "one of the user's Bots: an always-on agent that sees every project" : "the user's Bot: an always-on agent that leads their personal project and sees every project"}. The user can rename, pause or stop you in Studio.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
   if (bot.state === "active") {
     const memory = bot.memoryPageId ? `Your Memory page is ${bot.memoryPageId}: read it with pages_read when you wake up, keep it short and edit it yourself with pages_edit; its "## Check-in" section is your check-in list.` : "";
-    const skills = `Save a reusable procedure as your own skill with bot_skill_write${bot.skills?.length ? `; yours: ${bot.skills.join(", ")} (bot_skill_read)` : ""}. Search your past threads with bot_history_search.`;
+    // Progressive disclosure: names and one-line descriptions here, the full skill through bot_skill_view.
+    const skills = [
+      "Save a reusable procedure as a skill with bot_skill_write (bot_skill_patch fixes one). Search past threads with bot_history_search.",
+      ...(bot.skills?.length ? ["Your skills (load one with bot_skill_view before you follow it):", ...bot.skills.map((skill) => `- ${skill.name}: ${skill.description}`)] : []),
+    ].join("\n");
     const quiet = "Your chat is the user's inbox: post only what changed or needs them. When nothing did (a check-in with nothing new, a notice that a thread you started finished fine, an automation result like [PASS]), reply exactly [PASS]: no \"✓\", \"noted\" or other acknowledgement.";
     const runners = "Schedule with automation_create: check-ins, reminders, watchers, runners.";
     return [who, memory, quiet, runners, skills].filter(Boolean).join("\n");
@@ -144,7 +148,8 @@ export function modelChange(current: ThreadExecution, next: ThreadExecution): "u
   if (current.providerId && next.providerId !== current.providerId) return "handoff";
   return next.model === current.model && (next.reasoning ?? current.reasoning ?? null) === (current.reasoning ?? null) ? "unchanged" : "in-place";
 }
-type SkillRow = { bot_id: string; name: string; description: string; body: string; created_at: number; updated_at: number };
+type SkillRow = { bot_id: string; name: string; description: string; body: string; created_at: number; updated_at: number; state: "active" | "stale" | "archived"; pinned: number; used_at: number | null };
+const skillView = (skill: SkillRow): BotSkillView => ({ name: skill.name, description: skill.description, updatedAt: skill.updated_at, state: skill.state, pinned: !!skill.pinned, usedAt: skill.used_at ?? null });
 
 /** A provider's display name for a handoff note. */
 function providerName(providerId: string | null | undefined): string {
@@ -244,6 +249,8 @@ export interface BotDeps {
     /** Turns a runner Stop paused back on; false when it was deleted since. */
     restore(id: string): Promise<boolean>;
   };
+  /** Skill review forks (src/skill-learning.ts): background work, kept out of Activity. */
+  hiddenThreads?(): ReadonlySet<string>;
   /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
   automations?: {
     pauseAll(botId: string, onPaused?: (id: string) => void): Promise<string[]>;
@@ -722,20 +729,42 @@ export class Bots {
     if (bot.state !== "active") return botInstructions(bot);
     let memoryPageId: string | null = null;
     try { memoryPageId = this.memoryPage(bot.id); } catch { /* Pages unavailable: no memory line. */ }
-    return botInstructions({ ...bot, memoryPageId, skills: this.skills(bot.id).map((skill) => skill.name) });
+    return botInstructions({ ...bot, memoryPageId, skills: this.skills(bot.id).filter((skill) => skill.state !== "archived") });
   }
 
   skills(botId?: string): BotSkillView[] {
     const row = this.row(botId);
     if (!row) return [];
-    return (this.deps.db.prepare("SELECT * FROM bot_skills WHERE bot_id = ? ORDER BY name").all(row.id) as SkillRow[])
-      .map((skill) => ({ name: skill.name, description: skill.description, updatedAt: skill.updated_at }));
+    return (this.deps.db.prepare("SELECT * FROM bot_skills WHERE bot_id = ? ORDER BY name").all(row.id) as SkillRow[]).map(skillView);
   }
 
   skill(name: string, botId?: string): (BotSkillView & { body: string }) | null {
     const row = this.row(botId);
     const skill = row ? this.deps.db.prepare("SELECT * FROM bot_skills WHERE bot_id = ? AND name = ?").get(row.id, name) as SkillRow | undefined : undefined;
-    return skill ? { name: skill.name, description: skill.description, updatedAt: skill.updated_at, body: skill.body } : null;
+    return skill ? { ...skillView(skill), body: skill.body } : null;
+  }
+
+  /** The Bot loaded a skill (bot_skill_view): it's in use, so a stale one is active again. */
+  touchSkill(name: string, botId?: string): void {
+    const row = this.row(botId);
+    if (row) this.deps.db.prepare("UPDATE bot_skills SET used_at = ?, state = CASE WHEN state = 'stale' THEN 'active' ELSE state END WHERE bot_id = ? AND name = ?").run(Date.now(), row.id, name);
+  }
+
+  /** The curator's and Restore's state change; archived skills are hidden from the Bot, never deleted. */
+  setSkillState(name: string, state: "active" | "stale" | "archived", botId?: string): boolean {
+    const row = this.row(botId);
+    // Restored counts as used, so the next curator run doesn't archive it again.
+    const changed = row ? this.deps.db.prepare(`UPDATE bot_skills SET state = ?${state === "active" ? ", used_at = ?" : ""} WHERE bot_id = ? AND name = ?`).run(...(state === "active" ? [state, Date.now()] : [state]), row.id, name).changes > 0 : false;
+    if (changed) this.deps.changed();
+    return changed;
+  }
+
+  /** Pinned skills are exempt from the curator. */
+  pinSkill(name: string, pinned: boolean, botId?: string): boolean {
+    const row = this.row(botId);
+    const changed = row ? this.deps.db.prepare("UPDATE bot_skills SET pinned = ? WHERE bot_id = ? AND name = ?").run(pinned ? 1 : 0, row.id, name).changes > 0 : false;
+    if (changed) this.deps.changed();
+    return changed;
   }
 
   /** Adds or replaces one of a Bot's own skills. Only its thread loads them. */
@@ -743,11 +772,11 @@ export class Bots {
     const row = this.need(botId);
     if (!SKILL_NAME.test(input.name)) throw new Error("A skill name is lowercase words joined by hyphens, like weekly-review.");
     const now = Date.now();
-    this.deps.db.prepare(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT (bot_id, name) DO UPDATE SET description = excluded.description, body = excluded.body, updated_at = excluded.updated_at`)
-      .run(row.id, input.name, input.description.trim(), input.body, now, now);
+    this.deps.db.prepare(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, used_at) VALUES (?, ?, ?, ?, ?, ?, 'active', ?)
+      ON CONFLICT (bot_id, name) DO UPDATE SET description = excluded.description, body = excluded.body, updated_at = excluded.updated_at, state = 'active', used_at = excluded.used_at`)
+      .run(row.id, input.name, input.description.trim(), input.body, now, now, now);
     this.deps.changed();
-    return { name: input.name, description: input.description.trim(), updatedAt: now };
+    return this.skills(row.id).find((skill) => skill.name === input.name)!;
   }
 
   deleteSkill(name: string, botId?: string): boolean {
@@ -850,7 +879,8 @@ export class Bots {
     ]);
     // Runners have their own group; an urgent report puts its thread in Needs you.
     const runnerThreads = this.deps.runners?.threads(bot.id) ?? new Map<string, { urgent: boolean }>();
-    const { needsYou, inProgress, waiting, completed } = classifyActivity(threads.filter((thread) => !runnerThreads.has(thread.id)), bot.threadId);
+    const hidden = this.deps.hiddenThreads?.() ?? new Set<string>();
+    const { needsYou, inProgress, waiting, completed } = classifyActivity(threads.filter((thread) => !runnerThreads.has(thread.id) && !hidden.has(thread.id)), bot.threadId);
     const urgent = [...runnerThreads].filter(([, runner]) => runner.urgent).map(([id]) => id).filter((id) => !needsYou.some((thread) => thread.id === id));
     for (const thread of await Promise.all(urgent.map((threadId) => this.deps.sdk.threads.get({ threadId }).catch(() => null)))) {
       if (thread && !thread.archivedAt) needsYou.push({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled runner", status: thread.status, projectId: thread.projectId ?? null, updatedAt: thread.updatedAt ?? 0, relation: "started", needsYou: true, parentId: null });

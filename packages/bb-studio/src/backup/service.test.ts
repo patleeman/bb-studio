@@ -237,7 +237,7 @@ it("backs up the Bot and its skills, and restores them only when this BB has no 
   const sourceDb = studioDb();
   sourceDb.prepare("INSERT INTO project_leads (project_id, lead_thread_id, created_at, updated_at) VALUES ('proj_personal', 'thr_bot', 1, 5)").run();
   sourceDb.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, memory_page_id, shape, color, role, created_at, updated_at) VALUES ('bot_main', 'Dot', '🟣', 'paused', 'thr_bot', 1, 'pg_memory', 'star', '#e5484d', 'My chief of staff.', 1, 2)").run();
-  sourceDb.prepare("INSERT INTO bot_skills VALUES ('bot_main', 'weekly-review', 'Fridays', 'Steps', 1, 2)").run();
+  sourceDb.prepare("INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES ('bot_main', 'weekly-review', 'Fridays', 'Steps', 1, 2)").run();
   const service = (dir: string, db: Database.Database) => new BackupService({
     dataDir: dir, sdk: bb({ dataDir: dir, projects: [], addOns: {}, installed: [] }), bbVersion: async () => null,
     studioData: studioDataBackup(db, { threadExists: async () => true }),

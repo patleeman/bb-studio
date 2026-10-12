@@ -1,0 +1,254 @@
+import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
+import { afterEach, expect, it, vi } from "vitest";
+import { MIGRATIONS } from "./migrations";
+import {
+  ARCHIVE_AFTER_MS, CURATOR_EVERY_MS, CURATOR_IDLE_MS, cheapestModel, curatorPlan, lineDiff, lintSkill, patchText, REVIEW_TOOLS, reviewPrompt,
+  SkillLearning, STALE_AFTER_MS, tallyTurns, type LearningSkill, type SkillState,
+} from "./skill-learning";
+
+const dispose: (() => Promise<void>)[] = [];
+afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
+
+const DAY = 86_400_000;
+const turn = (seq: number, items: string[], opts: { user?: boolean; tool?: string } = {}) => [
+  ...(opts.user ? [{ seq: seq, type: "client/turn/requested", data: { initiator: "user" } }] : []),
+  ...items.map((type, i) => ({ seq: seq + 1 + i, type: "item/completed", data: { item: { type, ...(type === "toolCall" && opts.tool ? { tool: opts.tool } : {}) } } })),
+  { seq: seq + 1 + items.length, type: "turn/completed", data: { status: "completed" } },
+];
+
+it("counts tool turns and user turns, and a skill write resets the tool count", () => {
+  const events = [...turn(1, ["reasoning", "commandExecution", "agentMessage"], { user: true }), ...turn(10, ["agentMessage"], { user: true }), ...turn(20, ["fileRead", "mcpToolCall"])];
+  expect(tallyTurns(events)).toEqual({ toolTurns: 2, userTurns: 2, skillWrite: false, lastSeq: 23 });
+  const reset = [...turn(1, ["commandExecution"]), ...turn(10, ["toolCall"], { tool: "mcp__bb-bridge__bot_skill_patch" }), ...turn(20, ["commandExecution"])];
+  expect(tallyTurns(reset)).toMatchObject({ toolTurns: 1, skillWrite: true });
+  // An automation's turn isn't the user's.
+  expect(tallyTurns([{ seq: 1, type: "client/turn/requested", data: { initiator: "automation" } }]).userTurns).toBe(0);
+});
+
+it("picks the cheapest model by price, else by name", () => {
+  expect(cheapestModel([
+    { model: "opus", description: "Opus · $4/$20 per Mtok" }, { model: "sonnet", description: "Sonnet · $2/$10 per Mtok" }, { model: "haiku", description: "Haiku · $0.10/$0.50 per Mtok" },
+  ])).toBe("haiku");
+  expect(cheapestModel([{ model: "gpt-6-sol", description: "Workhorse" }, { model: "gpt-6-luna", description: "Fast and affordable" }])).toBe("gpt-6-luna");
+  expect(cheapestModel([{ model: "big" }])).toBeNull();
+});
+
+it("lints incident logs, oversize skills and near-duplicate names without blocking", () => {
+  expect(lintSkill({ name: "deploy", body: "On 2026-10-01 we tried PR #482 and it broke." }, [])).toEqual([expect.stringMatching(/log of one session/)]);
+  expect(lintSkill({ name: "deploy", body: "x".repeat(9000) }, [])).toEqual([expect.stringMatching(/9000 characters/)]);
+  expect(lintSkill({ name: "deploy-check", body: "Run the smoke test." }, ["deploy-checks", "inbox"])).toEqual([expect.stringMatching(/close to deploy-checks/)]);
+  expect(lintSkill({ name: "weekly-review", body: "1. Read the week's threads.\n2. Sum up." }, ["inbox-sweep"])).toEqual([]);
+});
+
+it("patches exact text once, refuses missing or ambiguous text", () => {
+  expect(patchText("a\nstep two\nb", "step two", "step 2")).toBe("a\nstep 2\nb");
+  expect(() => patchText("a", "zzz", "y")).toThrow(/isn't in the skill/);
+  expect(() => patchText("x x", "x", "y")).toThrow(/2 times/);
+  expect(patchText("x x", "x", "y", true)).toBe("y y");
+  expect(patchText("cost $1", "cost", "$& price")).toBe("$& price $1");
+});
+
+it("diffs lines", () => {
+  expect(lineDiff("a\nb\nc", "a\nB\nc")).toBe("  a\n- b\n+ B\n  c");
+  expect(lineDiff("", "new")).toBe("+ new");
+});
+
+it("moves unused skills active → stale → archived; pinned and used ones stay", () => {
+  const now = 1000 * DAY;
+  const skill = (name: string, state: SkillState, idleDays: number, pinned = false) => ({ name, state, pinned, usedAt: now - idleDays * DAY, updatedAt: 0 });
+  expect(curatorPlan([skill("fresh", "active", 5), skill("old", "active", 31), skill("older", "stale", 91), skill("ancient", "active", 200), skill("pinned", "active", 400, true), skill("gone", "archived", 400)], now)).toEqual([
+    { name: "old", from: "active", to: "stale" }, { name: "older", from: "stale", to: "archived" }, { name: "ancient", from: "active", to: "archived" },
+  ]);
+  expect(STALE_AFTER_MS).toBe(30 * DAY);
+  expect(ARCHIVE_AFTER_MS).toBe(90 * DAY);
+});
+
+it("gives a review fork only the skill tools and Memory page tools, and a lessons-not-logs prompt", () => {
+  expect([...REVIEW_TOOLS]).toEqual(["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "pages_read", "pages_edit"]);
+  const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools", approval: false });
+  expect(prompt).toMatch(/Lessons, not logs/);
+  expect(prompt).toMatch(/remember this/);
+  expect(prompt).toMatch(/merge it into one rule/);
+  expect(prompt).toMatch(/reply exactly \[PASS\]/);
+  expect(prompt).toMatch(/pg1/);
+});
+
+async function setup() {
+  const threads = new Map([["bot1", makeThreadResponse({ id: "bot1", projectId: "proj_personal", providerId: "claude-code", status: "idle", updatedAt: 0 })]]);
+  let events: { seq: number; type: string; data: Record<string, unknown> }[] = [];
+  let forks = 0;
+  const fork = vi.fn(async ({ sourceThreadId }: { sourceThreadId: string }) => {
+    const thread = makeThreadResponse({ id: `fork${++forks}`, projectId: "proj_personal", providerId: "claude-code", status: "idle", sourceThreadId });
+    threads.set(thread.id, thread);
+    return thread;
+  });
+  const update = vi.fn(async () => ({}));
+  const send = vi.fn(async (_args: unknown) => ({ ok: true }));
+  const stop = vi.fn(async (_args: unknown) => ({}));
+  const archive = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: 5 }); return { ok: true }; });
+  const list = vi.fn(async ({ threadId, afterSeq, order }: { threadId: string; afterSeq?: string; order?: string }) => {
+    if (threadId !== "bot1") return [];
+    const after = events.filter((event) => event.seq > Number(afterSeq ?? 0));
+    return order === "desc" ? [...after].reverse() : after;
+  });
+  const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
+    threads: {
+      get: (async ({ threadId }: { threadId: string }) => threads.get(threadId)!) as never, fork: fork as never, update: update as never, send: send as never, stop: stop as never, archive: archive as never,
+      events: { list: list as never, wait: (async () => null) as never },
+    },
+    providers: { models: (async () => ({ models: [
+      { model: "claude-opus", description: "$4/$20 per Mtok", supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }] },
+      { model: "claude-haiku", description: "$0.10/$0.50 per Mtok", supportedReasoningEfforts: [{ reasoningEffort: "low" }] },
+    ] })) as never },
+  } });
+  dispose.push(() => harness.lifecycle.dispose());
+  const db = bb.storage.database();
+  bb.storage.migrate(db, MIGRATIONS);
+  const bot = { id: "bot_main", name: "Dot", threadId: "bot1" as string | null, state: "active", kind: "studio" };
+  db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES ('bot_main', 'Dot', 'x', 'active', 'bot1', 0, 0, 0)").run();
+  const skills = (): LearningSkill[] => (db.prepare("SELECT * FROM bot_skills WHERE bot_id = 'bot_main' ORDER BY name").all() as { name: string; description: string; body: string; state: SkillState; pinned: number; used_at: number | null; updated_at: number }[])
+    .map((row) => ({ name: row.name, description: row.description, body: row.body, state: row.state, pinned: !!row.pinned, usedAt: row.used_at, updatedAt: row.updated_at }));
+  const writeSkill = (_botId: string, input: { name: string; description: string; body: string }) => {
+    db.prepare("INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES ('bot_main', ?, ?, ?, 0, 0) ON CONFLICT (bot_id, name) DO UPDATE SET body = excluded.body").run(input.name, input.description, input.body);
+  };
+  const learning = new SkillLearning({
+    db, sdk: bb.sdk, changed: () => {}, bots: () => [bot], bot: (id) => id === bot.id ? bot : null, memoryPage: () => "pg_mem",
+    skills: () => skills(),
+    setState: (_botId, name, state) => { db.prepare("UPDATE bot_skills SET state = ? WHERE name = ?").run(state, name); },
+    writeSkill,
+    deleteSkill: (_botId, name) => db.prepare("DELETE FROM bot_skills WHERE name = ?").run(name).changes > 0,
+  });
+  const work = (n: number, user = false) => { for (let i = 0; i < n; i++) events.push(...turn((events.at(-1)?.seq ?? 0) + 1, ["commandExecution"], { user })); };
+  return { db, bot, threads, learning, fork, update, send, stop, archive, work, skills, writeSkill, setEvents: (next: typeof events) => { events = next; } };
+}
+
+it("takes a baseline first, then forks a review on a cheap model after 10 tool turns", async () => {
+  const x = await setup();
+  x.work(30);
+  // First look: old history doesn't count.
+  await x.learning.idle(x.threads.get("bot1")!, "done");
+  expect((await x.learning.view("bot_main")).toolTurns).toBe(0);
+  x.work(9);
+  await x.learning.idle(x.threads.get("bot1")!, "done");
+  expect(x.fork).not.toHaveBeenCalled();
+  expect((await x.learning.view("bot_main")).toolTurns).toBe(9);
+  x.work(1);
+  await x.learning.idle(x.threads.get("bot1")!, "done");
+  expect(x.fork).toHaveBeenCalledWith(expect.objectContaining({ sourceThreadId: "bot1", visibility: "hidden", pluginMetadata: { botReview: "bot_main" } }));
+  expect(x.update).toHaveBeenCalledWith({ threadId: "fork1", model: "claude-haiku", reasoningLevel: "low" });
+  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "fork1", input: [expect.objectContaining({ text: expect.stringMatching(/Background skill review for "Dot"/) })] }));
+  const view = await x.learning.view("bot_main");
+  expect(view).toMatchObject({ reviewing: true, toolTurns: 0, defaultModel: "claude-haiku" });
+  expect(x.learning.reviewThreads()).toEqual(new Set(["fork1"]));
+
+  // Single flight: no second review while one runs.
+  expect(await x.learning.start("bot_main", "review")).toBe(false);
+
+  // The fork saves a skill and finishes: recorded and archived.
+  x.learning.noteWrite("fork1", "saved");
+  await x.learning.idle(x.threads.get("fork1")!, "Saved deploy-check.");
+  expect(x.archive).toHaveBeenCalledWith({ threadId: "fork1" });
+  expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: false, lastReview: { result: "Saved 1 skill" } });
+});
+
+it("records [PASS] as nothing to save, trips on user turns, and stays off when turned off or paused", async () => {
+  const x = await setup();
+  await x.learning.idle(x.threads.get("bot1")!, null);
+  await x.learning.set("bot_main", { interval: 3 });
+  for (let i = 0; i < 3; i++) x.setEvents([]);
+  x.setEvents([...turn(1, ["agentMessage"], { user: true }), ...turn(5, ["agentMessage"], { user: true }), ...turn(9, ["agentMessage"], { user: true })]);
+  x.db.prepare("UPDATE bot_learning SET seen_seq = 0").run();
+  await x.learning.idle(x.threads.get("bot1")!, null);
+  expect(x.fork).toHaveBeenCalledTimes(1);
+  expect(x.send.mock.calls[0]![0]).toMatchObject({ input: [{ text: expect.stringMatching(/run of turns with the user/) }] });
+  await x.learning.idle(x.threads.get("fork1")!, "[PASS]");
+  expect((await x.learning.view("bot_main")).lastReview?.result).toBe("Nothing to save");
+
+  await x.learning.set("bot_main", { enabled: false });
+  x.db.prepare("UPDATE bot_learning SET tool_turns = 50").run();
+  expect(await x.learning.maybeReview("bot_main")).toBe(false);
+  await x.learning.set("bot_main", { enabled: true });
+  x.bot.state = "paused";
+  expect(await x.learning.maybeReview("bot_main")).toBe(false);
+  x.bot.kind = "external";
+  x.bot.state = "active";
+  expect(await x.learning.start("bot_main", "review")).toBe(false);
+  expect(x.fork).toHaveBeenCalledTimes(1);
+});
+
+it("stops the review when the user starts a turn, when the bot pauses, or after 20 minutes", async () => {
+  const x = await setup();
+  expect(await x.learning.start("bot_main", "review")).toBe(true);
+  await x.learning.active("bot1");
+  expect(x.stop).toHaveBeenCalledWith({ threadId: "fork1" });
+  expect((await x.learning.view("bot_main")).lastReview?.result).toMatch(/you started a turn/);
+
+  expect(await x.learning.start("bot_main", "review")).toBe(true);
+  x.bot.state = "paused";
+  await x.learning.tick();
+  expect((await x.learning.view("bot_main")).lastReview?.result).toMatch(/Dot is paused/);
+
+  x.bot.state = "active";
+  expect(await x.learning.start("bot_main", "review")).toBe(true);
+  await x.learning.tick(Date.now() + 21 * 60_000);
+  expect((await x.learning.view("bot_main")).lastReview?.result).toMatch(/took too long/);
+});
+
+it("doesn't fork a busy bot thread", async () => {
+  const x = await setup();
+  x.threads.set("bot1", { ...x.threads.get("bot1")!, status: "active" });
+  expect(await x.learning.start("bot_main", "review")).toBe(false);
+});
+
+it("stages a review's changes when approval is on, and applies them on approve", async () => {
+  const x = await setup();
+  await x.learning.set("bot_main", { approval: true });
+  x.writeSkill("bot_main", { name: "deploy", description: "d", body: "old step" });
+  await x.learning.start("bot_main", "review");
+  expect(x.learning.staging("fork1")).toBe(true);
+  expect(x.learning.staging("bot1")).toBe(false);
+  x.learning.stage("bot_main", "fork1", { name: "deploy", action: "write", description: "d", body: "new step" });
+  x.learning.stage("bot_main", "fork1", { name: "inbox", action: "write", description: "Sort mail", body: "Steps" });
+  const view = await x.learning.view("bot_main");
+  expect(view.pending.map((each) => [each.name, each.diff])).toEqual([["deploy", "- old step\n+ new step"], ["inbox", "+ Steps"]]);
+  expect(x.skills().map((skill) => skill.body)).toEqual(["old step"]);
+  x.learning.resolve("bot_main", view.pending[0]!.id, true);
+  x.learning.resolve("bot_main", view.pending[1]!.id, false);
+  expect(x.skills().map((skill) => [skill.name, skill.body])).toEqual([["deploy", "new step"]]);
+  expect((await x.learning.view("bot_main")).pending).toEqual([]);
+  await x.learning.idle(x.threads.get("fork1")!, "Staged one.");
+  expect((await x.learning.view("bot_main")).lastReview?.result).toBe("2 waiting for approval");
+});
+
+it("runs the curator weekly once the bot is idle 2 hours, with a dry run, pins exempt, and optional consolidation", async () => {
+  const x = await setup();
+  const now = Date.now();
+  x.writeSkill("bot_main", { name: "old", description: "d", body: "b" });
+  x.writeSkill("bot_main", { name: "pinned", description: "d", body: "b" });
+  x.writeSkill("bot_main", { name: "fresh", description: "d", body: "b" });
+  x.db.prepare("UPDATE bot_skills SET used_at = ?, updated_at = 0 WHERE name IN ('old', 'pinned')").run(now - 100 * DAY);
+  x.db.prepare("UPDATE bot_skills SET used_at = ? WHERE name = 'fresh'").run(now);
+  x.db.prepare("UPDATE bot_skills SET pinned = 1 WHERE name = 'pinned'").run();
+
+  const dry = await x.learning.curate("bot_main", { dryRun: true, now });
+  expect(dry).toMatchObject({ changes: [{ name: "old", from: "active", to: "archived" }], result: "Dry run: 1 archived" });
+  expect(x.skills().find((skill) => skill.name === "old")?.state).toBe("active");
+
+  // Not due yet: the first run is a week after learning started.
+  await x.learning.tick(now);
+  expect(x.skills().find((skill) => skill.name === "old")?.state).toBe("active");
+  // Due, but the bot was busy recently.
+  x.threads.set("bot1", { ...x.threads.get("bot1")!, updatedAt: now + CURATOR_EVERY_MS });
+  await x.learning.tick(now + CURATOR_EVERY_MS + 1000);
+  expect(x.skills().find((skill) => skill.name === "old")?.state).toBe("active");
+  // Due and idle 2 hours.
+  await x.learning.set("bot_main", { consolidate: true });
+  await x.learning.tick(now + CURATOR_EVERY_MS + CURATOR_IDLE_MS + 2000);
+  expect(Object.fromEntries(x.skills().map((skill) => [skill.name, skill.state]))).toEqual({ fresh: "active", old: "archived", pinned: "active" });
+  expect(x.learning.curatorState("bot_main")).toMatchObject({ paused: false, lastOutcome: "1 archived" });
+  // Two skills left unarchived: a consolidation fork.
+  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ input: [expect.objectContaining({ text: expect.stringMatching(/Skill curator for "Dot"/) })] }));
+
+  await x.learning.set("bot_main", { curatorPaused: true });
+  expect(x.learning.curatorState("bot_main")).toMatchObject({ paused: true, nextRunAt: null });
+});

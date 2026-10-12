@@ -5602,6 +5602,23 @@
                 },
                 "updatedAt": {
                   "type": "number"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "stale",
+                    "archived"
+                  ]
+                },
+                "pinned": {
+                  "type": "boolean"
+                },
+                "usedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -5663,6 +5680,23 @@
           },
           "updatedAt": {
             "type": "number"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "stale",
+              "archived"
+            ]
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "usedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -5737,6 +5771,720 @@
         },
         "required": [
           "deleted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_skill_pin": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "pinned"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "changed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_skill_restore": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "changed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_learning": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval": {
+            "type": "number"
+          },
+          "reviewModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "defaultModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval": {
+            "type": "boolean"
+          },
+          "consolidate": {
+            "type": "boolean"
+          },
+          "curatorPaused": {
+            "type": "boolean"
+          },
+          "toolTurns": {
+            "type": "number"
+          },
+          "userTurns": {
+            "type": "number"
+          },
+          "reviewing": {
+            "type": "boolean"
+          },
+          "lastReview": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "number"
+                  },
+                  "result": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "at",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastCurator": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "number"
+                  },
+                  "result": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "at",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextCuratorAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "write",
+                    "delete"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "diff": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "action",
+                "description",
+                "diff",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "interval",
+          "reviewModel",
+          "defaultModel",
+          "models",
+          "approval",
+          "consolidate",
+          "curatorPaused",
+          "toolTurns",
+          "userTurns",
+          "reviewing",
+          "lastReview",
+          "lastCurator",
+          "nextCuratorAt",
+          "pending"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_learning_set": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 200
+          },
+          "reviewModel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approval": {
+            "type": "boolean"
+          },
+          "consolidate": {
+            "type": "boolean"
+          },
+          "curatorPaused": {
+            "type": "boolean"
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval": {
+            "type": "number"
+          },
+          "reviewModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "defaultModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval": {
+            "type": "boolean"
+          },
+          "consolidate": {
+            "type": "boolean"
+          },
+          "curatorPaused": {
+            "type": "boolean"
+          },
+          "toolTurns": {
+            "type": "number"
+          },
+          "userTurns": {
+            "type": "number"
+          },
+          "reviewing": {
+            "type": "boolean"
+          },
+          "lastReview": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "number"
+                  },
+                  "result": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "at",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastCurator": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "number"
+                  },
+                  "result": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "at",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextCuratorAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "write",
+                    "delete"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "diff": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "action",
+                "description",
+                "diff",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "interval",
+          "reviewModel",
+          "defaultModel",
+          "models",
+          "approval",
+          "consolidate",
+          "curatorPaused",
+          "toolTurns",
+          "userTurns",
+          "reviewing",
+          "lastReview",
+          "lastCurator",
+          "nextCuratorAt",
+          "pending"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_learning_review": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "started"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_skill_curate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "consolidating": {
+            "type": "boolean"
+          },
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "changes",
+          "consolidating",
+          "result"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_skill_pending_resolve": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "approve": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "approve"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval": {
+            "type": "number"
+          },
+          "reviewModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "defaultModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval": {
+            "type": "boolean"
+          },
+          "consolidate": {
+            "type": "boolean"
+          },
+          "curatorPaused": {
+            "type": "boolean"
+          },
+          "toolTurns": {
+            "type": "number"
+          },
+          "userTurns": {
+            "type": "number"
+          },
+          "reviewing": {
+            "type": "boolean"
+          },
+          "lastReview": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "number"
+                  },
+                  "result": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "at",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastCurator": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "number"
+                  },
+                  "result": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "at",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextCuratorAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "write",
+                    "delete"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "diff": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "action",
+                "description",
+                "diff",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "interval",
+          "reviewModel",
+          "defaultModel",
+          "models",
+          "approval",
+          "consolidate",
+          "curatorPaused",
+          "toolTurns",
+          "userTurns",
+          "reviewing",
+          "lastReview",
+          "lastCurator",
+          "nextCuratorAt",
+          "pending"
         ],
         "additionalProperties": false
       }

@@ -340,7 +340,17 @@ it("keeps skills to the Bot until shared into BB's user skills, and deletes them
   x.bots.writeSkill({ name: "weekly-review", description: "Fridays: sum up the week", body: "1. Read threads" });
   x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "Steps" });
   expect(x.bots.skills().map((skill) => skill.name)).toEqual(["inbox", "weekly-review"]);
-  expect(x.bots.instructions(x.bots.forThread("bot1")!)).toContain("inbox, weekly-review");
+  expect(x.bots.instructions(x.bots.forThread("bot1")!)).toContain("- inbox: Sort mail\n- weekly-review: Fridays: sum up the week");
+  // Archived skills are hidden from the Bot until restored; loading a stale one makes it active; pins stick.
+  expect(x.bots.setSkillState("inbox", "archived")).toBe(true);
+  expect(x.bots.instructions(x.bots.forThread("bot1")!)).not.toContain("inbox: Sort");
+  x.bots.setSkillState("inbox", "active");
+  expect(x.bots.skill("inbox")).toMatchObject({ state: "active", pinned: false, usedAt: expect.any(Number) });
+  x.bots.setSkillState("weekly-review", "stale");
+  x.bots.touchSkill("weekly-review");
+  expect(x.bots.skill("weekly-review")?.state).toBe("active");
+  expect(x.bots.pinSkill("weekly-review", true)).toBe(true);
+  expect(x.bots.skills().find((skill) => skill.name === "weekly-review")?.pinned).toBe(true);
   const { path } = await x.bots.shareSkill("weekly-review");
   expect(path).toBe(join(x.userSkillsDir, "weekly-review", "SKILL.md"));
   expect(await readFile(path, "utf8")).toBe('---\nname: weekly-review\ndescription: "Fridays: sum up the week"\n---\n\n1. Read threads\n');
