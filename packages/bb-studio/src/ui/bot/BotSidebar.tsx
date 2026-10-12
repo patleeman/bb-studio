@@ -7,7 +7,8 @@
 // the bot itself opens its main thread, the page.
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
-import { experimental_SidebarNavigationIcon as NavigationIcon, experimental_useSidebarNavigation, ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import * as BbApp from "@get-bb/plugin-sdk/app";
 import type { ExperimentalSidebarNavigationItem, ExperimentalSidebarNavigationProps } from "@get-bb/plugin-sdk";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { botPath, forBot, NEW_BOT_PATH, useBotSelection } from "./selection";
@@ -115,12 +116,22 @@ export function BotNavigation({ experimental_Original: Original }: ExperimentalS
   const sdk = useSdk();
   const onBotPage = isBotPath(usePathname());
   useEffect(() => { if (!onBotPage) void syncThreadList(sdk, false); }, [sdk, onBotPage]);
-  if (!onBotPage) return <Original />;
+  if (!onBotPage || !sidebarNavigation.experimental_useSidebarNavigation) return <Original />;
   return <BotNavigationItems />;
 }
 
+// Read off the module, not imported by name: a BB without sidebar navigation
+// (BB Nightly dropped it) has neither, and Studio must still build and load there.
+const sidebarNavigation = BbApp as Partial<Pick<typeof BbApp, "experimental_useSidebarNavigation" | "experimental_SidebarNavigationIcon">>;
+
 function BotNavigationItems() {
-  const { items, activeItemId, isShortcutModifierHeld, actions } = experimental_useSidebarNavigation();
+  const { experimental_useSidebarNavigation: useNavigation, experimental_SidebarNavigationIcon: NavigationIcon } = sidebarNavigation;
+  if (!useNavigation || !NavigationIcon) return null;
+  return <NavigationRows useNavigation={useNavigation} NavigationIcon={NavigationIcon} />;
+}
+
+function NavigationRows({ useNavigation, NavigationIcon }: { useNavigation: typeof BbApp.experimental_useSidebarNavigation; NavigationIcon: typeof BbApp.experimental_SidebarNavigationIcon }) {
+  const { items, activeItemId, isShortcutModifierHeld, actions } = useNavigation();
   const { creating } = useBotSelection();
   const open = (item: ExperimentalSidebarNavigationItem) => {
     if (item.id === NEW_THREAD_ITEM) openAppPath(NEW_BOT_PATH);
