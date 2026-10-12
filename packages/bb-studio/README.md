@@ -971,6 +971,10 @@ bb studio reindex
 
 ## Bot
 
+![The Bot's home in a staged BB: Dot with its chat, Needs you, In progress, Scheduled (its check-in and a Friday automation) and two completed threads it started](assets/bot.png)
+
+![Create your bot: name, emoji and an optional first message](assets/bot-create.png)
+
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
 the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
 of Staff", with the same thread and check-ins; rename it in its home.
