@@ -44,6 +44,11 @@ export function botHeartbeat(name: string): string {
   return `Check-in for ${JSON.stringify(name)}: read your Memory page and do what its "## Check-in" section says. Do the checks yourself; if a worker thread really helps, reuse the one you used before (bb thread tell) instead of starting a new one each time. Reply only if something changed or needs the user; otherwise finish without a final assistant message: no "✓", "nothing new" or other filler.`;
 }
 
+/** An external bot's check-in: it has no Memory page, so the message carries the ask. */
+export function externalHeartbeat(name: string): string {
+  return `Check-in for ${JSON.stringify(name)}: look over what you're keeping an eye on for me. Reply only if something changed or needs me; otherwise reply with one short line.`;
+}
+
 export const CHECKIN_PRESET_IDS = ["morning", "evening", "working", "off"] as const;
 export type CheckinPreset = (typeof CHECKIN_PRESET_IDS)[number];
 type PresetRun = { enabled: boolean; cadence: HeartbeatRun["cadence"]; time?: string; cron?: string };
@@ -245,7 +250,7 @@ export class Bots {
   promptFor(key: string): string | null {
     if (!key.startsWith(BOT_RUN_PREFIX)) return null;
     const row = this.row(key.slice(BOT_RUN_PREFIX.length));
-    return row ? botHeartbeat(row.name) : null;
+    return row ? (row.kind === "external" ? externalHeartbeat(row.name) : botHeartbeat(row.name)) : null;
   }
 
   /** An additional Bot's thread for its run key, for ProjectRuns.repair. */
@@ -319,7 +324,8 @@ export class Bots {
           title: input.name,
           environment: { type: "project-default" },
           pluginMetadata: { bot: id },
-          ...(external ? { providerId: external.providerId, model: external.model, executionInputSources: { providerId: "explicit", model: "explicit" } } : {}),
+          // Studio Agents' providers take no reasoning levels and run with full permission (the remote agent enforces its own).
+          ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: "full", executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : {}),
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
           input: [{ type: "text", text: input.prompt ?? `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`, mentions: [] }],
         } as never);

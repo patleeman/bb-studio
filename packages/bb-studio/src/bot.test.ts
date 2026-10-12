@@ -340,7 +340,7 @@ it("imports an external bot: its thread runs on the provider and model, and Stud
   await expect(x.bots.create({ name: "X", avatar: "🤖", external: { providerId: "codex", model: "m" } })).rejects.toThrow(/isn't an external/);
   const made = await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "hermes-agent" } });
   expect(made.bot).toMatchObject({ kind: "external", providerId: "hermes", model: "hermes-agent", primary: false });
-  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "hermes", model: "hermes-agent", pluginMetadata: { bot: made.bot!.id } });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "hermes", model: "hermes-agent", reasoningLevel: "none", permissionMode: "full", pluginMetadata: { bot: made.bot!.id } });
   expect(x.bots.memoryPage(made.bot!.id)).toBeNull();
   expect(() => x.bots.requireStudio(made.bot!.id, "skills")).toThrow("Herm has no Studio skills. Runs on Hermes — its memory and tools live there.");
   expect(() => x.bots.requireStudio(undefined, "skills")).not.toThrow();
@@ -350,5 +350,6 @@ it("imports an external bot: its thread runs on the provider and model, and Stud
   // Check-ins still work: an automation that messages its thread.
   await x.bots.setRun({ botId: made.bot!.id, enabled: true, cadence: "daily", time: "09:00" });
   expect(x.automations.at(-1)).toMatchObject({ execution: { targetThreadId: made.bot!.threadId } });
+  expect((x.automations.at(-1)!.execution as { prompt: string }).prompt).not.toContain("Memory page");
   expect((await x.bots.pause(made.bot!.id)).bot!.state).toBe("paused");
 });
