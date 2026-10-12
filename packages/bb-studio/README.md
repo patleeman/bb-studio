@@ -1117,6 +1117,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `automation_update`, `automation_pause`, `automation_resume`,
   `automation_run_now` and `automation_delete` ("in 2h check the deploy" is
   a reminder); `runner_*` still work.
+  ![The Info tab's Automations in a staged BB: Dot's original Check-in (weekdays 8:00) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; Dot's chat shows the watcher's line and its one-line reply](assets/bot-automations.png)
+
 - **Schedule editor** (`src/ui/bot/ScheduleEditor.tsx`, compiled by
   `src/schedule.ts`): presets, weekday chips, several times a day, every N
   minutes or hours within an active window, quiet hours (runs inside are
@@ -1127,6 +1129,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   one automation. More than eight is refused. The end date isn't a cron
   field: Studio pauses the group once the day has passed in its timezone.
   The preview shows the words and the crons.
+
+  ![The schedule editor editing the Release watch watcher: its bash script and 30 s timeout, what to do with the output, Wakes: The bot; presets, the Every… mode, every day on, every 15 minutes from 0:00 to 23:59, quiet hours 22:00–7:00, no end date, the America/New_York timezone, and the preview "Every 15 min, every day · quiet 22:00–7:00" with its cron */15 7-21 * * *](assets/bot-schedule-editor.png)
 - **Memory**: one Studio page per Bot, "<name>'s Memory" in the personal
   project, made the first time it's needed (its thread starts, or
   **Memory** in the ⋯ menu). Its top section, `## Check-in`, is what the Bot

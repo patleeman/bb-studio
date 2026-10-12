@@ -426,13 +426,15 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     const has = (name) => automations.some((each) => each.name === name);
     if (!has("Evening wrap-up")) await pluginRpc("studio", "bot_automation_create", { kind: "checkin", name: "Evening wrap-up", instruction: "Wrap up what got done on ORBIT-42 today and what's left for tomorrow.", schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["18:00"] } });
     if (!has("Check the deploy")) await pluginRpc("studio", "bot_automation_create", { kind: "reminder", name: "Check the deploy", instruction: "Check whether the ORBIT-42 production deploy finished and tell me.", schedule: { type: "once", at: Date.now() + 2 * 3600_000 } });
-    if (!has("Release watch")) {
-      const watcher = await pluginRpc("studio", "bot_automation_create", { kind: "watcher", name: "Release watch", instruction: "Tell me in one line, and only if it's ORBIT-42.", schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6], quiet: { from: "22:00", to: "07:00" } }, script: { body: WATCHER_SCRIPT, interpreter: "bash", timeoutMs: 30000 } });
-      // Two runs: the first prints (a wake-up), the second prints nothing.
-      for (let i = 0; i < 2; i++) {
-        await pluginRpc("studio", "bot_automation_run_now", { id: watcher.id });
-        for (let j = 0; j < 30 && (await pluginRpc("studio", "bot_automation_runs", { id: watcher.id })).runs.length <= i; j++) await sleep(2000);
-      }
+    if (!has("Release watch")) await pluginRpc("studio", "bot_automation_create", { kind: "watcher", name: "Release watch", instruction: "Tell me in one line, and only if it's ORBIT-42.", schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6], quiet: { from: "22:00", to: "07:00" } }, script: { body: WATCHER_SCRIPT, interpreter: "bash", timeoutMs: 30000 } });
+    ({ automations } = await pluginRpc("studio", "bot_automations", {}));
+    const watcherId = automations.find((each) => each.name === "Release watch").id;
+    // Two finished runs: the first prints (a wake-up), the second prints nothing. One at a time.
+    const finished = async () => (await pluginRpc("studio", "bot_automation_runs", { id: watcherId })).runs.filter((run) => run.outcome !== "Running");
+    for (let want = 1; want <= 2; want++) {
+      if ((await finished()).length >= want) continue;
+      await pluginRpc("studio", "bot_automation_run_now", { id: watcherId });
+      for (let j = 0; j < 30 && (await finished()).length < want; j++) await sleep(2000);
     }
     ({ automations } = await pluginRpc("studio", "bot_automations", {}));
     const watcher = automations.find((each) => each.name === "Release watch");
