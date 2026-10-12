@@ -101,7 +101,7 @@ function AutomationRow({ botId, automation, expanded, busy, disabled, onToggle, 
         <span className={`min-w-0 flex-1 truncate text-sm font-medium ${off ? "text-muted-foreground" : ""}`}>{automation.name}</span>
         <span className="shrink-0 text-xs text-muted-foreground" title={automation.nextRunAt ? `Next run ${new Date(automation.nextRunAt).toLocaleString()}` : undefined}>{when}</span>
       </button>
-      <p className="truncate pl-5.5 text-xs text-muted-foreground">{automation.scheduleText}{automation.kind === "watcher" && automation.target !== "main" ? ` · wakes ${automation.targetName}` : ""}</p>
+      <p className="truncate pl-5.5 text-xs text-muted-foreground" title={automation.lastOutcome ?? undefined}>{automation.scheduleText}{automation.kind === "watcher" && automation.target !== "main" ? ` · wakes ${automation.targetName}` : ""}{automation.lastOutcome && !/^(succeeded|skipped)$/.test(automation.lastOutcome) ? <> · <span className="text-foreground/80">{automation.lastOutcome}</span></> : null}</p>
       {expanded ? (
         <div className="flex flex-col gap-2 pl-5.5 pt-1">
           {automation.kind === "watcher" && automation.script

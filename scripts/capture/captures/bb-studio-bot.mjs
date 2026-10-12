@@ -125,7 +125,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await workspace(client);
     await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
     await client.waitForSelector('[aria-label="Dot info"]', 30000);
-    for (const text of ["Check-ins", "Morning brief", "Memory", "Skills", "Activity", "Scheduled"]) await client.waitForText(text, 30000);
+    for (const text of ["Automations", "Check-in", "Weekdays 8:00", "Memory", "Skills", "Activity", "Scheduled"]) await client.waitForText(text, 30000);
     await sleep(1500);
   };
 
@@ -191,17 +191,17 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await workspace(client);
     for (const text of ["Runners", "Inbox watch", "Deploy watch"]) await client.waitForText(text, 60000);
     await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
-    await client.waitForSelector('[aria-label$=" info"] section[aria-label=Runners] [data-runner]', 30000);
+    await client.waitForSelector('[aria-label$=" info"] section[aria-label=Automations] [data-kind=runner]', 30000);
     await client.evaluate(`(() => new Promise((resolve, reject) => {
       const started = Date.now();
       const tick = () => {
-        const section = document.querySelector('[aria-label$=" info"] section[aria-label=Runners]');
+        const section = document.querySelector('[aria-label$=" info"] section[aria-label=Automations]');
         const text = section?.textContent ?? "";
-        if (/Inbox watch/.test(text) && /Deploy watch/.test(text) && /two newsletters/.test(text) && /health check failing/.test(text) && /Run now/.test(text) && /New runner/.test(text)) {
+        if (/Inbox watch/.test(text) && /Deploy watch/.test(text) && /two newsletters/.test(text) && /health check failing/.test(text) && /New/.test(text)) {
           section.scrollIntoView({ block: "start" });
           return resolve(true);
         }
-        if (Date.now() - started > 60000) return reject(new Error("The Info tab's Runners section doesn't show both runners and their reports"));
+        if (Date.now() - started > 60000) return reject(new Error("The Info tab's Automations don't show both runners and their reports"));
         setTimeout(tick, 300);
       };
       tick();
@@ -217,7 +217,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await client.waitForSelector('button[aria-label="Bot info"]', 30000);
     // The right panel is open (Info) before the runner opens in its Threads tab.
     await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
-    await client.waitForSelector('[aria-label$=" info"] section[aria-label=Runners]', 30000);
+    await client.waitForSelector('[aria-label$=" info"] section[aria-label=Automations]', 30000);
     await client.evaluate(`(() => {
       const row = [...document.querySelectorAll('${SIDEBAR} section[aria-label="Runners"] button[data-runner]')].find((each) => each.textContent.includes("Deploy watch"));
       if (!row) throw new Error("No Deploy watch row under Runners");
@@ -413,6 +413,94 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
+  /**
+   * Automations (src/automations.ts): the original check-in (Morning brief
+   * preset) and an evening one, a reminder two hours out, a watcher whose
+   * script prints once and then stays quiet (run twice: one wake-up, one
+   * "Nothing new"), and the runners above.
+   */
+  const WATCHER_SCRIPT = 'if [ ! -f fired ]; then touch fired; echo "ORBIT-42 v1.4.0 is out on the release page"; fi\nexit 0';
+  const seededAutomations = async () => {
+    const { bot } = await seededRunners();
+    let { automations } = await pluginRpc("studio", "bot_automations", {});
+    const has = (name) => automations.some((each) => each.name === name);
+    if (!has("Evening wrap-up")) await pluginRpc("studio", "bot_automation_create", { kind: "checkin", name: "Evening wrap-up", instruction: "Wrap up what got done on ORBIT-42 today and what's left for tomorrow.", schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["18:00"] } });
+    if (!has("Check the deploy")) await pluginRpc("studio", "bot_automation_create", { kind: "reminder", name: "Check the deploy", instruction: "Check whether the ORBIT-42 production deploy finished and tell me.", schedule: { type: "once", at: Date.now() + 2 * 3600_000 } });
+    if (!has("Release watch")) {
+      const watcher = await pluginRpc("studio", "bot_automation_create", { kind: "watcher", name: "Release watch", instruction: "Tell me in one line, and only if it's ORBIT-42.", schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6], quiet: { from: "22:00", to: "07:00" } }, script: { body: WATCHER_SCRIPT, interpreter: "bash", timeoutMs: 30000 } });
+      // Two runs: the first prints (a wake-up), the second prints nothing.
+      for (let i = 0; i < 2; i++) {
+        await pluginRpc("studio", "bot_automation_run_now", { id: watcher.id });
+        for (let j = 0; j < 30 && (await pluginRpc("studio", "bot_automation_runs", { id: watcher.id })).runs.length <= i; j++) await sleep(2000);
+      }
+    }
+    ({ automations } = await pluginRpc("studio", "bot_automations", {}));
+    const watcher = automations.find((each) => each.name === "Release watch");
+    // Studio's minute tick posts the finding to the Bot's thread.
+    for (let i = 0; i < 50 && !(await pluginRpc("studio", "bot_automations", {})).automations.find((each) => each.id === watcher.id)?.lastOutcome?.startsWith("Woke"); i++) await sleep(3000);
+    const runs = (await pluginRpc("studio", "bot_automation_runs", { id: watcher.id })).runs.map((run) => run.outcome);
+    if (!runs.some((each) => each.startsWith("Woke it: ORBIT-42 v1.4.0")) || !runs.includes("Nothing new")) throw new Error(`The watcher's runs are ${JSON.stringify(runs)}, not one wake-up and one quiet run`);
+    await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
+    const transcript = await bbCli(["thread", "log", bot.threadId]).catch(() => "");
+    if (!/Watcher Release watch: ORBIT-42 v1\.4\.0/.test(transcript)) throw new Error("The Bot's thread didn't get the watcher's finding");
+    return watcher;
+  };
+  const openInfoAutomations = async (client) => {
+    await workspace(client);
+    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await client.waitForSelector('[aria-label$=" info"] section[aria-label=Automations] [data-kind=watcher]', 30000);
+  };
+  const automationsList = async (client) => {
+    await seededAutomations();
+    await openInfoAutomations(client);
+    await client.evaluate(`(() => { document.querySelector('section[aria-label=Automations] [data-kind=watcher] button[aria-expanded]').click(); return true; })()`);
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const section = document.querySelector('[aria-label$=" info"] section[aria-label=Automations]');
+        const text = section?.textContent ?? "";
+        const kinds = [...section.querySelectorAll('[data-kind]')].map((each) => each.dataset.kind);
+        const checkins = kinds.filter((kind) => kind === "checkin").length;
+        if (checkins === 2 && kinds.includes("reminder") && kinds.includes("runner") && /Evening wrap-up/.test(text) && /Check the deploy/.test(text) && /Woke it: ORBIT-42 v1.4.0/.test(text) && /Nothing new/.test(text) && /Weekdays 8:00/.test(text)) {
+          section.scrollIntoView({ block: "start" });
+          return resolve(true);
+        }
+        if (Date.now() - started > 60000) return reject(new Error("Automations don't show two check-ins, a reminder, the watcher's runs and runners: " + kinds.join(",")));
+        setTimeout(tick, 300);
+      };
+      tick();
+    }))()`);
+    await sleep(1500);
+  };
+  const scheduleEditor = async (client) => {
+    await seededAutomations();
+    await openInfoAutomations(client);
+    await client.evaluate(`(() => {
+      const row = document.querySelector('section[aria-label=Automations] [data-kind=watcher]');
+      row.querySelector('button[aria-expanded]').click();
+      return true;
+    })()`);
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const edit = [...document.querySelectorAll('section[aria-label=Automations] [data-kind=watcher] button')].find((each) => each.textContent.trim() === "Edit");
+        if (edit) { edit.click(); return resolve(true); }
+        if (Date.now() - started > 10000) return reject(new Error("No Edit on the watcher"));
+        setTimeout(tick, 200);
+      };
+      tick();
+    }))()`);
+    await client.waitForSelector('[data-testid=automation-editor] [data-testid=schedule-preview]', 30000);
+    await client.evaluate(`(() => {
+      const editor = document.querySelector('[data-testid=automation-editor]');
+      const text = editor.textContent;
+      for (const want of ["Edit Release watch", "Script", "Every 15 min, every day · quiet 22:00–7:00", "*/15 7-21 * * *", "Quiet hours", "Timezone", "Morning and evening"]) if (!text.includes(want)) throw new Error("The schedule editor lacks " + want);
+      if (!editor.querySelector('[role=group][aria-label=Days] [aria-pressed=true]')) throw new Error("No day chips on");
+      return true;
+    })()`);
+    await sleep(1000);
+  };
+
   return [
     {
       id: "studio-bot-create",
@@ -433,6 +521,8 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     { id: "studio-bot-threads", packageDir: "bb-studio", fileName: "bot-threads.png", setup: threads },
     { id: "studio-bot-leave", packageDir: "bb-studio", fileName: "bot-leave.png", setup: leave },
     { id: "studio-bot-runners", packageDir: "bb-studio", fileName: "bot-runners.png", setup: runnersInfo },
+    { id: "studio-bot-automations", packageDir: "bb-studio", fileName: "bot-automations.png", setup: automationsList },
+    { id: "studio-bot-schedule-editor", packageDir: "bb-studio", fileName: "bot-schedule-editor.png", setup: scheduleEditor },
     { id: "studio-bot-runner-thread", packageDir: "bb-studio", fileName: "bot-runner-thread.png", setup: runnerThread },
     { id: "studio-bot-new", packageDir: "bb-studio", fileName: "bot-new.png", setup: newBot },
     { id: "studio-bot-two", packageDir: "bb-studio", fileName: "bot-two.png", setup: twoBots },
