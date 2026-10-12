@@ -350,6 +350,12 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/ModelHandoff.swift",
+      "plugin": "studio",
+      "method": "thread_handoff_to_model",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "studio",
       "method": "pages.tree",

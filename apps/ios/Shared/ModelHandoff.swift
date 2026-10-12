@@ -27,7 +27,7 @@ extension BBClient {
     /// Studio starts a new thread with a handoff summary, carrying permissions
     /// forward (and, for a bot's thread, advancing the bot's chain).
     public func handoffToModel(_ threadId: String, providerId: String, model: String, reasoning: String?) async throws -> ModelHandoffResult {
-        try await rpc("studio", "thread_handoff_to_model", .object(omittingNil: [
+        try await rpc("studio", Studio.Method.thread_handoff_to_model, .object(omittingNil: [
             "threadId": .string(threadId), "providerId": .string(providerId), "model": .string(model),
             "reasoning": reasoning.map(JSONValue.string),
         ]))
