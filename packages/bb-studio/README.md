@@ -975,6 +975,8 @@ bb studio reindex
 
 ![The same workspace with two sub-threads opened from the sidebar in the right panel's Threads tab: a strip of two tabs over BB's thread view of the deploy-key thread, whose question waits on the user](assets/bot-threads.png)
 
+![After leaving the Bot page: Dot's main thread as a normal BB thread page, with BB's own thread list back in the sidebar (Dot and the threads it started, nested, then the project's other threads)](assets/bot-leave.png)
+
 ![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
