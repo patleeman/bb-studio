@@ -971,7 +971,7 @@ bb studio reindex
 
 ## Bot
 
-![The Bot's home in a staged BB: Dot with its chat, Needs you, In progress, Scheduled (its check-in and a Friday automation) and two completed threads it started](assets/bot.png)
+![The Bot's home in a staged BB: Dot with its chat and Memory button, Needs you, In progress, Waiting to start (a thread queued for next week), Scheduled (its check-in and a Friday automation), two completed threads it started, and Skills with one skill it saved (Share, Delete)](assets/bot.png)
 
 ![Create your bot: name, emoji and an optional first message](assets/bot-create.png)
 
