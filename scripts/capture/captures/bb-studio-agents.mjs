@@ -1,8 +1,7 @@
-// Studio Agents (packages/bb-studio-agents) and external bots. The staged BB
-// must have Studio Agents pointed at the local fixtures (Hermes:
-// packages/bb-studio-agents/scripts/hermes-fixture.mjs with
-// HERMES_FIXTURE_REPLY set; Grok: scripts/grok-fixture.mjs), with hermes and
-// grok enabled; OpenClaw and Dot stay off. Captures: the plugin's settings
+// Studio Agents (packages/bb-studio-agents) and external bots. staged-bb.mjs
+// starts the local fixtures (packages/bb-studio-agents/scripts: Hermes with
+// HERMES_FIXTURE_REPLY set, and Grok) and points Studio Agents at them, with
+// hermes and grok enabled; OpenClaw and Dot stay off. Captures: the plugin's settings
 // page; Import bot's dialog (Hermes and Grok ready, OpenClaw and Dot not
 // configured); an imported Hermes bot and an imported Grok bot after one
 // chat each, the Info tab saying its memory and tools live on the provider.
@@ -82,7 +81,10 @@ export default ({ pluginRpc, bbCli, sleep }) => {
         await client.navigate("/settings/plugins/external-agents");
         await client.waitForText("Studio Agents", 30000);
         for (const text of ["Enable Hermes", "Hermes API URL", "Enable Grok", "xAI API URL", "xAI API key environment variable", "Enable OpenClaw", "OpenClaw token environment variable"]) await client.waitForText(text, 30000);
-        for (const value of ["STAGED_XAI_KEY", "http://127.0.0.1:49390/v1", "STAGED_HERMES_TOKEN"]) {
+        // staged-bb.mjs points Grok at its fixture's port.
+        const grokUrl = process.env.BB_CAPTURE_GROK_URL;
+        if (!grokUrl) throw new Error("Set BB_CAPTURE_GROK_URL (staged-bb.mjs writes it to capture.env).");
+        for (const value of ["STAGED_XAI_KEY", grokUrl, "STAGED_HERMES_TOKEN"]) {
           let shown = false;
           for (let i = 0; i < 60 && !shown; i++) { shown = !!(await client.poll(`[...document.querySelectorAll("input")].some((input) => input.value === ${JSON.stringify(value)})`)); if (!shown) await sleep(250); }
           if (!shown) throw new Error(`Studio Agents settings don't show ${value}`);

@@ -21,7 +21,7 @@ import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
-import { useOpenInfo, useOpenSubThread } from "./workspace";
+import { useOpenInfo, useOpenSubThread, useOpenSubThreadRequests } from "./workspace";
 import { BOT_PATH, botPath, forBot, useBotSelection } from "./selection";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
@@ -237,6 +237,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const { bot, profile, run, busy, error, setSheet } = controls;
   const openInfo = useOpenInfo();
   const openSub = useOpenSubThread(bot.id, openThreadPage);
+  useOpenSubThreadRequests(bot.id);
   const startedNeedsYou = (activity.data?.needsYou ?? []).filter((thread) => thread.relation === "started");
   const status = statusLabel(view.run, bot.state, running);
 

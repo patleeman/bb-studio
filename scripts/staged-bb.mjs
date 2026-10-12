@@ -12,8 +12,8 @@
  *   node scripts/staged-bb.mjs stop
  *
  * BB_STAGED_DIR moves the instance (default $TMPDIR/bb-studio-staged) and
- * BB_STAGED_PORT picks its server port (default 48986); the host daemon and
- * the capture Chrome take the next two ports. stop deletes the directory, so
+ * BB_STAGED_PORT picks its server port (default 48986); the host daemon, the
+ * capture Chrome, and the Hermes and Grok fixtures take the next four ports. stop deletes the directory, so
  * every start seeds the same state.
  */
 import { spawn } from "node:child_process";
@@ -37,7 +37,7 @@ const stagedDir = resolve(process.env.BB_STAGED_DIR || join(tmpdir(), "bb-studio
   if (unsafe || stagedDir === dirname(stagedDir)) throw new Error(`Refusing to use ${stagedDir} as BB_STAGED_DIR: it would delete the repository, your home directory, or ~/.bb.`);
 }
 const port = Number(process.env.BB_STAGED_PORT ?? "48986");
-if (!Number.isInteger(port) || port < 1024 || port > 65533) throw new Error(`BB_STAGED_PORT must be a port from 1024 to 65533, not ${process.env.BB_STAGED_PORT}`);
+if (!Number.isInteger(port) || port < 1024 || port > 65531) throw new Error(`BB_STAGED_PORT must be a port from 1024 to 65531, not ${process.env.BB_STAGED_PORT}`);
 const serverUrl = `http://127.0.0.1:${port}`;
 const dataDir = join(stagedDir, "data");
 const binDir = join(stagedDir, "bb-app", "node_modules", ".bin");
@@ -156,8 +156,8 @@ async function start() {
   if (await healthy()) throw new Error(`Something already answers at ${serverUrl}. Run stop, or set BB_STAGED_PORT.`);
   // Anything else on these ports (another BB that rejects /health, a Chrome
   // with remote debugging) would receive the staged CLI calls and captures.
-  for (const candidate of [port, port + 1, port + 2]) {
-    if (!(await portFree(candidate))) throw new Error(`Port ${candidate} is in use. Set BB_STAGED_PORT to a free range of three ports.`);
+  for (const candidate of [port, port + 1, port + 2, port + 3, port + 4]) {
+    if (!(await portFree(candidate))) throw new Error(`Port ${candidate} is in use. Set BB_STAGED_PORT to a free range of five ports.`);
   }
   await rm(stagedDir, { recursive: true, force: true });
   await mkdir(stagedDir, { recursive: true });
@@ -241,6 +241,8 @@ async function seed({ plugins, capturePlugin, ref, version }) {
   const workspaceThread = !capturePlugin || capturePlugin === "studio" || capturePlugin === "artifacts"
     ? await seedWorkspaceThread(project, machine, orbitDir) : null;
 
+  if (!capturePlugin || capturePlugin === "studio" || capturePlugin === "external-agents") await startAgentFixtures();
+
   const envFile = join(stagedDir, "capture.env");
   await writeFile(
     envFile,
@@ -256,6 +258,7 @@ async function seed({ plugins, capturePlugin, ref, version }) {
       "unset BB_CAPTURE_ONLY BB_CAPTURE_PLUGIN",
       ...(capturePlugin ? [`export BB_CAPTURE_PLUGIN=${capturePlugin}`] : []),
       `export BB_CAPTURE_CDP_PORT=${port + 2}`,
+      `export BB_CAPTURE_GROK_URL=http://127.0.0.1:${port + 4}/v1`,
       `export PATH="${binDir}:$PATH"`,
       "unset BB_CLI BB_HOST_DAEMON_PORT BB_THREAD_ID BB_PROJECT_ID BB_ENVIRONMENT_ID BB_THREAD_STORAGE",
       "",
@@ -264,7 +267,36 @@ async function seed({ plugins, capturePlugin, ref, version }) {
   process.stdout.write(`\nSeeded project Orbit (${project.id}). Point captures at it with:\n  . "${envFile}"\n`);
 }
 
+const fixturePids = join(stagedDir, "fixtures.pids");
+
+/** Local Hermes and Grok APIs, so Studio Agents and imported bots have ready providers. */
+async function startAgentFixtures() {
+  const scripts = join(repoRoot, "packages/bb-studio-agents/scripts");
+  const tokens = join(stagedDir, "agents.env");
+  await writeFile(tokens, "STAGED_HERMES_TOKEN=bb-hermes-fixture\nSTAGED_XAI_KEY=bb-grok-fixture\n");
+  const pids = [];
+  for (const [script, env] of [
+    ["hermes-fixture.mjs", { HERMES_FIXTURE_PORT: String(port + 3), HERMES_FIXTURE_REPLY: "I'm Hermes. I run outside Studio, so my memory and tools live on Hermes." }],
+    ["grok-fixture.mjs", { GROK_FIXTURE_PORT: String(port + 4) }],
+  ]) {
+    const log = await open(join(stagedDir, script.replace(".mjs", ".log")), "a");
+    const child = spawn(process.execPath, [join(scripts, script)], { env: { ...process.env, ...env }, stdio: ["ignore", log.fd, log.fd], detached: true });
+    child.unref();
+    await log.close();
+    pids.push(child.pid);
+  }
+  await writeFile(fixturePids, pids.join("\n"));
+  const settings = {
+    hermesEnabled: "true", hermesBaseUrl: `http://127.0.0.1:${port + 3}`, hermesTokenEnv: "STAGED_HERMES_TOKEN", hermesTokenEnvFile: tokens,
+    grokEnabled: "true", grokBaseUrl: `http://127.0.0.1:${port + 4}/v1`, grokTokenEnv: "STAGED_XAI_KEY", grokTokenEnvFile: tokens,
+  };
+  for (const [key, value] of Object.entries(settings)) await run(join(binDir, "bb"), ["plugin", "config", "external-agents", "set", key, value], { quiet: true });
+}
+
 async function stop() {
+  for (const pid of existsSync(fixturePids) ? (await readFile(fixturePids, "utf8")).split("\n").filter(Boolean) : []) {
+    try { process.kill(Number(pid)); } catch {}
+  }
   // Stop even when /health doesn't answer (still starting, or wedged), so
   // deleting the directory can't orphan a running BB.
   if (existsSync(join(binDir, "bb-app"))) {

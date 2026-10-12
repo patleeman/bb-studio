@@ -3,7 +3,7 @@
 // its sidebar groups the threads it started. No React components here, so
 // app.tsx, the page and the tabs can share it without import cycles.
 import { experimental_useAppPanel, type JsonValue } from "@get-bb/plugin-sdk/app";
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
 
 /** The Bot's nav panel id (also BOT_PANEL in BotHome). */
@@ -113,8 +113,28 @@ export function useOpenSubThread(botId: string, fallback: (threadId: string) => 
   const panel = experimental_useAppPanel();
   return useCallback((threadId: string) => {
     writeStrip(botId, stripOpen(readStrip(botId), threadId));
-    if (!panel.openFixedTab({ surface: { kind: "current" }, tab: THREADS_TAB, target: { threadId } })) fallback(threadId);
+    if (panel.openFixedTab({ surface: { kind: "current" }, tab: THREADS_TAB, target: { threadId } })) return;
+    // BB's sidebar (the Bots list) has no panel of its own: ask the Bot page.
+    const request = new CustomEvent<OpenSubRequest>(OPEN_SUB_EVENT, { detail: { botId, threadId }, cancelable: true });
+    if (window.dispatchEvent(request)) fallback(threadId);
   }, [botId, panel, fallback]);
+}
+
+const OPEN_SUB_EVENT = "studio-bot:open-sub-thread";
+type OpenSubRequest = { botId: string; threadId: string };
+
+/** On the Bot page: opens sub-threads the Bots list in BB's sidebar asks for in this page's Threads tab. */
+export function useOpenSubThreadRequests(botId: string): void {
+  const panel = experimental_useAppPanel();
+  useEffect(() => {
+    const onRequest = (event: Event) => {
+      const { detail } = event as CustomEvent<OpenSubRequest>;
+      if (detail?.botId !== botId) return;
+      if (panel.openFixedTab({ surface: { kind: "current" }, tab: THREADS_TAB, target: { threadId: detail.threadId } })) event.preventDefault();
+    };
+    window.addEventListener(OPEN_SUB_EVENT, onRequest);
+    return () => window.removeEventListener(OPEN_SUB_EVENT, onRequest);
+  }, [botId, panel]);
 }
 
 /** Selects the Info tab. */

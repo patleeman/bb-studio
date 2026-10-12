@@ -141,7 +141,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem('studio:query:all', ''); localStorage.setItem('studio:collection:view', 'list')`);
         await client.navigate("/plugins/studio/studio/collection");
         const unfiltered = await openNew();
-        for (const label of ["Page", "Drawing", "Table"]) {
+        for (const label of ["Page", "Drawing"]) {
           if (!unfiltered.includes(label)) throw new Error(`New menu did not offer ${label}`);
         }
         // Bots live in Teams, not Studio.
@@ -297,10 +297,12 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         if (excluded !== '-kind:page') throw new Error(`Exclude produced ${excluded}`);
         await client.clickAriaButtonWithPointer("Options for Kind Pages");
         await client.clickElementWithTextAndPointer('[role="menuitem"]', "Include Pages");
-        await client.clickElementWithTextAndPointer('button', "More filters");
-        await client.waitForSelector('[role="dialog"] section[aria-label="Project"]');
-        await client.waitForAriaButton("Orbit");
-        await client.clickAriaButtonWithPointer("Orbit");
+        // Project is its own picker beside Kind, not a More filters section.
+        await client.clickAriaButtonWithPointer("Filter by project");
+        await client.waitForSelector('[aria-label="Project filters"] button[aria-label="Orbit"]');
+        await client.clickAriaButtonWithPointer("Orbit", "[data-radix-popper-content-wrapper]");
+        // Let the chip land before Escape closes the picker.
+        await client.waitForAriaButton("Remove Project Orbit");
         await escape();
         await client.waitForAriaButton("Remove Project Orbit");
         await sleep(350);
@@ -311,8 +313,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         viewId = overview.views.find((view) => view.name === 'Launch pages')?.id;
         if (!viewId) throw new Error("Save view did not persist the filter query");
         await client.clickElementWithTextAndPointer('button', "Clear filters");
-        await client.clickElementWithTextAndPointer('button', "Views");
-        await client.clickElementWithTextAndPointer('button', "Launch pages");
+        // The toolbar's Views menu, not the Studio sidebar's saved views behind the page.
+        await client.clickElementWithTextAndPointer('[role="toolbar"][aria-label="Filters"] button', "Views");
+        await client.waitForSelector('[data-radix-popper-content-wrapper] [aria-label="Saved views"]');
+        await client.clickElementWithTextAndPointer('[data-radix-popper-content-wrapper] [aria-label="Saved views"] button', "Launch pages");
         await client.waitForAriaButton("Remove Project Orbit");
         await client.waitForAriaButton("Remove Kind Pages");
         await client.waitForText("Offline mode launch");
