@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { afterEach, vi } from "vitest";
-import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, BOT_NAVIGATION_PROVIDER as BOT_NAV, isBotPath, listSwitch, NATIVE_LIST_PROVIDER as NATIVE, NATIVE_NAVIGATION_PROVIDER as NATIVE_NAV, NAVIGATION_SWITCH, sidebarSwitch, syncThreadList } from "./threadListSwitch";
+import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, isBotPath, listSwitch, NATIVE_LIST_PROVIDER as NATIVE, hideItemSwitch, NEW_THREAD_ITEM as NEW, syncThreadList } from "./threadListSwitch";
 
 describe("listSwitch", () => {
   it("switches to the Bots list on the Bot page and remembers the choice", () => {
@@ -34,39 +34,57 @@ describe("isBotPath", () => {
   });
 });
 
-describe("navigation switch", () => {
-  const nav = (current: string, onBotPage: boolean, saved: string | null) => sidebarSwitch(NAVIGATION_SWITCH, current, onBotPage, saved);
-  it("shows Studio's navigation (New bot) on the Bot page and remembers the choice", () => {
-    expect(nav(AUTO, true, null)).toEqual({ set: BOT_NAV, save: AUTO });
-    expect(nav(NATIVE_NAV, true, null)).toEqual({ set: BOT_NAV, save: NATIVE_NAV });
-    expect(nav(BOT_NAV, true, NATIVE_NAV)).toEqual({});
+describe("hideItemSwitch", () => {
+  const sw = (current: unknown, onBotPage: boolean, saved: number | null) => hideItemSwitch(NEW, current, onBotPage, saved);
+  it("hides New thread on the Bot page and remembers its index", () => {
+    expect(sw([NEW, "a", "b"], true, null)).toEqual({ set: ["a", "b"], save: 0 });
+    expect(sw(["a", NEW], true, null)).toEqual({ set: ["a"], save: 1 });
   });
-  it("restores BB's bundled navigation, never automatic, on leaving", () => {
-    expect(nav(BOT_NAV, false, AUTO)).toEqual({ set: NATIVE_NAV, save: null });
-    expect(nav(BOT_NAV, false, null)).toEqual({ set: NATIVE_NAV, save: null });
-    expect(nav(BOT_NAV, false, "other/nav")).toEqual({ set: "other/nav", save: null });
-    expect(nav(AUTO, false, null)).toEqual({ set: NATIVE_NAV });
-    expect(nav(NATIVE_NAV, false, null)).toEqual({});
+  it("leaves the list alone when New thread is already hidden", () => {
+    expect(sw(["a"], true, null)).toEqual({});
+    expect(sw(["a"], true, 0)).toEqual({});
+  });
+  it("puts it back at the remembered index, clamped, and forgets", () => {
+    expect(sw(["a", "b"], false, 0)).toEqual({ set: [NEW, "a", "b"], save: null });
+    expect(sw(["a", "b"], false, 1)).toEqual({ set: ["a", NEW, "b"], save: null });
+    expect(sw(["a"], false, 5)).toEqual({ set: ["a", NEW], save: null });
+  });
+  it("keeps a New thread the user hid hidden", () => {
+    expect(sw(["a"], false, null)).toEqual({});
+  });
+  it("only forgets when the user showed it again", () => {
+    expect(sw([NEW, "a"], false, 0)).toEqual({ save: null });
+  });
+  it("skips a null (BB default) or non-list value", () => {
+    expect(sw(null, true, null)).toEqual({});
+    expect(sw(null, false, 0)).toEqual({});
   });
 });
 
 describe("syncThreadList", () => {
   afterEach(() => localStorage.clear());
-  const fake = (prefs: Record<string, string>) => {
+  const fake = (prefs: Record<string, unknown>) => {
     const values = { ...prefs };
-    const set = vi.fn(async ({ key, value }: { key: string; value: string }) => { values[key] = value; });
+    const set = vi.fn(async ({ key, value }: { key: string; value: unknown }) => { values[key] = value; });
     const sdk = { system: { uiPreferences: {
       list: async () => ({ preferences: Object.fromEntries(Object.entries(values).map(([key, value]) => [key, { value, revision: 1 }])) }),
       set,
     } } };
     return { sdk: sdk as never, values, set };
   };
-  it("switches both the list and the navigation, and puts BB's back", async () => {
-    const x = fake({ "sidebar.threadListProvider": NATIVE, "sidebar.navigationProvider": AUTO });
+  it("switches the list and hides New thread, and puts BB's back", async () => {
+    const x = fake({ "sidebar.threadListProvider": NATIVE, "sidebar.visiblePluginPanels": ["a", NEW, "b"] });
     await syncThreadList(x.sdk, true);
-    expect(x.values).toEqual({ "sidebar.threadListProvider": BOT, "sidebar.navigationProvider": BOT_NAV });
+    expect(x.values).toEqual({ "sidebar.threadListProvider": BOT, "sidebar.visiblePluginPanels": ["a", "b"] });
     await syncThreadList(x.sdk, false);
-    expect(x.values).toEqual({ "sidebar.threadListProvider": NATIVE, "sidebar.navigationProvider": NATIVE_NAV });
+    expect(x.values).toEqual({ "sidebar.threadListProvider": NATIVE, "sidebar.visiblePluginPanels": ["a", NEW, "b"] });
+  });
+  it("leaves a New thread the user hid hidden", async () => {
+    const x = fake({ "sidebar.visiblePluginPanels": ["a"] });
+    await syncThreadList(x.sdk, true);
+    await syncThreadList(x.sdk, false);
+    expect(x.values).toEqual({ "sidebar.visiblePluginPanels": ["a"] });
+    expect(x.set).not.toHaveBeenCalled();
   });
   it("skips a preference this BB doesn't have", async () => {
     const x = fake({ "sidebar.threadListProvider": NATIVE });

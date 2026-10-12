@@ -981,7 +981,7 @@ bb studio reindex
 
 ![The Deploy watch runner's thread, opened from the Runners group: its job prompt, its first run and an automation run, each ending without a message (their runner_report calls fold into Worked for). Stable BB declines the Threads tab's target, so it opens as BB's thread page; the runner is unnested in BB's list, not under Dot](assets/bot-runner-thread.png)
 
-![New bot: the + beside Bots opens the create flow, a "New bot" row selected above Dot, the greeting "Hey! I'm a new bot." with Customize me, and a message box whose first message makes it (the navigation row above still says New thread: BB 0.46 has no sidebar navigation provider)](assets/bot-new.png)
+![New bot: the + beside Bots opens the create flow, a "New bot" row selected above Dot, the greeting "Hey! I'm a new bot." with Customize me, and a message box whose first message makes it](assets/bot-new.png)
 
 ![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; Scout's own chat, its title bar status (Checks in weekdays at 18:00) and its Info tab with its own check-in (Evening wrap-up), Memory, Skills and Runners](assets/bot-two.png)
 
@@ -1026,16 +1026,12 @@ of Staff", with the same thread and check-ins; rename it from its page.
   puts BB's list back at once. With several windows, the window you use
   decides: a window re-checks when its route changes or it gains focus, so a
   second window showing a thread also shows the Bots list until you use it.
-- **New bot**: on the Bot page the sidebar's top row (BB's navigation: New
-  thread, Search, the rail's panels) is Studio's sidebar navigation provider
-  `studio/bot-navigation` ("Bot (Studio)"), which shows BB's items in your
-  order with **New thread** as **New bot**. It switches
-  `sidebar.navigationProvider` exactly like the list: set on the Bot page,
-  your choice remembered, BB's bundled `navigation/navigation` put back on
-  leaving (never "Automatic"), and BB's own navigation shown if it ever
-  renders elsewhere. BB 0.46 (stable) and current Nightly have neither that
-  preference nor the slot, so there the row keeps BB's **New thread** and
-  **New bot** is the **+** beside **Bots** in the list. **New bot** opens
+- **New bot**: on the Bot page BB's sidebar shows the Bots list and hides
+  **New thread**; **+** next to **Bots** makes a new bot. Studio removes BB's
+  `__bb__/new-thread` item from `sidebar.visiblePluginPanels` on the Bot page,
+  remembers its position (in this device's storage), and puts it back there
+  on leaving. If you hid **New thread** yourself it stays hidden; if the
+  preference is unset (BB's default set) Studio leaves it alone. **New bot** opens
   `/plugins/studio/bot/new`: the same greeting and **Customize me** as a
   first bot, and your first message makes it.
 - **Several bots**: the first bot is the **primary**: the personal project's

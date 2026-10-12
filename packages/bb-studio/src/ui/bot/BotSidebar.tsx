@@ -8,9 +8,6 @@
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
-import * as BbApp from "@get-bb/plugin-sdk/app";
-import type { ExperimentalSidebarNavigationItem, ExperimentalSidebarNavigationProps } from "@get-bb/plugin-sdk";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
 import { botPath, forBot, NEW_BOT_PATH, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
@@ -104,78 +101,6 @@ export function BotListSwitcher() {
 
 type BotSummary = NonNullable<BotView["bot"]>;
 
-/** BB's "New thread" item, which Studio's navigation shows as "New bot" on the Bot page. */
-export const NEW_THREAD_ITEM = "__bb__/new-thread";
-
-/**
- * Studio's sidebar navigation (the row above the thread list): BB's items in
- * the user's order, with "New thread" as "New bot", which opens the create
- * flow. Shown off the Bot page only by mistake (as BotThreadList): it renders
- * BB's own navigation and puts BB's provider back.
- */
-export function BotNavigation({ experimental_Original: Original }: ExperimentalSidebarNavigationProps) {
-  const sdk = useSdk();
-  const onBotPage = isBotPath(usePathname());
-  useEffect(() => { if (!onBotPage) void syncThreadList(sdk, false); }, [sdk, onBotPage]);
-  if (!onBotPage || !sidebarNavigation.experimental_useSidebarNavigation) return <Original />;
-  return <BotNavigationItems />;
-}
-
-// Read off the module, not imported by name: a BB without sidebar navigation
-// (BB Nightly dropped it) has neither, and Studio must still build and load there.
-const sidebarNavigation = BbApp as Partial<Pick<typeof BbApp, "experimental_useSidebarNavigation" | "experimental_SidebarNavigationIcon">>;
-
-function BotNavigationItems() {
-  const { experimental_useSidebarNavigation: useNavigation, experimental_SidebarNavigationIcon: NavigationIcon } = sidebarNavigation;
-  if (!useNavigation || !NavigationIcon) return null;
-  return <NavigationRows useNavigation={useNavigation} NavigationIcon={NavigationIcon} />;
-}
-
-function NavigationRows({ useNavigation, NavigationIcon }: { useNavigation: typeof BbApp.experimental_useSidebarNavigation; NavigationIcon: typeof BbApp.experimental_SidebarNavigationIcon }) {
-  const { items, activeItemId, isShortcutModifierHeld, actions } = useNavigation();
-  const { creating } = useBotSelection();
-  const open = (item: ExperimentalSidebarNavigationItem) => {
-    if (item.id === NEW_THREAD_ITEM) openAppPath(NEW_BOT_PATH);
-    else actions.activate(item.id, { openInSplit: false });
-  };
-  const label = (item: ExperimentalSidebarNavigationItem) => item.id === NEW_THREAD_ITEM ? "New bot" : item.label;
-  const current = (item: ExperimentalSidebarNavigationItem) => item.id === NEW_THREAD_ITEM ? creating : !creating && item.id === activeItemId;
-  const hidden = items.filter((item) => !item.isVisible);
-  return (
-    <nav aria-label="Navigation" data-testid="bot-navigation" className="flex flex-col px-1.5 py-1">
-      {items.filter((item) => item.isVisible).map((item) => {
-        const Accessory = item.experimental_Accessory;
-        return (
-          <button key={item.id} type="button" data-item={item.id} aria-current={current(item) ? "page" : undefined} disabled={item.isDisabled || item.isLoading}
-            onClick={() => open(item)}
-            className="flex h-8 min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground hover:bg-state-hover disabled:opacity-50 aria-[current]:bg-state-active">
-            <NavigationIcon icon={item.icon} className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">{label(item)}</span>
-            {Accessory && item.id !== NEW_THREAD_ITEM ? <span className="shrink-0"><Accessory /></span> : null}
-            {isShortcutModifierHeld && item.shortcut && item.id !== NEW_THREAD_ITEM ? <span className="shrink-0 text-[11px] text-muted-foreground">{item.shortcut.label}</span> : null}
-          </button>
-        );
-      })}
-      {hidden.length ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className="flex h-8 min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground">
-              <Icon name="MoreHorizontal" className="size-4 shrink-0" /><span className="truncate">More</span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-44">
-            {hidden.map((item) => (
-              <DropdownMenuItem key={item.id} disabled={item.isDisabled || item.isLoading} onSelect={() => open(item)}>
-                <NavigationIcon icon={item.icon} className="size-4" />{label(item)}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
-    </nav>
-  );
-}
-
 function BotsList({ onNavigate }: { onNavigate(): void }) {
   const { botId, creating } = useBotSelection();
   const list = useLive<{ bots: BotSummary[] }>("bot_list", {}, { pollMs: 30_000 });
@@ -186,7 +111,7 @@ function BotsList({ onNavigate }: { onNavigate(): void }) {
   return (
     <nav aria-label="Bots" className="studio-root flex flex-col gap-0.5 px-1.5 pb-3">
       <style>{BOT_STYLES}</style>
-      {/* New bot here too: BB 0.46 has no sidebar navigation provider, so the row above may still say New thread. */}
+      {/* New bot: BB's New thread row is hidden on the Bot page (threadListSwitch.ts). */}
       <div className="flex h-7 items-center gap-1 pl-2 text-[11px] font-medium text-muted-foreground">
         <span className="min-w-0 flex-1">Bots</span>
         <button type="button" aria-label="New bot" title="New bot" data-testid="bot-new" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}

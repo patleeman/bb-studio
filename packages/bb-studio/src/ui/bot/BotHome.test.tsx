@@ -31,19 +31,10 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_useAppPanel: () => ({ openFixedTab: state.openFixedTab }),
   experimental_useFixedTabTarget: () => state.target,
   useSdk: () => sdk,
-  experimental_SidebarNavigationIcon: () => null,
   experimental_ProviderIcon: ({ provider }: { provider: { id: string } }) => React.createElement("i", { "data-logo": provider.id }),
-  experimental_useSidebarNavigation: () => ({
-    activeItemId: "studio/bot", isShortcutModifierHeld: false, actions: { activate: state.activate },
-    items: [
-      { id: "__bb__/new-thread", label: "New thread", icon: { kind: "host", name: "new-thread" }, isVisible: true, isDisabled: false, isLoading: false, shortcut: null, experimental_Accessory: null },
-      { id: "__bb__/search-threads", label: "Search", icon: { kind: "host", name: "search" }, isVisible: true, isDisabled: false, isLoading: false, shortcut: null, experimental_Accessory: null },
-      { id: "studio/bot", label: "Bot", icon: { kind: "plugin", pluginId: "studio", icon: "Bot" }, isVisible: true, isDisabled: false, isLoading: false, shortcut: null, experimental_Accessory: null },
-    ],
-  }),
 }));
 const sdk = { system: { uiPreferences: {
-  list: async () => ({ preferences: { "sidebar.threadListProvider": state.prefs, "sidebar.navigationProvider": state.navPref } }),
+  list: async () => ({ preferences: { "sidebar.threadListProvider": state.prefs } }),
   set: (args: unknown) => state.setPref(args),
 } } };
 vi.mock("./Onboarding", () => ({
@@ -75,7 +66,7 @@ vi.mock("@bb-studio/kit/ui", () => ({
 
 const { ActivityPanel, BOT_PATH, BotHome, BotRedirect } = await import("./BotHome");
 const { BotInfoTab, BotThreadsTab } = await import("./BotTabs");
-const { BotNavigation, BotThreadList } = await import("./BotSidebar");
+const { BotThreadList } = await import("./BotSidebar");
 const listProps = { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => {}, searchQuery: "" };
 
 let root: Root, container: HTMLDivElement;
@@ -322,29 +313,6 @@ test("New bot: the create flow greets as a new bot and the first message makes a
   expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "New bot", avatar: "🤖" }));
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/bot_scout", { replace: true });
   state.call.mockImplementation(async () => ({}));
-});
-
-test("the navigation row says New bot on the Bot page, which opens the create flow; other items are BB's", async () => {
-  const { openAppPath } = await import("@bb-studio/kit/app");
-  const Original = () => <div data-testid="bb-navigation">New thread</div>;
-  await show(<BotNavigation isCompactViewport={false} experimental_Original={Original} />);
-  const nav = container.querySelector("[data-testid=bot-navigation]")!;
-  expect([...nav.querySelectorAll("button")].map((each) => each.textContent)).toEqual(["New bot", "Search", "Bot"]);
-  expect(nav.textContent).not.toContain("New thread");
-  expect(nav.querySelector('[data-item="studio/bot"]')?.getAttribute("aria-current")).toBe("page");
-  act(() => click(button("New bot")));
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/new");
-  act(() => click(button("Search")));
-  expect(state.activate).toHaveBeenCalledWith("__bb__/search-threads", { openInSplit: false });
-});
-
-test("off the Bot page the navigation shows BB's own and puts BB's bundled provider back", async () => {
-  state.pathname = "/threads/thr_1";
-  const Original = () => <div data-testid="bb-navigation">New thread</div>;
-  await show(<BotNavigation isCompactViewport={false} experimental_Original={Original} />);
-  expect(container.querySelector("[data-testid=bb-navigation]")).not.toBeNull();
-  expect(container.querySelector("[data-testid=bot-navigation]")).toBeNull();
-  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.navigationProvider", value: "navigation/navigation", expectedRevision: 1 });
 });
 
 const providers = { installed: true, providers: [
