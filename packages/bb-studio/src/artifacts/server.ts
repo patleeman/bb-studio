@@ -190,8 +190,10 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
     const { bytes, mime } = await readSource(source);
     const name = basename(source.path);
     const guessed = mimeFor(name);
+    // A file saved before keeps its title (the user may have renamed it); only a new artifact gets one from the file name.
+    const known = input.artifactId ? true : store.findBySource(input.threadId, source.path) !== null;
     const result = store.save({
-      title: input.title ?? (input.artifactId ? null : titleFromName(name)),
+      title: input.title ?? (known ? null : titleFromName(name)),
       description: input.description,
       name,
       mime: guessed !== "application/octet-stream" ? guessed : (mime ?? guessed),

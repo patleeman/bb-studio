@@ -36,3 +36,22 @@ it("bb studio artifacts save refuses a file the host reports as over 25 MB befor
   expect(result.stderr).toContain("at most 25 MB");
   expect((await host.artifacts.cli(["list"], {} as never)).stdout).toBe("No artifacts yet.\n");
 });
+
+it("saving a changed file again keeps a title the user renamed", async () => {
+  const host = artifactsHost();
+  hosts.push(host);
+  const stub = host.harness.sdk.stub as unknown as (path: string, fn: () => unknown) => void;
+  stub("threads.get", async () => ({ projectId: null, environment: { hostId: "local", path: "/work" } }));
+  stub("threads.storageLocation", async () => { throw new Error("no storage"); });
+  let content = "one";
+  stub("files.read", async () => ({ path: "/work/report.md", content, contentEncoding: "utf8", sha256: "x", sizeBytes: content.length }));
+  const ctx = { threadId: "thr_1", cwd: "/work" } as never;
+  await host.artifacts.cli(["save", "report.md"], ctx);
+  const [saved] = host.artifacts.store.list();
+  await host.harness.behavior.callRpc("artifacts.update", { id: saved!.id, title: "Final" });
+  content = "two";
+  await host.artifacts.cli(["save", "report.md"], ctx);
+  expect(host.artifacts.store.get(saved!.id)).toMatchObject({ title: "Final", versions: 2 });
+  await host.artifacts.cli(["save", "report.md"], ctx);
+  expect(host.artifacts.store.get(saved!.id)!.title).toBe("Final");
+});
