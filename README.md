@@ -15,7 +15,6 @@ beside it.
 | [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code workspaces for your projects: one or more folders in a full editor beside your threads, run by a local code-server. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
-| [Studio Applets](packages/bb-studio-applets/) | `applets` | Experimental. Small native macOS apps your agents write as plain folders, such as a HUD of running threads, run by one signed app through an API you approve. |
 
 Install Studio first; the other plugins are built to run beside it. Studio
 Code's workspaces appear in Studio's collection.
@@ -45,7 +44,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
    - studio-code: Studio Code; VS Code workspaces beside your threads (downloads code-server on first open)
    - mobile: push notifications for the BB Studio iOS app; only if I use it
-   - applets: Studio Applets; experimental native macOS mini-apps; only if I ask for it
 3. Install each one I choose with `bb plugin install <id>@bb-studio --yes`.
 4. Run `bb plugin list`, confirm each installed plugin is running, and report
    anything that failed with its error.

@@ -10,7 +10,6 @@ import bb_studio_decisions from "./captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./captures/bb-studio-mobile.mjs";
 import design from "./captures/design.mjs";
 import bb_studio_code from "./captures/bb-studio-code.mjs";
-import bb_studio_applets from "./captures/bb-studio-applets.mjs";
 import bb_studio_agents from "./captures/bb-studio-agents.mjs";
 import compactHeaders from "./captures/compact-headers.mjs";
 
@@ -28,7 +27,6 @@ export function loadCaptures(context) {
     ...bb_studio_mobile(context),
     ...design(context),
     ...bb_studio_code(context),
-    ...bb_studio_applets(context),
     ...bb_studio_agents(context),
   ];
 }

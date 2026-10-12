@@ -67,3 +67,11 @@ in settings until you approve it. Approvals are stored in
 
 Requires BB 0.45 or later. Running applets needs macOS and the Studio Applets
 app.
+
+## Status
+
+Unlisted. The plugin isn't in `marketplace.json` or `.bb/plugins.json`, so
+it isn't published or installed with BB Studio. The code stays here for
+later; `scripts/check-marketplace.mjs` lists it as unlisted, and its
+screenshot capture (`scripts/capture/captures/bb-studio-applets.mjs`) is out
+of the default capture run.

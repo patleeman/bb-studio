@@ -47,12 +47,13 @@ for (const plugin of installed.plugins) {
 }
 // A plugin package listed in neither index would otherwise pass unnoticed.
 const retired = new Set(); // packages kept only for existing installs
+const unlisted = new Set(["packages/bb-studio-applets"]); // experimental packages kept in the repo, not published
 const listed = new Set(installed.plugins.map((plugin) => plugin.source.replace(/^\.\//, "").replace(/\/$/, "")));
 for (const dir of await readdir(join(root, "packages"))) {
   const path = `packages/${dir}`;
   let manifest;
   try { manifest = await readJson(join(path, "package.json")); } catch { continue; }
-  if (manifest.bb?.name && !listed.has(path) && !retired.has(path)) errors.push(`${path}: plugin absent from both indexes`);
+  if (manifest.bb?.name && !listed.has(path) && !retired.has(path) && !unlisted.has(path)) errors.push(`${path}: plugin absent from both indexes`);
 }
 if (errors.length) { console.error(errors.join("\n")); process.exitCode = 1; }
 else console.log(`Marketplace: ${marketIds.size} matching plugins`);
