@@ -1461,8 +1461,15 @@ export class TalkController {
   private async drain(): Promise<void> {
     const rpc = this.rpc;
     if (!rpc) return;
-    let segments = (await this.outbox.all().catch(() => [])).filter((s) => !s.rejected && !this.unsaved.has(keyString(s)));
-    for (const segment of segments.filter(isUploadable)) {
+    // A segment a closed window left open never uploads until it's sealed;
+    // seal it here too, not only at startup, so it can't hang the count.
+    await this.sealOrphans().catch(() => {});
+    const all = (await this.outbox.all().catch(() => [])).filter((s) => !s.rejected && !this.unsaved.has(keyString(s)));
+    // Open segments still being recorded (here or in another window) aren't
+    // waiting to upload yet; check back once they could count as orphans.
+    const open = all.filter((s) => !isUploadable(s) && !this.live.has(keyString(s)));
+    let segments = all.filter(isUploadable);
+    for (const segment of [...segments]) {
       this.set({ pendingUploads: segments.length });
       try {
         await rpc.call("recordings.segment_put", {
@@ -1504,6 +1511,7 @@ export class TalkController {
     }
     this.uploadBackoffMs = 2000;
     this.set({ pendingUploads: segments.length, uploadError: null });
+    if (open.length > 0) this.scheduleUpload();
     await this.maybeFinish();
   }
 
