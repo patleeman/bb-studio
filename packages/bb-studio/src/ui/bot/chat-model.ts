@@ -235,7 +235,8 @@ export function chatEntries(rows: readonly Row[], options: { working?: boolean; 
 
 /** The pending question or approval the chat can answer inline. */
 export type InlineAsk =
-  | { kind: "question"; interactionId: string; threadId: string; questionId: string; prompt: string; options: { label: string; value: string }[]; allowFreeText: boolean }
+  /** `via`: a provider's question (resolved with user_answer) or Studio's design_ask form (answered with respond). */
+  | { kind: "question"; via: "provider" | "form"; interactionId: string; threadId: string; questionId: string; prompt: string; options: { label: string; value: string }[]; allowFreeText: boolean }
   | { kind: "approval"; interactionId: string; threadId: string; title: string; detail: string | null; allowSession: boolean }
   | { kind: "open"; interactionId: string; threadId: string; title: string };
 
@@ -246,6 +247,17 @@ export function inlineAsk(interaction: unknown): InlineAsk | null {
   const threadId = str(interaction.threadId);
   const payload = isRow(interaction.payload) ? interaction.payload : null;
   if (!interactionId || !threadId || !payload) return null;
+  const origin = isRow(interaction.origin) ? interaction.origin : null;
+  if (origin?.kind === "plugin" && origin.pluginId === "studio" && origin.rendererId === "design-questions") {
+    const form = isRow(payload.data) ? payload.data : {};
+    const questions = Array.isArray(form.questions) ? form.questions.filter(isRow) : [];
+    const question = questions[0];
+    if (questions.length === 1 && question?.kind === "choice" && str(question.id) && str(question.question)) {
+      const options = (Array.isArray(question.options) ? question.options.filter(isRow) : []).flatMap((option) => (str(option.label) ? [{ label: str(option.label)!, value: str(option.label)! }] : []));
+      return { kind: "question", via: "form", interactionId, threadId, questionId: str(question.id)!, prompt: str(question.question)!, options, allowFreeText: question.other === true };
+    }
+    return { kind: "open", interactionId, threadId, title: str(question?.question) ?? str(payload.title) ?? "A few questions" };
+  }
   if (payload.kind === "user_question") {
     const questions = Array.isArray(payload.questions) ? payload.questions.filter(isRow) : [];
     const question = questions[0];
@@ -253,7 +265,7 @@ export function inlineAsk(interaction: unknown): InlineAsk | null {
       const options = (Array.isArray(question.options) ? question.options.filter(isRow) : [])
         .flatMap((option) => (str(option.label) && str(option.value) ? [{ label: str(option.label)!, value: str(option.value)! }] : []));
       if (options.length || question.allowFreeText) {
-        return { kind: "question", interactionId, threadId, questionId: str(question.id)!, prompt: str(question.prompt)!, options, allowFreeText: question.allowFreeText === true };
+        return { kind: "question", via: "provider", interactionId, threadId, questionId: str(question.id)!, prompt: str(question.prompt)!, options, allowFreeText: question.allowFreeText === true };
       }
     }
     return { kind: "open", interactionId, threadId, title: str(question?.prompt) ?? "A question is waiting" };

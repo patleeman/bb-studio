@@ -282,7 +282,7 @@ const Entry = memo(function Entry({ entry, bot, childStatus, previous, isLast, o
 function UserBubble({ text, images, queued }: { text: string; images: number; queued: boolean }) {
   return (
     <div className={`flex max-w-[80%] flex-col items-end gap-1 ${queued ? "opacity-70" : ""}`}>
-      <div className="rounded-[20px] rounded-br-md bg-foreground/[0.07] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] dark:bg-foreground/[0.1]">
+      <div data-bubble="user" className="rounded-[20px] rounded-br-md bg-foreground/[0.07] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] dark:bg-foreground/[0.1]">
         {text}
         {images ? <span className="mt-1 block text-xs text-muted-foreground">{images === 1 ? "1 image" : `${images} images`}</span> : null}
       </div>
@@ -417,7 +417,11 @@ function AskCard({ ask, sdk, onDone }: { ask: InlineAsk; sdk: Sdk; onDone(): voi
     setBusy(true);
     setError(null);
     try {
-      await sdk.threads.interactions.resolve({ threadId: ask.threadId, interactionId: ask.interactionId, resolution });
+      // Studio's question form takes its answers as `{ [questionId]: label }`.
+      const form = ask.kind === "question" && ask.via === "form" ? ask.questionId : null;
+      const formAnswer = form && "answers" in resolution ? resolution.answers[form] : null;
+      if (form && formAnswer) await sdk.threads.interactions.respond({ threadId: ask.threadId, interactionId: ask.interactionId, value: { [form]: formAnswer.freeText ?? formAnswer.selected[0] ?? "" } });
+      else await sdk.threads.interactions.resolve({ threadId: ask.threadId, interactionId: ask.interactionId, resolution });
       onDone();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));

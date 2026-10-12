@@ -10,7 +10,7 @@ const sdk = vi.hoisted(() => ({
     get: vi.fn(),
     send: vi.fn(async () => ({})),
     stop: vi.fn(async () => ({})),
-    interactions: { list: vi.fn(), resolve: vi.fn(async () => ({})) },
+    interactions: { list: vi.fn(), resolve: vi.fn(async () => ({})), respond: vi.fn(async () => ({})) },
   },
   subscribe: vi.fn(() => () => {}),
 }));
@@ -64,6 +64,14 @@ test("answers a pending question inline, above the composer", async () => {
   expect(container.querySelector('section[aria-label="Needs you"]')?.textContent).toContain("Which day?");
   await act(async () => button("Monday").click());
   expect(sdk.threads.interactions.resolve).toHaveBeenCalledWith({ threadId: "thr_bot", interactionId: "int_1", resolution: { kind: "user_answer", answers: { q: { selected: ["mon"] } } } });
+});
+
+test("answers Studio's question form inline through respond", async () => {
+  sdk.threads.timeline.mockResolvedValue(page([]));
+  sdk.threads.interactions.list.mockResolvedValue([{ id: "int_3", threadId: "thr_bot", status: "pending", origin: { kind: "plugin", pluginId: "studio", rendererId: "design-questions" }, payload: { kind: "plugin", title: "A few questions", data: { questions: [{ id: "vault", kind: "choice", question: "Which vault?", options: [{ label: "1Password" }] }] } } }]);
+  await show();
+  await act(async () => button("1Password").click());
+  expect(sdk.threads.interactions.respond).toHaveBeenCalledWith({ threadId: "thr_bot", interactionId: "int_3", value: { vault: "1Password" } });
 });
 
 test("approves inline", async () => {

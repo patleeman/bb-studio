@@ -90,7 +90,12 @@ describe("inlineAsk", () => {
   const base = { id: "int_1", threadId: "thr_1", status: "pending" };
   it("offers a single-choice question's options inline", () => {
     const ask = inlineAsk({ ...base, payload: { kind: "user_question", questions: [{ id: "q", prompt: "Which day?", multiSelect: false, allowFreeText: true, options: [{ label: "Monday", value: "mon" }] }] } });
-    expect(ask).toEqual({ kind: "question", interactionId: "int_1", threadId: "thr_1", questionId: "q", prompt: "Which day?", options: [{ label: "Monday", value: "mon" }], allowFreeText: true });
+    expect(ask).toEqual({ kind: "question", via: "provider", interactionId: "int_1", threadId: "thr_1", questionId: "q", prompt: "Which day?", options: [{ label: "Monday", value: "mon" }], allowFreeText: true });
+  });
+
+  it("answers Studio's one-question design_ask form inline too", () => {
+    const ask = inlineAsk({ ...base, origin: { kind: "plugin", pluginId: "studio", rendererId: "design-questions" }, payload: { kind: "plugin", title: "A few questions", data: { title: "A few questions", questions: [{ id: "vault", kind: "choice", question: "Which vault?", options: [{ label: "1Password" }, { label: "AWS" }] }] } } });
+    expect(ask).toMatchObject({ kind: "question", via: "form", questionId: "vault", prompt: "Which vault?", options: [{ label: "1Password", value: "1Password" }, { label: "AWS", value: "AWS" }], allowFreeText: false });
   });
 
   it("offers Approve and Deny for an approval", () => {
