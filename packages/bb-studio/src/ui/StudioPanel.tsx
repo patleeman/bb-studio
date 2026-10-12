@@ -4,6 +4,7 @@
 // on a kind, so /plugins/studio/studio/recording opens it on recordings.
 import { showBrowse } from "./Workspace";
 import { UnsentNotice } from "../talk/ui/unsent-notice";
+import { BotCard } from "./bot/BotHome";
 import {
   CollectionPage,
   createStudioItem,
@@ -387,6 +388,8 @@ export function StudioPanel() {
 
   const notice = (
     <>
+      {/* The Bot's card leads the unfiltered home. */}
+      {!onlyKind && !searchText && !query.filters.length ? <BotCard /> : null}
       {/* Talk kept its own page for these; recordings are Studio's now. */}
       {onlyKind?.id === "recording" || onlyKind?.id === "dictation" ? <UnsentNotice className="mb-2" /> : null}
       {searchText ? <SearchFreshness {...freshness} /> : null}

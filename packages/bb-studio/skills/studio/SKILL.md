@@ -23,7 +23,7 @@ Items belong to a BB project or are global. Every item has a link
 
 - Agent tool `studio_list_items`: newest first, each with its kind and link.
   It lists this thread's project's items and global items; a `project:`
-  filter or `allProjects: true` widens that. The Chief of Staff sees every
+  filter or `allProjects: true` widens that. The user's Bot sees every
   project. `query` takes filters and words:
   `kind:page project:"Q4 launch" tag:draft -tag:done notes`.
   Fields are `kind:`, `project:` (a name, or `global`), `tag:` (a name, or
@@ -66,7 +66,14 @@ stuff".
 - A BB project may have a lead: one thread, which the user picks in Studio's
   Setup page under **Project leads**. A Heartbeat can wake the lead on a
   schedule. A thread leads at most one project. The personal project's lead
-  is the Chief of Staff. A handoff keeps the successor the lead.
+  is the user's Bot (it replaced the Chief of Staff). A handoff keeps the
+  successor the lead.
+- The Bot is the user's always-on agent, with a name and emoji. `bot_get`
+  shows it, `bot_activity` lists what needs the user, what's in progress,
+  what's scheduled and what finished. `bot_set` renames it; `bot_pause`,
+  `bot_resume` and `bot_stop` change its state, only when the user asks.
+  Paused or stopped, the Bot starts no new work. Its home is
+  `/plugins/studio/studio/bot`.
 
 ## In the app
 

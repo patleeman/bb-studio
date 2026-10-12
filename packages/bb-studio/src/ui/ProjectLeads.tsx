@@ -1,12 +1,15 @@
 // Project leads in Studio's Setup page: each BB project can have a lead
 // thread, and a heartbeat that wakes it on a schedule (src/project-lead.ts).
-// The personal project's lead is the Chief of Staff.
+// The personal project's lead is the user's Bot, which has its own home
+// (src/ui/bot/BotHome.tsx); Setup links there instead of listing it.
 import { errorMessage } from "@bb-studio/kit/format";
 import { useProjects } from "@bb-studio/kit/app";
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@bb-studio/kit/ui";
 import { useEffect, useState } from "react";
 import type { HeartbeatRun, ProjectLeadView, ThreadOptionView } from "../contract";
 import { useCall, useLive, type Cadence } from "./live";
+import { openAppPath } from "@bb-studio/kit/app";
+import type { BotView } from "../contract";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
 const RUN_LABELS: Record<Cadence, string> = {
@@ -140,12 +143,21 @@ export function ProjectLeadsSection() {
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const byProject = new Map((leads.data?.leads ?? []).map((lead) => [lead.projectId, lead]));
   const titles = new Map((recent.data?.threads ?? []).map((thread) => [thread.id, thread.title]));
-  // The personal project (Chief of Staff) first, then by name.
-  const ordered = [...projects].sort((a, b) => Number(b.id === PERSONAL_PROJECT_ID) - Number(a.id === PERSONAL_PROJECT_ID) || a.name.localeCompare(b.name));
+  const bot = useLive<BotView>("bot_get", {}, { pollMs: 0 });
+  // The personal project's lead is the Bot, set in its own home.
+  const ordered = projects.filter((project) => project.id !== PERSONAL_PROJECT_ID).sort((a, b) => a.name.localeCompare(b.name));
   return (
     <section aria-label="Project leads" className="flex flex-col gap-2">
       <h2 className="text-sm font-medium text-foreground">Project leads</h2>
-      <p className="text-xs text-muted-foreground">Give a project a lead thread, and a heartbeat that wakes it to check on the project. Your personal project's lead is your Chief of Staff.</p>
+      <p className="text-xs text-muted-foreground">Give a project a lead thread, and a heartbeat that wakes it to check on the project.</p>
+      <button type="button" onClick={() => openAppPath("/plugins/studio/studio/bot")} className="flex min-w-0 items-center gap-2 rounded-md border border-border px-3 py-2 text-left hover:bg-state-hover">
+        <span aria-hidden className="text-base">{bot.data?.bot?.avatar ?? "🤖"}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-foreground">{bot.data?.bot?.name ?? "Your Bot"}</span>
+          <span className="block truncate text-xs text-muted-foreground">Leads your personal project and sees every project. Its chat, check-ins and Activity are in its home.</span>
+        </span>
+        <span className="text-xs text-muted-foreground">Open Bot →</span>
+      </button>
       {leads.error ? <p role="alert" className="text-xs text-destructive">{leads.error}</p> : null}
       <ul className="flex flex-col gap-1.5">
         {ordered.map((project) => {

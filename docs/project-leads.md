@@ -19,11 +19,21 @@ daily, weekdays, weekly, or a custom cron) through an automation named
 or the lead thread being deleted, turns it off. Handing the lead off to a
 new thread (`thread_handoff`) keeps the successor the lead.
 
-## The Chief of Staff
+## The Bot (formerly the Chief of Staff)
 
-The personal project's (`proj_personal`) lead is the Chief of Staff.
-`chief_of_staff`, `chief_of_staff_set` and `chief_of_staff_set_run` act on
-that lead. The Chief of Staff sees every project in `studio_list_items`.
+The personal project's (`proj_personal`) lead is the user's Bot
+(`packages/bb-studio/src/bot.ts`). The `bots` table gives it a name, an
+emoji avatar and a state (`active`, `paused`, `stopped`); its thread is
+always the personal project's lead, so a handoff rotates it and the
+project's Heartbeat is the Bot's check-in, with a prompt that uses its
+name. The Bot sees every project in `studio_list_items`. Setup → Project
+leads doesn't list the personal project; it links to the Bot's home.
+
+A migration made an existing Chief of Staff the Bot, named "Chief of
+Staff", with the same thread and Heartbeat. `chief_of_staff`,
+`chief_of_staff_set` and `chief_of_staff_set_run` are deprecated aliases of
+`bot_get`, `bot_set_thread` and `bot_set_run` for one release. See the
+Studio README's **Bot** section for pause, stop and Activity.
 
 ## RPCs
 

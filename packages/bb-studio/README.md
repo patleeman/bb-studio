@@ -922,9 +922,13 @@ open in the background, so it's as you left it when you come back.
   be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
   The tag menu also renames and deletes the active tag.
+- **Bot.** Your always-on agent (it replaces the Chief of Staff): a name,
+  an emoji, and a home at Studio → Bot with its chat, **Needs you**, and
+  **Activity** (In progress, Scheduled, Completed). Pause, resume or stop it
+  there. See [Bot](#bot).
 - **Project leads.** A BB project can have a lead thread, which a
-  Heartbeat wakes on a schedule; the personal project's lead is the Chief of
-  Staff. Set them in Setup under **Project leads**. BB's own sidebar groups
+  Heartbeat wakes on a schedule; the personal project's lead is your Bot.
+  Set them in Setup under **Project leads**. BB's own sidebar groups
   threads by project. See [`docs/project-leads.md`](../../docs/project-leads.md).
 - **Shared actions**: select items (shift-click for a range) to start a
   **New thread** that mentions them, move them to a project, archive, or
@@ -964,6 +968,41 @@ bb studio providers
 bb studio health [--json]
 bb studio reindex
 ```
+
+## Bot
+
+The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
+the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
+of Staff", with the same thread and check-ins; rename it in its home.
+
+- **Home**: `/plugins/studio/studio/bot`, or the Bot card at the top of
+  Studio's home. The header has its avatar, name (click to rename), state,
+  and Pause / Resume / Stop. Its chat shows inside the home (BB's
+  `ThreadChat`); **Open chat** opens the thread.
+- **Needs you**: its thread, or a thread it started, waiting on you (a
+  question or an approval).
+- **Activity**: **In progress** (running), **Scheduled** (its check-in and
+  any automation that wakes its thread, with the next run), **Completed**
+  (threads it started that finished).
+- **Threads it started**: BB's thread metadata names the thread that made
+  each thread. A thread whose `sourceThreadId`, `parentThreadId` or
+  `lifecycleOwnerThreadId` is the Bot's thread, or a thread it handed off
+  from, counts. `originPluginId` only names a plugin, so it isn't used.
+- **Pause** turns check-ins off; the Bot is told it's paused and gets no
+  Studio tools but its own. **Resume** turns check-ins back on if they were
+  on. **Stop** (confirmed) pauses it, stops the running threads it started,
+  and pauses automations that wake it. Nothing is deleted.
+- **No Bot yet**: the home offers **Create your bot**: a name, an emoji and
+  an optional first message start its chat in your personal project.
+- Its thread is an implementation detail. A handoff (`thread_handoff`)
+  moves the Bot to the new thread. It is the personal project's lead, so it
+  sees every project.
+- RPCs: `bot_get`, `bot_create`, `bot_set` (name, avatar), `bot_set_thread`,
+  `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
+  `bot_activity`. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
+  `bot_resume`, `bot_stop`, `bot_activity`. `chief_of_staff`,
+  `chief_of_staff_set` and `chief_of_staff_set_run` remain as deprecated
+  aliases for one release.
 
 ## How it works
 

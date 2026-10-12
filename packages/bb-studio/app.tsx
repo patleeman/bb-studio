@@ -31,6 +31,7 @@ import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
+import { BOT_SUBPATH, BotHome } from "./src/ui/bot/BotHome";
 import { registerThreadAutomations } from "./src/ui/automations/register";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 
@@ -90,6 +91,8 @@ function StudioRoot({ subPath }: { subPath: string }) {
   if (path === "") return <StudioWorkspace />;
   if (path === "browse") return <StudioPanel />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
+  // The user's Bot: its chat, what needs them, and its Activity.
+  if (path === BOT_SUBPATH) return <BotHome />;
   // Conversations about items: chats/item/…, chats/choose/…, chats/quote/….
   if (path === CHATS_PATH || path.startsWith(`${CHATS_PATH}/`)) return <ConversationPage subPath={path.slice(CHATS_PATH.length + 1)} />;
   // A built-in kind: <segment>/<id> is one item; <segment> alone is the

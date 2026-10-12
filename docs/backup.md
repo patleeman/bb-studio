@@ -29,7 +29,7 @@ use the CLI.
 | `excalidraw/` | Studio (built-in drawings) | Each drawing's scene, and its images as separate files. Studio writes this section itself, under the old Draw plugin's id, so backups from before the merge restore into it. |
 | `artifacts/` | Studio (built-in Artifacts) | Each artifact with every version's bytes. Studio writes this section itself, under the old plugin's id, so backups from before the merge restore into it. |
 | `design/` | Studio (built-in designs) | Each design with its rounds, screens (as HTML files) and comments. Studio writes this section itself, under the old Design plugin's id, so backups from before the merge restore into it. Saved styles aren't included. |
-| `studio/` | Studio | Tags and which items have them, saved views, project leads (the personal project's lead is the Chief of Staff) and their Heartbeat settings, item links, item chats, comments, versions and activity. |
+| `studio/` | Studio | Tags and which items have them, saved views, project leads (the personal project's lead is the user's Bot) and their Heartbeat settings, item links, item chats, comments, versions and activity. |
 
 ## What isn't
 
