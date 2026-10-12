@@ -475,7 +475,12 @@ export default async function plugin(bb: BbPluginApi) {
     project_leads: () => ({ leads: projectLeads.list() }),
     project_lead: ({ projectId }) => projectLeads.get(projectId),
     project_set_lead: ({ projectId, threadId }) => projectLeads.setLead(projectId, threadId),
-    project_set_run: ({ projectId, ...run }) => projectLeads.setRun(projectId, run),
+    // The personal project's heartbeat is the Bot's: it can't be turned on while the Bot is paused or stopped.
+    project_set_run: async ({ projectId, ...run }) => {
+      if (projectId === PERSONAL_PROJECT_ID) await bots.setRun(run);
+      else return projectLeads.setRun(projectId, run);
+      return projectLeads.get(projectId);
+    },
     bot_get: () => bots.get(),
     bot_create: (input) => bots.create(input),
     bot_set: (input) => bots.set(input),

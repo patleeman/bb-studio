@@ -261,3 +261,17 @@ it("puts queued threads under Waiting to start, not In progress", () => {
   expect(result.inProgress.map((each) => each.id)).toEqual(["run"]);
   expect(result.completed).toEqual([]);
 });
+
+it("keeps the Bot paused, and the heartbeat remembered, when resuming fails to restore it", async () => {
+  const x = await setup();
+  x.add({ id: "thr_bot" });
+  await x.bots.create({ name: "Ada", avatar: "A", threadId: "thr_bot" });
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  await x.bots.pause();
+  const real = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => { if (args.method === "automations_resume") throw new Error("down"); return real(args); });
+  await expect(x.bots.resume()).rejects.toThrow("down");
+  expect((await x.bots.get()).bot?.state).toBe("paused");
+  x.callRpc.mockImplementation(real);
+  expect(await x.bots.resume()).toMatchObject({ bot: { state: "active" }, run: { enabled: true } });
+});

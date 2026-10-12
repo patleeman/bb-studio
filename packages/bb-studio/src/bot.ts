@@ -283,9 +283,10 @@ export class Bots {
     const row = this.row();
     if (!row) throw new Error("Make your Bot first.");
     if (row.state !== "active") {
-      this.update({ state: "active", heartbeat_was_on: 0 });
+      // The heartbeat comes back first: if that fails the Bot stays paused and remembers it, so Resume can be retried.
       const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
       if (row.heartbeat_was_on && run && this.deps.leads.storedLead(PERSONAL_PROJECT_ID)) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, { ...run, enabled: true });
+      this.update({ state: "active", heartbeat_was_on: 0 });
     }
     return this.get();
   }
