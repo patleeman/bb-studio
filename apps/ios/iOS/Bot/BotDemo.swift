@@ -22,6 +22,25 @@ enum BotDemo {
                 (id, BotDemo.decode(#"{"id":"\#(id)","projectId":"proj_personal","status":"idle","parentThreadId":"\#(threadId)","createdAt":\#(at),"updatedAt":\#(at)}"#) as ThreadEntry)
             })
         }
+        /// Its automations: the original check-in, an evening one, a reminder, a watcher and a runner.
+        var automations: [BotAutomation] {
+            let t = BotDemo.now
+            let row = { (id: String, kind: String, name: String, instruction: String, schedule: String, text: String, state: String, next: Double?, extra: String) in
+                #"{"id":"\#(id)","kind":"\#(kind)","name":"\#(name)","original":\#(id == "heartbeat"),"instruction":"\#(instruction)","schedule":\#(schedule),"scheduleText":"\#(text)","state":"\#(state)","nextRunAt":\#(next.map { String($0) } ?? "null"),"lastRunAt":null,"lastOutcome":null,"target":"main","targetName":"Juniper","threadId":"\#(threadId)"\#(extra)}"#
+            }
+            let json = "[" + [
+                row("heartbeat", "checkin", "Check-in", "What your Memory page's Check-in section says.", #"{"type":"times","days":[1,2,3,4,5],"times":["08:00"]}"#, "Weekdays 8:00", "active", t + 50_400_000, ""),
+                row("aut_evening", "checkin", "Evening wrap-up", "Wrap up what got done today and what's left for tomorrow.", #"{"type":"times","days":[1,2,3,4,5],"times":["18:00"]}"#, "Weekdays 18:00", "active", t + 21_600_000, #","model":{"model":"gpt-5-mini","reasoning":"low"}"#),
+                row("aut_deploy", "reminder", "Check the deploy", "Check whether the deploy finished and tell me.", #"{"type":"once","at":\#(t + 7_200_000)}"#, "Once, today 4:00 PM", "active", t + 7_200_000, ""),
+                row("aut_release", "watcher", "Release watch", "Tell me only if it's a major version.", #"{"type":"interval","every":15,"unit":"minutes","days":[0,1,2,3,4,5,6],"quiet":{"from":"22:00","to":"07:00"}}"#, "Every 15 min, every day · quiet 22:00–7:00", "active", t + 600_000, #","script":{"body":"curl -fsS https://api.github.com/repos/acme/app/releases/latest | jq -r .tag_name","interpreter":"bash","timeoutMs":60000,"workingDirectory":null,"envKeys":[]}"#),
+                row("run_inbox", "runner", "Inbox watch", "Check my inbox for replies from Dana.", #"{"type":"cron","cron":"0 9-17/2 * * 1-5"}"#, "Cron 0 9-17/2 * * 1-5", "paused", nil, ""),
+            ].joined(separator: ",") + "]"
+            return BotDemo.decode(json)
+        }
+        var automationRuns: [BotAutomationRun] {
+            let t = BotDemo.now
+            return BotDemo.decode(#"[{"id":"r3","at":\#(t - 900_000),"status":"skipped","manual":false,"outcome":"Nothing new","threadId":null},{"id":"r2","at":\#(t - 1_800_000),"status":"succeeded","manual":false,"outcome":"Woke it: v2.0.0","threadId":null},{"id":"r1","at":\#(t - 2_700_000),"status":"skipped","manual":true,"outcome":"Nothing new","threadId":null}]"#)
+        }
     }
 
     static var variant: String? {

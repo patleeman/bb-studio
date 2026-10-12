@@ -314,6 +314,42 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automations",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automation_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automation_update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automation_delete",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automation_runs",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/Designs.swift",
       "plugin": "studio",
       "method": "designs.getDesign",

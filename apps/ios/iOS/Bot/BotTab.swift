@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One bot's chat, with its status, Activity, voice, profile, check-ins and
+/// One bot's chat, with its status, Activity, voice, profile, automations and
 /// Pause / Resume / Stop. Without a Bot, it greets you and the first message
 /// makes it. Every call is scoped to `botId`; nil is the primary bot.
 struct BotTab: View {
@@ -42,7 +42,7 @@ struct BotTab: View {
                             if let next { lead = .bot(next) }
                         }
                     case .checkIns:
-                        BotHeartbeatSheet(botId: botId)
+                        BotAutomationsSheet(botId: botId, botName: bot?.name ?? BotInfo.defaultName, active: bot?.state == .active)
                     case .skills:
                         BotSkillsSheet(name: bot?.name ?? BotInfo.defaultName, botId: botId)
                     }
@@ -147,8 +147,7 @@ struct BotTab: View {
                     Button { openMemory() } label: { Label("Memory", systemImage: "brain") }
                     Button { sheet = .skills } label: { Label("Skills", systemImage: "wand.and.stars") }
                 }
-                Button { sheet = .checkIns } label: { Label("Check-ins", systemImage: "alarm") }
-                    .disabled(bot.state != .active)
+                Button { sheet = .checkIns } label: { Label("Automations", systemImage: "alarm") }
             }
             Section {
                 if bot.state == .active {
