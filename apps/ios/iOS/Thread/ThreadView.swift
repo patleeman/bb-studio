@@ -14,6 +14,8 @@ struct ThreadView: View {
     @State private var choosingModel = false
     /// The composer's model button: the thread's model and reasoning level.
     @State private var executionLabel: String?
+    /// A handoff to another provider in flight, or a switch just done, over the composer.
+    @State private var handoffStatus: (text: String, working: Bool)?
     @State private var attachments: [PendingAttachment] = []
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var dictating = false
@@ -154,7 +156,7 @@ struct ThreadView: View {
             Text("The agent will start its next turn without this conversation's context.")
         }
         .sheet(isPresented: $choosingModel) {
-            ExecutionSheet(threadId: model.threadId, providerId: model.thread?.providerId)
+            ExecutionSheet(threadId: model.threadId, providerId: model.thread?.providerId, handoff: handOff)
         }
         // Again after the sheet closes, in case it changed them.
         .task(id: "\(model.threadId) \(model.thread?.providerId ?? "") \(choosingModel)") {
@@ -752,6 +754,33 @@ struct ThreadView: View {
     }
 
 
+    /// Hands the thread off to another provider's model, then follows the new
+    /// thread: the Bot tab reloads its bot; elsewhere it replaces this thread.
+    private func handOff(providerId: String, providerName: String, modelId: String, modelName: String, reasoning: String?) {
+        handoffStatus = (ModelHandoffPlan.progressLabel(providerName: providerName), true)
+        let threadId = model.threadId
+        Task {
+            do {
+                let result = try await app.client.handoffToModel(threadId, providerId: providerId, model: modelId, reasoning: reasoning)
+                guard let next = result.threadId, next != threadId else {
+                    handoffStatus = ModelHandoffPlan.doneLabel(result.change, modelName: modelName).map { ($0, false) }
+                    return
+                }
+                handoffStatus = nil
+                if let botChrome {
+                    botChrome.followThread(next)
+                } else if let index = app.path.lastIndex(of: .thread(id: threadId)) {
+                    app.path[index] = .thread(id: next)
+                } else {
+                    app.path.append(.thread(id: next))
+                }
+            } catch {
+                handoffStatus = nil
+                model.error = BBClient.describe(error, server: app.client.baseURL)
+            }
+        }
+    }
+
     private var composer: some View {
         VStack(spacing: 8) {
             if let botChrome {
@@ -765,6 +794,15 @@ struct ThreadView: View {
                 }
             }
             ThreadShelf(model: model)
+            if let status = handoffStatus {
+                ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .orange : .green) {
+                    HStack(spacing: 6) {
+                        if status.working { ProgressView().controlSize(.mini) }
+                        Text(status.text).lineLimit(1)
+                    }
+                } trailing: { EmptyView() }
+                .accessibilityIdentifier("handoffStatus")
+            }
             if model.thread?.status == "error", !editing {
                 ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
                     Text("The last turn failed").lineLimit(1)
@@ -826,10 +864,9 @@ struct ThreadView: View {
                 dictate: { dictating = true }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil,
                 clear: botChrome != nil
             ) {
-                if botChrome == nil {
-                    Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
-                        .accessibilityLabel("Model & permissions")
-                }
+                Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
+                    .disabled(handoffStatus?.working == true)
+                    .accessibilityLabel("Model & permissions")
             } send: {
                 if let botChrome, model.thread?.isRunning == true, !canSend {
                     // Nothing typed while the Bot works: stop it.

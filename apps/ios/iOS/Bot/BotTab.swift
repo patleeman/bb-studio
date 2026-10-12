@@ -106,7 +106,8 @@ struct BotTab: View {
         let chain = chain.last == bot.lead.threadId ? chain : bot.lead.threadId.map { [$0] } ?? []
         return BotChrome(bot: bot, chain: chain, started: BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain),
                          openThread: { path.append(.thread(id: $0)) },
-                         runningChanged: { _ in Task { await loadActivity() } })
+                         runningChanged: { _ in Task { await loadActivity() } },
+                         followThread: { _ in attempt += 1 })
     }
 
     @ToolbarContentBuilder

@@ -2,10 +2,13 @@ import SwiftUI
 
 /// The model, reasoning level and permissions for a thread's next turns. BB
 /// keeps model and reasoning as a thread override; permissions go with the next
-/// message. Another provider needs a new thread.
+/// message. Another provider hands off to a new thread, which `handoff` runs
+/// after the sheet closes.
 struct ExecutionSheet: View {
     let threadId: String
     let providerId: String?
+    /// Runs a handoff to another provider: provider, its name, model, its name, reasoning.
+    var handoff: ((_ providerId: String, _ providerName: String, _ model: String, _ modelName: String, _ reasoning: String?) -> Void)? = nil
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
@@ -20,6 +23,9 @@ struct ExecutionSheet: View {
     @State private var original: ThreadExecution?
     @State private var saving = false
     @State private var error: String?
+    @State private var providers: [ExecutionOptions.Provider] = []
+    /// The provider picked here; the thread's own unless handing off.
+    @State private var chosenProvider = ""
 
     var body: some View {
         NavigationStack {
@@ -27,6 +33,16 @@ struct ExecutionSheet: View {
                 if models.isEmpty, error == nil {
                     ProgressView().frame(maxWidth: .infinity)
                 } else {
+                    if handoff != nil, providers.count > 1 {
+                        Section {
+                            Picker("Provider", selection: $chosenProvider) {
+                                ForEach(providers) { Text($0.displayName).tag($0.id) }
+                            }
+                            .accessibilityIdentifier("providerPicker")
+                        } footer: {
+                            if handingOff { Text(ModelHandoffPlan.handoffFooter(providerName: chosenName)) }
+                        }
+                    }
                     Section {
                         Picker("Model", selection: $model) {
                             ForEach(models) { Text($0.displayName).tag($0.id) }
@@ -37,7 +53,7 @@ struct ExecutionSheet: View {
                             }
                         }
                     }
-                    if !permissionModes.isEmpty {
+                    if !permissionModes.isEmpty, !handingOff {
                         Section {
                             Picker("Permissions", selection: $permission) {
                                 ForEach(permissionModes, id: \.self) { Text(PermissionMode.label($0)).tag($0) }
@@ -62,7 +78,8 @@ struct ExecutionSheet: View {
                     if saving {
                         ProgressView()
                     } else {
-                        Button("Save") { Task { await save() } }.disabled(!changed)
+                        Button(ModelHandoffPlan.saveTitle(handoff: handingOff)) { Task { await save() } }
+                            .disabled(!changed || models.isEmpty)
                     }
                 }
             }
@@ -72,6 +89,7 @@ struct ExecutionSheet: View {
                 }
             }
             .task { await load() }
+            .onChange(of: chosenProvider) { old, _ in if !old.isEmpty { Task { await loadModels() } } }
         }
         .presentationDetents([.medium])
     }
@@ -82,7 +100,23 @@ struct ExecutionSheet: View {
         !model.isEmpty && (model != original?.model || (!reasoning.isEmpty && reasoning != original?.reasoningLevel))
     }
     private var permissionChanged: Bool { !permission.isEmpty && permission != currentPermission }
-    private var changed: Bool { modelChanged || permissionChanged }
+    private var changed: Bool { handingOff || modelChanged || permissionChanged }
+    private var handingOff: Bool { ModelHandoffPlan.isHandoff(current: providerId, chosen: chosenProvider) }
+    private var chosenName: String { providers.first { $0.id == chosenProvider }?.displayName ?? chosenProvider }
+
+    /// Another provider's models, or the thread's own again.
+    private func loadModels() async {
+        do {
+            let options = try await client.executionOptions(providerId: chosenProvider)
+            models = options.models
+            let name = handingOff ? nil : original?.model
+            model = models.first { name != nil && ($0.id == name || $0.model == name) }?.id
+                ?? models.first { $0.isDefault == true }?.id ?? models.first?.id ?? ""
+            reasoning = !handingOff ? original?.reasoningLevel ?? selected?.defaultReasoningEffort ?? "" : selected?.defaultReasoningEffort ?? ""
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+        }
+    }
 
     private func load() async {
         do {
@@ -92,6 +126,9 @@ struct ExecutionSheet: View {
             original = try await current
             let modes = options.providers.first { $0.id == providerId }?.capabilities?.permissionModes ?? []
             permissionModes = PermissionMode.allowed(modes, ceiling: options.permissionCeiling)
+            providers = ModelHandoffPlan.providers(options.providers, current: providerId)
+            chosenProvider = providerId ?? ""
+
             currentPermission = PermissionMode.pending(threadId, serverURL: client.baseURL) ?? original?.permissionMode ?? ""
             permission = currentPermission
             // The override may name a model by its `model` rather than its `id`.
@@ -108,6 +145,11 @@ struct ExecutionSheet: View {
         saving = true
         defer { saving = false }
         do {
+            if handingOff, let handoff, let selected {
+                handoff(chosenProvider, chosenName, selected.model, selected.displayName, reasoning.isEmpty ? nil : reasoning)
+                operation.complete(on: app) { dismiss() }
+                return
+            }
             if modelChanged {
                 try await client.setExecution(threadId, model: model, reasoningLevel: reasoning.isEmpty ? nil : reasoning)
             }

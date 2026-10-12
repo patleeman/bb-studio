@@ -11,6 +11,8 @@ struct BotChrome {
     var openThread: (String) -> Void
     /// The chat started or stopped running, or something came to need the user.
     var runningChanged: (Bool) -> Void = { _ in }
+    /// The chat moved to a new thread (a handoff to another provider).
+    var followThread: (String) -> Void = { _ in }
 }
 
 /// The Bot's name and live status in the middle of the navigation bar.
