@@ -981,6 +981,10 @@ bb studio reindex
 
 ![The Deploy watch runner's thread, opened from the Runners group: its job prompt, its first run and an automation run, each ending without a message (their runner_report calls fold into Worked for). Stable BB declines the Threads tab's target, so it opens as BB's thread page; the runner is unnested in BB's list, not under Dot](assets/bot-runner-thread.png)
 
+![New bot: the + beside Bots opens the create flow, a "New bot" row selected above Dot, the greeting "Hey! I'm a new bot." with Customize me, and a message box whose first message makes it (the navigation row above still says New thread: BB 0.46 has no sidebar navigation provider)](assets/bot-new.png)
+
+![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; Scout's own chat, its title bar status (Checks in weekdays at 18:00) and its Info tab with its own check-in (Evening wrap-up), Memory, Skills and Runners](assets/bot-two.png)
+
 ![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
