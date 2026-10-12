@@ -22,6 +22,19 @@ final class BotTests: XCTestCase {
         return (200, #"{"ok":true,"result":{"bot":{"id":"bot_main","name":"\#(name)","avatar":"🟣","state":"\#(state)","threadId":\#(thread),"createdAt":1,"updatedAt":1},"run":\#(run)}}"#)
     }
 
+    func testSkillLearningDecodesAndSaysTheLastReview() async throws {
+        let learning = #"{"ok":true,"result":{"enabled":true,"interval":10,"reviewModel":null,"defaultModel":"haiku","models":[],"approval":true,"consolidate":false,"curatorPaused":false,"toolTurns":3,"userTurns":1,"reviewing":false,"lastReview":{"at":1000,"result":"Saved 1 skill"},"lastCurator":null,"nextCuratorAt":null,"pending":[{"id":"pend_1","name":"deploy","action":"write","description":null,"diff":"+ step","createdAt":1}]}}"#
+        let skills = #"{"ok":true,"result":{"skills":[{"name":"deploy","description":"d","updatedAt":1,"state":"stale","pinned":true,"usedAt":1},{"name":"old","description":"d","updatedAt":1}]}}"#
+        let c = client(a, ["bot_learning": (200, learning), "bot_skills": (200, skills)])
+        let result = try await c.botLearning()
+        XCTAssertEqual(result.pending.map(\.diff), ["+ step"])
+        XCTAssertTrue(result.status(now: Date(timeIntervalSince1970: 3601))?.hasPrefix("Saved 1 skill · ") ?? false)
+        let list = try await c.botSkills()
+        XCTAssertEqual(list.map(\.state), ["stale", nil])
+        XCTAssertEqual(list.first?.pinned, true)
+        XCTAssertFalse(list[1].isArchived)
+    }
+
     func testBotIsRememberedPerServerWithNameAndAvatar() async throws {
         let first = try await client(a, ["bot_get": bot("thr_a")]).bot()
         let second = try await client(b, ["bot_get": bot("thr_b", name: "Penny")]).bot()

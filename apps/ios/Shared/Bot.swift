@@ -115,6 +115,35 @@ extension BBClient {
         return output.skills
     }
 
+    /// The Bot's skill learning: settings, the last review and changes waiting for approval.
+    public func botLearning(botId: String? = nil) async throws -> BotLearning {
+        try await rpc("studio", Studio.Method.bot_learning, Self.scoped(botId))
+    }
+
+    /// Turns Learn from work on or off.
+    @discardableResult
+    public func setBotLearning(enabled: Bool, botId: String? = nil) async throws -> BotLearning {
+        try await rpc("studio", Studio.Method.bot_learning_set, Self.scoped(botId, ["enabled": .bool(enabled)]))
+    }
+
+    /// Approves or rejects a review's staged skill change.
+    @discardableResult
+    public func resolveBotSkillChange(_ id: String, approve: Bool, botId: String? = nil) async throws -> BotLearning {
+        try await rpc("studio", Studio.Method.bot_skill_pending_resolve, Self.scoped(botId, ["id": .string(id), "approve": .bool(approve)]))
+    }
+
+    /// Pins a skill (the curator leaves it alone) or unpins it.
+    public func pinBotSkill(_ name: String, pinned: Bool, botId: String? = nil) async throws {
+        struct Output: Decodable { var changed: Bool }
+        let _: Output = try await rpc("studio", Studio.Method.bot_skill_pin, Self.scoped(botId, ["name": .string(name), "pinned": .bool(pinned)]))
+    }
+
+    /// Brings an archived skill back.
+    public func restoreBotSkill(_ name: String, botId: String? = nil) async throws {
+        struct Output: Decodable { var changed: Bool }
+        let _: Output = try await rpc("studio", Studio.Method.bot_skill_restore, Self.scoped(botId, ["name": .string(name)]))
+    }
+
     public var cachedBotThreadId: String? {
         AppGroup.defaults.string(forKey: ServerScope.key("botThreadId", serverURL: baseURL))
     }
@@ -357,7 +386,38 @@ public struct BotSkill: Decodable, Hashable, Sendable, Identifiable {
     public var name: String
     public var description: String
     public var updatedAt: Double
+    /// "active", "stale" (unused 30 days) or "archived" (unused 90 days; hidden from the Bot, restorable).
+    public var state: String?
+    /// The curator leaves a pinned skill alone.
+    public var pinned: Bool?
     public var id: String { name }
+    public var isArchived: Bool { state == "archived" }
+}
+
+/// A Bot's skill learning (`bot_learning`).
+public struct BotLearning: Decodable, Hashable, Sendable {
+    public struct Result: Decodable, Hashable, Sendable { public var at: Double; public var result: String }
+    public struct Change: Decodable, Hashable, Sendable, Identifiable {
+        public var id: String
+        public var name: String
+        /// "write" or "delete".
+        public var action: String
+        public var diff: String
+    }
+    public var enabled: Bool
+    public var interval: Int
+    public var reviewing: Bool
+    public var approval: Bool
+    public var lastReview: Result?
+    public var pending: [Change]
+
+    /// "Saved 1 skill · 2h ago", "Reviewing now…" or nil before the first review.
+    public func status(now: Date = Date()) -> String? {
+        if reviewing { return "Reviewing now…" }
+        guard let lastReview else { return nil }
+        let ago = RelativeDateTimeFormatter().localizedString(for: Date(timeIntervalSince1970: lastReview.at / 1000), relativeTo: now)
+        return "\(lastReview.result) · \(ago)"
+    }
 }
 
 /// The Bot's Activity (`bot_activity`).

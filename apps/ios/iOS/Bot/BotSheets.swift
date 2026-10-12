@@ -384,24 +384,73 @@ struct BotProfileSheet: View {
 
 // MARK: Skills
 
-/// The procedures the Bot saved for itself.
+/// The procedures the Bot saved for itself, how it learns them, and changes waiting for approval.
 struct BotSkillsSheet: View {
     let name: String
     var botId: String? = nil
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var skills: [BotSkill]?
+    @State private var learning: BotLearning?
     @State private var error: String?
+
+    private var current: [BotSkill] { (skills ?? []).filter { !$0.isArchived } }
+    private var archived: [BotSkill] { (skills ?? []).filter(\.isArchived) }
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(skills ?? []) { skill in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(skill.name).font(.body.monospaced().weight(.medium))
-                        Text(skill.description).font(.subheadline).foregroundStyle(.secondary)
+                if let learning {
+                    Section {
+                        Toggle("Learn from work", isOn: Binding(get: { learning.enabled }, set: { on in act { _ = try await app.client.setBotLearning(enabled: on, botId: botId) } }))
+                    } footer: {
+                        Text([learning.enabled ? "Reviews its work every \(learning.interval) turns and saves what's worth keeping." : "Off: it saves skills only when it decides to.", learning.status()].compactMap { $0 }.joined(separator: " "))
                     }
-                    .padding(.vertical, 2)
+                    if !learning.pending.isEmpty {
+                        Section("Waiting for your approval") {
+                            ForEach(learning.pending) { change in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(change.action == "delete" ? "Delete \(change.name)" : change.name).font(.body.monospaced().weight(.medium))
+                                    Text(change.diff).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(8)
+                                    HStack {
+                                        Button("Approve") { act { try await app.client.resolveBotSkillChange(change.id, approve: true, botId: botId) } }
+                                        Button("Reject", role: .destructive) { act { try await app.client.resolveBotSkillChange(change.id, approve: false, botId: botId) } }
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                            }
+                        }
+                    }
+                }
+                Section {
+                    ForEach(current) { skill in
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(skill.name).font(.body.monospaced().weight(.medium))
+                                if skill.pinned == true { Image(systemName: "pin.fill").font(.caption).foregroundStyle(.secondary).accessibilityLabel("Pinned") }
+                                if skill.state == "stale" { Text("stale").font(.caption).foregroundStyle(.secondary) }
+                            }
+                            Text(skill.description).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                        .swipeActions {
+                            Button(skill.pinned == true ? "Unpin" : "Pin") { act { try await app.client.pinBotSkill(skill.name, pinned: skill.pinned != true, botId: botId) } }
+                                .tint(.orange)
+                        }
+                    }
+                }
+                if !archived.isEmpty {
+                    Section {
+                        DisclosureGroup("Archived (\(archived.count))") {
+                            ForEach(archived) { skill in
+                                HStack {
+                                    Text(skill.name).font(.body.monospaced()).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Button("Restore") { act { try await app.client.restoreBotSkill(skill.name, botId: botId) } }.buttonStyle(.borderless)
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .overlay {
@@ -409,7 +458,7 @@ struct BotSkillsSheet: View {
                     ContentUnavailableView("Couldn't load skills", systemImage: "exclamationmark.triangle", description: Text(error))
                 } else if skills == nil {
                     ProgressView()
-                } else if skills?.isEmpty == true {
+                } else if current.isEmpty && archived.isEmpty && learning == nil {
                     ContentUnavailableView("No skills yet", systemImage: "wand.and.stars",
                                            description: Text("When \(name) works out how to do something, it saves the steps here and reuses them."))
                 }
@@ -417,10 +466,22 @@ struct BotSkillsSheet: View {
             .navigationTitle("Skills")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task {
-                do { skills = try await app.client.botSkills(botId: botId) } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
-            }
+            .task { await load() }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    private func load() async {
+        do {
+            skills = try await app.client.botSkills(botId: botId)
+            // An older Studio has no learning; the list still shows.
+            learning = try? await app.client.botLearning(botId: botId)
+        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    }
+
+    private func act(_ work: @escaping () async throws -> Void) {
+        Task {
+            do { try await work(); await load() } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+        }
     }
 }
