@@ -977,6 +977,10 @@ bb studio reindex
 
 ![After leaving the Bot page: Dot's main thread as a normal BB thread page, with BB's own thread list back in the sidebar (Dot and the threads it started, nested, then the project's other threads)](assets/bot-leave.png)
 
+![Runners: the Bots sidebar's Runners group (Inbox watch, Deploy watch with a Needs you dot) and the Info tab's Runners section with each runner's schedule, last report (Inbox watch logged "two newsletters"; Deploy watch's urgent "health check failing") and Pause, Run now, Edit, Delete](assets/bot-runners.png)
+
+![The Deploy watch runner's thread, opened from the Runners group: its job prompt, its first run and an automation run, each ending without a message (their runner_report calls fold into Worked for). Stable BB declines the Threads tab's target, so it opens as BB's thread page; the runner is unnested in BB's list, not under Dot](assets/bot-runner-thread.png)
+
 ![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced

@@ -74,7 +74,7 @@ export function RunnersSection({ botName, onOpen, disabled }: { botName: string;
   const runners = data.data?.runners ?? [];
   const adoptable = data.data?.adoptable ?? [];
   return (
-    <section aria-label="Runners" className="px-4 pt-4">
+    <section aria-label="Runners" data-testid="bot-runners" className="px-4 pt-4">
       <div className="flex items-center gap-2">
         <h3 className="flex-1 text-xs font-medium text-muted-foreground">Runners</h3>
         <button type="button" className={GHOST_BUTTON} disabled={disabled} onClick={() => { setError(null); setSheet({ kind: "new" }); }}><Icon name="Plus" />New runner</button>

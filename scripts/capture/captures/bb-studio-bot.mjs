@@ -5,7 +5,10 @@
 // a nested follow-up, a recurring automation), its main thread in BB's own
 // thread view, and the right panel's Info tab; then two sub-threads open in
 // the right panel's Threads tab; then a normal thread page, where BB's own
-// thread list is back.
+// thread list is back. Last, two runners (src/runners.ts): one that logs,
+// one that tells and then raises something urgent; the Bots sidebar's
+// Runners group, the Info tab's Runners section, and a runner's thread in
+// the Threads tab, with the Bot's chat holding only the runner's lines.
 const BOT_PATH = "/plugins/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
@@ -130,6 +133,103 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
+  /**
+   * Two runners on short schedules. Inbox watch only logs; Deploy watch tells
+   * on its first run and raises an urgent report on its second (Run now).
+   * The Bot's thread must get their tell lines and no child notices.
+   */
+  const RUNNERS = [
+    { name: "Inbox watch", job: "On your first run call runner_report with level log and summary \"Inbox: two newsletters, nothing for you.\" On later runs there is nothing new: finish without any message.", schedule: { cadence: "every15minutes", time: "09:00" } },
+    { name: "Deploy watch", job: "On your first run call runner_report with level tell and summary \"ORBIT-42 staging deploy finished: build 418 is healthy.\" On your second run call runner_report with level urgent and summary \"ORBIT-42 staging is down: health check failing since build 419.\" After that there is nothing new: finish without any message.", schedule: { cadence: "every30minutes", time: "09:00" } },
+  ];
+  const seededRunners = async () => {
+    const bot = await seededBot();
+    let { runners } = await pluginRpc("studio", "bot_runners", {});
+    for (const spec of RUNNERS) {
+      if (runners.some((runner) => runner.name === spec.name)) continue;
+      await pluginRpc("studio", "bot_runner_create", spec);
+    }
+    ({ runners } = await pluginRpc("studio", "bot_runners", {}));
+    const byName = (name) => runners.find((runner) => runner.name === name);
+    for (const runner of runners) await bbCli(["thread", "wait", runner.threadId, "--status", "idle", "--timeout", "300"]).catch(() => {});
+    const deploy = byName("Deploy watch");
+    ({ runners } = await pluginRpc("studio", "bot_runners", {}));
+    if (byName("Deploy watch").lastLevel === "tell") {
+      await pluginRpc("studio", "bot_runner_run_now", { id: deploy.id });
+      await sleep(5000);
+      await bbCli(["thread", "wait", deploy.threadId, "--status", "idle", "--timeout", "300"]).catch(() => {});
+    }
+    for (let i = 0; i < 40; i++) {
+      ({ runners } = await pluginRpc("studio", "bot_runners", {}));
+      if (byName("Inbox watch")?.lastLevel === "log" && byName("Deploy watch")?.lastLevel === "urgent") break;
+      await sleep(3000);
+    }
+    if (byName("Inbox watch")?.lastLevel !== "log") throw new Error("Inbox watch didn't log its first run");
+    if (byName("Deploy watch")?.lastLevel !== "urgent") throw new Error("Deploy watch didn't raise its urgent report");
+    await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
+    return { bot, runners };
+  };
+
+  /** The Bot's sidebar shows Runners; Info shows the Runners section with both. */
+  const runnersInfo = async (client) => {
+    await seededRunners();
+    await workspace(client);
+    for (const text of ["Runners", "Inbox watch", "Deploy watch"]) await client.waitForText(text, 60000);
+    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await client.waitForSelector('[aria-label$=" info"] section[aria-label=Runners] [data-runner]', 30000);
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const section = document.querySelector('[aria-label$=" info"] section[aria-label=Runners]');
+        const text = section?.textContent ?? "";
+        if (/Inbox watch/.test(text) && /Deploy watch/.test(text) && /two newsletters/.test(text) && /health check failing/.test(text) && /Run now/.test(text) && /New runner/.test(text)) {
+          section.scrollIntoView({ block: "start" });
+          return resolve(true);
+        }
+        if (Date.now() - started > 60000) return reject(new Error("The Info tab's Runners section doesn't show both runners and their reports"));
+        setTimeout(tick, 300);
+      };
+      tick();
+    }))()`);
+    await sleep(1500);
+  };
+
+  /** A runner's thread in the Threads tab, opened from the sidebar's Runners group. */
+  const runnerThread = async (client) => {
+    await seededRunners();
+    await workspace(client);
+    await client.waitForText("Deploy watch", 60000);
+    await client.waitForSelector('button[aria-label="Bot info"]', 30000);
+    // The right panel is open (Info) before the runner opens in its Threads tab.
+    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await client.waitForSelector('[aria-label$=" info"] section[aria-label=Runners]', 30000);
+    await client.evaluate(`(() => {
+      const row = [...document.querySelectorAll('${SIDEBAR} section[aria-label="Runners"] button[data-runner]')].find((each) => each.textContent.includes("Deploy watch"));
+      if (!row) throw new Error("No Deploy watch row under Runners");
+      row.click();
+      return true;
+    })()`);
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        // The Threads tab, or BB's thread page where the host declines a fixed-tab target (stable BB 0.46 does).
+        const tab = document.querySelector('[role=tablist][aria-label="Open threads"]') && document.querySelector('section[aria-label="Thread"]');
+        const page = location.pathname.includes("/threads/thr_") ? document.body : null;
+        const chat = tab ?? page;
+        if (chat && /Deploy watch/.test(chat.textContent) && /runner_report/.test(chat.textContent)) return resolve(true);
+        if (Date.now() - started > 60000) return reject(new Error("The Threads tab doesn't show the Deploy watch runner's thread"));
+        setTimeout(tick, 300);
+      };
+      tick();
+    }))()`);
+    // The Bot's own thread holds the runner's tell lines and no notice about a runner's thread.
+    const { bot, runners } = await seededRunners();
+    const log = JSON.stringify(await json(["thread", "log", bot.threadId, "--all"]));
+    if (!log.includes("From runner Deploy watch: ORBIT-42 staging deploy finished")) throw new Error("The Bot's thread has no tell line from Deploy watch");
+    for (const runner of runners) if (new RegExp(`@thread:${runner.threadId} (completed|failed|was interrupted|needs)`).test(log)) throw new Error(`A notice about ${runner.name} reached the Bot's thread`);
+    await sleep(1500);
+  };
+
   /** Leaving the Bot page: a normal thread, with BB's own thread list back. */
   const leave = async (client) => {
     const bot = await seededBot();
@@ -164,5 +264,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: info },
     { id: "studio-bot-threads", packageDir: "bb-studio", fileName: "bot-threads.png", setup: threads },
     { id: "studio-bot-leave", packageDir: "bb-studio", fileName: "bot-leave.png", setup: leave },
+    { id: "studio-bot-runners", packageDir: "bb-studio", fileName: "bot-runners.png", setup: runnersInfo },
+    { id: "studio-bot-runner-thread", packageDir: "bb-studio", fileName: "bot-runner-thread.png", setup: runnerThread },
   ];
 };
