@@ -1,16 +1,16 @@
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { experimental_runBridgeConformance, experimental_formatConformanceReport } from "@get-bb/plugin-sdk/provider-bridge/testing";
-import { createGrokBridge, grokHistoryStore, grokModels } from "./grok.js";
+import { boundHistory, createGrokBridge, GrokClient, grokHistoryStore, grokModels, HISTORY_MAX_AGE_MS } from "./grok.js";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).forEach(fn => fn()); });
 
-async function fixture() {
+async function fixture(stall = false) {
   const bodies: any[] = [];
   const server = createServer(async (req, res) => {
     let body = "";
@@ -20,6 +20,7 @@ async function fixture() {
     if (req.url === "/v1/chat/completions") {
       bodies.push(JSON.parse(body));
       res.writeHead(200, { "Content-Type": "text/event-stream" });
+      if (stall) { res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "o" } }] })}\n\n`); return; }
       for (const text of ["o", "k"]) res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
       res.end("data: [DONE]\n\n");
       return;
@@ -83,3 +84,45 @@ it("passes the published BB bridge conformance suite with an xAI fixture", async
   });
   expect(report.passed, experimental_formatConformanceReport(report)).toBe(true);
 }, 20_000);
+
+it("gives up on a stalled stream even with a caller's abort signal", async () => {
+  const { providerOptions } = await fixture(true);
+  const idle = GrokClient.idleMs;
+  GrokClient.idleMs = 200;
+  cleanups.push(() => { GrokClient.idleMs = idle; });
+  const got: string[] = [];
+  const run = async () => { for await (const text of new GrokClient(providerOptions as never).chat("grok-4", [{ role: "user", content: "Hi" }], new AbortController().signal)) got.push(text); };
+  await expect(run()).rejects.toThrow("Grok stopped responding.");
+  expect(got).toEqual(["o"]);
+});
+
+it("still stops at once when the caller aborts", async () => {
+  const { providerOptions } = await fixture(true);
+  const stop = new AbortController();
+  const run = async () => { for await (const _ of new GrokClient(providerOptions as never).chat("grok-4", [{ role: "user", content: "Hi" }], stop.signal)) stop.abort(); };
+  await expect(run()).rejects.toThrow("Grok stream was interrupted.");
+});
+
+it("bounds history: keeps the first instruction, drops the oldest turns, starts on a user turn", () => {
+  const turns = Array.from({ length: 10 }, (_, i) => ({ role: (i % 2 ? "assistant" : "user") as "user" | "assistant", content: `m${i}` }));
+  expect(boundHistory(turns, { messages: 5, chars: 1e6 }).map(m => m.content)).toEqual(["m0", "m6", "m7", "m8", "m9"]);
+  expect(boundHistory(turns, { messages: 100, chars: 8 }).map(m => m.content)).toEqual(["m0", "m8", "m9"]);
+  expect(boundHistory(turns.slice(0, 3), { messages: 100, chars: 1e6 })).toHaveLength(3);
+  const history = store();
+  history.write("t", Array.from({ length: 500 }, (_, i) => ({ role: (i % 2 ? "assistant" : "user") as "user" | "assistant", content: `m${i}` })));
+  const kept = history.read("t");
+  expect(kept.length).toBeLessThanOrEqual(80);
+  expect(kept[0]!.content).toBe("m0");
+  expect(kept.at(-1)!.content).toBe("m499");
+});
+
+it("prunes histories untouched for longer than the max age", () => {
+  const dir = mkdtempSync(join(tmpdir(), "grok-history-"));
+  writeFileSync(join(dir, "old.json"), "[]");
+  writeFileSync(join(dir, "new.json"), "[]");
+  const old = (Date.now() - HISTORY_MAX_AGE_MS - 1000) / 1000;
+  utimesSync(join(dir, "old.json"), old, old);
+  grokHistoryStore(dir);
+  expect(existsSync(join(dir, "old.json"))).toBe(false);
+  expect(existsSync(join(dir, "new.json"))).toBe(true);
+});

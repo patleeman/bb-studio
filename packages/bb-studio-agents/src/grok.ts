@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -24,11 +24,13 @@ type Message = { role: "system" | "user" | "assistant"; content: string };
 export class GrokClient {
   readonly connection: Connection;
   private readonly token: string;
+  /** A stream that sends nothing for this long is given up on, even with a caller's signal. */
+  static idleMs = 90_000;
   constructor(connection: Connection, env: NodeJS.ProcessEnv = process.env) {
     this.connection = connectionSchema.parse(connection);
     this.token = resolveToken(connection.tokenEnv, connection.tokenEnvFile, env);
   }
-  private async request(path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
+  private async request(path: string, body?: unknown, signal?: AbortSignal, timedOut?: () => boolean): Promise<Response> {
     if (!this.connection.enabled) throw new AgentConnectionError("Grok is disabled in Studio Agents settings.");
     if (!this.token) throw new AgentConnectionError(`Grok API key is missing. Set ${this.connection.tokenEnv} on the BB host.`);
     let response: Response;
@@ -41,7 +43,7 @@ export class GrokClient {
         redirect: "error",
       });
     } catch {
-      throw new AgentConnectionError(signal?.aborted ? "Grok request was cancelled." : "Grok is unreachable. Check its API URL.");
+      throw new AgentConnectionError(timedOut?.() ? "Grok stopped responding." : signal?.aborted ? "Grok request was cancelled." : "Grok is unreachable. Check its API URL.");
     }
     if (!response.ok) {
       await response.body?.cancel();
@@ -56,14 +58,27 @@ export class GrokClient {
   }
   /** Streams text deltas of one chat completion. */
   async *chat(model: string, messages: Message[], signal: AbortSignal): AsyncGenerator<string> {
-    const response = await this.request("/chat/completions", { model, messages, stream: true }, signal);
-    if (!response.body) throw new AgentConnectionError("xAI returned an empty stream.");
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+    // The caller's signal (stop) and an inactivity timer, combined: the timer
+    // restarts on every chunk, so a long answer is fine but a stalled one ends.
+    const abort = new AbortController();
+    let idle = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => { clearTimeout(timer); timer = setTimeout(() => { idle = true; abort.abort(); }, GrokClient.idleMs); };
+    const onAbort = () => abort.abort();
+    if (signal.aborted) abort.abort(); else signal.addEventListener("abort", onAbort, { once: true });
+    arm();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
+      const response = await this.request("/chat/completions", { model, messages, stream: true }, abort.signal, () => idle);
+      if (!response.body) throw new AgentConnectionError("xAI returned an empty stream.");
+      reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
       while (true) {
-        const { value, done } = await reader.read();
+        arm();
+        let chunk: ReadableStreamReadResult<Uint8Array>;
+        try { chunk = await reader.read(); } catch { throw new AgentConnectionError(idle ? "Grok stopped responding." : "Grok stream was interrupted."); }
+        const { value, done } = chunk;
         if (done) return;
         buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
         let index: number;
@@ -80,7 +95,11 @@ export class GrokClient {
         }
         if (buffer.length > 1_048_576) throw new AgentConnectionError("xAI stream line exceeds the size limit.");
       }
-    } finally { await reader.cancel().catch(() => {}); }
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      await reader?.cancel().catch(() => {});
+    }
   }
 }
 
@@ -101,11 +120,41 @@ export async function grokHealth(connection: Connection) {
   }
 }
 
-export function grokHistoryStore(dir = join(homedir(), ".config", "bb-external-agents", "grok")) {
+export const HISTORY_LIMITS = { messages: 80, chars: 240_000 };
+
+/**
+ * Bounds a thread's history so it isn't resent without end: at most
+ * `limits.messages` messages and `limits.chars` characters (a rough token
+ * budget). The oldest turns go first; the first message (the user's opening
+ * instruction) stays, and what's kept after it starts with a user turn.
+ */
+export function boundHistory(messages: Message[], limits = HISTORY_LIMITS): Message[] {
+  if (messages.length <= 1) return messages;
+  const [first, ...rest] = messages as [Message, ...Message[]];
+  const size = (list: Message[]) => list.reduce((sum, m) => sum + m.content.length, 0);
+  let start = 0;
+  while (start < rest.length && (1 + rest.length - start > limits.messages || first.content.length + size(rest.slice(start)) > limits.chars)) start++;
+  while (start < rest.length && start > 0 && rest[start]!.role !== "user") start++;
+  // The newest turn always goes, even if it alone is over the budget.
+  if (start >= rest.length) start = rest.length - 1;
+  return start === 0 ? messages : [first, ...rest.slice(start)];
+}
+
+/** Histories untouched this long belong to deleted or long-archived threads, and are pruned. */
+export const HISTORY_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+export function grokHistoryStore(dir = join(homedir(), ".config", "bb-external-agents", "grok"), now = Date.now()) {
   const file = (id: string) => join(dir, `${id.replace(/[^A-Za-z0-9_-]/g, "_")}.json`);
+  // Cheap: one directory scan when the bridge starts.
+  try {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (name.endsWith(".json") && now - statSync(path).mtimeMs > HISTORY_MAX_AGE_MS) rmSync(path, { force: true });
+    }
+  } catch { /* no history yet */ }
   return {
-    read(id: string): Message[] { try { return JSON.parse(readFileSync(file(id), "utf8")); } catch { return []; } },
-    write(id: string, messages: Message[]) { mkdirSync(dir, { recursive: true, mode: 0o700 }); writeFileSync(file(id), JSON.stringify(messages), { mode: 0o600 }); },
+    read(id: string): Message[] { try { return boundHistory(JSON.parse(readFileSync(file(id), "utf8"))); } catch { return []; } },
+    write(id: string, messages: Message[]) { mkdirSync(dir, { recursive: true, mode: 0o700 }); writeFileSync(file(id), JSON.stringify(boundHistory(messages)), { mode: 0o600 }); },
   };
 }
 
@@ -132,8 +181,7 @@ export function createGrokBridge(write?: (line: string) => void, store = grokHis
     if (session.active) throw new AgentConnectionError("Grok is already answering in this thread.");
     const active = { id: `grok-${randomUUID()}`, abort: new AbortController() };
     session.active = active;
-    const history = store.read(session.providerThreadId);
-    history.push({ role: "user", content: input });
+    const history = boundHistory([...store.read(session.providerThreadId), { role: "user", content: input }]);
     if (clientRequestId) deltas(session.threadId, [{ kind: "input.accepted", clientRequestId, providerTurnId: active.id }]);
     deltas(session.threadId, [{ kind: "turn.open", providerTurnId: active.id }]);
     const key = { channel: "assistant-0" };
