@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Deterministic local Hermes API fixture for staged BB approval verification.
-// No commands run. Every turn waits for a BB approval, then returns "ok".
+// No commands run. Every turn waits for a BB approval, then returns "ok",
+// unless HERMES_FIXTURE_REPLY sets a plain reply.
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 const runs = new Map();
@@ -23,6 +24,14 @@ const server = createServer(async (req, res) => {
   if (action === 'events') {
     run.stream = res;
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    // HERMES_FIXTURE_REPLY: answer with that text and no approval (staged screenshots).
+    if (process.env.HERMES_FIXTURE_REPLY) {
+      const text = process.env.HERMES_FIXTURE_REPLY;
+      emit({ event: 'message.delta', delta: text });
+      emit({ event: 'run.completed', output: text });
+      run.stream.end(': stream closed\n\n'); runs.delete(runId);
+      return;
+    }
     emit({ event: 'approval.request', request_id: run.requestId, command: 'echo ok (fixture: no command is executed)', reason: 'Staged BB approval round-trip', choices: ['once', 'deny'] });
     return;
   }

@@ -985,6 +985,12 @@ bb studio reindex
 
 ![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; Scout's own chat, its title bar status (Checks in weekdays at 18:00) and its Info tab with its own check-in (Evening wrap-up), Memory, Skills and Runners](assets/bot-two.png)
 
+![Import bot: the dialog over Dot's page lists Hermes (picked, Ready) and Grok (Ready) with their logos, OpenClaw and Dot as Not configured with a pointer to Studio Agents settings, the model hermes-fixture, and a name, shape and color for the new bot](assets/bot-import.png)
+
+![An imported Hermes bot: its avatar carries the Hermes logo in the Bots list and title bar; its chat shows the first exchange answered by the staged Hermes fixture; the Info tab says Runs on Hermes · hermes-fixture and that its memory and tools live there, with no Memory, Skills or Runners](assets/bot-external.png)
+
+![An imported Grok bot: the Grok logo on its avatar, Dot and Hermes listed above it, and its first reply streamed from the staged xAI fixture](assets/bot-external-grok.png)
+
 ![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced

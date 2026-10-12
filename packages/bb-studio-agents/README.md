@@ -106,12 +106,15 @@ No Gateway scope upgrade was needed.
 
 ## Staged preview
 
-![Studio Agents settings in stable BB](assets/staged-preview.png)
+![Studio Agents settings in a staged stable BB 0.46: Hermes on, pointed at the local Hermes fixture with token variable STAGED_HERMES_TOKEN read from a dotenv file; OpenClaw off with its defaults; Grok on, pointed at the local xAI fixture with key variable STAGED_XAI_KEY; experimental Dot off](assets/staged-preview.png)
 
-Captured from the full BB 0.45.0 application with the experimental Dot setting,
-the red4 Tailscale URLs, token variable names, and paired OpenClaw client
-state configured. The screenshot contains paths and variable names, not
-credential values.
+The plugin's settings page in a staged stable BB 0.46, installed from Git.
+Hermes and Grok point at this package's loopback fixtures
+(`scripts/hermes-fixture.mjs` with `HERMES_FIXTURE_REPLY` set, and
+`scripts/grok-fixture.mjs`); their fixture keys come from a dotenv file.
+OpenClaw and Dot are off. The screenshot shows variable names and paths,
+not credential values. Studio's README shows Import bot and the imported
+Hermes and Grok bots from the same staging.
 
 If the BB host does not inherit the token variable, set `hermesTokenEnvFile`
 or `openclawTokenEnvFile` to a dotenv file on that host. Only the named
