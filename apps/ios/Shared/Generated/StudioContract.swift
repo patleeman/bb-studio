@@ -37,6 +37,7 @@ public enum Studio {
     public static let bot_list = "bot_list"
     public static let bot_get = "bot_get"
     public static let bot_create = "bot_create"
+    public static let bot_external_providers = "bot_external_providers"
     public static let bot_set = "bot_set"
     public static let bot_set_thread = "bot_set_thread"
     public static let bot_set_run = "bot_set_run"
@@ -253,6 +254,8 @@ public enum Studio {
   public typealias BotGet = BotGetOutput
 
   public typealias BotCreate = BotCreateOutput
+
+  public typealias BotExternalProviders = BotExternalProvidersOutput
 
   public typealias BotSet = BotSetOutput
 
@@ -2961,6 +2964,30 @@ public enum Studio {
     }
   }
 
+  public enum BotListOutputBotsItemKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotListOutputBotsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -2972,10 +2999,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotListOutputBotsItemKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotListOutputBotsItemState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotListOutputBotsItemState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotListOutputBotsItemKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -2986,6 +3016,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3034,6 +3067,30 @@ public enum Studio {
     }
   }
 
+  public enum BotGetOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotGetOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3045,10 +3102,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotGetOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotGetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3059,6 +3119,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3181,6 +3244,16 @@ public enum Studio {
     }
   }
 
+  public struct BotCreateInputExternal: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+
+    public init(providerId: String? = nil, model: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+    }
+  }
+
   public struct BotCreateInput: Sendable, Hashable, Codable {
     public var name: String?
     public var avatar: String?
@@ -3188,14 +3261,16 @@ public enum Studio {
     public var color: String?
     public var threadId: String?
     public var prompt: String?
+    public var external: BotCreateInputExternal?
 
-    public init(name: String? = nil, avatar: String? = nil, shape: BotCreateInputShape? = nil, color: String? = nil, threadId: String? = nil, prompt: String? = nil) {
+    public init(name: String? = nil, avatar: String? = nil, shape: BotCreateInputShape? = nil, color: String? = nil, threadId: String? = nil, prompt: String? = nil, external: BotCreateInputExternal? = nil) {
       self.name = name
       self.avatar = avatar
       self.shape = shape
       self.color = color
       self.threadId = threadId
       self.prompt = prompt
+      self.external = external
     }
   }
 
@@ -3226,6 +3301,30 @@ public enum Studio {
     }
   }
 
+  public enum BotCreateOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotCreateOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3237,10 +3336,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotCreateOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCreateOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3251,6 +3353,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3325,6 +3430,85 @@ public enum Studio {
     public init(bot: BotCreateOutputBot? = nil, run: BotCreateOutputRun? = nil) {
       self.bot = bot
       self.run = run
+    }
+  }
+
+  public struct BotExternalProvidersInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public enum BotExternalProvidersOutputProvidersItemStatus: Sendable, Hashable, Codable {
+    case ready
+    case disabled
+    case offline
+    case unauthenticated
+    case missing
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ready": self = .ready
+      case "disabled": self = .disabled
+      case "offline": self = .offline
+      case "unauthenticated": self = .unauthenticated
+      case "missing": self = .missing
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ready: try container.encode("ready")
+      case .disabled: try container.encode("disabled")
+      case .offline: try container.encode("offline")
+      case .unauthenticated: try container.encode("unauthenticated")
+      case .missing: try container.encode("missing")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotExternalProvidersOutputProvidersItemModelsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var displayName: String?
+    public var isDefault: Bool?
+
+    public init(id: String? = nil, displayName: String? = nil, isDefault: Bool? = nil) {
+      self.id = id
+      self.displayName = displayName
+      self.isDefault = isDefault
+    }
+  }
+
+  public struct BotExternalProvidersOutputProvidersItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var displayName: String?
+    public var logoUrl: String?
+    public var status: BotExternalProvidersOutputProvidersItemStatus?
+    public var message: String?
+    public var models: [BotExternalProvidersOutputProvidersItemModelsItem]?
+
+    public init(id: String? = nil, displayName: String? = nil, logoUrl: String? = nil, status: BotExternalProvidersOutputProvidersItemStatus? = nil, message: String? = nil, models: [BotExternalProvidersOutputProvidersItemModelsItem]? = nil) {
+      self.id = id
+      self.displayName = displayName
+      self.logoUrl = logoUrl
+      self.status = status
+      self.message = message
+      self.models = models
+    }
+  }
+
+  public struct BotExternalProvidersOutput: Sendable, Hashable, Codable {
+    public var installed: Bool?
+    public var providers: [BotExternalProvidersOutputProvidersItem]?
+
+    public init(installed: Bool? = nil, providers: [BotExternalProvidersOutputProvidersItem]? = nil) {
+      self.installed = installed
+      self.providers = providers
     }
   }
 
@@ -3418,6 +3602,30 @@ public enum Studio {
     }
   }
 
+  public enum BotSetOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSetOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3429,10 +3637,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotSetOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3443,6 +3654,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3555,6 +3769,30 @@ public enum Studio {
     }
   }
 
+  public enum BotSetThreadOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSetThreadOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3566,10 +3804,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotSetThreadOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetThreadOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3580,6 +3821,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3748,6 +3992,30 @@ public enum Studio {
     }
   }
 
+  public enum BotSetRunOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSetRunOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3759,10 +4027,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotSetRunOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetRunOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3773,6 +4044,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3885,6 +4159,30 @@ public enum Studio {
     }
   }
 
+  public enum BotPauseOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotPauseOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3896,10 +4194,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotPauseOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotPauseOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3910,6 +4211,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4022,6 +4326,30 @@ public enum Studio {
     }
   }
 
+  public enum BotResumeOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotResumeOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -4033,10 +4361,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotResumeOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotResumeOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -4047,6 +4378,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4159,6 +4493,30 @@ public enum Studio {
     }
   }
 
+  public enum BotStopOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotStopOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -4170,10 +4528,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotStopOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotStopOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -4184,6 +4545,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4616,6 +4980,30 @@ public enum Studio {
     }
   }
 
+  public enum BotCheckinPresetOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotCheckinPresetOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -4627,10 +5015,13 @@ public enum Studio {
     public var color: String?
     public var role: String?
     public var primary: Bool?
+    public var kind: BotCheckinPresetOutputBotKind?
+    public var providerId: String?
+    public var model: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCheckinPresetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -4641,6 +5032,9 @@ public enum Studio {
       self.color = color
       self.role = role
       self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
