@@ -17,7 +17,9 @@ public final class BBRealtime {
     private var task: URLSessionWebSocketTask?
     private var subscriptions: [String: JSONValue] = [:]
     private var listeners: [UUID: (RealtimeEvent) -> Void] = [:]
-    private var retryDelay: TimeInterval = 1
+    private var backoff = ReconnectBackoff()
+    /// When the current socket was opened, to tell a stable connection from one that drops at once.
+    private var connectedAt: Date?
     private var pingTimer: Timer?
     private var running = false
 
@@ -28,7 +30,7 @@ public final class BBRealtime {
     public func start() {
         guard !running else { return }
         running = true
-        retryDelay = 1
+        backoff = ReconnectBackoff()
         connect()
     }
 
@@ -71,6 +73,7 @@ public final class BBRealtime {
         guard running, task == nil else { return }
         let task = URLSession.shared.webSocketTask(with: client.webSocketURL)
         self.task = task
+        connectedAt = Date()
         task.resume()
         for target in subscriptions.values { write(["type": "subscribe", "target": target]) }
         receive(on: task)
@@ -87,7 +90,6 @@ public final class BBRealtime {
                 guard let self, self.task === task else { return }
                 switch result {
                 case .success(let message):
-                    self.retryDelay = 1
                     self.handle(message)
                     self.receive(on: task)
                 case .failure:
@@ -101,8 +103,10 @@ public final class BBRealtime {
         task = nil
         pingTimer?.invalidate()
         guard running else { return }
-        let delay = retryDelay
-        retryDelay = min(retryDelay * 2, 30)
+        // A socket that connects and drops at once keeps backing off; only one
+        // that stayed up a while starts over from a short wait.
+        let delay = backoff.delay(afterUptime: connectedAt.map { Date().timeIntervalSince($0) })
+        connectedAt = nil
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
             self.connect()
@@ -139,5 +143,25 @@ public final class BBRealtime {
         guard let task, let data = try? JSONEncoder().encode(value), let text = String(data: data, encoding: .utf8)
         else { return }
         task.send(.string(text)) { _ in }
+    }
+}
+
+/// How long to wait before reconnecting: doubling from 1s up to 30s, with
+/// jitter, and starting over only after a connection stayed up for 30s.
+struct ReconnectBackoff {
+    static let base: TimeInterval = 1
+    static let cap: TimeInterval = 30
+    static let stableAfter: TimeInterval = 30
+
+    private(set) var attempt = 0
+
+    /// The wait before the next connect, after a connection that lasted
+    /// `uptime` (nil if it never opened). `jitter` in 0...1 picks a point in
+    /// the upper half of the step.
+    mutating func delay(afterUptime uptime: TimeInterval?, jitter: Double = .random(in: 0...1)) -> TimeInterval {
+        if let uptime, uptime >= Self.stableAfter { attempt = 0 }
+        let step = min(Self.cap, Self.base * pow(2, Double(min(attempt, 16))))
+        attempt += 1
+        return step / 2 + step / 2 * min(1, max(0, jitter))
     }
 }

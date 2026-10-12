@@ -9,6 +9,7 @@ struct BotTab: View {
     /// Back to the Bots list.
     var back: (() -> Void)? = nil
     @EnvironmentObject private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var path: [Route] = []
     @State private var lead = BotLead.loading
     @State private var activity: BotActivity?
@@ -21,6 +22,7 @@ struct BotTab: View {
     @State private var confirmingStop = false
     @State private var error: String?
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
+    private struct PollKey: Hashable { let interval: Duration?; let server: URL; let botId: String? }
 
     private var bot: BotInfo? { if case .bot(let bot) = lead { bot } else { nil } }
     private var needsYou: Int { activity?.needsYou.count ?? 0 }
@@ -59,13 +61,41 @@ struct BotTab: View {
         .task(id: LoadKey(visible: model.tab == .bot, server: model.serverURL, botId: botId, attempt: attempt)) {
             guard model.tab == .bot else { return }
             await load()
-            // Live status for the threads it started, as the desktop polls it.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(20))
-                if Task.isCancelled { break }
-                await loadActivity()
-            }
         }
+        // Live status for the threads it started: on BB's thread changes, with
+        // a slow poll behind them for the rest of the Activity.
+        .task(id: PollKey(interval: pollInterval, server: model.serverURL, botId: botId)) {
+            guard let interval = pollInterval else { return }
+            let (changes, signal) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+            let listener = model.realtime.listen { event in
+                if BotActivityPoll.refreshes(on: event) { signal.yield() }
+            }
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { @MainActor in
+                    for await _ in changes {
+                        // Settle a burst of changes into one refresh.
+                        try? await Task.sleep(for: .seconds(1))
+                        if Task.isCancelled { return }
+                        await loadActivity()
+                    }
+                }
+                group.addTask { @MainActor in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: interval)
+                        if Task.isCancelled { return }
+                        await loadActivity()
+                    }
+                }
+                await group.next()
+                group.cancelAll()
+            }
+            signal.finish()
+            model.realtime.removeListener(listener)
+        }
+    }
+
+    private var pollInterval: Duration? {
+        BotActivityPoll.interval(visible: model.tab == .bot, sceneActive: scenePhase == .active, running: activity?.running == true)
     }
 
     @ViewBuilder
@@ -235,7 +265,8 @@ struct BotTab: View {
         guard bot != nil else { activity = nil; return }
         let client = model.client
         guard let next = try? await client.botActivity(botId: botId) else { return }
-        activity = next
+        // An unchanged Activity redraws nothing.
+        if next != activity { activity = next }
         let ids = Set((next.needsYou + (next.waiting ?? []) + next.inProgress + next.completed).filter { $0.relation == "started" }.map(\.id))
         let missing = ids.subtracting(startedThreads.keys)
         guard !missing.isEmpty else { return }
@@ -284,4 +315,32 @@ struct BotTab: View {
 private enum BotSheet: String, Identifiable {
     case activity, profile, checkIns, skills
     var id: String { rawValue }
+}
+
+/// When the Bot tab refreshes the Activity.
+enum BotActivityPoll {
+    /// While the tab shows and the app is in front: every 30s while its
+    /// threads run, every 2 minutes when idle. Nil otherwise: no polling.
+    static func interval(visible: Bool, sceneActive: Bool, running: Bool) -> Duration? {
+        guard visible, sceneActive else { return nil }
+        return running ? .seconds(30) : .seconds(120)
+    }
+
+    /// A thread changed status, or the socket came back after missing changes.
+    /// Streaming output alone changes nothing the Activity shows.
+    static func refreshes(on event: RealtimeEvent) -> Bool {
+        switch event {
+        case .changed(let entity, _, let changes):
+            entity == "thread" && !(!changes.isEmpty && changes.allSatisfy { $0 == "events-appended" })
+        case .connected:
+            true
+        case .pluginSignal:
+            false
+        }
+    }
+}
+
+extension BotActivity {
+    /// Something of the Bot's is running or queued.
+    var running: Bool { !inProgress.isEmpty || !(waiting ?? []).isEmpty }
 }

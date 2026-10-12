@@ -105,30 +105,32 @@ final class ThreadModel: ObservableObject {
 
     /// Loads the next page up the chain: the rest of the earliest loaded
     /// thread, else the newest page of the thread before it.
-    private func loadEarlier(_ client: BBClient) async -> Bool {
+    private func loadEarlier(_ client: BBClient) async -> OlderPage {
         loadingOlder = true
         defer { loadingOlder = false }
         do {
             if let first = earlierPages.first, let cursor = earlierCursor {
                 let page = try await client.timeline(first.threadId, before: cursor)
                 let known = Set(first.rows.map(\.id))
+                let added = page.rows.filter { !known.contains($0.id) }
                 earlierCursor = page.timelinePage?.hasOlderRows == true ? page.timelinePage?.olderCursor : nil
                 let index = chainBefore.firstIndex(of: first.threadId) ?? 0
-                earlierPages[0] = BotChain.Page(threadId: first.threadId, rows: page.rows.filter { !known.contains($0.id) } + first.rows,
+                earlierPages[0] = BotChain.Page(threadId: first.threadId, rows: added + first.rows,
                                                 continuation: index > 0 && earlierCursor == nil)
-                return true
+                return added.isEmpty ? .nothing : .added
             }
             let next = (earlierPages.first.flatMap { chainBefore.firstIndex(of: $0.threadId) } ?? chainBefore.count) - 1
-            guard chainBefore.indices.contains(next) else { return false }
+            guard chainBefore.indices.contains(next) else { return .nothing }
             let page = try await client.timeline(chainBefore[next])
             earlierCursor = page.timelinePage?.hasOlderRows == true ? page.timelinePage?.olderCursor : nil
             earlierPages.insert(BotChain.Page(threadId: chainBefore[next], rows: page.rows, continuation: next > 0 && earlierCursor == nil), at: 0)
-            return true
+            // Another thread of the chain is in, even an empty one: the chain moved on.
+            return .added
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }
-        return false
+        return .failed
     }
     private var listener: UUID?
     private var refreshTask: Task<Void, Never>?
@@ -440,32 +442,34 @@ final class ThreadModel: ObservableObject {
         await loadInteractions()
     }
 
-    /// Whether rows were added.
+    /// Whether rows were added, nothing new came, the load failed, or another is in flight.
     @discardableResult
-    func loadOlder() async -> Bool {
-        if !hasOlder, hasEarlier, let client, !loadingOlder { return await loadEarlier(client) }
-        guard let client, olderCursor != nil, !loadingOlder else { return false }
+    func loadOlder() async -> OlderPage {
+        if loadingOlder { return .busy }
+        if !hasOlder, hasEarlier, let client { return await loadEarlier(client) }
+        guard let client, olderCursor != nil else { return .nothing }
         loadingOlder = true
         defer { loadingOlder = false }
         do {
             // In timeline order, so a full refresh can't swap the rows under the cursor mid-fetch.
-            let page = try await inTimelineOrder { [self] () async throws -> TimelinePage? in
+            let page = try await inTimelineOrder { [self] () async throws -> (TimelinePage, Int)? in
                 guard let cursor = olderCursor else { return nil }
                 let page = try await client.timeline(threadId, before: cursor)
                 let known = Set(rows.map(\.id))
-                rows = page.rows.filter { !known.contains($0.id) } + rows
+                let added = page.rows.filter { !known.contains($0.id) }
+                rows = added + rows
                 olderCursor = page.timelinePage?.olderCursor
                 hasOlder = page.timelinePage?.hasOlderRows ?? false
-                return page
+                return (page, added.count)
             }
-            guard let page else { return false }
+            guard let (page, added) = page else { return .nothing }
             Task { await ThreadTitles.fetchUnknown(in: page.rows.compactMap(\.text), client: client) }
-            return true
+            return added > 0 ? .added : .nothing
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = error.localizedDescription
         }
-        return false
+        return .failed
     }
 
     /// The whole thread, so find in thread sees every message.
@@ -474,10 +478,12 @@ final class ThreadModel: ObservableObject {
         loadingAll = true
         defer { loadingAll = false }
         while hasOlder, !Task.isCancelled {
-            if await !loadOlder() {
-                // Another load is in flight; wait for it rather than give up.
-                guard loadingOlder else { return }
-                try? await Task.sleep(for: .milliseconds(200))
+            switch await loadOlder() {
+            case .added: continue
+            // Another load is in flight; wait for it rather than give up.
+            case .busy: try? await Task.sleep(for: .milliseconds(200))
+            // A page with nothing new would come back the same again.
+            case .nothing, .failed: return
             }
         }
     }
@@ -631,5 +637,28 @@ enum TimelineItem: Identifiable {
         }
         flush()
         return items
+    }
+}
+
+/// What loading a page above the timeline did.
+enum OlderPage: Equatable {
+    case added, nothing, failed, busy
+
+    /// How long the top-of-timeline loader waits before the next page, or nil
+    /// to stop until the reader leaves the top and comes back. A page with
+    /// nothing new stops it; failures back off from 2s up to a minute.
+    func retryDelay(failures: inout Int) -> Duration? {
+        switch self {
+        case .added:
+            failures = 0
+            return .milliseconds(500)
+        case .busy:
+            return .milliseconds(500)
+        case .nothing:
+            return nil
+        case .failed:
+            failures += 1
+            return .seconds(min(60, 2 << min(failures - 1, 5)))
+        }
     }
 }

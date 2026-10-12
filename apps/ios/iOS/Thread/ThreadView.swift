@@ -509,12 +509,14 @@ struct ThreadView: View {
         } action: { _, isAtTop in
             atTop = isAtTop
         }
-        // Keeps trying while the reader stays at the top: after a failure, or
-        // when a page is too short to move them off it.
+        // Keeps loading while the reader stays at the top and a page is too
+        // short to move them off it; backs off after failures, and stops when
+        // a page brings nothing new.
         .task(id: atTop) {
+            var failures = 0
             while atTop, botChrome != nil ? model.canLoadOlder : model.hasOlder, !Task.isCancelled {
-                let loaded = await loadOlder()
-                try? await Task.sleep(for: .seconds(loaded ? 0.5 : 2))
+                guard let delay = await loadOlder().retryDelay(failures: &failures) else { break }
+                try? await Task.sleep(for: delay)
             }
         }
         .onChange(of: finding) { _, finding in
@@ -579,11 +581,12 @@ struct ThreadView: View {
 
     /// The page goes in above the reader, so bring back what was the first
     /// item. By id rather than offset: rows above are only estimated heights.
-    private func loadOlder() async -> Bool {
+    private func loadOlder() async -> OlderPage {
         let first = botChrome.map { BotChatEntry.build(model.chainRows, started: $0.started).first?.id } ?? TimelineItem.group(model.rows).first?.id
-        guard let first, await model.loadOlder() else { return false }
-        position.scrollTo(id: first, anchor: .top)
-        return true
+        guard let first else { return .nothing }
+        let result = await model.loadOlder()
+        if result == .added { position.scrollTo(id: first, anchor: .top) }
+        return result
     }
 
     /// Past this, the timeline is past its last row rather than bouncing.
