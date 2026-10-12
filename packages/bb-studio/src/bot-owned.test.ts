@@ -135,3 +135,16 @@ it("ownedThreads follows ownership through hidden threads and chains of automati
   ];
   expect(ownedThreads(threads, automations, chains, new Map([["run1", "a1"], ["run2", "a2"]]))).toEqual(new Map([["child", "b1"], ["run1", "b1"], ["run2", "b1"]]));
 });
+
+it("tells which Bot a thread belongs to: its chain, what it owns, what Studio hid for it", async () => {
+  const x = await setup();
+  seedChief(x);
+  await x.owned.sweep();
+  expect(x.owned.ownerOf("thr_old_chief")).toBe("bot_main");
+  expect(x.owned.ownerOf("thr_k3mtxc4nju")).toBe("bot_main");
+  expect(x.owned.ownerOf("thr_run_child")).toBe("bot_main");
+  // A runner's thread, recorded by src/runners.ts.
+  x.db.prepare("INSERT INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES ('thr_runner', 'bot_main', 'runner', 1)").run();
+  expect(x.owned.ownerOf("thr_runner")).toBe("bot_main");
+  for (const id of ["thr_user", "thr_fork", "thr_user_run", "thr_nope"]) expect(x.owned.ownerOf(id)).toBeNull();
+});

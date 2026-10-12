@@ -1020,8 +1020,11 @@ of Staff", with the same thread and check-ins; rename it from its page.
   Idle, Paused, Stopped), a quiet **Needs you** marker when a thread it
   started waits on you, ⋯ (Edit profile, Memory, Skills, Check-ins, Open as
   thread, Pause / Resume, Stop…) and **Info**.
-- **Sidebar**: on the Bot page, BB's sidebar shows the **Bots** list in
-  place of its thread list; everywhere else it is BB's normal thread list.
+- **Sidebar**: on the Bot page and on a Bot-owned thread (its chat and
+  handoff chain, a runner, a thread it spawned, an automation's run), BB's
+  sidebar shows the **Bots** list in place of its thread list; everywhere
+  else it is BB's normal thread list. Bot-owned threads are hidden from BB's
+  list, so a thread opened from the Bots list keeps it.
   The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
   Settings → Appearance). Under **Bots**, every bot (the primary first) with
   its avatar, tinted in its color; the selected one opens into the
@@ -1030,13 +1033,16 @@ of Staff", with the same thread and check-ins; rename it from its page.
   other than its check-in), **Recent**, and **Earlier conversations** (its
   handoff chain, closed by default). A thread another of its threads started
   nests under that one, at any depth (`bot_activity` returns each thread's
-  `parentId`). A row opens the thread in the right panel's **Threads** tab;
-  the bot's row opens its main thread. Closed groups are remembered on this
+  `parentId`). A row opens the thread as a BB thread in the main pane; the
+  bot's row opens its main thread. Closed groups are remembered on this
   device.
 - **Switching the list**: BB's `sidebar.threadListProvider` preference is
-  global, and Studio sets it by page: the Bot page shows `studio/bot`, the
-  Studio panel `studio/studio-items` (see Workspace), and every other page
-  BB's own list. Entering a Studio page remembers your choice (in this
+  global, and Studio sets it by page: the Bot page and Bot-owned threads
+  show `studio/bot`, the Studio panel `studio/studio-items` (see
+  Workspace), and every other page BB's own list. A thread opened from the
+  Bots list counts as the Bot's at once; for any other thread Studio asks
+  `bot_thread_owner` (cached), and the sidebar stays as it is until the
+  answer comes. Entering a Studio page remembers your choice (in this
   device's storage); leaving puts it back. "Automatic" would pick a Studio
   list everywhere, so off Studio's pages it becomes BB's own list
   (`thread-list/thread-list`); a list you pinned yourself comes back as it

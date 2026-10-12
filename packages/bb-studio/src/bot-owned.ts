@@ -123,6 +123,18 @@ export class BotOwnedThreads {
     return ids;
   }
 
+  /**
+   * The Bot a thread belongs to (its chain, a thread it owns as last seen, or
+   * one Studio hid for it, runners included), or null. The browser asks this
+   * to keep the Bots list in BB's sidebar while such a thread is open.
+   */
+  ownerOf(threadId: string): string | null {
+    const chained = this.chains().get(threadId) ?? this.owners.get(threadId);
+    if (chained) return chained;
+    const row = this.deps.db.prepare("SELECT bot_id FROM bot_hidden_threads WHERE thread_id = ?").get(threadId) as { bot_id: string } | undefined;
+    return row?.bot_id ?? null;
+  }
+
   /** Hides it once and records that Studio did; false when BB refused (the next sweep tries again). */
   private async hide(threadId: string, botId: string, reason: "spawned" | "automation"): Promise<boolean> {
     try {

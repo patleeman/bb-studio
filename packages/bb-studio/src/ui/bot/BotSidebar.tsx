@@ -1,5 +1,6 @@
 // The Bots sidebar: Studio's thread list provider ("Bot (Studio)"), which
-// replaces BB's thread list while the Bot page shows (threadListSwitch.ts).
+// replaces BB's thread list while the Bot page or a Bot-owned thread shows
+// (threadListSwitch.ts).
 // A "Bots" list: every Bot (the primary first), the selected one (the Bot
 // page's route, selection.ts) expanded under it into the threads it started: Needs you, Running,
 // Runners, Recurring, Recent (each nested under the thread that started it) and its
@@ -11,10 +12,10 @@ import { ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-
 import { botPath, forBot, NEW_BOT_PATH, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
-import { useLive } from "../live";
+import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
-import { isBotPath, syncThreadList } from "./threadListSwitch";
+import { isBotPath, knownBotOwned, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import { ImportBotDialog } from "./ImportBot";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, sidebarGroups, useOpenThread, type TreeNode } from "./workspace";
@@ -70,33 +71,38 @@ function age(at: number, now = Date.now()): string {
 }
 
 /**
- * The provider's component. Shown off the Bot page only by mistake (a reload
- * mid-switch, a second window): it puts BB's list back at once and shows a
- * quiet placeholder for that moment.
+ * The provider's component, on the Bot page and on a Bot-owned thread. On a
+ * thread whose owner is still being asked it stays (no flicker); anywhere
+ * else it shows only by mistake (a reload mid-switch, a second window): it
+ * puts BB's list back at once and shows a quiet placeholder for that moment.
  */
 export function BotThreadList({ onNavigate, activeThreadId }: PluginThreadListProps) {
   const sdk = useSdk();
+  const call = useCall();
   const pathname = usePathname();
   const onBotPage = isBotPath(pathname);
-  useEffect(() => { if (!onBotPage) void syncThreadList(sdk, pathname); }, [sdk, onBotPage, pathname]);
-  if (!onBotPage) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
+  const threadId = threadIdForPath(pathname);
+  useEffect(() => { if (!onBotPage) void syncThreadList(sdk, pathname, call); }, [sdk, call, onBotPage, pathname]);
+  if (!onBotPage && (!threadId || knownBotOwned(threadId) === false)) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
   return <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} />;
 }
 
 /**
  * Mounted in every window (an app overlay): sets BB's sidebar to the list this
- * window's page wants (the Bots list, the Studio list, or BB's), and re-checks
+ * window's page wants (the Bots list, also on a Bot-owned thread; the Studio
+ * list; or BB's), and re-checks
  * when the window gains focus, so the window in use decides.
  */
 export function ThreadListSwitcher() {
   const sdk = useSdk();
+  const call = useCall();
   const pathname = usePathname();
   useEffect(() => {
-    const sync = () => void syncThreadList(sdk, pathname);
+    const sync = () => void syncThreadList(sdk, pathname, call);
     sync();
     window.addEventListener("focus", sync);
     return () => window.removeEventListener("focus", sync);
-  }, [sdk, pathname]);
+  }, [sdk, call, pathname]);
   return null;
 }
 

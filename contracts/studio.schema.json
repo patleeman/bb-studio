@@ -5395,6 +5395,38 @@
         "additionalProperties": false
       }
     },
+    "bot_thread_owner": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "botId"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_checkin_preset": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

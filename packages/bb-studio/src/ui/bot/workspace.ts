@@ -5,6 +5,7 @@
 import { experimental_useAppPanel, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
+import { markBotOwned } from "./threadListSwitch";
 
 /** The Bot's nav panel id (also BOT_PANEL in BotHome). */
 const PANEL = "bot";
@@ -12,10 +13,14 @@ const PANEL = "bot";
 /** Info: the Bot's profile, controls, check-ins and activity. */
 export const INFO_TAB = { panelId: PANEL, id: "info" } as const;
 
-/** Opens one of the Bot's threads the way BB's own thread list does: as the thread, in the main pane. */
+/**
+ * Opens one of the Bot's threads the way BB's own thread list does: as the
+ * thread, in the main pane. It's marked the Bot's first, so the sidebar keeps
+ * the Bots list on it without waiting for the server (threadListSwitch.ts).
+ */
 export function useOpenThread(): (threadId: string) => void {
   const navigate = useBbNavigate();
-  return useCallback((threadId: string) => navigate.toThread(threadId), [navigate]);
+  return useCallback((threadId: string) => { markBotOwned(threadId); navigate.toThread(threadId); }, [navigate]);
 }
 
 /** Drops the strips the removed Threads tab saved (`studio.bot.<botId>.threads`). */

@@ -72,6 +72,7 @@ vi.mock("@bb-studio/kit/ui", () => ({
 const { ActivityPanel, BOT_PATH, BotHome, BotRedirect } = await import("./BotHome");
 const { BotInfoTab } = await import("./BotTabs");
 const { BotThreadList } = await import("./BotSidebar");
+const { forgetBotOwnership } = await import("./threadListSwitch");
 const listProps = { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => {}, searchQuery: "" };
 
 let root: Root, container: HTMLDivElement;
@@ -85,6 +86,7 @@ beforeEach(() => {
   state.activate.mockClear();
   state.inputs = [];
   localStorage.clear();
+  forgetBotOwnership();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -177,11 +179,42 @@ test("the Bots list: the bot on top, Needs you flat, started threads nested unde
 });
 
 test("off the Bot page the Bots list puts BB's list back and shows a placeholder", async () => {
-  state.pathname = "/threads/thr_1";
+  state.pathname = "/plugins/pages/pages";
   state.data = { bot_get: { bot: dot, run: null } };
   await show(<BotThreadList {...listProps} />);
   expect(container.querySelector("nav")).toBeNull();
   expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "thread-list/thread-list", expectedRevision: 1 });
+});
+
+test("on a thread no Bot owns the Bots list puts BB's list back once the server says so", async () => {
+  state.pathname = "/threads/thr_1";
+  state.call.mockImplementation((async (method: string) => method === "bot_thread_owner" ? { botId: null } : {}) as never);
+  state.data = { bot_get: { bot: dot, run: null } };
+  await show(<BotThreadList {...listProps} />);
+  expect(state.call).toHaveBeenCalledWith("bot_thread_owner", { threadId: "thr_1" });
+  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "thread-list/thread-list", expectedRevision: 1 });
+  state.call.mockImplementation(async () => ({}));
+});
+
+test("on a Bot-owned thread the Bots list stays: opened from it, or the server says so", async () => {
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, completed: [thread("t4", "Spawned work")] } };
+  await show(<BotThreadList {...listProps} />);
+  act(() => click(container.querySelector('[data-thread="t4"]')));
+  expect(state.toThread).toHaveBeenCalledWith("t4");
+  // Opened from the Bots list: known at once, the server isn't asked.
+  state.pathname = "/threads/t4";
+  await show(<BotThreadList {...listProps} activeThreadId="t4" />);
+  expect(container.querySelector("nav")).not.toBeNull();
+  expect(container.querySelector('[data-thread="t4"]')?.getAttribute("aria-current")).toBe("true");
+  expect(state.call).not.toHaveBeenCalledWith("bot_thread_owner", expect.anything());
+  // A runner or automation run opened some other way: the server says it's the Bot's.
+  state.pathname = "/threads/thr_run";
+  state.call.mockImplementation((async (method: string) => method === "bot_thread_owner" ? { botId: "bot_main" } : {}) as never);
+  await show(<BotThreadList {...listProps} activeThreadId="thr_run" />);
+  expect(state.call).toHaveBeenCalledWith("bot_thread_owner", { threadId: "thr_run" });
+  expect(container.querySelector("nav")).not.toBeNull();
+  expect(state.setPref).not.toHaveBeenCalled();
+  state.call.mockImplementation(async () => ({}));
 });
 
 test("the Bots list forgets the removed Threads tab's saved strips", async () => {

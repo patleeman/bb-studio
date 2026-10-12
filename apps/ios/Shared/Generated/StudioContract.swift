@@ -48,6 +48,7 @@ public enum Studio {
     public static let bot_activity = "bot_activity"
     public static let bot_memory = "bot_memory"
     public static let bot_chain = "bot_chain"
+    public static let bot_thread_owner = "bot_thread_owner"
     public static let bot_checkin_preset = "bot_checkin_preset"
     public static let bot_skills = "bot_skills"
     public static let bot_skill_write = "bot_skill_write"
@@ -292,6 +293,8 @@ public enum Studio {
   public typealias BotMemory = BotMemoryOutput
 
   public typealias BotChain = BotChainOutput
+
+  public typealias BotThreadOwner = BotThreadOwnerOutput
 
   public typealias BotCheckinPreset = BotCheckinPresetOutput
 
@@ -5109,6 +5112,22 @@ public enum Studio {
 
     public init(threadIds: [String]? = nil) {
       self.threadIds = threadIds
+    }
+  }
+
+  public struct BotThreadOwnerInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotThreadOwnerOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
     }
   }
 

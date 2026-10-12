@@ -598,6 +598,7 @@ export default async function plugin(bb: BbPluginApi) {
       models: async (providerId) => (await bb.sdk.providers.models({ providerId })).models,
     }),
     bot_chain: ({ botId }) => ({ threadIds: bots.chain(botId) }),
+    bot_thread_owner: ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? null }),
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),
     bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),
     bot_skill_write: ({ botId, ...input }) => { bots.requireStudio(botId, "skills"); return bots.writeSkill(input, botId); },
