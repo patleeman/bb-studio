@@ -49,6 +49,8 @@ export const CURATOR_IDLE_MS = 2 * 3_600_000;
 export const REVIEW_TIMEOUT_MS = 20 * 60_000;
 export const SKILL_SOFT_LIMIT = 8000;
 export const CURATOR_ID = "skill-curator";
+/** BB's largest page of thread events. */
+const EVENT_PAGE = 100;
 /** The tools a review fork gets, and nothing else of Studio's. */
 export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "pages_read", "pages_edit"] as const;
 const SKILL_WRITE_TOOL = /bot_skill_(write|patch|delete)$/;
@@ -348,14 +350,15 @@ export class SkillLearning {
       }
       let after = row.seen_seq;
       let tools = row.tool_turns, users = row.user_turns;
-      for (let page = 0; page < 20; page++) {
-        const events = await this.deps.sdk.threads.events.list({ threadId, afterSeq: String(after), order: "asc", limit: "500", types: ["client/turn/requested", "item/completed", "turn/completed"] }) as EventRow[];
+      // BB pages events 100 at a time.
+      for (let page = 0; page < 100; page++) {
+        const events = await this.deps.sdk.threads.events.list({ threadId, afterSeq: String(after), order: "asc", limit: String(EVENT_PAGE), types: ["client/turn/requested", "item/completed", "turn/completed"] }) as EventRow[];
         if (!events.length) break;
         const tally = tallyTurns(events);
         tools = tally.skillWrite ? tally.toolTurns : tools + tally.toolTurns;
         users += tally.userTurns;
         after = Math.max(after, tally.lastSeq);
-        if (events.length < 500) break;
+        if (events.length < EVENT_PAGE) break;
       }
       this.save(bot.id, { seen_seq: after, tool_turns: tools, user_turns: users });
     } finally {
@@ -428,7 +431,13 @@ export class SkillLearning {
 
   private async finish(review: ReviewRow, text: string | null): Promise<void> {
     // Memory edits go through Pages' own tool: read them off the fork's events.
-    const events = await this.deps.sdk.threads.events.list({ threadId: review.thread_id, order: "asc", limit: "500", types: ["item/completed"] }).catch(() => []) as EventRow[];
+    const events: EventRow[] = [];
+    for (let page = 0, after = 0; page < 20; page++) {
+      const batch = await this.deps.sdk.threads.events.list({ threadId: review.thread_id, afterSeq: String(after), order: "asc", limit: String(EVENT_PAGE), types: ["item/completed"] }).catch(() => []) as EventRow[];
+      events.push(...batch);
+      after = batch.at(-1)?.seq ?? after;
+      if (batch.length < EVENT_PAGE) break;
+    }
     const memory = events.filter((event) => /pages_edit$/.test(String((event.data as { item?: { tool?: string } } | undefined)?.item?.tool ?? ""))).length;
     if (memory) this.deps.db.prepare("UPDATE bot_skill_reviews SET memory = ? WHERE thread_id = ?").run(memory, review.thread_id);
     const fresh = this.review(review.thread_id)!;

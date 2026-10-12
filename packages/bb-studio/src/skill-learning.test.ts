@@ -86,10 +86,12 @@ async function setup() {
   const send = vi.fn(async (_args: unknown) => ({ ok: true }));
   const stop = vi.fn(async (_args: unknown) => ({}));
   const archive = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: 5 }); return { ok: true }; });
-  const list = vi.fn(async ({ threadId, afterSeq, order }: { threadId: string; afterSeq?: string; order?: string }) => {
+  const list = vi.fn(async ({ threadId, afterSeq, order, limit }: { threadId: string; afterSeq?: string; order?: string; limit?: string }) => {
+    // BB refuses pages over 100.
+    if (Number(limit) > 100) throw Object.assign(new Error("Thread event limit cannot exceed 100"), { status: 400 });
     if (threadId !== "bot1") return [];
     const after = events.filter((event) => event.seq > Number(afterSeq ?? 0));
-    return order === "desc" ? [...after].reverse() : after;
+    return (order === "desc" ? [...after].reverse() : after).slice(0, Number(limit ?? 100));
   });
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
@@ -251,4 +253,13 @@ it("runs the curator weekly once the bot is idle 2 hours, with a dry run, pins e
 
   await x.learning.set("bot_main", { curatorPaused: true });
   expect(x.learning.curatorState("bot_main")).toMatchObject({ paused: true, nextRunAt: null });
+});
+
+it("pages through more than 100 new events", async () => {
+  const x = await setup();
+  await x.learning.idle(x.threads.get("bot1")!, null);
+  await x.learning.set("bot_main", { enabled: false });
+  x.work(45);
+  await x.learning.idle(x.threads.get("bot1")!, null);
+  expect((await x.learning.view("bot_main")).toolTurns).toBe(45);
 });
