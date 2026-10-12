@@ -9,6 +9,9 @@
 // one that tells and then raises something urgent; the Bots sidebar's
 // Runners group, the Info tab's Runners section, and a runner's thread in
 // the Threads tab, with the Bot's chat holding only the runner's lines.
+// Then several bots: New bot in the sidebar's navigation row (Studio's
+// navigation replaces BB's on the Bot page) opening the create flow, and a
+// second bot, Scout, selected, with Dot listed above it.
 const BOT_PATH = "/plugins/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
@@ -20,6 +23,9 @@ const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet 
 const dismissProblems = (client) => client.evaluate(`(() => { [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide")?.click(); return true; })()`);
 const SIDEBAR = 'nav[aria-label="Bots"]';
 const LIST_PREF = "sidebar.threadListProvider";
+const NAV_PREF = "sidebar.navigationProvider";
+const NAVIGATION = "[data-testid=bot-navigation]";
+const SCOUT = { name: "Scout", avatar: "🛰️", shape: "hexagon", color: "#2ba59a", prompt: "Hi Scout. In one short sentence, say you'll watch competitors' release notes for anything that affects ORBIT-42." };
 /** Clicks a sidebar row by its title. */
 const openRow = (client, title) => client.evaluate(`(() => {
   const row = [...document.querySelectorAll('${SIDEBAR} button[data-thread]')].find((each) => each.textContent.includes(${JSON.stringify(title)}));
@@ -239,9 +245,73 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     for (let i = 0; i < 40 && JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF])) !== "thread-list/thread-list"; i++) await sleep(500);
     const pref = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
     if (pref !== "thread-list/thread-list") throw new Error(`After leaving the Bot page the thread list is ${pref}, not BB's`);
+    for (let i = 0; i < 40 && JSON.parse(await bbCli(["settings", "ui", "get", NAV_PREF])) !== "navigation/navigation"; i++) await sleep(500);
+    const nav = JSON.parse(await bbCli(["settings", "ui", "get", NAV_PREF]));
+    if (nav !== "navigation/navigation") throw new Error(`After leaving the Bot page the navigation is ${nav}, not BB's`);
+    await client.waitForText("New thread", 30000);
+    await client.evaluate(`(() => { if (document.querySelector('${NAVIGATION}')) throw new Error("Studio's navigation is still showing"); return true; })()`);
     await client.waitForText(CHILDREN[0].title, 30000);
     await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}')) throw new Error("The Bots list is still showing"); return true; })()`);
     await dismissProblems(client);
+    await sleep(1500);
+  };
+
+  /** On the Bot page the navigation row says New bot; clicking it opens the create flow. */
+  const newBot = async (client) => {
+    await seededBot();
+    await client.navigate(BOT_PATH);
+    await client.waitForSelector(SIDEBAR, 30000);
+    await client.waitForSelector(NAVIGATION, 30000);
+    await dismissProblems(client);
+    const nav = JSON.parse(await bbCli(["settings", "ui", "get", NAV_PREF]));
+    if (nav !== "studio/bot-navigation") throw new Error(`On the Bot page the navigation is ${nav}, not studio/bot-navigation`);
+    await client.evaluate(`(() => {
+      const nav = document.querySelector('${NAVIGATION}');
+      if (nav.getBoundingClientRect().left > 120) throw new Error("Studio's navigation isn't in BB's sidebar");
+      if (/New thread/.test(nav.textContent)) throw new Error("The navigation still says New thread");
+      const row = [...nav.querySelectorAll("button")].find((each) => each.textContent.trim() === "New bot");
+      if (!row) throw new Error("No New bot row");
+      if (!/Search/.test(nav.textContent)) throw new Error("BB's Search item is missing from the navigation");
+      row.click();
+      return true;
+    })()`);
+    await client.waitForText("Hey! I'm a new bot.", 30000);
+    for (const text of ["Customize me", "Dot"]) await client.waitForText(text, 30000);
+    await client.waitForSelector('textarea[aria-label="Message New bot"]', 30000);
+    if (!(await client.evaluate("location.pathname")).endsWith("/plugins/studio/bot/new")) throw new Error("New bot didn't open /plugins/studio/bot/new");
+    await sleep(800);
+  };
+
+  /** A second bot, Scout, selected: its page, its expanded sidebar entry and Info; Dot is listed above it. */
+  const twoBots = async (client) => {
+    await seededBot();
+    let { bots } = await pluginRpc("studio", "bot_list", {});
+    let scout = bots.find((bot) => bot.name === SCOUT.name);
+    if (!scout) ({ bot: scout } = await pluginRpc("studio", "bot_create", SCOUT));
+    if (scout.primary !== false) throw new Error("Scout was made the primary bot");
+    await bbCli(["thread", "wait", scout.threadId, "--status", "idle", "--timeout", "180"]).catch(() => {});
+    await pluginRpc("studio", "bot_checkin_preset", { botId: scout.id, preset: "evening" });
+    ({ bots } = await pluginRpc("studio", "bot_list", {}));
+    if (bots[0]?.name !== "Dot" || bots.length < 2) throw new Error("Dot isn't the primary bot listed first");
+    await client.navigate(`${BOT_PATH}/${scout.id}`);
+    await client.waitForSelector(SIDEBAR, 30000);
+    await dismissProblems(client);
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const nav = document.querySelector('${SIDEBAR}');
+        const main = nav?.querySelector('[data-testid=bot-main]');
+        const other = nav?.querySelector('[data-testid=bot-row]');
+        const chat = document.querySelector('section[aria-label="Chat"]');
+        if (main && /Scout/.test(main.textContent) && other && /Dot/.test(other.textContent) && chat && /release notes|competitor/i.test(chat.textContent)) return resolve(true);
+        if (Date.now() - started > 90000) return reject(new Error("The Bot page doesn't show Scout selected with Dot listed and Scout's chat"));
+        setTimeout(tick, 300);
+      };
+      tick();
+    }))()`);
+    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await client.waitForSelector('[aria-label="Scout info"]', 30000);
+    for (const text of ["Evening wrap-up", "Memory", "Runners"]) await client.waitForText(text, 30000);
     await sleep(1500);
   };
 
@@ -266,5 +336,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     { id: "studio-bot-leave", packageDir: "bb-studio", fileName: "bot-leave.png", setup: leave },
     { id: "studio-bot-runners", packageDir: "bb-studio", fileName: "bot-runners.png", setup: runnersInfo },
     { id: "studio-bot-runner-thread", packageDir: "bb-studio", fileName: "bot-runner-thread.png", setup: runnerThread },
+    { id: "studio-bot-new", packageDir: "bb-studio", fileName: "bot-new.png", setup: newBot },
+    { id: "studio-bot-two", packageDir: "bb-studio", fileName: "bot-two.png", setup: twoBots },
   ];
 };
