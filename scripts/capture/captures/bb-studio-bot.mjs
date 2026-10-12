@@ -87,7 +87,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await client.waitForSelector(SIDEBAR, 30000);
     await dismissProblems(client);
     // The Bot's own sidebar replaces BB's here; hide BB's the way a user would (the SDK can't).
-    await client.evaluate(`(() => { const nav = document.querySelector('${SIDEBAR}'); if (nav && nav.getBoundingClientRect().left > 120) document.querySelector('button[aria-label="Toggle Sidebar"]')?.click(); return true; })()`);
+    await client.evaluate(`(() => { const nav = document.querySelector('${SIDEBAR}'); if (nav && nav.getBoundingClientRect().left > 120) [...document.querySelectorAll('button[aria-label]')].find((each) => /sidebar/i.test(each.getAttribute("aria-label")) && !/bot/i.test(each.getAttribute("aria-label")))?.click(); return true; })()`);
     for (const text of ["Needs you", "Running", "Recurring", "Recent", "Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", "Inbox sweep", "Pull the ORBIT-42 thread digests", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 90000);
     // The follow-up nests under the thread that started it.
     await client.evaluate(`(() => {
