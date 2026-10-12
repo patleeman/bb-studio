@@ -52,7 +52,7 @@ export function SwitchModelDialog({ threadId, providerId, model, onClose, onSwit
       <DialogContent className="sm:max-w-md" data-testid="switch-model">
         <DialogHeader>
           <DialogTitle>Switch model</DialogTitle>
-          <DialogDescription>Now on {name(providerId)} · {model}. Another model from {name(providerId)} switches this chat in place; another provider hands it off to a new chat there with a summary, and the old one becomes Earlier conversation.</DialogDescription>
+          <DialogDescription>Now on {name(providerId)} · {model}. Another model from {name(providerId)} switches this chat in place; another provider hands it off to a new chat there with a summary, and the old one moves to Earlier conversations.</DialogDescription>
         </DialogHeader>
         <ProviderModelPicker value={value} disabled={!!pending} onChange={(next) => setValue({ providerId: next.providerId, model: next.model, reasoningLevel: next.reasoningLevel })} />
         {pending ? <p role="status" className="text-sm text-muted-foreground" data-testid="switch-model-pending">{pending}</p> : null}

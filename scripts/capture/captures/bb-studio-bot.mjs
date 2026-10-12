@@ -335,6 +335,84 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
+  /**
+   * Relay, a bot whose thread switches models (src/bot.ts switchModel): Codex
+   * → Claude Code Opus (a handoff), Opus → Sonnet (in place), then Claude →
+   * Codex (a handoff). Real agent replies; made once per staging.
+   */
+  const RELAY = { name: "Relay", avatar: "🔁", shape: "pill", color: "#d9822b", prompt: "Hi Relay. In one short sentence, say you'll keep notes on the ORBIT-42 launch." };
+  const relayBot = async () => {
+    await seededBot();
+    const find = async () => (await pluginRpc("studio", "bot_list", {})).bots.find((bot) => bot.name === RELAY.name);
+    let relay = await find();
+    if (!relay) ({ bot: relay } = await pluginRpc("studio", "bot_create", RELAY));
+    const idle = (threadId) => bbCli(["thread", "wait", threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
+    await idle(relay.threadId);
+    const view = async () => (await pluginRpc("studio", "bot_get", { botId: relay.id })).bot;
+    relay = await view();
+    if (relay.providerId === "codex" && (await pluginRpc("studio", "bot_chain", { botId: relay.id })).threadIds.length === 1) {
+      const { change, threadId } = await pluginRpc("studio", "thread_handoff_to_model", { threadId: relay.threadId, providerId: "claude-code", model: "claude-opus-5-5", reasoning: "low" });
+      if (change !== "handoff") throw new Error(`Codex → Claude was ${change}, not a handoff`);
+      await idle(threadId);
+      relay = await view();
+    }
+    if (relay.providerId === "claude-code" && relay.model !== "claude-sonnet-5-5") {
+      const { change, threadId } = await pluginRpc("studio", "thread_handoff_to_model", { threadId: relay.threadId, providerId: "claude-code", model: "claude-sonnet-5-5", reasoning: "low" });
+      if (change !== "in-place" || threadId !== relay.threadId) throw new Error(`Opus → Sonnet was ${change} on ${threadId}, not in place`);
+      relay = await view();
+    }
+    if (relay.providerId !== "claude-code" || relay.model !== "claude-sonnet-5-5") throw new Error(`Relay runs on ${relay.providerId} · ${relay.model}, not Claude Code · Sonnet`);
+    return relay;
+  };
+  const openRelay = async (client, relay) => {
+    await client.navigate(`${BOT_PATH}/${relay.id}`);
+    await client.waitForSelector(SIDEBAR, 30000);
+    await dismissProblems(client);
+    await client.waitForSelector('section[aria-label="Chat"]', 30000);
+  };
+  /** Switch model…: BB's picker, the bot's thread on Claude Code Sonnet after an in-place switch from Opus. */
+  const switchModel = async (client) => {
+    const relay = await relayBot();
+    await openRelay(client, relay);
+    await client.clickAriaButtonWithPointer("Bot menu");
+    await client.waitForText("Switch model…", 15000);
+    await client.clickElementWithTextAndPointer('[role="menuitem"]', "Switch model…");
+    await client.waitForSelector('[data-testid="switch-model"]', 15000);
+    await client.evaluate(`(() => {
+      const dialog = document.querySelector('[data-testid="switch-model"]');
+      if (!/Now on Claude Code · claude-sonnet-5-5/.test(dialog.textContent)) throw new Error("The dialog doesn't say the thread runs on Claude Code Sonnet: " + dialog.textContent);
+      if (!/Sonnet/.test(dialog.textContent)) throw new Error("BB's picker doesn't show Sonnet");
+      return true;
+    })()`);
+    await sleep(800);
+  };
+  /** Claude → Codex: a handoff; the chat is the new Codex thread, its Claude threads under Earlier conversations. */
+  const handoff = async (client) => {
+    let relay = await relayBot();
+    const before = relay.threadId;
+    const { change, threadId } = await pluginRpc("studio", "thread_handoff_to_model", { threadId: relay.threadId, providerId: "codex", model: "gpt-6.1-sol", reasoning: "low" });
+    if (change !== "handoff" || threadId === before) throw new Error(`Claude → Codex was ${change}, not a handoff`);
+    await bbCli(["thread", "wait", threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
+    relay = (await pluginRpc("studio", "bot_get", { botId: relay.id })).bot;
+    if (relay.threadId !== threadId || relay.providerId !== "codex") throw new Error("Relay didn't follow the handoff to Codex");
+    const { threadIds } = await pluginRpc("studio", "bot_chain", { botId: relay.id });
+    if (threadIds.length !== 3) throw new Error(`Relay's chain has ${threadIds.length} threads, not 3`);
+    await openRelay(client, relay);
+    await client.evaluate(`(() => { const group = document.querySelector('${SIDEBAR} section[aria-label="Earlier conversations"] > button'); if (!group) throw new Error("No Earlier conversations"); if (group.getAttribute("aria-expanded") !== "true") group.click(); return true; })()`);
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const earlier = document.querySelectorAll('${SIDEBAR} section[aria-label="Earlier conversations"] button[type=button]');
+        const chat = document.querySelector('section[aria-label="Chat"]');
+        if (earlier.length >= 3 && chat && chat.textContent.trim().length > 40) return resolve(true);
+        if (Date.now() - started > 90000) return reject(new Error("The handoff chat or its earlier conversations aren't showing"));
+        setTimeout(tick, 300);
+      };
+      tick();
+    }))()`);
+    await sleep(1500);
+  };
+
   return [
     {
       id: "studio-bot-create",
@@ -358,5 +436,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     { id: "studio-bot-runner-thread", packageDir: "bb-studio", fileName: "bot-runner-thread.png", setup: runnerThread },
     { id: "studio-bot-new", packageDir: "bb-studio", fileName: "bot-new.png", setup: newBot },
     { id: "studio-bot-two", packageDir: "bb-studio", fileName: "bot-two.png", setup: twoBots },
+    { id: "studio-bot-switch-model", packageDir: "bb-studio", fileName: "bot-switch-model.png", setup: switchModel },
+    { id: "studio-bot-handoff", packageDir: "bb-studio", fileName: "bot-handoff.png", setup: handoff },
   ];
 };
