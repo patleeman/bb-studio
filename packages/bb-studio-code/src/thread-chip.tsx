@@ -3,7 +3,7 @@
 // the chat. A dot pulses while the agent is editing.
 import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate, useRealtime, useRpc, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
-import { Icon, openAppPath } from "@bb-studio/kit/app";
+import { Icon } from "@bb-studio/kit/app";
 import { CHANNEL, CODE_TAB, PANEL_PATH, type CodeContract } from "./shared";
 
 type Chip = { workspaceId: string | null; title: string; working: boolean };
@@ -26,7 +26,7 @@ export function ThreadCodeChip({ threadId }: PluginThreadHeaderActionProps) {
     // `at` makes an open tab come back from its workspace list to this thread's worktree.
     const params = { ...(chip?.workspaceId ? { workspaceId: chip.workspaceId } : {}), at: Date.now() };
     if (!navigate.openThreadPanel({ actionId: CODE_TAB, title: "VS Code", params }) && chip?.workspaceId)
-      openAppPath(`/plugins/studio-code/${PANEL_PATH}/${encodeURIComponent(chip.workspaceId)}`);
+      navigate.toPluginPanel(PANEL_PATH, { subPath: chip.workspaceId });
   }, [chip, navigate]);
   if (!chip) return null;
   const label = chip.working ? `Open ${chip.title} in VS Code: the agent is editing files` : `Open ${chip.title} in VS Code`;

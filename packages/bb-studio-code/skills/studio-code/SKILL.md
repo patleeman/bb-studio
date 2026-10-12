@@ -77,4 +77,4 @@ While you work, their editor can follow along. The status bar shows what you're 
 | `code_show` | Move their editor to lines and highlight them. |
 | `code_edit` | Type edits into their open file; one undo step; merges with unsaved changes. |
 
-Link to a workspace as `/plugins/studio-code/workspaces/<workspace-id>`.
+Link to a workspace as `/plugins/studio-code/workspaces/<workspace-id>`; it opens on Code's own page (workspaces are not Studio items).

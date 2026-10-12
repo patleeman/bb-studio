@@ -1,13 +1,12 @@
 // bb-studio-code — server entry.
 //
-// A workspace is a Studio item: a title, the project (and so the Space) it
+// A workspace is Code's own (not a Studio item): a title, the project it
 // belongs to, and the folders VS Code opens. Opening one starts code-server
 // for it (src/server/runtime.ts); the app shows that editor in a frame.
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
-import { createChangeBus, createStoreProvider, defineItemMention, mustGet, studioServices } from "@bb-studio/kit/server";
+import { defineItemMention, mustGet } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { Activity } from "./src/server/activity";
@@ -23,48 +22,10 @@ import { CodeServers } from "./src/server/runtime";
 import { followWorktree, missingWorktreeMessage } from "./src/server/worktree-sync";
 import { ThreadWatcher } from "./src/server/watch";
 import { MIGRATIONS, WorkspaceStore } from "./src/server/store";
-import { CHANNEL, CODE_ICON, KIND_ID, PANEL_PATH, PLUGIN_ID, codeContract, workspaceHref, type Workspace } from "./src/shared";
+import { CHANNEL, codeContract, type Workspace } from "./src/shared";
 
-const KIND: StudioKind = {
-  id: KIND_ID,
-  label: "Workspace",
-  plural: "Workspaces",
-  icon: CODE_ICON,
-  columns: [{ id: "folders", label: "Folders" }],
-  actions: [],
-  create: { mode: "rpc" },
-  canArchive: true,
-  // Folders, not documents.
-  background: true,
-  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: false, templates: false },
-  mentionProviderId: "workspace",
-  blurb: "VS Code on one or more folders.",
-  agentHint: "A workspace is a list of folders the user edits in VS Code. Find one with code_workspaces_list; change its folders with code_workspace_set_folders.",
-};
-
-const LIST_LIMIT = 10_000;
 /** Typing takes about 3 seconds an edit; allow for up to 20 of them. A window with no screen says so within 5. */
 const EDIT_TIMEOUT_MS = 90_000;
-
-function item(workspace: Workspace): StudioItem {
-  return {
-    id: workspace.id,
-    kind: KIND_ID,
-    title: workspace.title,
-    icon: null,
-    projectId: workspace.projectId,
-    parentId: null,
-    createdAt: workspace.createdAt,
-    updatedAt: workspace.updatedAt,
-    updatedBy: null,
-    preview: workspace.folders.length ? `${workspace.threadId ? "Thread worktree · " : ""}${workspace.folders.join(" · ")}` : "No folders yet",
-    facts: [{ id: "folders", value: String(workspace.folders.length), sort: workspace.folders.length }],
-    badge: null,
-    thumbnailUrl: null,
-    href: workspaceHref(workspace.id),
-    archived: workspace.archived,
-  };
-}
 
 /** The folders the file browser may serve; ones from before the secrets rule are skipped. */
 function safeFolders(workspace: Workspace): string[] {
@@ -92,9 +53,8 @@ export default function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new WorkspaceStore(db);
-  const studio = studioSchemas(z);
-  const changes = createChangeBus({ bb, channel: CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ id }) });
-  bb.onDispose(() => changes.dispose());
+  // Workspaces are Code's own, not Studio items: a change tells Code's views only.
+  const changes = { changed: (id: string) => { try { bb.realtime.publish(CHANNEL, { id }); } catch { /* Views refetch. */ } } };
   // <dataDir>/plugins/<id>/, beside the plugin's database.
   const root = dirname(db.name);
   /** BB's palette as the app last sent it; kept so new workspaces start in it. */
@@ -131,12 +91,6 @@ export default function plugin(bb: BbPluginApi) {
   bb.onDispose(() => clearTimeout(reloaded));
   const must = (id: string) => mustGet((key) => store.get(key), id, "Workspace not found.");
 
-  const services = studioServices(bb.sdk);
-  /** Links a workspace to a thread, so the thread's tab lists it. Studio is optional. */
-  const link = (id: string, threadId: string, role: "created" | "edited") => {
-    const at = Date.now();
-    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role, state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => undefined);
-  };
   /** The reply card that opens the workspace beside the chat. */
   const card = (id: string) => `Put this line on its own in your reply so the user can open the workspace beside the chat:\n::workspace{id="${id}"}`;
 
@@ -182,7 +136,6 @@ export default function plugin(bb: BbPluginApi) {
     if (!folder) throw new Error("This thread has no worktree or folder yet.");
     const workspace = store.create({ title: folder.title, projectId: folder.projectId, folders: await checked(folder.path), threadId });
     changes.changed(workspace.id);
-    link(workspace.id, threadId, "created");
     return workspace;
   };
 
@@ -219,6 +172,22 @@ export default function plugin(bb: BbPluginApi) {
       const folders = project ? await checkFolders([project.path]).catch(() => []) : [];
       const workspace = store.create({ title: project?.name ?? "Workspace", projectId: project?.id ?? null, folders });
       changes.changed(workspace.id);
+      return { workspace };
+    },
+    list: () => ({ workspaces: store.recentList() }),
+    create: async ({ title, projectId }) => {
+      const project = projectId ? (await projects()).find((candidate) => candidate.id === projectId) : undefined;
+      const folders = project ? await checkFolders([project.path]).catch(() => []) : [];
+      const workspace = store.create({ title: title ?? project?.name ?? "Workspace", projectId: project?.id ?? null, folders });
+      store.markOpened(workspace.id);
+      changes.changed(workspace.id);
+      return { workspace };
+    },
+    archive: ({ id, archived }) => {
+      must(id);
+      if (archived) servers.stop(id);
+      const workspace = store.update(id, { archived });
+      changes.changed(id);
       return { workspace };
     },
     stop: ({ id }) => ({ status: servers.stop(must(id).id) }),
@@ -286,7 +255,6 @@ export default function plugin(bb: BbPluginApi) {
       if (folders?.length) {
         workspace = store.create({ title: title ?? "Workspace", projectId: ctx.projectId ?? null, folders: await checkFolders(folders), trusted: false });
         changes.changed(workspace.id);
-        link(workspace.id, ctx.threadId, "created");
       } else {
         workspace = await forThread(ctx.threadId);
         if (title && title !== workspace.title) {
@@ -301,12 +269,11 @@ export default function plugin(bb: BbPluginApi) {
     name: "code_workspace_set_folders",
     description: "Replace a workspace's folders (full paths on the computer running BB). An open VS Code updates without reloading.",
     parameters: z.object({ id: z.string().min(1).max(100), folders: z.array(z.string().trim().min(1).max(4096)).min(1).max(50) }),
-    execute: async ({ id, folders }, ctx) => {
+    execute: async ({ id, folders }) => {
       untrust(must(id));
       const workspace = store.update(id, { folders: await checkFolders(folders) });
       await servers.sync(workspace);
       changes.changed(id);
-      link(id, ctx.threadId, "edited");
       return `${summary(workspace)}\n${card(id)}`;
     },
   });
@@ -432,7 +399,6 @@ export default function plugin(bb: BbPluginApi) {
       const result = await bridges.request(workspace.id, { type: "edit", path: file, edits }, EDIT_TIMEOUT_MS);
       const outcome = editOutcome(result);
       if (outcome === "done") {
-        link(workspace.id, ctx.threadId, "edited");
         return result!.detail;
       }
       // An editor took the edit and failed, or didn't answer in time and may
@@ -443,7 +409,6 @@ export default function plugin(bb: BbPluginApi) {
       if (bridges.unsaved(workspace.id).includes(file))
         throw new Error(`The user's editor has unsaved changes in ${name} but isn't on screen, so neither it nor the file on disk was changed. Ask them to open the workspace, then try again.`);
       await editOnDisk(file, safeFolders(workspace), edits);
-      link(workspace.id, ctx.threadId, "edited");
       return `No editor was open, so the ${edits.length === 1 ? "edit went" : `${edits.length} edits went`} to ${name} on disk.`;
     },
   });
@@ -542,56 +507,4 @@ export default function plugin(bb: BbPluginApi) {
     tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders", "code_editor_state", "code_show", "code_edit"],
     skills: ["studio-code"],
   }));
-
-  createStoreProvider(bb, studio, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: PANEL_PATH, kinds: [KIND] }),
-    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const workspace = store.get(id); return workspace ? [item(workspace)] : []; }) }),
-    studio_read: ({ id }) => {
-      const workspace = store.get(id);
-      return { content: workspace ? [`VS Code workspace "${workspace.title}"`, "Folders:", ...workspace.folders.map((folder) => `- ${folder}`)].join("\n") : null };
-    },
-    studio_list: () => {
-      const items = store.list().slice(0, LIST_LIMIT).map(item);
-      return { items, truncated: items.length === LIST_LIMIT };
-    },
-    // A new workspace opens the folder of the project it was made in.
-    studio_create: async ({ kind, projectId }) => {
-      if (kind !== KIND_ID) throw new Error(`Unknown kind "${kind}".`);
-      const project = projectId ? (await projects()).find((candidate) => candidate.id === projectId) : undefined;
-      const folders = project ? await checkFolders([project.path]).catch(() => []) : [];
-      const workspace = store.create({ title: project?.name ?? "Workspace", projectId, folders });
-      changes.changed(workspace.id);
-      return { item: item(workspace) };
-    },
-    studio_rename: ({ id, title }) =>
-      eachId([id], () => {
-        must(id);
-        store.update(id, { title });
-        changes.changed(id);
-      }),
-    studio_action: ({ action }) => {
-      throw new Error(`Unknown action "${action}".`);
-    },
-  }, {
-    move: (id, projectId) => {
-      must(id);
-      store.update(id, { projectId });
-      changes.changed(id);
-    },
-    archive: (id, archived) => {
-      must(id);
-      if (archived) servers.stop(id);
-      store.update(id, { archived });
-      changes.changed(id);
-    },
-    delete: (id) => {
-      must(id);
-      servers.stop(id);
-      store.delete(id);
-      changes.changed(id);
-    },
-  }, {
-    find: (query) => store.list().filter((workspace) => `${workspace.title}\n${workspace.folders.join("\n")}`.toLowerCase().includes(query.toLowerCase())),
-    text: (workspace) => `${workspace.title}\n${workspace.folders.join("\n")}`,
-  });
 }

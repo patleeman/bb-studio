@@ -1,14 +1,15 @@
 # Studio Code
 
-Part of BB Studio. A **workspace** is a Studio item that opens one or more folders in VS Code, inside BB. Like any Studio item, it belongs to a project. A project can hold as many workspaces as you like, each open to different folders. The plugin id is `studio-code`.
+Part of BB Studio. Code is a tool with its own page, not Studio content. A **workspace** opens one or more folders in VS Code, inside BB. It can belong to a project, and a project can hold as many workspaces as you like, each open to different folders. Workspaces don't appear in Studio's library, search or sidebar. The plugin id is `studio-code`.
 
 ## Use it
 
-- **In Studio**, choose **New, Workspace**. It starts with its project's folder. With no project chosen, it starts empty and asks for folders.
+- **On Code's page**, click **Code** in the rail. VS Code opens full-page on the workspace you used last (the first time, one is made for a project's folder). The title bar names the workspace (click the name to rename it). Its **▾** menu lists your other workspaces, last opened first, plus **New workspace…** (starts empty and asks for folders) and **Archive this workspace**.
+- **Links** to `/plugins/studio-code/workspaces/<id>` open that workspace on Code's page, never as a Studio tab. Studio tabs saved for workspaces before this change are dropped.
 - **Beside a thread**, open the **VS Code** tab in the right panel. It opens the thread's own worktree, so you see the agent's changes, branch and diff. The workspace is made the first time and reused. **Back** lists the thread's other workspaces. This works only when the thread runs on the computer running BB.
-- **From a reply**, a `::workspace{id="cws_…"}` card opens the workspace in that tab.
+- **From a reply**, a `::workspace{id="cws_…"}` card opens the workspace in that tab, or on Code's page where there's no thread beside it.
 - **From a file tab**, code files open with VS Code by default. BB's preview always shows. If the thread already has a workspace, the file also jumps to its lines in that workspace's VS Code tab. If not, **Open in VS Code** makes one, so glancing at a file never makes a workspace or starts a server. Markdown stays in BB's preview. **Settings → Files** can make BB's preview the default instead.
-- **From the thread header**, a code-icon chip appears once the thread has a workspace (made for it, or holding its folder) or has edited files in its folder. One click opens that workspace beside the chat. A dot pulses while the agent is editing.
+- **From the thread header**, a code-icon chip appears once the thread has a workspace (made for it, or holding its folder) or has edited files in its folder. One click opens that workspace beside the chat (on Code's page if the thread has no right panel). A dot pulses while the agent is editing.
 - **In a composer**, type `@` and a workspace's name to give the agent its folders.
 - **Folders.** The folder button in the header adds or removes folders. **Browse…** walks the folders on the computer running BB (hidden ones on request, secret ones never). You can also type a full path (or `~/…`) or pick a BB project. VS Code shows every folder in one multi-root window and updates live when they change.
 - **Share toggle.** The eye in the workspace header turns on or off sharing what you have open with agents. It is on by default.
@@ -81,8 +82,9 @@ Tested on macOS (arm64) and Linux (arm64, in Docker). There is no Windows suppor
 
 ![A Studio Code workspace open in BB](assets/staged-preview.png)
 
-A workspace open in Studio, from a staged stable BB. It was made the way
-Studio's New makes one, for the seeded Orbit project. VS Code is laid out for
+A workspace open full-page on Code's own page, from a staged stable BB, with
+the workspace switcher in the title bar. It was made for the seeded Orbit
+project's folder. VS Code is laid out for
 BB, with its side bar and activity bar on the right. The retry loop in
 `src/retry.ts` (lines 8–18) is selected and highlighted the way `code_show`
 points an agent's user at code, and the status bar reads "BB showed you

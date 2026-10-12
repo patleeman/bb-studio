@@ -1,7 +1,7 @@
 // `::workspace{id="cws_…"}` in a reply: a card that opens the workspace in
 // the thread's workbench, beside the chat.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember, openAppPath } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, remember } from "@bb-studio/kit/app";
 import { relativeTime } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { CHANNEL, CODE_ICON, CODE_TAB, PANEL_PATH, isWorkspaceId, type CodeContract, type Workspace } from "./shared";
@@ -43,9 +43,9 @@ export function WorkspaceCard({ attributes }: PluginMessageDirectiveProps) {
       details={`${workspace.threadId ? "Thread worktree" : "VS Code workspace"} · ${folders} · ${relativeTime(workspace.updatedAt)}`}
       preview={<span className="font-mono text-xs" title={workspace.folders.join("\n")}>{workspace.folders.map(shortFolder).join(" · ")}</span>}
       onOpen={() => {
-        // The workbench when there is one; the main area otherwise.
+        // The workbench beside the thread when there is one; Code's own page otherwise.
         if (!navigate.openThreadPanel({ actionId: CODE_TAB, title, params: { workspaceId: id } }))
-          openAppPath(`/plugins/studio-code/${PANEL_PATH}/${encodeURIComponent(id)}`);
+          navigate.toPluginPanel(PANEL_PATH, { subPath: id });
       }}
     />
   );

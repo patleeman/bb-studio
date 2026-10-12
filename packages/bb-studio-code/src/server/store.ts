@@ -64,6 +64,13 @@ export class WorkspaceStore {
     return row ? decode(row) : null;
   }
 
+  /** Workspaces not archived, the one last opened first: Code's switcher. */
+  recentList(): Workspace[] {
+    return (this.db
+      .prepare("SELECT * FROM code_workspaces WHERE archived = 0 ORDER BY COALESCE(opened_at, updated_at) DESC")
+      .all() as Row[]).map(decode);
+  }
+
   markOpened(id: string): void {
     this.db.prepare("UPDATE code_workspaces SET opened_at = ? WHERE id = ?").run(Date.now(), id);
   }

@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, BarTitle, ICON_BUTTON, Icon, ItemHeader, ItemMenu, openAppPath, studioPath } from "@bb-studio/kit/app";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { BAR_BUTTON, BarTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, ICON_BUTTON, Icon, StudioBar } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { toast } from "sonner";
 import { FileBrowser } from "./file-browser";
 import { FolderPicker } from "./folder-picker";
 import { themeChanges, useThemeSync } from "./theme-sync";
-import { CHANNEL, HIDDEN_RELEASE_MS, KIND_ID, PLUGIN_ID, isWorkspaceId, workspaceHref, type CodeContract, type ServerStatus, type Workspace } from "./shared";
+import { CHANNEL, CODE_ICON, HIDDEN_RELEASE_MS, PANEL_PATH, isWorkspaceId, type CodeContract, type ServerStatus, type Workspace } from "./shared";
 
 /** What Code's page shows for a path: a workspace, or the root, which opens the latest one. */
 export function panelRoute(subPath: string): { kind: "workspace"; id: string } | { kind: "root" } {
@@ -14,42 +14,34 @@ export function panelRoute(subPath: string): { kind: "workspace"; id: string } |
   return isWorkspaceId(id) ? { kind: "workspace", id } : { kind: "root" };
 }
 
-/** A workspace; Code's own page opens the one last used, so clicking Code opens VS Code. */
+/** Code's page at a workspace: VS Code full-page, with the switcher in the title bar. */
 export function CodePanel({ subPath }: { subPath: string }) {
   const route = panelRoute(subPath);
-  const toCollection = useCallback(() => openAppPath(studioPath(KIND_ID)), []);
   if (route.kind === "root") return <RecentWorkspace />;
-  return <WorkspaceView key={route.id} id={route.id} back={{ backLabel: "Studio", onBack: toCollection }} />;
+  return <WorkspaceView key={route.id} id={route.id} page />;
 }
 
 /**
- * Finds (or makes) the workspace to open and moves to its page. The view is
- * retained, so it comes back without remounting each time Code is clicked:
- * whenever it's on screen, it moves on again.
+ * Code's root: finds (or makes) the workspace last used and moves to its
+ * page, within Code's own panel. Not retained, so each visit to the root
+ * mounts it afresh and moves on once.
  */
-function RecentWorkspace() {
+export function RecentWorkspace() {
   const rpc = useRpc<CodeContract>();
+  const navigate = useBbNavigate();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let live = true;
-    let asking = false;
     setError("");
-    const go = () => {
-      if (asking || !live || !(root.current?.getClientRects().length)) return;
-      asking = true;
-      rpc.call("recent", null).then(
-        ({ workspace }) => { setTimeout(() => { asking = false; }, 1000); if (live) openAppPath(workspaceHref(workspace.id), { replace: true }); },
-        (cause) => { if (live) { live = false; setError(errorMessage(cause)); } },
-      );
-    };
-    go();
-    const timer = setInterval(go, 250);
-    return () => { live = false; clearInterval(timer); };
-  }, [rpc, attempt]);
+    rpc.call("recent", null).then(
+      ({ workspace }) => { if (live) navigate.toPluginPanel(PANEL_PATH, { subPath: workspace.id, replace: true }); },
+      (cause) => { if (live) setError(errorMessage(cause)); },
+    );
+    return () => { live = false; };
+  }, [rpc, navigate, attempt]);
   return (
-    <div ref={root} className="studio-root flex h-full flex-col items-center justify-center gap-3 bg-background p-6 text-center text-foreground">
+    <div className="studio-root flex h-full flex-col items-center justify-center gap-3 bg-background p-6 text-center text-foreground">
       {error ? (
         <>
           <p role="alert" className="text-sm text-destructive">{error}</p>
@@ -60,6 +52,54 @@ function RecentWorkspace() {
           <Icon name="Loading" className="size-4 animate-spin motion-reduce:animate-none" /> Opening VS Code…
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * The switcher in Code's title bar: the workspace's name, then a menu of the
+ * others (last opened first), a new one, and archiving this one.
+ */
+function WorkspaceSwitcher({ workspace, onRename, onArchive }: { workspace: Workspace; onRename(title: string): void; onArchive(): void }) {
+  const rpc = useRpc<CodeContract>();
+  const navigate = useBbNavigate();
+  const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null);
+  const load = () => void rpc.call("list", null).then((result) => setWorkspaces(result.workspaces), () => setWorkspaces([]));
+  const go = (id: string) => navigate.toPluginPanel(PANEL_PATH, { subPath: id });
+  const create = () => void rpc.call("create", {}).then(({ workspace: made }) => go(made.id), (error) => toast.error(errorMessage(error)));
+  const others = (workspaces ?? []).filter((each) => each.id !== workspace.id);
+  return (
+    <div className="flex min-w-0 items-center gap-0.5">
+      <BarTitle title={workspace.title} label="Workspace name" placeholder="Untitled workspace" onRename={(title) => { if (title) onRename(title); }} />
+      <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className={ICON_BUTTON} title="Switch workspace" aria-label="Switch workspace">
+            <Icon name="ChevronDown" className="size-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-72">
+          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+          {workspaces === null ? (
+            <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
+          ) : others.length ? (
+            others.map((each) => (
+              <DropdownMenuItem key={each.id} onSelect={() => go(each.id)}>
+                <Icon name={CODE_ICON} className="size-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate" title={each.folders.join("\n")}>{each.title || "Untitled workspace"}</span>
+              </DropdownMenuItem>
+            ))
+          ) : (
+            <DropdownMenuItem disabled>No other workspaces</DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={create}>
+            <Icon name="Plus" className="size-4 shrink-0" /> New workspace…
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onArchive}>
+            <Icon name="Archive" className="size-4 shrink-0" /> Archive this workspace
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -121,11 +161,12 @@ const STATUS_TEXT: Record<ServerStatus["state"], string> = {
   failed: "VS Code couldn't start.",
 };
 
-export function WorkspaceView({ id, back = null }: {
+export function WorkspaceView({ id, page = false }: {
   id: string;
-  /** The bar's way back. None beside a thread: the tab is VS Code alone, with no bar. */
-  back?: { backLabel: string; onBack(): void } | null;
+  /** On Code's page: the title bar with the switcher. Beside a thread the tab is VS Code alone, with no bar. */
+  page?: boolean;
 }) {
+  const navigate = useBbNavigate();
   const rpc = useRpc<CodeContract>();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [status, setStatus] = useState<ServerStatus | null>(null);
@@ -212,7 +253,6 @@ export function WorkspaceView({ id, back = null }: {
   if (!workspace)
     return (
       <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-        {back ? <ItemHeader {...back} /> : null}
         <p role={loadError ? "alert" : "status"} className={`p-6 text-sm ${loadError ? "text-destructive" : "text-muted-foreground"}`}>{loadError || "Loading workspace…"}</p>
       </div>
     );
@@ -224,15 +264,19 @@ export function WorkspaceView({ id, back = null }: {
     || (embed && !userStopped && (status.state === "stopped" || (status.state === "failed" && !retried)));
   const password = status?.state === "running" ? status.password : null;
   const showFolders = embed && (editing || !workspace.folders.length);
-  const reference = { title: workspace.title, href: workspaceHref(id) };
+  // Archived: Code's root opens the next workspace.
+  const archive = () => void rpc.call("archive", { id, archived: true }).then(
+    () => navigate.toPluginPanel(PANEL_PATH, { replace: true }),
+    (error) => toast.error(errorMessage(error)),
+  );
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-      {back && <ItemHeader
-        {...back}
-        leading={<BarTitle title={workspace.title} label="Workspace name" placeholder="Untitled workspace" onRename={(title) => { if (title) void update({ title }); }} />}
-        item={reference}
-        trailing={
-          <>
+      {page && (
+        <StudioBar>
+          <div className="flex min-w-0 flex-1 items-center">
+            <WorkspaceSwitcher workspace={workspace} onRename={(title) => void update({ title })} onArchive={archive} />
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5">
             {embed && (
               <>
               <button
@@ -260,12 +304,11 @@ export function WorkspaceView({ id, back = null }: {
                 </button>
               </>
             ) : null}
-            <ItemMenu reference={reference} item={{ pluginId: PLUGIN_ID, id }} projectId={workspace.projectId} onMoved={() => setVersion((n) => n + 1)} />
-          </>
-        }
-      />}
+          </div>
+        </StudioBar>
+      )}
       {/* Without the bar, sharing still has to be visible and easy to stop. */}
-      {!back && workspace.share ? (
+      {!page && workspace.share ? (
         <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
           <Icon name="Eye" className="size-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">Agents can see your open file, selection and errors.</span>
@@ -274,7 +317,7 @@ export function WorkspaceView({ id, back = null }: {
           </button>
         </div>
       ) : null}
-      {showFolders && back && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
+      {showFolders && page && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
       <div ref={body} className="relative min-h-0 flex-1">
         {!embed ? (
           <FileBrowser workspace={workspace} />

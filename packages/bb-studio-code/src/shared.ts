@@ -10,7 +10,6 @@ const defineRpcContract = <const Contract extends PluginRpcContract>(contract: C
 export const PLUGIN_ID = "studio-code";
 /** The nav panel: /plugins/studio-code/workspaces, and workspaces/<id> for one. */
 export const PANEL_PATH = "workspaces";
-export const KIND_ID = "code-workspace";
 export const CODE_ICON = "Code";
 /** Realtime channel; payload `{ id }` when a workspace or its server changed. */
 export const CHANNEL = "studio-code-changed";
@@ -101,6 +100,21 @@ export const codeContract = defineRpcContract({
   /** The workspace Code's page opens: the latest, or a new one for a project's folder. */
   recent: {
     input: z.null(),
+    output: z.object({ workspace: workspaceSchema }),
+  },
+  /** Code's switcher: workspaces not archived, the one last opened first. */
+  list: {
+    input: z.null(),
+    output: z.object({ workspaces: z.array(workspaceSchema) }),
+  },
+  /** A new workspace: a project's folder, or none yet (its page then asks for folders). */
+  create: {
+    input: z.object({ title: z.string().trim().min(1).max(200).optional(), projectId: z.string().max(100).nullable().optional() }),
+    output: z.object({ workspace: workspaceSchema }),
+  },
+  /** Archives a workspace (stopping its VS Code), or brings it back. */
+  archive: {
+    input: z.object({ id, archived: z.boolean() }),
     output: z.object({ workspace: workspaceSchema }),
   },
   stop: {

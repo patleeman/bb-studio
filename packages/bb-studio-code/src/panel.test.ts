@@ -67,3 +67,37 @@ describe("Code's page", () => {
     expect(store.recent()?.id).toBe(a.id);
   });
 });
+
+describe("Code's own page, not Studio's", () => {
+  it("takes Code's panel out of Studio's workspace, so its links don't become Studio tabs", async () => {
+    const { leaveStudioWorkspace, CODE_ROOT } = await import("./own-page");
+    const seen: string[] = [];
+    const scope = Object.assign(new EventTarget(), {
+      __bbStudioWorkspace_v1: { revision: 3, providers: new Map([[CODE_ROOT, Symbol()], ["/plugins/other/items", Symbol()]]) },
+    });
+    scope.addEventListener("bb-studio-workspace-change", () => seen.push("changed"));
+    expect(leaveStudioWorkspace(scope as unknown as Record<string, unknown>)).toBe(true);
+    expect([...scope.__bbStudioWorkspace_v1.providers.keys()]).toEqual(["/plugins/other/items"]);
+    expect(scope.__bbStudioWorkspace_v1.revision).toBe(4);
+    expect(seen).toEqual(["changed"]);
+    expect(leaveStudioWorkspace(scope as unknown as Record<string, unknown>)).toBe(false);
+    expect(leaveStudioWorkspace({})).toBe(false);
+  });
+
+  it("lists workspaces for the switcher, last opened first, without archived ones", async () => {
+    const Database = (await import("better-sqlite3")).default;
+    const { MIGRATIONS, WorkspaceStore } = await import("./server/store");
+    const db = new Database(":memory:");
+    for (const statement of MIGRATIONS) db.exec(statement);
+    const store = new WorkspaceStore(db);
+    const a = store.create({ title: "A", projectId: null, folders: ["/a"] });
+    const b = store.create({ title: "B", projectId: null, folders: [] });
+    const c = store.create({ title: "C", projectId: null, folders: ["/c"] });
+    db.prepare("UPDATE code_workspaces SET updated_at = ? WHERE id = ?").run(1, a.id);
+    db.prepare("UPDATE code_workspaces SET updated_at = ? WHERE id = ?").run(2, b.id);
+    db.prepare("UPDATE code_workspaces SET updated_at = ? WHERE id = ?").run(3, c.id);
+    store.markOpened(a.id);
+    store.update(c.id, { archived: true });
+    expect(store.recentList().map((each) => each.title)).toEqual(["A", "B"]);
+  });
+});
