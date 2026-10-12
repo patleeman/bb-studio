@@ -4,7 +4,7 @@
 keeping what your agents make. Studio is one plugin with pages, recordings,
 drawings, designs and artifacts built in: every item lives in one collection
 that you can search, tag, and hand to an agent. Emoji reactions on replies
-are built in too. Code, Decisions, Mobile and Applets are separate plugins
+are built in too. Code, Decisions and Mobile are separate plugins
 beside it.
 
 ![Live BB screenshot of the Studio collection](packages/bb-studio/assets/staged-preview.png)

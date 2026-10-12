@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "name": "bb-studio",
   "displayName": "BB Studio",
-  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs and artifacts built in, plus Code, Decisions, Mobile and Applets beside it.",
+  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs and artifacts built in, plus Code, Decisions and Mobile beside it.",
   "plugins": [
     {
       "id": "studio",
