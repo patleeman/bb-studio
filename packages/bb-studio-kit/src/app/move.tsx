@@ -1,7 +1,7 @@
 // Opening a Studio item or a thread where the user asked: the main view or
 // a split pane. One hook, so every menu, click and drop opens things the
 // same way.
-import { experimental_useSidebarThreadActions, useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { useRef, type ReactNode } from "react";
 import { STUDIO_PLUGIN_ID } from "../contract";
 import { z } from "zod";
@@ -29,13 +29,11 @@ export function useOpenMain(): (target: OpenTarget) => void {
  */
 export function useOpenTarget(): { open(target: OpenTarget, place: OpenPlace): void; anchor: ReactNode } {
   const navigate = useBbNavigate();
-  const threads = experimental_useSidebarThreadActions();
   const sdk = useSdk();
   const link = useRef<HTMLAnchorElement>(null);
   const open = (target: OpenTarget, place: OpenPlace) => {
     if (target.kind === "thread") {
-      if (place === "split") threads.open(target.threadId, { split: true });
-      else navigate.toThread(target.threadId);
+      navigate.toThread(target.threadId, { split: place === "split" });
       return;
     }
     if (openWorkspaceItem({ href: target.path, title: target.title }, place === "split" ? "right" : "tab")) return;

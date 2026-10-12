@@ -18,7 +18,6 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRpc: () => state.rpc,
   useBbNavigate: () => state.navigate,
   useSdk: () => ({ plugins: { callRpc: vi.fn() } }),
-  experimental_useSidebarThreadActions: () => ({ open: vi.fn() }),
   experimental_NewThreadComposer: (props: any) => {
     state.props.set(props.draftKey, props);
     state.submit.set(props.draftKey, props.onSubmit);

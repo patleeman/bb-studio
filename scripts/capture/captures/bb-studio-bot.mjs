@@ -25,15 +25,6 @@ const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet 
 const dismissProblems = (client) => client.evaluate(`(() => { [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide")?.click(); return true; })()`);
 const SIDEBAR = 'nav[aria-label="Bots"]';
 const LIST_PREF = "sidebar.threadListProvider";
-const NAV_PREF = "sidebar.navigationProvider";
-const NAVIGATION = "[data-testid=bot-navigation]";
-/** The navigation provider preference, or null on a BB without one (0.46). */
-const navPref = async (bbCli) => {
-  try { return JSON.parse(await bbCli(["settings", "ui", "get", NAV_PREF])); } catch (error) {
-    if (/Unknown UI preference/.test(String(error))) return null;
-    throw error;
-  }
-};
 const SCOUT = { name: "Scout", avatar: "🛰️", shape: "hexagon", color: "#2ba59a", prompt: "Hi Scout. In one short sentence, say you'll watch competitors' release notes for anything that affects ORBIT-42." };
 /** Clicks a sidebar row by its title. */
 const openRow = (client, title) => client.evaluate(`(() => {
@@ -254,46 +245,26 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     for (let i = 0; i < 40 && JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF])) !== "thread-list/thread-list"; i++) await sleep(500);
     const pref = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
     if (pref !== "thread-list/thread-list") throw new Error(`After leaving the Bot page the thread list is ${pref}, not BB's`);
-    for (let i = 0; i < 40 && ![null, "navigation/navigation"].includes(await navPref(bbCli)); i++) await sleep(500);
-    const nav = await navPref(bbCli);
-    if (nav !== null && nav !== "navigation/navigation") throw new Error(`After leaving the Bot page the navigation is ${nav}, not BB's`);
     await client.waitForText("New thread", 30000);
-    await client.evaluate(`(() => { if (document.querySelector('${NAVIGATION}')) throw new Error("Studio's navigation is still showing"); return true; })()`);
     await client.waitForText(CHILDREN[0].title, 30000);
     await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}')) throw new Error("The Bots list is still showing"); return true; })()`);
     await dismissProblems(client);
     await sleep(1500);
   };
 
-  /** On the Bot page the navigation row says New bot; clicking it opens the create flow. */
+  /** On the Bot page the Bots list's New bot button opens the create flow. */
   const newBot = async (client) => {
     await seededBot();
     await client.navigate(BOT_PATH);
     await client.waitForSelector(SIDEBAR, 30000);
     await dismissProblems(client);
-    const nav = await navPref(bbCli);
-    if (nav !== null) {
-      if (nav !== "studio/bot-navigation") throw new Error(`On the Bot page the navigation is ${nav}, not studio/bot-navigation`);
-      await client.waitForSelector(NAVIGATION, 30000);
-      await client.evaluate(`(() => {
-        const nav = document.querySelector('${NAVIGATION}');
-        if (nav.getBoundingClientRect().left > 120) throw new Error("Studio's navigation isn't in BB's sidebar");
-        if (/New thread/.test(nav.textContent)) throw new Error("The navigation still says New thread");
-        const row = [...nav.querySelectorAll("button")].find((each) => each.textContent.trim() === "New bot");
-        if (!row) throw new Error("No New bot row");
-        if (!/Search/.test(nav.textContent)) throw new Error("BB's Search item is missing from the navigation");
-        row.click();
-        return true;
-      })()`);
-    } else {
-      // No navigation provider in this BB: New bot is the Bots list's +.
-      await client.evaluate(`(() => {
-        const button = document.querySelector('${SIDEBAR} [data-testid=bot-new]');
-        if (!button) throw new Error("No New bot button in the Bots list");
-        button.click();
-        return true;
-      })()`);
-    }
+    // BB keeps its New thread row; New bot is the Bots list's +.
+    await client.evaluate(`(() => {
+      const button = document.querySelector('${SIDEBAR} [data-testid=bot-new]');
+      if (!button) throw new Error("No New bot button in the Bots list");
+      button.click();
+      return true;
+    })()`);
     await client.waitForText("Hey! I'm a new bot.", 30000);
     for (const text of ["Customize me", "Dot"]) await client.waitForText(text, 30000);
     await client.waitForSelector(`${SIDEBAR} [data-testid=bot-new-row]`, 30000);

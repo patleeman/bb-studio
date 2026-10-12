@@ -21,7 +21,7 @@
     "build": "bb plugin build ."
   },
   "dependencies": {
-    "@get-bb/plugin-sdk": "0.6.15",
+    "@get-bb/plugin-sdk": "0.6.37",
     "zod": "^4.3.6"
   },
   "devDependencies": {
