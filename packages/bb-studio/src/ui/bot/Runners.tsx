@@ -129,7 +129,7 @@ export function RunnersSection({ botId, botName, onOpen, disabled }: { botId: st
       {sheet?.kind === "adopt" ? (
         <Confirm title={`Adopt ${sheet.candidate.title}?`} busy={busy} error={error} action="Adopt" onClose={() => setSheet(null)}
           onConfirm={() => void run("bot_runner_adopt", { threadId: sheet.candidate.threadId, automationId: sheet.candidate.automationId })}
-          text={`It becomes a runner on its automation "${sheet.candidate.automationName}"${sheet.candidate.cron ? ` (${sheet.candidate.cron})` : ""}, which stays. Its prompt gets one note: report with runner_report instead of replying [PASS] or messaging ${botName}. It's no longer nested under ${botName}, so BB stops posting its "completed" notices there. Delete undoes it.`} />
+          text={`It becomes a runner on its automation "${sheet.candidate.automationName}"${sheet.candidate.cron ? ` (${sheet.candidate.cron})` : ""}, which stays. Its prompt gets one note: report with runner_report instead of messaging ${botName}. It's no longer nested under ${botName}, so BB stops posting its "completed" notices there. Delete undoes it.`} />
       ) : null}
     </section>
   );

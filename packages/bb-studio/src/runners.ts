@@ -8,7 +8,8 @@
 //   log    → stays in the runner thread and the Bot's Activity;
 //   tell   → one "From runner X:" line in the Bot's thread;
 //   urgent → tell, plus Needs you and a phone push (Studio Mobile's notify).
-// A run with nothing to report ends without a message and produces nothing.
+// A run with nothing to report ends with exactly [PASS] (docs/silent-output.md)
+// and produces nothing.
 //
 // Why runner threads have no BB parent: BB posts "child completed / failed /
 // needs attention" notices into a thread's `parentThreadId` (any child that
@@ -49,17 +50,17 @@ export function runnerPrompt(runner: { name: string; job: string }): string {
 }
 
 /** How a runner reports; short, given every run and every session. */
-export const RUNNER_RULES = "Report only through runner_report: level log (kept here and in the Bot's Activity), tell (one short line to the user via the Bot), urgent (also Needs you and a phone push; only when the user must act now). Nothing new: finish without any final message, no ✓, [PASS] or summary. Never message the Bot's thread yourself.";
+export const RUNNER_RULES = "Report only through runner_report: level log (kept here and in the Bot's Activity), tell (one short line to the user via the Bot), urgent (also Needs you and a phone push; only when the user must act now). Nothing new, or after reporting: reply exactly [PASS], no ✓ or summary. Never message the Bot's thread yourself.";
 
 /** A runner thread's instructions at each session start. */
 export function runnerInstructions(runner: { name: string; job: string; state: string }, botName: string): string {
   const who = `You are ${JSON.stringify(runner.name)}, a runner: an automated sub-agent of the user's Bot ${JSON.stringify(botName)}. Each wake-up is one run. Your job: ${runner.job.trim()}`;
   if (runner.state !== "active") return `${who}\nYou are paused by the user. Don't do the job until resumed; answer questions only.`;
-  return `${who}\n${RUNNER_RULES} If a wake-up prompt asks you to reply [PASS] or to message the Bot, follow these rules instead.`;
+  return `${who}\n${RUNNER_RULES} If a wake-up prompt asks you to message the Bot, follow these rules instead.`;
 }
 
 /** Added to an adopted runner's own automation prompt (the rest is kept). */
-export const ADOPT_NOTE = `\nReporting (Studio runner, overrides any [PASS] or "tell the Bot" rule above): ${RUNNER_RULES}`;
+export const ADOPT_NOTE = `\nReporting (Studio runner, overrides any "tell the Bot" rule above): ${RUNNER_RULES}`;
 
 /** The one line a tell or urgent report adds to the Bot's thread. */
 export function tellLine(name: string, level: RunnerLevel, summary: string): string {
@@ -327,16 +328,16 @@ export class Runners {
     const summary = input.summary.trim();
     const now = Date.now();
     this.changedRow(row.id, { last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now, ...(input.level === "urgent" ? { urgent: 1 } : {}) });
-    if (input.level === "log") return "Logged. Finish without a final message.";
+    if (input.level === "log") return "Logged. Then reply exactly [PASS].";
     const bot = this.deps.bot(row.bot_id);
-    if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Finish without a final message.";
+    if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Then reply exactly [PASS].";
     // A plain message from this thread (senderThreadId), with an agent-only
     // note so the Bot doesn't answer it: the user reads the line as it is.
     await this.deps.sdk.threads.send({
       threadId: bot.threadId, mode: "auto", senderThreadId: threadId,
       input: [
         { type: "text", text: tellLine(row.name, input.level, summary), mentions: [] },
-        { type: "text", text: "Runner report, already shown to the user as is. Don't reply or acknowledge it; finish without a final message unless it asks you to act on something.", mentions: [], visibility: "agent-only" },
+        { type: "text", text: "Runner report, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS] unless it asks you to act on something.", mentions: [], visibility: "agent-only" },
       ],
     } as never);
     if (input.level === "urgent") {
@@ -346,7 +347,7 @@ export class Runners {
         input: { title: `${bot.name} · ${row.name}`, body: summary.slice(0, 4000), kind: "turn-finished", threadId: bot.threadId, projectId: PERSONAL_PROJECT_ID, coalesceKey: `runner:${row.id}` } as never,
       }).catch(() => {});
     }
-    return input.level === "urgent" ? "Told the user and pushed to their phone. Finish without a final message." : "Told the user. Finish without a final message.";
+    return input.level === "urgent" ? "Told the user and pushed to their phone. Then reply exactly [PASS]." : "Told the user. Then reply exactly [PASS].";
   }
 
   /** Threads the Bot started (or whose automation it made) that an automation wakes, not yet runners. */

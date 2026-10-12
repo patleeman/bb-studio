@@ -143,7 +143,8 @@ final class BotChatTests: XCTestCase {
           {"id":"r1","kind":"system","title":"Thought","createdAt":\(day1 + 40)},
           {"id":"s1b","kind":"conversation","role":"user","initiator":"system","text":"[bb system] again","systemMessageKind":"child-failed","systemMessageSubject":{"kind":"thread","threadId":"t_run","threadName":"Run"},"createdAt":\(day1 + 40)},
           {"id":"s2","kind":"conversation","role":"user","initiator":"system","text":"[bb system] plumbing","createdAt":\(day1 + 41)},
-          {"id":"a3","kind":"conversation","role":"assistant","text":"✓","createdAt":\(day1 + 42)}
+          {"id":"a3","kind":"conversation","role":"assistant","text":"✓","createdAt":\(day1 + 42)},
+          {"id":"a4","kind":"conversation","role":"assistant","text":" `[PASS]`\\n","createdAt":\(day1 + 43)}
         ]
         """)
         let started = [BotStartedThread(id: "t_run", title: "Run", createdAt: day1 + 20, status: .running),
@@ -157,6 +158,18 @@ final class BotChatTests: XCTestCase {
             }
         }
         XCTAssertEqual(shape, ["day", "a1", "work", "started:t_run:running", "a2", "update:t_run:failed"])
+    }
+
+    func testPassRepliesAreSilent() throws {
+        for text in ["[PASS]", " [pass]\n", "`[PASS]`", "```\n[PASS]\n```", "**[Pass]**"] { XCTAssertTrue(SilentOutput.isPass(text), text) }
+        for text in [nil, "", "PASS", "Tests: [PASS]", "[PASS]\nHere is the report.", "[PASS] done"] { XCTAssertFalse(SilentOutput.isPass(text), text ?? "nil") }
+        let timeline = try rows("""
+        [{"id":"u1","kind":"conversation","role":"user","text":"[PASS]","createdAt":1},
+         {"id":"a1","kind":"conversation","role":"assistant","text":"[PASS]","createdAt":2},
+         {"id":"a2","kind":"conversation","role":"assistant","text":"Found one.","createdAt":3}]
+        """)
+        XCTAssertEqual(timeline.map(\.isPassReply), [false, true, false])
+        XCTAssertEqual(timeline.filter(BotChatEntry.shows).map(\.id), ["u1", "a2"])
     }
 
     func testChainMergeHidesHandoffRequests() throws {

@@ -135,7 +135,7 @@ struct BotsTab: View {
                     let botId = bot.primary ? nil : bot.id
                     var summary = BotSummary()
                     if let threadId = bot.lead.threadId {
-                        async let reply = try? client.latestReply(threadId)
+                        async let reply = try? client.latestReply(threadId, skippingPass: true)
                         async let thread = try? client.thread(threadId)
                         summary.preview = (await reply)?.text.map(BotSummary.plain)
                         let entry = await thread

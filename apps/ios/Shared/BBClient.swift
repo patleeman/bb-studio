@@ -233,8 +233,9 @@ extension BBClient {
     }
 
     /// The newest assistant message in a thread.
-    public func latestReply(_ threadId: String) async throws -> TimelineRow? {
-        try await timeline(threadId, segments: 2).rows.last { $0.isConversation && $0.role == "assistant" }
+    /// The newest assistant reply; `skippingPass` passes over `[PASS]` ones (see SilentOutput).
+    public func latestReply(_ threadId: String, skippingPass: Bool = false) async throws -> TimelineRow? {
+        try await timeline(threadId, segments: 2).rows.last { $0.isConversation && $0.role == "assistant" && !(skippingPass && $0.isPassReply) }
     }
 
     /// Polls until the thread stops running with an assistant reply newer than `baselineId`.

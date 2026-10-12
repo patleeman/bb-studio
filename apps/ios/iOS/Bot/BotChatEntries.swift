@@ -174,11 +174,12 @@ enum BotChatEntry: Identifiable, Equatable {
     }
 
     /// Rows the chat leaves out: BB's own messages that aren't about a child
-    /// thread, and the Bot's bare "✓" after a quiet check-in.
+    /// thread, the Bot's bare "✓" after a quiet check-in, and its [PASS].
     static func shows(_ row: TimelineRow) -> Bool {
         guard row.isConversation else { return true }
         if row.isUser, let initiator = row.initiator, initiator != "user" { return childEvent(row) != nil }
         if !row.isUser, row.text?.trimmingCharacters(in: .whitespacesAndNewlines) == "✓", !row.hasAttachments { return false }
+        if row.isPassReply { return false }
         return true
     }
 

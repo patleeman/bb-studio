@@ -139,7 +139,7 @@ it("a run with nothing to report produces nothing: the instructions say so, and 
   const x = await setup();
   await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
   expect(x.send).not.toHaveBeenCalled();
-  expect(runnerPrompt({ name: "Inbox", job: "Check mail." })).toMatch(/Nothing new: finish without any final message/);
+  expect(runnerPrompt({ name: "Inbox", job: "Check mail." })).toMatch(/Nothing new, or after reporting: reply exactly \[PASS\]/);
   expect(runnerInstructions({ name: "Inbox", job: "Check mail.", state: "active" }, "Jarvis")).toMatch(/\[PASS\]/);
   expect(runnerInstructions({ name: "Inbox", job: "Check mail.", state: "paused" }, "Jarvis")).toMatch(/paused/);
   expect(tellLine("Inbox", "urgent", "  Payment\n failed ")).toBe("⚠️ From runner Inbox: Payment failed");

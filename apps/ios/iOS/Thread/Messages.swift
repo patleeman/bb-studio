@@ -32,6 +32,13 @@ struct MessageBubble: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.leading, 40)
+        } else if row.isPassReply {
+            // The agent had nothing to say (docs/silent-output.md).
+            Label("Passed", systemImage: "checkmark")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Passed: nothing to report")
         } else {
             VStack(alignment: .leading, spacing: 10) {
                 MarkdownText(text)
