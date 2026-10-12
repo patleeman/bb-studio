@@ -298,4 +298,10 @@ export const MIGRATIONS = [
   // set once Studio made the thread hidden. Rows from before start at 0, so
   // the startup step (Runners.hideThreads) hides them once.
   `ALTER TABLE bot_runners ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`,
+  // Threads Studio hid because a Bot owns them (src/bot-owned.ts; runners
+  // too): each is hidden once, so one the user shows again stays visible.
+  `CREATE TABLE bot_hidden_threads (
+       thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, reason TEXT NOT NULL, hidden_at INTEGER NOT NULL
+     );
+   CREATE INDEX bot_hidden_threads_bot ON bot_hidden_threads (bot_id);`,
 ];

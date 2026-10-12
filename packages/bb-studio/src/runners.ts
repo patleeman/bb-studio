@@ -147,6 +147,8 @@ export class Runners {
       if (!missing(error)) { await rest(); return false; }
     }
     this.deps.db.prepare("UPDATE bot_runners SET hidden = 1 WHERE id = ?").run(row.id);
+    // Recorded with the Bot's other hidden threads, so the sweep (src/bot-owned.ts) never hides it again once let go.
+    this.deps.db.prepare("INSERT OR IGNORE INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'runner', ?)").run(row.thread_id, row.bot_id, Date.now());
     return true;
   }
 
@@ -237,6 +239,7 @@ export class Runners {
         input: [{ type: "text", text: `${runnerPrompt({ name, job: input.job })}\nThis is your first run.`, mentions: [] }],
       } as never);
       this.deps.db.prepare("UPDATE bot_runners SET thread_id = ?, project_id = ?, last_run_at = ?, hidden = 1 WHERE id = ?").run(thread.id, thread.projectId ?? PERSONAL_PROJECT_ID, now, id);
+      this.deps.db.prepare("INSERT OR IGNORE INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'runner', ?)").run(thread.id, bot.id, now);
       await this.provision(this.row(id));
     } catch (error) {
       const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;

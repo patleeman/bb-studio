@@ -210,6 +210,11 @@ export function spawnedBy(thread: Partial<Pick<ListedThread, "parentThreadId" | 
   return [thread.parentThreadId, thread.lifecycleOwnerThreadId].some((id) => !!id && botThreads.has(id));
 }
 
+/** A hidden fork: a side chat or a skill review, not work the Bot owns. */
+function hiddenFork(thread: Partial<Pick<ListedThread, "visibility" | "originKind" | "parentThreadId" | "lifecycleOwnerThreadId">>): boolean {
+  return thread.visibility === "hidden" && thread.originKind === "fork" && !thread.parentThreadId && !thread.lifecycleOwnerThreadId;
+}
+
 /** Whether BB's metadata says one of `botThreads` started this thread, forks included (Activity and history). */
 export function startedBy(thread: Pick<ListedThread, "sourceThreadId" | "parentThreadId" | "lifecycleOwnerThreadId">, botThreads: ReadonlySet<string>): boolean {
   return [thread.sourceThreadId, thread.parentThreadId, thread.lifecycleOwnerThreadId].some((id) => !!id && botThreads.has(id));
@@ -251,6 +256,8 @@ export interface BotDeps {
   };
   /** Skill review forks (src/skill-learning.ts): background work, kept out of Activity. */
   hiddenThreads?(): ReadonlySet<string>;
+  /** Threads a Bot owns that BB doesn't link to it, such as its automations' runs (src/bot-owned.ts): Activity lists them. */
+  ownedThreads?(botId: string): ReadonlySet<string>;
   /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
   automations?: {
     pauseAll(botId: string, onPaused?: (id: string) => void): Promise<string[]>;
@@ -832,30 +839,38 @@ export class Bots {
   async started(botId?: string): Promise<{ id: string; title: string; projectId: string | null; parentThreadId?: string | null }[]> {
     const bot = this.stored(botId);
     if (!bot?.threadId) return [];
-    return (await this.workThreads(bot.threadId)).filter((thread) => thread.id !== bot.threadId)
+    return (await this.workThreads(bot.threadId, bot.id)).filter((thread) => thread.id !== bot.threadId)
       .map((thread) => ({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled thread", projectId: thread.projectId ?? null, parentThreadId: thread.parentThreadId ?? null }));
   }
 
-  /** The Bot's thread and every thread it started. */
+  /**
+   * The Bot's thread and every thread it started. Hidden threads count: the
+   * threads a Bot owns are hidden from BB's list and live here
+   * (src/bot-owned.ts). A hidden fork doesn't (a side chat, a skill review).
+   */
   private async startedThreads(threadId: string): Promise<(ActivityThread & Partial<ListedThread>)[]> {
     const chain = new Set(this.threadChain(threadId));
     const threads = this.deps.sdk.threads;
     const lists = await Promise.all([
-      ...[...chain].flatMap((id) => [threads.list({ sourceThreadId: id, archived: false, limit: 100 }), threads.list({ parentThreadId: id, archived: false, limit: 100 })]),
-      threads.list({ archived: false, limit: 200 }),
+      ...[...chain].flatMap((id) => [threads.list({ sourceThreadId: id, archived: false, includeHidden: true, limit: 100 }), threads.list({ parentThreadId: id, archived: false, includeHidden: true, limit: 100 })]),
+      threads.list({ archived: false, includeHidden: true, limit: 200 }),
     ].map((list) => list.catch(() => [] as ListedThread[])));
     // A listed thread says whether it waits on the user; a fetched one doesn't.
     const own = lists.flat().find((thread) => thread.id === threadId) ?? await threads.get({ threadId }).catch(() => null);
-    return [...(own ? [own as ActivityThread] : []), ...lists.flat().filter((thread) => thread.id !== threadId && startedBy(thread, chain))];
+    return [...(own ? [own as ActivityThread] : []), ...lists.flat().filter((thread) => thread.id !== threadId && !hiddenFork(thread) && startedBy(thread, chain))];
   }
 
-  /** startedThreads plus the threads those started, at any depth, from the recent list. */
-  private async workThreads(threadId: string): Promise<(ActivityThread & Partial<ListedThread>)[]> {
+  /** startedThreads, the threads the Bot owns otherwise (its automations' runs), and the threads those started, at any depth, from the recent list. */
+  private async workThreads(threadId: string, botId?: string): Promise<(ActivityThread & Partial<ListedThread>)[]> {
     const [started, recent] = await Promise.all([
       this.startedThreads(threadId),
-      this.deps.sdk.threads.list({ archived: false, limit: 200 }).catch(() => [] as ListedThread[]),
+      this.deps.sdk.threads.list({ archived: false, includeHidden: true, limit: 200 }).catch(() => [] as ListedThread[]),
     ]);
-    return [...started, ...descendants(recent, new Set(started.map((thread) => thread.id).filter((id) => id !== threadId)))];
+    const visible = recent.filter((thread) => !hiddenFork(thread));
+    const owned = botId ? this.deps.ownedThreads?.(botId) ?? new Set<string>() : new Set<string>();
+    const startedIds = new Set(started.map((thread) => thread.id));
+    const runs = visible.filter((thread) => owned.has(thread.id) && !startedIds.has(thread.id) && thread.id !== threadId);
+    return [...started, ...runs, ...descendants(visible, new Set([...started, ...runs].map((thread) => thread.id).filter((id) => id !== threadId)))];
   }
 
   private async automations(threadId: string): Promise<{ projectId: string | null; rows: AutomationRow[] }> {
@@ -873,7 +888,7 @@ export class Bots {
     const { bot, run } = await this.get(botId);
     if (!bot?.threadId) return { needsYou: [], inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
     const [threads, automations, output] = await Promise.all([
-      this.workThreads(bot.threadId),
+      this.workThreads(bot.threadId, bot.id),
       this.automations(bot.threadId),
       this.deps.sdk.threads.output({ threadId: bot.threadId }).catch(() => ({ output: null })),
     ]);

@@ -201,6 +201,9 @@ it("hides an adopted thread while it's a runner and shows it again when it's let
   expect((await x.runners.list()).map((each) => each.threadId)).toEqual(["thr_lead"]);
   await x.runners.delete(runner.id);
   expect(x.threads.get("thr_lead")).toMatchObject({ visibility: "visible", archivedAt: null });
+  // Recorded as hidden once, so the Bot-owned sweep (src/bot-owned.ts) leaves it visible.
+  const db = (x.runners as unknown as { deps: { db: import("better-sqlite3").Database } }).deps.db;
+  expect(db.prepare("SELECT bot_id, reason FROM bot_hidden_threads WHERE thread_id = 'thr_lead'").get()).toEqual({ bot_id: "bot_main", reason: "runner" });
 });
 
 it("hides runners from before once at startup, retries a failed hide, and never hides a Bot's own chat", async () => {

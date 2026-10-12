@@ -33,8 +33,8 @@ async function setup(migrations = MIGRATIONS) {
     if (!thread) throw Object.assign(new Error("Not found"), { status: 404 });
     return thread;
   });
-  // Like BB: hidden threads (runners, review forks) stay out of the list.
-  const list = vi.fn(async (args: { sourceThreadId?: string; parentThreadId?: string } = {}) => [...threads.values()].filter((thread) => thread.visibility !== "hidden" &&
+  // Like BB: hidden threads (runners, Bot-owned work, review forks) are listed only with includeHidden.
+  const list = vi.fn(async (args: { sourceThreadId?: string; parentThreadId?: string; includeHidden?: boolean } = {}) => [...threads.values()].filter((thread) => (args.includeHidden || thread.visibility !== "hidden") &&
     (!args.sourceThreadId || thread.sourceThreadId === args.sourceThreadId) && (!args.parentThreadId || thread.parentThreadId === args.parentThreadId)));
   const stop = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, status: "idle" }); return {}; });
   const archive = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: 5 }); return { ok: true }; });
@@ -190,6 +190,26 @@ it("keeps hidden runner threads under the Bot: out of BB's list, still in Needs 
   expect([...activity.inProgress, ...activity.waiting, ...activity.completed].map((t) => t.id)).toEqual(["w1"]);
   expect(x.threads.get("bot1")?.visibility).toBe("visible");
   expect(x.update).not.toHaveBeenCalled();
+});
+
+it("lists the threads a Bot owns in Activity though they're hidden from BB's list, but not hidden forks", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "child", parentThreadId: "bot1", visibility: "hidden", status: "active" });
+  x.add({ id: "grandchild", parentThreadId: "child", visibility: "hidden", status: "idle" });
+  // An automation the child made: its run is top-level; src/bot-owned.ts knows it's the Bot's.
+  x.add({ id: "run", originPluginId: "automations", visibility: "hidden", status: "idle" });
+  x.add({ id: "run_sub", parentThreadId: "run", visibility: "hidden", status: "idle" });
+  x.add({ id: "side_chat", sourceThreadId: "bot1", originKind: "fork", visibility: "hidden", status: "idle" });
+  x.add({ id: "user_fork", sourceThreadId: "bot1", originKind: "fork", status: "idle" });
+  (x.bots as unknown as { deps: { ownedThreads(botId: string): ReadonlySet<string> } }).deps.ownedThreads = () => new Set(["run"]);
+  const activity = await x.bots.activity();
+  expect(activity.inProgress.map((t) => t.id)).toEqual(["child"]);
+  expect(activity.completed.map((t) => t.id).sort()).toEqual(["grandchild", "run", "run_sub", "user_fork"]);
+  expect(activity.completed.find((t) => t.id === "run_sub")?.parentId).toBe("run");
+  // Stop reaches the hidden work it spawned.
+  expect((await x.bots.stop()).stoppedThreadIds).toEqual(["child"]);
 });
 
 it("applies check-in presets: one schedule and one Memory line each; Off turns check-ins off", async () => {

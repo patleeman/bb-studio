@@ -43,6 +43,7 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { Bots, SKILL_NAME } from "./src/bot";
 import { parseSchedule, Runners } from "./src/runners";
+import { BotOwnedThreads } from "./src/bot-owned";
 import { Automations } from "./src/automations";
 import { lintSkill, patchText, REVIEW_TOOLS, SkillLearning } from "./src/skill-learning";
 import { parseDuration, type Schedule } from "./src/schedule";
@@ -342,6 +343,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
     hiddenThreads: () => learning.reviewThreads(),
+    ownedThreads: (botId) => ownedThreads.owned(botId),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
@@ -359,7 +361,19 @@ export default async function plugin(bb: BbPluginApi) {
   });
   // Runner threads live under their Bot, out of BB's thread list: runners from
   // before (or a hide that failed) are hidden once; retried next startup.
-  void runners.hideThreads().catch((error) => bb.log.warn(`Hiding runner threads failed: ${errorText(error)}`));
+  // Threads a Bot owns (spawned by its chain, or by automations it or its
+  // threads made) live under it, out of BB's thread list (src/bot-owned.ts):
+  // hidden as they're made, plus a sweep at startup and every five minutes.
+  const ownedThreads = new BotOwnedThreads({
+    db, sdk: bb.sdk, changed: tagsChanged, log: (message) => bb.log.warn(message),
+    bots: () => bots.list().map((bot) => ({ id: bot.id, chain: bots.chain(bot.id) })),
+    skip: () => runners.threadIds(),
+  });
+  const sweepOwned = () => void ownedThreads.sweep().catch((error) => bb.log.warn(`Hiding Bot threads failed: ${errorText(error)}`));
+  bb.events.on("thread.created", ({ thread }) => void ownedThreads.created(thread).catch(() => {}));
+  const ownedTimer = setInterval(sweepOwned, 5 * 60_000);
+  bb.onDispose(() => { clearInterval(ownedTimer); ownedThreads.dispose(); });
+  void runners.hideThreads().catch((error) => bb.log.warn(`Hiding runner threads failed: ${errorText(error)}`)).finally(sweepOwned);
   // A Bot's automations (src/automations.ts): check-ins, reminders, watchers, and its runners in the same list.
   const automationBot = (botId?: string) => { const bot = bots.stored(botId); return bot ? { id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, primary: bot.primary !== false, kind: bot.kind ?? "studio" } : null; };
   const automations: Automations = new Automations({
