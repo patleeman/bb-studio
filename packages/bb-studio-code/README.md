@@ -92,10 +92,9 @@ src/retry.ts:8–18".
 
 ![VS Code beside a thread](assets/staged-thread.png)
 
-The same editor beside a conversation: the seeded thread on the left, its
-VS Code tab on the right. The thread hasn't run yet, so the tab offers the
-project's workspaces, and the capture opens Orbit's. Lines 13–15 are
-highlighted.
+The same editor beside a conversation: a seeded thread that ran in the Orbit
+checkout on the left, its VS Code tab on the right. The tab opens the
+thread's own folder as a workspace. Lines 13–15 are highlighted.
 
 Both are captured by `scripts/capture/captures/bb-studio-code.mjs`. It checks
 what VS Code shows through the bridge (the editor's own report of the file
