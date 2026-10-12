@@ -14,6 +14,9 @@ export const emptyPane = (): Pane => ({ kind: "pane", id: id(), tabs: [], active
  * shows. "+" opens it, and an item opened from it takes its place.
  */
 export const BROWSE: Tab = { href: "/plugins/studio/studio/browse", title: "New tab", kindIcon: "studio/studio" };
+/** Tools with their own page, never Studio tabs: tabs saved for them are dropped. */
+const OWN_PAGE_PREFIXES = ["/plugins/studio-code/"];
+export function isOwnPageTool(href: string): boolean { return OWN_PAGE_PREFIXES.some(prefix => href.startsWith(prefix)); }
 export function emptyWorkspace(): Workspace { const layout = emptyPane(); return { layout, focused: layout.id }; }
 export function panes(layout: Layout): Pane[] { return layout.kind === "pane" ? [layout] : [...panes(layout.first), ...panes(layout.second)]; }
 export function mapLayout(layout: Layout, fn: (node: Layout) => Layout): Layout {
@@ -92,7 +95,7 @@ export function parseWorkspace(value: unknown): Workspace {
       if (typeof tab?.href !== "string" || typeof tab.title !== "string") continue;
       // Tabs saved before a kind moved into Studio still name its old add-on address.
       const href = workspaceItemPath(canonicalPath(tab.href));
-      if (!href || seen.has(href)) continue;
+      if (!href || seen.has(href) || isOwnPageTool(href)) continue;
       seen.add(href); if (href === BROWSE.href) { tabs.push(BROWSE); continue; }
       tabs.push({ href, title: tab.title.slice(0, 300), ...(typeof tab.icon === "string" && tab.icon.length <= 16 ? { icon: tab.icon } : {}), ...(typeof tab.kindIcon === "string" && tab.kindIcon.length <= 64 ? { kindIcon: tab.kindIcon } : {}) });
     }

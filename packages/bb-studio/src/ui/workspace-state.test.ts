@@ -59,3 +59,12 @@ it("restores the maximum nested eight-pane arrangement", () => {
   expect(panes(state.layout)).toHaveLength(8);
   expect(parseWorkspace(JSON.parse(JSON.stringify(state)))).toEqual(state);
 });
+
+describe("tools with their own page", () => {
+  it("drops saved tabs for Studio Code's workspaces, which open Code's page instead", () => {
+    const pane = { kind: "pane", id: "p1", tabs: [{ href: "/plugins/studio-code/workspaces/cws_1", title: "Repo" }, { href: "/plugins/studio/studio/pages/pg_1", title: "Notes" }], active: "/plugins/studio-code/workspaces/cws_1" };
+    const tabs = panes(parseWorkspace({ layout: pane, focused: "p1" }).layout)[0]!;
+    expect(tabs.tabs.map(tab => tab.href)).toEqual(["/plugins/studio/studio/pages/pg_1"]);
+    expect(tabs.active).toBe("/plugins/studio/studio/pages/pg_1");
+  });
+});
