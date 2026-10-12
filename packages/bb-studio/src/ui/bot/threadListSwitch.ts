@@ -3,14 +3,17 @@
 // (/plugins/studio/studio and below) shows the Studio list (StudioSidebar,
 // `studio/studio-items`), the Bot page (/plugins/studio/bot) and a Bot-owned
 // thread (/threads/<id>: a Bot's chat or handoff chain, a runner, a thread it
-// spawned, an automation's run) the Bots list (BotSidebar, `studio/bot`), and
+// spawned, an automation's run; /projects/<id>/threads/<id> outside Personal)
+// the Bots list (BotSidebar, `studio/bot`), and
 // every other page BB's list, or the list the user picked before Studio
 // switched. Bot-owned threads are hidden from BB's list, so one opened from
 // the Bots list keeps it.
 //
-// Ownership: a thread opened from the Bot's lists (useOpenThread) is known at
-// once; any other comes from `bot_thread_owner`, cached here. Until the answer
-// comes the sidebar stays as it is, so it doesn't flicker to BB's list. "__automatic__" would pick a Studio list
+// Ownership: a thread opened from the Bot's lists (useOpenThread) is the Bot's
+// for good in this window (kept in sessionStorage over a reload), whatever the
+// server says later (a runner let go); any other comes from `bot_thread_owner`,
+// cached here. Until the answer comes, or when it can't be had, the sidebar
+// stays as it is, so it doesn't flicker to BB's list. "__automatic__" would pick a Studio list
 // everywhere (it picks the first non-bundled one), so off Studio's pages it
 // becomes BB's bundled list.
 //
@@ -52,9 +55,13 @@ export function providerForPath(pathname: string): string | null {
   return null;
 }
 
-/** The thread a BB thread page shows (/threads/<id>), or null. */
+/**
+ * The thread a BB thread page shows, or null. BB routes a Personal thread at
+ * /threads/<id> and any other at /projects/<project>/threads/<id>
+ * (getThreadRoutePath), and matches anything under either (useRouteState).
+ */
 export function threadIdForPath(pathname: string): string | null {
-  const match = /^\/threads\/([^/?#]+)\/?$/.exec(pathname);
+  const match = /^\/(?:projects\/[^/?#]+\/)?threads\/([^/?#]+)(?:\/|$)/.exec(pathname);
   if (!match) return null;
   try { return decodeURIComponent(match[1]!); } catch { return match[1]!; }
 }
@@ -64,22 +71,41 @@ export function threadIdForPath(pathname: string): string | null {
 /** A "not the Bot's" answer is rechecked after this: an automation's run is linked to its thread a little after BB makes it. */
 export const NOT_OWNED_TTL_MS = 30_000;
 const ownership = new Map<string, { owned: boolean; at: number }>();
-const asking = new Map<string, Promise<boolean>>();
+const asking = new Map<string, Promise<boolean | undefined>>();
+/** Where this window keeps the threads opened from the Bots list, over a reload. */
+export const OPENED_KEY = "studio.bot.openedThreads";
+const OPENED_MAX = 200;
+let opened: string[] | null = null;
 
-/** Records that a thread is a Bot's (the Bots list, Activity and Needs you open only those). */
+function openedThreads(): string[] {
+  if (!opened) {
+    try {
+      const raw = JSON.parse(sessionStorage.getItem(OPENED_KEY) ?? "[]") as unknown;
+      opened = Array.isArray(raw) ? raw.filter((each): each is string => typeof each === "string") : [];
+    } catch { opened = []; }
+  }
+  return opened;
+}
+
+/** Records that a thread is a Bot's (the Bots list, Activity and Needs you open only those). It stays the Bot's in this window. */
 export function markBotOwned(threadId: string): void {
   ownership.set(threadId, { owned: true, at: Date.now() });
+  const list = openedThreads().filter((each) => each !== threadId);
+  list.push(threadId);
+  opened = list.slice(-OPENED_MAX);
+  try { sessionStorage.setItem(OPENED_KEY, JSON.stringify(opened)); } catch { /* private mode */ }
 }
 
 /** What's known about a thread: true or false, or undefined while unknown (or a stale "no"). */
 export function knownBotOwned(threadId: string, now = Date.now()): boolean | undefined {
+  if (openedThreads().includes(threadId)) return true;
   const known = ownership.get(threadId);
   if (!known) return undefined;
   return known.owned || now - known.at < NOT_OWNED_TTL_MS ? known.owned : undefined;
 }
 
-/** Whether a Bot owns the thread: from the cache, or asked once (concurrent asks share it). A failed ask is "no", not cached. */
-export function botOwnsThread(threadId: string, call: Call): Promise<boolean> {
+/** Whether a Bot owns the thread: from the cache, or asked once (concurrent asks share it). A failed ask is unknown (undefined), not cached. */
+export function botOwnsThread(threadId: string, call: Call): Promise<boolean | undefined> {
   const known = knownBotOwned(threadId);
   if (known !== undefined) return Promise.resolve(known);
   let pending = asking.get(threadId);
@@ -90,27 +116,32 @@ export function botOwnsThread(threadId: string, call: Call): Promise<boolean> {
         // A thread opened from the Bots list while this was asked stays the Bot's.
         if (!ownership.get(threadId)?.owned) ownership.set(threadId, { owned, at: Date.now() });
         return knownBotOwned(threadId) ?? owned;
-      }, () => false)
+      }, () => knownBotOwned(threadId))
       .finally(() => asking.delete(threadId));
     asking.set(threadId, pending);
   }
   return pending;
 }
 
-/** Forgets what's known (tests). */
-export function forgetBotOwnership(): void {
+/** Forgets what's known (tests); `keepSession` acts as a reload, keeping what sessionStorage holds. */
+export function forgetBotOwnership({ keepSession = false } = {}): void {
   ownership.clear();
   asking.clear();
+  opened = null;
+  if (!keepSession) try { sessionStorage.removeItem(OPENED_KEY); } catch { /* private mode */ }
 }
 
-/** The list a page wants: providerForPath, or the Bots list on a Bot-owned thread. */
-export async function wantedProvider(pathname: string, call?: Call): Promise<string | null> {
+/**
+ * The list a page wants: providerForPath, or the Bots list on a Bot-owned
+ * thread; undefined when the owner couldn't be asked (leave the sidebar).
+ */
+export async function wantedProvider(pathname: string, call?: Call): Promise<string | null | undefined> {
   const page = providerForPath(pathname);
   if (page) return page;
   const threadId = threadIdForPath(pathname);
   if (!threadId) return null;
   const owned = call ? await botOwnsThread(threadId, call) : knownBotOwned(threadId) === true;
-  return owned ? BOT_LIST_PROVIDER : null;
+  return owned === undefined ? undefined : owned ? BOT_LIST_PROVIDER : null;
 }
 
 export interface ListSwitch {
@@ -166,8 +197,9 @@ export function syncThreadList(sdk: PluginBrowserBbSdk, pathname: string, call?:
     while (next) {
       again = null;
       try {
-        // Ownership first: while it loads the sidebar stays as it is.
-        await apply(sdk, await wantedProvider(next.path, next.call));
+        // Ownership first: while it loads, or if it can't be had, the sidebar stays as it is.
+        const want = await wantedProvider(next.path, next.call);
+        if (want !== undefined) await apply(sdk, want);
       } catch { /* next route change or focus tries again */ }
       next = again as { path: string; call?: Call } | null;
     }

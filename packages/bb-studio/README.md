@@ -1039,10 +1039,12 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - **Switching the list**: BB's `sidebar.threadListProvider` preference is
   global, and Studio sets it by page: the Bot page and Bot-owned threads
   show `studio/bot`, the Studio panel `studio/studio-items` (see
-  Workspace), and every other page BB's own list. A thread opened from the
-  Bots list counts as the Bot's at once; for any other thread Studio asks
-  `bot_thread_owner` (cached), and the sidebar stays as it is until the
-  answer comes. Entering a Studio page remembers your choice (in this
+  Workspace), and every other page BB's own list. Thread pages are
+  `/threads/<id>` in Personal and `/projects/<id>/threads/<id>` elsewhere.
+  A thread opened from the Bots list counts as the Bot's at once and stays
+  so in that window, even after a runner is let go; for any other thread
+  Studio asks `bot_thread_owner` (cached), and the sidebar stays as it is
+  until the answer comes, or if it can't be had. Entering a Studio page remembers your choice (in this
   device's storage); leaving puts it back. "Automatic" would pick a Studio
   list everywhere, so off Studio's pages it becomes BB's own list
   (`thread-list/thread-list`); a list you pinned yourself comes back as it
