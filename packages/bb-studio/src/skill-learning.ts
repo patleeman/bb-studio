@@ -222,6 +222,8 @@ export interface LearningDeps {
   writeSkill(botId: string, input: { name: string; description: string; body: string }): void;
   deleteSkill(botId: string, name: string): boolean;
   log?(message: string): void;
+  /** How often to look for a fork's workspace; tests make it fast. */
+  pollMs?: number;
 }
 
 export type LearningView = {
@@ -401,6 +403,9 @@ export class SkillLearning {
       this.deps.db.prepare("INSERT INTO bot_skill_reviews (thread_id, bot_id, kind, status, started_at) VALUES (?, ?, ?, 'running', ?)").run(fork.id, botId, kind, now);
       if (kind === "review") this.save(botId, { tool_turns: 0, user_turns: 0 });
       try {
+        // A message sent while the fork's workspace is still provisioning waits in its queue and
+        // isn't sent on its own: wait until it's ready.
+        await this.provisioned(fork.id);
         if (model) {
           const picked = models?.find((each) => each.model === model);
           const efforts = picked?.supportedReasoningEfforts?.map((each) => each.reasoningEffort) ?? [];
@@ -420,6 +425,18 @@ export class SkillLearning {
     } finally {
       this.starting.delete(botId);
     }
+  }
+
+  /** Waits (up to a minute) for a new thread's provisioning to finish. */
+  private async provisioned(threadId: string): Promise<void> {
+    for (let i = 0; i < 60; i++) {
+      const events = await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "5", types: ["system/thread-provisioning"] }).catch(() => []) as EventRow[];
+      const status = (events[0]?.data as { status?: string } | undefined)?.status;
+      if (status === "completed") return;
+      if (status === "failed") throw new Error("The review's workspace didn't start.");
+      await new Promise((done) => setTimeout(done, this.deps.pollMs ?? 1000));
+    }
+    throw new Error("The review's workspace took too long to start.");
   }
 
   private async providerModels(threadId: string) {

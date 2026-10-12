@@ -89,7 +89,8 @@ async function setup() {
   const list = vi.fn(async ({ threadId, afterSeq, order, limit }: { threadId: string; afterSeq?: string; order?: string; limit?: string }) => {
     // BB refuses pages over 100.
     if (Number(limit) > 100) throw Object.assign(new Error("Thread event limit cannot exceed 100"), { status: 400 });
-    if (threadId !== "bot1") return [];
+    // A fork's workspace is ready at once.
+    if (threadId !== "bot1") return [{ seq: 1, type: "system/thread-provisioning", data: { status: "completed" } }];
     const after = events.filter((event) => event.seq > Number(afterSeq ?? 0));
     return (order === "desc" ? [...after].reverse() : after).slice(0, Number(limit ?? 100));
   });
