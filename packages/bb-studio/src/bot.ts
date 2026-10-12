@@ -48,7 +48,7 @@ const WORKING = new Set(["active", "starting", "stopping"]);
 
 /** The Bot's check-in prompt. What to look at lives on its Memory page, not here. */
 export function botHeartbeat(name: string): string {
-  return `Check-in for ${JSON.stringify(name)}: read your Memory page and do what its "## Check-in" section says. Do the checks yourself; if a worker thread really helps, reuse the one you used before (bb thread tell) instead of starting a new one each time. Reply only if something changed or needs the user; otherwise finish without a final assistant message: no "✓", "nothing new" or other filler.`;
+  return `Check-in for ${JSON.stringify(name)}: read your Memory page and do what its "## Check-in" section says. Do the checks yourself; if a worker thread really helps, reuse the one you used before (bb thread tell) instead of starting a new one each time. Reply only if something changed or needs the user; otherwise reply exactly [PASS]: no "✓", "nothing new" or other filler.`;
 }
 
 /** An external bot's check-in: it has no Memory page, so the message carries the ask. */
@@ -95,7 +95,7 @@ export function botInstructions(bot: { name: string; state: BotState; role?: str
   if (bot.state === "active") {
     const memory = bot.memoryPageId ? `Your Memory page is ${bot.memoryPageId}: read it with pages_read when you wake up, keep it short and edit it yourself with pages_edit; its "## Check-in" section is your check-in list.` : "";
     const skills = `Save a reusable procedure as your own skill with bot_skill_write${bot.skills?.length ? `; yours: ${bot.skills.join(", ")} (bot_skill_read)` : ""}. Search your past threads with bot_history_search.`;
-    const quiet = "Your chat is the user's inbox: post only what changed or needs them. When nothing did (a check-in with nothing new, a notice that a thread you started finished fine, an automation result like [PASS]), finish without a final assistant message: no \"✓\", \"noted\" or other acknowledgement.";
+    const quiet = "Your chat is the user's inbox: post only what changed or needs them. When nothing did (a check-in with nothing new, a notice that a thread you started finished fine, an automation result like [PASS]), reply exactly [PASS]: no \"✓\", \"noted\" or other acknowledgement.";
     const runners = "Give recurring work to a runner (runner_create).";
     return [who, memory, quiet, runners, skills].filter(Boolean).join("\n");
   }

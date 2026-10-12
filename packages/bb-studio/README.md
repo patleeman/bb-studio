@@ -1082,8 +1082,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   (`bot_chain`, which the iOS app also reads for its history).
 - **Quiet**: the Bot is told its chat is your inbox. With nothing new (a
   check-in with nothing to report, a notice that a thread it started
-  finished fine, an automation result like `[PASS]`) it finishes without a
-  reply, never a "✓". On check-ins it does the checks itself or reuses the
+  finished fine, an automation result like `[PASS]`) it replies exactly
+  `[PASS]`, which Studio and the iOS app hide (docs/silent-output.md), never
+  a "✓". On check-ins it does the checks itself or reuses the
   worker thread it used before instead of starting a new one each time.
   BB's own "thread completed" notices for threads it started still show in
   the chat: the plugin SDK has no way to turn them off. Recurring work goes

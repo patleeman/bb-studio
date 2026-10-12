@@ -327,7 +327,7 @@ it("makes one Memory page on first need and points the Bot at it briefly", async
   x.pages.delete("pg1");
   expect(x.bots.memoryPage()).toBe("pg2");
   expect(botHeartbeat("Dot")).toMatch(/Memory page/);
-  expect(botHeartbeat("Dot")).toMatch(/without a final assistant message: no "✓"/);
+  expect(botHeartbeat("Dot")).toMatch(/reply exactly \[PASS\]: no "✓"/);
   expect(botInstructions({ name: "Dot", state: "active" })).toMatch(/finished fine.*no "✓"/);
   expect(botInstructions({ name: "Dot", state: "paused", memoryPageId: "pg1" })).not.toContain("pg1");
 });
