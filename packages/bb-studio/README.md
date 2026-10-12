@@ -1283,6 +1283,18 @@ of Staff", with the same thread and check-ins; rename it from its page.
     `bot_runners` groups them under the Bot. They're kept out of Activity's
     thread lists; an urgent report puts the thread in Needs you until you
     open it.
+  - **Not in BB's thread list**: a runner belongs to its Bot, so its thread
+    lives only under the Bot (Runners) and is hidden from BB's main Threads
+    list. Runners are spawned with `visibility: "hidden"`; an adopted thread
+    (a project lead, say) is hidden when adopted; runners from before are
+    hidden once at startup (`bot_runners.hidden`, retried if BB refuses). BB
+    keeps a hidden thread out of its sidebar, thread search, mention
+    suggestions and unread attention, and its subagents inherit it; the
+    thread still opens from Studio, runs its automation and takes messages.
+    Deleting a runner makes its thread visible again (an adopted one back in
+    the list, a Studio-made one in BB's archive). The Bot's own chat is never
+    hidden. Check-ins, reminders and watchers spawn no threads: they wake the
+    Bot's thread (or a runner's) or run a script.
   - **Sidebar**: a **Runners** group (status dot, next run; hover for the
     schedule and last report). A click opens the runner's thread in the
     Threads tab.
@@ -1297,8 +1309,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
     automation and schedule stay, one reporting note is appended to the
     automation's prompt (runner_report instead of `[PASS]` or messaging the
     Bot), and the thread is unnested from the Bot (BB posts one "removed"
-    notice, then none). Deleting an adopted runner only lets it go and
-    removes the note.
+    notice, then none) and hidden from BB's thread list. Deleting an adopted
+    runner only lets it go: the note is removed and the thread is visible
+    again.
   - Pausing a runner pauses its automation; **Stop** on the Bot pauses every
     runner. RPCs: `bot_runners`, `bot_runner_create`, `bot_runner_update`,
     `bot_runner_pause`, `bot_runner_resume`, `bot_runner_run_now`,

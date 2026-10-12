@@ -75,6 +75,20 @@ it("makes a check-in with two times as one automation, on a cheaper model", asyn
   expect(x.automations).toHaveLength(0);
 });
 
+it("never makes BB spawn a thread: check-ins and reminders wake the Bot's own thread, watchers run a script", async () => {
+  // So no Bot-owned worker thread can land in BB's thread list (runners are hidden in src/runners.ts).
+  const x = await setup();
+  await x.auto.create({ kind: "checkin", name: "Brief", instruction: "Summarize my day.", schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["08:00"] } });
+  await x.auto.create({ kind: "reminder", name: "Deploy", instruction: "Check the deploy.", schedule: { type: "once", at: Date.now() + 7_200_000 } });
+  await x.auto.create({ kind: "watcher", name: "Releases", schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6] }, script: { body: "echo", interpreter: "bash" } });
+  const executions = x.automations.map((a) => a.execution as { mode: string; targetThreadId?: string });
+  expect(executions).toHaveLength(3);
+  for (const execution of executions) {
+    if (execution.mode === "agent") expect(execution.targetThreadId).toBe("bot1");
+    else expect(execution.mode).toBe("script");
+  }
+});
+
 it("refuses a bad schedule before touching BB", async () => {
   const x = await setup();
   await expect(x.auto.create({ kind: "checkin", name: "Never", instruction: "x", schedule: { type: "times", days: [0], times: ["23:00"], quiet: { from: "22:00", to: "07:00" } } })).rejects.toThrow(/Quiet hours/);

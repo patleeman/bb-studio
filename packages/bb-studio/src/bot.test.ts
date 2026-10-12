@@ -33,7 +33,8 @@ async function setup(migrations = MIGRATIONS) {
     if (!thread) throw Object.assign(new Error("Not found"), { status: 404 });
     return thread;
   });
-  const list = vi.fn(async (args: { sourceThreadId?: string; parentThreadId?: string } = {}) => [...threads.values()].filter((thread) =>
+  // Like BB: hidden threads (runners, review forks) stay out of the list.
+  const list = vi.fn(async (args: { sourceThreadId?: string; parentThreadId?: string } = {}) => [...threads.values()].filter((thread) => thread.visibility !== "hidden" &&
     (!args.sourceThreadId || thread.sourceThreadId === args.sourceThreadId) && (!args.parentThreadId || thread.parentThreadId === args.parentThreadId)));
   const stop = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, status: "idle" }); return {}; });
   const archive = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: 5 }); return { ok: true }; });
@@ -173,6 +174,22 @@ it("keeps the Bot across a handoff, and counts threads its old thread started", 
   expect(activity.completed.map((t) => t.id)).toEqual(["w2"]);
   // Its chat reads the chain as one conversation, oldest first.
   expect(x.bots.chain()).toEqual(["bot1", threadId]);
+});
+
+it("keeps hidden runner threads under the Bot: out of BB's list, still in Needs you when urgent, its own chat visible", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "run_t", visibility: "hidden", title: "Inbox · Runner", status: "idle" });
+  x.add({ id: "run_quiet", visibility: "hidden", title: "Feeds · Runner", status: "idle" });
+  x.add({ id: "w1", parentThreadId: "bot1", status: "idle" });
+  const runnerThreads = new Map([["run_t", { urgent: true }], ["run_quiet", { urgent: false }]]);
+  (x.bots as unknown as { deps: { runners: unknown } }).deps.runners = { threads: () => runnerThreads, pauseAll: async () => [], restore: async () => true };
+  const activity = await x.bots.activity();
+  expect(activity.needsYou.map((t) => t.id)).toEqual(["run_t"]);
+  expect([...activity.inProgress, ...activity.waiting, ...activity.completed].map((t) => t.id)).toEqual(["w1"]);
+  expect(x.threads.get("bot1")?.visibility).toBe("visible");
+  expect(x.update).not.toHaveBeenCalled();
 });
 
 it("applies check-in presets: one schedule and one Memory line each; Off turns check-ins off", async () => {

@@ -355,7 +355,11 @@ export default async function plugin(bb: BbPluginApi) {
     bot: (botId) => bots.stored(botId),
     startedThreads: (botId) => bots.started(botId),
     chain: (botId) => bots.chain(botId),
+    botThreads: () => new Set(bots.list().flatMap((bot) => bots.chain(bot.id))),
   });
+  // Runner threads live under their Bot, out of BB's thread list: runners from
+  // before (or a hide that failed) are hidden once; retried next startup.
+  void runners.hideThreads().catch((error) => bb.log.warn(`Hiding runner threads failed: ${errorText(error)}`));
   // A Bot's automations (src/automations.ts): check-ins, reminders, watchers, and its runners in the same list.
   const automationBot = (botId?: string) => { const bot = bots.stored(botId); return bot ? { id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, primary: bot.primary !== false, kind: bot.kind ?? "studio" } : null; };
   const automations: Automations = new Automations({

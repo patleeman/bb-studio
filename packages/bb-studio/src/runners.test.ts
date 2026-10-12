@@ -175,3 +175,60 @@ it("offers a thread the Bot started with an automation for adoption, and adopts 
   expect(x.automations[0]).toMatchObject({ id: "auto_staff", execution: { prompt: "Staff heartbeat. Reply [PASS]." } });
   expect(x.threads.get("thr_staff")?.archivedAt).toBeNull();
 });
+
+it("keeps runner threads out of BB's thread list: a new one is spawned hidden, and is visible again once deleted", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  expect(x.spawn.mock.calls[0]![0]).toMatchObject({ visibility: "hidden" });
+  // Already hidden: the startup step has nothing to do.
+  expect(await x.runners.hideThreads()).toBe(0);
+  expect(x.update).not.toHaveBeenCalled();
+  await x.runners.delete(runner.id);
+  expect(x.update).toHaveBeenCalledWith({ threadId: runner.threadId, visibility: "visible" });
+  expect(x.threads.get(runner.threadId!)?.archivedAt).toBe(5);
+});
+
+it("hides an adopted thread while it's a runner and shows it again when it's let go", async () => {
+  const x = await setup();
+  x.add({ id: "thr_lead", title: "Project lead", parentThreadId: "bot1", visibility: "visible" });
+  x.started.push({ id: "thr_lead", title: "Project lead", projectId: "proj_personal", parentThreadId: "bot1" });
+  x.automations.push({ id: "auto_lead", projectId: "proj_personal", name: "Lead heartbeat", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { mode: "agent", targetThreadId: "thr_lead", prompt: "Check the project." } });
+  const runner = await x.runners.adopt({ threadId: "thr_lead", automationId: "auto_lead" });
+  expect(x.update).toHaveBeenCalledWith({ threadId: "thr_lead", visibility: "hidden", parentThreadId: null });
+  expect(x.threads.get("thr_lead")).toMatchObject({ visibility: "hidden", parentThreadId: null });
+  expect(await x.runners.hideThreads()).toBe(0);
+  // Still a runner under the Bot.
+  expect((await x.runners.list()).map((each) => each.threadId)).toEqual(["thr_lead"]);
+  await x.runners.delete(runner.id);
+  expect(x.threads.get("thr_lead")).toMatchObject({ visibility: "visible", archivedAt: null });
+});
+
+it("hides runners from before once at startup, retries a failed hide, and never hides a Bot's own chat", async () => {
+  const x = await setup();
+  const db = (x.runners as unknown as { deps: { db: import("better-sqlite3").Database } }).deps.db;
+  const insert = db.prepare(`INSERT INTO bot_runners (id, bot_id, name, job, thread_id, project_id, state, cadence, time, created_at, updated_at) VALUES (?, 'bot_main', ?, 'x', ?, 'proj_personal', 'active', 'daily', '09:00', 1, 1)`);
+  x.add({ id: "thr_old", title: "Old · Runner", visibility: "visible" });
+  x.add({ id: "thr_flaky", title: "Flaky · Runner", visibility: "visible" });
+  insert.run("run_old", "Old", "thr_old");
+  insert.run("run_flaky", "Flaky", "thr_flaky");
+  insert.run("run_bot", "Mine", "bot1");
+  insert.run("run_other_bot", "Theirs", "bot2");
+  // A Bot's own chat (this Bot's or another's) stays in BB's list.
+  (x.runners as unknown as { deps: { botThreads(): ReadonlySet<string> } }).deps.botThreads = () => new Set(["bot2"]);
+  const update = x.update.getMockImplementation()!;
+  let busy = true;
+  x.update.mockImplementation(async (args) => { if (busy && args.threadId === "thr_flaky") throw new Error("server busy"); return update(args); });
+  expect(await x.runners.hideThreads()).toBe(1);
+  expect(x.threads.get("thr_old")?.visibility).toBe("hidden");
+  expect(x.threads.get("thr_flaky")?.visibility).toBe("visible");
+  busy = false;
+  expect(await x.runners.hideThreads()).toBe(1);
+  expect(x.threads.get("thr_flaky")?.visibility).toBe("hidden");
+  // Done: nothing left to hide, nothing asked of BB.
+  const calls = x.update.mock.calls.length;
+  expect(await x.runners.hideThreads()).toBe(0);
+  expect(x.update.mock.calls.length).toBe(calls);
+  expect(x.threads.get("bot1")?.visibility).not.toBe("hidden");
+  expect(x.threads.get("bot2")?.visibility).not.toBe("hidden");
+  expect(x.update.mock.calls.filter(([args]) => args.threadId === "bot1" || args.threadId === "bot2")).toEqual([]);
+});

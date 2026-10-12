@@ -294,4 +294,8 @@ export const MIGRATIONS = [
   // Skills saved before use was tracked count as used at upgrade, so the
   // curator gives them the full 30 and 90 days instead of archiving at once.
   `UPDATE bot_skills SET used_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE used_at IS NULL;`,
+  // Runner threads live under their Bot, out of BB's thread list: `hidden` is
+  // set once Studio made the thread hidden. Rows from before start at 0, so
+  // the startup step (Runners.hideThreads) hides them once.
+  `ALTER TABLE bot_runners ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`,
 ];

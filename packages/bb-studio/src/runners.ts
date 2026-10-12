@@ -18,6 +18,15 @@
 // delete with the owner; immutable) post nothing, but a lifecycle owner would
 // archive the runner when the Bot's thread is handed off. So runners are
 // spawned unparented and this table groups them under their Bot.
+//
+// Why runner threads are hidden: a runner belongs to its Bot, so it lives
+// under the Bot in Studio (Runners) and not in BB's thread list. BB's
+// `visibility: "hidden"` keeps a thread out of the sidebar, thread search,
+// mention suggestions and unread attention; it still opens by id, runs turns
+// and gets its automation. A new runner is spawned hidden, an adopted thread
+// is hidden when adopted (and made visible again when let go), and runners
+// from before are hidden once at startup (hideThreads). A Bot's own chat is
+// never hidden. Anything that needs the user still comes through runner_report.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -32,6 +41,8 @@ type RunnerRow = {
   id: string; bot_id: string; name: string; job: string; thread_id: string | null; project_id: string; state: "active" | "paused";
   cadence: HeartbeatRun["cadence"]; time: string; cron: string | null; automation_id: string | null; automation_project_id: string | null; adopted: number;
   last_run_at: number | null; last_level: RunnerLevel | null; last_report: string | null; last_report_at: number | null; urgent: number;
+  /** 1 once Studio made the thread hidden. */
+  hidden: number;
   created_at: number; updated_at: number;
 };
 
@@ -78,6 +89,8 @@ export interface RunnerDeps {
   startedThreads(botId?: string): Promise<{ id: string; title: string; projectId: string | null; parentThreadId?: string | null }[]>;
   /** A Bot's thread and the ones it handed off from. */
   chain(botId?: string): string[];
+  /** Every Bot's own thread and the ones it handed off from: never hidden. */
+  botThreads?(): ReadonlySet<string>;
 }
 
 export class Runners {
@@ -112,6 +125,41 @@ export class Runners {
   /** Runner threads, with whether an urgent report waits on the user. */
   threads(botId?: string): Map<string, { urgent: boolean }> {
     return new Map(this.rows(botId).flatMap((row) => row.thread_id ? [[row.thread_id, { urgent: !!row.urgent }] as const] : []));
+  }
+
+  /** A Bot's own chat (any Bot's, handed-off ones included): it stays in BB's thread list. */
+  private isBotChat(threadId: string, botId: string): boolean {
+    return this.deps.bot(botId)?.threadId === threadId || this.deps.chain(botId).includes(threadId) || !!this.deps.botThreads?.().has(threadId);
+  }
+
+  /**
+   * Hides the runner's thread from BB's thread list (one threads.update,
+   * plus `extra` fields such as a cleared parent). False when it couldn't;
+   * hideThreads retries at the next startup.
+   */
+  private async hide(row: Pick<RunnerRow, "id" | "bot_id" | "thread_id">, extra: Record<string, unknown> = {}): Promise<boolean> {
+    if (!row.thread_id) return false;
+    const rest = () => Object.keys(extra).length ? this.deps.sdk.threads.update({ threadId: row.thread_id, ...extra } as never).catch(() => {}) : undefined;
+    if (this.isBotChat(row.thread_id, row.bot_id)) { await rest(); return false; }
+    try {
+      await this.deps.sdk.threads.update({ threadId: row.thread_id, visibility: "hidden", ...extra } as never);
+    } catch (error) {
+      if (!missing(error)) { await rest(); return false; }
+    }
+    this.deps.db.prepare("UPDATE bot_runners SET hidden = 1 WHERE id = ?").run(row.id);
+    return true;
+  }
+
+  /**
+   * Startup step: hides every runner thread not hidden yet (runners from
+   * before runner threads were hidden, or a hide that failed). Idempotent:
+   * a hidden row is skipped. Returns how many it hid.
+   */
+  async hideThreads(): Promise<number> {
+    const rows = this.deps.db.prepare("SELECT * FROM bot_runners WHERE thread_id IS NOT NULL AND hidden = 0").all() as RunnerRow[];
+    let hid = 0;
+    for (const row of rows) if (await this.hide(row)) hid++;
+    return hid;
   }
 
   instructions(row: RunnerRow): string {
@@ -176,9 +224,11 @@ export class Runners {
         this.deps.sdk.threads.get({ threadId: bot.threadId }),
         this.deps.sdk.threads.defaultExecutionOptions({ threadId: bot.threadId }).catch(() => null),
       ]);
-      // No parentThreadId and no lifecycle owner: BB posts nothing to the Bot (see the top of this file).
+      // No parentThreadId and no lifecycle owner: BB posts nothing to the Bot.
+      // Hidden: it lives under the Bot, not in BB's thread list (see the top of this file).
       const thread = await this.deps.sdk.threads.spawn({
         projectId: PERSONAL_PROJECT_ID,
+        visibility: "hidden",
         title: `${name} · Runner`,
         environment: { type: "project-default" },
         ...(botThread.providerId ? { providerId: botThread.providerId } : {}),
@@ -186,7 +236,7 @@ export class Runners {
         pluginMetadata: { runner: id, bot: bot.id },
         input: [{ type: "text", text: `${runnerPrompt({ name, job: input.job })}\nThis is your first run.`, mentions: [] }],
       } as never);
-      this.deps.db.prepare("UPDATE bot_runners SET thread_id = ?, project_id = ?, last_run_at = ? WHERE id = ?").run(thread.id, thread.projectId ?? PERSONAL_PROJECT_ID, now, id);
+      this.deps.db.prepare("UPDATE bot_runners SET thread_id = ?, project_id = ?, last_run_at = ?, hidden = 1 WHERE id = ?").run(thread.id, thread.projectId ?? PERSONAL_PROJECT_ID, now, id);
       await this.provision(this.row(id));
     } catch (error) {
       const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
@@ -298,9 +348,12 @@ export class Runners {
    * A runner Studio made: deletes its automation and archives its thread
    * (history kept). An adopted runner is only let go: its thread and
    * automation stay as they were before adopting, minus the reporting note.
+   * Either way its thread is visible again, so it isn't lost: an adopted one
+   * back in BB's thread list, an archived one in BB's archive.
    */
   async delete(id: string, botId?: string): Promise<{ deleted: true; kept: boolean }> {
     const row = this.row(id, botId);
+    if (row.thread_id && row.hidden) await this.deps.sdk.threads.update({ threadId: row.thread_id, visibility: "visible" } as never).catch(() => {});
     if (row.adopted) {
       if (row.automation_id) {
         const automation = (await this.automations([row.automation_project_id ?? row.project_id])).find((each) => each.id === row.automation_id);
@@ -378,8 +431,9 @@ export class Runners {
   /**
    * Adopt as runner (the user's choice): registers the thread, keeps its
    * automation and schedule, adds the reporting note to the automation's
-   * prompt, and detaches the thread from the Bot (one BB "removed" notice,
-   * then no more child notices).
+   * prompt, detaches the thread from the Bot (one BB "removed" notice,
+   * then no more child notices) and hides it from BB's thread list: it lives
+   * under the Bot now, until it's let go (delete).
    */
   async adopt(input: { threadId: string; automationId: string; name?: string; job?: string }, botId?: string): Promise<RunnerView> {
     const bot = this.bot(botId);
@@ -398,7 +452,7 @@ export class Runners {
       VALUES (?, ?, ?, ?, ?, ?, ?, 'custom', '09:00', ?, ?, ?, 1, ?, ?, ?)`)
       .run(id, bot.id, name, job, input.threadId, candidate.projectId, automation.enabled ? "active" : "paused", cron, automation.id, candidate.projectId, automation.lastRunAt ?? null, now, now);
     const thread = await this.deps.sdk.threads.get({ threadId: input.threadId }).catch(() => null);
-    if (thread?.parentThreadId) await this.deps.sdk.threads.update({ threadId: input.threadId, parentThreadId: null } as never).catch(() => {});
+    await this.hide({ id, bot_id: bot.id, thread_id: input.threadId }, thread?.parentThreadId ? { parentThreadId: null } : {});
     this.deps.changed();
     return this.one(id);
   }
