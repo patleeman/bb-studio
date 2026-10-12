@@ -970,11 +970,15 @@ bb studio reindex
 
 ## Bot
 
-![The Bot's page in a staged BB: Dot's avatar, name and status centered on top, a Needs-you banner for a plan waiting on approval, its chat, and the Activity card open with Waiting to start (a thread queued for next week), Running, Scheduled (its check-in and a Friday automation) and Recent (threads it started)](assets/bot.png)
+![The Bot's page in a staged BB: Dot's avatar, name and status on top; its chat with your messages as soft bubbles, its replies beside its avatar with quick-reply chips, cards for threads it started, a Needs-you card above the pill composer, and Activity open beside the chat with Needs you, Waiting to start, Scheduled and Recent](assets/bot.png)
 
-![A new Bot with nothing going on: its chat, and the Activity card with one quiet line per section](assets/bot-empty.png)
+![The same page in dark mode](assets/bot-dark.png)
 
-![No Bot yet: the page greets you as one, with Customize your bot and a message box; the first message makes it](assets/bot-create.png)
+![The Bot at work: its avatar's eyes move beside the thinking dots or its steps fold into one Working line, and the composer's button is Stop](assets/bot-working.png)
+
+![A question from the Bot's own thread, answered right above the composer with one click](assets/bot-needs-you.png)
+
+![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
 the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
@@ -982,7 +986,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
 
 - **Page**: its own nav panel, **Bot** in the rail (`/plugins/studio/bot`;
   the old `/plugins/studio/studio/bot` redirects there). The page is its
-  chat (BB's `ThreadChat`, full width and height). On top, centered: its
+  chat, Studio's own (below). On top, centered: its
   avatar (the pencil opens **Edit profile**), name, and live status
   (Working on N threads, Checks in …, Idle, Paused, Stopped). Top right: ⋯
   (Edit profile, Memory, Skills, Check-ins, Open as thread, Pause / Resume,
@@ -992,15 +996,53 @@ of Staff", with the same thread and check-ins; rename it from its page.
   sentence or two on its role ("You are my chief of staff."), which it's
   told. **Advanced** lists its skills. A Bot made before drawn avatars shows
   its emoji until you pick a shape; the emoji stays for older clients.
-- **Needs you**: its thread, or a thread it started, waiting on you (a
-  question or an approval), as a banner above the chat only when there is
-  one; **Answer** opens the thread.
-- **Activity**: a floating card (closed by default; remembered per device)
-  with its avatar and status, **Open thread** and **Check-ins**, and **Needs
-  you**, **Waiting to start** (only when something waits), **Running**,
-  **Scheduled** (its check-in and any automation that wakes its thread,
-  with the next run) and **Recent** (threads it started that finished; the
-  last three, then Show all). An empty section is one quiet line.
+- **Chat**: Studio draws it over BB's thread APIs instead of embedding
+  `ThreadChat`. It reads the Bot's whole handoff chain (`bot_chain`) as one
+  conversation: the current thread's newest page first, older pages and
+  earlier threads as you scroll up, without the handoff request between
+  them. It stays live through BB's realtime `thread:changed` signal
+  (`threads.timeline`, `threads.get`, `threads.interactions.list`).
+  - Your messages are soft bubbles on the right; the Bot's replies are plain
+    text (BB's `Markdown`, so code, links and Studio cards like `::page`
+    render as in any chat) beside its avatar, shown on the first of a run.
+    Day separators split days.
+  - A reply's trailing `::next{reply="…" do="…"}` line becomes chips under
+    the latest reply; a chip sends its text.
+  - Tool steps fold into one quiet line, **Working… · N steps** while it runs
+    and **Worked · N steps** after; click it for the steps.
+  - Threads it starts, and their outcomes (finished, failed, stopped, needs
+    you), are compact cards that open the thread, with live status from
+    Activity. BB's raw child-thread rows never show.
+  - While it works, its avatar's eyes look around beside three thinking
+    dots. Motion stops under reduced motion.
+- **Composer**: a pill at the bottom that grows with the text. **+** (or
+  paste) attaches images, the mic dictates through Studio Talk into the box,
+  and the round button sends, or stops the Bot while it works. Enter sends,
+  Shift+Enter is a new line, Esc stops, ⌘K (Ctrl+K) focuses the box.
+  Messages go with `threads.send` mode `auto`, so Smart Queue decides
+  whether one steers the running turn or waits as a follow-up; a waiting one
+  shows **Queued**. There's no hands-free voice call on desktop: Talk
+  dictates but doesn't speak replies, so voice stays with the iOS app.
+- **Needs you**: a card right above the composer. A question from the
+  Bot's own thread with one choice (a provider question, or Studio's
+  one-question `design_ask` form) is answered there; an approval has
+  **Deny**, **Always allow** (when offered) and **Approve**. Anything else,
+  and threads it started that wait on you, have **Open**.
+- **Starting out**: with no messages yet, the Bot says hello with four
+  chips: **Plan my week**, **What needs me today?** (both send), **Set up a
+  morning brief** (the Morning brief preset) and **Customize me** (Edit
+  profile).
+- **Activity**: a side panel (closed by default; remembered per device)
+  that pushes the chat over, with **Check-ins** and the sections that have
+  something: **Needs you**, **Running**, **Waiting to start**, **Scheduled**
+  (its check-in and any automation that wakes its thread, with the next
+  run) and **Recent** (threads it started that finished; the last three,
+  then Show all). With nothing in any, one quiet line.
+- **Check-ins**: four presets, one click each: **Morning brief** (weekdays
+  8:00), **Evening wrap-up** (weekdays 18:00), **Every 2 hours while I'm
+  working** (weekdays 9–17) and **Off**. A preset sets the schedule and adds
+  one line to the Memory page's `## Check-in` section saying what to do then
+  (once; Off adds nothing). **Custom schedule** has the full form.
 - **Memory**: one Studio page per Bot, "<name>'s Memory" in the personal
   project, made the first time it's needed (its thread starts, or
   **Memory** in the ⋯ menu). Its top section, `## Check-in`, is what the Bot
@@ -1033,8 +1075,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   Studio tools but its own. **Resume** turns check-ins back on if they were
   on. **Stop** (confirmed) pauses it, stops the running threads it started,
   and pauses automations that wake it. Nothing is deleted.
-- **No Bot yet**: the page greets you as your bot, with **Customize your
-  bot** (Edit profile) and a message box; your first message makes it
+- **No Bot yet**: the page greets you as your bot, with the same four chips
+  (**Customize me** opens Edit profile) and a message box; your first
+  message, or a chip, makes it
   ("Bot", a blob, unless you customized it) and starts its chat in your
   personal project. Its
   instructions come from Studio's agent configuration for its thread, not a
@@ -1044,7 +1087,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   sees every project.
 - RPCs: `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
-  `bot_activity`, `bot_memory`, `bot_skills`, `bot_skill_write`, `bot_skill_share`,
+  `bot_activity`, `bot_memory`, `bot_chain` (its thread and the ones it
+  handed off from, oldest first), `bot_checkin_preset` (`morning`,
+  `evening`, `working` or `off`), `bot_skills`, `bot_skill_write`, `bot_skill_share`,
   `bot_skill_delete`. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
   `bot_skill_write`, `bot_skill_read`, `bot_skill_delete` and
