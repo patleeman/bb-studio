@@ -291,4 +291,7 @@ export const MIGRATIONS = [
        id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, name TEXT NOT NULL, action TEXT NOT NULL,
        description TEXT, body TEXT, review_thread_id TEXT, created_at INTEGER NOT NULL
      );`,
+  // Skills saved before use was tracked count as used at upgrade, so the
+  // curator gives them the full 30 and 90 days instead of archiving at once.
+  `UPDATE bot_skills SET used_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE used_at IS NULL;`,
 ];

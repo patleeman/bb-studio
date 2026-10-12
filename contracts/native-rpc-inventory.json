@@ -262,6 +262,36 @@
     {
       "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
+      "method": "bot_learning",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_learning_set",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_skill_pending_resolve",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_skill_pin",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_skill_restore",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
       "method": "bot_set_thread",
       "coverage": "generated method"
     },
