@@ -146,7 +146,11 @@ it("takes a baseline first, then forks a review on a cheap model after 10 tool t
   // Single flight: no second review while one runs.
   expect(await x.learning.start("bot_main", "review")).toBe(false);
 
-  // The fork saves a skill and finishes: recorded and archived.
+  // A fork is idle before its prompt lands: that idle isn't the end.
+  await x.learning.idle(x.threads.get("fork1")!, null);
+  expect((await x.learning.view("bot_main")).reviewing).toBe(true);
+  // The fork runs, saves a skill and finishes: recorded and archived.
+  await x.learning.active("fork1");
   x.learning.noteWrite("fork1", "saved");
   await x.learning.idle(x.threads.get("fork1")!, "Saved deploy-check.");
   expect(x.archive).toHaveBeenCalledWith({ threadId: "fork1" });
@@ -163,6 +167,7 @@ it("records [PASS] as nothing to save, trips on user turns, and stays off when t
   await x.learning.idle(x.threads.get("bot1")!, null);
   expect(x.fork).toHaveBeenCalledTimes(1);
   expect(x.send.mock.calls[0]![0]).toMatchObject({ input: [{ text: expect.stringMatching(/run of turns with the user/) }] });
+  await x.learning.active("fork1");
   await x.learning.idle(x.threads.get("fork1")!, "[PASS]");
   expect((await x.learning.view("bot_main")).lastReview?.result).toBe("Nothing to save");
 
@@ -218,6 +223,7 @@ it("stages a review's changes when approval is on, and applies them on approve",
   x.learning.resolve("bot_main", view.pending[1]!.id, false);
   expect(x.skills().map((skill) => [skill.name, skill.body])).toEqual([["deploy", "new step"]]);
   expect((await x.learning.view("bot_main")).pending).toEqual([]);
+  await x.learning.active("fork1");
   await x.learning.idle(x.threads.get("fork1")!, "Staged one.");
   expect((await x.learning.view("bot_main")).lastReview?.result).toBe("2 waiting for approval");
 });

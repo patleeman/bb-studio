@@ -237,6 +237,8 @@ export type LearningView = {
 export class SkillLearning {
   /** Bots a review is being started for, before its row exists. */
   private readonly starting = new Set<string>();
+  /** Review forks that have started their turn: a fork is idle before the prompt lands, and that idle isn't the end. */
+  private readonly started = new Set<string>();
   /** Threads being counted now, so two idles don't count the same events. */
   private readonly counting = new Set<string>();
 
@@ -328,7 +330,10 @@ export class SkillLearning {
   /** A thread went idle: a review fork finishes; a Bot's thread is counted and may start a review. */
   async idle(thread: ThreadLike, lastAssistantText: string | null): Promise<void> {
     const review = this.review(thread.id);
-    if (review) { if (review.status === "running") await this.finish(review, lastAssistantText); return; }
+    if (review) {
+      if (review.status === "running" && this.started.delete(thread.id)) await this.finish(review, lastAssistantText);
+      return;
+    }
     const bot = this.deps.bots().find((each) => each.threadId === thread.id);
     if (!bot || bot.kind === "external") return;
     await this.count(bot);
@@ -465,6 +470,7 @@ export class SkillLearning {
 
   /** A thread became active: a new turn in a Bot's thread stops its running review. */
   async active(threadId: string): Promise<void> {
+    if (this.review(threadId)?.status === "running") { this.started.add(threadId); return; }
     const bot = this.deps.bots().find((each) => each.threadId === threadId);
     const review = bot ? this.running(bot.id) : undefined;
     if (review) await this.close(review, "Stopped: you started a turn", true);
