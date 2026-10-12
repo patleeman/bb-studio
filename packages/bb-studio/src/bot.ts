@@ -36,6 +36,17 @@ export function botHeartbeat(name: string): string {
   return `Check-in for ${JSON.stringify(name)}: read your Memory page and do what its "## Check-in" section says. Reply only if something matters to the user; otherwise finish without a final assistant message.`;
 }
 
+export const CHECKIN_PRESET_IDS = ["morning", "evening", "working", "off"] as const;
+export type CheckinPreset = (typeof CHECKIN_PRESET_IDS)[number];
+type PresetRun = { enabled: boolean; cadence: HeartbeatRun["cadence"]; time?: string; cron?: string };
+/** Proactive check-in presets: less is more, one schedule each. */
+export const CHECKIN_PRESETS: Record<CheckinPreset, { label: string; run: PresetRun; line: string | null }> = {
+  morning: { label: "Morning brief", run: { enabled: true, cadence: "weekdays", time: "08:00" }, line: "Weekday mornings: a short brief of today, what needs me, and what finished overnight." },
+  evening: { label: "Evening wrap-up", run: { enabled: true, cadence: "weekdays", time: "18:00" }, line: "Weekday evenings: wrap up what got done today and what's left for tomorrow." },
+  working: { label: "Every 2 hours while I'm working", run: { enabled: true, cadence: "custom", time: "09:00", cron: "0 9-17/2 * * 1-5" }, line: "Every 2 hours on workdays: only tell me what needs me or what changed." },
+  off: { label: "Off", run: { enabled: false, cadence: "daily" }, line: null },
+};
+
 /** A new Bot's Memory page: the check-in checklist on top, then memory. The Bot and the user edit it. */
 export const MEMORY_TEMPLATE = `## Check-in
 
@@ -111,6 +122,8 @@ export interface BotMemoryPages {
   exists(pageId: string): boolean;
   /** Makes a page in the personal project and returns its id. */
   create(input: { title: string; markdown: string }): string;
+  /** Adds a line to the page's "## Check-in" section (made if missing); false when it was already there. */
+  addCheckin?(pageId: string, line: string): boolean;
 }
 
 export interface BotDeps {
@@ -229,6 +242,29 @@ export class Bots {
     if (input.enabled && row && row.state !== "active") throw new Error(`Your Bot is ${row.state}. Resume it before turning its heartbeat on.`);
     await this.deps.leads.setRun(PERSONAL_PROJECT_ID, input);
     return this.get();
+  }
+
+  /**
+   * A check-in preset: one schedule and, unless it's Off, one line on the
+   * Memory page's Check-in section saying what to do then.
+   */
+  async checkinPreset(preset: CheckinPreset): Promise<BotView> {
+    const spec = CHECKIN_PRESETS[preset];
+    if (!spec.run.enabled) {
+      const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
+      if (run?.enabled) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, { ...run, enabled: false });
+      return this.get();
+    }
+    const view = await this.setRun(spec.run);
+    const pageId = this.memoryPage();
+    if (pageId && spec.line) this.deps.memory?.addCheckin?.(pageId, spec.line);
+    return view;
+  }
+
+  /** The Bot's thread and the ones it handed off from, oldest first: one continuous chat. */
+  chain(): string[] {
+    const bot = this.stored();
+    return bot?.threadId ? this.threadChain(bot.threadId).reverse() : [];
   }
 
   /** Heartbeat off, remembering whether it was on; the Bot is told it's paused (botInstructions). */

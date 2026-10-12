@@ -26,18 +26,47 @@ export function isBotShape(value: string | null | undefined): value is BotShape 
   return !!value && (BOT_SHAPES as readonly string[]).includes(value);
 }
 
-export function BotAvatar({ shape, color, emoji, size = 28, className }: { shape?: string | null; color?: string | null; emoji: string; size?: number; className?: string }) {
+/**
+ * The Bot's motion, shared by its avatar and chat: eyes blink now and then and
+ * look around while it works; messages ease in; the thinking dots pulse. All
+ * of it stops under reduced motion.
+ */
+export const BOT_STYLES = `
+@keyframes bb-bot-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.12); } }
+@keyframes bb-bot-look { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-1.3px, -0.4px); } 45% { transform: translate(1.3px, -0.4px); } 70% { transform: translate(0.4px, 0.5px); } }
+@keyframes bb-bot-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes bb-bot-dot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 0.9; transform: translateY(-2px); } }
+@keyframes bb-bot-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.bb-bot-eyes, .bb-bot-pupils { transform-box: view-box; transform-origin: 50% 50%; }
+.bb-bot-eyes { animation: bb-bot-blink 7s infinite; }
+.bb-bot-working .bb-bot-eyes { animation-duration: 3.2s; }
+.bb-bot-working .bb-bot-pupils { animation: bb-bot-look 2.6s ease-in-out infinite; }
+.bb-bot-in { animation: bb-bot-in 220ms cubic-bezier(.2,.7,.2,1) both; }
+.bb-bot-dot { animation: bb-bot-dot 1.2s ease-in-out infinite; }
+.bb-bot-shimmer { background: linear-gradient(90deg, currentColor 0%, currentColor 40%, transparent 50%, currentColor 60%, currentColor 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; animation: bb-bot-shimmer 2.2s linear infinite; }
+.bb-bot-shimmer { -webkit-text-fill-color: transparent; opacity: .75; }
+@media (prefers-reduced-motion: reduce) {
+  .bb-bot-eyes, .bb-bot-pupils, .bb-bot-in, .bb-bot-dot, .bb-bot-shimmer { animation: none !important; }
+  .bb-bot-shimmer { -webkit-text-fill-color: currentColor; }
+}
+`;
+
+export function BotAvatar({ shape, color, emoji, size = 28, className, working = false }: { shape?: string | null; color?: string | null; emoji: string; size?: number; className?: string; working?: boolean }) {
   if (!isBotShape(shape)) {
     return <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] leading-none ${className ?? ""}`} style={{ width: size, height: size, fontSize: size * 0.55 }} aria-hidden>{emoji}</span>;
   }
   const y = EYES_Y[shape] ?? 20;
   return (
-    <svg viewBox="0 0 40 40" width={size} height={size} className={`shrink-0 ${className ?? ""}`} aria-hidden data-shape={shape}>
+    <svg viewBox="0 0 40 40" width={size} height={size} className={`shrink-0 ${working ? "bb-bot-working" : ""} ${className ?? ""}`} aria-hidden data-shape={shape} data-working={working || undefined}>
       <path d={PATHS[shape]} fill={color ?? BOT_COLORS[0]} />
-      <circle cx="15.5" cy={y} r="2.1" fill="#fff" />
-      <circle cx="24.5" cy={y} r="2.1" fill="#fff" />
-      <circle cx="15.9" cy={y + 0.3} r="1" fill="#111" />
-      <circle cx="24.9" cy={y + 0.3} r="1" fill="#111" />
+      <g className="bb-bot-eyes" style={{ transformOrigin: `20px ${y}px` }}>
+        <circle cx="15.5" cy={y} r="2.1" fill="#fff" />
+        <circle cx="24.5" cy={y} r="2.1" fill="#fff" />
+        <g className="bb-bot-pupils">
+          <circle cx="15.9" cy={y + 0.3} r="1" fill="#111" />
+          <circle cx="24.9" cy={y + 0.3} r="1" fill="#111" />
+        </g>
+      </g>
     </svg>
   );
 }

@@ -9,7 +9,12 @@ vi.mock("../live", () => ({
   useLive: (method: string) => ({ data: state.data[method] ?? null, error: null, loading: false, refresh: () => {} }),
 }));
 vi.mock("../ProjectLeads", () => ({ HeartbeatFields: () => null, useHeartbeatForm: () => ({ input: () => ({}) }) }));
-vi.mock("@get-bb/plugin-sdk/app", () => ({ ThreadChat: ({ threadId }: { threadId: string }) => React.createElement("div", { "data-chat": threadId }) }));
+vi.mock("./BotChat", () => ({
+  default: ({ threadIds }: { threadIds: string[] }) => React.createElement("div", { "data-chat": threadIds.join(",") }),
+  Greeting: ({ lines, onStarter }: { lines: string[]; onStarter(starter: unknown): void }) => React.createElement("div", null, lines.join(" "),
+    React.createElement("button", { onClick: () => onStarter({ kind: "customize" }) }, "Customize me")),
+  Composer: ({ onSend }: { onSend(text: string, images: string[]): void }) => React.createElement("button", { "aria-label": "Send", onClick: () => onSend("", []) }),
+}));
 vi.mock("@bb-studio/kit/app", () => ({
   PageColumn: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   openAppPath: vi.fn(), DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
@@ -43,6 +48,11 @@ beforeEach(() => {
   root = createRoot(container);
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); });
+/** Renders and lets the lazily loaded chat arrive. */
+const show = async (node: React.ReactNode) => {
+  await act(async () => root.render(node));
+  for (let i = 0; i < 5; i++) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+};
 const button = (label: string) => [...container.querySelectorAll("button")].find((each) => each.textContent === label)!;
 
 const click = (el: Element | null | undefined) => (el as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -52,9 +62,9 @@ const dot = { id: "bot_main", name: "Dot", avatar: "🟣", shape: "blob", color:
 
 test("with no Bot, greets as one; Customize edits the draft and the first message makes it", async () => {
   state.data = { bot_get: { bot: null, run: null } };
-  act(() => root.render(<BotHome />));
+  await show(<BotHome />);
   expect(container.textContent).toContain("Hey! I'm your bot.");
-  act(() => button("Customize your bot").click());
+  act(() => button("Customize me").click());
   const name = container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement;
   act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(name, "Penny"); name.dispatchEvent(new Event("input", { bubbles: true })); });
   act(() => click(container.querySelector('[aria-label="Shape hexagon"]')));
@@ -71,29 +81,29 @@ test("Studio's old Bot address redirects to the Bot's own panel", async () => {
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot", { replace: true });
 });
 
-test("Activity: a quiet line per empty section, Waiting to start only when something waits, the recent few completed", () => {
+test("Activity: one quiet line when all is empty, sections only when non-empty, the recent few completed", () => {
   act(() => root.render(<ActivityPanel loading={false} data={empty} />));
-  for (const text of ["Nothing needs you", "Nothing running", "No check-ins scheduled", "No recent activity"]) expect(container.textContent).toContain(text);
-  expect(container.textContent).not.toContain("Waiting to start");
+  expect(container.textContent).toBe("Nothing going on right now.");
+  expect(container.querySelector("section")).toBeNull();
   const completed = ["a", "b", "c", "d", "e"].map((id) => thread(id, `Done ${id}`));
   act(() => root.render(<ActivityPanel loading={false} data={{ ...empty, waiting: [thread("w", "Friday digest")], completed }} />));
   expect(container.textContent).toContain("Friday digest");
+  expect([...container.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"))).toEqual(["Waiting to start", "Recent"]);
   expect(container.textContent).not.toContain("Done d");
   act(() => button("Show all 5").click());
   expect(container.textContent).toContain("Done e");
 });
 
-test("Needs you is a banner only when something waits; Activity is closed until opened, then remembered", () => {
+test("Activity is a side panel, closed until opened, then remembered", async () => {
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty };
-  act(() => root.render(<BotHome />));
-  expect(container.querySelector('[aria-label="Needs you"]')).toBeNull();
+  await show(<BotHome />);
   expect(container.querySelector('aside[aria-label="Activity"]')).toBeNull();
   act(() => click(container.querySelector('[aria-label="Show activity"]')));
   expect(container.querySelector('aside[aria-label="Activity"]')).not.toBeNull();
   expect(localStorage.getItem("studio.bot.activity")).toBe("open");
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }] } };
-  act(() => root.render(<BotHome key="again" />));
-  expect(container.querySelector('section[aria-label="Needs you"]')?.textContent).toContain("Approve deploy");
+  await show(<BotHome key="again" />);
+  expect(container.querySelector('aside[aria-label="Activity"] section[aria-label="Needs you"]')?.textContent).toContain("Approve deploy");
 });
 
 test("shows the Bot's chat and status, and confirms Stop", async () => {
@@ -101,7 +111,7 @@ test("shows the Bot's chat and status, and confirms Stop", async () => {
     bot_get: { bot: { ...dot, name: "Chief of Staff" }, run: { enabled: true, cadence: "daily", time: "09:00" } },
     bot_activity: { ...empty, inProgress: [thread("t2", "Research flights")] },
   };
-  act(() => root.render(<BotHome />));
+  await show(<BotHome />);
   expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("thr_bot");
   expect(container.querySelector("[data-testid=bot-status]")?.textContent).toBe("Working on 1 thread");
   act(() => button("Stop…").click());
@@ -133,4 +143,20 @@ test("Edit profile saves shape, color and role; Skills (Share/Delete) live under
   act(() => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(role, "You are my chief of staff."); role.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => button("Save").click());
   expect(state.call).toHaveBeenCalledWith("bot_set", { shape: "star", color: "#e5484d", role: "You are my chief of staff." });
+});
+
+test("the chat spans the Bot's handoff chain once bot_chain answers", async () => {
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, bot_chain: { threadIds: ["thr_old", "thr_bot"] } };
+  await show(<BotHome />);
+  expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("thr_old,thr_bot");
+});
+
+test("Check-ins offers presets, marks the current one, and applies one in a click", async () => {
+  state.data = { bot_get: { bot: dot, run: { enabled: true, cadence: "weekdays", time: "08:00" } }, bot_activity: empty };
+  await show(<BotHome />);
+  act(() => button("Check-ins…").click());
+  const presets = [...container.querySelectorAll('[role=radiogroup][aria-label="Check-in preset"] [role=radio]')];
+  expect(presets.map((each) => each.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]);
+  await act(async () => click(presets[1]));
+  expect(state.call).toHaveBeenCalledWith("bot_checkin_preset", { preset: "evening" });
 });

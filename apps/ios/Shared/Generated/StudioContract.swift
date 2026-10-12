@@ -44,6 +44,8 @@ public enum Studio {
     public static let bot_stop = "bot_stop"
     public static let bot_activity = "bot_activity"
     public static let bot_memory = "bot_memory"
+    public static let bot_chain = "bot_chain"
+    public static let bot_checkin_preset = "bot_checkin_preset"
     public static let bot_skills = "bot_skills"
     public static let bot_skill_write = "bot_skill_write"
     public static let bot_skill_share = "bot_skill_share"
@@ -255,6 +257,10 @@ public enum Studio {
   public typealias BotActivity = BotActivityOutput
 
   public typealias BotMemory = BotMemoryOutput
+
+  public typealias BotChain = BotChainOutput
+
+  public typealias BotCheckinPreset = BotCheckinPresetOutput
 
   public typealias BotSkills = BotSkillsOutput
 
@@ -4383,6 +4389,185 @@ public enum Studio {
 
     public init(pageId: String? = nil) {
       self.pageId = pageId
+    }
+  }
+
+  public struct BotChainInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct BotChainOutput: Sendable, Hashable, Codable {
+    public var threadIds: [String]?
+
+    public init(threadIds: [String]? = nil) {
+      self.threadIds = threadIds
+    }
+  }
+
+  public enum BotCheckinPresetInputPreset: Sendable, Hashable, Codable {
+    case morning
+    case evening
+    case working
+    case off
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "morning": self = .morning
+      case "evening": self = .evening
+      case "working": self = .working
+      case "off": self = .off
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .morning: try container.encode("morning")
+      case .evening: try container.encode("evening")
+      case .working: try container.encode("working")
+      case .off: try container.encode("off")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotCheckinPresetInput: Sendable, Hashable, Codable {
+    public var preset: BotCheckinPresetInputPreset?
+
+    public init(preset: BotCheckinPresetInputPreset? = nil) {
+      self.preset = preset
+    }
+  }
+
+  public enum BotCheckinPresetOutputBotState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case stopped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "stopped": self = .stopped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .stopped: try container.encode("stopped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotCheckinPresetOutputBot: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var avatar: String?
+    public var state: BotCheckinPresetOutputBotState?
+    public var threadId: String?
+    public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.avatar = avatar
+      self.state = state
+      self.threadId = threadId
+      self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public enum BotCheckinPresetOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotCheckinPresetOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: BotCheckinPresetOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: BotCheckinPresetOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct BotCheckinPresetOutput: Sendable, Hashable, Codable {
+    public var bot: BotCheckinPresetOutputBot?
+    public var run: BotCheckinPresetOutputRun?
+
+    public init(bot: BotCheckinPresetOutputBot? = nil, run: BotCheckinPresetOutputRun? = nil) {
+      self.bot = bot
+      self.run = run
     }
   }
 

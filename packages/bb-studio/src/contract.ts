@@ -278,6 +278,10 @@ export const rpcContract = defineRpcContract({
   bot_activity: { input: z.object({}), output: botActivity },
   /** The Bot's Memory page, made on first need. */
   bot_memory: { input: z.object({}), output: z.object({ pageId: z.string().nullable() }) },
+  /** The Bot's chat as one conversation: its thread and the ones it handed off from, oldest first. */
+  bot_chain: { input: z.object({}), output: z.object({ threadIds: z.array(z.string()) }) },
+  /** A check-in preset: sets the schedule and adds its one-line instruction to the Memory page's Check-in section. */
+  bot_checkin_preset: { input: z.object({ preset: z.enum(["morning", "evening", "working", "off"]) }), output: botView },
   /** The Bot's own skills. */
   bot_skills: { input: z.object({}), output: z.object({ skills: z.array(botSkill) }) },
   /** Adds or replaces one of the Bot's skills (as its bot_skill_write tool does). */

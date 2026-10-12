@@ -324,6 +324,7 @@ export default async function plugin(bb: BbPluginApi) {
     memory: {
       exists: (pageId) => { const page = pages.store.meta(pageId); return !!page && !page.archived_at; },
       create: ({ title, markdown }) => pages.createPage({ projectId: PERSONAL_PROJECT_ID, title, icon: "🧠", markdown }),
+      addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
   });
@@ -485,6 +486,8 @@ export default async function plugin(bb: BbPluginApi) {
     bot_stop: () => bots.stop(),
     bot_activity: () => bots.activity(),
     bot_memory: () => ({ pageId: bots.memoryPage() }),
+    bot_chain: () => ({ threadIds: bots.chain() }),
+    bot_checkin_preset: ({ preset }) => bots.checkinPreset(preset),
     bot_skills: () => ({ skills: bots.skills() }),
     bot_skill_write: (input) => bots.writeSkill(input),
     bot_skill_share: ({ name }) => bots.shareSkill(name),

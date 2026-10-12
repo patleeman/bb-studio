@@ -1,7 +1,7 @@
 // The Bot's own page (nav panel `bot`, /plugins/studio/bot), chat-first like
 // a messaging app: its drawn avatar, name and live status centered on top,
-// its chat filling the page, a Needs-you banner only when something waits on
-// the user, and Activity as a floating card behind the list button. The ⋯
+// its own chat (BotChat) filling the page with Needs-you right above the
+// composer, and Activity as a side panel that pushes the chat over. The ⋯
 // menu holds the rest. With no Bot yet, the page greets the user as one and
 // the first message makes it. Studio's old address redirects here.
 import { errorMessage } from "@bb-studio/kit/format";
@@ -11,13 +11,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   Icon, Input, Textarea,
 } from "@bb-studio/kit/ui";
-import { ThreadChat } from "@get-bb/plugin-sdk/app";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
-import { BOT_COLORS, BOT_SHAPES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
+import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
+import type { ChildStatus } from "./chat-model";
+import BotChat, { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./BotChat";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
 export const BOT_PANEL = "bot";
@@ -25,6 +26,23 @@ export const BOT_PATH = `/plugins/studio/${BOT_PANEL}`;
 /** Studio's old address for the Bot (/plugins/studio/studio/bot), which redirects. */
 export const BOT_SUBPATH = "bot";
 const ACTIVITY_KEY = "studio.bot.activity";
+type Preset = "morning" | "evening" | "working" | "off";
+/** Check-in presets (bot_checkin_preset): one schedule and one line on the Memory page each. */
+export const PRESETS: { id: Preset; label: string; hint: string }[] = [
+  { id: "morning", label: "Morning brief", hint: "Weekdays 8:00" },
+  { id: "evening", label: "Evening wrap-up", hint: "Weekdays 18:00" },
+  { id: "working", label: "Every 2 hours while I'm working", hint: "Weekdays 9–17" },
+  { id: "off", label: "Off", hint: "Only when you message" },
+];
+
+/** Which preset a schedule is, if any. */
+export function presetOf(run: HeartbeatRun | null): Preset | null {
+  if (!run?.enabled) return "off";
+  if (run.cadence === "weekdays" && run.time === "08:00") return "morning";
+  if (run.cadence === "weekdays" && run.time === "18:00") return "evening";
+  if (run.cadence === "custom" && run.cron === "0 9-17/2 * * 1-5") return "working";
+  return null;
+}
 const COMPLETED_PREVIEW = 3;
 const threadPath = (id: string) => `/threads/${encodeURIComponent(id)}`;
 
@@ -85,11 +103,11 @@ export function BotRedirect() {
 type Profile = { name: string; shape: string | null; color: string | null; role: string };
 
 /** The centered top of the page: avatar (its pencil edits the profile), name and live status. */
-function Identity({ avatar, profile, status, dot, onEdit }: { avatar: string; profile: Profile; status: string; dot: string; onEdit(): void }) {
+function Identity({ avatar, profile, status, dot, onEdit, working = false }: { avatar: string; profile: Profile; status: string; dot: string; onEdit(): void; working?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <button type="button" className="group relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Edit profile" onClick={onEdit}>
-        <BotAvatar shape={profile.shape} color={profile.color} emoji={avatar} size={56} />
+        <BotAvatar shape={profile.shape} color={profile.color} emoji={avatar} size={48} working={working} />
         <span className="absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground group-hover:text-foreground" aria-hidden><Icon name="Edit" className="size-3" /></span>
       </button>
       <h1 className="mt-1.5 max-w-full truncate text-sm font-semibold">{profile.name}</h1>
@@ -108,47 +126,40 @@ function Identity({ avatar, profile, status, dot, onEdit }: { avatar: string; pr
 function CreateBot({ onCreated }: { onCreated(): void }) {
   const [profile, setProfile] = useState<Profile>({ name: "Bot", shape: DEFAULT_SHAPE, color: BOT_COLORS[0], role: "" });
   const [editing, setEditing] = useState(false);
-  const [message, setMessage] = useState("");
   const { run, busy, error } = useAction(onCreated);
-  const send = async () => {
+  const make = async (message: string) => {
+    if (busy) return false;
     const made = await run("bot_create", { name: profile.name, avatar: "🤖", shape: profile.shape ?? DEFAULT_SHAPE, color: profile.color ?? BOT_COLORS[0], ...(message.trim() ? { prompt: message.trim() } : {}) });
     if (made && profile.role.trim()) await run("bot_set", { role: profile.role.trim() });
+    return !!made;
   };
+  const starter = (next: Starter) => {
+    if (next.kind === "customize") setEditing(true);
+    else if (next.kind === "send") void make(next.text);
+    else void make("Set up a morning brief for me: weekdays at 8:00.");
+  };
+  const identity = { name: profile.name, avatar: "🤖", shape: profile.shape, color: profile.color };
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
+      <style>{BOT_STYLES}</style>
       <header className="shrink-0 px-24 pt-5 pb-3"><Identity avatar="🤖" profile={profile} status="New" dot="bg-muted-foreground/50" onEdit={() => setEditing(true)} /></header>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 px-4 py-6">
-          <Bubble>Hey! I'm your bot. I see every project, check in on a schedule and tell you what needs you.</Bubble>
-          <Bubble>Want to give me a name and a look? Or just tell me what to keep an eye on.</Bubble>
-          <div className="pl-1">
-            <button type="button" className="inline-flex h-7 items-center gap-1 rounded-full border border-border px-3 text-xs hover:bg-state-hover" onClick={() => setEditing(true)}>
-              Customize your bot<Icon name="ChevronRight" className="size-3.5" />
-            </button>
+      <>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto flex min-h-full w-full max-w-[44rem] flex-col justify-end px-4 py-6">
+            <ChatGreeting bot={identity} onStarter={starter} lines={["Hey! I'm your bot.", "I see every project, check in on a schedule and tell you what needs you. Give me a name and a look, or just tell me what to keep an eye on."]} />
           </div>
         </div>
-      </div>
-      <div className="mx-auto w-full max-w-2xl shrink-0 px-4 pb-5">
-        {error ? <p role="alert" className="mb-2 text-sm text-destructive">{error}</p> : null}
-        <div className="flex items-end gap-2 rounded-3xl border border-border bg-foreground/[0.03] py-1.5 pr-1.5 pl-4">
-          <Textarea aria-label="First message" rows={1} placeholder="Send a message" value={message} disabled={!!busy}
-            className="max-h-40 min-h-9 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
-            onChange={(event) => setMessage(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} />
-          <button type="button" aria-label="Send" disabled={!!busy} onClick={() => void send()}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"><Icon name="ArrowUp" className="size-4" /></button>
+        <div className="mx-auto w-full max-w-[44rem] shrink-0 px-4 pb-4">
+          {error ? <p role="alert" className="mb-2 px-1 text-xs text-destructive">{error}</p> : null}
+          <ChatComposer name={profile.name} working={false} onSend={(text) => make(text)} onStop={() => {}} />
         </div>
-      </div>
+      </>
       {editing ? <ProfileDialog value={profile} onClose={() => setEditing(false)} onSave={(next) => { setProfile(next); setEditing(false); }} /> : null}
     </div>
   );
 }
 
-function Bubble({ children }: { children: ReactNode }) {
-  return <p className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-foreground/[0.06] px-3.5 py-2 text-sm">{children}</p>;
-}
-
-/** Whether the Activity card is open; closed by default, remembered on this device. */
+/** Whether the Activity panel is open; closed by default, remembered on this device. */
 function useActivityOpen(): [boolean, (open: boolean) => void] {
   const [open, setOpen] = useState(() => { try { return localStorage.getItem(ACTIVITY_KEY) === "open"; } catch { return false; } });
   const set = (next: boolean) => {
@@ -163,25 +174,46 @@ type Sheet = "profile" | "skills" | "checkins" | "stop" | null;
 function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const bot = view.bot!;
   const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 15_000 });
+  const chain = useLive<{ threadIds: string[] }>("bot_chain", {}, { pollMs: 120_000 });
   const refreshAll = () => { refresh(); activity.refresh(); };
   const { run, busy, error } = useAction(refreshAll);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [activityOpen, setActivityOpen] = useActivityOpen();
+  const [chatWorking, setChatWorking] = useState(false);
   const data = activity.data;
   const needsYou = data?.needsYou ?? [];
   const running = data?.inProgress.filter((thread) => thread.relation === "started").length ?? 0;
   const profile: Profile = { name: bot.name, shape: bot.shape ?? null, color: bot.color ?? null, role: bot.role ?? "" };
-  const status = statusLabel(view.run, bot.state, running);
+  const status = chatWorking ? "Working…" : statusLabel(view.run, bot.state, running);
+  const identity = { name: bot.name, avatar: bot.avatar, shape: profile.shape, color: profile.color };
+  // The chain ends at the Bot's thread; until bot_chain answers, the thread alone.
+  const threadIds = useMemo(() => {
+    const ids = chain.data?.threadIds ?? [];
+    return bot.threadId ? (ids.at(-1) === bot.threadId ? ids : [bot.threadId]) : [];
+  }, [chain.data, bot.threadId]);
+  const childStatus = useMemo(() => {
+    const map = new Map<string, ChildStatus>();
+    for (const thread of data?.completed ?? []) map.set(thread.id, "finished");
+    for (const thread of data?.inProgress ?? []) map.set(thread.id, "running");
+    for (const thread of data?.waiting ?? []) map.set(thread.id, "waiting");
+    for (const thread of needsYou) map.set(thread.id, "needs-you");
+    return map;
+  }, [data, needsYou]);
 
   const openMemory = async () => {
     const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null;
     if (memory?.pageId) openAppPath(pagePath(memory.pageId));
   };
+  const onStarter = (starter: Starter) => {
+    if (starter.kind === "customize") setSheet("profile");
+    else if (starter.kind === "preset") void run("bot_checkin_preset", { preset: starter.preset });
+  };
 
   return (
     <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
-      <header className="relative shrink-0 px-24 pt-5 pb-3">
-        <Identity avatar={bot.avatar} profile={profile} status={status} dot={STATE_DOT[bot.state]} onEdit={() => setSheet("profile")} />
+      <style>{BOT_STYLES}</style>
+      <header className="relative shrink-0 px-24 pt-4 pb-2">
+        <Identity avatar={bot.avatar} profile={profile} status={status} dot={chatWorking ? "bg-info" : STATE_DOT[bot.state]} working={chatWorking} onEdit={() => setSheet("profile")} />
         <div className="absolute top-3 right-3 flex items-center gap-0.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -200,46 +232,41 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
               {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
             </DropdownMenuContent>
           </DropdownMenu>
-          <button type="button" className={`${ICON_BUTTON} relative`} aria-label={activityOpen ? "Hide activity" : "Show activity"} aria-pressed={activityOpen} title="Activity" onClick={() => setActivityOpen(!activityOpen)}>
+          <button type="button" className={`${ICON_BUTTON} relative ${activityOpen ? "bg-state-active" : ""}`} aria-label={activityOpen ? "Hide activity" : "Show activity"} aria-pressed={activityOpen} title="Activity" onClick={() => setActivityOpen(!activityOpen)}>
             <Icon name="ListView" />
             {needsYou.length ? <span className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" aria-hidden /> : null}
           </button>
         </div>
       </header>
 
-      {error ? <p role="alert" className="mx-auto w-full max-w-2xl shrink-0 px-4 pb-2 text-sm text-destructive">{error}</p> : null}
-      {bot.state !== "active" ? (
-        <div className="mx-auto mb-2 flex w-full max-w-2xl shrink-0 items-center gap-3 px-4 text-sm text-muted-foreground">
-          <span className="min-w-0 flex-1">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
-          <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>
-        </div>
-      ) : null}
-      {needsYou.length ? <NeedsYouBanner threads={needsYou} /> : null}
-      {bot.threadId ? (
-        <section aria-label="Chat" className="min-h-0 flex-1">
-          <ThreadChat threadId={bot.threadId} variant="full" className="h-full" />
-        </section>
-      ) : (
-        <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. Make a thread your Bot from its ⋯ menu.</p>
-      )}
-
-      {activityOpen ? (
-        <aside aria-label="Activity" className="absolute top-14 right-3 z-20 flex max-h-[calc(100%-4.5rem)] w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-xl">
-          <div className="flex items-center gap-2.5 px-3 pt-3">
-            <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={32} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold">{bot.name}</div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className={`size-1.5 rounded-full ${STATE_DOT[bot.state]}`} aria-hidden /><span className="truncate">{status}</span></div>
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {error ? <p role="alert" className="mx-auto w-full max-w-[44rem] shrink-0 px-4 pb-2 text-sm text-destructive">{error}</p> : null}
+          {bot.state !== "active" ? (
+            <div className="mx-auto mb-2 flex w-full max-w-[44rem] shrink-0 items-center gap-3 px-4 text-sm text-muted-foreground">
+              <span className="min-w-0 flex-1">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
+              <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>
             </div>
-            <button type="button" className={ICON_BUTTON} aria-label="Close activity" onClick={() => setActivityOpen(false)}><Icon name="X" /></button>
-          </div>
-          <div className="flex gap-2 px-3 pt-3">
-            {bot.threadId ? <button type="button" className={`${OUTLINE_BUTTON} flex-1 justify-center`} onClick={() => openAppPath(threadPath(bot.threadId!))}><Icon name="ExternalLink" />Open thread</button> : null}
-            {bot.state === "active" ? <button type="button" className={`${OUTLINE_BUTTON} flex-1 justify-center`} onClick={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins</button> : null}
-          </div>
-          <ActivityPanel data={data} loading={activity.loading} error={activity.error} />
-        </aside>
-      ) : null}
+          ) : null}
+          {threadIds.length ? (
+            <section aria-label="Chat" className="min-h-0 flex-1">
+              <BotChat threadIds={threadIds} bot={identity} childStatus={childStatus} needsYou={needsYou} onWorkingChange={setChatWorking} onStarter={onStarter} />
+            </section>
+          ) : (
+            <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. Make a thread your Bot from its ⋯ menu.</p>
+          )}
+        </div>
+        {activityOpen ? (
+          <aside aria-label="Activity" className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border xl:w-80">
+            <div className="flex items-center gap-2 px-4 pt-3 pb-1">
+              <h2 className="min-w-0 flex-1 text-sm font-semibold">Activity</h2>
+              {bot.state === "active" ? <button type="button" className={GHOST_BUTTON} onClick={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins</button> : null}
+              <button type="button" className={ICON_BUTTON} aria-label="Close activity" onClick={() => setActivityOpen(false)}><Icon name="X" /></button>
+            </div>
+            <ActivityPanel data={data} loading={activity.loading} error={activity.error} />
+          </aside>
+        ) : null}
+      </div>
 
       {sheet === "profile" || sheet === "skills" ? (
         <ProfileDialog value={profile} advancedOpen={sheet === "skills"} advanced={<SkillsList name={bot.name} />} onClose={() => setSheet(null)}
@@ -254,7 +281,11 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
             if (Object.keys(input).length) void run("bot_set", input);
           }} />
       ) : null}
-      {sheet === "checkins" ? <CheckinsDialog run={view.run} busy={!!busy} onClose={() => setSheet(null)} onSave={(input) => { setSheet(null); void run("bot_set_run", input); }} /> : null}
+      {sheet === "checkins" ? (
+        <CheckinsDialog run={view.run} busy={!!busy} onClose={() => setSheet(null)}
+          onPreset={(preset) => { setSheet(null); void run("bot_checkin_preset", { preset }); }}
+          onSave={(input) => { setSheet(null); void run("bot_set_run", input); }} />
+      ) : null}
       {sheet === "stop" ? (
         <Dialog open onOpenChange={(open) => !open && setSheet(null)}>
           <DialogContent className="sm:max-w-md">
@@ -283,56 +314,39 @@ function statusLabel(run: HeartbeatRun | null, state: keyof typeof STATE_LABEL, 
   return `Checks in ${cadence}${run.time && /daily|weekdays|weekly/.test(run.cadence) ? ` at ${run.time}` : ""}`;
 }
 
-/** What waits on the user, between the header and the chat: one row per thread, each opens it. */
-function NeedsYouBanner({ threads }: { threads: BotThreadView[] }) {
-  return (
-    <section aria-label="Needs you" className="mx-auto mb-2 w-full max-w-2xl shrink-0 px-4">
-      <ul className="flex flex-col gap-1 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2">
-        {threads.map((thread) => (
-          <li key={thread.id} className="flex min-w-0 items-center gap-2 text-sm">
-            <Icon name="AlertCircle" className="size-4 shrink-0 text-warning" />
-            <span className="min-w-0 flex-1 truncate"><span className="text-muted-foreground">Needs you · </span>{thread.relation === "self" ? "Its chat" : thread.title}</span>
-            <button type="button" className="h-7 shrink-0 rounded-md px-2 text-sm font-medium hover:bg-state-hover" onClick={() => openAppPath(threadPath(thread.id))}>Answer</button>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** Activity's sections: each a quiet line when empty; Waiting to start only when something waits. */
+/** Activity's sections, only those with something in them; one quiet line when all are empty. */
 export function ActivityPanel({ data, loading, error }: { data: BotActivityView | null | undefined; loading: boolean; error?: string | null }) {
   const [allRecent, setAllRecent] = useState(false);
   if (!data) return <p className="px-4 py-3 text-xs text-muted-foreground">{loading ? "Loading…" : ""}</p>;
   const recent = allRecent ? data.completed : data.completed.slice(0, COMPLETED_PREVIEW);
+  const empty = !data.needsYou.length && !data.waiting?.length && !data.inProgress.length && !data.scheduled.length && !data.completed.length;
   return (
-    <div className="flex flex-col gap-3 px-1.5 pt-3 pb-2">
-      <Section title="Needs you" empty="Nothing needs you">{data.needsYou.length ? <ThreadList threads={data.needsYou} /> : null}</Section>
-      {data.waiting?.length ? <Section title="Waiting to start" empty="">{<ThreadList threads={data.waiting} />}</Section> : null}
-      <Section title="Running" empty="Nothing running">{data.inProgress.length ? <ThreadList threads={data.inProgress} /> : null}</Section>
-      <Section title="Scheduled" empty="No check-ins scheduled">{data.scheduled.length ? <ScheduledList items={data.scheduled} /> : null}</Section>
-      <Section title="Recent" empty="No recent activity">
-        {data.completed.length ? (
-          <>
-            <ThreadList threads={recent} />
-            {data.completed.length > COMPLETED_PREVIEW ? (
-              <button type="button" className="self-start px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground" onClick={() => setAllRecent(!allRecent)}>
-                {allRecent ? "Show fewer" : `Show all ${data.completed.length}`}
-              </button>
-            ) : null}
-          </>
-        ) : null}
-      </Section>
+    <div className="flex flex-col gap-4 px-2.5 pt-2 pb-3">
+      {empty ? <p className="px-1.5 text-sm text-muted-foreground">Nothing going on right now.</p> : null}
+      {data.needsYou.length ? <Section title="Needs you"><ThreadList threads={data.needsYou} /></Section> : null}
+      {data.inProgress.length ? <Section title="Running"><ThreadList threads={data.inProgress} /></Section> : null}
+      {data.waiting?.length ? <Section title="Waiting to start"><ThreadList threads={data.waiting} /></Section> : null}
+      {data.scheduled.length ? <Section title="Scheduled"><ScheduledList items={data.scheduled} /></Section> : null}
+      {data.completed.length ? (
+        <Section title="Recent">
+          <ThreadList threads={recent} />
+          {data.completed.length > COMPLETED_PREVIEW ? (
+            <button type="button" className="self-start px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground" onClick={() => setAllRecent(!allRecent)}>
+              {allRecent ? "Show fewer" : `Show all ${data.completed.length}`}
+            </button>
+          ) : null}
+        </Section>
+      ) : null}
       {error ? <p role="alert" className="px-1.5 text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }
 
-function Section({ title, empty, children }: { title: string; empty: string; children: ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section aria-label={title} className="flex flex-col">
-      <h3 className="px-1.5 pb-0.5 text-xs font-medium text-muted-foreground">{title}</h3>
-      {children ?? <p className="px-1.5 text-sm text-muted-foreground/70">{empty}</p>}
+      <h3 className="px-1.5 pb-1 text-xs font-medium text-muted-foreground">{title}</h3>
+      {children}
     </section>
   );
 }
@@ -365,16 +379,35 @@ function ScheduledList({ items }: { items: BotScheduledView[] }) {
   );
 }
 
-function CheckinsDialog({ run, busy, onClose, onSave }: { run: HeartbeatRun | null; busy: boolean; onClose(): void; onSave(input: unknown): void }) {
+/** Check-ins: a preset in one click (Morning brief, Evening wrap-up, Every 2 hours, Off), or a custom schedule. */
+function CheckinsDialog({ run, busy, onClose, onPreset, onSave }: { run: HeartbeatRun | null; busy: boolean; onClose(): void; onPreset(preset: Preset): void; onSave(input: unknown): void }) {
   const form = useHeartbeatForm(run);
+  const current = presetOf(run);
+  const [custom, setCustom] = useState(current === null);
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Check-ins</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3 text-sm"><HeartbeatFields form={form} disabled={busy} needs={null} /></div>
+        <DialogHeader>
+          <DialogTitle>Check-ins</DialogTitle>
+          <DialogDescription>When it checks in on its own. Each preset adds one line to its Memory page saying what to do.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-1" role="radiogroup" aria-label="Check-in preset">
+          {PRESETS.map((preset) => (
+            <button key={preset.id} type="button" role="radio" aria-checked={current === preset.id} disabled={busy} onClick={() => onPreset(preset.id)}
+              className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-left text-sm hover:bg-state-hover aria-checked:border-foreground/40 aria-checked:bg-state-active">
+              <span className="min-w-0 flex-1 font-medium">{preset.label}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{preset.hint}</span>
+              {current === preset.id ? <Icon name="Check" className="size-4 shrink-0" /> : null}
+            </button>
+          ))}
+          <button type="button" aria-expanded={custom} className="mt-2 flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground" onClick={() => setCustom(!custom)}>
+            <Icon name={custom ? "ChevronDown" : "ChevronRight"} className="size-3.5" />Custom schedule
+          </button>
+        </div>
+        {custom ? <div className="flex flex-col gap-3 text-sm"><HeartbeatFields form={form} disabled={busy} needs={null} /></div> : null}
         <DialogFooter>
-          <button type="button" className={GHOST_BUTTON} onClick={onClose}>Cancel</button>
-          <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => onSave(form.input())}>Save</button>
+          <button type="button" className={GHOST_BUTTON} onClick={onClose}>{custom ? "Cancel" : "Done"}</button>
+          {custom ? <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => onSave(form.input())}>Save</button> : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -23,7 +23,7 @@ import { rpcContract } from "./contract";
 import { studioEmbeds } from "./embeds";
 import { fetchPreview } from "./unfurl";
 import { createThread, listThreads, reply, setResolved } from "./comments";
-import { readMarkdown, textBlocks } from "./doc";
+import { readBlocks, readMarkdown, textBlocks } from "./doc";
 import type { Socket } from "./hub";
 import { errorText, pageUrl, PagesService, requestView, toView, truncate } from "./service";
 import { PageStore } from "./store";
@@ -47,6 +47,8 @@ export interface BuiltinPages {
   cli: PluginCliRegistration["run"];
   /** Makes a page as Studio (the Bot's Memory page), returning its id. */
   createPage(input: { projectId: string | null; title: string; icon?: string; markdown: string }): string;
+  /** Adds a bullet under the page's "## Check-in" heading (made on top if missing); false when the line is already there. */
+  addCheckin(pageId: string, line: string): boolean;
   dispose(): void;
 }
 
@@ -434,6 +436,22 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     backup,
     cli: (argv, ctx) => cli.run(argv, ctx),
     createPage: (input) => service.createPage({ ...input, parentId: null, actor: PLUGIN_RPC_ACTOR }).id,
+    addCheckin(pageId, line) {
+      const page = service.hub.open(pageId);
+      if (readMarkdown(page.doc).includes(line)) return false;
+      const actor = { key: PLUGIN_RPC_ACTOR, name: "Studio", color: actorColor(PLUGIN_RPC_ACTOR) };
+      const blocks = readBlocks(page.doc);
+      const text = (block: (typeof blocks)[number]) => (Array.isArray(block.content) ? block.content.map((part) => (part as { text?: string }).text ?? "").join("") : "").trim();
+      const heading = blocks.findIndex((block) => block.type === "heading" && /^check-?ins?$/i.test(text(block)));
+      if (heading < 0) {
+        service.edit(pageId, [{ op: "prepend", markdown: `## Check-in\n\n- ${line}` }], actor);
+        return true;
+      }
+      let last = heading;
+      for (let i = heading + 1; i < blocks.length && blocks[i]!.type !== "heading"; i++) if (text(blocks[i]!)) last = i;
+      service.edit(pageId, [{ op: "insert_after", block: blocks[last]!.id!, markdown: `- ${line}` }], actor);
+      return true;
+    },
     dispose() {
       studioNotifier.dispose();
       service.onPublish = null;

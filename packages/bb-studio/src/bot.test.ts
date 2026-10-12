@@ -4,7 +4,7 @@ import { MIGRATIONS } from "./migrations";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { botHeartbeat, botInstructions, BOT_ID, Bots, classifyActivity, MEMORY_TEMPLATE, startedBy } from "./bot";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, MEMORY_TEMPLATE, startedBy } from "./bot";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -115,6 +115,22 @@ it("keeps the Bot across a handoff, and counts threads its old thread started", 
   const activity = await x.bots.activity();
   expect(activity.inProgress.map((t) => t.id)).toEqual(["w1"]);
   expect(activity.completed.map((t) => t.id)).toEqual(["w2"]);
+  // Its chat reads the chain as one conversation, oldest first.
+  expect(x.bots.chain()).toEqual(["bot1", threadId]);
+});
+
+it("applies check-in presets: one schedule and one Memory line each; Off turns check-ins off", async () => {
+  const x = await setup();
+  const lines: string[] = [];
+  (x.bots as unknown as { deps: { memory: { addCheckin(pageId: string, line: string): boolean } } }).deps.memory.addCheckin = (_pageId, line) => { lines.push(line); return true; };
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const morning = await x.bots.checkinPreset("morning");
+  expect(morning.run).toMatchObject({ enabled: true, cadence: "weekdays", time: "08:00" });
+  const working = await x.bots.checkinPreset("working");
+  expect(working.run).toMatchObject({ enabled: true, cadence: "custom", cron: "0 9-17/2 * * 1-5" });
+  expect(lines).toEqual([CHECKIN_PRESETS.morning.line, CHECKIN_PRESETS.working.line]);
+  expect((await x.bots.checkinPreset("off")).run?.enabled).toBe(false);
+  expect(lines).toHaveLength(2);
 });
 
 it("pauses, resumes and stops", async () => {
