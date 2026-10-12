@@ -3,8 +3,10 @@ import SwiftUI
 /// What a thread needs to draw itself as the Bot's chat (the Bot tab).
 struct BotChrome {
     var bot: BotInfo
-    /// Threads the Bot started, by id, from its Activity.
-    var started: [String: BotActivity.Thread] = [:]
+    /// The Bot's handoff chain, oldest first, ending at its thread.
+    var chain: [String] = []
+    /// Threads the Bot started, from BB's thread metadata, with live status.
+    var started: [BotStartedThread] = []
     /// Opens a thread inside the Bot tab.
     var openThread: (String) -> Void
     /// The chat started or stopped running, or something came to need the user.
@@ -37,6 +39,10 @@ struct BotChromeToolbar: ViewModifier {
                     .accessibilityLabel("\(chrome.bot.name), \(status)")
                 }
             }
+            // A frosted bar, so earlier messages blur under the Bot's name
+            // instead of reading through it.
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         } else {
             content
         }

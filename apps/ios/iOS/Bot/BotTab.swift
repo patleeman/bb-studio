@@ -8,6 +8,10 @@ struct BotTab: View {
     @State private var path: [Route] = []
     @State private var lead = BotLead.loading
     @State private var activity: BotActivity?
+    /// The Bot's handoff chain, oldest first (`bot_chain`).
+    @State private var chain: [String] = []
+    /// BB's metadata for the threads the Activity says the Bot started.
+    @State private var startedThreads: [String: ThreadEntry] = [:]
     @State private var attempt = 0
     @State private var sheet: BotSheet?
     @State private var confirmingStop = false
@@ -51,6 +55,12 @@ struct BotTab: View {
         .task(id: LoadKey(visible: model.tab == .bot, server: model.serverURL, attempt: attempt)) {
             guard model.tab == .bot else { return }
             await load()
+            // Live status for the threads it started, as the desktop polls it.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(20))
+                if Task.isCancelled { break }
+                await loadActivity()
+            }
         }
     }
 
@@ -89,9 +99,8 @@ struct BotTab: View {
     }
 
     private func chrome(_ bot: BotInfo) -> BotChrome {
-        let started = ((activity?.needsYou ?? []) + (activity?.waiting ?? []) + (activity?.inProgress ?? []) + (activity?.completed ?? []))
-            .filter { $0.relation == "started" }
-        return BotChrome(bot: bot, started: Dictionary(started.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
+        let chain = chain.last == bot.lead.threadId ? chain : bot.lead.threadId.map { [$0] } ?? []
+        return BotChrome(bot: bot, chain: chain, started: BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain),
                          openThread: { path.append(.thread(id: $0)) },
                          runningChanged: { _ in Task { await loadActivity() } })
     }
@@ -169,6 +178,8 @@ struct BotTab: View {
         if let demo = BotDemo.current {
             lead = BotLead(demo.bot)
             activity = demo.bot == nil ? nil : demo.activity
+            chain = demo.chain
+            startedThreads = demo.startedThreads
             model.botTitle = demo.bot?.name
             if sheet == nil, attempt == 0, let shown = BotDemo.sheet.flatMap(BotSheet.init(rawValue:)) {
                 try? await Task.sleep(for: .milliseconds(800))
@@ -179,7 +190,11 @@ struct BotTab: View {
         #endif
         let client = model.client
         // Another server's Bot is never shown for this one.
-        if case .bot(let shown) = lead, client.cachedBotThreadId != shown.lead.threadId { lead = .loading }
+        if case .bot(let shown) = lead, client.cachedBotThreadId != shown.lead.threadId {
+            lead = .loading
+            chain = []
+            startedThreads = [:]
+        }
         do {
             lead = BotLead(try await client.bot())
         } catch where BBClient.isCancellation(error) {
@@ -197,6 +212,7 @@ struct BotTab: View {
             }
         }
         model.botTitle = bot?.name
+        if bot?.lead.threadId != nil, let ids = try? await client.botChain() { chain = ids }
         // An Action button press with nothing to talk to must not start recording later.
         if bot?.lead.threadId == nil { model.botTalkPending = false }
         await loadActivity()
@@ -204,7 +220,20 @@ struct BotTab: View {
 
     private func loadActivity() async {
         guard bot != nil else { activity = nil; return }
-        if let next = try? await model.client.botActivity() { activity = next }
+        let client = model.client
+        guard let next = try? await client.botActivity() else { return }
+        activity = next
+        let ids = Set((next.needsYou + (next.waiting ?? []) + next.inProgress + next.completed).filter { $0.relation == "started" }.map(\.id))
+        let missing = ids.subtracting(startedThreads.keys)
+        guard !missing.isEmpty else { return }
+        let fetched = await withTaskGroup(of: ThreadEntry?.self) { group in
+            for id in missing { group.addTask { try? await client.thread(id) } }
+            var out: [ThreadEntry] = []
+            for await thread in group { if let thread { out.append(thread) } }
+            return out
+        }
+        guard client.baseURL == model.serverURL else { return }
+        for thread in fetched { startedThreads[thread.id] = thread }
     }
 
     private func create(prompt: String) async throws {

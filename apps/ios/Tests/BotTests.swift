@@ -76,6 +76,29 @@ final class BotTests: XCTestCase {
         XCTAssertFalse(calls.all.first { $0.0 == "bot_set_run" }!.1.contains("cron"))
     }
 
+    func testCheckinPresetsMapToStudio() async throws {
+        let calls = Calls()
+        let client = client(a, [
+            "bot_checkin_preset": bot("thr_a", run: #"{"enabled":true,"cadence":"custom","time":"09:00","cron":"0 9-17/2 * * 1-5"}"#),
+            "bot_chain": (200, #"{"ok":true,"result":{"threadIds":["thr_0","thr_a"]}}"#),
+        ], sent: { method, body in calls.add(method, body) })
+        let info = try await client.setBotCheckinPreset(.working)
+        XCTAssertEqual(BotCheckinPreset.of(info?.lead), .working)
+        XCTAssertEqual(calls.all.first?.0, "bot_checkin_preset")
+        XCTAssertEqual(calls.all.first?.1, #"{"preset":"working"}"#)
+        XCTAssertEqual(BotCheckinPreset.allCases.map(\.rawValue), ["morning", "evening", "working", "off"])
+        XCTAssertEqual(BotCheckinPreset.of(ThreadLead(threadId: "t", heartbeat: "weekdays", time: "08:00")), .morning)
+        XCTAssertEqual(BotCheckinPreset.of(ThreadLead(threadId: "t", heartbeat: "weekdays", time: "18:00")), .evening)
+        XCTAssertEqual(BotCheckinPreset.of(ThreadLead(threadId: "t")), .off)
+        XCTAssertNil(BotCheckinPreset.of(ThreadLead(threadId: "t", heartbeat: "hourly")))
+        let chain = try await client.botChain()
+        XCTAssertEqual(chain, ["thr_0", "thr_a"])
+        // A Studio without bot_chain: the Bot's thread alone.
+        let older = self.client(b, ["bot_get": bot("thr_b")])
+        let alone = try await older.botChain()
+        XCTAssertEqual(alone, ["thr_b"])
+    }
+
     func testActivityDecodes() async throws {
         let client = client(a, ["bot_activity": (200, #"{"ok":true,"result":{"needsYou":[{"id":"t1","title":"Approve","status":"active","projectId":"p","updatedAt":1,"relation":"started","needsYou":true}],"inProgress":[],"scheduled":[{"id":"a1","kind":"heartbeat","name":"Check-in (heartbeat)","cron":"0 9 * * *","enabled":true,"nextRunAt":null}],"completed":[],"latest":null}}"#)])
         let activity = try await client.botActivity()

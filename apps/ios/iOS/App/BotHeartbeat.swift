@@ -54,7 +54,26 @@ struct BotHeartbeatSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle("Check-ins", isOn: $beating).disabled(!hasBot)
+                    ForEach(BotCheckinPreset.allCases) { preset in
+                        Button { Task { await apply(preset) } } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: preset.symbol).foregroundStyle(.tint).frame(width: 24)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(preset.title).foregroundStyle(Color.primary)
+                                    Text(preset.detail).font(.caption).foregroundStyle(Color.secondary)
+                                }
+                                Spacer()
+                                if loaded, BotCheckinPreset.of(bot?.lead) == preset {
+                                    Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(.tint)
+                                }
+                            }
+                        }
+                        .disabled(busy || !hasBot)
+                        .accessibilityAddTraits(loaded && BotCheckinPreset.of(bot?.lead) == preset ? .isSelected : [])
+                    }
+                } header: { Text("Presets") }
+                Section {
+                    Toggle("Custom schedule", isOn: $beating).disabled(!hasBot)
                     if beating, hasBot { HeartbeatFields(cadence: $cadence, time: $time, cron: $cron) }
                 } footer: {
                     Text(!loaded ? "Loading…" : hasBot ? "Wakes \(bot?.name ?? BotInfo.defaultName) on this schedule." : bot == nil ? "Make a Bot to turn on its check-ins." : "Resume \(bot?.name ?? BotInfo.defaultName) to turn on its check-ins.")
@@ -72,6 +91,9 @@ struct BotHeartbeatSheet: View {
             }
         }
         .task {
+            #if DEBUG
+            if let demo = BotDemo.current { bot = demo.bot; loaded = true; return }
+            #endif
             do {
                 bot = try await app.client.bot()
             } catch {
@@ -82,6 +104,22 @@ struct BotHeartbeatSheet: View {
             cadence = bot?.lead.heartbeat ?? "hourly"
             cron = bot?.lead.cron ?? ""
             if let parsed = HeartbeatFields.date(bot?.lead.time) { time = parsed }
+        }
+    }
+
+    /// A preset: one schedule and one line on the Bot's Memory page (`bot_checkin_preset`).
+    private func apply(_ preset: BotCheckinPreset) async {
+        busy = true
+        defer { busy = false }
+        do {
+            try await operation.run(currentServer: { app.serverURL }, work: { client in
+                try await client.setBotCheckinPreset(preset)
+            }, completion: { _ in
+                Task { await saved() }
+                dismiss()
+            })
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
         }
     }
 

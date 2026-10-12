@@ -100,25 +100,84 @@ final class BotChatTests: XCTestCase {
             case .day: "day"
             case .message(let row, let first, let last): "\(row.id)\(first ? "F" : "")\(last ? "L" : "")"
             case .work: "work"
-            case .child(let id, _): "child:\(id)"
+            case .child(_, let id): "child:\(id)"
             }
         }
         XCTAssertEqual(shape, ["day", "u1F", "u2L", "work", "a1F", "work", "a2L", "day", "a3FL"])
     }
 
-    func testThreadsTheBotStartsBecomeCards() throws {
+    private func thread(_ id: String, at: Double, parent: String? = nil, source: String? = nil, owner: String? = nil) throws -> ThreadEntry {
+        let json: [String: Any?] = ["id": id, "projectId": "p", "status": "idle", "createdAt": at, "updatedAt": at,
+                                    "parentThreadId": parent, "sourceThreadId": source, "lifecycleOwnerThreadId": owner]
+        return try JSONDecoder().decode(ThreadEntry.self, from: JSONSerialization.data(withJSONObject: json.compactMapValues { $0 }))
+    }
+
+    func testStartedThreadsComeFromMetadataWithLiveStatus() throws {
+        let activity = try JSONDecoder().decode(BotActivity.self, from: Data("""
+        {"needsYou":[{"id":"t_ask","title":"Ask","status":"active","relation":"started","needsYou":true,"updatedAt":1}],
+         "inProgress":[{"id":"t_run","title":"Run","status":"active","relation":"started","needsYou":false,"updatedAt":1},
+                       {"id":"thr_self","title":"Bot","status":"active","relation":"self","needsYou":false,"updatedAt":1}],
+         "scheduled":[],
+         "completed":[{"id":"t_done","title":"Done","status":"idle","relation":"started","needsYou":false,"updatedAt":1},
+                      {"id":"t_bad","title":"Bad","status":"error","relation":"started","needsYou":false,"updatedAt":1},
+                      {"id":"t_other","title":"Someone else's","status":"idle","relation":"started","needsYou":false,"updatedAt":1}],
+         "latest":null}
+        """.utf8))
+        let threads = Dictionary(uniqueKeysWithValues: try [
+            thread("t_ask", at: 4, source: "thr_old"), thread("t_run", at: 3, parent: "thr_self"),
+            thread("t_done", at: 1, owner: "thr_self"), thread("t_bad", at: 2, parent: "thr_self"),
+            thread("t_other", at: 5, parent: "thr_elsewhere"),
+        ].map { ($0.id, $0) })
+        let started = BotStartedThread.list(activity: activity, threads: threads, chain: ["thr_old", "thr_self"])
+        XCTAssertEqual(started.map(\.id), ["t_done", "t_bad", "t_run", "t_ask"])
+        XCTAssertEqual(started.map(\.status), [.finished, .failed, .running, .needsYou])
+    }
+
+    func testStartedCardsGoWhereTheyWereMadeAndSystemMessagesBecomeCards() throws {
         let timeline = try rows("""
         [
           {"id":"a1","kind":"conversation","role":"assistant","text":"On it.","createdAt":\(day1)},
-          {"id":"w1","kind":"work","workKind":"tool","toolName":"bb_thread_start","output":"{\\"threadId\\":\\"thr_abc12345\\"}","status":"completed","createdAt":\(day1 + 1)},
-          {"id":"w2","kind":"work","workKind":"tool","toolName":"bb_thread_start","output":"thr_abc12345 again, and the bot thr_self0001","status":"completed","createdAt":\(day1 + 2)},
-          {"id":"w3","kind":"work","workKind":"tool","toolName":"pages_read","output":"mentions thr_zzzzzzzz","status":"completed","createdAt":\(day1 + 3)}
+          {"id":"w1","kind":"work","workKind":"tool","toolName":"bb_thread_start","output":"thr_guessed1","status":"completed","createdAt":\(day1 + 10)},
+          {"id":"a2","kind":"conversation","role":"assistant","text":"Started.","createdAt":\(day1 + 30)},
+          {"id":"s1","kind":"conversation","role":"user","initiator":"system","text":"[bb system] done","systemMessageKind":"child-completed","systemMessageSubject":{"kind":"thread","threadId":"t_run","threadName":"Run"},"createdAt":\(day1 + 40)},
+          {"id":"r1","kind":"system","title":"Thought","createdAt":\(day1 + 40)},
+          {"id":"s1b","kind":"conversation","role":"user","initiator":"system","text":"[bb system] again","systemMessageKind":"child-failed","systemMessageSubject":{"kind":"thread","threadId":"t_run","threadName":"Run"},"createdAt":\(day1 + 40)},
+          {"id":"s2","kind":"conversation","role":"user","initiator":"system","text":"[bb system] plumbing","createdAt":\(day1 + 41)},
+          {"id":"a3","kind":"conversation","role":"assistant","text":"✓","createdAt":\(day1 + 42)}
         ]
         """)
-        let children = BotChatEntry.build(timeline, botThreadId: "thr_self0001").compactMap { entry -> String? in
-            if case .child(let id, _) = entry { id } else { nil }
+        let started = [BotStartedThread(id: "t_run", title: "Run", createdAt: day1 + 20, status: .running),
+                       BotStartedThread(id: "t_old", title: "Before", createdAt: day1 - 5, status: .finished)]
+        let shape: [String] = BotChatEntry.build(timeline, started: started).map {
+            switch $0 {
+            case .day: "day"
+            case .message(let row, _, _): row.id
+            case .work: "work"
+            case .child(let event, _): "\(event.verb == .started ? "started" : "update"):\(event.threadId ?? "-"):\(event.status.rawValue)"
+            }
         }
-        XCTAssertEqual(children, ["thr_abc12345"])
+        XCTAssertEqual(shape, ["day", "a1", "work", "started:t_run:running", "a2", "update:t_run:failed"])
+    }
+
+    func testChainMergeHidesHandoffRequests() throws {
+        let old = try rows("""
+        [{"id":"o1","kind":"conversation","role":"user","text":"Hi","createdAt":1},
+         {"id":"o2","kind":"conversation","role":"assistant","text":"Hello","createdAt":2}]
+        """)
+        let new = try rows("""
+        [{"id":"n1","kind":"conversation","role":"user","text":"Continue from thr_old: summary…","createdAt":3},
+         {"id":"n2","kind":"conversation","role":"assistant","text":"Back","createdAt":4},
+         {"id":"n3","kind":"conversation","role":"user","text":"Thanks","createdAt":5}]
+        """)
+        let merged = BotChain.merge([.init(threadId: "thr_old", rows: old, continuation: false),
+                                     .init(threadId: "thr_new", rows: new, continuation: true)])
+        XCTAssertEqual(merged.map(\.id), ["o1", "o2", "n2", "n3"])
+        // Until a thread's start is loaded, its first user message is real.
+        let partial = BotChain.merge([.init(threadId: "thr_new", rows: Array(new.dropFirst()), continuation: false)])
+        XCTAssertEqual(partial.map(\.id), ["n2", "n3"])
+        // The same row twice (a page refetched) shows once.
+        let twice = BotChain.merge([.init(threadId: "thr_old", rows: old + old, continuation: false)])
+        XCTAssertEqual(twice.map(\.id), ["o1", "o2"])
     }
 
     func testQuickRepliesComeFromTheLastReplyOnly() throws {

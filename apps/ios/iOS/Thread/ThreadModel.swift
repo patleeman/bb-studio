@@ -73,6 +73,63 @@ final class ThreadModel: ObservableObject {
 
     private var olderCursor: TimelineCursor?
     private var loadingOlder = false
+
+    // MARK: The Bot's handoff chain
+
+    /// The Bot's threads before this one, oldest first (`bot_chain`). Set by
+    /// the Bot tab; once this thread's start is in, its earlier threads load
+    /// above it as the reader scrolls up.
+    @Published var chainBefore: [String] = [] {
+        didSet { if chainBefore != oldValue { earlierPages = []; earlierCursor = nil } }
+    }
+    /// Earlier threads' loaded rows, oldest first; the first may be partly loaded.
+    @Published private(set) var earlierPages: [BotChain.Page] = []
+    /// The cursor into `earlierPages.first`'s older rows, nil once its start is in.
+    private var earlierCursor: TimelineCursor?
+
+    /// Whether an earlier thread of the chain still has rows to load.
+    var hasEarlier: Bool {
+        guard !chainBefore.isEmpty else { return false }
+        guard let first = earlierPages.first else { return true }
+        return earlierCursor != nil || chainBefore.first != first.threadId
+    }
+
+    /// More to load above: this thread's older pages, then its earlier threads.
+    var canLoadOlder: Bool { hasOlder || hasEarlier }
+
+    /// The whole chain as one conversation, handoff requests left out.
+    var chainRows: [TimelineRow] {
+        guard !chainBefore.isEmpty else { return rows }
+        return BotChain.merge(earlierPages + [BotChain.Page(threadId: threadId, rows: rows, continuation: !hasOlder)])
+    }
+
+    /// Loads the next page up the chain: the rest of the earliest loaded
+    /// thread, else the newest page of the thread before it.
+    private func loadEarlier(_ client: BBClient) async -> Bool {
+        loadingOlder = true
+        defer { loadingOlder = false }
+        do {
+            if let first = earlierPages.first, let cursor = earlierCursor {
+                let page = try await client.timeline(first.threadId, before: cursor)
+                let known = Set(first.rows.map(\.id))
+                earlierCursor = page.timelinePage?.hasOlderRows == true ? page.timelinePage?.olderCursor : nil
+                let index = chainBefore.firstIndex(of: first.threadId) ?? 0
+                earlierPages[0] = BotChain.Page(threadId: first.threadId, rows: page.rows.filter { !known.contains($0.id) } + first.rows,
+                                                continuation: index > 0 && earlierCursor == nil)
+                return true
+            }
+            let next = (earlierPages.first.flatMap { chainBefore.firstIndex(of: $0.threadId) } ?? chainBefore.count) - 1
+            guard chainBefore.indices.contains(next) else { return false }
+            let page = try await client.timeline(chainBefore[next])
+            earlierCursor = page.timelinePage?.hasOlderRows == true ? page.timelinePage?.olderCursor : nil
+            earlierPages.insert(BotChain.Page(threadId: chainBefore[next], rows: page.rows, continuation: next > 0 && earlierCursor == nil), at: 0)
+            return true
+        } catch where BBClient.isCancellation(error) {
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+        }
+        return false
+    }
     private var listener: UUID?
     private var refreshTask: Task<Void, Never>?
     /// Bumped when a refresh loop is abandoned, so it doesn't clear its successor's slot.
@@ -386,6 +443,7 @@ final class ThreadModel: ObservableObject {
     /// Whether rows were added.
     @discardableResult
     func loadOlder() async -> Bool {
+        if !hasOlder, hasEarlier, let client, !loadingOlder { return await loadEarlier(client) }
         guard let client, olderCursor != nil, !loadingOlder else { return false }
         loadingOlder = true
         defer { loadingOlder = false }

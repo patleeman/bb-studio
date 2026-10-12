@@ -143,55 +143,16 @@ struct BotProfileSheet: View {
     @State private var busy = false
     @State private var error: String?
 
-    enum CheckIn: String, CaseIterable, Identifiable {
-        case unchanged, morning, evening, every2hours, off
-        var id: String { rawValue }
-        var title: String {
-            switch self {
-            case .unchanged: "Keep current"
-            case .morning: "Morning brief"
-            case .evening: "Evening wrap-up"
-            case .every2hours: "Every 2 hours"
-            case .off: "Off"
-            }
-        }
-        var detail: String {
-            switch self {
-            case .unchanged: ""
-            case .morning: "Weekdays at 8:00"
-            case .evening: "Weekdays at 18:00"
-            case .every2hours: "Through the day"
-            case .off: "Only when you message"
-            }
-        }
-        var icon: String {
-            switch self {
-            case .unchanged: "circle"
-            case .morning: "sunrise.fill"
-            case .evening: "sunset.fill"
-            case .every2hours: "clock.fill"
-            case .off: "moon.zzz.fill"
-            }
-        }
-        /// cadence and time for `bot_set_run`, nil for off.
-        var run: (cadence: String, time: String?)? {
-            switch self {
-            case .morning: ("weekdays", "08:00")
-            case .evening: ("weekdays", "18:00")
-            case .every2hours: ("every2hours", "00:00")
-            default: nil
-            }
-        }
-
-        static func of(_ lead: ThreadLead?) -> CheckIn {
-            switch (lead?.heartbeat, lead?.time) {
-            case (nil, _): .off
-            case ("weekdays", "08:00"): .morning
-            case ("weekdays", "18:00"): .evening
-            case ("every2hours", _): .every2hours
-            default: .unchanged
-            }
-        }
+    /// Check-ins as Studio's presets (`bot_checkin_preset`); `unchanged` keeps a hand-made schedule.
+    enum CheckIn: Hashable, Identifiable {
+        case unchanged
+        case preset(BotCheckinPreset)
+        var id: String { if case .preset(let preset) = self { preset.rawValue } else { "unchanged" } }
+        static var allCases: [CheckIn] { [.unchanged] + BotCheckinPreset.allCases.map(CheckIn.preset) }
+        var title: String { if case .preset(let preset) = self { preset.title } else { "Keep current" } }
+        var detail: String { if case .preset(let preset) = self { preset.detail } else { "" } }
+        var icon: String { if case .preset(let preset) = self { preset.symbol } else { "circle" } }
+        static func of(_ lead: ThreadLead?) -> CheckIn { BotCheckinPreset.of(lead).map(CheckIn.preset) ?? .unchanged }
     }
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -301,7 +262,7 @@ struct BotProfileSheet: View {
                 shape = bot?.shape.flatMap(BotShape.init(rawValue:)) ?? .default
                 color = bot?.color ?? BotPalette.hex(forName: name)
                 matchName = bot?.color == nil || bot?.color == BotPalette.hex(forName: name)
-                checkIn = bot == nil ? .morning : CheckIn.of(bot?.lead)
+                checkIn = bot == nil ? .preset(.morning) : CheckIn.of(bot?.lead)
             }
         }
     }
@@ -320,13 +281,8 @@ struct BotProfileSheet: View {
             } else {
                 next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role)
             }
-            if checkIn != .unchanged, next?.state == .active {
-                if let run = checkIn.run {
-                    try await client.setBotHeartbeat(enabled: true, cadence: run.cadence, time: run.time, cron: nil)
-                } else if next?.lead.heartbeat != nil {
-                    try await client.setBotHeartbeat(enabled: false, cadence: next?.lead.heartbeat ?? "hourly", time: next?.lead.time, cron: next?.lead.cron)
-                }
-                next = try await client.bot() ?? next
+            if case .preset(let preset) = checkIn, next?.state == .active, preset != BotCheckinPreset.of(next?.lead) {
+                next = try await client.setBotCheckinPreset(preset) ?? next
             }
             app.botTitle = next?.name
             saved(next)

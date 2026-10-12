@@ -12,8 +12,8 @@ struct BotChatTimeline: View {
     let projectId: String?
     let running: Bool
     let thinking: String?
-    /// Threads the Bot started, by id, for their cards' titles and status.
-    let started: [String: BotActivity.Thread]
+    /// Threads the Bot started, placed where they were made, with live status.
+    let started: [BotStartedThread]
     var react: (String) -> Void
     var quote: (String) -> Void
     var select: (String) -> Void
@@ -22,7 +22,8 @@ struct BotChatTimeline: View {
     var openThread: (String) -> Void
 
     var body: some View {
-        let entries = BotChatEntry.build(rows, botThreadId: threadId)
+        let entries = BotChatEntry.build(rows, started: started)
+        let live = Dictionary(started.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
         ForEach(entries) { entry in
             switch entry {
             case .day(let date, _):
@@ -34,8 +35,10 @@ struct BotChatTimeline: View {
                     edit: row.id == editableId ? edit : nil)
             case .work(let rows):
                 BotWorkRow(rows: rows)
-            case .child(let id, _):
-                BotChildCard(threadId: id, info: started[id]) { openThread(id) }
+            case .child(let event, _):
+                BotChildCard(event: event, live: event.threadId.flatMap { live[$0] }) {
+                    if let id = event.threadId { openThread(id) }
+                }
             }
         }
     }
@@ -79,7 +82,8 @@ struct BotMessageRow: View {
         Group {
             if row.isUser { user } else { reply }
         }
-        .padding(.top, first ? 8 : 0)
+        // A run reads as one: bubbles 4pt apart, runs 20pt (the stack's 14 plus 6).
+        .padding(.top, first ? 6 : -10)
     }
 
     private var user: some View {
@@ -109,9 +113,10 @@ struct BotMessageRow: View {
     }
 
     private var reply: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        // As on the desktop: the avatar and name open the Bot's run.
+        HStack(alignment: .top, spacing: 8) {
             Group {
-                if last { BotAvatar(bot.look, size: Self.avatarSize) } else { Color.clear }
+                if first { BotAvatar(bot.look, size: Self.avatarSize) } else { Color.clear }
             }
             .frame(width: Self.avatarSize, height: Self.avatarSize)
             VStack(alignment: .leading, spacing: 4) {
@@ -140,7 +145,7 @@ struct BotMessageRow: View {
         let big: CGFloat = 20, small: CGFloat = 6
         return mine
             ? UnevenRoundedRectangle(topLeadingRadius: big, bottomLeadingRadius: big, bottomTrailingRadius: last ? big : small, topTrailingRadius: first ? big : small, style: .continuous)
-            : UnevenRoundedRectangle(topLeadingRadius: first ? big : small, bottomLeadingRadius: last ? small : small, bottomTrailingRadius: big, topTrailingRadius: big, style: .continuous)
+            : UnevenRoundedRectangle(topLeadingRadius: first ? small : small, bottomLeadingRadius: last ? big : small, bottomTrailingRadius: big, topTrailingRadius: big, style: .continuous)
     }
 
     private var plainText: String {
@@ -189,10 +194,12 @@ struct BotWorkRow: View {
                     if running {
                         ProgressView().controlSize(.mini)
                     } else {
-                        Image(systemName: failed ? "exclamationmark.triangle.fill" : "sparkles")
-                            .foregroundStyle(failed ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+                        Image(systemName: failed ? "exclamationmark.triangle.fill" : "checkmark")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(failed ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                     }
-                    Text(summary).lineLimit(1)
+                    Text(title).lineLimit(1)
+                    if steps > 0 { Text("· \(steps) step\(steps == 1 ? "" : "s")").foregroundStyle(.tertiary).lineLimit(1) }
                     Image(systemName: "chevron.right")
                         .font(.caption2.weight(.semibold))
                         .rotationEffect(.degrees(expanded ? 90 : 0))
@@ -200,10 +207,8 @@ struct BotWorkRow: View {
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(.fill.quaternary, in: .capsule)
-                .contentShape(.capsule)
+                .padding(.vertical, 4)
+                .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(summary)
@@ -221,59 +226,70 @@ struct BotWorkRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var summary: String {
-        let count = steps == 0 ? "" : " · \(steps) step\(steps == 1 ? "" : "s")"
-        if running { return "Working…\(count)" }
-        if failed { return "Hit a snag\(count)" }
-        return steps == 0 ? "Thought it through" : "Worked\(count)"
-    }
+    private var title: String { running ? "Working…" : failed ? "Hit a snag" : steps == 0 ? "Thought it through" : "Worked" }
+    private var summary: String { steps == 0 ? title : "\(title), \(steps) step\(steps == 1 ? "" : "s")" }
 }
 
-/// A thread the Bot started: its title and whether it's still running.
+/// A thread the Bot started or heard back from, as one compact card (desktop's ChildCard).
 struct BotChildCard: View {
-    let threadId: String
-    let info: BotActivity.Thread?
+    let event: BotChildEvent
+    /// The thread's status now, from the Bot's Activity.
+    let live: BotChildStatus?
     let open: () -> Void
-    @EnvironmentObject private var app: AppModel
-    @State private var thread: ThreadEntry?
 
-    private var title: String { info?.title ?? thread?.displayTitle ?? "A thread" }
-    private var needsYou: Bool { info?.needsYou ?? (thread?.hasPendingInteraction == true) }
-    private var running: Bool { info.map { ["running", "active", "pending", "inProgress", "starting"].contains($0.status) } ?? (thread?.isRunning == true) }
-    private var status: String { needsYou ? "needs you" : running ? "running" : "finished" }
+    private var status: BotChildStatus { live ?? event.status }
+    private var symbol: String {
+        if event.verb == .started { return "arrow.up.right" }
+        switch status {
+        case .finished: return "checkmark.circle"
+        case .failed: return "exclamationmark.circle"
+        default: return "text.bubble"
+        }
+    }
+    private var dot: Color {
+        switch status {
+        case .running, .finished: .green
+        case .failed: .red
+        case .needsYou: .orange
+        case .stopped, .waiting: .secondary
+        }
+    }
+    private var label: String { "\(event.verb == .started ? "Started " : "")‘\(event.title)’" }
 
     var body: some View {
         Button(action: open) {
             HStack(spacing: 10) {
-                Image(systemName: "arrow.triangle.branch")
+                Image(systemName: symbol)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .background(.fill.tertiary, in: .circle)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Started “\(title)”").font(.subheadline.weight(.medium)).lineLimit(1)
-                    HStack(spacing: 4) {
-                        Circle().fill(needsYou ? Color.orange : running ? .green : .secondary).frame(width: 6, height: 6)
-                        Text(status.prefix(1).uppercased() + status.dropFirst()).font(.caption).foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
+                    .background(.fill.tertiary, in: .rect(cornerRadius: 8, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    (Text(event.verb == .started ? "Started " : "").foregroundStyle(.secondary) + Text("‘\(event.title)’"))
+                        .font(.subheadline)
+                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        Circle().fill(dot).frame(width: 6, height: 6)
+                        Text(status.label).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                if event.threadId != nil {
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(Color(uiColor: .secondarySystemBackground), in: .rect(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.separator.opacity(0.5)))
+            .frame(maxWidth: 360, alignment: .leading)
+            .background(Color(uiColor: .systemBackground), in: .rect(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator))
         }
         .buttonStyle(.plain)
+        .disabled(event.threadId == nil)
         .padding(.leading, 36)
-        .padding(.trailing, 40)
-        .accessibilityLabel("Started \(title), \(status)")
-        .accessibilityHint("Opens the thread")
-        .task(id: threadId) {
-            guard info == nil else { return }
-            thread = try? await app.client.thread(threadId)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("\(label), \(status.label)")
+        .accessibilityHint(event.threadId != nil ? "Opens the thread" : "")
     }
 }
 
@@ -284,7 +300,7 @@ struct BotTypingRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             BotAvatar(bot.look, size: 28, working: true)
             VStack(alignment: .leading, spacing: 4) {
                 TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
@@ -302,7 +318,7 @@ struct BotTypingRow: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 13)
-                .background(Color(uiColor: .secondarySystemBackground), in: UnevenRoundedRectangle(topLeadingRadius: 20, bottomLeadingRadius: 6, bottomTrailingRadius: 20, topTrailingRadius: 20, style: .continuous))
+                .background(Color(uiColor: .secondarySystemBackground), in: UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 20, bottomTrailingRadius: 20, topTrailingRadius: 20, style: .continuous))
                 if let line = thought {
                     Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         .padding(.leading, 6)

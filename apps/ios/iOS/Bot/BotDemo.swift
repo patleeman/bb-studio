@@ -13,6 +13,15 @@ enum BotDemo {
         var thread: ThreadEntry
         var rows: [TimelineRow]
         var interactions: [PendingInteraction]
+        var chain: [String] { [threadId] }
+        /// BB's metadata for the threads it started: made from its thread, at these times.
+        var startedThreads: [String: ThreadEntry] {
+            let made: [(String, Double)] = [("thr_reviewprs1", now - 86_400_000 - 3_600_000 + 70_000), ("thr_research1", now - 600_000 + 20_000),
+                                            ("thr_waiting01", now - 600_000 + 21_000), ("thr_deck0001", now - 86_400_000 * 2)]
+            return Dictionary(uniqueKeysWithValues: made.map { id, at in
+                (id, BotDemo.decode(#"{"id":"\#(id)","projectId":"proj_personal","status":"idle","parentThreadId":"\#(threadId)","createdAt":\#(at),"updatedAt":\#(at)}"#) as ThreadEntry)
+            })
+        }
     }
 
     static var variant: String? {
@@ -38,7 +47,7 @@ enum BotDemo {
                        rows: rows(variant), interactions: variant == "needs" ? interactions : [])
     }
 
-    private static func decode<T: Decodable>(_ json: String) -> T {
+    fileprivate static func decode<T: Decodable>(_ json: String) -> T {
         try! JSONDecoder().decode(T.self, from: Data(json.utf8))
     }
 
@@ -63,6 +72,8 @@ enum BotDemo {
             message("m2", "user", "Thanks. Can you get the PRs moving?", yesterday + 60_000),
             work("w1", "bb_thread_start", yesterday + 70_000, output: "{\\\"threadId\\\":\\\"thr_reviewprs1\\\"}"),
             message("m3", "assistant", "On it. I started a thread to review both and will ping you if anything needs a decision.", yesterday + 90_000),
+            #"{"id":"s1","kind":"conversation","role":"user","initiator":"system","text":"[bb system] @thread:thr_reviewprs1 completed","systemMessageKind":"child-completed","systemMessageSubject":{"kind":"thread","threadId":"thr_reviewprs1","threadName":"Review open PRs"},"createdAt":\#(yesterday + 3_000_000)}"#,
+            message("s2", "assistant", "✓", yesterday + 3_010_000),
             message("m4", "user", "What needs me today?", today),
             work("w2", "pages_read", today + 5_000),
             work("w3", "bb_threads_list", today + 8_000),

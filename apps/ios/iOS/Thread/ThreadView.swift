@@ -237,6 +237,10 @@ struct ThreadView: View {
         }
         .focusedSceneValue(\.thread, actions)
         .sensoryFeedback(.success, trigger: model.confirmations)
+        .task(id: botChrome?.chain) {
+            // The chain ends at this thread; until `bot_chain` answers, the thread alone.
+            if let chain = botChrome?.chain, chain.last == model.threadId { model.chainBefore = Array(chain.dropLast()) }
+        }
         .modifier(BotThreadHooks(chrome: botChrome, sends: sends, running: model.thread?.isRunning == true, interactions: model.interactions.count))
         .sensoryFeedback(.warning, trigger: model.interactions.count) { old, new in new > old }
         .sensoryFeedback(.error, trigger: model.error) { _, new in new != nil }
@@ -393,15 +397,15 @@ struct ThreadView: View {
     private var timeline: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
-                if model.hasOlder {
+                if botChrome != nil ? model.canLoadOlder : model.hasOlder {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                 }
                 if let botChrome {
-                    if !model.hasOlder { BotHero(bot: botChrome.bot, status: botStatus, working: model.thread?.isRunning == true) }
+                    if !model.canLoadOlder { BotHero(bot: botChrome.bot, status: botStatus, working: model.thread?.isRunning == true) }
                     BotChatTimeline(
-                        bot: botChrome.bot, rows: model.rows, threadId: model.threadId, projectId: model.thread?.projectId,
+                        bot: botChrome.bot, rows: model.chainRows, threadId: model.threadId, projectId: model.thread?.projectId,
                         running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started,
                         react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
                         edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread)
@@ -466,6 +470,9 @@ struct ThreadView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollPosition($position)
+        // The Bot's header floats on glass: earlier messages blur away under it
+        // rather than being cut off at a hard edge.
+        .scrollEdgeEffectStyle(botChrome != nil ? .soft : nil, for: .top)
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
         .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -503,7 +510,7 @@ struct ThreadView: View {
         // Keeps trying while the reader stays at the top: after a failure, or
         // when a page is too short to move them off it.
         .task(id: atTop) {
-            while atTop, model.hasOlder, !Task.isCancelled {
+            while atTop, botChrome != nil ? model.canLoadOlder : model.hasOlder, !Task.isCancelled {
                 let loaded = await loadOlder()
                 try? await Task.sleep(for: .seconds(loaded ? 0.5 : 2))
             }
@@ -571,7 +578,8 @@ struct ThreadView: View {
     /// The page goes in above the reader, so bring back what was the first
     /// item. By id rather than offset: rows above are only estimated heights.
     private func loadOlder() async -> Bool {
-        guard let first = TimelineItem.group(model.rows).first?.id, await model.loadOlder() else { return false }
+        let first = botChrome.map { BotChatEntry.build(model.chainRows, started: $0.started).first?.id } ?? TimelineItem.group(model.rows).first?.id
+        guard let first, await model.loadOlder() else { return false }
         position.scrollTo(id: first, anchor: .top)
         return true
     }

@@ -15,6 +15,9 @@ public struct ThreadEntry: Codable, Identifiable, Hashable, Sendable {
     public var titleFallback: String?
     public var status: String
     public var parentThreadId: String?
+    /// The thread this one was spawned from, and the one that owns its lifecycle.
+    public var sourceThreadId: String?
+    public var lifecycleOwnerThreadId: String?
     public var visibility: String?
     public var archivedAt: Double?
     public var pinnedAt: Double?
@@ -76,6 +79,20 @@ public struct TimelineRow: Codable, Identifiable, Hashable, Sendable {
     public var change: FileChange?
     /// The last event of the turn this row came from.
     public var sourceSeqEnd: Double?
+    /// Who sent a user message: "user", or "system"/"agent" for BB's own messages.
+    public var initiator: String?
+    /// BB's own messages: `child-completed`, `child-failed`, … and what they are about.
+    public var systemMessageKind: String?
+    public var systemMessageSubject: SystemMessageSubject?
+
+    public struct SystemMessageSubject: Codable, Hashable, Sendable {
+        public struct Outcome: Codable, Hashable, Sendable { public var threadId: String?; public var status: String? }
+        public var kind: String?
+        public var threadId: String?
+        public var threadName: String?
+        public var count: Int?
+        public var outcomes: [Outcome]?
+    }
 
     /// An edited file: `diff` is unified-diff hunks, sometimes with `---`/`+++` headers.
     public struct FileChange: Codable, Hashable, Sendable {

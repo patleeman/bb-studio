@@ -134,9 +134,75 @@ extension BBClient {
         return ThreadLead(threadId: output.bot?.threadId, enabled: run?.enabled, cadence: run?.cadence, time: run?.time, cron: run?.cron)
     }
 
+    /// The Bot's handoff chain, oldest thread first; it ends at the Bot's thread.
+    /// A Studio without `bot_chain` answers with the Bot's thread alone.
+    public func botChain() async throws -> [String] {
+        struct Output: Decodable { var threadIds: [String] }
+        do {
+            let output: Output = try await rpc("studio", Studio.Method.bot_chain, .object([:]))
+            return output.threadIds
+        } catch where Self.isMissingRPC(error) {
+            return try await botThreadId().map { [$0] } ?? []
+        }
+    }
+
+    /// Sets the Bot's check-ins to a preset (`bot_checkin_preset`): one schedule and one line on its Memory page.
+    @discardableResult
+    public func setBotCheckinPreset(_ preset: BotCheckinPreset) async throws -> BotInfo? {
+        let output: BotWire = try await rpc("studio", Studio.Method.bot_checkin_preset, preset.input)
+        let info = output.info
+        remember(info)
+        return info
+    }
+
     /// What the Bot is doing: Needs you, In progress, Scheduled, Completed.
     public func botActivity() async throws -> BotActivity {
         try await rpc("studio", Studio.Method.bot_activity, .object([:]))
+    }
+}
+
+/// Studio's check-in presets, as on the desktop Bot page.
+public enum BotCheckinPreset: String, CaseIterable, Identifiable, Sendable {
+    case morning, evening, working, off
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .morning: "Morning brief"
+        case .evening: "Evening wrap-up"
+        case .working: "Every 2 hours while I'm working"
+        case .off: "Off"
+        }
+    }
+
+    public var detail: String {
+        switch self {
+        case .morning: "Weekdays 8:00"
+        case .evening: "Weekdays 18:00"
+        case .working: "Weekdays 9–17"
+        case .off: "Only when you message"
+        }
+    }
+
+    public var symbol: String {
+        switch self {
+        case .morning: "sunrise.fill"
+        case .evening: "sunset.fill"
+        case .working: "clock.fill"
+        case .off: "moon.zzz.fill"
+        }
+    }
+
+    /// `bot_checkin_preset`'s input.
+    public var input: JSONValue { .object(["preset": .string(rawValue)]) }
+
+    /// Which preset a Bot's check-ins are, nil for a hand-made schedule (desktop's `presetOf`).
+    public static func of(_ lead: ThreadLead?) -> BotCheckinPreset? {
+        guard let cadence = lead?.heartbeat else { return .off }
+        if cadence == "weekdays", lead?.time == "08:00" { return .morning }
+        if cadence == "weekdays", lead?.time == "18:00" { return .evening }
+        if cadence == "custom", lead?.cron == "0 9-17/2 * * 1-5" { return .working }
+        return nil
     }
 }
 
