@@ -1,7 +1,7 @@
 // The Bot's home (/plugins/studio/studio/bot): first its onboarding, while the
 // staged BB has no Bot, then the Bot with real activity: threads it started
 // that ran on the staged provider, one waiting to start, its check-in and an
-// automation that wakes it.
+// automation that wakes it, its Memory page and a skill it saved.
 const BOT_PATH = "/plugins/studio/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
@@ -61,9 +61,16 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
             trigger: { triggerType: "schedule", cron: "0 14 * * 5", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }, execution,
           });
         }
+        // Its Memory page, and a skill it saved.
+        const { pageId } = await pluginRpc("studio", "bot_memory", {});
+        if (!pageId) throw new Error("The Bot has no Memory page");
+        await pluginRpc("studio", "bot_skill_write", {
+          name: "release-readiness", description: "Before a release: check the checklist, open blockers and the lead's last update",
+          body: "1. Read the launch checklist page.\n2. List open blockers.\n3. Ask the project's lead for status if it's older than a day.",
+        });
         await client.navigate(BOT_PATH);
         await client.waitForText("Dot", 30000);
-        for (const text of ["Active", "Chat", "Needs you", "In progress", "Scheduled", "Completed", "Check-in (heartbeat)", "Friday release check", ...CHILDREN.map((child) => child.title)]) {
+        for (const text of ["Active", "Chat", "Memory", "Needs you", "In progress", "Waiting to start", "Draft Monday's status update", "Scheduled", "Completed", "Skills", "release-readiness", "Share", "Check-in (heartbeat)", "Friday release check", ...CHILDREN.map((child) => child.title)]) {
           await client.waitForText(text, 30000);
         }
         // The Bot's own chat renders inside the home.

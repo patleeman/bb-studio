@@ -1030,7 +1030,7 @@ of Staff", with the same thread and check-ins; rename it in its home.
   sees every project.
 - RPCs: `bot_get`, `bot_create`, `bot_set` (name, avatar), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
-  `bot_activity`, `bot_memory`, `bot_skills`, `bot_skill_share`,
+  `bot_activity`, `bot_memory`, `bot_skills`, `bot_skill_write`, `bot_skill_share`,
   `bot_skill_delete`. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
   `bot_skill_write`, `bot_skill_read`, `bot_skill_delete` and

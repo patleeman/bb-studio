@@ -486,6 +486,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_activity: () => bots.activity(),
     bot_memory: () => ({ pageId: bots.memoryPage() }),
     bot_skills: () => ({ skills: bots.skills() }),
+    bot_skill_write: (input) => bots.writeSkill(input),
     bot_skill_share: ({ name }) => bots.shareSkill(name),
     bot_skill_delete: ({ name }) => ({ deleted: bots.deleteSkill(name) }),
     // Deprecated aliases of bot_get, bot_set_thread and bot_set_run, for one release.

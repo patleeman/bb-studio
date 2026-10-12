@@ -271,6 +271,8 @@ export const rpcContract = defineRpcContract({
   bot_memory: { input: z.object({}), output: z.object({ pageId: z.string().nullable() }) },
   /** The Bot's own skills. */
   bot_skills: { input: z.object({}), output: z.object({ skills: z.array(botSkill) }) },
+  /** Adds or replaces one of the Bot's skills (as its bot_skill_write tool does). */
+  bot_skill_write: { input: z.object({ name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64), description: z.string().trim().min(1).max(500), body: z.string().min(1).max(20_000) }), output: botSkill },
   /** Shares a Bot skill: it moves into BB's user skills, for every agent. */
   bot_skill_share: { input: z.object({ name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },
   /** Deletes a Bot skill. */

@@ -45,6 +45,7 @@ public enum Studio {
     public static let bot_activity = "bot_activity"
     public static let bot_memory = "bot_memory"
     public static let bot_skills = "bot_skills"
+    public static let bot_skill_write = "bot_skill_write"
     public static let bot_skill_share = "bot_skill_share"
     public static let bot_skill_delete = "bot_skill_delete"
     public static let thread_handoff = "thread_handoff"
@@ -256,6 +257,8 @@ public enum Studio {
   public typealias BotMemory = BotMemoryOutput
 
   public typealias BotSkills = BotSkillsOutput
+
+  public typealias BotSkillWrite = BotSkillWriteOutput
 
   public typealias BotSkillShare = BotSkillShareOutput
 
@@ -4258,6 +4261,30 @@ public enum Studio {
 
     public init(skills: [BotSkillsOutputSkillsItem]? = nil) {
       self.skills = skills
+    }
+  }
+
+  public struct BotSkillWriteInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var description: String?
+    public var body: String?
+
+    public init(name: String? = nil, description: String? = nil, body: String? = nil) {
+      self.name = name
+      self.description = description
+      self.body = body
+    }
+  }
+
+  public struct BotSkillWriteOutput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var description: String?
+    public var updatedAt: Double?
+
+    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil) {
+      self.name = name
+      self.description = description
+      self.updatedAt = updatedAt
     }
   }
 
