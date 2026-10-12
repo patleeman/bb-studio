@@ -10,6 +10,16 @@ enum NotificationActions {
     static let choicePrefix = "BB_CHOICE_"
 
     static func register() {
+        let fixed = categories()
+        // Keep the extension's option categories, or delivered questions lose their buttons.
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationCategories { existing in
+            center.setNotificationCategories(fixed.union(existing.filter { $0.identifier.hasPrefix("BB_CHOICE.") }))
+        }
+    }
+
+    /// The fixed categories the relay names in `aps.category`.
+    static func categories() -> Set<UNNotificationCategory> {
         let approve = UNNotificationAction(
             identifier: approve, title: "Approve", options: [.authenticationRequired],
             icon: UNNotificationActionIcon(systemImageName: "checkmark"))
@@ -26,18 +36,20 @@ enum NotificationActions {
             identifier: reply, title: "Answer", options: [.authenticationRequired],
             icon: UNNotificationActionIcon(systemImageName: "text.bubble"), textInputButtonTitle: "Send",
             textInputPlaceholder: "Your answer")
+        let replyAction = UNTextInputNotificationAction(
+            identifier: reply, title: "Reply", options: [.authenticationRequired],
+            icon: UNNotificationActionIcon(systemImageName: "arrowshape.turn.up.left"), textInputButtonTitle: "Send",
+            textInputPlaceholder: "Reply")
         let fixed: Set = [
             UNNotificationCategory(identifier: "BB_APPROVAL", actions: [approve, deny], intentIdentifiers: []),
             UNNotificationCategory(identifier: "BB_PLAN", actions: [approvePlan, keepPlanning], intentIdentifiers: []),
             UNNotificationCategory(identifier: "BB_QUESTION", actions: [answer], intentIdentifiers: []),
+            // A finished turn (the Bot's messages included): the reply is sent to the thread.
+            UNNotificationCategory(identifier: "BB_REPLY", actions: [replyAction], intentIdentifiers: []),
             // The extension swaps in a per-options category; this is the fallback if it doesn't run.
             UNNotificationCategory(identifier: "BB_CHOICE", actions: [answer], intentIdentifiers: []),
         ]
-        // Keep the extension's option categories, or delivered questions lose their buttons.
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationCategories { existing in
-            center.setNotificationCategories(fixed.union(existing.filter { $0.identifier.hasPrefix("BB_CHOICE.") }))
-        }
+        return fixed
     }
 
     /// Runs a lock-screen action. Returns false when the app should open the thread instead.

@@ -93,7 +93,9 @@ export class ProviderToken {
 /**
  * The app's notification category, which decides the lock-screen actions:
  * Approve/Deny for approvals, Approve plan/Keep planning for plans, and an
- * answer box for questions. Finished turns and errors are plain alerts.
+ * answer box for questions, and a Reply box on finished turns (the Bot's
+ * messages among them) so the user can answer from the lock screen. Errors
+ * are plain alerts.
  * `BB_CHOICE` questions also get `mutable-content`, so the app's notification
  * extension can add a button per option. Interaction details come from
  * `enrichInteraction` in server.ts.
@@ -110,6 +112,8 @@ export function notificationCategory(data: Record<string, unknown>): string | un
       if (!decisions.includes("allow_once") || !decisions.includes("deny")) return undefined;
       return data.subjectKind === "plan" ? "BB_PLAN" : "BB_APPROVAL";
     }
+    case "turn-finished":
+      return typeof data.threadId === "string" ? "BB_REPLY" : undefined;
     default:
       return undefined;
   }

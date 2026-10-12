@@ -1,3 +1,4 @@
+import UserNotifications
 import XCTest
 @testable import BBStudio
 
@@ -6,6 +7,13 @@ final class MobileSafetyTests: XCTestCase {
         XCTAssertTrue(NotificationActions.matchesClear(["serverId": "a", "threadId": "thr_a"], threadIds: ["thr_a"], serverId: "a"))
         XCTAssertFalse(NotificationActions.matchesClear(["serverId": "b", "threadId": "thr_a"], threadIds: ["thr_a"], serverId: "a"))
         XCTAssertFalse(NotificationActions.matchesClear(["threadId": "thr_a"], threadIds: ["thr_a"], serverId: "a"))
+    }
+
+    func testFinishedTurnPushesOfferAReplyThatSendsToTheThread() {
+        let reply = NotificationActions.categories().first { $0.identifier == "BB_REPLY" }
+        let action = reply?.actions.first as? UNTextInputNotificationAction
+        XCTAssertEqual(action?.identifier, NotificationActions.reply)
+        XCTAssertEqual(action?.title, "Reply")
     }
 
     func testStaleApprovalDoesNotResolveReplacement() async throws {

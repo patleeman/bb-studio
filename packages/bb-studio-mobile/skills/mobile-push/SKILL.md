@@ -28,7 +28,8 @@ thread's pending interactions. It adds `interactionId`, `interactionKind`,
 | `BB_PLAN` | Same, for a plan | Approve plan, Keep planning |
 | `BB_CHOICE` | One single-select question with options | A button per option (up to 6), plus Other… when free text is allowed |
 | `BB_QUESTION` | Any other ask-user question | Answer (text) |
-| None | `turn-finished` or `thread-error` | Tap to open the thread |
+| `BB_REPLY` | `turn-finished` with a thread (a reply, the Bot's messages included) | Reply (text), sent to the thread |
+| None | `thread-error`, or no thread | Tap to open the thread |
 
 For `BB_CHOICE`, the push also carries `choices` (option labels) and
 `choiceFreeText`, and sets `mutable-content`. The app's notification service

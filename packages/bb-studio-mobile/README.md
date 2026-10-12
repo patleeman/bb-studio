@@ -15,7 +15,9 @@ settings, see [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md).
 
 ## Notifications
 
-- **Plain alerts.** Finished turns and errors are alerts with no Reply field.
+- **Reply.** Finished turns (any thread's reply, including the Bot's) carry
+  the `BB_REPLY` category: a Reply field that sends the text to the thread.
+  Errors are plain alerts.
   Tap one to open the thread.
 - **Actions.** Approval, plan, and question notifications keep lock-screen
   actions. The relay looks up the thread's pending interaction and adds it to

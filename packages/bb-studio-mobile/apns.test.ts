@@ -63,7 +63,7 @@ describe("apnsPayload", () => {
       apnsPayload({ to: "apns:x", title: "T", body: "B", data: { threadId: "thr_1", kind: "turn-finished" } }),
     );
     expect(payload).toEqual({
-      aps: { alert: { title: "T", body: "B" }, sound: "default", "thread-id": "thr_1" },
+      aps: { alert: { title: "T", body: "B" }, sound: "default", "thread-id": "thr_1", category: "BB_REPLY" },
       threadId: "thr_1",
       kind: "turn-finished",
     });
@@ -98,8 +98,9 @@ describe("notificationCategory", () => {
     expect(notificationCategory({ ...approval, decisions: ["allow_once"] })).toBeUndefined();
   });
 
-  it("uses an answer box for questions and plain alerts for finished turns and errors", () => {
+  it("uses an answer box for questions, a Reply box for finished turns and plain alerts for errors", () => {
     expect(notificationCategory({ ...approval, interactionKind: "user_question" })).toBe("BB_QUESTION");
+    expect(notificationCategory({ kind: "turn-finished", threadId: "thr_bot" })).toBe("BB_REPLY");
     expect(notificationCategory({ kind: "turn-finished" })).toBeUndefined();
     expect(notificationCategory({ kind: "thread-error" })).toBeUndefined();
   });
@@ -118,7 +119,14 @@ describe("notificationCategory", () => {
     expect(payload.choices).toEqual(["Red"]);
   });
 
-  it.each(["turn-finished", "thread-error"])("keeps %s tappable without notification actions", (kind) => {
+  it("gives turn-finished a Reply box and keeps it tappable", () => {
+    const payload = JSON.parse(apnsPayload({ to: "apns:x", data: { kind: "turn-finished", threadId: "thr_1" } }));
+    expect(payload.aps).toMatchObject({ category: "BB_REPLY", "thread-id": "thr_1" });
+    expect(payload.aps).not.toHaveProperty("mutable-content");
+    expect(payload.threadId).toBe("thr_1");
+  });
+
+  it.each(["thread-error"])("keeps %s tappable without notification actions", (kind) => {
     const payload = JSON.parse(apnsPayload({ to: "apns:x", data: { kind, threadId: "thr_1" } }));
     expect(payload.aps).not.toHaveProperty("category");
     expect(payload.aps).not.toHaveProperty("mutable-content");
