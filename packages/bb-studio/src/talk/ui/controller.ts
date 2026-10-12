@@ -1609,11 +1609,12 @@ export const talk = new TalkController();
 
 // A reload of Studio's bundle (e.g. a plugin update) loads this module again
 // in the same window. The old controller would keep the microphone and the
-// capture lock with no pill left to stop it, so finish its capture here.
+// capture lock with no pill left to stop it, so finish its capture here. It
+// keeps the transcript as a recording rather than typing it in unseen.
 const CURRENT = Symbol.for("bb-studio.talk.controller");
 const previous = (window as unknown as Record<symbol, TalkController | undefined>)[CURRENT];
 (window as unknown as Record<symbol, TalkController>)[CURRENT] = talk;
-if (previous && previous !== talk) void previous.stop().catch(() => {});
+if (previous && previous !== talk) void previous.stop(false).catch(() => {});
 
 export function useTalkState(): TalkState {
   return useSyncExternalStore(talk.subscribe, talk.getState);
