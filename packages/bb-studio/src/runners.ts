@@ -304,13 +304,15 @@ export class Runners {
   /**
    * runner_report from a runner's thread. log stays here; tell posts one line
    * into the Bot's thread; urgent also goes to Needs you and the phone.
+   * An urgent flag stays until the user acknowledges it (acknowledge, when
+   * they open the runner); a later log or tell doesn't clear it.
    */
   async report(threadId: string, input: { level: RunnerLevel; summary: string }): Promise<string> {
     const row = this.forThread(threadId);
     if (!row) throw new Error("Only a runner's thread can report.");
     const summary = input.summary.trim();
     const now = Date.now();
-    this.changedRow(row.id, { last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now, urgent: input.level === "urgent" ? 1 : 0 });
+    this.changedRow(row.id, { last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now, ...(input.level === "urgent" ? { urgent: 1 } : {}) });
     if (input.level === "log") return "Logged. Finish without a final message.";
     const bot = this.deps.bot(row.bot_id);
     if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Finish without a final message.";

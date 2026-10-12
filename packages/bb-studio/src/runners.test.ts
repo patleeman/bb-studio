@@ -119,6 +119,10 @@ it("routes reports by level: log stays, tell posts one line, urgent also pushes 
   expect(x.send).toHaveBeenCalledTimes(2);
   expect(x.calls.find((call) => call.pluginId === "mobile")).toMatchObject({ method: "notify", input: { kind: "turn-finished", threadId: "bot1", body: "The payment failed.", coalesceKey: `runner:${id}` } });
   expect(x.runners.threads().get(threadId!)).toEqual({ urgent: true });
+  // A later log or tell doesn't clear an unacknowledged urgent; only the user seeing it does.
+  await x.runners.report(threadId!, { level: "log", summary: "Nothing new." });
+  await x.runners.report(threadId!, { level: "tell", summary: "Still waiting." });
+  expect(x.runners.threads().get(threadId!)).toEqual({ urgent: true });
   x.runners.seen(id);
   expect(x.runners.threads().get(threadId!)).toEqual({ urgent: false });
   await expect(x.runners.report("bot1", { level: "log", summary: "x" })).rejects.toThrow(/runner/);
