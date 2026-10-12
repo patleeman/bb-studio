@@ -201,4 +201,14 @@ export const MIGRATIONS = [
   ...PAGE_MIGRATIONS,
   // Explore's Next row click log, which Pages kept in explore.db.
   ...NEXT_LOG_MIGRATIONS,
+  // The user's Bot (src/bot.ts): an always-on agent with a name and avatar.
+  // Its thread is the personal project's lead; an existing lead (the Chief of
+  // Staff) becomes the Bot, keeping its thread and heartbeat.
+  `CREATE TABLE bots (
+       id TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT NOT NULL, state TEXT NOT NULL,
+       thread_id TEXT, heartbeat_was_on INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+     );
+   INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at)
+     SELECT 'bot_main', 'Chief of Staff', '🧭', 'active', lead_thread_id, 0, created_at, updated_at
+     FROM project_leads WHERE project_id = 'proj_personal' AND lead_thread_id IS NOT NULL;`,
 ];

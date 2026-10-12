@@ -1,0 +1,283 @@
+// The user's Bot: an always-on agent with a name, an avatar and a state
+// (active, paused, stopped), modelled on ChatGPT's dots. It replaces the
+// Chief of Staff. Its thread is an implementation detail: it is the personal
+// project's lead (src/project-lead.ts), so a handoff rotates it and the
+// project's heartbeat is the Bot's check-in. The `bots` table allows several
+// Bots; Studio uses one (BOT_ID).
+//
+// "Threads it started" come from BB's thread metadata: a thread whose
+// sourceThreadId, parentThreadId or lifecycleOwnerThreadId is the Bot's thread,
+// or one of the threads it handed off from. originPluginId only says which
+// plugin spawned a thread, not which thread, so it isn't used.
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type Database from "better-sqlite3";
+import { z } from "zod";
+import type { BotActivityView, BotScheduledView, BotThreadView, BotView, HeartbeatRun } from "./contract";
+import { PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
+
+type Sdk = BbPluginApi["sdk"];
+type ListedThread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
+/** What Activity reads from a thread, listed or fetched. */
+type ActivityThread = Pick<ListedThread, "id" | "title" | "titleFallback" | "status" | "projectId" | "updatedAt" | "archivedAt"> & { hasPendingInteraction?: boolean };
+export type BotState = "active" | "paused" | "stopped";
+export const BOT_ID = "bot_main";
+export const DEFAULT_BOT_NAME = "Bot";
+export const DEFAULT_BOT_AVATAR = "🤖";
+const HEARTBEAT_NAME = `Studio project heartbeat ${PERSONAL_PROJECT_ID}`;
+const RUNNING = new Set(["active", "starting", "pending", "stopping"]);
+
+/** The Bot's check-in prompt: the Chief of Staff's, under the Bot's name. */
+export function botHeartbeat(name: string): string {
+  return `Heartbeat: you are ${JSON.stringify(name)}, the user's Bot: an always-on agent that leads their personal project and sees every other project. Check on the projects and their leads; hand work to a project's lead rather than doing it yourself. Steer only the workers and leads' work you started; read and report on threads the user started. Reply only when something changed or needs the user; otherwise finish without a final assistant message.`;
+}
+
+/** Instructions for the Bot's own thread, given at each session start. */
+export function botInstructions(bot: { name: string; state: BotState }): string {
+  const who = `You are ${JSON.stringify(bot.name)}, the user's Bot: an always-on agent that leads their personal project and sees every project. The user can rename, pause or stop you in Studio.`;
+  if (bot.state === "active") return who;
+  return `${who}\nYou are ${bot.state} by the user. Don't start new work: don't spawn or steer threads, change Studio items or schedule anything. Answer questions, and tell the user to resume you (Studio → Bot → Resume) for anything else.`;
+}
+
+type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; created_at: number; updated_at: number };
+
+/** Sorts threads into the Bot's Activity. Pending interactions win; then running; the rest are done. */
+export function classifyActivity(threads: readonly ActivityThread[], botThreadId: string | null, limit = 15): Pick<BotActivityView, "needsYou" | "inProgress" | "completed"> {
+  const view = (thread: ActivityThread): BotThreadView => ({
+    id: thread.id,
+    title: thread.title || thread.titleFallback || "Untitled thread",
+    status: thread.status,
+    projectId: thread.projectId ?? null,
+    updatedAt: thread.updatedAt ?? 0,
+    relation: thread.id === botThreadId ? "self" : "started",
+    needsYou: !!thread.hasPendingInteraction,
+  });
+  const seen = new Set<string>();
+  const unique = threads.filter((thread) => !thread.archivedAt && !seen.has(thread.id) && !!seen.add(thread.id)).map(view);
+  const newest = (a: BotThreadView, b: BotThreadView) => b.updatedAt - a.updatedAt;
+  const needsYou = unique.filter((thread) => thread.needsYou).sort(newest);
+  const inProgress = unique.filter((thread) => !thread.needsYou && RUNNING.has(thread.status)).sort(newest);
+  const completed = unique.filter((thread) => !thread.needsYou && !RUNNING.has(thread.status) && thread.relation === "started").sort(newest).slice(0, limit);
+  return { needsYou, inProgress, completed };
+}
+
+/** Whether BB's metadata says one of `botThreads` started this thread. */
+export function startedBy(thread: Pick<ListedThread, "sourceThreadId" | "parentThreadId" | "lifecycleOwnerThreadId">, botThreads: ReadonlySet<string>): boolean {
+  return [thread.sourceThreadId, thread.parentThreadId, thread.lifecycleOwnerThreadId].some((id) => !!id && botThreads.has(id));
+}
+
+const automationRow = z.object({
+  id: z.string(),
+  name: z.string(),
+  enabled: z.boolean(),
+  trigger: z.object({ cron: z.string().optional() }).passthrough(),
+  execution: z.object({ targetThreadId: z.string().nullish() }).passthrough(),
+  nextRunAt: z.number().nullish(),
+}).passthrough();
+type AutomationRow = z.infer<typeof automationRow>;
+
+export interface BotDeps {
+  db: Database.Database;
+  sdk: Sdk;
+  leads: ProjectLeads;
+  changed(): void;
+}
+
+export class Bots {
+  constructor(private readonly deps: BotDeps) {}
+
+  private row(): BotRow | undefined {
+    return this.deps.db.prepare("SELECT * FROM bots ORDER BY created_at, id LIMIT 1").get() as BotRow | undefined;
+  }
+
+  /** The Bot as stored, its thread read from the personal project's lead. */
+  stored(): BotView["bot"] {
+    const row = this.row();
+    if (!row) return null;
+    const threadId = this.deps.leads.storedLead(PERSONAL_PROJECT_ID);
+    if (threadId !== row.thread_id) this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
+    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, createdAt: row.created_at, updatedAt: row.updated_at };
+  }
+
+  /** The heartbeat prompt for the personal project. */
+  prompt(): string {
+    return botHeartbeat(this.row()?.name ?? DEFAULT_BOT_NAME);
+  }
+
+  /** The Bot whose thread this is, if any. */
+  forThread(threadId: string | undefined | null): NonNullable<BotView["bot"]> | null {
+    if (!threadId) return null;
+    const bot = this.stored();
+    return bot && bot.threadId === threadId ? bot : null;
+  }
+
+  async get(): Promise<BotView> {
+    const lead = await this.deps.leads.get(PERSONAL_PROJECT_ID);
+    return { bot: this.stored(), run: lead.run };
+  }
+
+  private insert(name: string, avatar: string) {
+    const now = Date.now();
+    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, ?, ?, 'active', NULL, 0, ?, ?)").run(BOT_ID, name, avatar, now, now);
+  }
+
+  private update(fields: Partial<Pick<BotRow, "name" | "avatar" | "state" | "heartbeat_was_on">>) {
+    const row = this.row();
+    if (!row) throw new Error("Make your Bot first.");
+    const next = { ...row, ...fields };
+    this.deps.db.prepare("UPDATE bots SET name = ?, avatar = ?, state = ?, heartbeat_was_on = ?, updated_at = ? WHERE id = ?").run(next.name, next.avatar, next.state, next.heartbeat_was_on, Date.now(), row.id);
+    this.deps.changed();
+  }
+
+  /** Makes the Bot from a thread, or a new chat in the personal project. */
+  async create(input: { name: string; avatar: string; threadId?: string; prompt?: string }): Promise<BotView> {
+    if (this.row()) throw new Error("You already have a Bot.");
+    let threadId = input.threadId;
+    if (!threadId) {
+      const thread = await this.deps.sdk.threads.spawn({
+        projectId: PERSONAL_PROJECT_ID,
+        title: input.name,
+        environment: { type: "project-default" },
+        input: [
+          { type: "text", text: botInstructions({ name: input.name, state: "active" }), mentions: [], visibility: "agent-only" },
+          { type: "text", text: input.prompt ?? `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`, mentions: [] },
+        ],
+      } as never);
+      threadId = thread.id;
+    }
+    await this.deps.leads.setLead(PERSONAL_PROJECT_ID, threadId);
+    this.insert(input.name, input.avatar);
+    this.deps.changed();
+    return this.get();
+  }
+
+  async set(input: { name?: string; avatar?: string }): Promise<BotView> {
+    const before = this.row();
+    this.update({ ...(input.name ? { name: input.name } : {}), ...(input.avatar ? { avatar: input.avatar } : {}) });
+    // The heartbeat's prompt carries the name.
+    const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
+    if (input.name && input.name !== before?.name && run?.enabled) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, run);
+    return this.get();
+  }
+
+  /** Makes a thread the Bot's ("Make this my Bot"), making the Bot if there is none. */
+  async setThread(threadId: string): Promise<BotView> {
+    await this.deps.leads.setLead(PERSONAL_PROJECT_ID, threadId);
+    if (!this.row()) this.insert(DEFAULT_BOT_NAME, DEFAULT_BOT_AVATAR);
+    this.deps.changed();
+    return this.get();
+  }
+
+  async setRun(input: { enabled: boolean; cadence: HeartbeatRun["cadence"]; time?: string; cron?: string }): Promise<BotView> {
+    const row = this.row();
+    if (input.enabled && row && row.state !== "active") throw new Error(`Your Bot is ${row.state}. Resume it before turning its heartbeat on.`);
+    await this.deps.leads.setRun(PERSONAL_PROJECT_ID, input);
+    return this.get();
+  }
+
+  /** Heartbeat off, remembering whether it was on; the Bot is told it's paused (botInstructions). */
+  async pause(): Promise<BotView> {
+    const row = this.row();
+    if (!row) throw new Error("Make your Bot first.");
+    if (row.state === "active") {
+      const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
+      if (run?.enabled) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, { ...run, enabled: false });
+      this.update({ state: "paused", heartbeat_was_on: run?.enabled ? 1 : 0 });
+    }
+    return this.get();
+  }
+
+  async resume(): Promise<BotView> {
+    const row = this.row();
+    if (!row) throw new Error("Make your Bot first.");
+    if (row.state !== "active") {
+      this.update({ state: "active", heartbeat_was_on: 0 });
+      const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
+      if (row.heartbeat_was_on && run && this.deps.leads.storedLead(PERSONAL_PROJECT_ID)) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, { ...run, enabled: true });
+    }
+    return this.get();
+  }
+
+  /** Pause, stop the running threads it started, and pause automations that wake its thread. */
+  async stop(): Promise<BotView & { stoppedThreadIds: string[]; pausedAutomationIds: string[] }> {
+    await this.pause();
+    const stoppedThreadIds: string[] = [];
+    const pausedAutomationIds: string[] = [];
+    const bot = this.stored();
+    if (bot?.threadId) {
+      for (const thread of await this.startedThreads(bot.threadId)) {
+        if (thread.id === bot.threadId || thread.archivedAt || !RUNNING.has(thread.status)) continue;
+        await this.deps.sdk.threads.stop({ threadId: thread.id });
+        stoppedThreadIds.push(thread.id);
+      }
+      const { projectId, rows } = await this.automations(bot.threadId);
+      for (const automation of rows) {
+        if (!automation.enabled) continue;
+        await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_pause", input: { projectId, automationId: automation.id } as never, outputSchema: z.unknown() });
+        pausedAutomationIds.push(automation.id);
+      }
+    }
+    this.update({ state: "stopped" });
+    return { ...(await this.get()), stoppedThreadIds, pausedAutomationIds };
+  }
+
+  /** The Bot's thread and the ones it handed off from, newest first. */
+  private threadChain(threadId: string): string[] {
+    const chain = [threadId];
+    const previous = this.deps.db.prepare("SELECT old_thread_id FROM project_thread_handoffs WHERE new_thread_id = ?");
+    for (let i = 0; i < 20; i++) {
+      const row = previous.get(chain.at(-1)) as { old_thread_id: string } | undefined;
+      if (!row || chain.includes(row.old_thread_id)) break;
+      chain.push(row.old_thread_id);
+    }
+    return chain;
+  }
+
+  /** The Bot's thread and every thread it started. */
+  private async startedThreads(threadId: string): Promise<(ActivityThread & Partial<ListedThread>)[]> {
+    const chain = new Set(this.threadChain(threadId));
+    const threads = this.deps.sdk.threads;
+    const lists = await Promise.all([
+      ...[...chain].flatMap((id) => [threads.list({ sourceThreadId: id, archived: false, limit: 100 }), threads.list({ parentThreadId: id, archived: false, limit: 100 })]),
+      threads.list({ archived: false, limit: 200 }),
+    ].map((list) => list.catch(() => [] as ListedThread[])));
+    // A listed thread says whether it waits on the user; a fetched one doesn't.
+    const own = lists.flat().find((thread) => thread.id === threadId) ?? await threads.get({ threadId }).catch(() => null);
+    return [...(own ? [own as ActivityThread] : []), ...lists.flat().filter((thread) => thread.id !== threadId && startedBy(thread, chain))];
+  }
+
+  private async automations(threadId: string): Promise<{ projectId: string | null; rows: AutomationRow[] }> {
+    const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null);
+    const projectId = thread?.projectId ?? PERSONAL_PROJECT_ID;
+    const raw = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_list", input: { projectId } as never, outputSchema: z.unknown() }).catch(() => []);
+    const rows = (Array.isArray(raw) ? raw : []).flatMap((entry) => {
+      const parsed = automationRow.safeParse(entry);
+      return parsed.success && parsed.data.execution.targetThreadId === threadId ? [parsed.data] : [];
+    });
+    return { projectId, rows };
+  }
+
+  async activity(): Promise<BotActivityView> {
+    const { bot, run } = await this.get();
+    if (!bot?.threadId) return { needsYou: [], inProgress: [], scheduled: [], completed: [], latest: null };
+    const [threads, automations, output] = await Promise.all([
+      this.startedThreads(bot.threadId),
+      this.automations(bot.threadId),
+      this.deps.sdk.threads.output({ threadId: bot.threadId }).catch(() => ({ output: null })),
+    ]);
+    const { needsYou, inProgress, completed } = classifyActivity(threads, bot.threadId);
+    const scheduled: BotScheduledView[] = automations.rows.map((automation) => ({
+      id: automation.id,
+      kind: automation.name === HEARTBEAT_NAME ? "heartbeat" : "automation",
+      name: automation.name === HEARTBEAT_NAME ? "Check-in (heartbeat)" : automation.name,
+      cron: automation.trigger.cron ?? null,
+      enabled: automation.enabled,
+      nextRunAt: automation.nextRunAt ?? null,
+    }));
+    if (run && !scheduled.some((each) => each.kind === "heartbeat")) {
+      scheduled.unshift({ id: "heartbeat", kind: "heartbeat", name: "Check-in (heartbeat)", cron: null, enabled: run.enabled, nextRunAt: null });
+    }
+    scheduled.sort((a, b) => Number(b.kind === "heartbeat") - Number(a.kind === "heartbeat") || (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity));
+    const latest = output?.output ? output.output.slice(-1200) : null;
+    return { needsYou, inProgress, scheduled, completed, latest };
+  }
+}

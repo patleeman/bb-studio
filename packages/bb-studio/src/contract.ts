@@ -116,12 +116,57 @@ const projectLead = z.object({
 });
 export type ProjectLeadView = z.infer<typeof projectLead>;
 const leadProjectId = z.string().min(1).max(200);
-/** The user's Chief of Staff: the personal project's lead, with its heartbeat. Same data as project_lead for proj_personal. */
+/** Deprecated (chief_of_staff*): the Bot's thread and heartbeat. Same data as project_lead for proj_personal. */
 const chiefOfStaff = z.object({
   threadId: z.string().nullable(),
   run: heartbeatRunSchema.nullable(),
 });
 export type ChiefOfStaffView = z.infer<typeof chiefOfStaff>;
+/** The user's Bot (src/bot.ts): an always-on agent. Its thread is an implementation detail that handoffs rotate. */
+export const botStateSchema = z.enum(["active", "paused", "stopped"]);
+const bot = z.object({
+  id: z.string(),
+  name: z.string(),
+  avatar: z.string(),
+  state: botStateSchema,
+  threadId: z.string().nullable(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+/** The Bot, or null before one is made, and its heartbeat. */
+const botView = z.object({ bot: bot.nullable(), run: heartbeatRunSchema.nullable() });
+export type BotView = z.infer<typeof botView>;
+const botName = z.string().trim().min(1).max(60);
+const botAvatar = z.string().trim().min(1).max(16);
+/** A thread in the Bot's Activity: its own thread ("self") or one it started. */
+const botThread = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.string(),
+  projectId: z.string().nullable(),
+  updatedAt: z.number(),
+  relation: z.enum(["self", "started"]),
+  needsYou: z.boolean(),
+});
+export type BotThreadView = z.infer<typeof botThread>;
+const botScheduled = z.object({
+  id: z.string(),
+  kind: z.enum(["heartbeat", "automation"]),
+  name: z.string(),
+  cron: z.string().nullable(),
+  enabled: z.boolean(),
+  nextRunAt: z.number().nullable(),
+});
+export type BotScheduledView = z.infer<typeof botScheduled>;
+const botActivity = z.object({
+  needsYou: z.array(botThread),
+  inProgress: z.array(botThread),
+  scheduled: z.array(botScheduled),
+  completed: z.array(botThread),
+  /** The end of the Bot thread's latest reply, for the home's chat preview. */
+  latest: z.string().nullable(),
+});
+export type BotActivityView = z.infer<typeof botActivity>;
 /** The full request from experimental_NewThreadComposer; Studio picks the project. */
 const newThreadRequest = conversationRequestSchema(z);
 export type NewThreadRequestInput = z.output<typeof newThreadRequest>;
@@ -191,13 +236,31 @@ export const rpcContract = defineRpcContract({
   project_set_lead: { input: z.object({ projectId: leadProjectId, threadId: z.string().min(1).max(200).nullable() }), output: projectLead },
   /** Turns the lead's heartbeat on or off; on needs a lead. */
   project_set_run: { input: heartbeatRunSchema.omit({ time: true }).extend({ projectId: leadProjectId, time: heartbeatRunSchema.shape.time.optional() }), output: projectLead },
-  /** The Chief of Staff (the personal project's lead) and its heartbeat. Clears a thread that was deleted. */
+  /** Deprecated alias of bot_get (one release): the Bot's thread and heartbeat. Clears a thread that was deleted. */
   chief_of_staff: { input: z.object({}), output: chiefOfStaff },
-  /** Makes a thread the personal project's lead, out of any other lead role; null leaves it an ordinary thread. */
+  /** Deprecated alias of bot_set_thread (one release); null leaves the Bot without a thread. */
   chief_of_staff_set: { input: z.object({ threadId: z.string().min(1).max(200).nullable() }), output: chiefOfStaff },
-  /** Turns the Chief of Staff's heartbeat on or off; on needs a Chief of Staff. */
+  /** Deprecated alias of bot_set_run (one release). */
   chief_of_staff_set_run: { input: heartbeatRunSchema.omit({ time: true }).extend({ time: heartbeatRunSchema.shape.time.optional() }), output: chiefOfStaff },
-  /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and a Chief of Staff stays Chief of Staff. */
+  /** The user's Bot and its heartbeat; bot null before one is made. */
+  bot_get: { input: z.object({}), output: botView },
+  /** Makes the Bot: from an existing thread, or a new chat in the personal project started with `prompt`. */
+  bot_create: { input: z.object({ name: botName, avatar: botAvatar, threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional() }), output: botView },
+  /** Renames the Bot or changes its avatar. */
+  bot_set: { input: z.object({ name: botName.optional(), avatar: botAvatar.optional() }), output: botView },
+  /** Makes a thread the Bot's thread ("Make this my Bot"); makes the Bot if there is none. */
+  bot_set_thread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: botView },
+  /** The Bot's heartbeat (check-ins); on needs an active Bot. */
+  bot_set_run: { input: heartbeatRunSchema.omit({ time: true }).extend({ time: heartbeatRunSchema.shape.time.optional() }), output: botView },
+  /** Pauses the Bot: heartbeat off, and it's told it's paused and refuses new work. */
+  bot_pause: { input: z.object({}), output: botView },
+  /** Resumes a paused or stopped Bot, and its heartbeat if it was on. */
+  bot_resume: { input: z.object({}), output: botView },
+  /** Pauses the Bot, stops the running threads it started and turns off its schedules. Its data is kept. */
+  bot_stop: { input: z.object({}), output: botView.extend({ stoppedThreadIds: z.array(z.string()), pausedAutomationIds: z.array(z.string()) }) },
+  /** What the Bot is doing: Needs you, In progress, Scheduled, Completed. */
+  bot_activity: { input: z.object({}), output: botActivity },
+  /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and the Bot keeps its new thread. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** Saves a collection query by name, replacing a view with that name. */
   saveView: { input: z.object({ name: z.string().min(1).max(60), query: z.string().max(500) }), output: z.object({ view: savedView }) },

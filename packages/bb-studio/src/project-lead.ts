@@ -3,8 +3,9 @@
 // lead on a schedule; a handoff keeps its successor the lead. A thread leads
 // at most one project, and needn't be in the project it leads.
 //
-// The personal project's lead is the user's Chief of Staff. It sees every
-// project, and its heartbeat uses CHIEF_HEARTBEAT.
+// The personal project's lead is the user's Bot's thread (src/bot.ts; it was
+// called the Chief of Staff). It sees every project, and its heartbeat uses
+// the Bot's prompt (botHeartbeat).
 //
 // Leads used to belong to Studio Spaces. A migration (src/migrations.ts)
 // queues each Space's lead and heartbeat in `space_lead_moves`;
@@ -34,6 +35,8 @@ export interface ProjectLeadDeps {
   sdk: Sdk;
   /** Open collections refetch. */
   changed(): void;
+  /** The personal project's heartbeat prompt (the Bot's); CHIEF_HEARTBEAT when absent. */
+  personalPrompt?(): string;
 }
 
 const threadTitle = (thread: Pick<Thread, "title" | "titleFallback">) => thread.title || thread.titleFallback || "Untitled thread";
@@ -44,7 +47,7 @@ export class ProjectLeads {
   readonly runs: ProjectRuns;
 
   constructor(private readonly deps: ProjectLeadDeps) {
-    this.runs = new ProjectRuns(deps.db, deps.sdk, deps.changed);
+    this.runs = new ProjectRuns(deps.db, deps.sdk, deps.changed, deps.personalPrompt);
   }
 
   // Reads, lead, run and handoff for one project share a queue: a stale read
@@ -135,7 +138,7 @@ export class ProjectLeads {
   setRun(projectId: string, input: { enabled: boolean; cadence: HeartbeatRun["cadence"]; time?: string; cron?: string }): Promise<ProjectLeadView> {
     return this.serial(projectId, async () => {
       const current = await this.read(projectId);
-      if (input.enabled && !current.leadThreadId) throw new Error(projectId === PERSONAL_PROJECT_ID ? "Pick your Chief of Staff before turning on its heartbeat." : "Pick the project's lead before turning on its heartbeat.");
+      if (input.enabled && !current.leadThreadId) throw new Error(projectId === PERSONAL_PROJECT_ID ? "Make your Bot before turning on its heartbeat." : "Pick the project's lead before turning on its heartbeat.");
       await this.runs.set(projectId, current.leadThreadId, { enabled: input.enabled, cadence: input.cadence, time: input.time ?? current.run?.time ?? "09:00", cron: input.cron ?? current.run?.cron });
       return this.read(projectId);
     });
@@ -209,7 +212,7 @@ export class ProjectLeads {
         const summary = [
           `Continue the work from /threads/${encodeURIComponent(threadId)} (${threadTitle(old)}). Read that thread with bb thread if you need more context.`,
           `Latest response (excerpt):\n${(output ?? "No response yet.").slice(-12_000)}`,
-          ledProject === PERSONAL_PROJECT_ID ? "You are now the user's Chief of Staff, the lead of their personal project and above every other project. Hand work to each project's lead, steer the workers you start (read but don't steer threads the user started), and report in this thread." : "",
+          ledProject === PERSONAL_PROJECT_ID ? "You are now the user's Bot, the lead of their personal project and above every other project. Hand work to each project's lead, steer the workers you start (read but don't steer threads the user started), and report in this thread." : "",
           ledProject && ledProject !== PERSONAL_PROJECT_ID ? `You are now the lead of the project ${ledProject}. Steer the workers you start (read but don't steer threads the user started), and report in this thread.` : "",
         ].filter(Boolean).join("\n\n");
         const next = await this.deps.sdk.threads.spawn({
@@ -248,7 +251,7 @@ const automation = z.object({ id: z.string(), name: z.string() });
 /** Automations owns the schedule; this table keeps its settings and identity. */
 export class ProjectRuns {
   private pending = new Map<string, Promise<void>>();
-  constructor(private db: Database.Database, private sdk: Sdk, private changed: () => void) {}
+  constructor(private db: Database.Database, private sdk: Sdk, private changed: () => void, private personalPrompt: () => string = () => CHIEF_HEARTBEAT) {}
 
   /**
    * Finishes migrations (src/migrations.ts) and any heartbeat left on without
@@ -312,7 +315,7 @@ export class ProjectRuns {
     const execution = {
       mode: "agent", providerId: thread.providerId, model: defaults.model, reasoningLevel: defaults.reasoningLevel ?? "medium",
       permissionMode: defaults.permissionMode ?? "accept-edits", environment: { type: "project-default" }, targetThreadId: leadThreadId,
-      prompt: projectId === PERSONAL_PROJECT_ID ? CHIEF_HEARTBEAT : `${HEARTBEAT}\nProject: ${projectId}.`,
+      prompt: projectId === PERSONAL_PROJECT_ID ? this.personalPrompt() : `${HEARTBEAT}\nProject: ${projectId}.`,
     };
     const name = `Studio project heartbeat ${projectId}`;
     let automationId = row?.automation_id ?? null;

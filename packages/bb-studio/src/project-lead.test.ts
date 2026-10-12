@@ -73,7 +73,7 @@ it.each<[HeartbeatRun["cadence"], string]>([
 it("needs a lead for a heartbeat, and the personal project's lead is the Chief of Staff", async () => {
   const x = await setup();
   await expect(x.leads.setRun("p", { enabled: true, cadence: "daily" })).rejects.toThrow(/lead/);
-  await expect(x.leads.setChiefRun({ enabled: true, cadence: "daily" })).rejects.toThrow(/Chief of Staff/);
+  await expect(x.leads.setChiefRun({ enabled: true, cadence: "daily" })).rejects.toThrow(/Make your Bot/);
   const chief = await x.spawn({ projectId: "p" });
   expect(await x.leads.setChief(chief.id)).toEqual({ threadId: chief.id, run: null });
   expect(await x.leads.get(PERSONAL_PROJECT_ID)).toMatchObject({ leadThreadId: chief.id });

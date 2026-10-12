@@ -24,7 +24,7 @@ import { parseCliArgs, type CliSpec } from "./src/cli-args";
 //   lists their items (src/sidebar.ts).
 // - Studio keeps tags, which group items across add-ons (src/tags.ts).
 // - Each BB project can have a lead thread with a heartbeat; the personal
-//   project's lead is the Chief of Staff (src/project-lead.ts).
+//   project's lead is the user's Bot (src/project-lead.ts, src/bot.ts).
 // - Studio keeps saved views, named collection queries (src/views.ts). The
 //   query language (src/query.ts) drives the agent tool and CLI too.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
@@ -39,6 +39,7 @@ import { errorText, StudioHub, type HubItem } from "./src/hub";
 import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
+import { botInstructions, Bots } from "./src/bot";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { formatWorkspace, openHrefs, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
 import { WORKSPACE_CHANNEL } from "./src/ids";
@@ -142,17 +143,21 @@ export default async function plugin(bb: BbPluginApi) {
     .catch(() => kindRoutes)
     .finally(() => { routesRefresh = null; });
   void refreshRoutes();
+  const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS };
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them. A kind turned off gives neither, from the next
   // session start or resume on (BB doesn't change a running session).
-  bb.agents.configure(() => {
+  bb.agents.configure((context) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     const off = new Set(kindSettings.current.off);
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
-    const instructions = [off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
-    return { tools, skills: [], instructions };
+    // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
+    const bot = bots.forThread(context.thread.id);
+    if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS], skills: [], instructions: botInstructions(bot) };
+    const instructions = [bot ? botInstructions(bot) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+    return { tools: [...tools, ...BOT_TOOLS], skills: [], instructions };
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
   // (callProvider in the kit), as they reach an add-on's over RPC.
@@ -308,7 +313,10 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   // Each project's optional lead thread and its heartbeat (src/project-lead.ts).
-  const projectLeads = new ProjectLeads({ db, sdk: bb.sdk, changed: tagsChanged });
+  // The heartbeat of the personal project is the Bot's check-in, under its name.
+  const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, changed: tagsChanged, personalPrompt: (): string => bots.prompt() });
+  // The user's Bot (src/bot.ts): the personal project's lead, with a name, avatar and state.
+  const bots: Bots = new Bots({ db, sdk: bb.sdk, leads: projectLeads, changed: tagsChanged });
   // Moves Spaces' leads to projects, retires old heartbeat automations and turns
   // migrated heartbeats back on; whatever fails is retried next startup.
   void projectLeads.finishMoves()
@@ -452,9 +460,19 @@ export default async function plugin(bb: BbPluginApi) {
     project_lead: ({ projectId }) => projectLeads.get(projectId),
     project_set_lead: ({ projectId, threadId }) => projectLeads.setLead(projectId, threadId),
     project_set_run: ({ projectId, ...run }) => projectLeads.setRun(projectId, run),
+    bot_get: () => bots.get(),
+    bot_create: (input) => bots.create(input),
+    bot_set: (input) => bots.set(input),
+    bot_set_thread: ({ threadId }) => bots.setThread(threadId),
+    bot_set_run: (run) => bots.setRun(run),
+    bot_pause: () => bots.pause(),
+    bot_resume: () => bots.resume(),
+    bot_stop: () => bots.stop(),
+    bot_activity: () => bots.activity(),
+    // Deprecated aliases of bot_get, bot_set_thread and bot_set_run, for one release.
     chief_of_staff: () => projectLeads.chief(),
-    chief_of_staff_set: ({ threadId }) => projectLeads.setChief(threadId),
-    chief_of_staff_set_run: (run) => projectLeads.setChiefRun(run),
+    chief_of_staff_set: async ({ threadId }) => { if (threadId) await bots.setThread(threadId); else await projectLeads.setChief(null); return projectLeads.chief(); },
+    chief_of_staff_set_run: async (run) => { await bots.setRun(run); return projectLeads.chief(); },
     thread_handoff: ({ threadId, request }) => projectLeads.handoff(threadId, request),
     saveView: ({ name, query }) => {
       const view = views.save(name, query);
@@ -673,7 +691,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_list_items",
     description:
-      "List the user's BB Studio items — pages, Talk recordings, drawings and anything else a Studio add-on provides — newest first. It lists this thread's project's items and global ones (the Chief of Staff, the personal project's lead, sees every project); a project: filter or allProjects lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
+      "List the user's BB Studio items — pages, Talk recordings, drawings and anything else a Studio add-on provides — newest first. It lists this thread's project's items and global ones (the user's Bot, the personal project's lead, sees every project); a project: filter or allProjects lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
     parameters: z.object({
       query: z
         .string()
@@ -686,6 +704,39 @@ export default async function plugin(bb: BbPluginApi) {
     }),
     async execute({ query, kind, allProjects, tag }, ctx) {
       return formatList(await listItems({ projectId: ctx.projectId ?? null, threadId: ctx.threadId, all: allProjects === true, kind, query, tag }));
+    },
+  });
+
+  // The Bot's tools (src/bot.ts), in every thread so the user can ask any agent about it.
+  const describeBot = ({ bot, run }: Awaited<ReturnType<typeof bots.get>>) => bot
+    ? `${bot.avatar} ${bot.name} is ${bot.state}. Thread: ${bot.threadId ? `/threads/${bot.threadId}` : "none"}. Check-ins: ${run?.enabled ? `${run.cadence}${run.cadence === "custom" ? ` (${run.cron})` : ` at ${run.time}`}` : "off"}.`
+    : "The user has no Bot yet. They can make one in Studio → Bot.";
+  const listThreads = (label: string, threads: { id: string; title: string; status: string }[]) => threads.length ? [`${label}:`, ...threads.map((thread) => `- [${thread.title}](/threads/${thread.id}) (${thread.status})`)] : [];
+  bb.agents.registerTool({ name: "bot_get", description: "Show the user's Bot (their always-on agent, formerly the Chief of Staff): name, avatar, state (active, paused, stopped), its thread and check-ins.", parameters: z.object({}), execute: async () => describeBot(await bots.get()) });
+  bb.agents.registerTool({
+    name: "bot_set", description: "Rename the user's Bot or change its avatar emoji. Only when the user asks.",
+    parameters: z.object({ name: z.string().trim().min(1).max(60).optional(), avatar: z.string().trim().min(1).max(16).optional().describe("One emoji") }),
+    execute: async (input) => describeBot(await bots.set(input)),
+  });
+  bb.agents.registerTool({ name: "bot_pause", description: "Pause the user's Bot: its check-ins stop and it takes on no new work until resumed. Only when the user asks.", parameters: z.object({}), execute: async () => describeBot(await bots.pause()) });
+  bb.agents.registerTool({
+    name: "bot_resume", description: "Resume the user's paused or stopped Bot, and its check-ins if they were on. Only when the user asks; the Bot can't resume itself.", parameters: z.object({}),
+    execute: async (_input, ctx) => bots.forThread(ctx.threadId) ? "Only the user can resume you: Studio → Bot → Resume." : describeBot(await bots.resume()),
+  });
+  bb.agents.registerTool({
+    name: "bot_stop", description: "Stop the user's Bot: pause it, stop the running threads it started and pause automations that wake it. Data is kept. Only when the user explicitly asks to stop it.", parameters: z.object({}),
+    execute: async () => { const result = await bots.stop(); return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n"); },
+  });
+  bb.agents.registerTool({
+    name: "bot_activity", description: "What the user's Bot is doing: threads that need the user, in progress, scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({}),
+    execute: async () => {
+      const activity = await bots.activity();
+      const lines = [
+        ...listThreads("Needs you", activity.needsYou), ...listThreads("In progress", activity.inProgress),
+        ...(activity.scheduled.length ? ["Scheduled:", ...activity.scheduled.map((each) => `- ${each.name}${each.enabled ? "" : " (off)"}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toISOString()}` : ""}`)] : []),
+        ...listThreads("Completed", activity.completed),
+      ];
+      return lines.length ? lines.join("\n") : "Nothing to show yet.";
     },
   });
 
