@@ -1038,7 +1038,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   reply, never a "✓". On check-ins it does the checks itself or reuses the
   worker thread it used before instead of starting a new one each time.
   BB's own "thread completed" notices for threads it started still show in
-  the chat: the plugin SDK has no way to turn them off.
+  the chat: the plugin SDK has no way to turn them off. Recurring work goes
+  to runners instead, which post none (below).
 - **Starting out**: with no Bot yet, the page says hello as one with four
   chips: **Plan my week**, **What needs me today?** (both send), **Set up a
   morning brief** (the Morning brief preset) and **Customize me** (Edit
@@ -1099,6 +1100,54 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
   `bot_skill_write`, `bot_skill_read`, `bot_skill_delete` and
   `bot_history_search`.
+- **Runners** (`src/runners.ts`, table `bot_runners`): automated sub-agents
+  so the Bot's chat isn't flooded. A runner is one long-lived thread with a
+  name, a job (a short instruction), a schedule (an automation that wakes
+  its own thread; the heartbeat's cadences and cron), a state (active or
+  paused), its last run and its last report. The Bot makes one with
+  `runner_create` when a task becomes recurring; its first run starts at
+  once, and each scheduled run's prompt carries the job.
+  - **Quiet by default**: a runner never writes to the Bot's chat. It
+    reports with `runner_report({ level, summary })`, a tool only runner
+    threads get: `log` stays in its thread and the Bot's Info; `tell` posts
+    one line, "From runner <name>: …", into the Bot's thread (a message
+    sent from the runner's thread, with an agent-only note telling the Bot
+    not to answer it); `urgent` is a tell plus **Needs you** and a phone push
+    (Studio Mobile's `notify`, `turn-finished` on the Bot's thread, so the
+    lock screen has **Reply**). A run with nothing to report ends without a
+    message and produces nothing.
+  - **No child notices**: BB posts "child completed / failed / needs
+    attention" into a thread's `parentThreadId` (any non-fork child) and
+    "ownership assigned / removed" when that parent changes;
+    `sourceThreadId` and `lifecycleOwnerThreadId` post nothing, but a
+    lifecycle owner is immutable and archives its dependents with it (a
+    handoff archives the Bot's old thread). So runner threads are spawned
+    with no parent or owner, tagged `pluginMetadata: { runner, bot }`, and
+    `bot_runners` groups them under the Bot. They're kept out of Activity's
+    thread lists; an urgent report puts the thread in Needs you until you
+    open it.
+  - **Sidebar**: a **Runners** group (status dot, next run; hover for the
+    schedule and last report). A click opens the runner's thread in the
+    Threads tab.
+  - **Info**: a **Runners** section with each runner's schedule and last
+    report, **Pause**/**Resume**, **Run now** (the automation's run),
+    **Edit** (name, job, schedule with the heartbeat's fields) and
+    **Delete** (confirmed: its automation is deleted, its thread archived).
+    **New runner** makes one.
+  - **Adopt as runner**: Info lists threads the Bot started (or whose
+    automation its thread created) that an automation wakes. Nothing
+    changes until you click **Adopt**: the thread is registered, its
+    automation and schedule stay, one reporting note is appended to the
+    automation's prompt (runner_report instead of `[PASS]` or messaging the
+    Bot), and the thread is unnested from the Bot (BB posts one "removed"
+    notice, then none). Deleting an adopted runner only lets it go and
+    removes the note.
+  - Pausing a runner pauses its automation; **Stop** on the Bot pauses every
+    runner. RPCs: `bot_runners`, `bot_runner_create`, `bot_runner_update`,
+    `bot_runner_pause`, `bot_runner_resume`, `bot_runner_run_now`,
+    `bot_runner_delete`, `bot_runner_seen`, `bot_runner_adopt`. The Bot's
+    tools: `runner_create`, `runner_update`, `runner_pause`,
+    `runner_resume`, `runner_delete`, `runner_list`, `runner_run_now`.
 - **Backup**: a Studio backup includes the Bot (name, avatar, shape, color,
   role, state, Memory page id) and its skills; they're restored only on a BB without a Bot. The
   Memory page itself comes back with Pages.

@@ -40,6 +40,7 @@ import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { Bots, SKILL_NAME } from "./src/bot";
+import { parseSchedule, Runners } from "./src/runners";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { formatWorkspace, openHrefs, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
 import { WORKSPACE_CHANNEL } from "./src/ids";
@@ -145,7 +146,9 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_skill_write", "bot_skill_read", "bot_skill_delete", "bot_history_search"] as const;
+  const BOT_OWN_TOOLS = ["bot_skill_write", "bot_skill_read", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now"] as const;
+  /** Only a runner's thread gets this (src/runners.ts). */
+  const RUNNER_TOOLS = ["runner_report"] as const;
   const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS };
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
@@ -158,8 +161,10 @@ export default async function plugin(bb: BbPluginApi) {
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     const bot = bots.forThread(context.thread.id, context.pluginMetadata);
     if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS], skills: [], instructions: bots.instructions(bot) };
-    const instructions = [bot ? bots.instructions(bot) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
-    return { tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : [])], skills: [], instructions };
+    // A runner is told its job and how to report; it reports with runner_report only.
+    const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
+    const instructions = [bot ? bots.instructions(bot) : "", runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+    return { tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: [], instructions };
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
   // (callProvider in the kit), as they reach an add-on's over RPC.
@@ -327,6 +332,14 @@ export default async function plugin(bb: BbPluginApi) {
       addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
+    runners: { threads: () => runners.threads(), pauseAll: () => runners.pauseAll() },
+  });
+  // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
+  const runners: Runners = new Runners({
+    db, sdk: bb.sdk, changed: tagsChanged,
+    bot: () => bots.stored(),
+    startedThreads: () => bots.started(),
+    chain: () => bots.chain(),
   });
   // Moves Spaces' leads to projects, retires old heartbeat automations and turns
   // migrated heartbeats back on; whatever fails is retried next startup.
@@ -497,6 +510,15 @@ export default async function plugin(bb: BbPluginApi) {
     bot_skill_write: (input) => bots.writeSkill(input),
     bot_skill_share: ({ name }) => bots.shareSkill(name),
     bot_skill_delete: ({ name }) => ({ deleted: bots.deleteSkill(name) }),
+    bot_runners: async () => { const [list, adoptable] = await Promise.all([runners.list(), runners.adoptable()]); return { runners: list, adoptable }; },
+    bot_runner_create: (input) => runners.create(input),
+    bot_runner_update: (input) => runners.update(input),
+    bot_runner_pause: ({ id }) => runners.setState(id, "paused"),
+    bot_runner_resume: ({ id }) => runners.setState(id, "active"),
+    bot_runner_run_now: ({ id }) => runners.runNow(id),
+    bot_runner_delete: ({ id }) => runners.delete(id),
+    bot_runner_seen: ({ id }) => { runners.seen(id); return { ok: true as const }; },
+    bot_runner_adopt: (input) => runners.adopt(input),
     // Deprecated aliases of bot_get, bot_set_thread and bot_set_run, for one release.
     chief_of_staff: () => projectLeads.chief(),
     chief_of_staff_set: async ({ threadId }) => { if (threadId) await bots.setThread(threadId); else await projectLeads.setChief(null); return projectLeads.chief(); },
@@ -787,6 +809,37 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "bot_skill_delete", description: "Delete one of your own skills.", parameters: z.object({ name: z.string().min(1).max(64) }),
     execute: ({ name }, ctx) => { ownBot(ctx.threadId); return bots.deleteSkill(name) ? `Deleted ${name}.` : `No skill "${name}".`; },
+  });
+  // The Bot's runners: its tools (its thread only) and the runner's one report tool.
+  const scheduleParam = z.object({
+    cadence: z.enum(["every5minutes", "every15minutes", "every30minutes", "hourly", "every2hours", "every6hours", "daily", "weekdays", "weekly", "custom"]),
+    time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional().describe("HH:MM local; the minute for hourly cadences. Default 09:00"),
+    cron: z.string().max(100).optional().describe("Five-field cron, only with cadence custom"),
+  });
+  const describeRunner = (runner: Awaited<ReturnType<typeof runners.list>>[number]) =>
+    `- ${runner.name} (${runner.id}, ${runner.state}${runner.adopted ? ", adopted" : ""}): ${runner.schedule.cadence}${runner.schedule.cadence === "custom" ? ` ${runner.schedule.cron}` : ` at ${runner.schedule.time}`}${runner.nextRunAt ? `, next ${new Date(runner.nextRunAt).toLocaleString()}` : ""}. Job: ${runner.job}${runner.lastReport ? `\n  Last report (${runner.lastLevel}): ${runner.lastReport}` : ""}${runner.threadId ? `\n  Thread: /threads/${runner.threadId}` : ""}`;
+  const runnerTool = (name: string, description: string, parameters: z.ZodObject, execute: (input: never) => Promise<string>) =>
+    bb.agents.registerTool({ name, description, parameters, execute: async (input, ctx) => { ownBot(ctx.threadId); return execute(input as never); } });
+  runnerTool("runner_create", "Make a runner: a long-lived thread that does a recurring job on its own schedule and stays quiet unless it has something to report (it tells you or the user through runner_report). Use it when a task becomes recurring, so your chat stays for the user. Its first run starts now.",
+    z.object({ name: z.string().trim().min(1).max(60), job: z.string().trim().min(1).max(2000).describe("A short instruction: what to check or do each run, and what counts as worth reporting"), schedule: scheduleParam }),
+    async (input: { name: string; job: string; schedule: z.infer<typeof scheduleParam> }) => `Made the runner:\n${describeRunner(await runners.create({ ...input, schedule: parseSchedule(input.schedule) }))}`);
+  runnerTool("runner_update", "Change a runner's name, job or schedule.",
+    z.object({ id: z.string().min(1).describe("Runner id or name"), name: z.string().trim().min(1).max(60).optional(), job: z.string().trim().min(1).max(2000).optional(), schedule: scheduleParam.optional() }),
+    async (input: { id: string; name?: string; job?: string; schedule?: z.infer<typeof scheduleParam> }) => describeRunner(await runners.update({ ...input, schedule: input.schedule ? parseSchedule(input.schedule) : undefined })));
+  runnerTool("runner_pause", "Pause a runner: its schedule stops until resumed.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }) => describeRunner(await runners.setState(id, "paused")));
+  runnerTool("runner_resume", "Resume a paused runner.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }) => describeRunner(await runners.setState(id, "active")));
+  runnerTool("runner_run_now", "Run a runner now, outside its schedule.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }) => describeRunner(await runners.runNow(id)));
+  runnerTool("runner_delete", "Delete a runner you made: its schedule is deleted and its thread archived. An adopted runner is only let go (its thread and automation stay). Only when the user asks or the job is over.",
+    z.object({ id: z.string().min(1) }), async ({ id }: { id: string }) => (await runners.delete(id)).kept ? "Let go of the adopted runner; its thread and automation stay." : "Deleted the runner; its thread is archived.");
+  runnerTool("runner_list", "List your runners: schedule, state, next run and last report.", z.object({}), async () => (await runners.list()).map(describeRunner).join("\n") || "No runners yet.");
+  bb.agents.registerTool({
+    name: "runner_report",
+    description: "Report from this run. log: kept in this thread and the Bot's Activity. tell: one short line to the user in the Bot's chat. urgent: tell plus Needs you and a phone push, only when the user must act now. With nothing new, don't call it and finish without a final message.",
+    parameters: z.object({ level: z.enum(["log", "tell", "urgent"]), summary: z.string().trim().min(1).max(600).describe("One or two short sentences") }),
+    execute: async (input, ctx) => {
+      if (!ctx.threadId || !runners.forThread(ctx.threadId)) throw new Error("Only a runner's thread can report.");
+      return runners.report(ctx.threadId, input);
+    },
   });
   bb.agents.registerTool({
     name: "bot_history_search", description: "Search your own past threads (your earlier threads and the threads you started) for words.",

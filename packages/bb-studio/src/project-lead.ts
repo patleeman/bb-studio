@@ -352,7 +352,7 @@ export class ProjectRuns {
   }
 }
 
-function heartbeatCron(run: HeartbeatRun): string {
+export function heartbeatCron(run: HeartbeatRun): string {
   const [hour, minute] = run.time.split(":").map(Number);
   switch (run.cadence) {
     case "every5minutes": return "*/5 * * * *";

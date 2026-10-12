@@ -64,7 +64,8 @@ export function botInstructions(bot: { name: string; state: BotState; role?: str
     const memory = bot.memoryPageId ? `Your Memory page is ${bot.memoryPageId}: read it with pages_read when you wake up, keep it short and edit it yourself with pages_edit; its "## Check-in" section is your check-in list.` : "";
     const skills = `Save a reusable procedure as your own skill with bot_skill_write${bot.skills?.length ? `; yours: ${bot.skills.join(", ")} (bot_skill_read)` : ""}. Search your past threads with bot_history_search.`;
     const quiet = "Your chat is the user's inbox: post only what changed or needs them. When nothing did (a check-in with nothing new, a notice that a thread you started finished fine, an automation result like [PASS]), finish without a final assistant message: no \"✓\", \"noted\" or other acknowledgement.";
-    return [who, memory, quiet, skills].filter(Boolean).join("\n");
+    const runners = "Give recurring work to a runner (runner_create).";
+    return [who, memory, quiet, runners, skills].filter(Boolean).join("\n");
   }
   return `${who}\nYou are ${bot.state} by the user. Don't start new work: don't spawn or steer threads, change Studio items or schedule anything. Answer questions, and tell the user to resume you (Studio → Bot → Resume) for anything else.`;
 }
@@ -155,6 +156,8 @@ export interface BotDeps {
   memory?: BotMemoryPages;
   /** BB's user skills directory (`<data dir>/skills`), where a shared skill goes. */
   userSkillsDir?: string;
+  /** Runner threads (src/runners.ts): kept out of Activity's thread lists; an urgent one is in Needs you. */
+  runners?: { threads(): Map<string, { urgent: boolean }>; pauseAll(): Promise<string[]> };
 }
 
 export class Bots {
@@ -331,6 +334,7 @@ export class Bots {
         pausedAutomationIds.push(automation.id);
       }
     }
+    await this.deps.runners?.pauseAll();
     this.update({ state: "stopped" });
     return { ...(await this.get()), stoppedThreadIds, pausedAutomationIds };
   }
@@ -430,6 +434,14 @@ export class Bots {
     return chain;
   }
 
+  /** Threads the Bot started (any depth), its own excluded: where adoptable runners come from. */
+  async started(): Promise<{ id: string; title: string; projectId: string | null; parentThreadId?: string | null }[]> {
+    const bot = this.stored();
+    if (!bot?.threadId) return [];
+    return (await this.workThreads(bot.threadId)).filter((thread) => thread.id !== bot.threadId)
+      .map((thread) => ({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled thread", projectId: thread.projectId ?? null, parentThreadId: thread.parentThreadId ?? null }));
+  }
+
   /** The Bot's thread and every thread it started. */
   private async startedThreads(threadId: string): Promise<(ActivityThread & Partial<ListedThread>)[]> {
     const chain = new Set(this.threadChain(threadId));
@@ -471,8 +483,14 @@ export class Bots {
       this.automations(bot.threadId),
       this.deps.sdk.threads.output({ threadId: bot.threadId }).catch(() => ({ output: null })),
     ]);
-    const { needsYou, inProgress, waiting, completed } = classifyActivity(threads, bot.threadId);
-    const scheduled: BotScheduledView[] = automations.rows.map((automation) => ({
+    // Runners have their own group; an urgent report puts its thread in Needs you.
+    const runnerThreads = this.deps.runners?.threads() ?? new Map<string, { urgent: boolean }>();
+    const { needsYou, inProgress, waiting, completed } = classifyActivity(threads.filter((thread) => !runnerThreads.has(thread.id)), bot.threadId);
+    const urgent = [...runnerThreads].filter(([, runner]) => runner.urgent).map(([id]) => id).filter((id) => !needsYou.some((thread) => thread.id === id));
+    for (const thread of await Promise.all(urgent.map((threadId) => this.deps.sdk.threads.get({ threadId }).catch(() => null)))) {
+      if (thread && !thread.archivedAt) needsYou.push({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled runner", status: thread.status, projectId: thread.projectId ?? null, updatedAt: thread.updatedAt ?? 0, relation: "started", needsYou: true, parentId: null });
+    }
+    const scheduled: BotScheduledView[] = automations.rows.filter((automation) => !automation.execution.targetThreadId || !runnerThreads.has(automation.execution.targetThreadId)).map((automation) => ({
       id: automation.id,
       kind: automation.name === HEARTBEAT_NAME ? "heartbeat" : "automation",
       name: automation.name === HEARTBEAT_NAME ? "Check-in (heartbeat)" : automation.name,

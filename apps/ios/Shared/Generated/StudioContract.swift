@@ -50,6 +50,15 @@ public enum Studio {
     public static let bot_skill_write = "bot_skill_write"
     public static let bot_skill_share = "bot_skill_share"
     public static let bot_skill_delete = "bot_skill_delete"
+    public static let bot_runners = "bot_runners"
+    public static let bot_runner_create = "bot_runner_create"
+    public static let bot_runner_update = "bot_runner_update"
+    public static let bot_runner_pause = "bot_runner_pause"
+    public static let bot_runner_resume = "bot_runner_resume"
+    public static let bot_runner_run_now = "bot_runner_run_now"
+    public static let bot_runner_delete = "bot_runner_delete"
+    public static let bot_runner_seen = "bot_runner_seen"
+    public static let bot_runner_adopt = "bot_runner_adopt"
     public static let thread_handoff = "thread_handoff"
     public static let saveView = "saveView"
     public static let deleteView = "deleteView"
@@ -269,6 +278,24 @@ public enum Studio {
   public typealias BotSkillShare = BotSkillShareOutput
 
   public typealias BotSkillDelete = BotSkillDeleteOutput
+
+  public typealias BotRunners = BotRunnersOutput
+
+  public typealias BotRunnerCreate = BotRunnerCreateOutput
+
+  public typealias BotRunnerUpdate = BotRunnerUpdateOutput
+
+  public typealias BotRunnerPause = BotRunnerPauseOutput
+
+  public typealias BotRunnerResume = BotRunnerResumeOutput
+
+  public typealias BotRunnerRunNow = BotRunnerRunNowOutput
+
+  public typealias BotRunnerDelete = BotRunnerDeleteOutput
+
+  public typealias BotRunnerSeen = BotRunnerSeenOutput
+
+  public typealias BotRunnerAdopt = BotRunnerAdoptOutput
 
   public typealias ThreadHandoff = ThreadHandoffOutput
 
@@ -4658,6 +4685,1261 @@ public enum Studio {
 
     public init(deleted: Bool? = nil) {
       self.deleted = deleted
+    }
+  }
+
+  public struct BotRunnersInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public enum BotRunnersOutputRunnersItemState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotRunnersOutputRunnersItemScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnersOutputRunnersItemSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnersOutputRunnersItemScheduleCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(cadence: BotRunnersOutputRunnersItemScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public enum BotRunnersOutputRunnersItemLastLevel: Sendable, Hashable, Codable {
+    case log
+    case tell
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "log": self = .log
+      case "tell": self = .tell
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .log: try container.encode("log")
+      case .tell: try container.encode("tell")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnersOutputRunnersItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var threadId: String?
+    public var state: BotRunnersOutputRunnersItemState?
+    public var adopted: Bool?
+    public var schedule: BotRunnersOutputRunnersItemSchedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastLevel: BotRunnersOutputRunnersItemLastLevel?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.job = job
+      self.threadId = threadId
+      self.state = state
+      self.adopted = adopted
+      self.schedule = schedule
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastLevel = lastLevel
+      self.lastReport = lastReport
+      self.lastReportAt = lastReportAt
+      self.urgent = urgent
+    }
+  }
+
+  public struct BotRunnersOutputAdoptableItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var automationId: String?
+    public var automationName: String?
+    public var projectId: String?
+    public var cron: String?
+    public var enabled: Bool?
+
+    public init(threadId: String? = nil, title: String? = nil, automationId: String? = nil, automationName: String? = nil, projectId: String? = nil, cron: String? = nil, enabled: Bool? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.automationId = automationId
+      self.automationName = automationName
+      self.projectId = projectId
+      self.cron = cron
+      self.enabled = enabled
+    }
+  }
+
+  public struct BotRunnersOutput: Sendable, Hashable, Codable {
+    public var runners: [BotRunnersOutputRunnersItem]?
+    public var adoptable: [BotRunnersOutputAdoptableItem]?
+
+    public init(runners: [BotRunnersOutputRunnersItem]? = nil, adoptable: [BotRunnersOutputAdoptableItem]? = nil) {
+      self.runners = runners
+      self.adoptable = adoptable
+    }
+  }
+
+  public enum BotRunnerCreateInputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerCreateInputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerCreateInputScheduleCadence?
+    public var cron: String?
+    public var time: String?
+
+    public init(cadence: BotRunnerCreateInputScheduleCadence? = nil, cron: String? = nil, time: String? = nil) {
+      self.cadence = cadence
+      self.cron = cron
+      self.time = time
+    }
+  }
+
+  public struct BotRunnerCreateInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var job: String?
+    public var schedule: BotRunnerCreateInputSchedule?
+
+    public init(name: String? = nil, job: String? = nil, schedule: BotRunnerCreateInputSchedule? = nil) {
+      self.name = name
+      self.job = job
+      self.schedule = schedule
+    }
+  }
+
+  public enum BotRunnerCreateOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotRunnerCreateOutputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerCreateOutputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerCreateOutputScheduleCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(cadence: BotRunnerCreateOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public enum BotRunnerCreateOutputLastLevel: Sendable, Hashable, Codable {
+    case log
+    case tell
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "log": self = .log
+      case "tell": self = .tell
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .log: try container.encode("log")
+      case .tell: try container.encode("tell")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerCreateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var threadId: String?
+    public var state: BotRunnerCreateOutputState?
+    public var adopted: Bool?
+    public var schedule: BotRunnerCreateOutputSchedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastLevel: BotRunnerCreateOutputLastLevel?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.job = job
+      self.threadId = threadId
+      self.state = state
+      self.adopted = adopted
+      self.schedule = schedule
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastLevel = lastLevel
+      self.lastReport = lastReport
+      self.lastReportAt = lastReportAt
+      self.urgent = urgent
+    }
+  }
+
+  public enum BotRunnerUpdateInputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerUpdateInputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerUpdateInputScheduleCadence?
+    public var cron: String?
+    public var time: String?
+
+    public init(cadence: BotRunnerUpdateInputScheduleCadence? = nil, cron: String? = nil, time: String? = nil) {
+      self.cadence = cadence
+      self.cron = cron
+      self.time = time
+    }
+  }
+
+  public struct BotRunnerUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var schedule: BotRunnerUpdateInputSchedule?
+
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, schedule: BotRunnerUpdateInputSchedule? = nil) {
+      self.id = id
+      self.name = name
+      self.job = job
+      self.schedule = schedule
+    }
+  }
+
+  public enum BotRunnerUpdateOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotRunnerUpdateOutputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerUpdateOutputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerUpdateOutputScheduleCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(cadence: BotRunnerUpdateOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public enum BotRunnerUpdateOutputLastLevel: Sendable, Hashable, Codable {
+    case log
+    case tell
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "log": self = .log
+      case "tell": self = .tell
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .log: try container.encode("log")
+      case .tell: try container.encode("tell")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerUpdateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var threadId: String?
+    public var state: BotRunnerUpdateOutputState?
+    public var adopted: Bool?
+    public var schedule: BotRunnerUpdateOutputSchedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastLevel: BotRunnerUpdateOutputLastLevel?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.job = job
+      self.threadId = threadId
+      self.state = state
+      self.adopted = adopted
+      self.schedule = schedule
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastLevel = lastLevel
+      self.lastReport = lastReport
+      self.lastReportAt = lastReportAt
+      self.urgent = urgent
+    }
+  }
+
+  public struct BotRunnerPauseInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum BotRunnerPauseOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotRunnerPauseOutputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerPauseOutputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerPauseOutputScheduleCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(cadence: BotRunnerPauseOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public enum BotRunnerPauseOutputLastLevel: Sendable, Hashable, Codable {
+    case log
+    case tell
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "log": self = .log
+      case "tell": self = .tell
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .log: try container.encode("log")
+      case .tell: try container.encode("tell")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerPauseOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var threadId: String?
+    public var state: BotRunnerPauseOutputState?
+    public var adopted: Bool?
+    public var schedule: BotRunnerPauseOutputSchedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastLevel: BotRunnerPauseOutputLastLevel?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.job = job
+      self.threadId = threadId
+      self.state = state
+      self.adopted = adopted
+      self.schedule = schedule
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastLevel = lastLevel
+      self.lastReport = lastReport
+      self.lastReportAt = lastReportAt
+      self.urgent = urgent
+    }
+  }
+
+  public struct BotRunnerResumeInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum BotRunnerResumeOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotRunnerResumeOutputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerResumeOutputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerResumeOutputScheduleCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(cadence: BotRunnerResumeOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public enum BotRunnerResumeOutputLastLevel: Sendable, Hashable, Codable {
+    case log
+    case tell
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "log": self = .log
+      case "tell": self = .tell
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .log: try container.encode("log")
+      case .tell: try container.encode("tell")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerResumeOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var threadId: String?
+    public var state: BotRunnerResumeOutputState?
+    public var adopted: Bool?
+    public var schedule: BotRunnerResumeOutputSchedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastLevel: BotRunnerResumeOutputLastLevel?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.job = job
+      self.threadId = threadId
+      self.state = state
+      self.adopted = adopted
+      self.schedule = schedule
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastLevel = lastLevel
+      self.lastReport = lastReport
+      self.lastReportAt = lastReportAt
+      self.urgent = urgent
+    }
+  }
+
+  public struct BotRunnerRunNowInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum BotRunnerRunNowOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotRunnerRunNowOutputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerRunNowOutputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerRunNowOutputScheduleCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(cadence: BotRunnerRunNowOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public enum BotRunnerRunNowOutputLastLevel: Sendable, Hashable, Codable {
+    case log
+    case tell
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "log": self = .log
+      case "tell": self = .tell
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .log: try container.encode("log")
+      case .tell: try container.encode("tell")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerRunNowOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var threadId: String?
+    public var state: BotRunnerRunNowOutputState?
+    public var adopted: Bool?
+    public var schedule: BotRunnerRunNowOutputSchedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastLevel: BotRunnerRunNowOutputLastLevel?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.job = job
+      self.threadId = threadId
+      self.state = state
+      self.adopted = adopted
+      self.schedule = schedule
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastLevel = lastLevel
+      self.lastReport = lastReport
+      self.lastReportAt = lastReportAt
+      self.urgent = urgent
+    }
+  }
+
+  public struct BotRunnerDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct BotRunnerDeleteOutput: Sendable, Hashable, Codable {
+    public var deleted: Bool?
+    public var kept: Bool?
+
+    public init(deleted: Bool? = nil, kept: Bool? = nil) {
+      self.deleted = deleted
+      self.kept = kept
+    }
+  }
+
+  public struct BotRunnerSeenInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct BotRunnerSeenOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BotRunnerAdoptInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var automationId: String?
+    public var name: String?
+    public var job: String?
+
+    public init(threadId: String? = nil, automationId: String? = nil, name: String? = nil, job: String? = nil) {
+      self.threadId = threadId
+      self.automationId = automationId
+      self.name = name
+      self.job = job
+    }
+  }
+
+  public enum BotRunnerAdoptOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotRunnerAdoptOutputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerAdoptOutputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerAdoptOutputScheduleCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(cadence: BotRunnerAdoptOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public enum BotRunnerAdoptOutputLastLevel: Sendable, Hashable, Codable {
+    case log
+    case tell
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "log": self = .log
+      case "tell": self = .tell
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .log: try container.encode("log")
+      case .tell: try container.encode("tell")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerAdoptOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var threadId: String?
+    public var state: BotRunnerAdoptOutputState?
+    public var adopted: Bool?
+    public var schedule: BotRunnerAdoptOutputSchedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastLevel: BotRunnerAdoptOutputLastLevel?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.job = job
+      self.threadId = threadId
+      self.state = state
+      self.adopted = adopted
+      self.schedule = schedule
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastLevel = lastLevel
+      self.lastReport = lastReport
+      self.lastReportAt = lastReportAt
+      self.urgent = urgent
     }
   }
 

@@ -222,4 +222,15 @@ export const MIGRATIONS = [
   `ALTER TABLE bots ADD COLUMN shape TEXT;
    ALTER TABLE bots ADD COLUMN color TEXT;
    ALTER TABLE bots ADD COLUMN role TEXT;`,
+  // Runners (src/runners.ts): long-lived threads a Bot keeps on a schedule,
+  // quiet unless they report. Studio's table is the source of truth: runner
+  // threads have no BB parent, so BB posts no child notices to the Bot.
+  `CREATE TABLE bot_runners (
+       id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, name TEXT NOT NULL, job TEXT NOT NULL,
+       thread_id TEXT UNIQUE, project_id TEXT NOT NULL,
+       state TEXT NOT NULL, cadence TEXT NOT NULL, time TEXT NOT NULL, cron TEXT,
+       automation_id TEXT, automation_project_id TEXT, adopted INTEGER NOT NULL DEFAULT 0,
+       last_run_at INTEGER, last_level TEXT, last_report TEXT, last_report_at INTEGER, urgent INTEGER NOT NULL DEFAULT 0,
+       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+     );`,
 ];

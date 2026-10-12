@@ -185,6 +185,33 @@ const botActivity = z.object({
   latest: z.string().nullable(),
 });
 export type BotActivityView = z.infer<typeof botActivity>;
+/** A Bot's runner (src/runners.ts): a long-lived thread on its own schedule that reports only through runner_report. */
+const runnerSchedule = heartbeatRunSchema.omit({ enabled: true, time: true }).extend({ time: heartbeatRunSchema.shape.time.default("09:00") });
+const runnerLevel = z.enum(["log", "tell", "urgent"]);
+const runner = z.object({
+  id: z.string(),
+  name: z.string(),
+  job: z.string(),
+  threadId: z.string().nullable(),
+  state: z.enum(["active", "paused"]),
+  /** Adopted from a thread and automation the Bot had; deleting only lets it go. */
+  adopted: z.boolean(),
+  schedule: heartbeatRunSchema.omit({ enabled: true }),
+  nextRunAt: z.number().nullable(),
+  lastRunAt: z.number().nullable(),
+  lastLevel: runnerLevel.nullable(),
+  lastReport: z.string().nullable(),
+  lastReportAt: z.number().nullable(),
+  /** An urgent report the user hasn't opened: it's in Needs you. */
+  urgent: z.boolean(),
+});
+export type RunnerView = z.infer<typeof runner>;
+/** A thread the Bot started that an automation wakes: it can be adopted as a runner. */
+const runnerAdoptable = z.object({ threadId: z.string(), title: z.string(), automationId: z.string(), automationName: z.string(), projectId: z.string(), cron: z.string().nullable(), enabled: z.boolean() });
+export type RunnerAdoptableView = z.infer<typeof runnerAdoptable>;
+const runnerName = z.string().trim().min(1).max(60);
+const runnerJob = z.string().trim().min(1).max(2000);
+const runnerId = z.string().min(1).max(200);
 /** The full request from experimental_NewThreadComposer; Studio picks the project. */
 const newThreadRequest = conversationRequestSchema(z);
 export type NewThreadRequestInput = z.output<typeof newThreadRequest>;
@@ -292,6 +319,20 @@ export const rpcContract = defineRpcContract({
   bot_skill_share: { input: z.object({ name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },
   /** Deletes a Bot skill. */
   bot_skill_delete: { input: z.object({ name: z.string().min(1).max(100) }), output: z.object({ deleted: z.boolean() }) },
+  /** The Bot's runners, and threads it started that an automation wakes (Adopt as runner). */
+  bot_runners: { input: z.object({}), output: z.object({ runners: z.array(runner), adoptable: z.array(runnerAdoptable) }) },
+  /** Makes a runner: its thread (first run now) and its schedule. */
+  bot_runner_create: { input: z.object({ name: runnerName, job: runnerJob, schedule: runnerSchedule }), output: runner },
+  bot_runner_update: { input: z.object({ id: runnerId, name: runnerName.optional(), job: runnerJob.optional(), schedule: runnerSchedule.optional() }), output: runner },
+  bot_runner_pause: { input: z.object({ id: runnerId }), output: runner },
+  bot_runner_resume: { input: z.object({ id: runnerId }), output: runner },
+  bot_runner_run_now: { input: z.object({ id: runnerId }), output: runner },
+  /** Deletes a runner Studio made (automation deleted, thread archived); an adopted one is only let go. */
+  bot_runner_delete: { input: z.object({ id: runnerId }), output: z.object({ deleted: z.literal(true), kept: z.boolean() }) },
+  /** The user opened a runner: its urgent report leaves Needs you. */
+  bot_runner_seen: { input: z.object({ id: runnerId }), output: z.object({ ok: z.literal(true) }) },
+  /** Adopt as runner: registers the thread, keeps its automation, switches it to runner_report. The user's choice only. */
+  bot_runner_adopt: { input: z.object({ threadId: z.string().min(1).max(200), automationId: z.string().min(1).max(200), name: runnerName.optional(), job: runnerJob.optional() }), output: runner },
   /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and the Bot keeps its new thread. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** Saves a collection query by name, replacing a view with that name. */

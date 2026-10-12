@@ -1,5 +1,5 @@
 // The Bot page's right-panel fixed tabs (nav panel `bot`, app.tsx):
-// Info — its profile, controls, check-ins, Memory, skills and activity;
+// Info — its profile, controls, check-ins, Memory, skills, runners and activity;
 // Threads — the sub-threads the user opened, a strip of them over BB's
 // thread view. Fixed tabs are a fixed set, so Threads keeps its own strip.
 import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON } from "@bb-studio/kit/app";
@@ -10,6 +10,7 @@ import type { BotActivityView, BotThreadView, BotView } from "../../contract";
 import { useLive } from "../live";
 import { ActivityPanel, openThreadPage, PRESETS, presetOf, runningCount, statusLabel, useBotControls } from "./BotHome";
 import { BotAvatar } from "./BotAvatar";
+import { RunnersSection } from "./Runners";
 import { stripClose, stripFocus, stripMove, stripOpen, THREADS_TAB, useOpenSubThread, useStrip } from "./workspace";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
@@ -55,6 +56,8 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
         <InfoRow label="Memory" value="What it keeps in mind" action={{ label: "Open", run: () => void openMemory() }} />
         <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: () => setSheet("skills") }} />
       </dl>
+
+      <RunnersSection botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} />
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
       <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} />

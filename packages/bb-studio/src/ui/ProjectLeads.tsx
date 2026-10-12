@@ -41,14 +41,14 @@ export function useHeartbeatForm(run: Run) {
 }
 
 /** Cadence select plus time or cron. `needs` explains why it's off, when it must be. */
-export function HeartbeatFields({ form, disabled, needs }: { form: HeartbeatForm; disabled: boolean; needs: string | null }) {
+export function HeartbeatFields({ form, disabled, needs, label = "Heartbeat" }: { form: HeartbeatForm; disabled: boolean; needs: string | null; label?: string }) {
   const { cadence, setCadence, time, setTime, cron, setCron } = form;
   const on = needs === null;
   return (
     <>
       <label className="block space-y-1">
-        <span className="font-medium">Heartbeat</span>
-        <select aria-label="Heartbeat" className={SELECT} disabled={disabled || !on} value={on ? cadence : "off"} onChange={(event) => setCadence(event.target.value as Cadence | "off")}>
+        <span className="font-medium">{label}</span>
+        <select aria-label={label} className={SELECT} disabled={disabled || !on} value={on ? cadence : "off"} onChange={(event) => setCadence(event.target.value as Cadence | "off")}>
           <option value="off">Off</option>
           {(Object.keys(RUN_LABELS) as Cadence[]).map((value) => <option key={value} value={value}>{RUN_LABELS[value]}</option>)}
         </select>

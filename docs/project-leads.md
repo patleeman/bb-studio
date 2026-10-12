@@ -44,6 +44,19 @@ Staff", with the same thread and Heartbeat. `chief_of_staff`,
 Studio README's **Bot** section for its workspace (sidebar, Info and
 Threads tabs), pause and stop.
 
+### Runners
+
+A Bot hands recurring work to runners (`packages/bb-studio/src/runners.ts`,
+table `bot_runners`): long-lived threads, each woken by its own automation
+(the Heartbeat's cadences, via `heartbeatCron`), that report only through
+`runner_report` (`log`, `tell`, `urgent`). Runner threads have no
+`parentThreadId` or `lifecycleOwnerThreadId`: BB posts child-completed and
+ownership notices to a thread's parent, and a lifecycle owner would archive
+them on a handoff. Studio's table is the source of truth for which Bot owns
+them. A thread the Bot started that an automation already wakes can be
+adopted from the Bot's Info tab; it keeps its automation. See the Studio
+README's **Bot → Runners**.
+
 ## RPCs
 
 - `project_leads`: every lead and its Heartbeat settings.

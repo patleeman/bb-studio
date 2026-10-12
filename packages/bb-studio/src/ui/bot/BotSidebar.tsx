@@ -2,7 +2,7 @@
 // replaces BB's thread list while the Bot page shows (threadListSwitch.ts).
 // A "Bots" list (one bot today; more kinds can join it), the selected bot
 // expanded under it into the threads it started: Needs you, Running,
-// Recurring, Recent (each nested under the thread that started it) and its
+// Runners, Recurring, Recent (each nested under the thread that started it) and its
 // earlier conversations. A sub-thread opens in the Bot page's Threads tab;
 // the bot itself opens its main thread, the page.
 import { Icon } from "@bb-studio/kit/ui";
@@ -14,6 +14,7 @@ import { useLive } from "../live";
 import { BOT_PATH, openThreadPage, runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, colorForName } from "./BotAvatar";
 import { isBotPath, syncThreadList } from "./threadListSwitch";
+import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { sidebarGroups, useOpenSubThread, useStrip, type TreeNode } from "./workspace";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
@@ -127,6 +128,8 @@ function BotEntry({ view, onNavigate }: { view: BotView; onNavigate(): void }) {
   const toggle = (id: string) => setLayout({ closed: layout.closed.includes(id) ? layout.closed.filter((each) => each !== id) : [...layout.closed, id] });
   const active = strip.active;
   const onOpen = (threadId: string) => { openSub(threadId); onNavigate(); };
+  const runners = useRunners();
+  const openRunner = useOpenRunner(onOpen, () => { runners.refresh(); activity.refresh(); });
   const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} />;
 
   return (
@@ -153,6 +156,11 @@ function BotEntry({ view, onNavigate }: { view: BotView; onNavigate(): void }) {
           </Group>
         ) : null}
         {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
+        {runners.data?.runners.length ? (
+          <Group id="runners" title="Runners" closed={layout.closed} onToggle={toggle}>
+            {runners.data.runners.map((runner) => <RunnerSidebarRow key={runner.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} />)}
+          </Group>
+        ) : null}
         {groups.recurring.length ? (
           <Group id="recurring" title="Recurring" closed={layout.closed} onToggle={toggle}>
             {groups.recurring.map((item) => <RecurringRow key={item.id} item={item} />)}
