@@ -258,6 +258,8 @@ export interface BotDeps {
   hiddenThreads?(): ReadonlySet<string>;
   /** Threads a Bot owns that BB doesn't link to it, such as its automations' runs (src/bot-owned.ts): Activity lists them. */
   ownedThreads?(botId: string): ReadonlySet<string>;
+  /** A Bot got a thread (made, set or handed off): its chain leaves BB's thread list (src/bot-owned.ts). */
+  claimChains?(): Promise<unknown>;
   /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
   automations?: {
     pauseAll(botId: string, onPaused?: (id: string) => void): Promise<string[]>;
@@ -529,6 +531,7 @@ export class Bots {
       this.deps.db.prepare("DELETE FROM bots WHERE id = ?").run(id);
       throw error;
     }
+    await this.claimChains();
     this.deps.changed();
     return this.get(id);
   }
@@ -556,8 +559,14 @@ export class Bots {
     if (other && !other.primary) throw new Error(`That thread is ${other.name}'s.`);
     await this.deps.leads.setLead(PERSONAL_PROJECT_ID, threadId);
     if (!this.row()) this.insert(BOT_ID, DEFAULT_BOT_NAME, DEFAULT_BOT_AVATAR);
+    await this.claimChains();
     this.deps.changed();
     return this.get();
+  }
+
+  /** Hides the Bots' chains from BB's thread list; a failure waits for the next sweep. */
+  private async claimChains(): Promise<void> {
+    await this.deps.claimChains?.().catch(() => {});
   }
 
   /** Turns a Bot's check-in on or off. An additional Bot's is its own automation on its thread. */
@@ -617,9 +626,13 @@ export class Bots {
       this.deps.changed();
     }
     // Check-ins and reminders follow whichever Bot's thread this was (the primary's too).
+    let bot = false;
     for (const row of this.rows()) {
-      if (this.view(row).threadId === newThreadId) await this.deps.automations?.follow(row.id).catch(() => {});
+      if (this.view(row).threadId !== newThreadId) continue;
+      bot = true;
+      await this.deps.automations?.follow(row.id).catch(() => {});
     }
+    if (bot) await this.claimChains();
   }
 
   /** Heartbeat off, remembering whether it was on; the Bot is told it's paused (botInstructions). */
@@ -855,9 +868,20 @@ export class Bots {
       ...[...chain].flatMap((id) => [threads.list({ sourceThreadId: id, archived: false, includeHidden: true, limit: 100 }), threads.list({ parentThreadId: id, archived: false, includeHidden: true, limit: 100 })]),
       threads.list({ archived: false, includeHidden: true, limit: 200 }),
     ].map((list) => list.catch(() => [] as ListedThread[])));
-    // A listed thread says whether it waits on the user; a fetched one doesn't.
-    const own = lists.flat().find((thread) => thread.id === threadId) ?? await threads.get({ threadId }).catch(() => null);
+    // A listed thread says whether it waits on the user; a fetched one doesn't,
+    // so its pending interactions say. The Bot's chat is hidden from BB's
+    // list (and its attention), and Needs you still finds its question.
+    const own = lists.flat().find((thread) => thread.id === threadId) ?? await this.fetched(threadId);
     return [...(own ? [own as ActivityThread] : []), ...lists.flat().filter((thread) => thread.id !== threadId && !hiddenFork(thread) && startedBy(thread, chain))];
+  }
+
+  /** One thread by id, with whether an interaction waits on the user. */
+  private async fetched(threadId: string): Promise<(ActivityThread & Partial<ListedThread>) | null> {
+    const [thread, interactions] = await Promise.all([
+      this.deps.sdk.threads.get({ threadId }).catch(() => null),
+      this.deps.sdk.threads.interactions.list({ threadId }).catch(() => [] as { status?: string }[]),
+    ]);
+    return thread ? { ...thread, hasPendingInteraction: interactions.some((interaction) => (interaction as { status?: string }).status === "pending") } as ActivityThread & Partial<ListedThread> : null;
   }
 
   /** startedThreads, the threads the Bot owns otherwise (its automations' runs), and the threads those started, at any depth, from the recent list. */

@@ -23,7 +23,7 @@ async function setup() {
     return {};
   });
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
-    threads: { list: list as never, update: update as never },
+    threads: { list: list as never, update: update as never, get: (async ({ threadId }: { threadId: string }) => { const thread = threads.get(threadId); if (!thread) throw Object.assign(new Error("Not found"), { status: 404 }); return thread; }) as never },
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
   } });
   dispose.push(() => harness.lifecycle.dispose());
@@ -65,14 +65,17 @@ it("reads the automation marker a run's first message starts with", () => {
   expect(automationMarker({ originPluginId: "automations", titleFallback: "Scan" })).toBeNull();
 });
 
-it("finds what a Bot owns: spawned at any depth and its automations' runs, never its chain or the user's forks", async () => {
+it("hides every thread a Bot uses: its chain, what it spawned at any depth and its automations' runs, never the user's threads or forks", async () => {
   const x = await setup();
   seedChief(x);
-  expect(await x.owned.sweep()).toBe(5);
+  expect(await x.owned.sweep()).toBe(7);
   const hidden = [...x.threads.values()].filter((thread) => thread.visibility === "hidden").map((thread) => thread.id).sort();
-  expect(hidden).toEqual(["thr_g3hgcvzv2n", "thr_run_child", "thr_run_old", "thr_run_untitled", "thr_wj23f5639w"]);
-  expect(x.owned.owned("bot_main")).toEqual(new Set(hidden));
-  for (const id of ["thr_old_chief", "thr_k3mtxc4nju", "thr_user", "thr_fork", "thr_user_run"]) expect(x.threads.get(id)?.visibility).toBe("visible");
+  expect(hidden).toEqual(["thr_g3hgcvzv2n", "thr_k3mtxc4nju", "thr_old_chief", "thr_run_child", "thr_run_old", "thr_run_untitled", "thr_wj23f5639w"]);
+  const reasons = Object.fromEntries((x.db.prepare("SELECT thread_id, reason FROM bot_hidden_threads").all() as { thread_id: string; reason: string }[]).map((row) => [row.thread_id, row.reason]));
+  expect(reasons).toMatchObject({ thr_k3mtxc4nju: "chain", thr_old_chief: "chain", thr_g3hgcvzv2n: "spawned", thr_wj23f5639w: "automation" });
+  // Activity lists the work, not the chain (it shows the Bot's chat as "self").
+  expect(x.owned.owned("bot_main")).toEqual(new Set(hidden.filter((id) => id !== "thr_k3mtxc4nju" && id !== "thr_old_chief")));
+  for (const id of ["thr_user", "thr_fork", "thr_user_run"]) expect(x.threads.get(id)?.visibility).toBe("visible");
   // Idempotent.
   expect(await x.owned.sweep()).toBe(0);
 });
@@ -99,13 +102,31 @@ it("hides as threads are made: a child of a known Bot thread at once, an automat
   expect(x.threads.get("thr_g3hgcvzv2n")?.visibility).toBe("hidden");
   await x.owned.created(x.add({ id: "thr_grandchild", lifecycleOwnerThreadId: "thr_g3hgcvzv2n" }));
   expect(x.threads.get("thr_grandchild")?.visibility).toBe("hidden");
-  // The Bot's own chat and the user's thread: nothing.
+  // The Bot's own chat hides at once; the user's thread: nothing.
   await x.owned.created(x.threads.get("thr_k3mtxc4nju")!);
+  expect(x.threads.get("thr_k3mtxc4nju")?.visibility).toBe("hidden");
   await x.owned.created(x.threads.get("thr_user")!);
   expect(x.callRpc).not.toHaveBeenCalled();
   await x.owned.created(x.add({ id: "thr_wj23f5639w", originPluginId: "automations" }));
   await vi.waitFor(() => expect(x.threads.get("thr_wj23f5639w")?.visibility).toBe("hidden"));
+  expect(x.threads.get("thr_user")?.visibility).toBe("visible");
+});
+
+it("hides a Bot's chain when it gets a thread, once: a chat the user shows again stays visible", async () => {
+  const x = await setup();
+  seedChief(x);
+  // An archived handoff thread is left alone.
+  x.threads.set("thr_old_chief", { ...x.threads.get("thr_old_chief")!, archivedAt: 5 });
+  expect(await x.owned.claimChains()).toBe(1);
+  expect(x.threads.get("thr_k3mtxc4nju")?.visibility).toBe("hidden");
+  expect(x.threads.get("thr_old_chief")?.visibility).toBe("visible");
+  expect(x.threads.get("thr_g3hgcvzv2n")?.visibility).toBe("visible");
+  x.threads.set("thr_k3mtxc4nju", { ...x.threads.get("thr_k3mtxc4nju")!, visibility: "visible" });
+  expect(await x.owned.claimChains()).toBe(0);
+  expect(await x.owned.sweep()).toBe(5);
+  await x.owned.created(x.threads.get("thr_k3mtxc4nju")!);
   expect(x.threads.get("thr_k3mtxc4nju")?.visibility).toBe("visible");
+  expect(x.owned.ownerOf("thr_k3mtxc4nju")).toBe("bot_main");
 });
 
 it("leaves runner threads to src/runners.ts and BB's refusals to the next sweep", async () => {
@@ -114,7 +135,7 @@ it("leaves runner threads to src/runners.ts and BB's refusals to the next sweep"
   x.skip.add("thr_g3hgcvzv2n");
   const update = x.update.getMockImplementation()!;
   x.update.mockImplementation(async (args) => { if (args.threadId === "thr_run_old") throw new Error("busy"); return update(args); });
-  expect(await x.owned.sweep()).toBe(3);
+  expect(await x.owned.sweep()).toBe(5);
   expect(x.threads.get("thr_g3hgcvzv2n")?.visibility).toBe("visible");
   expect(x.threads.get("thr_run_old")?.visibility).toBe("visible");
   x.update.mockImplementation(update);

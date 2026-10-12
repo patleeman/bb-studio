@@ -39,6 +39,8 @@ async function setup(migrations = MIGRATIONS) {
   const stop = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, status: "idle" }); return {}; });
   const archive = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: 5 }); return { ok: true }; });
   const automations: Record<string, unknown>[] = [];
+  // Each thread's interactions (threads.interactions.list).
+  const pending = new Map<string, { id: string; status: string }[]>();
   const callRpc = vi.fn(async ({ method, input }: { method: string; input: Record<string, unknown> }) => {
     if (method === "automations_list") return automations;
     if (method === "automations_create") { const made = { id: `a${automations.length + 1}`, name: input.name, enabled: false, trigger: input.trigger, execution: input.execution, nextRunAt: 99 }; automations.push(made); return made; }
@@ -58,6 +60,7 @@ async function setup(migrations = MIGRATIONS) {
     threads: {
       spawn: spawn as never, get: get as never, archive: archive as never, list: list as never, stop: stop as never,
       unpin: async () => ({}) as never, update: update as never, output: async () => ({ output: "All quiet." }),
+      interactions: { list: (async ({ threadId }: { threadId: string }) => pending.get(threadId) ?? []) as never } as never,
       search: (async ({ query }: { query: string }) => {
         const hit = (thread: Thread) => ({ thread, matches: [{ text: `${thread.title} mentions ${query}`, highlightRanges: [], sourceKind: "assistant_message", sourceSeq: 1 }] });
         return { active: { results: [...threads.values()].filter((thread) => !thread.archivedAt).map(hit) }, archived: { results: [...threads.values()].filter((thread) => thread.archivedAt).map(hit) } };
@@ -77,7 +80,7 @@ async function setup(migrations = MIGRATIONS) {
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
   const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
   bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, memory, userSkillsDir });
-  return { bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update };
+  return { bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending };
 }
 
 const prompts = (x: Awaited<ReturnType<typeof setup>>) => x.automations.map((a) => (a.execution as { prompt: string }).prompt);
@@ -176,7 +179,7 @@ it("keeps the Bot across a handoff, and counts threads its old thread started", 
   expect(x.bots.chain()).toEqual(["bot1", threadId]);
 });
 
-it("keeps hidden runner threads under the Bot: out of BB's list, still in Needs you when urgent, its own chat visible", async () => {
+it("keeps hidden runner threads under the Bot: out of BB's list, still in Needs you when urgent; its chat isn't the runners' to hide", async () => {
   const x = await setup();
   x.add({ id: "bot1" });
   await x.bots.setThread("bot1");
@@ -190,6 +193,43 @@ it("keeps hidden runner threads under the Bot: out of BB's list, still in Needs 
   expect([...activity.inProgress, ...activity.waiting, ...activity.completed].map((t) => t.id)).toEqual(["w1"]);
   expect(x.threads.get("bot1")?.visibility).toBe("visible");
   expect(x.update).not.toHaveBeenCalled();
+});
+
+it("hides the Bot's chain from BB's list as it gets a thread: made, set or handed off", async () => {
+  const x = await setup();
+  const claimed: string[][] = [];
+  (x.bots as unknown as { deps: { claimChains(): Promise<unknown> } }).deps.claimChains = async () => { claimed.push(x.bots.list().flatMap((bot) => x.bots.chain(bot.id))); };
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  expect(claimed.at(-1)).toEqual(["t1"]);
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  expect(claimed.at(-1)).toEqual(["t1", scout.threadId]);
+  x.add({ id: "mine" });
+  await x.bots.setThread("mine");
+  expect(claimed.at(-1)).toContain("mine");
+  const moved = await x.bots.switchModel(scout.threadId!, { providerId: "claude", model: "sonnet" });
+  // Claimed once the Bot has moved to its new thread.
+  expect(claimed.at(-1)).toEqual(expect.arrayContaining([scout.threadId, moved.threadId]));
+  const count = claimed.length;
+  // A handoff of a thread that is no Bot's claims nothing.
+  x.add({ id: "plain", providerId: "codex" });
+  await x.bots.switchModel("plain", { providerId: "claude", model: "opus" });
+  expect(claimed.length).toBe(count);
+  // A failure never fails the Bot: the sweep retries.
+  (x.bots as unknown as { deps: { claimChains(): Promise<unknown> } }).deps.claimChains = async () => { throw new Error("busy"); };
+  await expect(x.bots.create({ name: "Third", avatar: "3️⃣" })).resolves.toBeTruthy();
+});
+
+it("puts a question in the Bot's hidden chat in Needs you, from its pending interactions", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", visibility: "hidden", status: "idle" });
+  await x.bots.setThread("bot1");
+  x.pending.set("bot1", [{ id: "q1", status: "pending" }]);
+  // Past BB's recent list: Studio fetches it, and its interactions say it waits on you.
+  x.list.mockImplementation(async () => []);
+  const activity = await x.bots.activity();
+  expect(activity.needsYou).toEqual([expect.objectContaining({ id: "bot1", relation: "self", needsYou: true })]);
+  x.pending.set("bot1", [{ id: "q1", status: "resolved" }]);
+  expect((await x.bots.activity()).needsYou).toEqual([]);
 });
 
 it("lists the threads a Bot owns in Activity though they're hidden from BB's list, but not hidden forks", async () => {

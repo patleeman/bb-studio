@@ -344,6 +344,7 @@ export default async function plugin(bb: BbPluginApi) {
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
     hiddenThreads: () => learning.reviewThreads(),
     ownedThreads: (botId) => ownedThreads.owned(botId),
+    claimChains: () => ownedThreads.claimChains(),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
@@ -361,9 +362,10 @@ export default async function plugin(bb: BbPluginApi) {
   });
   // Runner threads live under their Bot, out of BB's thread list: runners from
   // before (or a hide that failed) are hidden once; retried next startup.
-  // Threads a Bot owns (spawned by its chain, or by automations it or its
-  // threads made) live under it, out of BB's thread list (src/bot-owned.ts):
-  // hidden as they're made, plus a sweep at startup and every five minutes.
+  // Every thread a Bot uses (its chain, what the chain spawned, runs of
+  // automations it or its threads made) lives under it, out of BB's thread
+  // list (src/bot-owned.ts): hidden as they're made or assigned, plus a sweep
+  // at startup and every five minutes.
   const ownedThreads = new BotOwnedThreads({
     db, sdk: bb.sdk, changed: tagsChanged, log: (message) => bb.log.warn(message),
     bots: () => bots.list().map((bot) => ({ id: bot.id, chain: bots.chain(bot.id) })),
@@ -573,7 +575,12 @@ export default async function plugin(bb: BbPluginApi) {
     },
     project_leads: () => ({ leads: projectLeads.list() }),
     project_lead: ({ projectId }) => projectLeads.get(projectId),
-    project_set_lead: ({ projectId, threadId }) => projectLeads.setLead(projectId, threadId),
+    project_set_lead: async ({ projectId, threadId }) => {
+      const lead = await projectLeads.setLead(projectId, threadId);
+      // The personal project's lead is the primary Bot's thread.
+      if (projectId === PERSONAL_PROJECT_ID) await ownedThreads.claimChains().catch(() => {});
+      return lead;
+    },
     // The personal project's heartbeat is the Bot's: it can't be turned on while the Bot is paused or stopped.
     project_set_run: async ({ projectId, ...run }) => {
       if (projectId === PERSONAL_PROJECT_ID) await bots.setRun(run);

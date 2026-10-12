@@ -1293,11 +1293,14 @@ of Staff", with the same thread and check-ins; rename it from its page.
     suggestions and unread attention, and its subagents inherit it; the
     thread still opens from Studio, runs its automation and takes messages.
     Deleting a runner makes its thread visible again (an adopted one back in
-    the list, a Studio-made one in BB's archive). The Bot's own chat is never
-    hidden. Check-ins, reminders and watchers spawn no threads: they wake the
-    Bot's thread (or a runner's) or run a script.
-  - **Other threads a Bot owns** (`src/bot-owned.ts`) are hidden the same
-    way: threads its chain spawned at any depth (`parentThreadId` or
+    the list, a Studio-made one in BB's archive). Check-ins, reminders and
+    watchers spawn no threads: they wake the Bot's thread (or a runner's) or
+    run a script.
+  - **Every other thread a Bot uses** (`src/bot-owned.ts`) is hidden the
+    same way, so BB's main list keeps only the threads you made. That is the
+    Bot's own chat and handoff chain, hidden as soon as the Bot gets it (a
+    new Bot, Make this my Bot, a handoff to a new thread or model) and by
+    the sweep below; threads its chain spawned at any depth (`parentThreadId` or
     `lifecycleOwnerThreadId`; a fork the user made is theirs), and every
     thread an automation starts when the Bot's chain or a thread it owns
     created that automation (`createdByThreadId`), transitively. A child the
@@ -1308,9 +1311,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
     `automations_runs` for each run's thread, or the run's `[bb automation
     due:<id>]` first message when it's older than the runs page). They stay
     in the Bot's Activity and Recent, which list hidden threads
-    (`includeHidden`) except hidden forks (side chats, skill reviews).
+    (`includeHidden`) except hidden forks (side chats, skill reviews); the
+    Bot's chat is its Activity's own thread and opens from the Bots list.
     Studio records each thread it hid (`bot_hidden_threads`) and hides a
-    thread only once, so one you show again in BB stays visible. BB's thread
+    thread only once, so one you show again in BB, the Bot's chat included,
+    stays visible. A hidden thread has no unread dot or attention in BB, so
+    a question the Bot asks in its chat reaches you through Activity's
+    **Needs you** (Studio reads its pending interactions). BB's thread
     search skips hidden threads, so the Bot's history search does too.
   - **Sidebar**: a **Runners** group (status dot, next run; hover for the
     schedule and last report). A click opens the runner's thread as a

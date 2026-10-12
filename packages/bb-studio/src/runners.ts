@@ -26,7 +26,9 @@
 // and gets its automation. A new runner is spawned hidden, an adopted thread
 // is hidden when adopted (and made visible again when let go), and runners
 // from before are hidden once at startup (hideThreads). A Bot's own chat is
-// never hidden. Anything that needs the user still comes through runner_report.
+// never a runner's to hide (letting the runner go would show it again):
+// src/bot-owned.ts hides it with the rest of the Bot's chain. Anything that
+// needs the user still comes through runner_report.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -89,7 +91,7 @@ export interface RunnerDeps {
   startedThreads(botId?: string): Promise<{ id: string; title: string; projectId: string | null; parentThreadId?: string | null }[]>;
   /** A Bot's thread and the ones it handed off from. */
   chain(botId?: string): string[];
-  /** Every Bot's own thread and the ones it handed off from: never hidden. */
+  /** Every Bot's own thread and the ones it handed off from: never a runner's to hide (src/bot-owned.ts hides them). */
   botThreads?(): ReadonlySet<string>;
 }
 
@@ -127,7 +129,7 @@ export class Runners {
     return new Map(this.rows(botId).flatMap((row) => row.thread_id ? [[row.thread_id, { urgent: !!row.urgent }] as const] : []));
   }
 
-  /** A Bot's own chat (any Bot's, handed-off ones included): it stays in BB's thread list. */
+  /** A Bot's own chat (any Bot's, handed-off ones included): src/bot-owned.ts hides it, not a runner. */
   private isBotChat(threadId: string, botId: string): boolean {
     return this.deps.bot(botId)?.threadId === threadId || this.deps.chain(botId).includes(threadId) || !!this.deps.botThreads?.().has(threadId);
   }

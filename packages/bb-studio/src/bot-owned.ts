@@ -1,5 +1,7 @@
-// Bot-owned threads: work a Bot started lives under that Bot in Studio
-// (Bots panel, Activity), not in BB's main thread list.
+// Bot-owned threads: every thread a Bot uses lives under that Bot in Studio
+// (Bots panel, Activity), not in BB's main thread list. That is the Bot's
+// own chain (its chat and the threads it handed off from) and the work it
+// started. BB's main list keeps the threads the user made.
 //
 // A thread is owned by a Bot when
 //   (a) the Bot's chain (its thread and the ones it handed off from) spawned
@@ -9,8 +11,9 @@
 //       created that automation (createdByThreadId), transitively: a child
 //       the Bot spawned sets up an automation, and each run's new thread is
 //       the Bot's too.
-// The Bot's own chain is never hidden. Runner threads are hidden by
-// src/runners.ts and skipped here.
+// The Bot's chain is hidden too: by the sweep and thread.created, and at
+// once when a Bot gets a thread (made, set, or handed off: claimChains).
+// Runner threads are hidden by src/runners.ts and skipped here.
 //
 // How: thread.created hides a thread whose parent or owner is already known
 // to be the Bot's at once, and asks for a sweep otherwise (an automation's
@@ -22,7 +25,11 @@
 // starts with.
 //
 // Studio records each thread it hid (bot_hidden_threads) and never hides a
-// thread twice: a thread the user made visible again stays visible.
+// thread twice: a thread the user made visible again stays visible, the
+// Bot's own chat included.
+//
+// BB's threads.list drops hidden threads unless includeHidden is set, so
+// every Studio read of a Bot's threads (Activity, Bots list) passes it.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -116,10 +123,11 @@ export class BotOwnedThreads {
     return new Set((this.deps.db.prepare("SELECT thread_id FROM bot_hidden_threads").all() as { thread_id: string }[]).map((row) => row.thread_id));
   }
 
-  /** The threads a Bot owns (as last seen): Activity lists them under it. */
+  /** The threads a Bot owns (as last seen), its chain left out: Activity lists them under it. */
   owned(botId: string): Set<string> {
     const ids = new Set([...this.owners].filter(([, bot]) => bot === botId).map(([id]) => id));
     for (const row of this.deps.db.prepare("SELECT thread_id FROM bot_hidden_threads WHERE bot_id = ?").all(botId) as { thread_id: string }[]) ids.add(row.thread_id);
+    for (const id of this.chains().keys()) ids.delete(id);
     return ids;
   }
 
@@ -136,7 +144,7 @@ export class BotOwnedThreads {
   }
 
   /** Hides it once and records that Studio did; false when BB refused (the next sweep tries again). */
-  private async hide(threadId: string, botId: string, reason: "spawned" | "automation"): Promise<boolean> {
+  private async hide(threadId: string, botId: string, reason: "chain" | "spawned" | "automation"): Promise<boolean> {
     try {
       await this.deps.sdk.threads.update({ threadId, visibility: "hidden" } as never);
     } catch (error) {
@@ -147,14 +155,37 @@ export class BotOwnedThreads {
     return true;
   }
 
-  private eligible(thread: ThreadLike, chains: ReadonlyMap<string, string>, recorded: ReadonlySet<string>): boolean {
-    return thread.visibility !== "hidden" && !thread.archivedAt && !chains.has(thread.id) && !recorded.has(thread.id) && !this.deps.skip?.().has(thread.id);
+  private eligible(thread: ThreadLike, recorded: ReadonlySet<string>): boolean {
+    return thread.visibility !== "hidden" && !thread.archivedAt && !recorded.has(thread.id) && !this.deps.skip?.().has(thread.id);
   }
 
-  /** thread.created: a child of a known Bot thread hides now; one that may be an automation's run waits for a sweep. */
+  /**
+   * A Bot got a thread (made, set as its thread, or handed off to): hides
+   * each chain thread Studio never hid, at once. Returns how many it hid.
+   */
+  async claimChains(): Promise<number> {
+    const chains = this.chains();
+    const recorded = this.recorded();
+    let hid = 0;
+    for (const [threadId, botId] of chains) {
+      if (recorded.has(threadId)) continue;
+      const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null);
+      if (!thread || !this.eligible(thread as ThreadLike, recorded)) continue;
+      if (await this.hide(threadId, botId, "chain")) hid++;
+    }
+    if (hid) this.deps.changed?.();
+    return hid;
+  }
+
+  /** thread.created: a Bot's chain thread or a child of a known Bot thread hides now; one that may be an automation's run waits for a sweep. */
   async created(thread: ThreadLike): Promise<void> {
     const chains = this.chains();
-    if (!chains.size || !this.eligible(thread, chains, this.recorded())) return;
+    if (!chains.size || !this.eligible(thread, this.recorded())) return;
+    const chained = chains.get(thread.id);
+    if (chained) {
+      if (await this.hide(thread.id, chained, "chain")) this.deps.changed?.();
+      return;
+    }
     const known = (id: string | null | undefined) => id ? chains.get(id) ?? this.owners.get(id) : undefined;
     const via = known(thread.parentThreadId) ?? known(thread.lifecycleOwnerThreadId);
     if (via) {
@@ -176,7 +207,7 @@ export class BotOwnedThreads {
     this.timer = null;
   }
 
-  /** Finds every Bot-owned thread and hides the ones Studio never hid. Idempotent; returns how many it hid. */
+  /** Finds every Bot-owned thread, the Bots' chains included, and hides the ones Studio never hid. Idempotent; returns how many it hid. */
   sweep(): Promise<number> {
     this.running ??= this.run().finally(() => { this.running = null; });
     return this.running;
@@ -205,9 +236,10 @@ export class BotOwnedThreads {
     const recorded = this.recorded();
     let hid = 0;
     for (const thread of threads) {
-      const bot = owners.get(thread.id);
-      if (!bot || !this.eligible(thread, chains, recorded)) continue;
-      if (await this.hide(thread.id, bot, thread.parentThreadId || thread.lifecycleOwnerThreadId ? "spawned" : "automation")) hid++;
+      const chained = chains.get(thread.id);
+      const bot = chained ?? owners.get(thread.id);
+      if (!bot || !this.eligible(thread, recorded)) continue;
+      if (await this.hide(thread.id, bot, chained ? "chain" : thread.parentThreadId || thread.lifecycleOwnerThreadId ? "spawned" : "automation")) hid++;
     }
     if (hid) this.deps.changed?.();
     return hid;
