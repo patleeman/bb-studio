@@ -232,6 +232,30 @@
     {
       "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
+      "method": "bot_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_set",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_memory",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_skills",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
       "method": "bot_set_thread",
       "coverage": "generated method"
     },
