@@ -14,14 +14,14 @@ struct CaptureControl: ControlWidget {
     }
 }
 
-struct ChiefTalkControl: ControlWidget {
+struct BotTalkControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "nyc.plee.bbgo.chief-talk") {
-            ControlWidgetButton(action: OpenURLIntent(URL(string: "bbstudio://chief-talk")!)) {
-                Label("Talk to Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
+            ControlWidgetButton(action: OpenURLIntent(URL(string: "bbstudio://bot-talk")!)) {
+                Label("Talk to Bot", systemImage: "person.crop.circle.badge.checkmark")
             }
         }
-        .displayName("Talk to Chief of Staff")
+        .displayName("Talk to Bot")
         .description("Press to start talking, press again to send.")
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The cadence, time and cron fields a heartbeat is set with, used by the Chief of
-/// Staff's heartbeat.
+/// The cadence, time and cron fields a heartbeat is set with, used by the Bot's
+/// check-ins.
 struct HeartbeatFields: View {
     @Binding var cadence: String
     @Binding var time: Date
@@ -33,13 +33,13 @@ struct HeartbeatFields: View {
     }
 }
 
-/// Sets the heartbeat that wakes the Chief of Staff (`chief_of_staff_set_run`).
-struct ChiefHeartbeatSheet: View {
+/// Sets the check-ins (heartbeat) that wake the Bot (`bot_set_run`).
+struct BotHeartbeatSheet: View {
     var saved: () async -> Void = {}
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     @Environment(\.dismiss) private var dismiss
-    @State private var chief: ThreadLead?
+    @State private var bot: BotInfo?
     @State private var loaded = false
     @State private var beating = false
     @State private var cadence = "hourly"
@@ -48,40 +48,40 @@ struct ChiefHeartbeatSheet: View {
     @State private var busy = false
     @State private var error: String?
 
-    private var hasChief: Bool { chief?.threadId != nil }
+    private var hasBot: Bool { bot?.lead.threadId != nil && bot?.state == .active }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle("Heartbeat", isOn: $beating).disabled(!hasChief)
-                    if beating, hasChief { HeartbeatFields(cadence: $cadence, time: $time, cron: $cron) }
+                    Toggle("Check-ins", isOn: $beating).disabled(!hasBot)
+                    if beating, hasBot { HeartbeatFields(cadence: $cadence, time: $time, cron: $cron) }
                 } footer: {
-                    Text(!loaded ? "Loading…" : hasChief ? "Wakes the Chief of Staff on this schedule." : "Set a Chief of Staff to turn on the heartbeat.")
+                    Text(!loaded ? "Loading…" : hasBot ? "Wakes \(bot?.name ?? BotInfo.defaultName) on this schedule." : bot == nil ? "Make a Bot to turn on its check-ins." : "Resume \(bot?.name ?? BotInfo.defaultName) to turn on its check-ins.")
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
-            .navigationTitle("Chief of Staff Heartbeat")
+            .navigationTitle("Check-ins")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }
-                        .disabled(busy || !hasChief || (beating && cadence == "custom" && cron.trimmingCharacters(in: .whitespaces).isEmpty))
+                        .disabled(busy || !hasBot || (beating && cadence == "custom" && cron.trimmingCharacters(in: .whitespaces).isEmpty))
                 }
             }
         }
         .task {
             do {
-                chief = try await app.client.chiefOfStaff()
+                bot = try await app.client.bot()
             } catch {
                 self.error = BBClient.describe(error, server: app.client.baseURL)
             }
             loaded = true
-            beating = chief?.heartbeat != nil
-            cadence = chief?.heartbeat ?? "hourly"
-            cron = chief?.cron ?? ""
-            if let parsed = HeartbeatFields.date(chief?.time) { time = parsed }
+            beating = bot?.lead.heartbeat != nil
+            cadence = bot?.lead.heartbeat ?? "hourly"
+            cron = bot?.lead.cron ?? ""
+            if let parsed = HeartbeatFields.date(bot?.lead.time) { time = parsed }
         }
     }
 
@@ -91,7 +91,7 @@ struct ChiefHeartbeatSheet: View {
         do {
             try await operation.run(currentServer: { app.serverURL }, work: { client in
                 let custom = cadence == "custom" ? cron.trimmingCharacters(in: .whitespaces) : nil
-                try await client.setChiefOfStaffHeartbeat(enabled: beating, cadence: cadence, time: HeartbeatFields.text(time), cron: custom)
+                try await client.setBotHeartbeat(enabled: beating, cadence: cadence, time: HeartbeatFields.text(time), cron: custom)
             }, completion: { _ in
                 Task { await saved() }
                 dismiss()

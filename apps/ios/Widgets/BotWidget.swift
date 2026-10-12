@@ -2,21 +2,23 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-/// The Chief of Staff, the lead of BB's personal project: its latest message, a mic,
+/// The user's Bot (the lead of BB's personal project): its latest message, a mic,
 /// and Approve and Deny when it is waiting on an approval.
-struct ChiefEntry: TimelineEntry {
+struct BotEntry: TimelineEntry {
     var serverURL: URL = ServerScope.selectedURL
     var date: Date
     var threadId: String?
     var message: String?
     var running = false
-    var approval: ChiefApproval?
+    var approval: BotApproval?
     var stale = false
+    /// The Bot's name and emoji, as last loaded.
+    var title = BotInfo.defaultName
 
-    static let placeholder = ChiefEntry(date: .now, message: "Your chief of staff's latest message shows here.")
+    static let placeholder = BotEntry(date: .now, message: "Your Bot's latest message shows here.")
 }
 
-struct ChiefApproval: Codable, Hashable {
+struct BotApproval: Codable, Hashable {
     var interactionId: String
     var summary: String
     var canApprove: Bool
@@ -24,29 +26,29 @@ struct ChiefApproval: Codable, Hashable {
     var subjectKind: String?
 }
 
-private struct ChiefCache: Codable {
+private struct BotCache: Codable {
     var threadId: String?
     var message: String?
     var running: Bool
-    var approval: ChiefApproval?
+    var approval: BotApproval?
 }
 
-struct ChiefProvider: TimelineProvider {
-    func placeholder(in context: Context) -> ChiefEntry { .placeholder }
+struct BotProvider: TimelineProvider {
+    func placeholder(in context: Context) -> BotEntry { .placeholder }
 
-    func getSnapshot(in context: Context, completion: @escaping (ChiefEntry) -> Void) {
+    func getSnapshot(in context: Context, completion: @escaping (BotEntry) -> Void) {
         completion(cached() ?? .placeholder)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<ChiefEntry>) -> Void) {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<BotEntry>) -> Void) {
         Task {
             let client = BBClient()
-            var entry = cached() ?? ChiefEntry(date: .now)
+            var entry = cached() ?? BotEntry(date: .now)
             do {
-                guard let threadId = try await client.chiefOfStaffThreadId() else {
-                    entry = ChiefEntry(date: .now)
+                guard let threadId = try await client.botThreadId() else {
+                    entry = BotEntry(date: .now)
                     // Forget the old lead, so a later offline refresh doesn't bring it back.
-                    DiskCache.save(ChiefCache(threadId: nil, message: nil, running: false, approval: nil), as: "chief-widget", serverURL: client.baseURL)
+                    DiskCache.save(BotCache(threadId: nil, message: nil, running: false, approval: nil), as: "chief-widget", serverURL: client.baseURL)
                     throw CancellationError()
                 }
                 async let reply = client.latestReply(threadId)
@@ -58,12 +60,12 @@ struct ChiefProvider: TimelineProvider {
                 entry.approval = (try? await pending)?
                     .first { $0.status == "pending" && $0.payload.kind == "approval" }
                     .map {
-                        ChiefApproval(interactionId: $0.id, summary: $0.payload.subject?.command ?? $0.payload.subject?.plan ?? $0.summary,
+                        BotApproval(interactionId: $0.id, summary: $0.payload.subject?.command ?? $0.payload.subject?.plan ?? $0.summary,
                                       canApprove: $0.decisions.contains("allow_once"), canDeny: $0.decisions.contains("deny"),
                                       subjectKind: $0.payload.subject?.kind)
                     }
                 entry.stale = false
-                DiskCache.save(ChiefCache(threadId: threadId, message: entry.message, running: entry.running, approval: entry.approval),
+                DiskCache.save(BotCache(threadId: threadId, message: entry.message, running: entry.running, approval: entry.approval),
                                as: "chief-widget", serverURL: client.baseURL)
             } catch is CancellationError {
             } catch {
@@ -71,15 +73,18 @@ struct ChiefProvider: TimelineProvider {
             }
             entry.date = .now
             entry.serverURL = client.baseURL
+            entry.title = [client.cachedBotAvatar, client.cachedBotName].compactMap { $0 }.joined(separator: " ")
             if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
             // The app reloads widgets when a thread starts or stops running.
             completion(Timeline(entries: [entry], policy: .after(.now + (entry.running ? 5 : 15) * 60)))
         }
     }
 
-    private func cached() -> ChiefEntry? {
-        guard let value = DiskCache.load(ChiefCache.self, key: "chief-widget") else { return nil }
-        return ChiefEntry(date: .now, threadId: value.threadId, message: value.message, running: value.running, approval: value.approval)
+    private func cached() -> BotEntry? {
+        guard let value = DiskCache.load(BotCache.self, key: "chief-widget") else { return nil }
+        let client = BBClient()
+        return BotEntry(date: .now, threadId: value.threadId, message: value.message, running: value.running, approval: value.approval,
+                        title: [client.cachedBotAvatar, client.cachedBotName].compactMap { $0 }.joined(separator: " "))
     }
 
     /// Markdown markers read as noise at widget size.
@@ -90,9 +95,9 @@ struct ChiefProvider: TimelineProvider {
     }
 }
 
-/// Answers the chief's pending approval from the widget, without opening the app.
-struct ChiefDecisionIntent: AppIntent {
-    static let title: LocalizedStringResource = "Answer Chief of Staff"
+/// Answers the Bot's pending approval from the widget, without opening the app.
+struct BotDecisionIntent: AppIntent {
+    static let title: LocalizedStringResource = "Answer Bot"
     static let isDiscoverable = false
 
     @Parameter(title: "Thread") var threadId: String
@@ -116,27 +121,28 @@ struct ChiefDecisionIntent: AppIntent {
     }
 }
 
-struct ChiefWidget: Widget {
+struct BotWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "BBChief", provider: ChiefProvider()) { entry in
-            ChiefWidgetView(entry: entry).containerBackground(.fill.tertiary, for: .widget)
+        // Kept from the Chief of Staff widget, so widgets people placed stay.
+        StaticConfiguration(kind: "BBChief", provider: BotProvider()) { entry in
+            BotWidgetView(entry: entry).containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("Chief of Staff")
-        .description("Your chief of staff's latest message, with a mic to talk to it.")
+        .configurationDisplayName("Bot")
+        .description("Your Bot's latest message, with a mic to talk to it.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
     }
 }
 
-private struct ChiefWidgetView: View {
+private struct BotWidgetView: View {
     @Environment(\.widgetFamily) private var family
-    private let snapshot: ChiefEntry
-    init(entry: ChiefEntry) { snapshot = entry }
-    private var entry: ChiefEntry { snapshot.serverURL == ServerScope.selectedURL ? snapshot : .placeholder }
+    private let snapshot: BotEntry
+    init(entry: BotEntry) { snapshot = entry }
+    private var entry: BotEntry { snapshot.serverURL == ServerScope.selectedURL ? snapshot : .placeholder }
 
-    private var talkURL: URL { AppLink.scoped(URL(string: "bbstudio://chief-talk")!, serverURL: entry.serverURL) }
-    private var openURL: URL { AppLink.scoped(URL(string: "bbstudio://chief")!, serverURL: entry.serverURL) }
+    private var talkURL: URL { AppLink.scoped(URL(string: "bbstudio://bot-talk")!, serverURL: entry.serverURL) }
+    private var openURL: URL { AppLink.scoped(URL(string: "bbstudio://bot")!, serverURL: entry.serverURL) }
     private var message: String {
-        if entry.threadId == nil && entry.message == nil { return "No Chief of Staff is set. Pick one from a thread's menu in BB Studio." }
+        if entry.threadId == nil && entry.message == nil { return "You don't have a Bot yet. Make one in Studio → Bot." }
         return entry.message ?? "No messages yet."
     }
 
@@ -150,7 +156,7 @@ private struct ChiefWidgetView: View {
             .widgetURL(entry.approval != nil ? openURL : talkURL)
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 1) {
-                Label(entry.approval != nil ? "Needs approval" : entry.running ? "Working…" : "Chief of Staff",
+                Label(entry.approval != nil ? "Needs approval" : entry.running ? "Working…" : entry.title,
                       systemImage: "person.crop.circle.badge.checkmark")
                     .font(.headline)
                 Text(entry.approval?.summary ?? message).font(.caption).lineLimit(2)
@@ -176,7 +182,7 @@ private struct ChiefWidgetView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Text(entry.approval != nil ? "Needs approval" : entry.running ? "Working…" : "Chief of Staff")
+            Text(entry.approval != nil ? "Needs approval" : entry.running ? "Working…" : entry.title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(entry.approval != nil ? Color.orange : entry.running ? .green : .secondary)
                 .lineLimit(1)
@@ -189,22 +195,22 @@ private struct ChiefWidgetView: View {
                     .frame(width: 30, height: 30)
                     .background(Color.red, in: .circle)
             }
-            .accessibilityLabel("Talk to Chief of Staff")
+            .accessibilityLabel("Talk to \(entry.title)")
         }
     }
 
     @ViewBuilder
-    private func decisions(_ approval: ChiefApproval) -> some View {
+    private func decisions(_ approval: BotApproval) -> some View {
         if let threadId = entry.threadId {
             HStack(spacing: 6) {
                 if approval.canApprove {
-                    Button(intent: ChiefDecisionIntent(threadId: threadId, interactionId: approval.interactionId, decision: "allow_once", serverURL: entry.serverURL)) {
+                    Button(intent: BotDecisionIntent(threadId: threadId, interactionId: approval.interactionId, decision: "allow_once", serverURL: entry.serverURL)) {
                         Text(approvalLabel("allow_once", subjectKind: approval.subjectKind)).frame(maxWidth: .infinity)
                     }
                     .tint(.green)
                 }
                 if approval.canDeny {
-                    Button(intent: ChiefDecisionIntent(threadId: threadId, interactionId: approval.interactionId, decision: "deny", serverURL: entry.serverURL)) {
+                    Button(intent: BotDecisionIntent(threadId: threadId, interactionId: approval.interactionId, decision: "deny", serverURL: entry.serverURL)) {
                         Text(approvalLabel("deny", subjectKind: approval.subjectKind)).frame(maxWidth: .infinity)
                     }
                     .tint(.red)

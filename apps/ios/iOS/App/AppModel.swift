@@ -72,7 +72,7 @@ enum Sheet: Identifiable, Hashable {
 }
 
 enum Tab: Hashable {
-    case inbox, studio, chief, settings
+    case inbox, studio, bot, settings
 }
 
 @MainActor
@@ -84,8 +84,10 @@ final class AppModel: ObservableObject {
     @Published var tab: Tab = .inbox
     @Published var path: [Route] = []
     @Published var studioPath: [Route] = []
-    /// Set by the Action button until the Chief of Staff tab starts or stops talking.
-    @Published var chiefTalkPending = false
+    /// Set by the Action button until the Bot tab starts or stops talking.
+    @Published var botTalkPending = false
+    /// The Bot's name and emoji for its tab, as last loaded for this server.
+    @Published var botTitle: String?
     /// The Studio tab's kind filter; nil for everything.
     @Published var studioKind: String?
     @Published var sheet: Sheet?
@@ -130,7 +132,7 @@ final class AppModel: ObservableObject {
         PhoneRelay.shared.pushStatus([])
         studioKind = nil
         sheet = nil
-        chiefTalkPending = false
+        botTalkPending = false
         realtime.stop()
         client = BBClient(baseURL: url)
         realtime = BBRealtime(client: client)
@@ -183,7 +185,7 @@ final class AppModel: ObservableObject {
     }
 
     /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`,
-    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://chief` (also the old `web`), `bbstudio://chief-talk`.
+    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://bot` (also `chief` and the old `web`), `bbstudio://bot-talk` (also `chief-talk`).
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
@@ -210,8 +212,8 @@ final class AppModel: ObservableObject {
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
-        case "chief", "web": tab = .chief
-        case "chief-talk": toggleChiefTalk()
+        case "bot", "chief", "web": tab = .bot
+        case "bot-talk", "chief-talk": toggleBotTalk()
         case "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
         default: tab = .inbox
@@ -266,10 +268,10 @@ final class AppModel: ObservableObject {
         sheet = .dictation(threadId: threadId, autoStart: true)
     }
 
-    func toggleChiefTalk() {
+    func toggleBotTalk() {
         sheet = nil
-        tab = .chief
-        chiefTalkPending = true
+        tab = .bot
+        botTalkPending = true
     }
 
     func startVoiceChat(threadId: String? = nil) {

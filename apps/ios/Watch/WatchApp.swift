@@ -22,9 +22,9 @@ struct WatchInboxView: View {
         List {
             if let chief = model.chiefId {
                 NavigationLink {
-                    WatchThreadView(threadId: chief, title: "Chief of Staff", talkFirst: true)
+                    WatchThreadView(threadId: chief, title: model.botName, talkFirst: true)
                 } label: {
-                    Label("Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
+                    Label(model.botName, systemImage: "person.crop.circle.badge.checkmark")
                         .foregroundStyle(Color.accentColor)
                 }
             }
@@ -56,12 +56,12 @@ struct WatchInboxView: View {
         .refreshable { await model.load() }
         .navigationDestination(isPresented: $showChief) {
             if let chief = model.chiefId {
-                WatchThreadView(threadId: chief, title: "Chief of Staff", talkFirst: true)
+                WatchThreadView(threadId: chief, title: model.botName, talkFirst: true)
             }
         }
-        // The Chief of Staff complication.
+        // The Bot complication (`chief` from complications placed before the rename).
         .onOpenURL { url in
-            guard url.host() == "chief" else { return }
+            guard url.host() == "bot" || url.host() == "chief" else { return }
             Task {
                 if model.chiefId == nil { await model.load() }
                 showChief = model.chiefId != nil
@@ -73,7 +73,7 @@ struct WatchInboxView: View {
 struct WatchThreadView: View {
     let threadId: String
     let title: String
-    /// Puts the reply field first, for the Chief of Staff: tap it and speak.
+    /// Puts the reply field first, for the Bot: tap it and speak.
     var talkFirst = false
     @State private var rows: [TimelineRow] = []
     @State private var thread: ThreadEntry?
@@ -104,7 +104,7 @@ struct WatchThreadView: View {
     private var threadList: some View {
         List {
             if talkFirst {
-                TextField("Talk to chief…", text: $reply)
+                TextField("Talk to bot…", text: $reply)
                     .onSubmit { send(reply, clearsDraft: true) }
             }
             if let loadError, rows.isEmpty {

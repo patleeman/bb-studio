@@ -15,9 +15,9 @@ struct RootView: View {
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)
 
-            ChiefOfStaffTab()
-                .tabItem { Label("Chief of Staff", systemImage: "person.crop.circle.badge.checkmark") }
-                .tag(Tab.chief)
+            BotTab()
+                .tabItem { Label(model.botTitle ?? BotInfo.defaultName, systemImage: "person.crop.circle.badge.checkmark") }
+                .tag(Tab.bot)
 
             NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gear") }
@@ -110,28 +110,40 @@ struct RouteDestination: View {
     }
 }
 
-/// Studio's Chief of Staff thread, the agent to go to first.
-private struct ChiefOfStaffTab: View {
+/// Studio's Bot: its chat, with its state, Activity, check-ins and Pause / Resume / Stop.
+private struct BotTab: View {
     @EnvironmentObject private var model: AppModel
     @State private var path: [Route] = []
-    @State private var lead = ChiefLead.loading
+    @State private var lead = BotLead.loading
+    @State private var activity: BotActivity?
     @State private var attempt = 0
     @State private var editingHeartbeat = false
+    @State private var showingActivity = false
+    @State private var confirmingStop = false
+    @State private var error: String?
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let attempt: Int }
+
+    private var bot: BotInfo? { if case .bot(let bot) = lead { bot } else { nil } }
 
     var body: some View {
         NavigationStack(path: $path) {
             Group {
                 switch lead {
-                case .thread(let id):
-                    ThreadView(threadId: id, hidesTabBar: false, answersActionButton: true).id("\(model.serverURL.absoluteString)|\(id)")
+                case .bot(let bot):
+                    if let id = bot.lead.threadId {
+                        ThreadView(threadId: id, hidesTabBar: false, answersActionButton: true).id("\(model.serverURL.absoluteString)|\(id)")
+                            .safeAreaInset(edge: .top) { banner(bot) }
+                    } else {
+                        ContentUnavailableView("\(bot.name) has no chat", systemImage: "person.crop.circle.badge.questionmark",
+                                               description: Text("Open a thread, then choose Make this my Bot from its ⋯ menu."))
+                    }
                 case .none:
-                    ContentUnavailableView("No chief of staff",
+                    ContentUnavailableView("No Bot yet",
                                            systemImage: "person.crop.circle.badge.questionmark",
-                                           description: Text("No Chief of Staff is set. The Chief of Staff leads your personal project: open a thread, then choose Make Chief of Staff from its ⋯ menu."))
+                                           description: Text("Your Bot is an always-on agent that sees every project. Create it in Studio → Bot on your Mac, or open a thread and choose Make this my Bot from its ⋯ menu."))
                 case .unavailable(let message):
                     ContentUnavailableView {
-                        Label("Chief of Staff unavailable", systemImage: "exclamationmark.triangle")
+                        Label("Bot unavailable", systemImage: "exclamationmark.triangle")
                     } description: {
                         Text(message)
                     } actions: {
@@ -143,46 +155,175 @@ private struct ChiefOfStaffTab: View {
             }
             .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             .toolbar {
-                if case .thread = lead {
+                if let bot {
+                    ToolbarItem(placement: .topBarLeading) { botMenu(bot) }
                     ToolbarItem(placement: .topBarLeading) {
-                        Button { editingHeartbeat = true } label: { Label("Heartbeat", systemImage: "waveform.path.ecg") }
-                            .accessibilityHint("Sets how often the Chief of Staff wakes")
+                        Button { showingActivity = true } label: {
+                            Label("Activity", systemImage: (activity?.needsYou.isEmpty ?? true) ? "list.bullet.rectangle" : "exclamationmark.bubble.fill")
+                        }
+                        .badge(activity?.needsYou.count ?? 0)
+                        .accessibilityHint("What \(bot.name) is doing and what needs you")
                     }
                 }
             }
-            .sheet(isPresented: $editingHeartbeat) { ChiefHeartbeatSheet() }
+            .sheet(isPresented: $editingHeartbeat, onDismiss: { attempt += 1 }) { BotHeartbeatSheet() }
+            .sheet(isPresented: $showingActivity) {
+                BotActivitySheet(name: bot?.name ?? BotInfo.defaultName, activity: activity) { id in
+                    showingActivity = false
+                    path.append(.thread(id: id))
+                } refresh: { await loadActivity() }
+            }
+            .confirmationDialog("Stop \(bot?.name ?? BotInfo.defaultName)?", isPresented: $confirmingStop, titleVisibility: .visible) {
+                Button("Stop", role: .destructive) { change(.stop) }
+            } message: {
+                Text("It pauses, its check-ins and automations turn off, and the running threads it started stop. Its chat and data are kept.")
+            }
+            .alert("Couldn't change the Bot", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("OK", role: .cancel) { error = nil }
+            } message: { Text(error ?? "") }
         }
-        .task(id: LoadKey(visible: model.tab == .chief, server: model.serverURL, attempt: attempt)) {
-            guard model.tab == .chief else { return }
+        .task(id: LoadKey(visible: model.tab == .bot, server: model.serverURL, attempt: attempt)) {
+            guard model.tab == .bot else { return }
             let client = model.client
-            // Another server's lead is never shown for this one.
-            if case .thread(let shown) = lead, client.cachedChiefOfStaffThreadId != shown { lead = .loading }
+            // Another server's Bot is never shown for this one.
+            if case .bot(let shown) = lead, client.cachedBotThreadId != shown.lead.threadId { lead = .loading }
             do {
-                lead = ChiefLead(try await client.chiefOfStaffThreadId())
+                lead = BotLead(try await client.bot())
             } catch where BBClient.isCancellation(error) {
                 return
             } catch {
                 guard client.baseURL == model.serverURL else { return }
                 // Offline or a server without Studio: keep what this server last said.
-                if case .thread = lead {
-                } else if let cached = client.cachedChiefOfStaffThreadId {
-                    lead = .thread(cached)
+                if case .bot = lead {
+                } else if let cached = client.cachedBotThreadId {
+                    lead = .bot(BotInfo(name: client.cachedBotName, avatar: client.cachedBotAvatar ?? BotInfo.defaultAvatar, state: .active, lead: ThreadLead(threadId: cached)))
                 } else {
                     lead = .unavailable(BBClient.describe(error, server: client.baseURL))
                 }
             }
+            model.botTitle = bot?.name
             // An Action button press with nothing to talk to must not start recording later.
-            if case .thread = lead {} else { model.chiefTalkPending = false }
+            if bot?.lead.threadId == nil { model.botTalkPending = false }
+            await loadActivity()
+        }
+    }
+
+    private func loadActivity() async {
+        guard bot != nil else { activity = nil; return }
+        activity = try? await model.client.botActivity()
+    }
+
+    @ViewBuilder
+    private func banner(_ bot: BotInfo) -> some View {
+        if bot.state != .active {
+            HStack(spacing: 8) {
+                Image(systemName: bot.state == .paused ? "pause.circle.fill" : "stop.circle.fill").foregroundStyle(.orange)
+                Text("\(bot.name) is \(bot.state.rawValue). It won't start new work.").font(.footnote)
+                Spacer(minLength: 0)
+                Button("Resume") { change(.resume) }.font(.footnote.weight(.semibold))
+            }
+            .padding(.horizontal).padding(.vertical, 8)
+            .background(.bar)
+        }
+    }
+
+    private func botMenu(_ bot: BotInfo) -> some View {
+        Menu {
+            Section("\(bot.title) · \(bot.state.rawValue.capitalized)") {
+                Button { editingHeartbeat = true } label: { Label("Check-ins…", systemImage: "waveform.path.ecg") }
+                    .disabled(bot.state != .active)
+                if bot.state == .active {
+                    Button { change(.pause) } label: { Label("Pause", systemImage: "pause.circle") }
+                } else {
+                    Button { change(.resume) } label: { Label("Resume", systemImage: "play.circle") }
+                }
+                if bot.state != .stopped {
+                    Button(role: .destructive) { confirmingStop = true } label: { Label("Stop…", systemImage: "stop.circle") }
+                }
+            }
+        } label: {
+            Text(bot.avatar).font(.title3).accessibilityLabel("\(bot.name), \(bot.state.rawValue)")
+        }
+    }
+
+    private func change(_ action: BotInfo.Action) {
+        Task {
+            do {
+                if let next = try await model.client.setBotState(action) { lead = .bot(next) }
+                await loadActivity()
+            } catch {
+                self.error = BBClient.describe(error, server: model.client.baseURL)
+            }
         }
     }
 }
 
-/// What the Chief of Staff tab shows for the selected server.
-enum ChiefLead: Equatable {
+/// What the Bot tab shows for the selected server.
+enum BotLead: Equatable {
     case loading
-    case thread(String)
+    case bot(BotInfo)
     case none
     case unavailable(String)
 
-    init(_ threadId: String?) { self = threadId.map(ChiefLead.thread) ?? .none }
+    init(_ bot: BotInfo?) { self = bot.map(BotLead.bot) ?? .none }
+}
+
+/// The Bot's Needs you and Activity: In progress, Scheduled, Completed.
+struct BotActivitySheet: View {
+    let name: String
+    let activity: BotActivity?
+    var open: (String) -> Void
+    var refresh: () async -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                threads("Needs you", activity?.needsYou, empty: "Nothing needs you.")
+                threads("In progress", activity?.inProgress, empty: "Nothing running.")
+                Section("Scheduled") {
+                    if let scheduled = activity?.scheduled, !scheduled.isEmpty {
+                        ForEach(scheduled) { item in
+                            LabeledContent {
+                                Text(!item.enabled ? "Off" : item.nextRunAt.map { Date(timeIntervalSince1970: $0 / 1000).formatted(date: .abbreviated, time: .shortened) } ?? "On")
+                            } label: {
+                                Label(item.name, systemImage: item.kind == "heartbeat" ? "waveform.path.ecg" : "clock")
+                            }
+                        }
+                    } else {
+                        Text("No check-ins or automations.").foregroundStyle(.secondary)
+                    }
+                }
+                threads("Completed", activity?.completed, empty: "Threads it starts show here when they finish.")
+            }
+            .refreshable { await refresh() }
+            .navigationTitle("\(name)'s Activity")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+
+    private func threads(_ title: String, _ rows: [BotActivity.Thread]?, empty: String) -> some View {
+        Section(title) {
+            if let rows, !rows.isEmpty {
+                ForEach(rows) { row in
+                    Button { open(row.id) } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.relation == "self" ? "Its chat" : row.title).lineLimit(1)
+                                Text(row.needsYou ? "Waiting for you" : Date(timeIntervalSince1970: row.updatedAt / 1000).formatted(.relative(presentation: .named)))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: row.needsYou ? "exclamationmark.bubble" : row.relation == "self" ? "bubble.left" : "arrow.triangle.branch")
+                                .foregroundStyle(row.needsYou ? .orange : .secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                }
+            } else {
+                Text(empty).foregroundStyle(.secondary)
+            }
+        }
+    }
 }

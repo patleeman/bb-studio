@@ -6,7 +6,7 @@ struct ThreadView: View {
     private var client: BBClient { operation.client }
     @StateObject private var model: ThreadModel
     @StateObject private var talk: HoldToTalk
-    @StateObject private var chief = ChiefOfStaffModel()
+    @StateObject private var bot = BotModel()
     @State private var draft = ""
     @State private var mentions: [Mention] = []
     @ObservedObject private var outbox = Outbox.shared
@@ -44,7 +44,7 @@ struct ThreadView: View {
     @State private var confirmingCompact = false
     @State private var confirmingClearContext = false
     @State private var showingContext = false
-    @State private var editingChiefHeartbeat = false
+    @State private var editingBotHeartbeat = false
     @State private var renaming = false
     @State private var openingFile: OpenFile?
     @State private var newTitle = ""
@@ -61,7 +61,7 @@ struct ThreadView: View {
     /// Hides the tab bar on iPhone, for a thread pushed from a list; a tab's
     /// own thread keeps it.
     private let hidesTabBar: Bool
-    /// The Chief of Staff's thread: the Action button talks to it.
+    /// The Bot's thread: the Action button talks to it.
     private let answersActionButton: Bool
 
     init(threadId: String, hidesTabBar: Bool = true, answersActionButton: Bool = false) {
@@ -124,7 +124,7 @@ struct ThreadView: View {
                 composerFocused = true
             }
         }
-        .sheet(isPresented: $editingChiefHeartbeat) { ChiefHeartbeatSheet() }
+        .sheet(isPresented: $editingBotHeartbeat) { BotHeartbeatSheet() }
         .sheet(isPresented: $showingContext) { ThreadContextView(threadId: model.threadId) }
         .alert("Rename thread", isPresented: $renaming) {
             TextField("Title", text: $newTitle)
@@ -203,7 +203,7 @@ struct ThreadView: View {
                 Task { sourcePage = try? await client.chatPage(model.threadId) }
             }
             if runningPlugins.split(separator: ",").contains("studio") {
-                Task { await chief.load(client: client) }
+                Task { await bot.load(client: client) }
             }
             await model.load()
         }
@@ -225,7 +225,7 @@ struct ThreadView: View {
             }
             takeActionButton()
         }
-        .onChange(of: app.chiefTalkPending) { _, _ in takeActionButton() }
+        .onChange(of: app.botTalkPending) { _, _ in takeActionButton() }
         .onChange(of: talk.error) { _, error in
             if let error { app.flash(error) }
         }
@@ -329,10 +329,10 @@ struct ThreadView: View {
                             Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
                         }
                     }
-                    ChiefOfStaffMenu(
-                        model: chief, threadId: model.threadId,
+                    BotMenu(
+                        model: bot, threadId: model.threadId,
                         isChild: model.thread?.parentThreadId != nil,
-                        editHeartbeat: { editingChiefHeartbeat = true }
+                        editHeartbeat: { editingBotHeartbeat = true }
                     ) { model.error = $0 }
                     if let sourcePage {
                         Button { app.push(.page(id: sourcePage.id)) } label: {
@@ -611,8 +611,8 @@ struct ThreadView: View {
     }
 
     private func takeActionButton() {
-        guard answersActionButton, app.chiefTalkPending else { return }
-        app.chiefTalkPending = false
+        guard answersActionButton, app.botTalkPending else { return }
+        app.botTalkPending = false
         // Dictation and voice chat own the microphone while they're open.
         guard !dictating, app.sheet == nil else { return }
         talk.toggleHandsFree()

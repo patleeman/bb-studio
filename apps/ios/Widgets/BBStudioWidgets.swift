@@ -7,10 +7,10 @@ struct BBStudioWidgets: WidgetBundle {
     var body: some Widget {
         RecordingLiveActivity()
         StatusWidget()
-        ChiefWidget()
+        BotWidget()
         WorkWidget()
         CaptureControl()
-        ChiefTalkControl()
+        BotTalkControl()
         DictateControl()
         VoiceControl()
         NewThreadControl()

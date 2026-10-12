@@ -165,8 +165,9 @@ final class WatchModel: ObservableObject {
 
     @Published private(set) var client: BBClient
     @Published var threads: [ThreadEntry] = []
-    /// The Chief of Staff: Studio's Chief of Staff slot, pinned above the list.
+    /// The user's Bot (formerly the Chief of Staff), pinned above the list.
     @Published var chiefId: String?
+    @Published var botName = BotInfo.defaultName
     @Published var error: String?
     @Published var loading = false
     private var loadGeneration = 0
@@ -216,10 +217,11 @@ final class WatchModel: ObservableObject {
             threads = loadedThreads
             // Nil clears a lead that was removed; a failed lookup keeps the last answer.
             do {
-                let chief = try await client.chiefOfStaffThreadId()
-                if generation == loadGeneration { chiefId = chief }
+                let bot = try await client.bot()
+                if generation == loadGeneration { chiefId = bot?.lead.threadId; botName = bot?.title ?? BotInfo.defaultName }
             } catch where generation == loadGeneration && chiefId == nil {
-                chiefId = client.cachedChiefOfStaffThreadId
+                chiefId = client.cachedBotThreadId
+                botName = client.cachedBotName
             }
             StatusSnapshot(ThreadSummary(threads), serverURL: client.baseURL).save()
             guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }

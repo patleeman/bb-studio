@@ -83,7 +83,7 @@ struct BBStudioWatchWidgets: WidgetBundle {
     }
 }
 
-/// Opens the Chief of Staff, Studio's Chief of Staff slot, from the watch face.
+/// Opens the user's Bot (formerly the Chief of Staff) from the watch face.
 /// Shows its latest message once the watch app has opened the thread.
 struct ChiefEntry: TimelineEntry {
     var date: Date
@@ -104,10 +104,10 @@ struct ChiefComplication: Widget {
         StaticConfiguration(kind: "BBGoChief", provider: ChiefProvider()) { entry in
             ChiefComplicationView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
-                .widgetURL(URL(string: "bbstudio://chief"))
+                .widgetURL(URL(string: "bbstudio://bot"))
         }
-        .configurationDisplayName("Chief of Staff")
-        .description("Talk to your chief of staff.")
+        .configurationDisplayName("Bot")
+        .description("Talk to your Bot.")
         .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryInline, .accessoryRectangular])
     }
 }
@@ -127,12 +127,12 @@ struct ChiefComplicationView: View {
         case .accessoryCorner:
             Image(systemName: "person.crop.circle.badge.checkmark")
                 .font(.title3)
-                .widgetLabel { Text("Chief") }
+                .widgetLabel { Text("Bot") }
         case .accessoryInline:
-            Label("Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
+            Label("Bot", systemImage: "person.crop.circle.badge.checkmark")
         default:
             VStack(alignment: .leading, spacing: 2) {
-                Label("Chief of Staff", systemImage: "person.crop.circle.badge.checkmark")
+                Label("Bot", systemImage: "person.crop.circle.badge.checkmark")
                     .font(.headline)
                     .widgetAccentable()
                 Text(entry.latest ?? "Tap to talk").font(.caption).lineLimit(2)

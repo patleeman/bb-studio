@@ -160,35 +160,36 @@ struct CaptureIntent: AppIntent {
     }
 }
 
+/// Kept under its old type name so shortcuts people made still run.
 struct TalkToChiefIntent: AppIntent {
-    static let title: LocalizedStringResource = "Talk to Chief of Staff"
-    static let description = IntentDescription("Start talking to your Chief of Staff; run it again to send.")
+    static let title: LocalizedStringResource = "Talk to Bot"
+    static let description = IntentDescription("Start talking to your Bot; run it again to send.")
     static let openAppWhenRun = true
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.toggleChiefTalk()
+        AppModel.shared.toggleBotTalk()
         return .result()
     }
 }
 
 struct TellChiefIntent: AppIntent {
-    static let title: LocalizedStringResource = "Tell Chief of Staff"
-    static let description = IntentDescription("Send a message to your Chief of Staff and hear the reply.")
+    static let title: LocalizedStringResource = "Tell Bot"
+    static let description = IntentDescription("Send a message to your Bot and hear the reply.")
 
-    @Parameter(title: "Message", requestValueDialog: "What should I tell your chief of staff?")
+    @Parameter(title: "Message", requestValueDialog: "What should I tell your bot?")
     var message: String
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
         let client = BBClient()
         let leadId: String?
         do {
-            leadId = try await client.chiefOfStaffThreadId()
+            leadId = try await client.botThreadId()
         } catch {
-            return .result(value: "", dialog: "I couldn't find your chief of staff. \(BBClient.describe(error, server: client.baseURL))")
+            return .result(value: "", dialog: "I couldn't find your bot. \(BBClient.describe(error, server: client.baseURL))")
         }
         guard let threadId = leadId else {
-            return .result(value: "", dialog: "No Chief of Staff is set yet. Pick one from a thread's menu in BB Studio.")
+            return .result(value: "", dialog: "You don't have a Bot yet. Make one in Studio, or choose Make this my Bot from a thread's menu.")
         }
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .result(value: "", dialog: "There was nothing to send.")
@@ -196,7 +197,7 @@ struct TellChiefIntent: AppIntent {
         let baseline = try await client.latestReply(threadId)?.id
         try await client.send(threadId, text: message)
         guard let reply = try await client.waitForReply(threadId, after: baseline, timeout: .seconds(25)) else {
-            return .result(value: "", dialog: "Sent. Your chief of staff is still working, and you'll get a notification when it's done.")
+            return .result(value: "", dialog: "Sent. Your bot is still working, and you'll get a notification when it's done.")
         }
         let spoken = VoiceChatEngine.speakable(reply)
         let dialog = spoken.count > 700 ? String(spoken.prefix(700)) + "… The rest is in the app." : spoken
@@ -220,14 +221,14 @@ struct BBShortcuts: AppShortcutsProvider {
     // Symbol names must be literals here; they match StudioKind and Symbols.
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: TalkToChiefIntent(), phrases: ["Talk to my chief of staff in \(.applicationName)"], shortTitle: "Chief of Staff",
+            intent: TalkToChiefIntent(), phrases: ["Talk to my bot in \(.applicationName)", "Talk to my chief of staff in \(.applicationName)"], shortTitle: "Bot",
             systemImageName: "person.crop.circle.badge.checkmark")
         AppShortcut(intent: CaptureIntent(), phrases: ["Capture in \(.applicationName)"], shortTitle: "Capture", systemImageName: "square.and.arrow.down")
         // At the limit of ten: Open page stays in the Shortcuts app's action list.
         AppShortcut(
             intent: TellChiefIntent(),
-            phrases: ["Tell my chief of staff in \(.applicationName)", "Ask my chief of staff in \(.applicationName)"],
-            shortTitle: "Tell Chief of Staff", systemImageName: "bubble.left.and.text.bubble.right")
+            phrases: ["Tell my bot in \(.applicationName)", "Ask my bot in \(.applicationName)", "Tell my chief of staff in \(.applicationName)"],
+            shortTitle: "Tell Bot", systemImageName: "bubble.left.and.text.bubble.right")
         AppShortcut(intent: SendToThreadIntent(), phrases: ["Send to a thread in \(.applicationName)"], shortTitle: "Send to thread", systemImageName: "paperplane")
         AppShortcut(intent: StartRecordingIntent(), phrases: ["Start recording in \(.applicationName)"], shortTitle: "Record", systemImageName: "record.circle")
         AppShortcut(

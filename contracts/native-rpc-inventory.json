@@ -218,27 +218,39 @@
       "coverage": "generated method"
     },
     {
-      "file": "apps/ios/Shared/ChiefOfStaff.swift",
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
       "method": "chief_of_staff",
       "coverage": "generated method"
     },
     {
-      "file": "apps/ios/Shared/ChiefOfStaff.swift",
+      "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
-      "method": "chief_of_staff_set",
+      "method": "bot_set_thread",
       "coverage": "generated method"
     },
     {
-      "file": "apps/ios/Shared/ChiefOfStaff.swift",
+      "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
-      "method": "chief_of_staff",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_set_run",
       "coverage": "generated method"
     },
     {
-      "file": "apps/ios/Shared/ChiefOfStaff.swift",
+      "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
-      "method": "chief_of_staff_set_run",
+      "method": "bot_activity",
       "coverage": "generated method"
     },
     {
