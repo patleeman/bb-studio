@@ -232,6 +232,12 @@
     {
       "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
+      "method": "bot_list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
       "method": "bot_create",
       "coverage": "generated method"
     },
@@ -287,6 +293,24 @@
       "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
       "method": "bot_activity",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_runners",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "paused",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_runner_run_now",
       "coverage": "generated method"
     },
     {
