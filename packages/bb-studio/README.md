@@ -1023,9 +1023,11 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `sidebar.navigationProvider` exactly like the list: set on the Bot page,
   your choice remembered, BB's bundled `navigation/navigation` put back on
   leaving (never "Automatic"), and BB's own navigation shown if it ever
-  renders elsewhere. A BB without that preference or slot keeps its own
-  navigation. **New bot** opens `/plugins/studio/bot/new`: the same greeting
-  and **Customize me** as a first bot, and your first message makes it.
+  renders elsewhere. BB 0.46 (stable) and current Nightly have neither that
+  preference nor the slot, so there the row keeps BB's **New thread** and
+  **New bot** is the **+** beside **Bots** in the list. **New bot** opens
+  `/plugins/studio/bot/new`: the same greeting and **Customize me** as a
+  first bot, and your first message makes it.
 - **Several bots**: the first bot is the **primary**: the personal project's
   lead (the Chief of Staff before it), the one the iOS app shows, and the one
   agent tools act on outside a bot's thread. Each further bot has its own

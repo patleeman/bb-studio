@@ -184,7 +184,18 @@ function BotsList({ onNavigate }: { onNavigate(): void }) {
   return (
     <nav aria-label="Bots" className="studio-root flex flex-col gap-0.5 px-1.5 pb-3">
       <style>{BOT_STYLES}</style>
-      <div className="flex h-7 items-center px-2 text-[11px] font-medium text-muted-foreground">Bots</div>
+      {/* New bot here too: BB 0.46 has no sidebar navigation provider, so the row above may still say New thread. */}
+      <div className="flex h-7 items-center gap-1 pl-2 text-[11px] font-medium text-muted-foreground">
+        <span className="min-w-0 flex-1">Bots</span>
+        <button type="button" aria-label="New bot" title="New bot" data-testid="bot-new" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}
+          className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-3.5" /></button>
+      </div>
+      {creating && bots.length ? (
+        <div aria-current="page" data-testid="bot-new-row" className="flex min-w-0 items-center gap-2.5 rounded-md bg-state-active px-2 py-1.5 text-sm">
+          <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50"><Icon name="Plus" className="size-3" /></span>
+          <span className="min-w-0 flex-1 truncate">New bot</span>
+        </div>
+      ) : null}
       {bots.length ? bots.map((bot) => bot.id === selected?.id
         ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} />
         : <BotRow key={bot.id} bot={bot} onNavigate={onNavigate} />)

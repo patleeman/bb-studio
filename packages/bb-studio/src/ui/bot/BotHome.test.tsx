@@ -300,6 +300,8 @@ test("several Bots: the selected one (from the route) is expanded and scoped; an
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot");
   act(() => click(nav.querySelector("[data-testid=bot-main]")));
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/bot_scout");
+  act(() => click(nav.querySelector("[data-testid=bot-new]")));
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/new");
   // The page and its Info tab act on the selected Bot.
   await show(<BotHome />);
   expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("thr_scout");
