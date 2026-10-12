@@ -192,7 +192,8 @@ private struct BotRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            BotAvatar(bot.look, size: 48, working: summary?.running == true)
+            // Still in the list: only the open chat's avatar and typing row animate.
+            BotAvatar(bot.look, size: 48)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(bot.name).font(.headline).lineLimit(1)

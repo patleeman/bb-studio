@@ -81,14 +81,14 @@ public struct BotLook: Hashable, Sendable {
 }
 
 /// The avatar. While `working`, the eyes glance and blink now and then (not
-/// with Reduce Motion).
+/// with Reduce Motion, and not while the app is in the background). Every
+/// working avatar follows one shared clock.
 public struct BotAvatar: View {
     let look: BotLook
     var size: CGFloat = 28
     var working = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var blink = false
-    @State private var glance: CGFloat = 0
+    @Environment(\.scenePhase) private var scenePhase
 
     public init(_ look: BotLook, size: CGFloat = 28, working: Bool = false) {
         self.look = look
@@ -96,10 +96,13 @@ public struct BotAvatar: View {
         self.working = working
     }
 
+    private var animates: Bool { working && !reduceMotion && scenePhase == .active }
+
     public var body: some View {
         Group {
             if let shape = look.shape {
-                drawn(shape)
+                // A still avatar never reads the clock, so its ticks don't redraw it.
+                drawn(shape, blink: animates && BotBlinkClock.shared.blink, glance: animates ? BotBlinkClock.shared.glance : 0)
             } else {
                 Text(look.emoji)
                     .font(.system(size: size * 0.55))
@@ -109,27 +112,15 @@ public struct BotAvatar: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
-        .task(id: working && !reduceMotion) {
-            guard working, !reduceMotion else {
-                blink = false
-                glance = 0
-                return
-            }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(Int.random(in: 1400...2600)))
-                if Task.isCancelled { break }
-                if Bool.random() {
-                    withAnimation(.easeInOut(duration: 0.08)) { blink = true }
-                    try? await Task.sleep(for: .milliseconds(110))
-                    withAnimation(.easeInOut(duration: 0.12)) { blink = false }
-                } else {
-                    withAnimation(.smooth(duration: 0.35)) { glance = glance == 0 ? [-1, 1].randomElement()! : 0 }
-                }
-            }
+        .task(id: animates && look.shape != nil) {
+            guard animates, look.shape != nil else { return }
+            BotBlinkClock.shared.attach()
+            while !Task.isCancelled { try? await Task.sleep(for: .seconds(3600)) }
+            BotBlinkClock.shared.detach()
         }
     }
 
-    private func drawn(_ shape: BotShape) -> some View {
+    private func drawn(_ shape: BotShape, blink: Bool, glance: CGFloat) -> some View {
         let scale = size / 40
         let y = shape.eyesY
         return ZStack(alignment: .topLeading) {
@@ -146,6 +137,45 @@ public struct BotAvatar: View {
             }
         }
         .frame(width: size, height: size, alignment: .topLeading)
+    }
+}
+
+/// One blink-and-glance loop for every working avatar on screen; it runs
+/// only while at least one is attached.
+@MainActor @Observable
+final class BotBlinkClock {
+    static let shared = BotBlinkClock()
+
+    private(set) var blink = false
+    private(set) var glance: CGFloat = 0
+    @ObservationIgnored private var watchers = 0
+    @ObservationIgnored private var loop: Task<Void, Never>?
+
+    func attach() {
+        watchers += 1
+        guard loop == nil else { return }
+        loop = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(Int.random(in: 1400...2600)))
+                guard !Task.isCancelled, let self else { return }
+                if Bool.random() {
+                    withAnimation(.easeInOut(duration: 0.08)) { self.blink = true }
+                    try? await Task.sleep(for: .milliseconds(110))
+                    withAnimation(.easeInOut(duration: 0.12)) { self.blink = false }
+                } else {
+                    withAnimation(.smooth(duration: 0.35)) { self.glance = self.glance == 0 ? [-1, 1].randomElement()! : 0 }
+                }
+            }
+        }
+    }
+
+    func detach() {
+        watchers = max(0, watchers - 1)
+        guard watchers == 0 else { return }
+        loop?.cancel()
+        loop = nil
+        blink = false
+        glance = 0
     }
 }
 

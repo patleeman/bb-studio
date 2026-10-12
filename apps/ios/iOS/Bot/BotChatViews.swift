@@ -293,32 +293,28 @@ struct BotChildCard: View {
     }
 }
 
-/// Three dots that breathe while the Bot is thinking, beside its avatar.
+/// Three dots that pulse while the Bot is thinking, beside its avatar.
 struct BotTypingRow: View {
     let bot: BotInfo
     let thinking: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             BotAvatar(bot.look, size: 28, working: true)
             VStack(alignment: .leading, spacing: 4) {
-                TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
-                    let t = context.date.timeIntervalSinceReferenceDate
-                    HStack(spacing: 5) {
-                        ForEach(0..<3) { index in
-                            let phase = reduceMotion ? 0.5 : (sin(t * 5 - Double(index) * 0.9) + 1) / 2
-                            Circle()
-                                .fill(Color.secondary)
-                                .frame(width: 7, height: 7)
-                                .opacity(0.35 + 0.65 * phase)
-                                .offset(y: -2.5 * phase)
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 13)
-                .background(Color(uiColor: .secondarySystemBackground), in: UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 20, bottomTrailingRadius: 20, topTrailingRadius: 20, style: .continuous))
+                // A symbol effect runs in the render server, so the dots cost
+                // nothing per frame here; it stops in the background.
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(.secondary)
+                    .symbolEffect(.variableColor.iterative.dimInactiveLayers.nonReversing, options: .repeating,
+                                  isActive: !reduceMotion && scenePhase == .active)
+                    .frame(height: 8)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 13)
+                    .background(Color(uiColor: .secondarySystemBackground), in: UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 20, bottomTrailingRadius: 20, topTrailingRadius: 20, style: .continuous))
                 if let line = thought {
                     Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         .padding(.leading, 6)
