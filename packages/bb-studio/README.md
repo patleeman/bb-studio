@@ -1117,7 +1117,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `automation_update`, `automation_pause`, `automation_resume`,
   `automation_run_now` and `automation_delete` ("in 2h check the deploy" is
   a reminder); `runner_*` still work.
-  ![The Info tab's Automations in a staged BB: Dot's original Check-in (weekdays 8:00) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; Dot's chat shows the watcher's line and its one-line reply](assets/bot-automations.png)
+  ![The Info tab's Automations in a staged BB: Dot's original Check-in (weekdays 8:00), the Skill curator (weekly, when idle) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; Dot's chat shows the watcher's line and its one-line reply](assets/bot-automations.png)
 
 - **Schedule editor** (`src/ui/bot/ScheduleEditor.tsx`, compiled by
   `src/schedule.ts`): presets, weekday chips, several times a day, every N
@@ -1191,7 +1191,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
   - **Settings** (Skills, ⋯ or Edit profile → Advanced): **Learn from
     work** on or off, every N turns, review model, approval, the last
     review's result with **Review now**, pins, and a collapsed **Archived**
-    list.
+    list. iOS: the Skills sheet has Learn from work, approvals, pins (swipe)
+    and Archived with Restore.
+
+  ![Skills in a staged BB, opened from Info → Manage skills: Learn from work on, every 10 turns; the last review "Saved 1 skill · Updated Memory · 2m ago" with Review now; Review model Cheapest (gpt-6-luna); Review skills before saving and Curator merges overlapping skills off; and the system-checks skill Dot's review fork saved after the user corrected how a system report should look (Dot's chat behind shows the four-row table)](assets/bot-skills.png)
 - **Recall**: `bot_history_search` searches BB's thread search, keeping
   only the Bot's threads (its handoff chain and threads it started).
 - **Phone**: questions and approvals it, or a thread it started, raises push

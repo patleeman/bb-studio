@@ -433,8 +433,9 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         const section = document.querySelector('[aria-label$=" info"] section[aria-label=Automations]');
         const text = section?.textContent ?? "";
         const kinds = [...section.querySelectorAll('[data-kind]')].map((each) => each.dataset.kind);
+        // The two check-ins plus the Skill curator, which lists as one.
         const checkins = kinds.filter((kind) => kind === "checkin").length;
-        if (checkins === 2 && kinds.includes("reminder") && kinds.includes("runner") && /Evening wrap-up/.test(text) && /Check the deploy/.test(text) && /Woke it: ORBIT-42 v1.4.0/.test(text) && /Nothing new/.test(text) && /Weekdays 8:00/.test(text)) {
+        if (checkins === 3 && /Skill curator/.test(text) && kinds.includes("reminder") && kinds.includes("runner") && /Evening wrap-up/.test(text) && /Check the deploy/.test(text) && /Woke it: ORBIT-42 v1.4.0/.test(text) && /Nothing new/.test(text) && /Weekdays 8:00/.test(text)) {
           section.scrollIntoView({ block: "start" });
           return resolve(true);
         }
@@ -474,7 +475,60 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1000);
   };
 
+  /**
+   * Skills that learn (src/skill-learning.ts): Dot is taught a procedure with a
+   * correction, then reviews its own work in a background fork (Review now,
+   * as the Skills section's button does; it also starts on its own every 10
+   * turns) and saves a skill.
+   */
+  const SKILL_LESSONS = [
+    "Give me a system report: run uname -sr, sw_vers -productVersion, sysctl -n hw.ncpu and df -h / and show them.",
+    "Not like that. A system report is a 4-row Markdown table (OS, macOS, CPUs, Free disk), free disk from the Avail column, nothing else. I'll ask for this often, so keep the procedure. Do it again.",
+  ];
+  const seededSkills = async () => {
+    const bot = await seededBot();
+    let learning = await pluginRpc("studio", "bot_learning", {});
+    if (!/Saved \d+ skill/.test(learning.lastReview?.result ?? "")) {
+      for (const lesson of SKILL_LESSONS) {
+        await bbCli(["thread", "tell", bot.threadId, lesson]);
+        await sleep(3000);
+        await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "300"]);
+      }
+      let started = false;
+      for (let i = 0; i < 20 && !started; i++) {
+        ({ started } = await pluginRpc("studio", "bot_learning_review", {}));
+        if (!started) await sleep(3000);
+      }
+      if (!started) throw new Error("The skill review didn't start");
+      for (let i = 0; i < 100; i++) {
+        learning = await pluginRpc("studio", "bot_learning", {});
+        if (!learning.reviewing) break;
+        await sleep(3000);
+      }
+      if (!/Saved \d+ skill/.test(learning.lastReview?.result ?? "")) throw new Error(`The skill review ended with ${JSON.stringify(learning.lastReview)}, not a saved skill`);
+    }
+    const { skills } = await pluginRpc("studio", "bot_skills", {});
+    if (!skills.some((skill) => skill.state !== "archived")) throw new Error("Dot has no skill after its review");
+    return skills;
+  };
+  const skillsSection = async (client) => {
+    const skills = await seededSkills();
+    await workspace(client);
+    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await client.waitForSelector('button[aria-label="Manage skills"]', 30000);
+    await client.evaluate(`(() => { document.querySelector('button[aria-label="Manage skills"]').click(); return true; })()`);
+    await client.waitForSelector('[aria-label="Learn from work"]', 30000);
+    for (const text of ["Learn from work", "turns", "Review model", "Review skills before saving", "Curator merges overlapping skills", skills[0].name]) await client.waitForText(text, 30000);
+    await client.evaluate(`(() => {
+      const status = document.querySelector('[aria-label="Last review"]')?.textContent ?? "";
+      if (!/^Saved \\d+ skill.* · /.test(status)) throw new Error("The last review reads " + JSON.stringify(status));
+      return true;
+    })()`);
+    await sleep(1000);
+  };
+
   return [
+    { id: "studio-bot-skills", packageDir: "bb-studio", fileName: "bot-skills.png", setup: skillsSection },
     {
       id: "studio-bot-create",
       packageDir: "bb-studio",
