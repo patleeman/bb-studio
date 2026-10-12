@@ -22,6 +22,15 @@ const args = process.argv.slice(2);
 const option = (name) => { const index = args.indexOf(name); return index < 0 ? null : args[index + 1] ?? null; };
 const flag = (name) => args.includes(name);
 const git = (...argv) => execFileSync("git", argv, { cwd: repo, encoding: "utf8" }).trim();
+
+// An unknown flag (like --help) must never fall through to a real release.
+const usage = "usage: node scripts/release.mjs [--ref <commit>] [--dry-run] [--skip-tests]";
+const known = new Set(["--ref", "--dry-run", "--skip-tests"]);
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--help" || args[i] === "-h") { console.log(usage); process.exit(0); }
+  if (!known.has(args[i])) { console.error(`unknown argument: ${args[i]}\n${usage}`); process.exit(2); }
+  if (args[i] === "--ref") i++;
+}
 const isAncestor = (ancestor, commit) => spawnSync("git", ["merge-base", "--is-ancestor", ancestor, commit], { cwd: repo }).status === 0;
 
 git("fetch", "--quiet", "origin");
