@@ -57,6 +57,20 @@ them. A thread the Bot started that an automation already wakes can be
 adopted from the Bot's Info tab; it keeps its automation. See the Studio
 README's **Bot → Runners**.
 
+### Automations
+
+Besides its heartbeat, a Bot has automations (`packages/bb-studio/src/automations.ts`,
+table `bot_automations`): check-ins on its thread, one-shot reminders, and
+watchers (BB script automations whose stdout Studio posts to the Bot's
+thread; it polls their runs each minute). Each is one or more BB
+automations, since `src/schedule.ts` compiles a schedule (times, intervals
+in a window, quiet hours, end date) to as few crons as express it. The
+heartbeat is listed among them as the original check-in, unchanged. Pause
+and Stop turn them off and record them in `bot_stop_paused`
+(`bot-automation`); Resume turns back on only those. Check-ins and
+reminders follow the Bot's thread on a handoff. See the Studio README's
+**Bot → Automations** and **Watchers**.
+
 ## RPCs
 
 - `project_leads`: every lead and its Heartbeat settings.

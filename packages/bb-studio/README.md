@@ -1093,11 +1093,40 @@ of Staff", with the same thread and check-ins; rename it from its page.
   chips: **Plan my week**, **What needs me today?** (both send), **Set up a
   morning brief** (the Morning brief preset) and **Customize me** (Edit
   profile).
-- **Check-ins**: four presets, one click each: **Morning brief** (weekdays
-  8:00), **Evening wrap-up** (weekdays 18:00), **Every 2 hours while I'm
-  working** (weekdays 9–17) and **Off**. A preset sets the schedule and adds
-  one line to the Memory page's `## Check-in` section saying what to do then
-  (once; Off adds nothing). **Custom schedule** has the full form.
+- **Automations** (`src/automations.ts`, table `bot_automations`; Info tab,
+  iOS ⋯ → Automations): one list of what wakes a Bot, four kinds.
+  - **Check-in**: wakes the Bot's own thread with a short instruction on a
+    schedule; have several (Morning brief 8:00, Evening wrap-up 18:00). The
+    Bot's original check-in (its project heartbeat) is listed first as
+    **Check-in**, schedule and automation unchanged; its instruction stays
+    the Memory page's `## Check-in` section, and it takes one repeating
+    cron. Turning it off keeps its schedule.
+  - **Reminder**: one message to the Bot's thread at a time (BB's one-shot
+    trigger); done once it ran.
+  - **Watcher**: a script BB runs on the server host on a schedule that
+    wakes the Bot only when it prints something (see **Watchers** below).
+  - **Runner**: the runners below, in the same list.
+
+  Check-ins and reminders may pick a cheaper model and reasoning on the
+  Bot's provider for routine runs. Every wake-up prompt ends with the
+  `[PASS]` rule (docs/silent-output.md). Each row shows the schedule in
+  words, the next run and its state; open it for the instruction or script,
+  recent runs with what came of each (BB's `automations_runs`), Pause /
+  Resume, Run now, Edit and Delete. A bot with none only wakes when you
+  write. The Bot has `automation_list`, `automation_create`,
+  `automation_update`, `automation_pause`, `automation_resume`,
+  `automation_run_now` and `automation_delete` ("in 2h check the deploy" is
+  a reminder); `runner_*` still work.
+- **Schedule editor** (`src/ui/bot/ScheduleEditor.tsx`, compiled by
+  `src/schedule.ts`): presets, weekday chips, several times a day, every N
+  minutes or hours within an active window, quiet hours (runs inside are
+  skipped, across midnight too), an end date, the timezone, and a raw cron.
+  BB takes one cron per automation, so a schedule compiles to as few crons
+  as express it exactly: times that share a minute merge (`0 8,18 * * *`),
+  others split (8:00 and 18:30 are two), and Studio keeps them together as
+  one automation. More than eight is refused. The end date isn't a cron
+  field: Studio pauses the group once the day has passed in its timezone.
+  The preview shows the words and the crons.
 - **Memory**: one Studio page per Bot, "<name>'s Memory" in the personal
   project, made the first time it's needed (its thread starts, or
   **Memory** in the ⋯ menu). Its top section, `## Check-in`, is what the Bot
@@ -1126,9 +1155,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   each thread. A thread whose `sourceThreadId`, `parentThreadId` or
   `lifecycleOwnerThreadId` is the Bot's thread, or a thread it handed off
   from, counts. `originPluginId` only names a plugin, so it isn't used.
-- **Pause** turns check-ins off; the Bot is told it's paused and gets no
-  Studio tools but its own. **Resume** turns check-ins back on if they were
-  on. **Stop** (confirmed) pauses it, stops the running threads it spawned
+- **Pause** turns check-ins, reminders and watchers off; the Bot is told
+  it's paused and gets no Studio tools but its own. **Resume** turns back on
+  exactly what Pause or Stop turned off. **Stop** (confirmed) pauses it, stops the running threads it spawned
   itself, and pauses automations that wake it and its runners. A spawned
   thread is a BB child of the Bot's thread (`parentThreadId`) or one that
   archives with it (`lifecycleOwnerThreadId`); a fork or "continue in new
@@ -1157,6 +1186,25 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
   `bot_skill_write`, `bot_skill_read`, `bot_skill_delete` and
   `bot_history_search`.
+- **Watchers**, for script authors. Studio creates a BB script automation
+  (bash, sh, node or python3; timeout up to 15 minutes; working directory
+  the automation's storage by default, so files like `last.txt` persist
+  between runs). The contract:
+  - Exit 0 and print the finding to **stdout**: Studio posts it to the
+    Bot's thread as "Watcher <name>: <output>" (first 1,500 characters) with
+    a note carrying the watcher's instruction, and the Bot wakes. Point a
+    watcher at a runner and the runner wakes instead.
+  - Print nothing, or end with a line `{"wakeAgent": false}`: nothing
+    happens, no tokens. BB records the run as skipped.
+  - Exit non-zero or time out: nothing happens; the run shows as failed
+    with its first stderr line. Use it for errors, not for "no change".
+  - Keep your own state (the last value seen) in a file; print only what's
+    new. Stderr never wakes anyone.
+
+  How it works: BB runs scripts without an agent and tells plugins nothing
+  when a run ends, so Studio reads each active watcher's recent runs once a
+  minute (`automations_runs`) and posts each new one with output once. The
+  script needs no bb CLI, token or callback.
 - **Runners** (`src/runners.ts`, table `bot_runners`): automated sub-agents
   so the Bot's chat isn't flooded. A runner is one long-lived thread with a
   name, a job (a short instruction), a schedule (an automation that wakes
