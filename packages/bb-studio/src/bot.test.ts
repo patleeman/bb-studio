@@ -355,7 +355,6 @@ it("imports an external bot: its thread runs on the provider and model, and Stud
   const made = await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "hermes-agent" } });
   expect(made.bot).toMatchObject({ kind: "external", providerId: "hermes", model: "hermes-agent", primary: false });
   expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "hermes", model: "hermes-agent", reasoningLevel: "none", permissionMode: "accept-edits", pluginMetadata: { bot: made.bot!.id } });
-  expect(made.bot).toMatchObject({ permissionMode: "accept-edits" });
   expect(x.bots.memoryPage(made.bot!.id)).toBeNull();
   expect(() => x.bots.requireStudio(made.bot!.id, "skills")).toThrow("Herm has no Studio skills. Runs on Hermes — its memory and tools live there.");
   expect(() => x.bots.requireStudio(undefined, "skills")).not.toThrow();
@@ -393,9 +392,8 @@ it("resolves the Bot a thread acts for: own thread or handoff chain, its runners
 it("imports with the permission picked, falling back to what the provider supports", async () => {
   const x = await setup();
   await x.bots.create({ name: "Bot", avatar: "🤖" });
-  const full = await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "h", permissionMode: "full" } });
+  await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "h", permissionMode: "full" } });
   expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ permissionMode: "full" });
-  expect(full.bot).toMatchObject({ permissionMode: "full" });
   // Grok runs with full access only.
   await x.bots.create({ name: "G", avatar: "🤖", external: { providerId: "grok", model: "g" } });
   expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ permissionMode: "full" });
@@ -411,38 +409,44 @@ it("derives a bot's kind from its current provider, and fills it in from its thr
   expect(pickPermission(["accept-edits", "auto", "full"], "auto")).toBe("auto");
   const x = await setup();
   const made = await x.bots.create({ name: "Dot", avatar: "🟣" });
-  // An existing Studio bot reads its provider and model off its thread.
-  expect(made.bot).toMatchObject({ kind: "studio", providerId: "codex", model: "model", reasoningLevel: "high" });
+  // A bot's provider and model are its current thread's.
+  expect(made.bot).toMatchObject({ kind: "studio", providerId: "codex", model: "model" });
   expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "sonnet" })).toBe("in-place");
   expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "codex", model: "gpt" })).toBe("handoff");
   expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "opus" })).toBe("unchanged");
   expect(modelChange({ providerId: null, model: null }, { providerId: "claude", model: "opus" })).toBe("in-place");
 });
 
-it("switches a bot's model in place on the same provider, and hands it off to another provider", async () => {
+it("switches a thread's model in place on the same provider, and hands a bot's thread off to another provider", async () => {
   const x = await setup();
   await x.bots.create({ name: "Bot", avatar: "🤖" });
   const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
   const first = scout.threadId!;
-  const same = await x.bots.setModel({ botId: scout.id, providerId: "codex", model: "faster", reasoning: "low" });
-  expect(same).toMatchObject({ change: "in-place", threadId: first });
+  expect(await x.bots.switchModel(first, { providerId: "codex", model: "model" })).toEqual({ change: "unchanged", threadId: first });
+  expect(await x.bots.switchModel(first, { providerId: "codex", model: "faster", reasoning: "low" })).toEqual({ change: "in-place", threadId: first });
   expect(x.update).toHaveBeenCalledWith({ threadId: first, model: "faster", reasoningLevel: "low" });
+  expect((await x.bots.get(scout.id)).bot).toMatchObject({ model: "faster" });
   await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "09:00" });
-  const moved = await x.bots.setModel({ botId: scout.id, providerId: "claude", model: "sonnet", reasoning: "medium" });
+  const moved = await x.bots.switchModel(first, { providerId: "claude", model: "sonnet", reasoning: "medium" });
   expect(moved.change).toBe("handoff");
   expect(moved.threadId).not.toBe(first);
-  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "claude", model: "sonnet", permissionMode: "accept-edits", pluginMetadata: { handoffFrom: first } });
+  // The thread's permission is carried forward.
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ projectId: PERSONAL_PROJECT_ID, providerId: "claude", model: "sonnet", permissionMode: "accept-edits", pluginMetadata: { handoffFrom: first } });
   expect((await x.bots.get(scout.id)).bot).toMatchObject({ threadId: moved.threadId, providerId: "claude", model: "sonnet", kind: "studio" });
-  // Its chain records the old thread; its check-in follows.
   expect(x.bots.chain(scout.id)).toEqual([first, moved.threadId]);
   expect(x.automations.at(-1)).toMatchObject({ execution: { targetThreadId: moved.threadId } });
   // The new thread's first turn is the bot's, before it moves.
   expect(x.bots.forThread("t99", { handoffFrom: moved.threadId })).toMatchObject({ id: scout.id });
-  // Onto an external provider: Studio's Memory, skills and runners are off.
-  const external = await x.bots.setModel({ botId: scout.id, providerId: "grok", model: "grok-4" });
-  expect(external).toMatchObject({ change: "handoff", bot: { kind: "external", permissionMode: "full", reasoningLevel: "none" } });
+  // Onto an external provider: its kind follows the thread, so Studio's Memory, skills and runners are off.
+  const external = await x.bots.switchModel(moved.threadId, { providerId: "grok", model: "grok-4" });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "grok", reasoningLevel: "none", permissionMode: "full" });
+  expect((await x.bots.get(scout.id)).bot).toMatchObject({ threadId: external.threadId, kind: "external", providerId: "grok" });
   expect(() => x.bots.requireStudio(scout.id, "skills")).toThrow(/Runs on Grok/);
+  // Any thread works, not only a bot's.
+  x.add({ id: "plain", providerId: "codex" });
+  expect((await x.bots.switchModel("plain", { providerId: "claude", model: "opus" })).change).toBe("handoff");
   // The primary bot leads with Studio's tools.
-  await expect(x.bots.setModel({ providerId: "hermes", model: "h" })).rejects.toThrow(/personal project/);
-  await expect(x.bots.setModel({ providerId: "nope", model: "h" })).rejects.toThrow(/isn't an agent provider/);
+  const primary = (await x.bots.get()).bot!.threadId!;
+  await expect(x.bots.switchModel(primary, { providerId: "hermes", model: "h" })).rejects.toThrow(/personal project/);
+  await expect(x.bots.switchModel(primary, { providerId: "nope", model: "h" })).rejects.toThrow(/isn't an agent provider/);
 });

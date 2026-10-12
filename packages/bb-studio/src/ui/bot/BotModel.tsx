@@ -1,45 +1,46 @@
-// The bot's Model control (title bar and Info tab): BB's provider/model
-// picker and permission picker, bound to bot_set_model. BB keeps a thread on
-// one provider, so the same provider switches the bot's thread in place and
-// another provider hands it off to a new thread there ("Handing off to Codex…").
+// "Switch model…" (the Bot's ⋯ menu): the model is the thread's, and BB's
+// composer switches it within the thread's provider. BB keeps a thread on one
+// provider and doesn't let a plugin intercept its composer, so a switch to
+// another provider happens here: thread_handoff_to_model hands the thread off
+// to a new one there ("Handing off to Codex…"), along the bot's chain. Nothing
+// is stored on the bot.
+import { GHOST_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { experimental_PermissionModePicker as PermissionModePicker, experimental_ProviderModelPicker as ProviderModelPicker, experimental_useProviders as useProviders } from "@get-bb/plugin-sdk/app";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@bb-studio/kit/ui";
+import { experimental_ProviderModelPicker as ProviderModelPicker, experimental_useProviders as useProviders } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
-import type { BotView } from "../../contract";
 import { useCall } from "../live";
 
-type Bot = NonNullable<BotView["bot"]>;
-type Reasoning = NonNullable<Bot["reasoningLevel"]>;
-type Permission = NonNullable<Bot["permissionMode"]>;
+type Reasoning = "none" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra" | "ultracode";
 export type ModelChoice = { providerId: string; model: string; reasoningLevel: Reasoning };
 
-/** What saving a choice does: nothing, a switch in place, or a handoff to another provider. */
-export function modelChangeKind(bot: Pick<Bot, "providerId" | "model" | "reasoningLevel">, next: ModelChoice): "unchanged" | "in-place" | "handoff" {
-  if (bot.providerId && bot.providerId !== next.providerId) return "handoff";
-  return bot.model === next.model && (bot.reasoningLevel ?? null) === next.reasoningLevel ? "unchanged" : "in-place";
+/** What switching does: nothing, a switch in place, or a handoff to another provider. */
+export function modelChangeKind(current: { providerId: string | null; model: string | null }, next: ModelChoice): "unchanged" | "in-place" | "handoff" {
+  if (current.providerId && current.providerId !== next.providerId) return "handoff";
+  return current.model === next.model ? "unchanged" : "in-place";
 }
 
-/** The status line while a change saves. */
+/** The status line while a switch runs. */
 export function pendingLabel(kind: "in-place" | "handoff", providerName: string, model: string): string {
   return kind === "handoff" ? `Handing off to ${providerName}…` : `Switching to ${model}…`;
 }
 
-export function BotModelControl({ bot, onChanged, showPermission = false, align = "end" }: { bot: Bot; onChanged(): void; showPermission?: boolean; align?: "start" | "end" }) {
+export function SwitchModelDialog({ threadId, providerId, model, onClose, onSwitched }: { threadId: string; providerId: string; model: string; onClose(): void; onSwitched(threadId: string): void }) {
   const call = useCall();
   const { providers } = useProviders();
+  const [value, setValue] = useState<ModelChoice>({ providerId, model, reasoningLevel: "medium" });
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const name = (id: string) => providers.find((each) => each.id === id)?.displayName ?? id;
-  if (!bot.providerId || !bot.model) return null;
-  const value: ModelChoice = { providerId: bot.providerId, model: bot.model, reasoningLevel: bot.reasoningLevel ?? "none" };
-  const save = async (next: ModelChoice, permission?: Permission) => {
-    const kind = permission ? "in-place" : modelChangeKind(bot, next);
+  const kind = modelChangeKind({ providerId, model }, value);
+  const run = async () => {
     if (kind === "unchanged" || pending) return;
-    setPending(pendingLabel(kind, name(next.providerId), next.model));
+    setPending(pendingLabel(kind, name(value.providerId), value.model));
     setError(null);
     try {
-      await call("bot_set_model", { botId: bot.id, providerId: next.providerId, model: next.model, reasoning: next.reasoningLevel, ...(permission ? { permission } : {}) });
-      onChanged();
+      const result = await call("thread_handoff_to_model", { threadId, providerId: value.providerId, model: value.model, reasoning: value.reasoningLevel }) as { threadId: string };
+      onSwitched(result.threadId);
+      onClose();
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -47,11 +48,20 @@ export function BotModelControl({ bot, onChanged, showPermission = false, align 
     }
   };
   return (
-    <span className="flex min-w-0 items-center gap-1.5" data-testid="bot-model">
-      <ProviderModelPicker value={value} align={align} disabled={!!pending} onChange={(next) => void save({ providerId: next.providerId, model: next.model, reasoningLevel: next.reasoningLevel })} />
-      {showPermission ? <PermissionModePicker providerId={bot.providerId} value={bot.permissionMode ?? "accept-edits"} disabled={!!pending} align={align} onChange={(permission) => void save(value, permission)} /> : null}
-      {pending ? <span role="status" className="truncate text-xs text-muted-foreground" data-testid="bot-model-pending">{pending}</span> : null}
-      {error ? <span role="alert" className="truncate text-xs text-destructive" title={error}>{error}</span> : null}
-    </span>
+    <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
+      <DialogContent className="sm:max-w-md" data-testid="switch-model">
+        <DialogHeader>
+          <DialogTitle>Switch model</DialogTitle>
+          <DialogDescription>Now on {name(providerId)} · {model}. Another model from {name(providerId)} switches this chat in place; another provider hands it off to a new chat there with a summary, and the old one becomes Earlier conversation.</DialogDescription>
+        </DialogHeader>
+        <ProviderModelPicker value={value} disabled={!!pending} onChange={(next) => setValue({ providerId: next.providerId, model: next.model, reasoningLevel: next.reasoningLevel })} />
+        {pending ? <p role="status" className="text-sm text-muted-foreground" data-testid="switch-model-pending">{pending}</p> : null}
+        {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+        <DialogFooter>
+          <button type="button" className={GHOST_BUTTON} disabled={!!pending} onClick={onClose}>Cancel</button>
+          <button type="button" className={PRIMARY_BUTTON} disabled={kind === "unchanged" || !!pending} onClick={() => void run()}>{kind === "handoff" ? `Hand off to ${name(value.providerId)}` : "Switch"}</button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

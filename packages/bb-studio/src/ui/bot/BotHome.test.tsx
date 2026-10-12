@@ -363,28 +363,28 @@ test("an external bot shows its provider's logo and hides Memory, skills and run
   await show(<BotInfoTab />);
   expect(container.querySelector('[data-logo="hermes"]')).not.toBeNull();
   expect(container.textContent).toContain("Runs on Hermes — its memory and tools live there.");
-  expect(container.querySelector('[data-picker="hermes/hermes-agent"]')).not.toBeNull();
+  expect(container.textContent).toContain("hermes-agent");
   expect(button("Open")).toBeUndefined();
   expect(container.textContent).not.toContain("Procedures it saved");
 });
 
-test("the Model control switches in place on the same provider and hands off to another, saying so", async () => {
+test("Switch model hands off to another provider, saying so, and switches in place within one", async () => {
   const { modelChangeKind, pendingLabel } = await import("./BotModel");
-  expect(modelChangeKind({ providerId: "claude", model: "opus", reasoningLevel: "high" }, { providerId: "claude", model: "sonnet", reasoningLevel: "high" })).toBe("in-place");
-  expect(modelChangeKind({ providerId: "claude", model: "opus", reasoningLevel: "high" }, { providerId: "codex", model: "gpt-5", reasoningLevel: "high" })).toBe("handoff");
-  expect(modelChangeKind({ providerId: "claude", model: "opus", reasoningLevel: "high" }, { providerId: "claude", model: "opus", reasoningLevel: "high" })).toBe("unchanged");
+  expect(modelChangeKind({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "sonnet", reasoningLevel: "high" })).toBe("in-place");
+  expect(modelChangeKind({ providerId: "claude", model: "opus" }, { providerId: "codex", model: "gpt-5", reasoningLevel: "high" })).toBe("handoff");
+  expect(modelChangeKind({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "opus", reasoningLevel: "high" })).toBe("unchanged");
   expect(pendingLabel("handoff", "Codex", "gpt-5")).toBe("Handing off to Codex…");
-  const claude = { ...dot, providerId: "claude", model: "opus", reasoningLevel: "high", permissionMode: "accept-edits" };
-  state.data = { bot_get: { bot: claude, run: null }, bot_activity: empty };
-  let finish: () => void = () => {};
-  state.call.mockImplementation((() => new Promise<void>((resolve) => { finish = resolve; })) as never);
-  await show(<BotInfoTab />);
+  const { SwitchModelDialog } = await import("./BotModel");
+  let finish: (value: unknown) => void = () => {};
+  state.call.mockImplementation((() => new Promise((resolve) => { finish = resolve; })) as never);
+  const switched = vi.fn();
+  await show(<SwitchModelDialog threadId="t1" providerId="claude" model="opus" onClose={() => {}} onSwitched={switched} />);
   expect(container.querySelector('[data-picker="claude/opus"]')).not.toBeNull();
-  expect(container.querySelector('[data-permission="accept-edits"]')).not.toBeNull();
   await act(async () => button("pick codex").click());
-  expect(state.call).toHaveBeenCalledWith("bot_set_model", { botId: dot.id, providerId: "codex", model: "gpt-5", reasoning: "high" });
-  expect(container.querySelector('[data-testid="bot-model-pending"]')!.textContent).toBe("Handing off to Codex…");
-  await act(async () => finish());
-  expect(container.querySelector('[data-testid="bot-model-pending"]')).toBeNull();
+  await act(async () => button("Hand off to Codex").click());
+  expect(state.call).toHaveBeenCalledWith("thread_handoff_to_model", { threadId: "t1", providerId: "codex", model: "gpt-5", reasoning: "high" });
+  expect(container.querySelector('[data-testid="switch-model-pending"]')!.textContent).toBe("Handing off to Codex…");
+  await act(async () => finish({ change: "handoff", threadId: "t2" }));
+  expect(switched).toHaveBeenCalledWith("t2");
   state.call.mockImplementation((async () => ({})) as never);
 });

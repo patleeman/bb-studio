@@ -142,14 +142,11 @@ const bot = z.object({
   role: z.string().nullable().optional(),
   /** The primary Bot: the personal project's lead. Additional Bots ("New bot") have their own thread. */
   primary: z.boolean().optional(),
-  /** Derived from providerId: "external" runs on an external agent provider (Studio Agents), with that provider's memory and tools; "studio" runs BB's tools (Memory, skills, runners). */
+  /** From its current thread's provider: "external" runs on an external agent provider (Studio Agents), with that provider's memory and tools; "studio" runs BB's tools (Memory, skills, runners). */
   kind: z.enum(["studio", "external"]).optional(),
-  /** What its thread runs on now; swappable with bot_set_model (another provider hands it off). Null until known. */
+  /** Its current thread's provider and model (read off BB; the model is the thread's, not the bot's). */
   providerId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
-  reasoningLevel: reasoningLevel.nullable().optional(),
-  /** The permission its threads start with (accept-edits by default for an import). */
-  permissionMode: permissionMode.nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -329,13 +326,14 @@ export const rpcContract = defineRpcContract({
   /** The external agent providers a bot can be imported from (Studio Agents), with their status and models. */
   bot_external_providers: { input: z.object({}), output: externalProviders },
   /**
-   * Switches the bot's provider, model, reasoning level or permission. The same
-   * provider switches its thread in place (as BB's composer does); another
-   * provider hands it off to a new thread there. Without a thread it's stored.
+   * Switches any thread's model. The same provider switches it in place (as
+   * BB's composer does); another provider hands it off to a new thread there
+   * with a summary, carrying its permission forward. A bot's thread hands off
+   * along the bot's chain. threadId is the thread to follow afterwards.
    */
-  bot_set_model: {
-    input: z.object({ botId, providerId: z.string().min(1).max(100), model: z.string().min(1).max(200), reasoning: reasoningLevel.optional(), permission: permissionMode.optional() }),
-    output: botView.extend({ change: z.enum(["unchanged", "in-place", "handoff", "stored"]), threadId: z.string().nullable() }),
+  thread_handoff_to_model: {
+    input: z.object({ threadId: z.string().min(1).max(200), providerId: z.string().min(1).max(100), model: z.string().min(1).max(200), reasoning: reasoningLevel.optional() }),
+    output: z.object({ change: z.enum(["unchanged", "in-place", "handoff"]), threadId: z.string() }),
   },
   /** Renames the Bot or changes its avatar. */
   bot_set: { input: z.object({ botId, name: botName.optional(), avatar: botAvatar.optional(), shape: botShape.nullable().optional(), color: botColor.optional(), role: botRole.optional() }), output: botView },

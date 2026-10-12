@@ -103,12 +103,12 @@ export function skillMarkdown(skill: { name: string; description: string; body: 
   return `---\nname: ${skill.name}\ndescription: ${JSON.stringify(skill.description)}\n---\n\n${skill.body.trim()}\n`;
 }
 
-type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; memory_page_id: string | null; shape: string | null; color: string | null; role: string | null; kind?: string | null; provider_id?: string | null; model?: string | null; permission_mode?: string | null; reasoning_level?: string | null; created_at: number; updated_at: number };
+type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; memory_page_id: string | null; shape: string | null; color: string | null; role: string | null; provider_id?: string | null; created_at: number; updated_at: number };
 
 export type PermissionMode = "accept-edits" | "auto" | "full";
 export type ReasoningLevel = "none" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra" | "ultracode";
-/** What a bot runs on. */
-export type BotExecution = { providerId: string | null; model: string | null; reasoning?: ReasoningLevel | null; permission?: PermissionMode | null };
+/** What a thread runs on. */
+export type ThreadExecution = { providerId: string | null; model: string | null; reasoning?: ReasoningLevel | null };
 
 /**
  * A bot's kind comes from the provider it runs on now: an external agent
@@ -128,15 +128,14 @@ export function pickPermission(modes: readonly string[], wanted?: string | null)
 }
 
 /**
- * How a model change lands, as BB allows it: a thread keeps its provider for
- * life (threads.update takes a model and reasoning level, not a provider), so
- * the same provider switches the thread in place and another provider hands
- * the bot off to a new thread there.
+ * How a thread's model change lands, as BB allows it: a thread keeps its
+ * provider for life (threads.update takes a model and reasoning level, not a
+ * provider), so the same provider switches the thread in place and another
+ * provider hands it off to a new thread there.
  */
-export function modelChange(current: BotExecution, next: BotExecution): "unchanged" | "in-place" | "handoff" {
+export function modelChange(current: ThreadExecution, next: ThreadExecution): "unchanged" | "in-place" | "handoff" {
   if (current.providerId && next.providerId !== current.providerId) return "handoff";
-  const same = next.model === current.model && (next.reasoning ?? null) === (current.reasoning ?? null) && (next.permission ?? null) === (current.permission ?? null);
-  return same ? "unchanged" : "in-place";
+  return next.model === current.model && (next.reasoning ?? current.reasoning ?? null) === (current.reasoning ?? null) ? "unchanged" : "in-place";
 }
 type SkillRow = { bot_id: string; name: string; description: string; body: string; created_at: number; updated_at: number };
 
@@ -267,7 +266,7 @@ export class Bots {
       if (threadId !== row.thread_id) this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
     }
     const memoryPageId = row.memory_page_id && this.deps.memory?.exists(row.memory_page_id) ? row.memory_page_id : null;
-    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, primary, kind: botKind(row.provider_id), providerId: row.provider_id ?? null, model: row.model ?? null, reasoningLevel: (row.reasoning_level ?? null) as ReasoningLevel | null, permissionMode: (row.permission_mode ?? null) as PermissionMode | null, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, primary, kind: botKind(row.provider_id), providerId: row.provider_id ?? null, model: (threadId ? this.models.get(threadId) : null) ?? null, createdAt: row.created_at, updatedAt: row.updated_at };
   }
 
   /** A Bot as stored (the primary without an id); its thread read from the personal project's lead for the primary. */
@@ -343,7 +342,7 @@ export class Bots {
   async get(botId?: string | null): Promise<BotView> {
     let row = this.row(botId);
     if (botId && !row) throw new Error(`No Bot "${botId}".`);
-    if (row) row = await this.sync(row);
+    if (row) row = await this.refresh(row);
     if (!row || this.isPrimary(row)) {
       const lead = await this.deps.leads.get(PERSONAL_PROJECT_ID);
       return { bot: this.stored(row?.id), run: lead.run };
@@ -351,108 +350,83 @@ export class Bots {
     return { bot: this.view(row), run: this.deps.leads.runs.get(this.runKey(row)) };
   }
 
-  private insert(id: string, name: string, avatar: string, shape: string | null = null, color: string | null = null, external?: { providerId: string; model: string; permissionMode?: PermissionMode }) {
+  private insert(id: string, name: string, avatar: string, shape: string | null = null, color: string | null = null, providerId: string | null = null) {
     const now = Date.now();
-    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, shape, color, state, thread_id, heartbeat_was_on, kind, provider_id, model, permission_mode, reasoning_level, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'active', NULL, 0, ?, ?, ?, ?, ?, ?, ?)")
-      .run(id, name, avatar, shape, color, botKind(external?.providerId), external?.providerId ?? null, external?.model ?? null, external?.permissionMode ?? null, external ? "none" : null, now, now);
+    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, shape, color, state, thread_id, heartbeat_was_on, provider_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'active', NULL, 0, ?, ?, ?)")
+      .run(id, name, avatar, shape, color, providerId, now, now);
   }
 
-  /** Stores what a bot runs on; the legacy kind column follows the provider. */
-  private saveExecution(id: string, execution: BotExecution) {
-    this.deps.db.prepare("UPDATE bots SET provider_id = ?, model = ?, reasoning_level = ?, permission_mode = ?, kind = ?, updated_at = ? WHERE id = ?")
-      .run(execution.providerId, execution.model, execution.reasoning ?? null, execution.permission ?? null, botKind(execution.providerId), Date.now(), id);
-  }
+  /** The current thread's model, by thread id: read off BB, never a bot setting. */
+  private readonly models = new Map<string, string>();
 
   /**
-   * Reads the bot's provider and model off its thread: a Studio bot made
-   * before bots kept them, or a model changed in the chat's own composer.
+   * Reads what the bot's current thread runs on. The model and provider are
+   * the thread's (BB's composer changes them); `provider_id` only caches the
+   * provider so the bot's kind is known where reads must be synchronous
+   * (agents.configure, requireStudio).
    */
-  private async sync(row: BotRow): Promise<BotRow> {
+  private async refresh(row: BotRow): Promise<BotRow> {
     const threadId = this.view(row).threadId;
     if (!threadId) return row;
     const [thread, options] = await Promise.all([
       this.deps.sdk.threads.get({ threadId }).catch(() => null),
       this.deps.sdk.threads.defaultExecutionOptions({ threadId }).catch(() => null),
     ]);
-    if (!thread?.providerId) return row;
-    const next = { providerId: thread.providerId, model: options?.model || row.model || null, reasoning: (options?.reasoningLevel ?? row.reasoning_level ?? null) as ReasoningLevel | null, permission: (row.permission_mode ?? options?.permissionMode ?? null) as PermissionMode | null };
-    if (next.providerId === row.provider_id && next.model === row.model && next.reasoning === (row.reasoning_level ?? null) && next.permission === (row.permission_mode ?? null)) return row;
-    this.saveExecution(row.id, next);
+    if (options?.model) this.models.set(threadId, options.model);
+    if (!thread?.providerId || thread.providerId === row.provider_id) return row;
+    this.deps.db.prepare("UPDATE bots SET provider_id = ? WHERE id = ?").run(thread.providerId, row.id);
     return this.need(row.id);
   }
 
-  /** The permission modes a provider supports, from BB's provider list; empty when it isn't registered. */
-  private async permissionModes(providerId: string): Promise<{ registered: boolean; modes: string[] }> {
+  /** BB's agent provider entry (permission modes, reasoning levels), or null when it isn't registered. */
+  private async provider(providerId: string): Promise<{ modes: string[]; levels: string[] } | null> {
     let providers: Awaited<ReturnType<Sdk["providers"]["list"]>> = [];
-    try { providers = await this.deps.sdk.providers.list(); } catch { /* No provider list: nothing is known to be supported. */ }
-    const provider = providers.find((each) => each.id === providerId);
-    return { registered: !!provider, modes: [...(provider?.capabilities?.permissionModes ?? [])] };
+    try { providers = await this.deps.sdk.providers.list(); } catch { /* No provider list. */ }
+    const provider = providers.find((each) => each.id === providerId) as { capabilities?: { permissionModes?: readonly string[] }; reasoningLevels?: readonly ({ id: string } | string)[] } | undefined;
+    if (!provider) return null;
+    return { modes: [...(provider.capabilities?.permissionModes ?? [])], levels: (provider.reasoningLevels ?? []).map((each) => typeof each === "string" ? each : each.id) };
   }
 
   /**
-   * Switches a bot's provider, model, reasoning level or permission. The
-   * same provider changes its thread in place; another provider hands it off
-   * to a new thread there (with a summary of the old one), which its chain,
-   * check-in and runners follow. Without a thread, the choice is just stored.
+   * Switches any thread's model. BB keeps a thread on its provider, so the
+   * same provider changes it in place (threads.update, as BB's composer
+   * does) and another provider hands it off: a new thread there with a
+   * summary of this one, its permission carried forward, the old one archived.
+   * A bot's thread hands off along its chain (check-in and runners follow).
    */
-  async setModel(input: { botId?: string; providerId: string; model: string; reasoning?: ReasoningLevel; permission?: PermissionMode }): Promise<BotView & { change: "unchanged" | "in-place" | "handoff" | "stored"; threadId: string | null }> {
-    const row = await this.sync(this.need(input.botId));
-    const kind = botKind(input.providerId);
-    if (kind === "external" && this.isPrimary(row)) throw new Error(`${row.name} leads your personal project with Studio's tools, so it can't run on ${externalName(input.providerId)}. Import another bot for that.`);
-    const { registered, modes } = await this.permissionModes(input.providerId);
-    if (!registered) throw new Error(`${input.providerId} isn't an agent provider BB has right now.`);
-    const next: BotExecution = {
-      providerId: input.providerId, model: input.model,
-      reasoning: kind === "external" ? "none" : input.reasoning ?? (input.providerId === row.provider_id ? (row.reasoning_level as ReasoningLevel | null) : null) ?? null,
-      permission: pickPermission(modes, input.permission ?? row.permission_mode),
-    };
-    const current: BotExecution = { providerId: row.provider_id ?? null, model: row.model ?? null, reasoning: (row.reasoning_level ?? null) as ReasoningLevel | null, permission: (row.permission_mode ?? null) as PermissionMode | null };
-    const threadId = this.view(row).threadId;
-    const change = modelChange(current, next);
-    if (!threadId) {
-      this.saveExecution(row.id, next);
-      this.deps.changed();
-      return { ...(await this.get(row.id)), change: "stored", threadId: null };
-    }
-    if (change === "unchanged") return { ...(await this.get(row.id)), change, threadId };
-    if (change === "in-place") {
-      await this.deps.sdk.threads.update({ threadId, model: next.model, ...(next.reasoning ? { reasoningLevel: next.reasoning } : {}) });
-      this.saveExecution(row.id, next);
-      this.deps.changed();
-      return { ...(await this.get(row.id)), change, threadId };
-    }
-    // Saved first, so the new thread's first turn is configured for the new provider (forThread follows handoffFrom).
-    this.saveExecution(row.id, next);
-    try {
-      const { threadId: newId } = await this.deps.leads.handoff(threadId, {
-        projectId: PERSONAL_PROJECT_ID, providerId: next.providerId!, model: next.model!, reasoningLevel: next.reasoning ?? (kind === "external" ? "none" : "medium"), permissionMode: next.permission!,
-        executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" },
-        environment: { type: "project-default" },
-        input: [{ type: "text", text: `You were moved from ${providerName(current.providerId)} to ${providerName(next.providerId)} (${next.model}). Say in a sentence that you're here and carry on.`, mentions: [], visibility: "agent-only" }],
-      } as never);
-      await this.handedOff(threadId, newId);
-      this.deps.changed();
-      return { ...(await this.get(row.id)), change, threadId: newId };
-    } catch (error) {
-      this.saveExecution(row.id, current);
-      throw error;
-    }
-  }
-
-  /**
-   * A handoff of a bot's thread started elsewhere (thread_handoff from the
-   * composer): it keeps the bot's permission where the new provider allows it,
-   * and the bot runs on the new provider and model from then on.
-   */
-  async handoffRequest<T extends { providerId: string; model: string; reasoningLevel: string; permissionMode: PermissionMode }>(threadId: string, request: T): Promise<T> {
+  async switchModel(threadId: string, input: { providerId: string; model: string; reasoning?: ReasoningLevel }): Promise<{ change: "unchanged" | "in-place" | "handoff"; threadId: string }> {
+    const [thread, options] = await Promise.all([
+      this.deps.sdk.threads.get({ threadId }),
+      this.deps.sdk.threads.defaultExecutionOptions({ threadId }).catch(() => null),
+    ]);
+    const provider = await this.provider(input.providerId);
+    if (!provider) throw new Error(`${input.providerId} isn't an agent provider BB has right now.`);
     const bot = this.forThread(threadId);
-    if (!bot) return request;
-    const row = this.need(bot.id);
-    if (botKind(request.providerId) === "external" && this.isPrimary(row)) throw new Error(`${row.name} leads your personal project with Studio's tools, so it can't run on ${externalName(request.providerId)}.`);
-    const { modes } = await this.permissionModes(request.providerId);
-    const permission = pickPermission(modes, row.permission_mode ?? request.permissionMode);
-    this.saveExecution(row.id, { providerId: request.providerId, model: request.model, reasoning: request.reasoningLevel as ReasoningLevel, permission });
-    return { ...request, permissionMode: permission };
+    const external = botKind(input.providerId) === "external";
+    if (bot?.primary && external) throw new Error(`${bot.name} leads your personal project with Studio's tools, so it can't run on ${externalName(input.providerId)}. Import another bot for that.`);
+    const levels = provider.levels;
+    const fits = (level: string | null | undefined): level is ReasoningLevel => !!level && (!levels.length || levels.includes(level));
+    const reasoning: ReasoningLevel = external ? "none" : fits(input.reasoning) ? input.reasoning : fits(options?.reasoningLevel) ? options!.reasoningLevel as ReasoningLevel : (levels[0] as ReasoningLevel | undefined) ?? "medium";
+    const change = modelChange({ providerId: thread.providerId, model: options?.model ?? null, reasoning: (options?.reasoningLevel ?? null) as ReasoningLevel | null }, { providerId: input.providerId, model: input.model, reasoning: input.reasoning ?? null });
+    if (change === "unchanged") return { change, threadId };
+    if (change === "in-place") {
+      await this.deps.sdk.threads.update({ threadId, model: input.model, ...(input.reasoning ? { reasoningLevel: input.reasoning } : {}) });
+      this.models.set(threadId, input.model);
+      this.deps.changed();
+      return { change, threadId };
+    }
+    const permission = pickPermission(provider.modes, options?.permissionMode);
+    const { threadId: newId } = await this.deps.leads.handoff(threadId, {
+      projectId: thread.projectId, providerId: input.providerId, model: input.model, reasoningLevel: reasoning, permissionMode: permission,
+      executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" },
+      environment: { type: "project-default" },
+      input: [{ type: "text", text: `You were moved from ${providerName(thread.providerId)} to ${providerName(input.providerId)} (${input.model}). Say in a sentence that you're here and carry on.`, mentions: [], visibility: "agent-only" }],
+    } as never);
+    await this.handedOff(threadId, newId);
+    if (bot) this.deps.db.prepare("UPDATE bots SET provider_id = ?, updated_at = ? WHERE id = ?").run(input.providerId, Date.now(), bot.id);
+    this.models.set(newId, input.model);
+    this.deps.changed();
+    return { change, threadId: newId };
   }
 
   /** Throws for an external bot: `what` (its Memory page, skills, runners) lives on its provider. */
@@ -476,14 +450,14 @@ export class Bots {
     let external = input.external;
     if (external && !EXTERNAL_PROVIDERS.some((each) => each.id === external!.providerId)) throw new Error(`${external.providerId} isn't an external agent provider.`);
     // Accept edits unless asked otherwise, where the provider supports it.
-    if (external) external = { ...external, permissionMode: pickPermission((await this.permissionModes(external.providerId)).modes, external.permissionMode ?? "accept-edits") };
+    if (external) external = { ...external, permissionMode: pickPermission((await this.provider(external.providerId))?.modes ?? [], external.permissionMode ?? "accept-edits") };
     if (external && input.threadId) throw new Error("An imported bot starts its own thread on its provider.");
     // The primary Bot leads the personal project with Studio's tools, so an import is always an additional Bot.
     if (external && !this.row()) throw new Error("Make your first bot in Studio, then import others.");
     const primary = !this.row();
     const id = primary ? BOT_ID : `bot_${Math.random().toString(36).slice(2, 12)}`;
     // The row comes first, so the new thread's first turn gets the Bot's instructions (forThread).
-    this.insert(id, input.name, input.avatar, input.shape ?? null, input.color ?? null, external);
+    this.insert(id, input.name, input.avatar, input.shape ?? null, input.color ?? null, external?.providerId ?? null);
     let threadId = input.threadId;
     try {
       if (threadId && this.forThread(threadId)) throw new Error("That thread is already a Bot's.");

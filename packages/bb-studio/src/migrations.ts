@@ -243,5 +243,11 @@ export const MIGRATIONS = [
   // permission; Studio bots' provider and model fill in from their thread.
   `ALTER TABLE bots ADD COLUMN permission_mode TEXT;
    ALTER TABLE bots ADD COLUMN reasoning_level TEXT;
-   UPDATE bots SET permission_mode = 'full' WHERE kind = 'external';`,
+   UPDATE bots SET permission_mode = 'full' WHERE kind = 'external';`,  // The model is the thread's, not the bot's: a bot follows its current
+  // thread, and its kind comes from that thread's provider (provider_id only
+  // caches it). The stored kind, model and execution settings go.
+  `ALTER TABLE bots DROP COLUMN kind;
+   ALTER TABLE bots DROP COLUMN model;
+   ALTER TABLE bots DROP COLUMN permission_mode;
+   ALTER TABLE bots DROP COLUMN reasoning_level;`,
 ];

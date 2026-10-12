@@ -1202,9 +1202,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   key, Not installed) and links to Studio Agents settings when none is
   ready. Pick one, its model (OpenClaw: its Gateway agent), a name, shape
   and color, and its **Permissions** (only the modes the provider supports;
-  Accept edits by default, Grok is Full access only); `bot_create` with
-  `external: { providerId, model, permissionMode }` starts the bot's thread
-  there (`bot_external_providers` lists the choices with their
+  Accept edits by default, Grok is Full access only), all for its first
+  thread; `bot_create` with `external: { providerId, model, permissionMode }`
+  starts that thread (`bot_external_providers` lists the choices with their
   `permissionModes`). Your first bot is always a Studio bot.
   - **What works**: its chat, the Bots sidebar, sub-threads, Needs you,
     check-ins (Studio's automation sends its thread the check-in message),
@@ -1216,27 +1216,26 @@ of Staff", with the same thread and check-ins; rename it from its page.
     `bot_runner_adopt` refuse an external bot. Its instructions only say who
     it is. A Studio backup doesn't carry the provider yet: a restored
     external bot comes back as a Studio bot.
-- **Model** (title bar and Info tab): every bot stores its `providerId`,
-  `model`, `reasoningLevel` and `permissionMode`, and the control is BB's own
-  provider/model picker (plus its permission picker on Info), bound to
-  `bot_set_model({ botId?, providerId, model, reasoning?, permission? })`.
-  BB keeps a thread on one provider for life: `threads.update` changes only
-  its model and reasoning level, and BB's composer picks models within the
-  thread's provider. So the same provider (Opus → Sonnet) switches the bot's
-  thread in place (`change: "in-place"`); another provider (Claude → Codex)
-  hands it off (`change: "handoff"`, "Handing off to Codex…") through the
-  project-lead handoff: a new thread on the new provider gets a summary of
-  the old one, the old one is archived and shows as Earlier conversation,
-  and its chain, check-in and runners follow. A model changed in the chat's
-  own composer is read back from the thread (`bot_get`), and a handoff from
-  the thread's own menu (`thread_handoff`) keeps the bot's permission and
-  moves it to the new provider. A permission change applies to the bot's
-  next thread (BB takes a thread's permission with each send). The primary
-  bot leads with Studio's tools, so it can't move to an external provider.
-- **Kind follows the provider**: an external provider (Studio Agents) makes
-  it an external bot, any other provider a Studio bot with Memory, skills,
-  runners and bot tools. Bots made before this fill their provider and model
-  in from their thread.
+- **Model is the thread's**: a bot follows its current thread, and the
+  provider and model are that thread's (`bot_get` reads them off BB). BB keeps
+  a thread on one provider for life: `threads.update` changes only its model
+  and reasoning level, and BB's composer (in the bot's chat too) picks models
+  within the thread's provider, with no hook for a plugin to intercept. So
+  another provider is the Bot's ⋯ menu → **Switch model…**, BB's own
+  provider/model picker bound to the generic
+  `thread_handoff_to_model({ threadId, providerId, model, reasoning? })`: the
+  same provider (Opus → Sonnet) switches the thread in place
+  (`change: "in-place"`); another (Claude → Codex) hands it off
+  (`change: "handoff"`, "Handing off to Codex…") through the project-lead
+  handoff: a new thread there gets a summary of the old one and its
+  permission, the old one is archived and shows as Earlier conversation, and
+  a bot's chain, check-in and runners follow. It works on any thread. Nothing
+  is stored on the bot. The primary bot leads with Studio's tools, so it
+  can't move to an external provider.
+- **Kind follows the current thread's provider**: an external provider
+  (Studio Agents) makes it an external bot, any other a Studio bot with
+  Memory, skills, runners and bot tools (`provider_id` only caches the
+  provider for synchronous reads).
 - **Backup**: a Studio backup includes the Bot (name, avatar, shape, color,
   role, state, Memory page id) and its skills; they're restored only on a BB without a Bot. The
   Memory page itself comes back with Pages.

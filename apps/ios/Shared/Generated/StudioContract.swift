@@ -38,7 +38,7 @@ public enum Studio {
     public static let bot_get = "bot_get"
     public static let bot_create = "bot_create"
     public static let bot_external_providers = "bot_external_providers"
-    public static let bot_set_model = "bot_set_model"
+    public static let thread_handoff_to_model = "thread_handoff_to_model"
     public static let bot_set = "bot_set"
     public static let bot_set_thread = "bot_set_thread"
     public static let bot_set_run = "bot_set_run"
@@ -258,7 +258,7 @@ public enum Studio {
 
   public typealias BotExternalProviders = BotExternalProvidersOutput
 
-  public typealias BotSetModel = BotSetModelOutput
+  public typealias ThreadHandoffToModel = ThreadHandoffToModelOutput
 
   public typealias BotSet = BotSetOutput
 
@@ -2991,75 +2991,6 @@ public enum Studio {
     }
   }
 
-  public enum BotListOutputBotsItemReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotListOutputBotsItemPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotListOutputBotsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3074,12 +3005,10 @@ public enum Studio {
     public var kind: BotListOutputBotsItemKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotListOutputBotsItemReasoningLevel?
-    public var permissionMode: BotListOutputBotsItemPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotListOutputBotsItemState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotListOutputBotsItemKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotListOutputBotsItemReasoningLevel? = nil, permissionMode: BotListOutputBotsItemPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotListOutputBotsItemState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotListOutputBotsItemKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3093,8 +3022,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3167,75 +3094,6 @@ public enum Studio {
     }
   }
 
-  public enum BotGetOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotGetOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotGetOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3250,12 +3108,10 @@ public enum Studio {
     public var kind: BotGetOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotGetOutputBotReasoningLevel?
-    public var permissionMode: BotGetOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotGetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotGetOutputBotReasoningLevel? = nil, permissionMode: BotGetOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotGetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3269,8 +3125,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3503,75 +3357,6 @@ public enum Studio {
     }
   }
 
-  public enum BotCreateOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotCreateOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotCreateOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -3586,12 +3371,10 @@ public enum Studio {
     public var kind: BotCreateOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotCreateOutputBotReasoningLevel?
-    public var permissionMode: BotCreateOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCreateOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotCreateOutputBotReasoningLevel? = nil, permissionMode: BotCreateOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCreateOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3605,8 +3388,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3792,7 +3573,7 @@ public enum Studio {
     }
   }
 
-  public enum BotSetModelInputReasoning: Sendable, Hashable, Codable {
+  public enum ThreadHandoffToModelInputReasoning: Sendable, Hashable, Codable {
     case none
     case low
     case medium
@@ -3834,276 +3615,24 @@ public enum Studio {
     }
   }
 
-  public enum BotSetModelInputPermission: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct BotSetModelInput: Sendable, Hashable, Codable {
-    public var botId: String?
+  public struct ThreadHandoffToModelInput: Sendable, Hashable, Codable {
+    public var threadId: String?
     public var providerId: String?
     public var model: String?
-    public var reasoning: BotSetModelInputReasoning?
-    public var permission: BotSetModelInputPermission?
+    public var reasoning: ThreadHandoffToModelInputReasoning?
 
-    public init(botId: String? = nil, providerId: String? = nil, model: String? = nil, reasoning: BotSetModelInputReasoning? = nil, permission: BotSetModelInputPermission? = nil) {
-      self.botId = botId
+    public init(threadId: String? = nil, providerId: String? = nil, model: String? = nil, reasoning: ThreadHandoffToModelInputReasoning? = nil) {
+      self.threadId = threadId
       self.providerId = providerId
       self.model = model
       self.reasoning = reasoning
-      self.permission = permission
     }
   }
 
-  public enum BotSetModelOutputBotState: Sendable, Hashable, Codable {
-    case active
-    case paused
-    case stopped
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "active": self = .active
-      case "paused": self = .paused
-      case "stopped": self = .stopped
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .active: try container.encode("active")
-      case .paused: try container.encode("paused")
-      case .stopped: try container.encode("stopped")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotSetModelOutputBotKind: Sendable, Hashable, Codable {
-    case studio
-    case external
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "studio": self = .studio
-      case "external": self = .external
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .studio: try container.encode("studio")
-      case .external: try container.encode("external")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotSetModelOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotSetModelOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct BotSetModelOutputBot: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var avatar: String?
-    public var state: BotSetModelOutputBotState?
-    public var threadId: String?
-    public var memoryPageId: String?
-    public var shape: String?
-    public var color: String?
-    public var role: String?
-    public var primary: Bool?
-    public var kind: BotSetModelOutputBotKind?
-    public var providerId: String?
-    public var model: String?
-    public var reasoningLevel: BotSetModelOutputBotReasoningLevel?
-    public var permissionMode: BotSetModelOutputBotPermissionMode?
-    public var createdAt: Double?
-    public var updatedAt: Double?
-
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetModelOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetModelOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotSetModelOutputBotReasoningLevel? = nil, permissionMode: BotSetModelOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
-      self.id = id
-      self.name = name
-      self.avatar = avatar
-      self.state = state
-      self.threadId = threadId
-      self.memoryPageId = memoryPageId
-      self.shape = shape
-      self.color = color
-      self.role = role
-      self.primary = primary
-      self.kind = kind
-      self.providerId = providerId
-      self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
-      self.createdAt = createdAt
-      self.updatedAt = updatedAt
-    }
-  }
-
-  public enum BotSetModelOutputRunCadence: Sendable, Hashable, Codable {
-    case hourly
-    case daily
-    case weekdays
-    case every5minutes
-    case every15minutes
-    case every30minutes
-    case every2hours
-    case every6hours
-    case weekly
-    case custom
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "hourly": self = .hourly
-      case "daily": self = .daily
-      case "weekdays": self = .weekdays
-      case "every5minutes": self = .every5minutes
-      case "every15minutes": self = .every15minutes
-      case "every30minutes": self = .every30minutes
-      case "every2hours": self = .every2hours
-      case "every6hours": self = .every6hours
-      case "weekly": self = .weekly
-      case "custom": self = .custom
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .hourly: try container.encode("hourly")
-      case .daily: try container.encode("daily")
-      case .weekdays: try container.encode("weekdays")
-      case .every5minutes: try container.encode("every5minutes")
-      case .every15minutes: try container.encode("every15minutes")
-      case .every30minutes: try container.encode("every30minutes")
-      case .every2hours: try container.encode("every2hours")
-      case .every6hours: try container.encode("every6hours")
-      case .weekly: try container.encode("weekly")
-      case .custom: try container.encode("custom")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct BotSetModelOutputRun: Sendable, Hashable, Codable {
-    public var enabled: Bool?
-    public var cadence: BotSetModelOutputRunCadence?
-    public var time: String?
-    public var cron: String?
-
-    public init(enabled: Bool? = nil, cadence: BotSetModelOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
-      self.enabled = enabled
-      self.cadence = cadence
-      self.time = time
-      self.cron = cron
-    }
-  }
-
-  public enum BotSetModelOutputChange: Sendable, Hashable, Codable {
+  public enum ThreadHandoffToModelOutputChange: Sendable, Hashable, Codable {
     case unchanged
     case in_place
     case handoff
-    case stored
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -4112,7 +3641,6 @@ public enum Studio {
       case "unchanged": self = .unchanged
       case "in-place": self = .in_place
       case "handoff": self = .handoff
-      case "stored": self = .stored
       default: self = .unknown(value)
       }
     }
@@ -4123,21 +3651,16 @@ public enum Studio {
       case .unchanged: try container.encode("unchanged")
       case .in_place: try container.encode("in-place")
       case .handoff: try container.encode("handoff")
-      case .stored: try container.encode("stored")
       case .unknown(let value): try container.encode(value)
       }
     }
   }
 
-  public struct BotSetModelOutput: Sendable, Hashable, Codable {
-    public var bot: BotSetModelOutputBot?
-    public var run: BotSetModelOutputRun?
-    public var change: BotSetModelOutputChange?
+  public struct ThreadHandoffToModelOutput: Sendable, Hashable, Codable {
+    public var change: ThreadHandoffToModelOutputChange?
     public var threadId: String?
 
-    public init(bot: BotSetModelOutputBot? = nil, run: BotSetModelOutputRun? = nil, change: BotSetModelOutputChange? = nil, threadId: String? = nil) {
-      self.bot = bot
-      self.run = run
+    public init(change: ThreadHandoffToModelOutputChange? = nil, threadId: String? = nil) {
       self.change = change
       self.threadId = threadId
     }
@@ -4257,75 +3780,6 @@ public enum Studio {
     }
   }
 
-  public enum BotSetOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotSetOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotSetOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -4340,12 +3794,10 @@ public enum Studio {
     public var kind: BotSetOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotSetOutputBotReasoningLevel?
-    public var permissionMode: BotSetOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotSetOutputBotReasoningLevel? = nil, permissionMode: BotSetOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -4359,8 +3811,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4497,75 +3947,6 @@ public enum Studio {
     }
   }
 
-  public enum BotSetThreadOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotSetThreadOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotSetThreadOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -4580,12 +3961,10 @@ public enum Studio {
     public var kind: BotSetThreadOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotSetThreadOutputBotReasoningLevel?
-    public var permissionMode: BotSetThreadOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetThreadOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotSetThreadOutputBotReasoningLevel? = nil, permissionMode: BotSetThreadOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetThreadOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -4599,8 +3978,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4793,75 +4170,6 @@ public enum Studio {
     }
   }
 
-  public enum BotSetRunOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotSetRunOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotSetRunOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -4876,12 +4184,10 @@ public enum Studio {
     public var kind: BotSetRunOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotSetRunOutputBotReasoningLevel?
-    public var permissionMode: BotSetRunOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetRunOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotSetRunOutputBotReasoningLevel? = nil, permissionMode: BotSetRunOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetRunOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -4895,8 +4201,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -5033,75 +4337,6 @@ public enum Studio {
     }
   }
 
-  public enum BotPauseOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotPauseOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotPauseOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -5116,12 +4351,10 @@ public enum Studio {
     public var kind: BotPauseOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotPauseOutputBotReasoningLevel?
-    public var permissionMode: BotPauseOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotPauseOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotPauseOutputBotReasoningLevel? = nil, permissionMode: BotPauseOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotPauseOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -5135,8 +4368,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -5273,75 +4504,6 @@ public enum Studio {
     }
   }
 
-  public enum BotResumeOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotResumeOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotResumeOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -5356,12 +4518,10 @@ public enum Studio {
     public var kind: BotResumeOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotResumeOutputBotReasoningLevel?
-    public var permissionMode: BotResumeOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotResumeOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotResumeOutputBotReasoningLevel? = nil, permissionMode: BotResumeOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotResumeOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -5375,8 +4535,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -5513,75 +4671,6 @@ public enum Studio {
     }
   }
 
-  public enum BotStopOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotStopOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotStopOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -5596,12 +4685,10 @@ public enum Studio {
     public var kind: BotStopOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotStopOutputBotReasoningLevel?
-    public var permissionMode: BotStopOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotStopOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotStopOutputBotReasoningLevel? = nil, permissionMode: BotStopOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotStopOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -5615,8 +4702,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -6073,75 +5158,6 @@ public enum Studio {
     }
   }
 
-  public enum BotCheckinPresetOutputBotReasoningLevel: Sendable, Hashable, Codable {
-    case none
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-    case ultracode
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "none": self = .none
-      case "low": self = .low
-      case "medium": self = .medium
-      case "high": self = .high
-      case "xhigh": self = .xhigh
-      case "max": self = .max
-      case "ultra": self = .ultra
-      case "ultracode": self = .ultracode
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .none: try container.encode("none")
-      case .low: try container.encode("low")
-      case .medium: try container.encode("medium")
-      case .high: try container.encode("high")
-      case .xhigh: try container.encode("xhigh")
-      case .max: try container.encode("max")
-      case .ultra: try container.encode("ultra")
-      case .ultracode: try container.encode("ultracode")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum BotCheckinPresetOutputBotPermissionMode: Sendable, Hashable, Codable {
-    case accept_edits
-    case auto
-    case full
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "accept-edits": self = .accept_edits
-      case "auto": self = .auto
-      case "full": self = .full
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .accept_edits: try container.encode("accept-edits")
-      case .auto: try container.encode("auto")
-      case .full: try container.encode("full")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotCheckinPresetOutputBot: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -6156,12 +5172,10 @@ public enum Studio {
     public var kind: BotCheckinPresetOutputBotKind?
     public var providerId: String?
     public var model: String?
-    public var reasoningLevel: BotCheckinPresetOutputBotReasoningLevel?
-    public var permissionMode: BotCheckinPresetOutputBotPermissionMode?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCheckinPresetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: BotCheckinPresetOutputBotReasoningLevel? = nil, permissionMode: BotCheckinPresetOutputBotPermissionMode? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCheckinPresetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -6175,8 +5189,6 @@ public enum Studio {
       self.kind = kind
       self.providerId = providerId
       self.model = model
-      self.reasoningLevel = reasoningLevel
-      self.permissionMode = permissionMode
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }

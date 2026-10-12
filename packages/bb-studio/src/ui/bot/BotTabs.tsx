@@ -10,7 +10,6 @@ import type { BotActivityView, BotThreadView, BotView } from "../../contract";
 import { useLive } from "../live";
 import { ActivityPanel, openThreadPage, PRESETS, presetOf, runningCount, statusLabel, useBotControls } from "./BotHome";
 import { BotAvatar, botProvider } from "./BotAvatar";
-import { BotModelControl } from "./BotModel";
 import { externalName, externalNote } from "../../external-providers";
 import { RunnersSection } from "./Runners";
 import { forBot, useBotSelection } from "./selection";
@@ -63,11 +62,7 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
 
       <dl className="mx-4 flex flex-col divide-y divide-border border-y border-border text-sm">
         <InfoRow label="Check-ins" value={bot.state === "active" ? checkins : "Off while " + bot.state} action={bot.state === "active" ? { label: "Change", run: () => setSheet("checkins") } : null} />
-        <div className="flex min-h-10 items-center gap-3 py-1.5">
-          <dt className="w-20 shrink-0 text-xs text-muted-foreground">Model</dt>
-          <dd className="min-w-0 flex-1">{bot.providerId ? <BotModelControl bot={bot} onChanged={refresh} showPermission align="start" /> : <span className="text-muted-foreground">{bot.kind === "external" ? externalName(bot.providerId) : "Loading…"}</span>}</dd>
-        </div>
-        {bot.kind === "external" ? null : <>
+        {bot.kind === "external" ? <InfoRow label="Runs on" value={`${externalName(bot.providerId)}${bot.model ? ` · ${bot.model}` : ""}`} action={null} /> : <>
           <InfoRow label="Memory" value="What it keeps in mind" action={{ label: "Open", run: () => void openMemory() }} />
           <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: () => setSheet("skills") }} />
         </>}

@@ -21,7 +21,7 @@ import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
-import { BotModelControl } from "./BotModel";
+import { SwitchModelDialog } from "./BotModel";
 import { useOpenInfo, useOpenSubThread, useOpenSubThreadRequests } from "./workspace";
 import { BOT_PATH, botPath, forBot, useBotSelection } from "./selection";
 
@@ -241,6 +241,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   useOpenSubThreadRequests(bot.id);
   const startedNeedsYou = (activity.data?.needsYou ?? []).filter((thread) => thread.relation === "started");
   const status = statusLabel(view.run, bot.state, running);
+  const [switching, setSwitching] = useState(false);
 
   return (
     <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
@@ -263,7 +264,6 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
           </button>
         ) : null}
         <span className="min-w-0 flex-1" />
-        <BotModelControl bot={bot} onChanged={refresh} />
         <div className="flex shrink-0 items-center gap-0.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -279,6 +279,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
                 </>}
               {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
               {bot.threadId ? <DropdownMenuItem onSelect={() => openThreadPage(bot.threadId!)}><Icon name="ExternalLink" />Open as thread</DropdownMenuItem> : null}
+              {bot.threadId && bot.providerId && bot.model ? <DropdownMenuItem onSelect={() => setSwitching(true)}><Icon name="Repeat" />Switch model…</DropdownMenuItem> : null}
               <DropdownMenuSeparator />
               {bot.state === "active"
                 ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
@@ -289,6 +290,9 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
           <button type="button" className={ICON_BUTTON} aria-label="Bot info" title="Info" onClick={() => openInfo()}><Icon name="Info" /></button>
         </div>
       </StudioBar>
+      {switching && bot.threadId && bot.providerId && bot.model
+        ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
+        : null}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {error ? <p role="alert" className="shrink-0 px-4 py-1.5 text-sm text-destructive">{error}</p> : null}
