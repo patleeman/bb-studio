@@ -27,7 +27,17 @@ the item's own tools and status, such as a page saving or a recording paused;
 the tab names the item, so its title isn't repeated, and Chat isn't offered.
 Each tab row carries the active item's tools, such as Chat, beside its tabs.
 With one pane, the tab row takes BB's title bar, so the item sits under a
-single bar. Open items live here, not in the sidebar.
+single bar. Open items live here as tabs.
+**Studio sidebar**: on the Studio panel, BB's sidebar shows Studio's list
+in place of its thread list (thread list provider `studio/studio-items`,
+"Studio (Studio)" in Settings → Appearance; it switches back on leaving, as
+the Bot's list does, see Bot). **+** at the top is Studio's New menu. Below
+it, **All items** and each enabled kind (Setup → Kinds) with its item count,
+then **Saved views**, **Tags** (with their colors and counts), **Pinned**
+(pinned tabs) and **Recent** (the 15 most recently edited items). A kind,
+view or tag opens the new tab page filtered by it; an item opens as a tab.
+The row for the current filter or tab is highlighted, and each group
+collapses from its heading.
 Conversation-side item views continue to work independently. At phone widths, a
 pane picker shows one pane at a time while preserving the desktop arrangement.
 
@@ -1018,20 +1028,18 @@ of Staff", with the same thread and check-ins; rename it from its page.
   the bot's row opens its main thread. Closed groups are remembered on this
   device.
 - **Switching the list**: BB's `sidebar.threadListProvider` preference is
-  global. Entering the Bot page sets it to `studio/bot` and remembers your
-  choice (in this device's storage); leaving sets it back. "Automatic" would
-  pick Studio's list everywhere, so off the Bot page it becomes BB's own list
+  global, and Studio sets it by page: the Bot page shows `studio/bot`, the
+  Studio panel `studio/studio-items` (see Workspace), and every other page
+  BB's own list. Entering a Studio page remembers your choice (in this
+  device's storage); leaving puts it back. "Automatic" would pick a Studio
+  list everywhere, so off Studio's pages it becomes BB's own list
   (`thread-list/thread-list`); a list you pinned yourself comes back as it
-  was. If the Bots list ever shows off the Bot page (a reload mid-switch), it
-  puts BB's list back at once. With several windows, the window you use
-  decides: a window re-checks when its route changes or it gains focus, so a
-  second window showing a thread also shows the Bots list until you use it.
-- **New bot**: on the Bot page BB's sidebar shows the Bots list and hides
-  **New thread**; **+** next to **Bots** makes a new bot. Studio removes BB's
-  `__bb__/new-thread` item from `sidebar.visiblePluginPanels` on the Bot page,
-  remembers its position (in this device's storage), and puts it back there
-  on leaving. If you hid **New thread** yourself it stays hidden; if the
-  preference is unset (BB's default set) Studio leaves it alone. **New bot** opens
+  was. If a Studio list ever shows on the wrong page (a reload mid-switch),
+  it switches to that page's list at once. With several windows, the window
+  you use decides: a window re-checks when its route changes or it gains
+  focus.
+- **New bot**: **+** next to **Bots** makes a new bot (BB's own **New
+  thread** row stays above the list; BB always shows it). **New bot** opens
   `/plugins/studio/bot/new`: the same greeting and **Customize me** as a
   first bot, and your first message makes it.
 - **Several bots**: the first bot is the **primary**: the personal project's

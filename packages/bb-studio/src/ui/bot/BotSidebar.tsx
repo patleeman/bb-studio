@@ -76,26 +76,27 @@ function age(at: number, now = Date.now()): string {
  */
 export function BotThreadList({ onNavigate }: PluginThreadListProps) {
   const sdk = useSdk();
-  const onBotPage = isBotPath(usePathname());
-  useEffect(() => { if (!onBotPage) void syncThreadList(sdk, false); }, [sdk, onBotPage]);
+  const pathname = usePathname();
+  const onBotPage = isBotPath(pathname);
+  useEffect(() => { if (!onBotPage) void syncThreadList(sdk, pathname); }, [sdk, onBotPage, pathname]);
   if (!onBotPage) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
   return <BotsList onNavigate={onNavigate} />;
 }
 
 /**
- * Mounted in every window (an app overlay): sets BB's sidebar to the Bots list
- * when this window shows the Bot page and back when it leaves, and re-checks
+ * Mounted in every window (an app overlay): sets BB's sidebar to the list this
+ * window's page wants (the Bots list, the Studio list, or BB's), and re-checks
  * when the window gains focus, so the window in use decides.
  */
-export function BotListSwitcher() {
+export function ThreadListSwitcher() {
   const sdk = useSdk();
-  const onBotPage = isBotPath(usePathname());
+  const pathname = usePathname();
   useEffect(() => {
-    const sync = () => void syncThreadList(sdk, onBotPage);
+    const sync = () => void syncThreadList(sdk, pathname);
     sync();
     window.addEventListener("focus", sync);
     return () => window.removeEventListener("focus", sync);
-  }, [sdk, onBotPage]);
+  }, [sdk, pathname]);
   return null;
 }
 
@@ -111,7 +112,6 @@ function BotsList({ onNavigate }: { onNavigate(): void }) {
   return (
     <nav aria-label="Bots" className="studio-root flex flex-col gap-0.5 px-1.5 pb-3">
       <style>{BOT_STYLES}</style>
-      {/* New bot: BB's New thread row is hidden on the Bot page (threadListSwitch.ts). */}
       <div className="flex h-7 items-center gap-1 pl-2 text-[11px] font-medium text-muted-foreground">
         <span className="min-w-0 flex-1">Bots</span>
         <button type="button" aria-label="New bot" title="New bot" data-testid="bot-new" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}

@@ -45,19 +45,37 @@ const EMPTY_QUERY: Query = { filters: [], text: "" };
 
 const QUERY_KEY = "studio:query:all";
 const QUERY_EVENT = "studio:query";
+/** The list changed its own query; the sidebar follows. */
+const QUERY_CHANGED = "studio:query-changed";
 
 /** Opens the new tab page, on `kind`'s items when given, from an old address that showed the list. */
 export function openCollection(kind: string | null): void {
-  if (kind) {
-    const query = { filters: [{ field: "kind" as const, value: kind }], text: "" };
-    try {
-      localStorage.setItem(QUERY_KEY, formatQuery(query));
-    } catch {
-      // Storage can be refused; an open collection still hears the event.
-    }
-    window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: formatQuery(query) }));
+  if (kind) showLibrary(formatQuery({ filters: [{ field: "kind" as const, value: kind }], text: "" }));
+  else showBrowse();
+}
+
+/** Opens the new tab page with the library filtered by `query` (Studio's query text; "" shows everything). */
+export function showLibrary(query: string): void {
+  try {
+    localStorage.setItem(QUERY_KEY, query);
+  } catch {
+    // Storage can be refused; an open collection still hears the event.
   }
+  window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: query }));
   showBrowse();
+}
+
+/** The library's current query text, as the Studio sidebar shows it selected. */
+export function useLibraryQuery(): string {
+  const read = () => { try { return localStorage.getItem(QUERY_KEY) ?? ""; } catch { return ""; } };
+  const [query, setQuery] = useState(read);
+  useEffect(() => {
+    const onQuery = (event: Event) => setQuery((event as CustomEvent<string>).detail);
+    window.addEventListener(QUERY_EVENT, onQuery);
+    window.addEventListener(QUERY_CHANGED, onQuery);
+    return () => { window.removeEventListener(QUERY_EVENT, onQuery); window.removeEventListener(QUERY_CHANGED, onQuery); };
+  }, []);
+  return query;
 }
 
 /** The query, remembered across visits. */
@@ -82,6 +100,7 @@ function useStoredQuery(key: string): [Query, (query: Query) => void] {
       } catch {
         // Private windows can refuse storage; the query lasts this session.
       }
+      if (key === QUERY_KEY) window.dispatchEvent(new CustomEvent(QUERY_CHANGED, { detail: formatQuery(next) }));
     },
     [key],
   );

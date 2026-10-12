@@ -11,7 +11,6 @@ const state = vi.hoisted(() => ({
   pathname: "/plugins/studio/bot",
   prefs: { value: "studio/bot", revision: 1 },
   setPref: vi.fn(async (_args: unknown) => ({})),
-  navPref: { value: "studio/bot-navigation", revision: 1 },
   activate: vi.fn(),
   inputs: [] as [string, unknown][],
 }));
