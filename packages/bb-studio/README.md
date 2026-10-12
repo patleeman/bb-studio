@@ -924,7 +924,7 @@ open in the background, so it's as you left it when you come back.
   The tag menu also renames and deletes the active tag.
 - **Bot.** Your always-on agent (it replaces the Chief of Staff): a name, a
   drawn avatar, and a workspace of its own (the **Bot** rail item): its
-  chat, a sidebar of the threads it started, and Info and Threads tabs in
+  chat, a Bots list in BB's sidebar with the threads it started, and Info and Threads tabs in
   the right panel. See [Bot](#bot).
 - **Project leads.** A BB project can have a lead thread, which a
   Heartbeat wakes on a schedule; the personal project's lead is your Bot.
@@ -971,7 +971,7 @@ bb studio reindex
 
 ## Bot
 
-![The Bot's workspace in a staged BB: Dot's avatar, name and status in the title bar; on the left its sidebar, tinted in Dot's color, with Dot on top and the threads it started under Needs you, Running, Recurring (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it; BB's own thread view of its chat in the middle; and the right panel's Info tab with its profile, Pause and Stop, Check-ins (Morning brief), Memory, Skills and Activity](assets/bot.png)
+![The Bot's workspace in a staged BB: Dot's avatar, name and status in the title bar; in BB's sidebar the Bots list, tinted in Dot's color, with Dot on top and the threads it started under Needs you, Running, Recurring (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it; BB's own thread view of its chat in the middle; and the right panel's Info tab with its profile, Pause and Stop, Check-ins (Morning brief), Memory, Skills and Activity](assets/bot.png)
 
 ![The same workspace with two sub-threads opened from the sidebar in the right panel's Threads tab: a strip of two tabs over BB's thread view of the deploy-key thread, whose question waits on the user](assets/bot-threads.png)
 
@@ -988,17 +988,28 @@ of Staff", with the same thread and check-ins; rename it from its page.
   Idle, Paused, Stopped), a quiet **Needs you** marker when a thread it
   started waits on you, ⋯ (Edit profile, Memory, Skills, Check-ins, Open as
   thread, Pause / Resume, Stop…) and **Info**.
-- **Sidebar**: a column inside the page, tinted in the Bot's color: the Bot
-  on top (always selected; its thread is the page), then the threads it
-  started: **Needs you**, **Running** (a thread that is running or queued,
-  or has one below it), **Recurring** (automations that wake it, other than
-  its check-in), **Recent**, and **Earlier conversations** (its handoff
-  chain, closed by default). A thread another of its threads started nests
-  under that one, at any depth (`bot_activity` returns each thread's
+- **Sidebar**: on the Bot page, BB's sidebar shows the **Bots** list in
+  place of its thread list; everywhere else it is BB's normal thread list.
+  The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
+  Settings → Appearance). Under **Bots**, each bot (one today) with its
+  avatar and status, tinted in its color; the selected one opens into the
+  threads it started: **Needs you**, **Running** (a thread that is running
+  or queued, or has one below it), **Recurring** (automations that wake it,
+  other than its check-in), **Recent**, and **Earlier conversations** (its
+  handoff chain, closed by default). A thread another of its threads started
+  nests under that one, at any depth (`bot_activity` returns each thread's
   `parentId`). A row opens the thread in the right panel's **Threads** tab;
-  the page stays put. Drag its edge to resize; hide it to a slim rail. Width,
-  hidden groups and collapse are remembered on this device. BB's own sidebar
-  stays as it is: the plugin SDK can't hide it.
+  the bot's row opens its main thread. Closed groups are remembered on this
+  device.
+- **Switching the list**: BB's `sidebar.threadListProvider` preference is
+  global. Entering the Bot page sets it to `studio/bot` and remembers your
+  choice (in this device's storage); leaving sets it back. "Automatic" would
+  pick Studio's list everywhere, so off the Bot page it becomes BB's own list
+  (`thread-list/thread-list`); a list you pinned yourself comes back as it
+  was. If the Bots list ever shows off the Bot page (a reload mid-switch), it
+  puts BB's list back at once. With several windows, the window you use
+  decides: a window re-checks when its route changes or it gains focus, so a
+  second window showing a thread also shows the Bots list until you use it.
 - **Right panel**: two fixed tabs beside BB's Browser and Terminal.
   **Info** is the Bot's profile, Pause / Resume and Stop, Check-ins, Memory,
   Skills and Activity: **Needs you**, **Running**, **Waiting to start**,

@@ -1,9 +1,11 @@
 // The Bot's workspace (/plugins/studio/bot). First its onboarding, while the
 // staged BB has no Bot (greeting and starter chips); then a Bot with history:
-// its sidebar of the threads it started (one needing the user, one running,
+// the Bots list in BB's sidebar (it replaces BB's thread list on the Bot page)
+// with the threads it started (one needing the user, one running,
 // a nested follow-up, a recurring automation), its main thread in BB's own
 // thread view, and the right panel's Info tab; then two sub-threads open in
-// the right panel's Threads tab.
+// the right panel's Threads tab; then a normal thread page, where BB's own
+// thread list is back.
 const BOT_PATH = "/plugins/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
@@ -13,7 +15,8 @@ const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet 
 
 /** Staging's plugin-problem card is closed so it doesn't cover the page. */
 const dismissProblems = (client) => client.evaluate(`(() => { [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide")?.click(); return true; })()`);
-const SIDEBAR = 'nav[aria-label="Dot threads"]';
+const SIDEBAR = 'nav[aria-label="Bots"]';
+const LIST_PREF = "sidebar.threadListProvider";
 /** Clicks a sidebar row by its title. */
 const openRow = (client, title) => client.evaluate(`(() => {
   const row = [...document.querySelectorAll('${SIDEBAR} button[data-thread]')].find((each) => each.textContent.includes(${JSON.stringify(title)}));
@@ -86,8 +89,10 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await client.navigate(BOT_PATH);
     await client.waitForSelector(SIDEBAR, 30000);
     await dismissProblems(client);
-    // The Bot's own sidebar replaces BB's here; hide BB's the way a user would (the SDK can't).
-    await client.evaluate(`(() => { const nav = document.querySelector('${SIDEBAR}'); if (nav && nav.getBoundingClientRect().left > 120) [...document.querySelectorAll('button[aria-label]')].find((each) => /sidebar/i.test(each.getAttribute("aria-label")) && !/bot/i.test(each.getAttribute("aria-label")))?.click(); return true; })()`);
+    const pref = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
+    if (pref !== "studio/bot") throw new Error(`On the Bot page the thread list is ${pref}, not studio/bot`);
+    // The Bots list sits in BB's sidebar itself, left of the page, not a column inside it.
+    await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}').getBoundingClientRect().left > 120) throw new Error("The Bots list isn't in BB's sidebar"); return true; })()`);
     for (const text of ["Needs you", "Running", "Recurring", "Recent", "Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", "Inbox sweep", "Pull the ORBIT-42 thread digests", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 90000);
     // The follow-up nests under the thread that started it.
     await client.evaluate(`(() => {
@@ -125,6 +130,21 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
+  /** Leaving the Bot page: a normal thread, with BB's own thread list back. */
+  const leave = async (client) => {
+    const bot = await seededBot();
+    await client.navigate(BOT_PATH);
+    await client.waitForSelector(SIDEBAR, 30000);
+    await client.navigate(`/threads/${bot.threadId}`);
+    for (let i = 0; i < 40 && JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF])) !== "thread-list/thread-list"; i++) await sleep(500);
+    const pref = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
+    if (pref !== "thread-list/thread-list") throw new Error(`After leaving the Bot page the thread list is ${pref}, not BB's`);
+    await client.waitForText(CHILDREN[0].title, 30000);
+    await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}')) throw new Error("The Bots list is still showing"); return true; })()`);
+    await dismissProblems(client);
+    await sleep(1500);
+  };
+
   return [
     {
       id: "studio-bot-create",
@@ -143,5 +163,6 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     },
     { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: info },
     { id: "studio-bot-threads", packageDir: "bb-studio", fileName: "bot-threads.png", setup: threads },
+    { id: "studio-bot-leave", packageDir: "bb-studio", fileName: "bot-leave.png", setup: leave },
   ];
 };

@@ -1,6 +1,6 @@
 // The Bot's workspace (nav panel `bot`, /plugins/studio/bot): its main
-// thread (BB's ThreadChat) always fills the page, its sidebar on the left
-// lists the threads it started, and the right panel's fixed tabs hold its
+// thread (BB's ThreadChat) always fills the page, BB's sidebar shows the
+// Bots list with the threads it started (BotSidebar.tsx), and the right panel's fixed tabs hold its
 // Info and the sub-threads the user opened (BotTabs.tsx). Identity, status
 // and the ⋯ menu sit in the panel's title bar. With no Bot yet, the page greets the user as one and
 // the first message makes it. Studio's old address redirects here.
@@ -18,7 +18,6 @@ import { pagePath } from "../../pages/constants";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
-import { BotSidebar } from "./BotSidebar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
 import { useOpenInfo, useOpenSubThread } from "./workspace";
 
@@ -218,12 +217,11 @@ export const runningCount = (activity: BotActivityView | null | undefined) => ac
 export const openThreadPage = (threadId: string) => openAppPath(threadPath(threadId));
 
 /**
- * The Bot's workspace: its sidebar on the left, its main thread filling the
- * page, and the right panel's Info and Threads tabs (src/ui/bot/BotTabs.tsx).
+ * The Bot's workspace: its main thread filling the page (the Bots list
+ * replaces BB's sidebar list), and the right panel's Info and Threads tabs (src/ui/bot/BotTabs.tsx).
  */
 function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 15_000 });
-  const chain = useLive<{ threadIds: string[] }>("bot_chain", {}, { pollMs: 120_000 });
   const running = runningCount(activity.data);
   const controls = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
   const { bot, profile, run, busy, error, setSheet } = controls;
@@ -231,9 +229,6 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const openSub = useOpenSubThread(bot.id, openThreadPage);
   const startedNeedsYou = (activity.data?.needsYou ?? []).filter((thread) => thread.relation === "started");
   const status = statusLabel(view.run, bot.state, running);
-  // Earlier conversations: the handoff chain before its current thread (bot_chain ends at it), newest first.
-  const ids = chain.data?.threadIds ?? [];
-  const earlier = bot.threadId && ids.at(-1) === bot.threadId ? ids.slice(0, -1).reverse() : [];
 
   return (
     <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
@@ -278,24 +273,21 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
         </div>
       </StudioBar>
 
-      <div className="flex min-h-0 flex-1">
-        <BotSidebar bot={bot} status={status} working={running > 0} activity={activity.data} earlier={earlier} onOpen={openSub} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          {error ? <p role="alert" className="shrink-0 px-4 py-1.5 text-sm text-destructive">{error}</p> : null}
-          {bot.state !== "active" ? (
-            <div className="flex shrink-0 items-center justify-center gap-3 border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
-              <span className="min-w-0">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
-              <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>
-            </div>
-          ) : null}
-          {bot.threadId ? (
-            <section aria-label="Chat" className="min-h-0 flex-1">
-              <ThreadChat key={bot.threadId} threadId={bot.threadId} variant="full" className="h-full" />
-            </section>
-          ) : (
-            <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. Make a thread your Bot from its ⋯ menu.</p>
-          )}
-        </div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {error ? <p role="alert" className="shrink-0 px-4 py-1.5 text-sm text-destructive">{error}</p> : null}
+        {bot.state !== "active" ? (
+          <div className="flex shrink-0 items-center justify-center gap-3 border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
+            <span className="min-w-0">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
+            <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>
+          </div>
+        ) : null}
+        {bot.threadId ? (
+          <section aria-label="Chat" className="min-h-0 flex-1">
+            <ThreadChat key={bot.threadId} threadId={bot.threadId} variant="full" className="h-full" />
+          </section>
+        ) : (
+          <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. Make a thread your Bot from its ⋯ menu.</p>
+        )}
       </div>
       {controls.sheets}
     </div>

@@ -1,35 +1,32 @@
-// The Bot's own sidebar: a column inside its page (BB's sidebar is global and
-// stays as it is). The bot on top (its main thread is the page), then the
-// threads it started: Needs you, Running, Recurring, Recent, each started
-// thread nested under the one that started it, and its earlier conversations.
-// A sub-thread opens in the right panel's Threads tab. The header names the
-// bot as one of a list so more kinds of bot can join it later.
+// The Bots sidebar: Studio's thread list provider ("Bot (Studio)"), which
+// replaces BB's thread list while the Bot page shows (threadListSwitch.ts).
+// A "Bots" list (one bot today; more kinds can join it), the selected bot
+// expanded under it into the threads it started: Needs you, Running,
+// Recurring, Recent (each nested under the thread that started it) and its
+// earlier conversations. A sub-thread opens in the Bot page's Threads tab;
+// the bot itself opens its main thread, the page.
 import { Icon } from "@bb-studio/kit/ui";
-import { ThreadTitle } from "@get-bb/plugin-sdk/app";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { openAppPath, usePathname } from "@bb-studio/kit/app";
+import { ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
-import { BotAvatar, colorForName } from "./BotAvatar";
-import { sidebarGroups, useStrip, type TreeNode } from "./workspace";
+import { useLive } from "../live";
+import { BOT_PATH, openThreadPage, runningCount, statusLabel } from "./BotHome";
+import { BOT_STYLES, BotAvatar, colorForName } from "./BotAvatar";
+import { isBotPath, syncThreadList } from "./threadListSwitch";
+import { sidebarGroups, useOpenSubThread, useStrip, type TreeNode } from "./workspace";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
-export const SIDEBAR_MIN = 200;
-export const SIDEBAR_MAX = 420;
-const SIDEBAR_DEFAULT = 252;
-type Layout = { width: number; collapsed: boolean; closed: string[] };
+type Layout = { closed: string[] };
 
 function readLayout(): Layout {
   try {
     const raw = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "null") as Partial<Layout> | null;
-    return {
-      width: clampWidth(typeof raw?.width === "number" ? raw.width : SIDEBAR_DEFAULT),
-      collapsed: raw?.collapsed === true,
-      closed: Array.isArray(raw?.closed) ? raw.closed.filter((each): each is string => typeof each === "string") : ["earlier"],
-    };
+    return { closed: Array.isArray(raw?.closed) ? raw.closed.filter((each): each is string => typeof each === "string") : ["earlier"] };
   } catch {
-    return { width: SIDEBAR_DEFAULT, collapsed: false, closed: ["earlier"] };
+    return { closed: ["earlier"] };
   }
 }
-export const clampWidth = (width: number) => Math.round(Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, width)));
 
 function useLayout(): [Layout, (patch: Partial<Layout>) => void] {
   const [layout, setLayout] = useState(readLayout);
@@ -69,88 +66,115 @@ function age(at: number, now = Date.now()): string {
   return relative.format(-Math.round(minutes / 10080), "week").replace(/\s?ago$/, "");
 }
 
-export function BotSidebar({ bot, status, working, activity, earlier, onOpen }: {
-  bot: NonNullable<BotView["bot"]>;
-  status: string;
-  working: boolean;
-  activity: BotActivityView | null | undefined;
-  /** Its earlier conversations, newest first. */
-  earlier: string[];
-  onOpen(threadId: string): void;
-}) {
+/**
+ * The provider's component. Shown off the Bot page only by mistake (a reload
+ * mid-switch, a second window): it puts BB's list back at once and shows a
+ * quiet placeholder for that moment.
+ */
+export function BotThreadList({ onNavigate }: PluginThreadListProps) {
+  const sdk = useSdk();
+  const onBotPage = isBotPath(usePathname());
+  useEffect(() => { if (!onBotPage) void syncThreadList(sdk, false); }, [sdk, onBotPage]);
+  if (!onBotPage) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
+  return <BotsList onNavigate={onNavigate} />;
+}
+
+/**
+ * Mounted in every window (an app overlay): sets BB's sidebar to the Bots list
+ * when this window shows the Bot page and back when it leaves, and re-checks
+ * when the window gains focus, so the window in use decides.
+ */
+export function BotListSwitcher() {
+  const sdk = useSdk();
+  const onBotPage = isBotPath(usePathname());
+  useEffect(() => {
+    const sync = () => void syncThreadList(sdk, onBotPage);
+    sync();
+    window.addEventListener("focus", sync);
+    return () => window.removeEventListener("focus", sync);
+  }, [sdk, onBotPage]);
+  return null;
+}
+
+function BotsList({ onNavigate }: { onNavigate(): void }) {
+  const view = useLive<BotView>("bot_get", {}, { pollMs: 30_000 });
+  const bot = view.data?.bot;
+  return (
+    <nav aria-label="Bots" className="studio-root flex flex-col px-1.5 pb-3">
+      <style>{BOT_STYLES}</style>
+      <div className="flex h-7 items-center px-2 text-[11px] font-medium text-muted-foreground">Bots</div>
+      {bot ? <BotEntry view={view.data!} onNavigate={onNavigate} />
+        : <p className="px-2 text-xs text-muted-foreground">{view.loading ? "Loading…" : view.error ?? "No bot yet. Say hi to make one."}</p>}
+    </nav>
+  );
+}
+
+/** One bot: its row, and (it's the selected bot) its threads under it. */
+function BotEntry({ view, onNavigate }: { view: BotView; onNavigate(): void }) {
+  const bot = view.bot!;
+  const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 15_000 });
+  const chain = useLive<{ threadIds: string[] }>("bot_chain", {}, { pollMs: 120_000 });
   const [layout, setLayout] = useLayout();
   const [strip] = useStrip(bot.id);
-  const groups = sidebarGroups(activity);
+  const openSub = useOpenSubThread(bot.id, openThreadPage);
+  const running = runningCount(activity.data);
+  const status = statusLabel(view.run, bot.state, running);
+  const groups = sidebarGroups(activity.data);
+  const ids = chain.data?.threadIds ?? [];
+  const earlier = bot.threadId && ids.at(-1) === bot.threadId ? ids.slice(0, -1).reverse() : [];
   const color = bot.color ?? colorForName(bot.name);
-  const surface = { "--bot-accent": color, background: `color-mix(in oklab, ${color} 6%, transparent)` } as CSSProperties;
+  const accent = { "--bot-accent": color } as CSSProperties;
   const toggle = (id: string) => setLayout({ closed: layout.closed.includes(id) ? layout.closed.filter((each) => each !== id) : [...layout.closed, id] });
   const active = strip.active;
+  const onOpen = (threadId: string) => { openSub(threadId); onNavigate(); };
+  const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} />;
 
-  if (layout.collapsed) {
-    return (
-      <nav aria-label={`${bot.name} threads`} className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-border py-2" style={surface}>
-        <button type="button" className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground" aria-label="Show bot sidebar" title="Show sidebar" onClick={() => setLayout({ collapsed: false })}>
-          <Icon name="PanelLeft" className="size-4" />
-        </button>
-        <span className="relative">
-          <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={26} working={working} />
+  return (
+    <div className="flex flex-col" style={accent}>
+      {/* The bot: its main thread is the Bot page. */}
+      <button type="button" aria-current="page" data-testid="bot-main" title={`${bot.name}: ${status}`}
+        onClick={() => { openAppPath(BOT_PATH); onNavigate(); }}
+        className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:brightness-110"
+        style={{ background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" }}>
+        <span className="relative shrink-0">
+          <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={28} working={running > 0} />
           {groups.needsYou.length ? <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label="Needs you" /> : null}
         </span>
-      </nav>
-    );
-  }
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-medium">{bot.name}</span>
+          <span className="truncate text-[11px] text-muted-foreground">{status}</span>
+        </span>
+      </button>
 
-  const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} />;
-  return (
-    <nav aria-label={`${bot.name} threads`} className="relative flex shrink-0 flex-col border-r border-border" style={{ ...surface, width: layout.width }}>
-      <div className="flex h-8 shrink-0 items-center gap-1 pr-1.5 pl-3">
-        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">Bots</span>
-        <button type="button" className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground" aria-label="Hide bot sidebar" title="Hide sidebar" onClick={() => setLayout({ collapsed: true })}>
-          <Icon name="PanelLeft" className="size-3.5" />
-        </button>
+      <div className="mt-2 ml-3 flex flex-col gap-2.5 border-l pl-1.5" style={{ borderColor: "color-mix(in oklab, var(--bot-accent) 35%, transparent)" }}>
+        {groups.needsYou.length ? (
+          <Group id="needs" title="Needs you" closed={layout.closed} onToggle={toggle} badge={groups.needsYou.length}>
+            {groups.needsYou.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} />)}
+          </Group>
+        ) : null}
+        {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
+        {groups.recurring.length ? (
+          <Group id="recurring" title="Recurring" closed={layout.closed} onToggle={toggle}>
+            {groups.recurring.map((item) => <RecurringRow key={item.id} item={item} />)}
+          </Group>
+        ) : null}
+        {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
+        {!groups.needsYou.length && !groups.running.length && !groups.recent.length ? (
+          <p className="px-2 text-xs text-muted-foreground">Threads {bot.name} starts show up here.</p>
+        ) : null}
+        {earlier.length ? (
+          <Group id="earlier" title="Earlier conversations" closed={layout.closed} onToggle={toggle}>
+            {earlier.map((id) => (
+              <button key={id} type="button" onClick={() => onOpen(id)} aria-current={active === id ? "true" : undefined}
+                className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">
+                <Icon name="Clock" className="size-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate"><ThreadTitle threadId={id} /></span>
+              </button>
+            ))}
+          </Group>
+        ) : null}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3">
-        {/* The bot itself: its main thread is the page, so it is always the selected row. */}
-        <div aria-current="page" data-testid="bot-main" className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5"
-          style={{ background: "color-mix(in oklab, var(--bot-accent) 13%, transparent)" }}>
-          <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={28} working={working} />
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium">{bot.name}</span>
-            <span className="truncate text-[11px] text-muted-foreground">{status}</span>
-          </span>
-        </div>
-
-        <div className="mt-3 flex flex-col gap-2.5">
-          {groups.needsYou.length ? (
-            <Group id="needs" title="Needs you" closed={layout.closed} onToggle={toggle} badge={groups.needsYou.length}>
-              {groups.needsYou.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} />)}
-            </Group>
-          ) : null}
-          {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
-          {groups.recurring.length ? (
-            <Group id="recurring" title="Recurring" closed={layout.closed} onToggle={toggle}>
-              {groups.recurring.map((item) => <RecurringRow key={item.id} item={item} />)}
-            </Group>
-          ) : null}
-          {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
-          {!groups.needsYou.length && !groups.running.length && !groups.recent.length ? (
-            <p className="px-2 text-xs text-muted-foreground">Threads {bot.name} starts show up here.</p>
-          ) : null}
-          {earlier.length ? (
-            <Group id="earlier" title="Earlier conversations" closed={layout.closed} onToggle={toggle}>
-              {earlier.map((id) => (
-                <button key={id} type="button" onClick={() => onOpen(id)} aria-current={active === id ? "true" : undefined}
-                  className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">
-                  <Icon name="Clock" className="size-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate"><ThreadTitle threadId={id} /></span>
-                </button>
-              ))}
-            </Group>
-          ) : null}
-        </div>
-      </div>
-      <ResizeHandle width={layout.width} onResize={(width) => setLayout({ width })} />
-    </nav>
+    </div>
   );
 }
 
@@ -202,33 +226,5 @@ function RecurringRow({ item }: { item: BotScheduledView }) {
       <span className={`min-w-0 flex-1 truncate ${item.enabled ? "" : "text-muted-foreground"}`}>{item.name}</span>
       <span className="shrink-0 text-[11px] text-muted-foreground">{item.enabled ? next ?? "on" : "off"}</span>
     </div>
-  );
-}
-
-/** Drag the column's right edge; arrow keys work too. */
-function ResizeHandle({ width, onResize }: { width: number; onResize(width: number): void }) {
-  const drag = useRef<{ x: number; width: number } | null>(null);
-  const [live, setLive] = useState<number | null>(null);
-  useEffect(() => {
-    if (live === null) return;
-    const move = (event: PointerEvent) => { if (drag.current) setLive(clampWidth(drag.current.width + event.clientX - drag.current.x)); };
-    const up = () => { drag.current = null; setLive((value) => { if (value !== null) onResize(value); return null; }); };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up, { once: true });
-    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-  }, [live !== null]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const nav = handle.current?.parentElement;
-    if (nav && live !== null) nav.style.width = `${live}px`;
-  }, [live]);
-  const handle = useRef<HTMLDivElement>(null);
-  return (
-    <div ref={handle} role="separator" aria-orientation="vertical" aria-label="Resize bot sidebar" aria-valuemin={SIDEBAR_MIN} aria-valuemax={SIDEBAR_MAX} aria-valuenow={live ?? width} tabIndex={0}
-      className="absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize outline-none hover:bg-border/60 focus-visible:bg-ring/40"
-      onPointerDown={(event) => { event.preventDefault(); drag.current = { x: event.clientX, width }; setLive(width); }}
-      onKeyDown={(event) => {
-        if (event.key === "ArrowLeft") onResize(clampWidth(width - 16));
-        else if (event.key === "ArrowRight") onResize(clampWidth(width + 16));
-      }} />
   );
 }

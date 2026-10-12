@@ -34,6 +34,8 @@ import { SetupPage } from "./src/ui/setup/SetupPage";
 import { BOT_PANEL, BOT_SUBPATH, BotHome, BotRedirect } from "./src/ui/bot/BotHome";
 import { BotInfoTab, BotThreadsTab } from "./src/ui/bot/BotTabs";
 import { INFO_TAB, THREADS_TAB } from "./src/ui/bot/workspace";
+import { BotListSwitcher, BotThreadList } from "./src/ui/bot/BotSidebar";
+import { BOT_LIST_ID } from "./src/ui/bot/threadListSwitch";
 import { registerThreadAutomations } from "./src/ui/automations/register";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 
@@ -223,6 +225,9 @@ export default definePluginApp((app) => {
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));
   app.slots.experimental_appOverlay({ id: "health-watch", component: HealthWatch });
+  // The Bots list replaces BB's thread list while the Bot page shows (src/ui/bot/threadListSwitch.ts).
+  app.slots.experimental_threadList({ id: BOT_LIST_ID, title: "Bot (Studio)", description: "Bots and their threads. Studio switches to it on the Bot page and back when you leave.", component: BotThreadList });
+  app.slots.experimental_appOverlay({ id: "bot-list-switch", component: BotListSwitcher });
   // The thread panel's Automations tab and the header's clock badge.
   registerThreadAutomations(app);
   app.commands.register({

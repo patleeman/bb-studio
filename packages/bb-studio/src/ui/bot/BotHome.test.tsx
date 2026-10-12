@@ -8,6 +8,9 @@ const state = vi.hoisted(() => ({
   call: vi.fn(async () => ({})),
   openFixedTab: vi.fn((_options: unknown) => true),
   target: null as null | { sequence: number; target: { threadId: string }; clear(): void },
+  pathname: "/plugins/studio/bot",
+  prefs: { value: "studio/bot", revision: 1 },
+  setPref: vi.fn(async (_args: unknown) => ({})),
 }));
 vi.mock("../live", () => ({
   useCall: () => state.call,
@@ -19,7 +22,12 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   ThreadTitle: ({ threadId }: { threadId: string }) => React.createElement("span", null, `title:${threadId}`),
   experimental_useAppPanel: () => ({ openFixedTab: state.openFixedTab }),
   experimental_useFixedTabTarget: () => state.target,
+  useSdk: () => sdk,
 }));
+const sdk = { system: { uiPreferences: {
+  list: async () => ({ preferences: { "sidebar.threadListProvider": state.prefs } }),
+  set: (args: unknown) => state.setPref(args),
+} } };
 vi.mock("./Onboarding", () => ({
   Greeting: ({ lines, onStarter }: { lines: string[]; onStarter(starter: unknown): void }) => React.createElement("div", null, lines.join(" "),
     React.createElement("button", { onClick: () => onStarter({ kind: "customize" }) }, "Customize me")),
@@ -28,7 +36,7 @@ vi.mock("./Onboarding", () => ({
 vi.mock("@bb-studio/kit/app", () => ({
   PageColumn: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   StudioBar: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
-  openAppPath: vi.fn(), DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
+  openAppPath: vi.fn(), usePathname: () => state.pathname, DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
 }));
 vi.mock("@bb-studio/kit/ui", () => ({
   Icon: () => null,
@@ -49,6 +57,8 @@ vi.mock("@bb-studio/kit/ui", () => ({
 
 const { ActivityPanel, BOT_PATH, BotHome, BotRedirect } = await import("./BotHome");
 const { BotInfoTab, BotThreadsTab } = await import("./BotTabs");
+const { BotThreadList } = await import("./BotSidebar");
+const listProps = { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => {}, searchQuery: "" };
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
@@ -56,6 +66,8 @@ beforeEach(() => {
   state.call.mockClear();
   state.openFixedTab.mockClear();
   state.target = null;
+  state.pathname = "/plugins/studio/bot";
+  state.setPref.mockClear();
   localStorage.clear();
   container = document.createElement("div");
   document.body.append(container);
@@ -108,7 +120,7 @@ test("Activity: one quiet line when all is empty, sections only when non-empty, 
   expect(container.textContent).toContain("Done e");
 });
 
-test("the sidebar: the bot on top, Needs you flat, started threads nested under the one that started them; a row opens the Threads tab", async () => {
+test("the Bots list: the bot on top, Needs you flat, started threads nested under the one that started them; a row opens the Threads tab", async () => {
   state.data = {
     bot_get: { bot: dot, run: null },
     bot_activity: {
@@ -120,8 +132,8 @@ test("the sidebar: the bot on top, Needs you flat, started threads nested under 
     },
     bot_chain: { threadIds: ["thr_old", "thr_bot"] },
   };
-  await show(<BotHome />);
-  const nav = container.querySelector('nav[aria-label="Dot threads"]')!;
+  await show(<BotThreadList {...listProps} />);
+  const nav = container.querySelector('nav[aria-label="Bots"]')!;
   expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Dot");
   const groups = [...nav.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"));
   expect(groups).toEqual(["Needs you", "Running", "Recurring", "Recent", "Earlier conversations"]);
@@ -136,20 +148,28 @@ test("the sidebar: the bot on top, Needs you flat, started threads nested under 
   expect(state.openFixedTab).toHaveBeenCalledWith({ surface: { kind: "current" }, tab: expect.objectContaining({ panelId: "bot", id: "threads" }), target: { threadId: "t4" } });
   expect(JSON.parse(localStorage.getItem("studio.bot.bot_main.threads")!)).toEqual({ open: ["t4"], active: "t4" });
   expect(nav.querySelector('[data-thread="t4"]')?.getAttribute("aria-current")).toBe("true");
-  // No in-page Activity panel or banner; a quiet needs-you indicator in the title bar.
-  expect(container.querySelector('aside[aria-label="Activity"]')).toBeNull();
+  // Closed groups are remembered.
+  act(() => click(nav.querySelector('section[aria-label="Recent"] > button')));
+  expect(JSON.parse(localStorage.getItem("studio.bot.sidebar")!).closed).toContain("recent");
+  // The page itself has no column of its own; a quiet needs-you indicator in the title bar.
+  await show(<BotHome />);
+  expect(container.querySelector("nav")).toBeNull();
   expect(container.querySelector('[aria-label="1 needs you"]')).not.toBeNull();
-  // Collapse is remembered.
-  act(() => click(nav.querySelector('[aria-label="Hide bot sidebar"]')));
-  expect(JSON.parse(localStorage.getItem("studio.bot.sidebar")!).collapsed).toBe(true);
-  expect(container.querySelector('[aria-label="Show bot sidebar"]')).not.toBeNull();
+});
+
+test("off the Bot page the Bots list puts BB's list back and shows a placeholder", async () => {
+  state.pathname = "/threads/thr_1";
+  state.data = { bot_get: { bot: dot, run: null } };
+  await show(<BotThreadList {...listProps} />);
+  expect(container.querySelector("nav")).toBeNull();
+  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "thread-list/thread-list", expectedRevision: 1 });
 });
 
 test("when the host declines the Threads tab, the sub-thread opens as a BB thread", async () => {
   const { openAppPath } = await import("@bb-studio/kit/app");
   state.openFixedTab.mockReturnValueOnce(false);
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, completed: [thread("t4", "Weekly digest")] } };
-  await show(<BotHome />);
+  await show(<BotThreadList {...listProps} />);
   await act(async () => click(container.querySelector('[data-thread="t4"]')));
   expect(openAppPath).toHaveBeenCalledWith("/threads/t4");
 });
