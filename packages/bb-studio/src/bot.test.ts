@@ -353,3 +353,24 @@ it("imports an external bot: its thread runs on the provider and model, and Stud
   expect((x.automations.at(-1)!.execution as { prompt: string }).prompt).not.toContain("Memory page");
   expect((await x.bots.pause(made.bot!.id)).bot!.state).toBe("paused");
 });
+
+it("resolves the Bot a thread acts for: own thread or handoff chain, its runners, threads it started; else none", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  x.add({ id: "run_t" });
+  x.add({ id: "child", parentThreadId: "t2" });
+  x.add({ id: "grandchild", sourceThreadId: "child" });
+  x.add({ id: "runner_child", lifecycleOwnerThreadId: "run_t" });
+  x.add({ id: "loose" });
+  const runnerBot = (id: string) => id === "run_t" ? scout : null;
+  expect(await x.bots.actingFor("t2", runnerBot)).toEqual({ botId: scout, via: "own" });
+  expect(await x.bots.actingFor("run_t", runnerBot)).toEqual({ botId: scout, via: "runner" });
+  expect(await x.bots.actingFor("grandchild", runnerBot)).toEqual({ botId: scout, via: "started" });
+  expect(await x.bots.actingFor("runner_child", runnerBot)).toEqual({ botId: scout, via: "started" });
+  expect(await x.bots.actingFor("loose", runnerBot)).toBeNull();
+  const { threadId } = await x.leads.handoff("t2", request);
+  await x.bots.handedOff("t2", threadId);
+  expect(await x.bots.actingFor("t2", runnerBot)).toEqual({ botId: scout, via: "own" });
+  expect(await x.bots.actingFor(threadId, runnerBot)).toEqual({ botId: scout, via: "own" });
+});

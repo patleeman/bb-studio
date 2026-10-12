@@ -272,6 +272,31 @@ export class Bots {
     return named ? { ...named, threadId } : null;
   }
 
+  /**
+   * The Bot a thread acts for, and how: its own thread or one it handed off
+   * from ("own"), a runner's thread (`runnerBot` names the runner's Bot), or a
+   * thread it started, walking parent, source and lifecycle owner up to a Bot
+   * or runner thread (depth-limited). Null: no Bot's, so tools fall back to
+   * the primary Bot.
+   */
+  async actingFor(threadId: string | undefined | null, runnerBot?: (threadId: string) => string | null | undefined): Promise<{ botId: string; via: "own" | "runner" | "started" } | null> {
+    if (!threadId) return null;
+    const bots = this.list();
+    const chains = bots.flatMap((bot) => bot.threadId ? [[bot.id, new Set(this.threadChain(bot.threadId))] as const] : []);
+    const seen = new Set<string>();
+    let id: string | null | undefined = threadId;
+    for (let depth = 0; id && depth < 8 && !seen.has(id); depth++) {
+      seen.add(id);
+      const own = chains.find(([, chain]) => chain.has(id!));
+      if (own) return { botId: own[0], via: depth === 0 ? "own" : "started" };
+      const runner = runnerBot?.(id);
+      if (runner && bots.some((bot) => bot.id === runner)) return { botId: runner, via: depth === 0 ? "runner" : "started" };
+      const thread: Partial<ListedThread> | null = await this.deps.sdk.threads.get({ threadId: id }).catch(() => null);
+      id = thread ? thread.parentThreadId ?? thread.sourceThreadId ?? thread.lifecycleOwnerThreadId : null;
+    }
+    return null;
+  }
+
   async get(botId?: string | null): Promise<BotView> {
     const row = this.row(botId);
     if (botId && !row) throw new Error(`No Bot "${botId}".`);
