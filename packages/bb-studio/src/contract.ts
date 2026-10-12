@@ -138,6 +138,8 @@ const bot = z.object({
   color: z.string().nullable().optional(),
   /** A sentence or two on its role, given to it ("You are my chief of staff."). */
   role: z.string().nullable().optional(),
+  /** The primary Bot: the personal project's lead. Additional Bots ("New bot") have their own thread. */
+  primary: z.boolean().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -152,6 +154,9 @@ const botAvatar = z.string().trim().min(1).max(16);
 const botShape = z.enum(BOT_SHAPES);
 const botColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const botRole = z.string().trim().max(400);
+/** Which Bot a bot_* call acts on; the primary Bot when absent. */
+const botId = z.string().min(1).max(100).optional();
+const forBot = z.object({ botId });
 /** A thread in the Bot's Activity: its own thread ("self") or one it started. */
 const botThread = z.object({
   id: z.string(),
@@ -287,52 +292,54 @@ export const rpcContract = defineRpcContract({
   chief_of_staff_set: { input: z.object({ threadId: z.string().min(1).max(200).nullable() }), output: chiefOfStaff },
   /** Deprecated alias of bot_set_run (one release). */
   chief_of_staff_set_run: { input: heartbeatRunSchema.omit({ time: true }).extend({ time: heartbeatRunSchema.shape.time.optional() }), output: chiefOfStaff },
-  /** The user's Bot and its heartbeat; bot null before one is made. */
-  bot_get: { input: z.object({}), output: botView },
-  /** Makes the Bot: from an existing thread, or a new chat in the personal project started with `prompt`. */
+  /** Every Bot, the primary first. */
+  bot_list: { input: z.object({}), output: z.object({ bots: z.array(bot) }) },
+  /** A Bot (the primary without botId) and its heartbeat; bot null before one is made. */
+  bot_get: { input: forBot, output: botView },
+  /** Makes a Bot: from an existing thread, or a new chat in the personal project started with `prompt`. The first is the primary; later ones are additional Bots. */
   bot_create: { input: z.object({ name: botName, avatar: botAvatar, shape: botShape.optional(), color: botColor.optional(), threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional() }), output: botView },
   /** Renames the Bot or changes its avatar. */
-  bot_set: { input: z.object({ name: botName.optional(), avatar: botAvatar.optional(), shape: botShape.nullable().optional(), color: botColor.optional(), role: botRole.optional() }), output: botView },
+  bot_set: { input: z.object({ botId, name: botName.optional(), avatar: botAvatar.optional(), shape: botShape.nullable().optional(), color: botColor.optional(), role: botRole.optional() }), output: botView },
   /** Makes a thread the Bot's thread ("Make this my Bot"); makes the Bot if there is none. */
   bot_set_thread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: botView },
   /** The Bot's heartbeat (check-ins); on needs an active Bot. */
-  bot_set_run: { input: heartbeatRunSchema.omit({ time: true }).extend({ time: heartbeatRunSchema.shape.time.optional() }), output: botView },
+  bot_set_run: { input: heartbeatRunSchema.omit({ time: true }).extend({ botId, time: heartbeatRunSchema.shape.time.optional() }), output: botView },
   /** Pauses the Bot: heartbeat off, and it's told it's paused and refuses new work. */
-  bot_pause: { input: z.object({}), output: botView },
+  bot_pause: { input: forBot, output: botView },
   /** Resumes a paused or stopped Bot, and its heartbeat if it was on. */
-  bot_resume: { input: z.object({}), output: botView },
+  bot_resume: { input: forBot, output: botView },
   /** Pauses the Bot, stops the running threads it started and turns off its schedules. Its data is kept. */
-  bot_stop: { input: z.object({}), output: botView.extend({ stoppedThreadIds: z.array(z.string()), pausedAutomationIds: z.array(z.string()) }) },
+  bot_stop: { input: forBot, output: botView.extend({ stoppedThreadIds: z.array(z.string()), pausedAutomationIds: z.array(z.string()) }) },
   /** What the Bot is doing: Needs you, In progress, Scheduled, Completed. */
-  bot_activity: { input: z.object({}), output: botActivity },
+  bot_activity: { input: forBot, output: botActivity },
   /** The Bot's Memory page, made on first need. */
-  bot_memory: { input: z.object({}), output: z.object({ pageId: z.string().nullable() }) },
+  bot_memory: { input: forBot, output: z.object({ pageId: z.string().nullable() }) },
   /** The Bot's chat as one conversation: its thread and the ones it handed off from, oldest first. */
-  bot_chain: { input: z.object({}), output: z.object({ threadIds: z.array(z.string()) }) },
+  bot_chain: { input: forBot, output: z.object({ threadIds: z.array(z.string()) }) },
   /** A check-in preset: sets the schedule and adds its one-line instruction to the Memory page's Check-in section. */
-  bot_checkin_preset: { input: z.object({ preset: z.enum(["morning", "evening", "working", "off"]) }), output: botView },
+  bot_checkin_preset: { input: z.object({ botId, preset: z.enum(["morning", "evening", "working", "off"]) }), output: botView },
   /** The Bot's own skills. */
-  bot_skills: { input: z.object({}), output: z.object({ skills: z.array(botSkill) }) },
+  bot_skills: { input: forBot, output: z.object({ skills: z.array(botSkill) }) },
   /** Adds or replaces one of the Bot's skills (as its bot_skill_write tool does). */
-  bot_skill_write: { input: z.object({ name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64), description: z.string().trim().min(1).max(500), body: z.string().min(1).max(20_000) }), output: botSkill },
+  bot_skill_write: { input: z.object({ botId, name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64), description: z.string().trim().min(1).max(500), body: z.string().min(1).max(20_000) }), output: botSkill },
   /** Shares a Bot skill: it moves into BB's user skills, for every agent. */
-  bot_skill_share: { input: z.object({ name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },
+  bot_skill_share: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },
   /** Deletes a Bot skill. */
-  bot_skill_delete: { input: z.object({ name: z.string().min(1).max(100) }), output: z.object({ deleted: z.boolean() }) },
+  bot_skill_delete: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ deleted: z.boolean() }) },
   /** The Bot's runners, and threads it started that an automation wakes (Adopt as runner). */
-  bot_runners: { input: z.object({}), output: z.object({ runners: z.array(runner), adoptable: z.array(runnerAdoptable) }) },
+  bot_runners: { input: forBot, output: z.object({ runners: z.array(runner), adoptable: z.array(runnerAdoptable) }) },
   /** Makes a runner: its thread (first run now) and its schedule. */
-  bot_runner_create: { input: z.object({ name: runnerName, job: runnerJob, schedule: runnerSchedule }), output: runner },
-  bot_runner_update: { input: z.object({ id: runnerId, name: runnerName.optional(), job: runnerJob.optional(), schedule: runnerSchedule.optional() }), output: runner },
-  bot_runner_pause: { input: z.object({ id: runnerId }), output: runner },
-  bot_runner_resume: { input: z.object({ id: runnerId }), output: runner },
-  bot_runner_run_now: { input: z.object({ id: runnerId }), output: runner },
+  bot_runner_create: { input: z.object({ botId, name: runnerName, job: runnerJob, schedule: runnerSchedule }), output: runner },
+  bot_runner_update: { input: z.object({ botId, id: runnerId, name: runnerName.optional(), job: runnerJob.optional(), schedule: runnerSchedule.optional() }), output: runner },
+  bot_runner_pause: { input: z.object({ botId, id: runnerId }), output: runner },
+  bot_runner_resume: { input: z.object({ botId, id: runnerId }), output: runner },
+  bot_runner_run_now: { input: z.object({ botId, id: runnerId }), output: runner },
   /** Deletes a runner Studio made (automation deleted, thread archived); an adopted one is only let go. */
-  bot_runner_delete: { input: z.object({ id: runnerId }), output: z.object({ deleted: z.literal(true), kept: z.boolean() }) },
+  bot_runner_delete: { input: z.object({ botId, id: runnerId }), output: z.object({ deleted: z.literal(true), kept: z.boolean() }) },
   /** The user opened a runner: its urgent report leaves Needs you. */
-  bot_runner_seen: { input: z.object({ id: runnerId }), output: z.object({ ok: z.literal(true) }) },
+  bot_runner_seen: { input: z.object({ botId, id: runnerId }), output: z.object({ ok: z.literal(true) }) },
   /** Adopt as runner: registers the thread, keeps its automation, switches it to runner_report. The user's choice only. */
-  bot_runner_adopt: { input: z.object({ threadId: z.string().min(1).max(200), automationId: z.string().min(1).max(200), name: runnerName.optional(), job: runnerJob.optional() }), output: runner },
+  bot_runner_adopt: { input: z.object({ botId, threadId: z.string().min(1).max(200), automationId: z.string().min(1).max(200), name: runnerName.optional(), job: runnerJob.optional() }), output: runner },
   /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and the Bot keeps its new thread. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** Saves a collection query by name, replacing a view with that name. */

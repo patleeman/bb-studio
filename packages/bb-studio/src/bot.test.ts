@@ -56,7 +56,7 @@ async function setup(migrations = MIGRATIONS) {
   const db = bb.storage.database();
   bb.storage.migrate(db, migrations);
   const bots = { current: null as Bots | null };
-  const leads = new ProjectLeads({ db, sdk: bb.sdk, changed: () => {}, personalPrompt: () => bots.current!.prompt() });
+  const leads = new ProjectLeads({ db, sdk: bb.sdk, changed: () => {}, personalPrompt: () => bots.current!.prompt(), botPrompt: (key) => bots.current!.promptFor(key) });
   const pages = new Map<string, { title: string; markdown: string }>();
   let made = 0;
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
@@ -87,11 +87,53 @@ it("creates a Bot with a new chat in the personal project and names it in the he
   // Its instructions come from agents.configure, so its only message is the user's, and the title isn't the instructions.
   expect(x.spawn).toHaveBeenCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Dot", pluginMetadata: { bot: BOT_ID }, input: [expect.objectContaining({ text: "Watch my inbox" })] }));
   expect(view.bot).toMatchObject({ name: "Dot", avatar: "🟣", threadId: "t1" });
-  await expect(x.bots.create({ name: "Two", avatar: "2" })).rejects.toThrow(/already/);
   await x.bots.setRun({ enabled: true, cadence: "hourly" });
   expect(prompts(x)).toEqual([botHeartbeat("Dot")]);
   await x.bots.set({ name: "Penny" });
   expect(prompts(x)).toEqual([botHeartbeat("Penny")]);
+});
+
+it("makes a second Bot with its own thread, check-in, memory, skills and handoff, the first staying primary", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const two = await x.bots.create({ name: "Scout", avatar: "🛰️", prompt: "Watch releases" });
+  const id = two.bot!.id;
+  expect(id).not.toBe(BOT_ID);
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Scout", pluginMetadata: { bot: id } }));
+  expect(two.bot).toMatchObject({ name: "Scout", threadId: "t2", primary: false });
+  // The primary stays the personal project's lead; the new Bot isn't a lead.
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
+  expect(x.bots.list().map((bot) => [bot.name, bot.primary])).toEqual([["Dot", true], ["Scout", false]]);
+  expect((await x.bots.get()).bot?.name).toBe("Dot");
+  expect(x.bots.forThread("t2")?.id).toBe(id);
+  expect(x.bots.instructions(x.bots.forThread("t2")!)).toContain("one of the user's Bots");
+  // Its check-in is its own automation on its thread, with its name; not a project in project_leads.
+  await x.bots.setRun({ botId: id, enabled: true, cadence: "daily", time: "07:30" });
+  expect(x.automations).toEqual([expect.objectContaining({ name: `Studio project heartbeat bot:${id}`, execution: expect.objectContaining({ targetThreadId: "t2", prompt: botHeartbeat("Scout") }) })]);
+  expect((await x.bots.get(id)).run).toMatchObject({ enabled: true, cadence: "daily", time: "07:30" });
+  expect((await x.bots.get()).run).toBeNull();
+  expect(x.leads.list().map((lead) => lead.projectId)).toEqual([PERSONAL_PROJECT_ID]);
+  expect((await x.bots.activity(id)).scheduled).toEqual([expect.objectContaining({ kind: "heartbeat", enabled: true })]);
+  // Memory and skills are its own.
+  expect(x.bots.memoryPage(id)).not.toBe(x.bots.memoryPage());
+  x.bots.writeSkill({ name: "release-watch", description: "d", body: "b" }, id);
+  expect(x.bots.skills(id).map((s) => s.name)).toEqual(["release-watch"]);
+  expect(x.bots.skills()).toEqual([]);
+  // Pausing it leaves the primary alone and turns only its check-in off.
+  await x.bots.pause(id);
+  expect(x.bots.stored(id)?.state).toBe("paused");
+  expect(x.bots.stored()?.state).toBe("active");
+  expect(x.automations).toEqual([]);
+  await x.bots.resume(id);
+  expect(x.automations).toHaveLength(1);
+  // A handoff moves it to the new thread, check-in included.
+  const { threadId } = await x.leads.handoff("t2", request);
+  await x.bots.handedOff("t2", threadId);
+  expect(x.bots.stored(id)?.threadId).toBe(threadId);
+  expect(x.bots.chain(id)).toEqual(["t2", threadId]);
+  expect((x.automations[0]!.execution as { targetThreadId: string }).targetThreadId).toBe(threadId);
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
+  await expect(x.bots.setThread(threadId)).rejects.toThrow(/Scout/);
 });
 
 it("keeps a drawn avatar and a role it's told, with the emoji as a fallback", async () => {

@@ -11,18 +11,26 @@ import { useLive } from "../live";
 import { ActivityPanel, openThreadPage, PRESETS, presetOf, runningCount, statusLabel, useBotControls } from "./BotHome";
 import { BotAvatar } from "./BotAvatar";
 import { RunnersSection } from "./Runners";
+import { forBot, useBotSelection } from "./selection";
 import { stripClose, stripFocus, stripMove, stripOpen, THREADS_TAB, useOpenSubThread, useStrip } from "./workspace";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 
+/** The selected Bot (selection.ts): the primary on the plain Bot page. */
+function useSelectedBot(pollMs: number) {
+  const { botId, creating } = useBotSelection();
+  return { view: useLive<BotView>("bot_get", forBot(botId), { pollMs }), creating };
+}
+
 export function BotInfoTab() {
-  const view = useLive<BotView>("bot_get", {}, { pollMs: 30_000 });
+  const { view, creating } = useSelectedBot(30_000);
+  if (creating) return <p className="p-4 text-sm text-muted-foreground">Say hi to make the new bot.</p>;
   if (!view.data?.bot) return <p className="p-4 text-sm text-muted-foreground">{view.loading ? "Loading…" : "No bot yet."}</p>;
-  return <Info view={view.data} refresh={view.refresh} />;
+  return <Info key={view.data.bot.id} view={view.data} refresh={view.refresh} />;
 }
 
 function Info({ view, refresh }: { view: BotView; refresh(): void }) {
-  const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 15_000 });
+  const activity = useLive<BotActivityView>("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
   const running = runningCount(activity.data);
   const { bot, profile, run, busy, error, setSheet, openMemory, sheets } = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
   const openSub = useOpenSubThread(bot.id, openThreadPage);
@@ -57,7 +65,7 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
         <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: () => setSheet("skills") }} />
       </dl>
 
-      <RunnersSection botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} />
+      <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} />
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
       <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} />
@@ -77,16 +85,16 @@ function InfoRow({ label, value, action }: { label: string; value: string; actio
 }
 
 export function BotThreadsTab() {
-  const view = useLive<BotView>("bot_get", {}, { pollMs: 60_000 });
-  const botId = view.data?.bot?.id;
+  const { view, creating } = useSelectedBot(60_000);
+  const botId = creating ? undefined : view.data?.bot?.id;
   if (!botId) return <p className="p-4 text-sm text-muted-foreground">{view.loading ? "Loading…" : "No bot yet."}</p>;
-  return <Threads botId={botId} name={view.data!.bot!.name} />;
+  return <Threads key={botId} botId={botId} name={view.data!.bot!.name} />;
 }
 
 function Threads({ botId, name }: { botId: string; name: string }) {
   const target = experimental_useFixedTabTarget(THREADS_TAB);
   const [strip, update] = useStrip(botId);
-  const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 30_000 });
+  const activity = useLive<BotActivityView>("bot_activity", { botId }, { pollMs: 30_000 });
   const [dragging, setDragging] = useState<string | null>(null);
   // A target is a request to open one thread: add it to the strip, then go back to untargeted.
   useEffect(() => {

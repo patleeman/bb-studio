@@ -2,8 +2,14 @@
 // (active, paused, stopped), modelled on ChatGPT's dots. It replaces the
 // Chief of Staff. Its thread is an implementation detail: it is the personal
 // project's lead (src/project-lead.ts), so a handoff rotates it and the
-// project's heartbeat is the Bot's check-in. The `bots` table allows several
-// Bots; Studio uses one (BOT_ID).
+// project's heartbeat is the Bot's check-in. That is the primary Bot (BOT_ID).
+//
+// The user can make more Bots ("New bot"). Each has its own thread (stored on
+// its row, not a project lead; a handoff moves it, handedOff), Memory page,
+// skills, runners and check-in. An additional Bot's check-in is its own
+// automation, kept by ProjectRuns under the key `bot:<id>` (BOT_RUN_PREFIX).
+// Every Bot has the same powers: it sees every project. Methods take an
+// optional bot id; without one they act on the primary Bot.
 //
 // "Threads it started" come from BB's thread metadata: a thread whose
 // sourceThreadId, parentThreadId or lifecycleOwnerThreadId is the Bot's thread,
@@ -16,7 +22,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { BotActivityView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "./contract";
-import { PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
+import { BOT_RUN_PREFIX, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 
 type Sdk = BbPluginApi["sdk"];
 type ListedThread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
@@ -26,7 +32,7 @@ export type BotState = "active" | "paused" | "stopped";
 export const BOT_ID = "bot_main";
 export const DEFAULT_BOT_NAME = "Bot";
 export const DEFAULT_BOT_AVATAR = "🤖";
-const HEARTBEAT_NAME = `Studio project heartbeat ${PERSONAL_PROJECT_ID}`;
+const heartbeatName = (key: string) => `Studio project heartbeat ${key}`;
 const RUNNING = new Set(["active", "starting", "pending", "stopping"]);
 /** Running now; a "pending" thread is waiting to start. */
 const WORKING = new Set(["active", "starting", "stopping"]);
@@ -58,8 +64,8 @@ export const MEMORY_TEMPLATE = `## Check-in
 `;
 
 /** Instructions for the Bot's own thread, given at each session start. Short: they point at the page and tools. */
-export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly string[] }): string {
-  const who = `You are ${JSON.stringify(bot.name)}, the user's Bot: an always-on agent that leads their personal project and sees every project. The user can rename, pause or stop you in Studio.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
+export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly string[]; primary?: boolean }): string {
+  const who = `You are ${JSON.stringify(bot.name)}, ${bot.primary === false ? "one of the user's Bots: an always-on agent that sees every project" : "the user's Bot: an always-on agent that leads their personal project and sees every project"}. The user can rename, pause or stop you in Studio.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
   if (bot.state === "active") {
     const memory = bot.memoryPageId ? `Your Memory page is ${bot.memoryPageId}: read it with pages_read when you wake up, keep it short and edit it yourself with pages_edit; its "## Check-in" section is your check-in list.` : "";
     const skills = `Save a reusable procedure as your own skill with bot_skill_write${bot.skills?.length ? `; yours: ${bot.skills.join(", ")} (bot_skill_read)` : ""}. Search your past threads with bot_history_search.`;
@@ -157,170 +163,265 @@ export interface BotDeps {
   /** BB's user skills directory (`<data dir>/skills`), where a shared skill goes. */
   userSkillsDir?: string;
   /** Runner threads (src/runners.ts): kept out of Activity's thread lists; an urgent one is in Needs you. */
-  runners?: { threads(): Map<string, { urgent: boolean }>; pauseAll(): Promise<string[]> };
+  runners?: { threads(botId?: string): Map<string, { urgent: boolean }>; pauseAll(botId?: string): Promise<string[]> };
 }
 
 export class Bots {
   constructor(private readonly deps: BotDeps) {}
 
-  private row(): BotRow | undefined {
-    return this.deps.db.prepare("SELECT * FROM bots ORDER BY created_at, id LIMIT 1").get() as BotRow | undefined;
+  /** Every Bot, the primary first (BOT_ID, else the oldest). */
+  private rows(): BotRow[] {
+    return this.deps.db.prepare("SELECT * FROM bots ORDER BY (id = ?) DESC, created_at, id").all(BOT_ID) as BotRow[];
   }
 
-  /** The Bot as stored, its thread read from the personal project's lead. */
-  stored(): BotView["bot"] {
-    const row = this.row();
-    if (!row) return null;
-    const threadId = this.deps.leads.storedLead(PERSONAL_PROJECT_ID);
-    if (threadId !== row.thread_id) this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
+  /** One Bot by id, or the primary without one. */
+  private row(botId?: string | null): BotRow | undefined {
+    if (botId) return this.deps.db.prepare("SELECT * FROM bots WHERE id = ?").get(botId) as BotRow | undefined;
+    return this.rows()[0];
+  }
+
+  private need(botId?: string | null): BotRow {
+    const row = this.row(botId);
+    if (!row) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first.");
+    return row;
+  }
+
+  /** The primary Bot's id: the personal project's lead. */
+  primaryId(): string | null {
+    return this.rows()[0]?.id ?? null;
+  }
+
+  private isPrimary(row: BotRow): boolean {
+    return row.id === this.primaryId();
+  }
+
+  /** Where the Bot's check-in lives in ProjectRuns: the personal project's for the primary, its own otherwise. */
+  private runKey(row: BotRow): string {
+    return this.isPrimary(row) ? PERSONAL_PROJECT_ID : `${BOT_RUN_PREFIX}${row.id}`;
+  }
+
+  private view(row: BotRow): NonNullable<BotView["bot"]> {
+    const primary = this.isPrimary(row);
+    let threadId = row.thread_id;
+    if (primary) {
+      threadId = this.deps.leads.storedLead(PERSONAL_PROJECT_ID);
+      if (threadId !== row.thread_id) this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
+    }
     const memoryPageId = row.memory_page_id && this.deps.memory?.exists(row.memory_page_id) ? row.memory_page_id : null;
-    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, primary, createdAt: row.created_at, updatedAt: row.updated_at };
   }
 
-  /** The heartbeat prompt for the personal project. */
+  /** A Bot as stored (the primary without an id); its thread read from the personal project's lead for the primary. */
+  stored(botId?: string | null): BotView["bot"] {
+    const row = this.row(botId);
+    return row ? this.view(row) : null;
+  }
+
+  /** Every Bot, the primary first. */
+  list(): NonNullable<BotView["bot"]>[] {
+    return this.rows().map((row) => this.view(row));
+  }
+
+  /** The heartbeat prompt for the personal project (the primary Bot's). */
   prompt(): string {
     return botHeartbeat(this.row()?.name ?? DEFAULT_BOT_NAME);
   }
 
+  /** An additional Bot's check-in prompt, by its run key (`bot:<id>`). */
+  promptFor(key: string): string | null {
+    if (!key.startsWith(BOT_RUN_PREFIX)) return null;
+    const row = this.row(key.slice(BOT_RUN_PREFIX.length));
+    return row ? botHeartbeat(row.name) : null;
+  }
+
+  /** An additional Bot's thread for its run key, for ProjectRuns.repair. */
+  threadForRunKey(key: string): string | null {
+    return key.startsWith(BOT_RUN_PREFIX) ? this.stored(key.slice(BOT_RUN_PREFIX.length))?.threadId ?? null : null;
+  }
+
   /**
    * The Bot whose thread this is, if any. A new Bot's thread starts before it
-   * becomes the lead, so its spawn metadata (`{ bot: BOT_ID }`) counts while
-   * the Bot has no thread yet.
+   * is saved as the Bot's, so its spawn metadata (`{ bot: <id> }`) counts
+   * while that Bot has no thread yet.
    */
   forThread(threadId: string | undefined | null, metadata?: { readonly [key: string]: unknown }): NonNullable<BotView["bot"]> | null {
     if (!threadId) return null;
-    const bot = this.stored();
-    if (!bot) return null;
-    if (bot.threadId === threadId) return bot;
-    return !bot.threadId && metadata?.bot === bot.id ? { ...bot, threadId } : null;
+    const bots = this.list();
+    const own = bots.find((bot) => bot.threadId === threadId);
+    if (own) return own;
+    const named = bots.find((bot) => !bot.threadId && metadata?.bot === bot.id);
+    return named ? { ...named, threadId } : null;
   }
 
-  async get(): Promise<BotView> {
-    const lead = await this.deps.leads.get(PERSONAL_PROJECT_ID);
-    return { bot: this.stored(), run: lead.run };
+  async get(botId?: string | null): Promise<BotView> {
+    const row = this.row(botId);
+    if (botId && !row) throw new Error(`No Bot "${botId}".`);
+    if (!row || this.isPrimary(row)) {
+      const lead = await this.deps.leads.get(PERSONAL_PROJECT_ID);
+      return { bot: this.stored(row?.id), run: lead.run };
+    }
+    return { bot: this.view(row), run: this.deps.leads.runs.get(this.runKey(row)) };
   }
 
-  private insert(name: string, avatar: string, shape: string | null = null, color: string | null = null) {
+  private insert(id: string, name: string, avatar: string, shape: string | null = null, color: string | null = null) {
     const now = Date.now();
-    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, shape, color, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'active', NULL, 0, ?, ?)").run(BOT_ID, name, avatar, shape, color, now, now);
+    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, shape, color, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'active', NULL, 0, ?, ?)").run(id, name, avatar, shape, color, now, now);
   }
 
-  private update(fields: Partial<Pick<BotRow, "name" | "avatar" | "shape" | "color" | "role" | "state" | "heartbeat_was_on">>) {
-    const row = this.row();
-    if (!row) throw new Error("Make your Bot first.");
+  private update(row: BotRow, fields: Partial<Pick<BotRow, "name" | "avatar" | "shape" | "color" | "role" | "state" | "heartbeat_was_on">>) {
     const next = { ...row, ...fields };
     this.deps.db.prepare("UPDATE bots SET name = ?, avatar = ?, shape = ?, color = ?, role = ?, state = ?, heartbeat_was_on = ?, updated_at = ? WHERE id = ?").run(next.name, next.avatar, next.shape ?? null, next.color ?? null, next.role ?? null, next.state, next.heartbeat_was_on, Date.now(), row.id);
     this.deps.changed();
   }
 
-  /** Makes the Bot from a thread, or a new chat in the personal project. */
+  /**
+   * Makes a Bot from a thread, or a new chat in the personal project. The
+   * first is the primary (the personal project's lead); later ones are
+   * additional Bots with their own thread.
+   */
   async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string }): Promise<BotView> {
-    if (this.row()) throw new Error("You already have a Bot.");
+    const primary = !this.row();
+    const id = primary ? BOT_ID : `bot_${Math.random().toString(36).slice(2, 12)}`;
     // The row comes first, so the new thread's first turn gets the Bot's instructions (forThread).
-    this.insert(input.name, input.avatar, input.shape ?? null, input.color ?? null);
+    this.insert(id, input.name, input.avatar, input.shape ?? null, input.color ?? null);
     let threadId = input.threadId;
     try {
+      if (threadId && this.forThread(threadId)) throw new Error("That thread is already a Bot's.");
       if (!threadId) {
         const thread = await this.deps.sdk.threads.spawn({
           projectId: PERSONAL_PROJECT_ID,
           title: input.name,
           environment: { type: "project-default" },
-          pluginMetadata: { bot: BOT_ID },
+          pluginMetadata: { bot: id },
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
           input: [{ type: "text", text: input.prompt ?? `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`, mentions: [] }],
         } as never);
         threadId = thread.id;
       }
-      await this.deps.leads.setLead(PERSONAL_PROJECT_ID, threadId);
+      if (primary) await this.deps.leads.setLead(PERSONAL_PROJECT_ID, threadId);
+      else this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), id);
     } catch (error) {
-      this.deps.db.prepare("DELETE FROM bots WHERE id = ?").run(BOT_ID);
+      this.deps.db.prepare("DELETE FROM bots WHERE id = ?").run(id);
       throw error;
     }
     this.deps.changed();
-    return this.get();
+    return this.get(id);
   }
 
-  async set(input: { name?: string; avatar?: string; shape?: string | null; color?: string; role?: string }): Promise<BotView> {
-    const before = this.row();
-    this.update({
+  async set(input: { botId?: string; name?: string; avatar?: string; shape?: string | null; color?: string; role?: string }): Promise<BotView> {
+    const before = this.need(input.botId);
+    this.update(before, {
       ...(input.name ? { name: input.name } : {}), ...(input.avatar ? { avatar: input.avatar } : {}),
       ...(input.shape !== undefined ? { shape: input.shape } : {}), ...(input.color ? { color: input.color } : {}),
       ...(input.role !== undefined ? { role: input.role.trim() || null } : {}),
     });
     // The heartbeat's prompt carries the name.
-    const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
-    if (input.name && input.name !== before?.name && run?.enabled) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, run);
-    return this.get();
+    const key = this.runKey(before);
+    const run = this.deps.leads.runs.get(key);
+    if (input.name && input.name !== before.name && run?.enabled) {
+      if (key === PERSONAL_PROJECT_ID) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, run);
+      else await this.deps.leads.runs.set(key, this.view(before).threadId, run);
+    }
+    return this.get(before.id);
   }
 
-  /** Makes a thread the Bot's ("Make this my Bot"), making the Bot if there is none. */
+  /** Makes a thread the primary Bot's ("Make this my Bot"), making the Bot if there is none. */
   async setThread(threadId: string): Promise<BotView> {
+    const other = this.forThread(threadId);
+    if (other && !other.primary) throw new Error(`That thread is ${other.name}'s.`);
     await this.deps.leads.setLead(PERSONAL_PROJECT_ID, threadId);
-    if (!this.row()) this.insert(DEFAULT_BOT_NAME, DEFAULT_BOT_AVATAR);
+    if (!this.row()) this.insert(BOT_ID, DEFAULT_BOT_NAME, DEFAULT_BOT_AVATAR);
     this.deps.changed();
     return this.get();
   }
 
-  async setRun(input: { enabled: boolean; cadence: HeartbeatRun["cadence"]; time?: string; cron?: string }): Promise<BotView> {
-    const row = this.row();
-    if (input.enabled && row && row.state !== "active") throw new Error(`Your Bot is ${row.state}. Resume it before turning its heartbeat on.`);
-    await this.deps.leads.setRun(PERSONAL_PROJECT_ID, input);
-    return this.get();
+  /** Turns a Bot's check-in on or off. An additional Bot's is its own automation on its thread. */
+  private async writeRun(row: BotRow, run: HeartbeatRun): Promise<void> {
+    const key = this.runKey(row);
+    if (key === PERSONAL_PROJECT_ID) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, run);
+    else await this.deps.leads.runs.set(key, this.view(row).threadId, run);
+  }
+
+  async setRun(input: { botId?: string; enabled: boolean; cadence: HeartbeatRun["cadence"]; time?: string; cron?: string }): Promise<BotView> {
+    const { botId, ...run } = input;
+    const row = this.row(botId);
+    if (botId && !row) throw new Error(`No Bot "${botId}".`);
+    if (run.enabled && row && row.state !== "active") throw new Error(`${row.name} is ${row.state}. Resume it before turning its check-ins on.`);
+    if (!row || this.isPrimary(row)) {
+      await this.deps.leads.setRun(PERSONAL_PROJECT_ID, run);
+      return this.get();
+    }
+    const current = this.deps.leads.runs.get(this.runKey(row));
+    await this.writeRun(row, { enabled: run.enabled, cadence: run.cadence, time: run.time ?? current?.time ?? "09:00", ...(run.cron ?? current?.cron ? { cron: run.cron ?? current?.cron } : {}) });
+    return this.get(row.id);
   }
 
   /**
    * A check-in preset: one schedule and, unless it's Off, one line on the
    * Memory page's Check-in section saying what to do then.
    */
-  async checkinPreset(preset: CheckinPreset): Promise<BotView> {
+  async checkinPreset(preset: CheckinPreset, botId?: string): Promise<BotView> {
+    const row = this.row(botId);
     const spec = CHECKIN_PRESETS[preset];
     if (!spec.run.enabled) {
-      const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
-      if (run?.enabled) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, { ...run, enabled: false });
-      return this.get();
+      if (row) {
+        const run = this.deps.leads.runs.get(this.runKey(row));
+        if (run?.enabled) await this.writeRun(row, { ...run, enabled: false });
+      }
+      return this.get(row?.id);
     }
-    const view = await this.setRun(spec.run);
-    const pageId = this.memoryPage();
+    const view = await this.setRun({ ...spec.run, ...(botId ? { botId } : {}) });
+    const pageId = this.memoryPage(row?.id);
     if (pageId && spec.line) this.deps.memory?.addCheckin?.(pageId, spec.line);
     return view;
   }
 
-  /** The Bot's thread and the ones it handed off from, oldest first: one continuous chat. */
-  chain(): string[] {
-    const bot = this.stored();
+  /** A Bot's thread and the ones it handed off from, oldest first: one continuous chat. */
+  chain(botId?: string): string[] {
+    const bot = this.stored(botId);
     return bot?.threadId ? this.threadChain(bot.threadId).reverse() : [];
   }
 
-  /** Heartbeat off, remembering whether it was on; the Bot is told it's paused (botInstructions). */
-  async pause(): Promise<BotView> {
-    const row = this.row();
-    if (!row) throw new Error("Make your Bot first.");
-    if (row.state === "active") {
-      const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
-      if (run?.enabled) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, { ...run, enabled: false });
-      this.update({ state: "paused", heartbeat_was_on: run?.enabled ? 1 : 0 });
+  /** A thread was handed off (thread_handoff): an additional Bot follows its thread, check-in included. */
+  async handedOff(oldThreadId: string, newThreadId: string): Promise<void> {
+    for (const row of this.rows()) {
+      if (this.isPrimary(row) || row.thread_id !== oldThreadId) continue;
+      this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(newThreadId, Date.now(), row.id);
+      const run = this.deps.leads.runs.get(this.runKey(row));
+      if (run?.enabled) await this.deps.leads.runs.set(this.runKey(row), newThreadId, run);
+      this.deps.changed();
     }
-    return this.get();
   }
 
-  async resume(): Promise<BotView> {
-    const row = this.row();
-    if (!row) throw new Error("Make your Bot first.");
+  /** Heartbeat off, remembering whether it was on; the Bot is told it's paused (botInstructions). */
+  async pause(botId?: string): Promise<BotView> {
+    const row = this.need(botId);
+    if (row.state === "active") {
+      const run = this.deps.leads.runs.get(this.runKey(row));
+      if (run?.enabled) await this.writeRun(row, { ...run, enabled: false });
+      this.update(row, { state: "paused", heartbeat_was_on: run?.enabled ? 1 : 0 });
+    }
+    return this.get(row.id);
+  }
+
+  async resume(botId?: string): Promise<BotView> {
+    const row = this.need(botId);
     if (row.state !== "active") {
       // The heartbeat comes back first: if that fails the Bot stays paused and remembers it, so Resume can be retried.
-      const run = this.deps.leads.runs.get(PERSONAL_PROJECT_ID);
-      if (row.heartbeat_was_on && run && this.deps.leads.storedLead(PERSONAL_PROJECT_ID)) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, { ...run, enabled: true });
-      this.update({ state: "active", heartbeat_was_on: 0 });
+      const run = this.deps.leads.runs.get(this.runKey(row));
+      if (row.heartbeat_was_on && run && this.view(row).threadId) await this.writeRun(row, { ...run, enabled: true });
+      this.update(this.need(row.id), { state: "active", heartbeat_was_on: 0 });
     }
-    return this.get();
+    return this.get(row.id);
   }
 
   /** Pause, stop the running threads it started, and pause automations that wake its thread. */
-  async stop(): Promise<BotView & { stoppedThreadIds: string[]; pausedAutomationIds: string[] }> {
-    await this.pause();
+  async stop(botId?: string): Promise<BotView & { stoppedThreadIds: string[]; pausedAutomationIds: string[] }> {
+    const id = this.need(botId).id;
+    await this.pause(id);
     const stoppedThreadIds: string[] = [];
     const pausedAutomationIds: string[] = [];
-    const bot = this.stored();
+    const bot = this.stored(id);
     if (bot?.threadId) {
       for (const thread of await this.startedThreads(bot.threadId)) {
         if (thread.id === bot.threadId || thread.archivedAt || !RUNNING.has(thread.status)) continue;
@@ -334,14 +435,14 @@ export class Bots {
         pausedAutomationIds.push(automation.id);
       }
     }
-    await this.deps.runners?.pauseAll();
-    this.update({ state: "stopped" });
-    return { ...(await this.get()), stoppedThreadIds, pausedAutomationIds };
+    await this.deps.runners?.pauseAll(id);
+    this.update(this.need(id), { state: "stopped" });
+    return { ...(await this.get(id)), stoppedThreadIds, pausedAutomationIds };
   }
 
-  /** The Bot's Memory page, made on first need. Null without a Bot or Pages. */
-  memoryPage(): string | null {
-    const row = this.row();
+  /** A Bot's Memory page, made on first need. Null without a Bot or Pages. */
+  memoryPage(botId?: string): string | null {
+    const row = this.row(botId);
     const pages = this.deps.memory;
     if (!row || !pages) return null;
     if (row.memory_page_id && pages.exists(row.memory_page_id)) return row.memory_page_id;
@@ -351,31 +452,30 @@ export class Bots {
     return pageId;
   }
 
-  /** What the Bot's own thread is told; its Memory page is made here on first need. */
+  /** What a Bot's own thread is told; its Memory page is made here on first need. */
   instructions(bot: NonNullable<BotView["bot"]>): string {
     if (bot.state !== "active") return botInstructions(bot);
     let memoryPageId: string | null = null;
-    try { memoryPageId = this.memoryPage(); } catch { /* Pages unavailable: no memory line. */ }
-    return botInstructions({ ...bot, memoryPageId, skills: this.skills().map((skill) => skill.name) });
+    try { memoryPageId = this.memoryPage(bot.id); } catch { /* Pages unavailable: no memory line. */ }
+    return botInstructions({ ...bot, memoryPageId, skills: this.skills(bot.id).map((skill) => skill.name) });
   }
 
-  skills(): BotSkillView[] {
-    const row = this.row();
+  skills(botId?: string): BotSkillView[] {
+    const row = this.row(botId);
     if (!row) return [];
     return (this.deps.db.prepare("SELECT * FROM bot_skills WHERE bot_id = ? ORDER BY name").all(row.id) as SkillRow[])
       .map((skill) => ({ name: skill.name, description: skill.description, updatedAt: skill.updated_at }));
   }
 
-  skill(name: string): (BotSkillView & { body: string }) | null {
-    const row = this.row();
+  skill(name: string, botId?: string): (BotSkillView & { body: string }) | null {
+    const row = this.row(botId);
     const skill = row ? this.deps.db.prepare("SELECT * FROM bot_skills WHERE bot_id = ? AND name = ?").get(row.id, name) as SkillRow | undefined : undefined;
     return skill ? { name: skill.name, description: skill.description, updatedAt: skill.updated_at, body: skill.body } : null;
   }
 
-  /** Adds or replaces one of the Bot's own skills. Only its thread loads them. */
-  writeSkill(input: { name: string; description: string; body: string }): BotSkillView {
-    const row = this.row();
-    if (!row) throw new Error("Make your Bot first.");
+  /** Adds or replaces one of a Bot's own skills. Only its thread loads them. */
+  writeSkill(input: { name: string; description: string; body: string }, botId?: string): BotSkillView {
+    const row = this.need(botId);
     if (!SKILL_NAME.test(input.name)) throw new Error("A skill name is lowercase words joined by hyphens, like weekly-review.");
     const now = Date.now();
     this.deps.db.prepare(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
@@ -385,16 +485,16 @@ export class Bots {
     return { name: input.name, description: input.description.trim(), updatedAt: now };
   }
 
-  deleteSkill(name: string): boolean {
-    const row = this.row();
+  deleteSkill(name: string, botId?: string): boolean {
+    const row = this.row(botId);
     const deleted = row ? this.deps.db.prepare("DELETE FROM bot_skills WHERE bot_id = ? AND name = ?").run(row.id, name).changes > 0 : false;
     if (deleted) this.deps.changed();
     return deleted;
   }
 
   /** Share: moves a skill into BB's user skills, where every agent finds it. */
-  async shareSkill(name: string): Promise<{ path: string }> {
-    const skill = this.skill(name);
+  async shareSkill(name: string, botId?: string): Promise<{ path: string }> {
+    const skill = this.skill(name, botId);
     if (!skill) throw new Error(`Your Bot has no skill "${name}".`);
     if (!this.deps.userSkillsDir) throw new Error("BB's skills folder isn't available.");
     const dir = join(this.deps.userSkillsDir, skill.name);
@@ -402,13 +502,13 @@ export class Bots {
     await mkdir(dir, { recursive: true });
     const path = join(dir, "SKILL.md");
     await writeFile(path, skillMarkdown(skill), { flag: "wx" });
-    this.deleteSkill(name);
+    this.deleteSkill(name, botId);
     return { path };
   }
 
-  /** Searches the Bot's own threads (its handoff chain and threads it started) through BB's thread search. */
-  async historySearch(query: string, limit = 10): Promise<{ threadId: string; title: string; text: string }[]> {
-    const bot = this.stored();
+  /** Searches a Bot's own threads (its handoff chain and threads it started) through BB's thread search. */
+  async historySearch(query: string, limit = 10, botId?: string): Promise<{ threadId: string; title: string; text: string }[]> {
+    const bot = this.stored(botId);
     if (!bot?.threadId) return [];
     const mine = new Set([...this.threadChain(bot.threadId), ...(await this.startedThreads(bot.threadId)).map((thread) => thread.id)]);
     const found = await this.deps.sdk.threads.search({ query, limitPerGroup: "50" });
@@ -422,7 +522,7 @@ export class Bots {
     return hits.slice(0, limit);
   }
 
-  /** The Bot's thread and the ones it handed off from, newest first. */
+  /** A Bot's thread and the ones it handed off from, newest first. */
   private threadChain(threadId: string): string[] {
     const chain = [threadId];
     const previous = this.deps.db.prepare("SELECT old_thread_id FROM project_thread_handoffs WHERE new_thread_id = ?");
@@ -434,9 +534,9 @@ export class Bots {
     return chain;
   }
 
-  /** Threads the Bot started (any depth), its own excluded: where adoptable runners come from. */
-  async started(): Promise<{ id: string; title: string; projectId: string | null; parentThreadId?: string | null }[]> {
-    const bot = this.stored();
+  /** Threads a Bot started (any depth), its own excluded: where adoptable runners come from. */
+  async started(botId?: string): Promise<{ id: string; title: string; projectId: string | null; parentThreadId?: string | null }[]> {
+    const bot = this.stored(botId);
     if (!bot?.threadId) return [];
     return (await this.workThreads(bot.threadId)).filter((thread) => thread.id !== bot.threadId)
       .map((thread) => ({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled thread", projectId: thread.projectId ?? null, parentThreadId: thread.parentThreadId ?? null }));
@@ -475,8 +575,8 @@ export class Bots {
     return { projectId, rows };
   }
 
-  async activity(): Promise<BotActivityView> {
-    const { bot, run } = await this.get();
+  async activity(botId?: string): Promise<BotActivityView> {
+    const { bot, run } = await this.get(botId);
     if (!bot?.threadId) return { needsYou: [], inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
     const [threads, automations, output] = await Promise.all([
       this.workThreads(bot.threadId),
@@ -484,12 +584,13 @@ export class Bots {
       this.deps.sdk.threads.output({ threadId: bot.threadId }).catch(() => ({ output: null })),
     ]);
     // Runners have their own group; an urgent report puts its thread in Needs you.
-    const runnerThreads = this.deps.runners?.threads() ?? new Map<string, { urgent: boolean }>();
+    const runnerThreads = this.deps.runners?.threads(bot.id) ?? new Map<string, { urgent: boolean }>();
     const { needsYou, inProgress, waiting, completed } = classifyActivity(threads.filter((thread) => !runnerThreads.has(thread.id)), bot.threadId);
     const urgent = [...runnerThreads].filter(([, runner]) => runner.urgent).map(([id]) => id).filter((id) => !needsYou.some((thread) => thread.id === id));
     for (const thread of await Promise.all(urgent.map((threadId) => this.deps.sdk.threads.get({ threadId }).catch(() => null)))) {
       if (thread && !thread.archivedAt) needsYou.push({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled runner", status: thread.status, projectId: thread.projectId ?? null, updatedAt: thread.updatedAt ?? 0, relation: "started", needsYou: true, parentId: null });
     }
+    const HEARTBEAT_NAME = heartbeatName(bot.primary === false ? `${BOT_RUN_PREFIX}${bot.id}` : PERSONAL_PROJECT_ID);
     const scheduled: BotScheduledView[] = automations.rows.filter((automation) => !automation.execution.targetThreadId || !runnerThreads.has(automation.execution.targetThreadId)).map((automation) => ({
       id: automation.id,
       kind: automation.name === HEARTBEAT_NAME ? "heartbeat" : "automation",

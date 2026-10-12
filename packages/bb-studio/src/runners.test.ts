@@ -42,11 +42,29 @@ async function setup() {
   bb.storage.migrate(db, MIGRATIONS);
   const bot = { id: "bot_main", name: "Jarvis", threadId: "bot1" as string | null, state: "active" };
   const started: { id: string; title: string; projectId: string | null; parentThreadId?: string | null }[] = [];
-  const runners = new Runners({ db, sdk: bb.sdk, changed: () => {}, bot: () => bot, startedThreads: async () => started, chain: () => ["bot1"] });
+  add({ id: "bot2", title: "Scout" });
+  const second = { id: "bot_two", name: "Scout", threadId: "bot2" as string | null, state: "active" };
+  const runners = new Runners({ db, sdk: bb.sdk, changed: () => {}, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"] });
   return { runners, threads, add, spawn, send, update, archive, automations, calls, bot, started };
 }
 
 const schedule = { cadence: "every15minutes" as const, time: "09:00" };
+
+it("keeps each Bot's runners apart: listing, names, reports and pausing", async () => {
+  const x = await setup();
+  await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  const theirs = await x.runners.create({ name: "Inbox", job: "Check releases.", schedule }, "bot_two");
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ pluginMetadata: { runner: theirs.id, bot: "bot_two" } }));
+  expect((await x.runners.list()).map((each) => each.job)).toEqual(["Check mail."]);
+  expect((await x.runners.list("bot_two")).map((each) => each.job)).toEqual(["Check releases."]);
+  expect((await x.runners.setState("Inbox", "paused", "bot_two")).id).toBe(theirs.id);
+  expect(x.runners.instructions(x.runners.forThread(theirs.threadId)!)).toContain('"Scout"');
+  await x.runners.report(theirs.threadId!, { level: "tell", summary: "v2 is out" });
+  expect(x.send).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "bot2" }));
+  expect(await x.runners.pauseAll()).toHaveLength(1);
+  expect(x.runners.threads("bot_two").has(theirs.threadId!)).toBe(true);
+  expect(x.runners.threads().has(theirs.threadId!)).toBe(false);
+});
 
 it("creates a runner: an unparented thread, its first run, and a schedule that wakes its own thread", async () => {
   const x = await setup();

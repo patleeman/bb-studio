@@ -11,10 +11,18 @@ const state = vi.hoisted(() => ({
   pathname: "/plugins/studio/bot",
   prefs: { value: "studio/bot", revision: 1 },
   setPref: vi.fn(async (_args: unknown) => ({})),
+  navPref: { value: "studio/bot-navigation", revision: 1 },
+  activate: vi.fn(),
+  inputs: [] as [string, unknown][],
 }));
 vi.mock("../live", () => ({
   useCall: () => state.call,
-  useLive: (method: string) => ({ data: state.data[method] ?? null, error: null, loading: false, refresh: () => {} }),
+  useLive: (method: string, input: unknown) => {
+    state.inputs.push([method, input]);
+    const bot = (state.data.bot_get as { bot: unknown } | undefined)?.bot;
+    const fallback = method === "bot_list" && bot ? { bots: [bot] } : null;
+    return { data: state.data[method] ?? fallback, error: null, loading: false, refresh: () => {} };
+  },
 }));
 vi.mock("../ProjectLeads", () => ({ HeartbeatFields: () => null, useHeartbeatForm: () => ({ input: () => ({}) }) }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
@@ -23,9 +31,18 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_useAppPanel: () => ({ openFixedTab: state.openFixedTab }),
   experimental_useFixedTabTarget: () => state.target,
   useSdk: () => sdk,
+  experimental_SidebarNavigationIcon: () => null,
+  experimental_useSidebarNavigation: () => ({
+    activeItemId: "studio/bot", isShortcutModifierHeld: false, actions: { activate: state.activate },
+    items: [
+      { id: "__bb__/new-thread", label: "New thread", icon: { kind: "host", name: "new-thread" }, isVisible: true, isDisabled: false, isLoading: false, shortcut: null, experimental_Accessory: null },
+      { id: "__bb__/search-threads", label: "Search", icon: { kind: "host", name: "search" }, isVisible: true, isDisabled: false, isLoading: false, shortcut: null, experimental_Accessory: null },
+      { id: "studio/bot", label: "Bot", icon: { kind: "plugin", pluginId: "studio", icon: "Bot" }, isVisible: true, isDisabled: false, isLoading: false, shortcut: null, experimental_Accessory: null },
+    ],
+  }),
 }));
 const sdk = { system: { uiPreferences: {
-  list: async () => ({ preferences: { "sidebar.threadListProvider": state.prefs } }),
+  list: async () => ({ preferences: { "sidebar.threadListProvider": state.prefs, "sidebar.navigationProvider": state.navPref } }),
   set: (args: unknown) => state.setPref(args),
 } } };
 vi.mock("./Onboarding", () => ({
@@ -57,7 +74,7 @@ vi.mock("@bb-studio/kit/ui", () => ({
 
 const { ActivityPanel, BOT_PATH, BotHome, BotRedirect } = await import("./BotHome");
 const { BotInfoTab, BotThreadsTab } = await import("./BotTabs");
-const { BotThreadList } = await import("./BotSidebar");
+const { BotNavigation, BotThreadList } = await import("./BotSidebar");
 const listProps = { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => {}, searchQuery: "" };
 
 let root: Root, container: HTMLDivElement;
@@ -68,6 +85,8 @@ beforeEach(() => {
   state.target = null;
   state.pathname = "/plugins/studio/bot";
   state.setPref.mockClear();
+  state.activate.mockClear();
+  state.inputs = [];
   localStorage.clear();
   container = document.createElement("div");
   document.body.append(container);
@@ -205,7 +224,7 @@ test("Info tab: profile, controls, check-ins, and activity whose rows open the T
   await act(async () => [...container.querySelectorAll("button")].find((each) => each.textContent?.startsWith("Approve deploy"))!.click());
   expect(state.openFixedTab).toHaveBeenCalledWith(expect.objectContaining({ target: { threadId: "t1" } }));
   await act(async () => button("Pause").click());
-  expect(state.call).toHaveBeenCalledWith("bot_pause", {});
+  expect(state.call).toHaveBeenCalledWith("bot_pause", { botId: "bot_main" });
 });
 
 test("shows the Bot's chat and status, and confirms Stop", async () => {
@@ -219,7 +238,7 @@ test("shows the Bot's chat and status, and confirms Stop", async () => {
   act(() => button("Stop…").click());
   expect(container.textContent).toContain("the 1 running thread it started stop");
   await act(async () => click([...container.querySelectorAll("[role=dialog] button")].find((each) => each.textContent === "Stop")));
-  expect(state.call).toHaveBeenCalledWith("bot_stop", {});
+  expect(state.call).toHaveBeenCalledWith("bot_stop", { botId: "bot_main" });
 });
 
 test("Edit profile saves shape, color and role; Skills (Share/Delete) live under Advanced; Memory opens its page", async () => {
@@ -236,15 +255,15 @@ test("Edit profile saves shape, color and role; Skills (Share/Delete) live under
   act(() => button("Skills…").click());
   expect(container.textContent).toContain("weekly-review");
   await act(async () => button("Share").click());
-  expect(state.call).toHaveBeenCalledWith("bot_skill_share", { name: "weekly-review" });
+  expect(state.call).toHaveBeenCalledWith("bot_skill_share", { name: "weekly-review", botId: "bot_main" });
   await act(async () => button("Delete").click());
-  expect(state.call).toHaveBeenCalledWith("bot_skill_delete", { name: "weekly-review" });
+  expect(state.call).toHaveBeenCalledWith("bot_skill_delete", { name: "weekly-review", botId: "bot_main" });
   act(() => click(container.querySelector('[aria-label="Shape star"]')));
   act(() => click(container.querySelector('[aria-label="Color #e5484d"]')));
   const role = container.querySelector('textarea[aria-label="Role"]') as HTMLTextAreaElement;
   act(() => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(role, "You are my chief of staff."); role.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => button("Save").click());
-  expect(state.call).toHaveBeenCalledWith("bot_set", { shape: "star", color: "#e5484d", role: "You are my chief of staff." });
+  expect(state.call).toHaveBeenCalledWith("bot_set", { shape: "star", color: "#e5484d", role: "You are my chief of staff.", botId: "bot_main" });
 });
 
 test("BB's thread view always shows the Bot's main thread", async () => {
@@ -260,5 +279,67 @@ test("Check-ins offers presets, marks the current one, and applies one in a clic
   const presets = [...container.querySelectorAll('[role=radiogroup][aria-label="Check-in preset"] [role=radio]')];
   expect(presets.map((each) => each.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]);
   await act(async () => click(presets[1]));
-  expect(state.call).toHaveBeenCalledWith("bot_checkin_preset", { preset: "evening" });
+  expect(state.call).toHaveBeenCalledWith("bot_checkin_preset", { preset: "evening", botId: "bot_main" });
+});
+
+const scout = { ...dot, id: "bot_scout", name: "Scout", avatar: "🛰️", threadId: "thr_scout", primary: false };
+
+test("several Bots: the selected one (from the route) is expanded and scoped; another opens its page", async () => {
+  const { openAppPath } = await import("@bb-studio/kit/app");
+  state.pathname = "/plugins/studio/bot/bot_scout";
+  state.data = { bot_list: { bots: [{ ...dot, primary: true }, scout] }, bot_get: { bot: scout, run: null }, bot_activity: empty };
+  await show(<BotThreadList {...listProps} />);
+  const nav = container.querySelector('nav[aria-label="Bots"]')!;
+  expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Scout");
+  expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_scout" }]);
+  expect(state.inputs).toContainEqual(["bot_activity", { botId: "bot_scout" }]);
+  expect(state.inputs).toContainEqual(["bot_runners", { botId: "bot_scout" }]);
+  const other = nav.querySelector('[data-testid=bot-row][data-bot="bot_main"]')!;
+  expect(other.textContent).toContain("Dot");
+  act(() => click(other));
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot");
+  act(() => click(nav.querySelector("[data-testid=bot-main]")));
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/bot_scout");
+  // The page and its Info tab act on the selected Bot.
+  await show(<BotHome />);
+  expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("thr_scout");
+  await show(<BotInfoTab />);
+  act(() => click(button("Pause")));
+  expect(state.call).toHaveBeenCalledWith("bot_pause", { botId: "bot_scout" });
+});
+
+test("New bot: the create flow greets as a new bot and the first message makes a second one, then opens it", async () => {
+  const { openAppPath } = await import("@bb-studio/kit/app");
+  state.pathname = "/plugins/studio/bot/new";
+  state.data = { bot_get: { bot: dot, run: null } };
+  state.call.mockImplementation((async (method: string) => method === "bot_create" ? { bot: scout, run: null } : {}) as never);
+  await show(<BotHome />);
+  expect(container.textContent).toContain("I'm a new bot");
+  await act(async () => click(container.querySelector('[aria-label="Send"]')));
+  expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "New bot", avatar: "🤖" }));
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/bot_scout", { replace: true });
+  state.call.mockImplementation(async () => ({}));
+});
+
+test("the navigation row says New bot on the Bot page, which opens the create flow; other items are BB's", async () => {
+  const { openAppPath } = await import("@bb-studio/kit/app");
+  const Original = () => <div data-testid="bb-navigation">New thread</div>;
+  await show(<BotNavigation isCompactViewport={false} experimental_Original={Original} />);
+  const nav = container.querySelector("[data-testid=bot-navigation]")!;
+  expect([...nav.querySelectorAll("button")].map((each) => each.textContent)).toEqual(["New bot", "Search", "Bot"]);
+  expect(nav.textContent).not.toContain("New thread");
+  expect(nav.querySelector('[data-item="studio/bot"]')?.getAttribute("aria-current")).toBe("page");
+  act(() => click(button("New bot")));
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/new");
+  act(() => click(button("Search")));
+  expect(state.activate).toHaveBeenCalledWith("__bb__/search-threads", { openInSplit: false });
+});
+
+test("off the Bot page the navigation shows BB's own and puts BB's bundled provider back", async () => {
+  state.pathname = "/threads/thr_1";
+  const Original = () => <div data-testid="bb-navigation">New thread</div>;
+  await show(<BotNavigation isCompactViewport={false} experimental_Original={Original} />);
+  expect(container.querySelector("[data-testid=bb-navigation]")).not.toBeNull();
+  expect(container.querySelector("[data-testid=bot-navigation]")).toBeNull();
+  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.navigationProvider", value: "navigation/navigation", expectedRevision: 1 });
 });

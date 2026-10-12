@@ -321,7 +321,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   // Each project's optional lead thread and its heartbeat (src/project-lead.ts).
   // The heartbeat of the personal project is the Bot's check-in, under its name.
-  const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, changed: tagsChanged, personalPrompt: (): string => bots.prompt() });
+  const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, changed: tagsChanged, personalPrompt: (): string => bots.prompt(), botPrompt: (key) => bots.promptFor(key) });
   // The user's Bot (src/bot.ts): the personal project's lead, with a name, avatar and state.
   // Its Memory page is a Studio page in the personal project; a shared skill goes to BB's user skills.
   const bots: Bots = new Bots({
@@ -332,19 +332,19 @@ export default async function plugin(bb: BbPluginApi) {
       addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
-    runners: { threads: () => runners.threads(), pauseAll: () => runners.pauseAll() },
+    runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId) => runners.pauseAll(botId) },
   });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
     db, sdk: bb.sdk, changed: tagsChanged,
-    bot: () => bots.stored(),
-    startedThreads: () => bots.started(),
-    chain: () => bots.chain(),
+    bot: (botId) => bots.stored(botId),
+    startedThreads: (botId) => bots.started(botId),
+    chain: (botId) => bots.chain(botId),
   });
   // Moves Spaces' leads to projects, retires old heartbeat automations and turns
   // migrated heartbeats back on; whatever fails is retried next startup.
   void projectLeads.finishMoves()
-    .then(() => projectLeads.runs.repair((projectId) => projectLeads.storedLead(projectId)))
+    .then(() => projectLeads.runs.repair((key) => bots.threadForRunKey(key) ?? projectLeads.storedLead(key)))
     // An enabled check-in picks up the current prompt (botHeartbeat), same schedule.
     .then(async () => {
       const run = projectLeads.runs.get(PERSONAL_PROJECT_ID);
@@ -494,36 +494,42 @@ export default async function plugin(bb: BbPluginApi) {
       else return projectLeads.setRun(projectId, run);
       return projectLeads.get(projectId);
     },
-    bot_get: () => bots.get(),
+    bot_list: () => ({ bots: bots.list() }),
+    bot_get: ({ botId }) => bots.get(botId),
     bot_create: (input) => bots.create(input),
     bot_set: (input) => bots.set(input),
     bot_set_thread: ({ threadId }) => bots.setThread(threadId),
     bot_set_run: (run) => bots.setRun(run),
-    bot_pause: () => bots.pause(),
-    bot_resume: () => bots.resume(),
-    bot_stop: () => bots.stop(),
-    bot_activity: () => bots.activity(),
-    bot_memory: () => ({ pageId: bots.memoryPage() }),
-    bot_chain: () => ({ threadIds: bots.chain() }),
-    bot_checkin_preset: ({ preset }) => bots.checkinPreset(preset),
-    bot_skills: () => ({ skills: bots.skills() }),
-    bot_skill_write: (input) => bots.writeSkill(input),
-    bot_skill_share: ({ name }) => bots.shareSkill(name),
-    bot_skill_delete: ({ name }) => ({ deleted: bots.deleteSkill(name) }),
-    bot_runners: async () => { const [list, adoptable] = await Promise.all([runners.list(), runners.adoptable()]); return { runners: list, adoptable }; },
-    bot_runner_create: (input) => runners.create(input),
-    bot_runner_update: (input) => runners.update(input),
-    bot_runner_pause: ({ id }) => runners.setState(id, "paused"),
-    bot_runner_resume: ({ id }) => runners.setState(id, "active"),
-    bot_runner_run_now: ({ id }) => runners.runNow(id),
-    bot_runner_delete: ({ id }) => runners.delete(id),
-    bot_runner_seen: ({ id }) => { runners.seen(id); return { ok: true as const }; },
-    bot_runner_adopt: (input) => runners.adopt(input),
+    bot_pause: ({ botId }) => bots.pause(botId),
+    bot_resume: ({ botId }) => bots.resume(botId),
+    bot_stop: ({ botId }) => bots.stop(botId),
+    bot_activity: ({ botId }) => bots.activity(botId),
+    bot_memory: ({ botId }) => ({ pageId: bots.memoryPage(botId) }),
+    bot_chain: ({ botId }) => ({ threadIds: bots.chain(botId) }),
+    bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),
+    bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),
+    bot_skill_write: ({ botId, ...input }) => bots.writeSkill(input, botId),
+    bot_skill_share: ({ botId, name }) => bots.shareSkill(name, botId),
+    bot_skill_delete: ({ botId, name }) => ({ deleted: bots.deleteSkill(name, botId) }),
+    bot_runners: async ({ botId }) => { const [list, adoptable] = await Promise.all([runners.list(botId), runners.adoptable(botId)]); return { runners: list, adoptable }; },
+    bot_runner_create: ({ botId, ...input }) => runners.create(input, botId),
+    bot_runner_update: ({ botId, ...input }) => runners.update(input, botId),
+    bot_runner_pause: ({ botId, id }) => runners.setState(id, "paused", botId),
+    bot_runner_resume: ({ botId, id }) => runners.setState(id, "active", botId),
+    bot_runner_run_now: ({ botId, id }) => runners.runNow(id, botId),
+    bot_runner_delete: ({ botId, id }) => runners.delete(id, botId),
+    bot_runner_seen: ({ botId, id }) => { runners.seen(id, botId); return { ok: true as const }; },
+    bot_runner_adopt: ({ botId, ...input }) => runners.adopt(input, botId),
     // Deprecated aliases of bot_get, bot_set_thread and bot_set_run, for one release.
     chief_of_staff: () => projectLeads.chief(),
     chief_of_staff_set: async ({ threadId }) => { if (threadId) await bots.setThread(threadId); else await projectLeads.setChief(null); return projectLeads.chief(); },
     chief_of_staff_set_run: async (run) => { await bots.setRun(run); return projectLeads.chief(); },
-    thread_handoff: ({ threadId, request }) => projectLeads.handoff(threadId, request),
+    thread_handoff: async ({ threadId, request }) => {
+      const result = await projectLeads.handoff(threadId, request);
+      // An additional Bot's thread isn't a lead: it follows the handoff here.
+      await bots.handedOff(threadId, result.threadId);
+      return result;
+    },
     saveView: ({ name, query }) => {
       const view = views.save(name, query);
       tagsChanged();
@@ -707,7 +713,7 @@ export default async function plugin(bb: BbPluginApi) {
     const compiled = compileQuery(parsed, names);
     if (compiled.unknown.length) throw unknownFilter(compiled.unknown[0]!, names);
     const named = parsed.filters.some((filter) => !filter.negate && filter.field === "project");
-    const everything = named || options.all || (options.threadId !== undefined && projectLeads.chiefThreadId() === options.threadId);
+    const everything = named || options.all || (options.threadId !== undefined && (projectLeads.chiefThreadId() === options.threadId || !!bots.forThread(options.threadId)));
     const inScope = (item: HubItem) => everything || item.projectId === null || item.projectId === options.projectId;
     const labels = new Map(data.providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.label])));
     const text = compiled.text.toLowerCase();
@@ -762,25 +768,27 @@ export default async function plugin(bb: BbPluginApi) {
     ? `${bot.avatar} ${bot.name} is ${bot.state}. Thread: ${bot.threadId ? `/threads/${bot.threadId}` : "none"}. Check-ins: ${run?.enabled ? `${run.cadence}${run.cadence === "custom" ? ` (${run.cron})` : ` at ${run.time}`}` : "off"}.`
     : "The user has no Bot yet. They can make one in Studio → Bot.";
   const listThreads = (label: string, threads: { id: string; title: string; status: string }[]) => threads.length ? [`${label}:`, ...threads.map((thread) => `- [${thread.title}](/threads/${thread.id}) (${thread.status})`)] : [];
-  bb.agents.registerTool({ name: "bot_get", description: "Show the user's Bot (their always-on agent, formerly the Chief of Staff): name, avatar, state (active, paused, stopped), its thread and check-ins.", parameters: z.object({}), execute: async () => describeBot(await bots.get()) });
+  // In a Bot's own thread these act on that Bot; elsewhere on the primary Bot.
+  const selfBot = (threadId: string | undefined) => bots.forThread(threadId)?.id;
+  bb.agents.registerTool({ name: "bot_get", description: "Show the user's Bot (their always-on agent, formerly the Chief of Staff): name, avatar, state (active, paused, stopped), its thread and check-ins. In a Bot's own thread, that Bot.", parameters: z.object({}), execute: async (_input, ctx) => describeBot(await bots.get(selfBot(ctx.threadId))) });
   bb.agents.registerTool({
     name: "bot_set", description: "Rename the user's Bot, change its avatar emoji, or set its role (a sentence or two it's given). Only when the user asks.",
     parameters: z.object({ name: z.string().trim().min(1).max(60).optional(), avatar: z.string().trim().min(1).max(16).optional().describe("One emoji"), role: z.string().trim().max(400).optional().describe("Its role in the user's words; empty clears it") }),
-    execute: async (input) => describeBot(await bots.set(input)),
+    execute: async (input, ctx) => describeBot(await bots.set({ ...input, botId: selfBot(ctx.threadId) })),
   });
-  bb.agents.registerTool({ name: "bot_pause", description: "Pause the user's Bot: its check-ins stop and it takes on no new work until resumed. Only when the user asks.", parameters: z.object({}), execute: async () => describeBot(await bots.pause()) });
+  bb.agents.registerTool({ name: "bot_pause", description: "Pause the user's Bot: its check-ins stop and it takes on no new work until resumed. Only when the user asks.", parameters: z.object({}), execute: async (_input, ctx) => describeBot(await bots.pause(selfBot(ctx.threadId))) });
   bb.agents.registerTool({
     name: "bot_resume", description: "Resume the user's paused or stopped Bot, and its check-ins if they were on. Only when the user asks; the Bot can't resume itself.", parameters: z.object({}),
     execute: async (_input, ctx) => bots.forThread(ctx.threadId) ? "Only the user can resume you: Studio → Bot → Resume." : describeBot(await bots.resume()),
   });
   bb.agents.registerTool({
     name: "bot_stop", description: "Stop the user's Bot: pause it, stop the running threads it started and pause automations that wake it. Data is kept. Only when the user explicitly asks to stop it.", parameters: z.object({}),
-    execute: async () => { const result = await bots.stop(); return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n"); },
+    execute: async (_input, ctx) => { const result = await bots.stop(selfBot(ctx.threadId)); return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n"); },
   });
   bb.agents.registerTool({
     name: "bot_activity", description: "What the user's Bot is doing: threads that need the user, in progress, scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({}),
-    execute: async () => {
-      const activity = await bots.activity();
+    execute: async (_input, ctx) => {
+      const activity = await bots.activity(selfBot(ctx.threadId));
       const lines = [
         ...listThreads("Needs you", activity.needsYou), ...listThreads("In progress", activity.inProgress),
         ...(activity.scheduled.length ? ["Scheduled:", ...activity.scheduled.map((each) => `- ${each.name}${each.enabled ? "" : " (off)"}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toISOString()}` : ""}`)] : []),
@@ -791,7 +799,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   // The Bot's own tools: given only to its thread (agents.configure above).
-  const ownBot = (threadId: string | undefined) => { if (!bots.forThread(threadId)) throw new Error("Only the user's Bot has its own skills and history."); };
+  const ownBot = (threadId: string | undefined): string => { const bot = bots.forThread(threadId); if (!bot) throw new Error("Only the user's Bot has its own skills and history."); return bot.id; };
   bb.agents.registerTool({
     name: "bot_skill_write",
     description: "Save a reusable procedure you learned as one of your own skills (only you load them; the user can share one with every agent). Same name replaces it. Keep it short: when to use it, then the steps.",
@@ -800,15 +808,15 @@ export default async function plugin(bb: BbPluginApi) {
       description: z.string().trim().min(1).max(500).describe("When to use it, in one sentence"),
       body: z.string().min(1).max(20_000).describe("Markdown instructions"),
     }),
-    execute: (input, ctx) => { ownBot(ctx.threadId); const skill = bots.writeSkill(input); return `Saved your skill ${skill.name}.`; },
+    execute: (input, ctx) => { const skill = bots.writeSkill(input, ownBot(ctx.threadId)); return `Saved your skill ${skill.name}.`; },
   });
   bb.agents.registerTool({
     name: "bot_skill_read", description: "Read one of your own skills.", parameters: z.object({ name: z.string().min(1).max(64) }),
-    execute: ({ name }, ctx) => { ownBot(ctx.threadId); const skill = bots.skill(name); return skill ? `# ${skill.name}\n${skill.description}\n\n${skill.body}` : `No skill "${name}". Yours: ${bots.skills().map((each) => each.name).join(", ") || "none"}.`; },
+    execute: ({ name }, ctx) => { const botId = ownBot(ctx.threadId); const skill = bots.skill(name, botId); return skill ? `# ${skill.name}\n${skill.description}\n\n${skill.body}` : `No skill "${name}". Yours: ${bots.skills(botId).map((each) => each.name).join(", ") || "none"}.`; },
   });
   bb.agents.registerTool({
     name: "bot_skill_delete", description: "Delete one of your own skills.", parameters: z.object({ name: z.string().min(1).max(64) }),
-    execute: ({ name }, ctx) => { ownBot(ctx.threadId); return bots.deleteSkill(name) ? `Deleted ${name}.` : `No skill "${name}".`; },
+    execute: ({ name }, ctx) => { return bots.deleteSkill(name, ownBot(ctx.threadId)) ? `Deleted ${name}.` : `No skill "${name}".`; },
   });
   // The Bot's runners: its tools (its thread only) and the runner's one report tool.
   const scheduleParam = z.object({
@@ -818,20 +826,20 @@ export default async function plugin(bb: BbPluginApi) {
   });
   const describeRunner = (runner: Awaited<ReturnType<typeof runners.list>>[number]) =>
     `- ${runner.name} (${runner.id}, ${runner.state}${runner.adopted ? ", adopted" : ""}): ${runner.schedule.cadence}${runner.schedule.cadence === "custom" ? ` ${runner.schedule.cron}` : ` at ${runner.schedule.time}`}${runner.nextRunAt ? `, next ${new Date(runner.nextRunAt).toLocaleString()}` : ""}. Job: ${runner.job}${runner.lastReport ? `\n  Last report (${runner.lastLevel}): ${runner.lastReport}` : ""}${runner.threadId ? `\n  Thread: /threads/${runner.threadId}` : ""}`;
-  const runnerTool = (name: string, description: string, parameters: z.ZodObject, execute: (input: never) => Promise<string>) =>
-    bb.agents.registerTool({ name, description, parameters, execute: async (input, ctx) => { ownBot(ctx.threadId); return execute(input as never); } });
+  const runnerTool = (name: string, description: string, parameters: z.ZodObject, execute: (input: never, botId: string) => Promise<string>) =>
+    bb.agents.registerTool({ name, description, parameters, execute: async (input, ctx) => execute(input as never, ownBot(ctx.threadId)) });
   runnerTool("runner_create", "Make a runner: a long-lived thread that does a recurring job on its own schedule and stays quiet unless it has something to report (it tells you or the user through runner_report). Use it when a task becomes recurring, so your chat stays for the user. Its first run starts now.",
     z.object({ name: z.string().trim().min(1).max(60), job: z.string().trim().min(1).max(2000).describe("A short instruction: what to check or do each run, and what counts as worth reporting"), schedule: scheduleParam }),
-    async (input: { name: string; job: string; schedule: z.infer<typeof scheduleParam> }) => `Made the runner:\n${describeRunner(await runners.create({ ...input, schedule: parseSchedule(input.schedule) }))}`);
+    async (input: { name: string; job: string; schedule: z.infer<typeof scheduleParam> }, botId) => `Made the runner:\n${describeRunner(await runners.create({ ...input, schedule: parseSchedule(input.schedule) }, botId))}`);
   runnerTool("runner_update", "Change a runner's name, job or schedule.",
     z.object({ id: z.string().min(1).describe("Runner id or name"), name: z.string().trim().min(1).max(60).optional(), job: z.string().trim().min(1).max(2000).optional(), schedule: scheduleParam.optional() }),
-    async (input: { id: string; name?: string; job?: string; schedule?: z.infer<typeof scheduleParam> }) => describeRunner(await runners.update({ ...input, schedule: input.schedule ? parseSchedule(input.schedule) : undefined })));
-  runnerTool("runner_pause", "Pause a runner: its schedule stops until resumed.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }) => describeRunner(await runners.setState(id, "paused")));
-  runnerTool("runner_resume", "Resume a paused runner.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }) => describeRunner(await runners.setState(id, "active")));
-  runnerTool("runner_run_now", "Run a runner now, outside its schedule.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }) => describeRunner(await runners.runNow(id)));
+    async (input: { id: string; name?: string; job?: string; schedule?: z.infer<typeof scheduleParam> }, botId) => describeRunner(await runners.update({ ...input, schedule: input.schedule ? parseSchedule(input.schedule) : undefined }, botId)));
+  runnerTool("runner_pause", "Pause a runner: its schedule stops until resumed.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeRunner(await runners.setState(id, "paused", botId)));
+  runnerTool("runner_resume", "Resume a paused runner.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeRunner(await runners.setState(id, "active", botId)));
+  runnerTool("runner_run_now", "Run a runner now, outside its schedule.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeRunner(await runners.runNow(id, botId)));
   runnerTool("runner_delete", "Delete a runner you made: its schedule is deleted and its thread archived. An adopted runner is only let go (its thread and automation stay). Only when the user asks or the job is over.",
-    z.object({ id: z.string().min(1) }), async ({ id }: { id: string }) => (await runners.delete(id)).kept ? "Let go of the adopted runner; its thread and automation stay." : "Deleted the runner; its thread is archived.");
-  runnerTool("runner_list", "List your runners: schedule, state, next run and last report.", z.object({}), async () => (await runners.list()).map(describeRunner).join("\n") || "No runners yet.");
+    z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => (await runners.delete(id, botId)).kept ? "Let go of the adopted runner; its thread and automation stay." : "Deleted the runner; its thread is archived.");
+  runnerTool("runner_list", "List your runners: schedule, state, next run and last report.", z.object({}), async (_input: unknown, botId) => (await runners.list(botId)).map(describeRunner).join("\n") || "No runners yet.");
   bb.agents.registerTool({
     name: "runner_report",
     description: "Report from this run. log: kept in this thread and the Bot's Activity. tell: one short line to the user in the Bot's chat. urgent: tell plus Needs you and a phone push, only when the user must act now. With nothing new, don't call it and finish without a final message.",
@@ -845,8 +853,7 @@ export default async function plugin(bb: BbPluginApi) {
     name: "bot_history_search", description: "Search your own past threads (your earlier threads and the threads you started) for words.",
     parameters: z.object({ query: z.string().trim().min(1).max(200) }),
     execute: async ({ query }, ctx) => {
-      ownBot(ctx.threadId);
-      const hits = await bots.historySearch(query);
+      const hits = await bots.historySearch(query, 10, ownBot(ctx.threadId));
       return hits.length ? hits.map((hit) => `- [${hit.title}](/threads/${hit.threadId}): ${hit.text.replace(/\s+/g, " ")}`).join("\n") : "No matches in your threads.";
     },
   });

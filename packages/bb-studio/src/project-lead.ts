@@ -37,7 +37,12 @@ export interface ProjectLeadDeps {
   changed(): void;
   /** The personal project's heartbeat prompt (the Bot's); CHIEF_HEARTBEAT when absent. */
   personalPrompt?(): string;
+  /** An additional Bot's check-in prompt, for its run key (`bot:<id>`, src/bot.ts); null for other keys. */
+  botPrompt?(key: string): string | null;
 }
+
+/** project_runs also keeps additional Bots' check-ins, keyed `bot:<id>`: not projects. */
+export const BOT_RUN_PREFIX = "bot:";
 
 const threadTitle = (thread: Pick<Thread, "title" | "titleFallback">) => thread.title || thread.titleFallback || "Untitled thread";
 const missing = (error: unknown) => rpcErrorStatus(error) === 404;
@@ -47,7 +52,7 @@ export class ProjectLeads {
   readonly runs: ProjectRuns;
 
   constructor(private readonly deps: ProjectLeadDeps) {
-    this.runs = new ProjectRuns(deps.db, deps.sdk, deps.changed, deps.personalPrompt);
+    this.runs = new ProjectRuns(deps.db, deps.sdk, deps.changed, deps.personalPrompt, deps.botPrompt);
   }
 
   // Reads, lead, run and handoff for one project share a queue: a stale read
@@ -93,7 +98,7 @@ export class ProjectLeads {
 
   /** Every project with a lead or heartbeat settings, as stored. */
   list(): ProjectLeadView[] {
-    const rows = this.deps.db.prepare("SELECT project_id FROM project_leads WHERE lead_thread_id IS NOT NULL UNION SELECT project_id FROM project_runs ORDER BY project_id").all() as { project_id: string }[];
+    const rows = this.deps.db.prepare("SELECT project_id FROM project_leads WHERE lead_thread_id IS NOT NULL UNION SELECT project_id FROM project_runs WHERE project_id NOT LIKE 'bot:%' ORDER BY project_id").all() as { project_id: string }[];
     return rows.map(({ project_id: projectId }) => ({ projectId, leadThreadId: this.storedLead(projectId), run: this.runs.get(projectId) }));
   }
 
@@ -251,7 +256,7 @@ const automation = z.object({ id: z.string(), name: z.string() });
 /** Automations owns the schedule; this table keeps its settings and identity. */
 export class ProjectRuns {
   private pending = new Map<string, Promise<void>>();
-  constructor(private db: Database.Database, private sdk: Sdk, private changed: () => void, private personalPrompt: () => string = () => CHIEF_HEARTBEAT) {}
+  constructor(private db: Database.Database, private sdk: Sdk, private changed: () => void, private personalPrompt: () => string = () => CHIEF_HEARTBEAT, private botPrompt: (key: string) => string | null = () => null) {}
 
   /**
    * Finishes migrations (src/migrations.ts) and any heartbeat left on without
@@ -315,7 +320,7 @@ export class ProjectRuns {
     const execution = {
       mode: "agent", providerId: thread.providerId, model: defaults.model, reasoningLevel: defaults.reasoningLevel ?? "medium",
       permissionMode: defaults.permissionMode ?? "accept-edits", environment: { type: "project-default" }, targetThreadId: leadThreadId,
-      prompt: projectId === PERSONAL_PROJECT_ID ? this.personalPrompt() : `${HEARTBEAT}\nProject: ${projectId}.`,
+      prompt: projectId === PERSONAL_PROJECT_ID ? this.personalPrompt() : projectId.startsWith(BOT_RUN_PREFIX) ? this.botPrompt(projectId) ?? CHIEF_HEARTBEAT : `${HEARTBEAT}\nProject: ${projectId}.`,
     };
     const name = `Studio project heartbeat ${projectId}`;
     let automationId = row?.automation_id ?? null;

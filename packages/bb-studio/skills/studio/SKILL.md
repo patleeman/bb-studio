@@ -73,7 +73,9 @@ stuff".
   what's scheduled and what finished. `bot_set` renames it; `bot_pause`,
   `bot_resume` and `bot_stop` change its state, only when the user asks.
   Paused or stopped, the Bot starts no new work. Its home is
-  `/plugins/studio/studio/bot`.
+  `/plugins/studio/bot`. The user can have several bots (New bot on that
+  page); the first is the primary. In a bot's own thread these tools act on
+  that bot; elsewhere on the primary.
 
 ## In the app
 

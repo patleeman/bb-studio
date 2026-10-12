@@ -997,8 +997,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - **Sidebar**: on the Bot page, BB's sidebar shows the **Bots** list in
   place of its thread list; everywhere else it is BB's normal thread list.
   The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
-  Settings → Appearance). Under **Bots**, each bot (one today) with its
-  avatar and status, tinted in its color; the selected one opens into the
+  Settings → Appearance). Under **Bots**, every bot (the primary first) with
+  its avatar, tinted in its color; the selected one opens into the
   threads it started: **Needs you**, **Running** (a thread that is running
   or queued, or has one below it), **Recurring** (automations that wake it,
   other than its check-in), **Recent**, and **Earlier conversations** (its
@@ -1016,6 +1016,26 @@ of Staff", with the same thread and check-ins; rename it from its page.
   puts BB's list back at once. With several windows, the window you use
   decides: a window re-checks when its route changes or it gains focus, so a
   second window showing a thread also shows the Bots list until you use it.
+- **New bot**: on the Bot page the sidebar's top row (BB's navigation: New
+  thread, Search, the rail's panels) is Studio's sidebar navigation provider
+  `studio/bot-navigation` ("Bot (Studio)"), which shows BB's items in your
+  order with **New thread** as **New bot**. It switches
+  `sidebar.navigationProvider` exactly like the list: set on the Bot page,
+  your choice remembered, BB's bundled `navigation/navigation` put back on
+  leaving (never "Automatic"), and BB's own navigation shown if it ever
+  renders elsewhere. A BB without that preference or slot keeps its own
+  navigation. **New bot** opens `/plugins/studio/bot/new`: the same greeting
+  and **Customize me** as a first bot, and your first message makes it.
+- **Several bots**: the first bot is the **primary**: the personal project's
+  lead (the Chief of Staff before it), the one the iOS app shows, and the one
+  agent tools act on outside a bot's thread. Each further bot has its own
+  thread in the personal project (not a lead; a handoff moves it too), Memory
+  page, skills, runners and check-ins. Its check-ins are its own automation
+  on its thread (`Studio project heartbeat bot:<id>`). Every bot has the same
+  powers: it sees every project. The page shows the selected bot: the
+  primary at `/plugins/studio/bot`, another at `/plugins/studio/bot/<botId>`;
+  its title bar, Info, Threads, runners, check-ins, Memory and skills are
+  that bot's. In a bot's own thread its tools act on that bot.
 - **Right panel**: two fixed tabs beside BB's Browser and Terminal.
   **Info** is the Bot's profile, Pause / Resume and Stop, Check-ins, Memory,
   Skills and Activity: **Needs you**, **Running**, **Waiting to start**,
@@ -1095,12 +1115,14 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - Its thread is an implementation detail. A handoff (`thread_handoff`)
   moves the Bot to the new thread. It is the personal project's lead, so it
   sees every project.
-- RPCs: `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role), `bot_set_thread`,
+- RPCs: `bot_list`, `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
   `bot_activity`, `bot_memory`, `bot_chain` (its thread and the ones it
   handed off from, oldest first), `bot_checkin_preset` (`morning`,
   `evening`, `working` or `off`), `bot_skills`, `bot_skill_write`, `bot_skill_share`,
-  `bot_skill_delete`. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
+  `bot_skill_delete`, and the runner RPCs below. Each takes an optional
+  `botId` (the primary when absent); `bot_create` makes the primary first,
+  then additional bots. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
   `bot_skill_write`, `bot_skill_read`, `bot_skill_delete` and
   `bot_history_search`.

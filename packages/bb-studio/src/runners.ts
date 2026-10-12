@@ -71,25 +71,28 @@ export interface RunnerDeps {
   db: Database.Database;
   sdk: Sdk;
   changed(): void;
-  /** The Bot as stored (src/bot.ts). */
-  bot(): RunnerBot | null;
-  /** The Bot's thread chain plus the threads it started: where adoptable runners come from. */
-  startedThreads(): Promise<{ id: string; title: string; projectId: string | null; parentThreadId?: string | null }[]>;
-  /** The Bot's thread and the ones it handed off from. */
-  chain(): string[];
+  /** A Bot as stored (src/bot.ts); the primary without an id. */
+  bot(botId?: string): RunnerBot | null;
+  /** A Bot's thread chain plus the threads it started: where adoptable runners come from. */
+  startedThreads(botId?: string): Promise<{ id: string; title: string; projectId: string | null; parentThreadId?: string | null }[]>;
+  /** A Bot's thread and the ones it handed off from. */
+  chain(botId?: string): string[];
 }
 
 export class Runners {
   constructor(private readonly deps: RunnerDeps) {}
 
-  private rows(): RunnerRow[] {
-    const bot = this.deps.bot();
+  /** A Bot's runners (the primary's without an id). */
+  private rows(botId?: string): RunnerRow[] {
+    const bot = this.deps.bot(botId);
     return bot ? this.deps.db.prepare("SELECT * FROM bot_runners WHERE bot_id = ? ORDER BY created_at, id").all(bot.id) as RunnerRow[] : [];
   }
 
-  private row(id: string): RunnerRow {
-    const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ? OR thread_id = ? OR lower(name) = lower(?)").get(id, id, id) as RunnerRow | undefined;
-    if (!row) throw new Error(`No runner "${id}". Yours: ${this.rows().map((each) => each.name).join(", ") || "none"}.`);
+  /** A runner by id, thread or name; a name is looked up among `botId`'s runners when given. */
+  private row(id: string, botId?: string): RunnerRow {
+    const row = (this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ? OR thread_id = ?").get(id, id)
+      ?? (botId ? this.rows(botId).find((each) => each.name.toLowerCase() === id.toLowerCase()) : this.deps.db.prepare("SELECT * FROM bot_runners WHERE lower(name) = lower(?)").get(id))) as RunnerRow | undefined;
+    if (!row) throw new Error(`No runner "${id}". Yours: ${this.rows(botId).map((each) => each.name).join(", ") || "none"}.`);
     return row;
   }
 
@@ -106,12 +109,12 @@ export class Runners {
   }
 
   /** Runner threads, with whether an urgent report waits on the user. */
-  threads(): Map<string, { urgent: boolean }> {
-    return new Map(this.rows().flatMap((row) => row.thread_id ? [[row.thread_id, { urgent: !!row.urgent }] as const] : []));
+  threads(botId?: string): Map<string, { urgent: boolean }> {
+    return new Map(this.rows(botId).flatMap((row) => row.thread_id ? [[row.thread_id, { urgent: !!row.urgent }] as const] : []));
   }
 
   instructions(row: RunnerRow): string {
-    return runnerInstructions(row, this.deps.bot()?.name ?? "Bot");
+    return runnerInstructions(row, this.deps.bot(row.bot_id)?.name ?? "Bot");
   }
 
   private call<T>(method: string, input: unknown, schema: z.ZodType<T>) {
@@ -136,14 +139,14 @@ export class Runners {
     };
   }
 
-  async list(): Promise<RunnerView[]> {
-    const rows = this.rows();
+  async list(botId?: string): Promise<RunnerView[]> {
+    const rows = this.rows(botId);
     const automations = await this.automations(rows.flatMap((row) => row.automation_project_id ? [row.automation_project_id] : []));
     return rows.map((row) => this.view(row, automations.find((each) => each.id === row.automation_id)));
   }
 
-  private bot(): RunnerBot & { threadId: string } {
-    const bot = this.deps.bot();
+  private bot(botId?: string): RunnerBot & { threadId: string } {
+    const bot = this.deps.bot(botId);
     if (!bot?.threadId) throw new Error("Make your Bot first.");
     if (bot.state !== "active") throw new Error(`Your Bot is ${bot.state}. Resume it first.`);
     return bot as RunnerBot & { threadId: string };
@@ -157,11 +160,11 @@ export class Runners {
   }
 
   /** Makes the runner's thread (its first message is its first run) and its automation. */
-  async create(input: { name: string; job: string; schedule: RunnerSchedule }): Promise<RunnerView> {
-    const bot = this.bot();
+  async create(input: { name: string; job: string; schedule: RunnerSchedule }, botId?: string): Promise<RunnerView> {
+    const bot = this.bot(botId);
     const schedule = parseSchedule(input.schedule);
     const name = input.name.trim();
-    if (this.rows().some((row) => row.name.toLowerCase() === name.toLowerCase())) throw new Error(`You already have a runner named "${name}".`);
+    if (this.rows(bot.id).some((row) => row.name.toLowerCase() === name.toLowerCase())) throw new Error(`You already have a runner named "${name}".`);
     const id = `run_${Math.random().toString(36).slice(2, 12)}`;
     const now = Date.now();
     // The row comes first, so the thread's first turn gets runner instructions (forThread by metadata).
@@ -197,7 +200,7 @@ export class Runners {
 
   private async one(id: string): Promise<RunnerView> {
     const row = this.row(id);
-    return (await this.list()).find((each) => each.id === row.id) ?? this.view(row);
+    return (await this.list(row.bot_id)).find((each) => each.id === row.id) ?? this.view(row);
   }
 
   /** Makes or updates the runner's automation to match its row (adopted runners keep their prompt). */
@@ -228,11 +231,11 @@ export class Runners {
     await this.call(row.state === "active" ? "automations_resume" : "automations_pause", { projectId: row.automation_project_id ?? projectId, automationId: row.automation_id }, z.unknown());
   }
 
-  async update(input: { id: string; name?: string; job?: string; schedule?: RunnerSchedule }): Promise<RunnerView> {
-    const row = this.row(input.id);
+  async update(input: { id: string; name?: string; job?: string; schedule?: RunnerSchedule }, botId?: string): Promise<RunnerView> {
+    const row = this.row(input.id, botId);
     const schedule = input.schedule ? parseSchedule(input.schedule) : null;
     const name = input.name?.trim();
-    if (name && name.toLowerCase() !== row.name.toLowerCase() && this.rows().some((each) => each.name.toLowerCase() === name.toLowerCase())) throw new Error(`You already have a runner named "${name}".`);
+    if (name && name.toLowerCase() !== row.name.toLowerCase() && this.rows(row.bot_id).some((each) => each.name.toLowerCase() === name.toLowerCase())) throw new Error(`You already have a runner named "${name}".`);
     const next: RunnerRow = { ...row, ...(name ? { name } : {}), ...(input.job?.trim() ? { job: input.job.trim() } : {}), ...(schedule ? { cadence: schedule.cadence, time: schedule.time, cron: schedule.cron ?? null } : {}) };
     // The automation first: if it refuses the schedule, nothing changes.
     if (schedule || (!row.adopted && (next.name !== row.name || next.job !== row.job))) await this.provision(next);
@@ -241,18 +244,18 @@ export class Runners {
     return this.one(row.id);
   }
 
-  async setState(id: string, state: "active" | "paused"): Promise<RunnerView> {
-    const row = this.row(id);
-    if (state === "active") this.bot();
+  async setState(id: string, state: "active" | "paused", botId?: string): Promise<RunnerView> {
+    const row = this.row(id, botId);
+    if (state === "active") this.bot(row.bot_id);
     if (row.automation_id) await this.call(state === "active" ? "automations_resume" : "automations_pause", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown());
     this.changedRow(row.id, { state });
     return this.one(row.id);
   }
 
   /** Pauses every active runner (the Bot was stopped). */
-  async pauseAll(): Promise<string[]> {
+  async pauseAll(botId?: string): Promise<string[]> {
     const paused: string[] = [];
-    for (const row of this.rows()) {
+    for (const row of this.rows(botId)) {
       if (row.state !== "active") continue;
       await this.setState(row.id, "paused");
       paused.push(row.id);
@@ -261,9 +264,9 @@ export class Runners {
   }
 
   /** Runs it now, through its automation (so the run counts like a scheduled one). */
-  async runNow(id: string): Promise<RunnerView> {
-    const row = this.row(id);
-    this.bot();
+  async runNow(id: string, botId?: string): Promise<RunnerView> {
+    const row = this.row(id, botId);
+    this.bot(row.bot_id);
     if (!row.automation_id) throw new Error("This runner has no schedule to run.");
     await this.call("automations_run", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown());
     this.changedRow(row.id, { last_run_at: Date.now() });
@@ -275,8 +278,8 @@ export class Runners {
    * (history kept). An adopted runner is only let go: its thread and
    * automation stay as they were before adopting, minus the reporting note.
    */
-  async delete(id: string): Promise<{ deleted: true; kept: boolean }> {
-    const row = this.row(id);
+  async delete(id: string, botId?: string): Promise<{ deleted: true; kept: boolean }> {
+    const row = this.row(id, botId);
     if (row.adopted) {
       if (row.automation_id) {
         const automation = (await this.automations([row.automation_project_id ?? row.project_id])).find((each) => each.id === row.automation_id);
@@ -293,8 +296,8 @@ export class Runners {
   }
 
   /** The user saw an urgent report: it leaves Needs you. */
-  seen(id: string): void {
-    const row = this.row(id);
+  seen(id: string, botId?: string): void {
+    const row = this.row(id, botId);
     if (row.urgent) this.changedRow(row.id, { urgent: 0 });
   }
 
@@ -309,7 +312,7 @@ export class Runners {
     const now = Date.now();
     this.changedRow(row.id, { last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now, urgent: input.level === "urgent" ? 1 : 0 });
     if (input.level === "log") return "Logged. Finish without a final message.";
-    const bot = this.deps.bot();
+    const bot = this.deps.bot(row.bot_id);
     if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Finish without a final message.";
     // A plain message from this thread (senderThreadId), with an agent-only
     // note so the Bot doesn't answer it: the user reads the line as it is.
@@ -331,11 +334,11 @@ export class Runners {
   }
 
   /** Threads the Bot started (or whose automation it made) that an automation wakes, not yet runners. */
-  async adoptable(): Promise<RunnerAdoptableView[]> {
-    const bot = this.deps.bot();
+  async adoptable(botId?: string): Promise<RunnerAdoptableView[]> {
+    const bot = this.deps.bot(botId);
     if (!bot?.threadId) return [];
-    const started = await this.deps.startedThreads();
-    const chain = new Set(this.deps.chain());
+    const started = await this.deps.startedThreads(bot.id);
+    const chain = new Set(this.deps.chain(bot.id));
     const mine = new Map(started.filter((thread) => !chain.has(thread.id)).map((thread) => [thread.id, thread]));
     const runners = this.threadIds();
     const automations = await this.automations([PERSONAL_PROJECT_ID, ...started.flatMap((thread) => thread.projectId ? [thread.projectId] : [])]);
@@ -355,10 +358,10 @@ export class Runners {
    * prompt, and detaches the thread from the Bot (one BB "removed" notice,
    * then no more child notices).
    */
-  async adopt(input: { threadId: string; automationId: string; name?: string; job?: string }): Promise<RunnerView> {
-    const bot = this.bot();
+  async adopt(input: { threadId: string; automationId: string; name?: string; job?: string }, botId?: string): Promise<RunnerView> {
+    const bot = this.bot(botId);
     if (this.threadIds().has(input.threadId)) throw new Error("That thread is already a runner.");
-    const candidate = (await this.adoptable()).find((each) => each.threadId === input.threadId && each.automationId === input.automationId);
+    const candidate = (await this.adoptable(bot.id)).find((each) => each.threadId === input.threadId && each.automationId === input.automationId);
     if (!candidate) throw new Error("That thread isn't one your Bot started with an automation waking it.");
     const automation = (await this.automations([candidate.projectId])).find((each) => each.id === candidate.automationId)!;
     const name = (input.name?.trim() || candidate.title.replace(/\s*·\s*Runner$/i, "")).slice(0, 60);

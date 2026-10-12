@@ -1,17 +1,20 @@
 // The Bots sidebar: Studio's thread list provider ("Bot (Studio)"), which
 // replaces BB's thread list while the Bot page shows (threadListSwitch.ts).
-// A "Bots" list (one bot today; more kinds can join it), the selected bot
-// expanded under it into the threads it started: Needs you, Running,
+// A "Bots" list: every Bot (the primary first), the selected one (the Bot
+// page's route, selection.ts) expanded under it into the threads it started: Needs you, Running,
 // Runners, Recurring, Recent (each nested under the thread that started it) and its
 // earlier conversations. A sub-thread opens in the Bot page's Threads tab;
 // the bot itself opens its main thread, the page.
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
-import { ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { experimental_SidebarNavigationIcon as NavigationIcon, experimental_useSidebarNavigation, ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import type { ExperimentalSidebarNavigationItem, ExperimentalSidebarNavigationProps } from "@get-bb/plugin-sdk";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@bb-studio/kit/ui";
+import { botPath, forBot, NEW_BOT_PATH, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
 import { useLive } from "../live";
-import { BOT_PATH, openThreadPage, runningCount, statusLabel } from "./BotHome";
+import { openThreadPage, runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, colorForName } from "./BotAvatar";
 import { isBotPath, syncThreadList } from "./threadListSwitch";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
@@ -97,24 +100,106 @@ export function BotListSwitcher() {
   return null;
 }
 
-function BotsList({ onNavigate }: { onNavigate(): void }) {
-  const view = useLive<BotView>("bot_get", {}, { pollMs: 30_000 });
-  const bot = view.data?.bot;
+type BotSummary = NonNullable<BotView["bot"]>;
+
+/** BB's "New thread" item, which Studio's navigation shows as "New bot" on the Bot page. */
+export const NEW_THREAD_ITEM = "__bb__/new-thread";
+
+/**
+ * Studio's sidebar navigation (the row above the thread list): BB's items in
+ * the user's order, with "New thread" as "New bot", which opens the create
+ * flow. Shown off the Bot page only by mistake (as BotThreadList): it renders
+ * BB's own navigation and puts BB's provider back.
+ */
+export function BotNavigation({ experimental_Original: Original }: ExperimentalSidebarNavigationProps) {
+  const sdk = useSdk();
+  const onBotPage = isBotPath(usePathname());
+  useEffect(() => { if (!onBotPage) void syncThreadList(sdk, false); }, [sdk, onBotPage]);
+  if (!onBotPage) return <Original />;
+  return <BotNavigationItems />;
+}
+
+function BotNavigationItems() {
+  const { items, activeItemId, isShortcutModifierHeld, actions } = experimental_useSidebarNavigation();
+  const { creating } = useBotSelection();
+  const open = (item: ExperimentalSidebarNavigationItem) => {
+    if (item.id === NEW_THREAD_ITEM) openAppPath(NEW_BOT_PATH);
+    else actions.activate(item.id, { openInSplit: false });
+  };
+  const label = (item: ExperimentalSidebarNavigationItem) => item.id === NEW_THREAD_ITEM ? "New bot" : item.label;
+  const current = (item: ExperimentalSidebarNavigationItem) => item.id === NEW_THREAD_ITEM ? creating : !creating && item.id === activeItemId;
+  const hidden = items.filter((item) => !item.isVisible);
   return (
-    <nav aria-label="Bots" className="studio-root flex flex-col px-1.5 pb-3">
+    <nav aria-label="Navigation" data-testid="bot-navigation" className="flex flex-col px-1.5 py-1">
+      {items.filter((item) => item.isVisible).map((item) => {
+        const Accessory = item.experimental_Accessory;
+        return (
+          <button key={item.id} type="button" data-item={item.id} aria-current={current(item) ? "page" : undefined} disabled={item.isDisabled || item.isLoading}
+            onClick={() => open(item)}
+            className="flex h-8 min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground hover:bg-state-hover disabled:opacity-50 aria-[current]:bg-state-active">
+            <NavigationIcon icon={item.icon} className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate">{label(item)}</span>
+            {Accessory && item.id !== NEW_THREAD_ITEM ? <span className="shrink-0"><Accessory /></span> : null}
+            {isShortcutModifierHeld && item.shortcut && item.id !== NEW_THREAD_ITEM ? <span className="shrink-0 text-[11px] text-muted-foreground">{item.shortcut.label}</span> : null}
+          </button>
+        );
+      })}
+      {hidden.length ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="flex h-8 min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground">
+              <Icon name="MoreHorizontal" className="size-4 shrink-0" /><span className="truncate">More</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-44">
+            {hidden.map((item) => (
+              <DropdownMenuItem key={item.id} disabled={item.isDisabled || item.isLoading} onSelect={() => open(item)}>
+                <NavigationIcon icon={item.icon} className="size-4" />{label(item)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </nav>
+  );
+}
+
+function BotsList({ onNavigate }: { onNavigate(): void }) {
+  const { botId, creating } = useBotSelection();
+  const list = useLive<{ bots: BotSummary[] }>("bot_list", {}, { pollMs: 30_000 });
+  const view = useLive<BotView>("bot_get", forBot(botId), { pollMs: 30_000 });
+  const bots = list.data?.bots ?? [];
+  const selected = creating ? null : view.data?.bot ?? null;
+  return (
+    <nav aria-label="Bots" className="studio-root flex flex-col gap-0.5 px-1.5 pb-3">
       <style>{BOT_STYLES}</style>
       <div className="flex h-7 items-center px-2 text-[11px] font-medium text-muted-foreground">Bots</div>
-      {bot ? <BotEntry view={view.data!} onNavigate={onNavigate} />
-        : <p className="px-2 text-xs text-muted-foreground">{view.loading ? "Loading…" : view.error ?? "No bot yet. Say hi to make one."}</p>}
+      {bots.length ? bots.map((bot) => bot.id === selected?.id
+        ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} />
+        : <BotRow key={bot.id} bot={bot} onNavigate={onNavigate} />)
+        : <p className="px-2 text-xs text-muted-foreground">{list.loading || view.loading ? "Loading…" : list.error ?? view.error ?? "No bot yet. Say hi to make one."}</p>}
     </nav>
+  );
+}
+
+/** A Bot that isn't selected: one row that opens its page. */
+function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
+  return (
+    <button type="button" data-testid="bot-row" data-bot={bot.id} title={bot.name}
+      onClick={() => { openAppPath(botPath(bot.id, bot.primary !== false)); onNavigate(); }}
+      className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-state-hover">
+      <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={22} />
+      <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
+      {bot.state !== "active" ? <span className="shrink-0 text-[11px] text-muted-foreground">{bot.state}</span> : null}
+    </button>
   );
 }
 
 /** One bot: its row, and (it's the selected bot) its threads under it. */
 function BotEntry({ view, onNavigate }: { view: BotView; onNavigate(): void }) {
   const bot = view.bot!;
-  const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 15_000 });
-  const chain = useLive<{ threadIds: string[] }>("bot_chain", {}, { pollMs: 120_000 });
+  const activity = useLive<BotActivityView>("bot_activity", { botId: bot.id }, { pollMs: 15_000 });
+  const chain = useLive<{ threadIds: string[] }>("bot_chain", { botId: bot.id }, { pollMs: 120_000 });
   const [layout, setLayout] = useLayout();
   const [strip] = useStrip(bot.id);
   const openSub = useOpenSubThread(bot.id, openThreadPage);
@@ -128,15 +213,15 @@ function BotEntry({ view, onNavigate }: { view: BotView; onNavigate(): void }) {
   const toggle = (id: string) => setLayout({ closed: layout.closed.includes(id) ? layout.closed.filter((each) => each !== id) : [...layout.closed, id] });
   const active = strip.active;
   const onOpen = (threadId: string) => { openSub(threadId); onNavigate(); };
-  const runners = useRunners();
-  const openRunner = useOpenRunner(onOpen, () => { runners.refresh(); activity.refresh(); });
+  const runners = useRunners(bot.id);
+  const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
   const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} />;
 
   return (
     <div className="flex flex-col" style={accent}>
       {/* The bot: its main thread is the Bot page. */}
       <button type="button" aria-current="page" data-testid="bot-main" title={`${bot.name}: ${status}`}
-        onClick={() => { openAppPath(BOT_PATH); onNavigate(); }}
+        onClick={() => { openAppPath(botPath(bot.id, bot.primary !== false)); onNavigate(); }}
         className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:brightness-110"
         style={{ background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" }}>
         <span className="relative shrink-0">

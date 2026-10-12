@@ -34,6 +34,7 @@ public enum Studio {
     public static let chief_of_staff = "chief_of_staff"
     public static let chief_of_staff_set = "chief_of_staff_set"
     public static let chief_of_staff_set_run = "chief_of_staff_set_run"
+    public static let bot_list = "bot_list"
     public static let bot_get = "bot_get"
     public static let bot_create = "bot_create"
     public static let bot_set = "bot_set"
@@ -246,6 +247,8 @@ public enum Studio {
   public typealias ChiefOfStaffSet = ChiefOfStaffSetOutput
 
   public typealias ChiefOfStaffSetRun = ChiefOfStaffSetRunOutput
+
+  public typealias BotList = BotListOutput
 
   public typealias BotGet = BotGetOutput
 
@@ -2925,10 +2928,83 @@ public enum Studio {
     }
   }
 
-  public struct BotGetInput: Sendable, Hashable, Codable {
+  public struct BotListInput: Sendable, Hashable, Codable {
 
 
     public init() {}
+  }
+
+  public enum BotListOutputBotsItemState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case stopped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "stopped": self = .stopped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .stopped: try container.encode("stopped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotListOutputBotsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var avatar: String?
+    public var state: BotListOutputBotsItemState?
+    public var threadId: String?
+    public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
+    public var primary: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotListOutputBotsItemState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.avatar = avatar
+      self.state = state
+      self.threadId = threadId
+      self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
+      self.primary = primary
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct BotListOutput: Sendable, Hashable, Codable {
+    public var bots: [BotListOutputBotsItem]?
+
+    public init(bots: [BotListOutputBotsItem]? = nil) {
+      self.bots = bots
+    }
+  }
+
+  public struct BotGetInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public enum BotGetOutputBotState: Sendable, Hashable, Codable {
@@ -2968,10 +3044,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -2981,6 +3058,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3158,10 +3236,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3171,6 +3250,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3294,13 +3374,15 @@ public enum Studio {
   }
 
   public struct BotSetInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var name: String?
     public var avatar: String?
     public var shape: BotSetInputShape?
     public var color: String?
     public var role: String?
 
-    public init(name: String? = nil, avatar: String? = nil, shape: BotSetInputShape? = nil, color: String? = nil, role: String? = nil) {
+    public init(botId: String? = nil, name: String? = nil, avatar: String? = nil, shape: BotSetInputShape? = nil, color: String? = nil, role: String? = nil) {
+      self.botId = botId
       self.name = name
       self.avatar = avatar
       self.shape = shape
@@ -3346,10 +3428,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3359,6 +3442,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3481,10 +3565,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3494,6 +3579,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3623,12 +3709,14 @@ public enum Studio {
     public var enabled: Bool?
     public var cadence: BotSetRunInputCadence?
     public var cron: String?
+    public var botId: String?
     public var time: String?
 
-    public init(enabled: Bool? = nil, cadence: BotSetRunInputCadence? = nil, cron: String? = nil, time: String? = nil) {
+    public init(enabled: Bool? = nil, cadence: BotSetRunInputCadence? = nil, cron: String? = nil, botId: String? = nil, time: String? = nil) {
       self.enabled = enabled
       self.cadence = cadence
       self.cron = cron
+      self.botId = botId
       self.time = time
     }
   }
@@ -3670,10 +3758,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3683,6 +3772,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3761,9 +3851,11 @@ public enum Studio {
   }
 
   public struct BotPauseInput: Sendable, Hashable, Codable {
+    public var botId: String?
 
-
-    public init() {}
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public enum BotPauseOutputBotState: Sendable, Hashable, Codable {
@@ -3803,10 +3895,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3816,6 +3909,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3894,9 +3988,11 @@ public enum Studio {
   }
 
   public struct BotResumeInput: Sendable, Hashable, Codable {
+    public var botId: String?
 
-
-    public init() {}
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public enum BotResumeOutputBotState: Sendable, Hashable, Codable {
@@ -3936,10 +4032,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -3949,6 +4046,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4027,9 +4125,11 @@ public enum Studio {
   }
 
   public struct BotStopInput: Sendable, Hashable, Codable {
+    public var botId: String?
 
-
-    public init() {}
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public enum BotStopOutputBotState: Sendable, Hashable, Codable {
@@ -4069,10 +4169,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -4082,6 +4183,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4164,9 +4266,11 @@ public enum Studio {
   }
 
   public struct BotActivityInput: Sendable, Hashable, Codable {
+    public var botId: String?
 
-
-    public init() {}
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public enum BotActivityOutputNeedsYouItemRelation: Sendable, Hashable, Codable {
@@ -4414,9 +4518,11 @@ public enum Studio {
   }
 
   public struct BotMemoryInput: Sendable, Hashable, Codable {
+    public var botId: String?
 
-
-    public init() {}
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public struct BotMemoryOutput: Sendable, Hashable, Codable {
@@ -4428,9 +4534,11 @@ public enum Studio {
   }
 
   public struct BotChainInput: Sendable, Hashable, Codable {
+    public var botId: String?
 
-
-    public init() {}
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public struct BotChainOutput: Sendable, Hashable, Codable {
@@ -4472,9 +4580,11 @@ public enum Studio {
   }
 
   public struct BotCheckinPresetInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var preset: BotCheckinPresetInputPreset?
 
-    public init(preset: BotCheckinPresetInputPreset? = nil) {
+    public init(botId: String? = nil, preset: BotCheckinPresetInputPreset? = nil) {
+      self.botId = botId
       self.preset = preset
     }
   }
@@ -4516,10 +4626,11 @@ public enum Studio {
     public var shape: String?
     public var color: String?
     public var role: String?
+    public var primary: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -4529,6 +4640,7 @@ public enum Studio {
       self.shape = shape
       self.color = color
       self.role = role
+      self.primary = primary
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4607,9 +4719,11 @@ public enum Studio {
   }
 
   public struct BotSkillsInput: Sendable, Hashable, Codable {
+    public var botId: String?
 
-
-    public init() {}
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public struct BotSkillsOutputSkillsItem: Sendable, Hashable, Codable {
@@ -4633,11 +4747,13 @@ public enum Studio {
   }
 
   public struct BotSkillWriteInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var name: String?
     public var description: String?
     public var body: String?
 
-    public init(name: String? = nil, description: String? = nil, body: String? = nil) {
+    public init(botId: String? = nil, name: String? = nil, description: String? = nil, body: String? = nil) {
+      self.botId = botId
       self.name = name
       self.description = description
       self.body = body
@@ -4657,9 +4773,11 @@ public enum Studio {
   }
 
   public struct BotSkillShareInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var name: String?
 
-    public init(name: String? = nil) {
+    public init(botId: String? = nil, name: String? = nil) {
+      self.botId = botId
       self.name = name
     }
   }
@@ -4673,9 +4791,11 @@ public enum Studio {
   }
 
   public struct BotSkillDeleteInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var name: String?
 
-    public init(name: String? = nil) {
+    public init(botId: String? = nil, name: String? = nil) {
+      self.botId = botId
       self.name = name
     }
   }
@@ -4689,9 +4809,11 @@ public enum Studio {
   }
 
   public struct BotRunnersInput: Sendable, Hashable, Codable {
+    public var botId: String?
 
-
-    public init() {}
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
   }
 
   public enum BotRunnersOutputRunnersItemState: Sendable, Hashable, Codable {
@@ -4928,11 +5050,13 @@ public enum Studio {
   }
 
   public struct BotRunnerCreateInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var name: String?
     public var job: String?
     public var schedule: BotRunnerCreateInputSchedule?
 
-    public init(name: String? = nil, job: String? = nil, schedule: BotRunnerCreateInputSchedule? = nil) {
+    public init(botId: String? = nil, name: String? = nil, job: String? = nil, schedule: BotRunnerCreateInputSchedule? = nil) {
+      self.botId = botId
       self.name = name
       self.job = job
       self.schedule = schedule
@@ -5143,12 +5267,14 @@ public enum Studio {
   }
 
   public struct BotRunnerUpdateInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var id: String?
     public var name: String?
     public var job: String?
     public var schedule: BotRunnerUpdateInputSchedule?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, schedule: BotRunnerUpdateInputSchedule? = nil) {
+    public init(botId: String? = nil, id: String? = nil, name: String? = nil, job: String? = nil, schedule: BotRunnerUpdateInputSchedule? = nil) {
+      self.botId = botId
       self.id = id
       self.name = name
       self.job = job
@@ -5300,9 +5426,11 @@ public enum Studio {
   }
 
   public struct BotRunnerPauseInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var id: String?
 
-    public init(id: String? = nil) {
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
       self.id = id
     }
   }
@@ -5451,9 +5579,11 @@ public enum Studio {
   }
 
   public struct BotRunnerResumeInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var id: String?
 
-    public init(id: String? = nil) {
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
       self.id = id
     }
   }
@@ -5602,9 +5732,11 @@ public enum Studio {
   }
 
   public struct BotRunnerRunNowInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var id: String?
 
-    public init(id: String? = nil) {
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
       self.id = id
     }
   }
@@ -5753,9 +5885,11 @@ public enum Studio {
   }
 
   public struct BotRunnerDeleteInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var id: String?
 
-    public init(id: String? = nil) {
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
       self.id = id
     }
   }
@@ -5771,9 +5905,11 @@ public enum Studio {
   }
 
   public struct BotRunnerSeenInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var id: String?
 
-    public init(id: String? = nil) {
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
       self.id = id
     }
   }
@@ -5787,12 +5923,14 @@ public enum Studio {
   }
 
   public struct BotRunnerAdoptInput: Sendable, Hashable, Codable {
+    public var botId: String?
     public var threadId: String?
     public var automationId: String?
     public var name: String?
     public var job: String?
 
-    public init(threadId: String? = nil, automationId: String? = nil, name: String? = nil, job: String? = nil) {
+    public init(botId: String? = nil, threadId: String? = nil, automationId: String? = nil, name: String? = nil, job: String? = nil) {
+      self.botId = botId
       self.threadId = threadId
       self.automationId = automationId
       self.name = name

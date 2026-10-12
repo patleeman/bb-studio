@@ -12,7 +12,7 @@ import { useCall, useLive, type Cadence } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 
 export type RunnersData = { runners: RunnerView[]; adoptable: RunnerAdoptableView[] };
-export const useRunners = () => useLive<RunnersData>("bot_runners", {}, { pollMs: 15_000 });
+export const useRunners = (botId: string) => useLive<RunnersData>("bot_runners", { botId }, { pollMs: 15_000 });
 
 const CADENCE: Record<Cadence, string> = {
   every5minutes: "Every 5 min", every15minutes: "Every 15 min", every30minutes: "Every 30 min", hourly: "Hourly", every2hours: "Every 2 h",
@@ -48,28 +48,28 @@ export function RunnerSidebarRow({ runner, active, onOpen }: { runner: RunnerVie
 }
 
 /** Opens a runner's thread; an urgent report counts as seen. */
-export function useOpenRunner(open: (threadId: string) => void, refresh: () => void) {
+export function useOpenRunner(botId: string, open: (threadId: string) => void, refresh: () => void) {
   const call = useCall();
   return (runner: RunnerView) => {
     if (!runner.threadId) return;
     open(runner.threadId);
-    if (runner.urgent) void call("bot_runner_seen", { id: runner.id }).then(refresh, () => {});
+    if (runner.urgent) void call("bot_runner_seen", { botId, id: runner.id }).then(refresh, () => {});
   };
 }
 
 type Sheet = { kind: "new" } | { kind: "edit"; runner: RunnerView } | { kind: "delete"; runner: RunnerView } | { kind: "adopt"; candidate: RunnerAdoptableView } | null;
 
 /** The Info tab's Runners section. */
-export function RunnersSection({ botName, onOpen, disabled }: { botName: string; onOpen(threadId: string): void; disabled: boolean }) {
-  const data = useRunners();
+export function RunnersSection({ botId, botName, onOpen, disabled }: { botId: string; botName: string; onOpen(threadId: string): void; disabled: boolean }) {
+  const data = useRunners(botId);
   const call = useCall();
   const [sheet, setSheet] = useState<Sheet>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const open = useOpenRunner(onOpen, data.refresh);
+  const open = useOpenRunner(botId, onOpen, data.refresh);
   const run = async (method: string, input: unknown) => {
     setBusy(true); setError(null);
-    try { await call(method, input); setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
+    try { await call(method, { ...(input as object), botId }); setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   };
   const runners = data.data?.runners ?? [];
   const adoptable = data.data?.adoptable ?? [];

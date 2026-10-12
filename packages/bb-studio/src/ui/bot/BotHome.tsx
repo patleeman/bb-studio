@@ -3,7 +3,8 @@
 // Bots list with the threads it started (BotSidebar.tsx), and the right panel's fixed tabs hold its
 // Info and the sub-threads the user opened (BotTabs.tsx). Identity, status
 // and the ⋯ menu sit in the panel's title bar. With no Bot yet, the page greets the user as one and
-// the first message makes it. Studio's old address redirects here.
+// the first message makes it; "New bot" (/plugins/studio/bot/new) does the same for another Bot.
+// The route picks the Bot (selection.ts); Studio's old address redirects here.
 import { errorMessage } from "@bb-studio/kit/format";
 import { DANGER_BUTTON, GHOST_BUTTON, ICON_BUTTON, openAppPath, OUTLINE_BUTTON, PageColumn, PRIMARY_BUTTON, StudioBar } from "@bb-studio/kit/app";
 import {
@@ -20,10 +21,11 @@ import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
 import { useOpenInfo, useOpenSubThread } from "./workspace";
+import { BOT_PATH, botPath, forBot, useBotSelection } from "./selection";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
 export const BOT_PANEL = "bot";
-export const BOT_PATH = `/plugins/studio/${BOT_PANEL}`;
+export { BOT_PATH };
 /** Studio's old address for the Bot (/plugins/studio/studio/bot), which redirects. */
 export const BOT_SUBPATH = "bot";
 type Preset = "morning" | "evening" | "working" | "off";
@@ -63,16 +65,16 @@ function when(at: number): string {
   return `${today ? "Today" : date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
-/** Calls an RPC, refreshing the Bot after; errors show in the home. */
-function useAction(refresh: () => void) {
+/** Calls an RPC, refreshing the Bot after; errors show in the home. bot_* calls act on `botId` when given. */
+export function useAction(refresh: () => void, botId?: string) {
   const call = useCall();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const run = async (method: string, input: unknown = {}) => {
+  const run = async (method: string, input: object = {}) => {
     setBusy(method);
     setError(null);
     try {
-      const result = await call(method, input);
+      const result = await call(method, method.startsWith("bot_") && method !== "bot_create" ? forBot(botId, input) : input);
       refresh();
       return result;
     } catch (cause) {
@@ -86,12 +88,13 @@ function useAction(refresh: () => void) {
 }
 
 export function BotHome() {
-  const view = useLive<BotView>("bot_get", {}, { pollMs: 30_000 });
+  const { botId, creating } = useBotSelection();
+  const view = useLive<BotView>("bot_get", forBot(creating ? undefined : botId), { pollMs: 30_000 });
   if (view.loading && !view.data) return <PageColumn><p className="text-sm text-muted-foreground">Loading…</p></PageColumn>;
   if (view.error && !view.data) return <PageColumn><p role="alert" className="text-sm text-destructive">{view.error}</p></PageColumn>;
   const bot = view.data?.bot;
-  if (!bot) return <CreateBot onCreated={view.refresh} />;
-  return <BotPage view={view.data!} refresh={view.refresh} />;
+  if (!bot || creating) return <CreateBot key={creating ? "new" : "first"} first={!bot} onCreated={view.refresh} />;
+  return <BotPage key={bot.id} view={view.data!} refresh={view.refresh} />;
 }
 
 /** Studio's old address (/plugins/studio/studio/bot): replaced by the Bot's own panel. */
@@ -123,14 +126,18 @@ function Identity({ avatar, profile, status, dot, onEdit, working = false, compa
  * No Bot yet: the page already looks like its chat. It greets the user, a
  * chip opens the profile editor, and the first message makes the Bot.
  */
-function CreateBot({ onCreated }: { onCreated(): void }) {
-  const [profile, setProfile] = useState<Profile>({ name: "Bot", shape: DEFAULT_SHAPE, color: BOT_COLORS[0], role: "" });
+function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) {
+  const [profile, setProfile] = useState<Profile>(() => first
+    ? { name: "Bot", shape: DEFAULT_SHAPE, color: BOT_COLORS[0], role: "" }
+    : { name: "New bot", shape: BOT_SHAPES[3] ?? DEFAULT_SHAPE, color: BOT_COLORS[2] ?? BOT_COLORS[0], role: "" });
   const [editing, setEditing] = useState(false);
   const { run, busy, error } = useAction(onCreated);
   const make = async (message: string) => {
     if (busy) return false;
-    const made = await run("bot_create", { name: profile.name, avatar: "🤖", shape: profile.shape ?? DEFAULT_SHAPE, color: profile.color ?? BOT_COLORS[0], ...(message.trim() ? { prompt: message.trim() } : {}) });
-    if (made && profile.role.trim()) await run("bot_set", { role: profile.role.trim() });
+    const made = await run("bot_create", { name: profile.name, avatar: "🤖", shape: profile.shape ?? DEFAULT_SHAPE, color: profile.color ?? BOT_COLORS[0], ...(message.trim() ? { prompt: message.trim() } : {}) }) as BotView | null;
+    if (made?.bot && profile.role.trim()) await run("bot_set", { botId: made.bot.id, role: profile.role.trim() });
+    // The page moves to the new Bot (the primary's is the plain Bot page).
+    if (made?.bot && !first) openAppPath(botPath(made.bot.id, made.bot.primary !== false), { replace: true });
     return !!made;
   };
   const starter = (next: Starter) => {
@@ -146,7 +153,9 @@ function CreateBot({ onCreated }: { onCreated(): void }) {
       <>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex min-h-full w-full max-w-[44rem] flex-col justify-end px-4 py-6">
-            <ChatGreeting bot={identity} onStarter={starter} lines={["Hey! I'm your bot.", "I see every project, check in on a schedule and tell you what needs you. Give me a name and a look, or just tell me what to keep an eye on."]} />
+            <ChatGreeting bot={identity} onStarter={starter} lines={first
+              ? ["Hey! I'm your bot.", "I see every project, check in on a schedule and tell you what needs you. Give me a name and a look, or just tell me what to keep an eye on."]
+              : ["Hey! I'm a new bot.", "I have my own chat, memory, skills and check-ins, and I see every project too. Give me a name and a look, or just tell me what I'm for."]} />
           </div>
         </div>
         <div className="mx-auto w-full max-w-[44rem] shrink-0 px-4 pb-4">
@@ -164,7 +173,7 @@ export type Sheet = "profile" | "skills" | "checkins" | "stop" | null;
 /** The Bot's controls, shared by the page and its Info tab: RPCs, dialogs, and opening its Memory. */
 export function useBotControls(view: BotView, refresh: () => void, running: number) {
   const bot = view.bot!;
-  const { run, busy, error } = useAction(refresh);
+  const { run, busy, error } = useAction(refresh, bot.id);
   const [sheet, setSheet] = useState<Sheet>(null);
   const profile: Profile = { name: bot.name, shape: bot.shape ?? null, color: bot.color ?? null, role: bot.role ?? "" };
   const openMemory = async () => {
@@ -174,7 +183,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
   const sheets = (
     <>
       {sheet === "profile" || sheet === "skills" ? (
-        <ProfileDialog value={profile} advancedOpen={sheet === "skills"} advanced={<SkillsList name={bot.name} />} onClose={() => setSheet(null)}
+        <ProfileDialog value={profile} advancedOpen={sheet === "skills"} advanced={<SkillsList botId={bot.id} name={bot.name} />} onClose={() => setSheet(null)}
           onSave={(next) => {
             setSheet(null);
             const input = {
@@ -189,7 +198,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
       {sheet === "checkins" ? (
         <CheckinsDialog run={view.run} busy={!!busy} onClose={() => setSheet(null)}
           onPreset={(preset) => { setSheet(null); void run("bot_checkin_preset", { preset }); }}
-          onSave={(input) => { setSheet(null); void run("bot_set_run", input); }} />
+          onSave={(input) => { setSheet(null); void run("bot_set_run", input as object); }} />
       ) : null}
       {sheet === "stop" ? (
         <Dialog open onOpenChange={(open) => !open && setSheet(null)}>
@@ -221,7 +230,7 @@ export const openThreadPage = (threadId: string) => openAppPath(threadPath(threa
  * replaces BB's sidebar list), and the right panel's Info and Threads tabs (src/ui/bot/BotTabs.tsx).
  */
 function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
-  const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 15_000 });
+  const activity = useLive<BotActivityView>("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
   const running = runningCount(activity.data);
   const controls = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
   const { bot, profile, run, busy, error, setSheet } = controls;
@@ -286,7 +295,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
             <ThreadChat key={bot.threadId} threadId={bot.threadId} variant="full" className="h-full" />
           </section>
         ) : (
-          <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. Make a thread your Bot from its ⋯ menu.</p>
+          <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. {bot.primary === false ? "" : "Make a thread your Bot from its ⋯ menu."}</p>
         )}
       </div>
       {controls.sheets}
@@ -456,9 +465,9 @@ function ProfileDialog({ value, advanced, advancedOpen = false, onClose, onSave 
 }
 
 /** The Bot's own skills: only its thread loads them. Share moves one into BB's user skills, for every agent. */
-function SkillsList({ name }: { name: string }) {
-  const skills = useLive<{ skills: BotSkillView[] }>("bot_skills", {}, { pollMs: 30_000 });
-  const { run, busy, error } = useAction(skills.refresh);
+function SkillsList({ botId, name }: { botId: string; name: string }) {
+  const skills = useLive<{ skills: BotSkillView[] }>("bot_skills", { botId }, { pollMs: 30_000 });
+  const { run, busy, error } = useAction(skills.refresh, botId);
   const list = skills.data?.skills ?? [];
   return (
     <div className="flex flex-col gap-1">
