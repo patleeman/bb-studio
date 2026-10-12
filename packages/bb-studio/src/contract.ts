@@ -125,6 +125,8 @@ const chiefOfStaff = z.object({
 export type ChiefOfStaffView = z.infer<typeof chiefOfStaff>;
 /** The user's Bot (src/bot.ts): an always-on agent. Its thread is an implementation detail that handoffs rotate. */
 export const botStateSchema = z.enum(["active", "paused", "stopped"]);
+const reasoningLevel = z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]);
+const permissionMode = z.enum(["accept-edits", "auto", "full"]);
 const bot = z.object({
   id: z.string(),
   name: z.string(),
@@ -140,10 +142,14 @@ const bot = z.object({
   role: z.string().nullable().optional(),
   /** The primary Bot: the personal project's lead. Additional Bots ("New bot") have their own thread. */
   primary: z.boolean().optional(),
-  /** "external": its thread runs on an external agent provider (Import bot), with that provider's memory and tools. */
+  /** Derived from providerId: "external" runs on an external agent provider (Studio Agents), with that provider's memory and tools; "studio" runs BB's tools (Memory, skills, runners). */
   kind: z.enum(["studio", "external"]).optional(),
+  /** What its thread runs on now; swappable with bot_set_model (another provider hands it off). Null until known. */
   providerId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
+  reasoningLevel: reasoningLevel.nullable().optional(),
+  /** The permission its threads start with (accept-edits by default for an import). */
+  permissionMode: permissionMode.nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -161,7 +167,7 @@ const botRole = z.string().trim().max(400);
 /** Which Bot a bot_* call acts on; the primary Bot when absent. */
 const botId = z.string().min(1).max(100).optional();
 /** Import bot: the provider (one of EXTERNAL_PROVIDERS) and model its thread runs on. */
-const externalBot = z.object({ providerId: z.string().min(1).max(100), model: z.string().min(1).max(200) });
+const externalBot = z.object({ providerId: z.string().min(1).max(100), model: z.string().min(1).max(200), permissionMode: permissionMode.optional() });
 const externalProviders = z.object({
   /** Studio Agents (plugin id external-agents) is installed and answering. */
   installed: z.boolean(),
@@ -173,6 +179,8 @@ const externalProviders = z.object({
     status: z.enum(["ready", "disabled", "offline", "unauthenticated", "missing"]),
     message: z.string(),
     models: z.array(z.object({ id: z.string(), displayName: z.string(), isDefault: z.boolean() })),
+    /** The permission modes it supports, from BB's provider list (empty when it isn't registered). */
+    permissionModes: z.array(permissionMode).default([]),
   })),
 });
 export type ExternalProvidersView = z.infer<typeof externalProviders>;
@@ -320,6 +328,15 @@ export const rpcContract = defineRpcContract({
   bot_create: { input: z.object({ name: botName, avatar: botAvatar, shape: botShape.optional(), color: botColor.optional(), threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional(), external: externalBot.optional() }), output: botView },
   /** The external agent providers a bot can be imported from (Studio Agents), with their status and models. */
   bot_external_providers: { input: z.object({}), output: externalProviders },
+  /**
+   * Switches the bot's provider, model, reasoning level or permission. The same
+   * provider switches its thread in place (as BB's composer does); another
+   * provider hands it off to a new thread there. Without a thread it's stored.
+   */
+  bot_set_model: {
+    input: z.object({ botId, providerId: z.string().min(1).max(100), model: z.string().min(1).max(200), reasoning: reasoningLevel.optional(), permission: permissionMode.optional() }),
+    output: botView.extend({ change: z.enum(["unchanged", "in-place", "handoff", "stored"]), threadId: z.string().nullable() }),
+  },
   /** Renames the Bot or changes its avatar. */
   bot_set: { input: z.object({ botId, name: botName.optional(), avatar: botAvatar.optional(), shape: botShape.nullable().optional(), color: botColor.optional(), role: botRole.optional() }), output: botView },
   /** Makes a thread the Bot's thread ("Make this my Bot"); makes the Bot if there is none. */

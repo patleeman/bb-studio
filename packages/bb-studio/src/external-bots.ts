@@ -10,7 +10,7 @@ type Health = { online: boolean; status: string; message: string };
 
 export interface ExternalProviderDeps {
   /** BB's registered agent providers (id, display name, logo). */
-  registered(): Promise<readonly { id: string; displayName: string; logoUrl?: string | null }[]>;
+  registered(): Promise<readonly { id: string; displayName: string; logoUrl?: string | null; capabilities?: { permissionModes?: readonly string[] } }[]>;
   /** Studio Agents' health RPC; throws when the plugin isn't installed. */
   health(provider: string): Promise<Health>;
   /** BB's model catalog for one provider. */
@@ -22,7 +22,7 @@ export async function externalProviders(deps: ExternalProviderDeps): Promise<Ext
   let installed = true;
   const providers = await Promise.all(EXTERNAL_PROVIDERS.map(async ({ id, displayName }): Promise<Provider> => {
     const info = registered.find((each) => each.id === id);
-    const base = { id, displayName: info?.displayName ?? displayName, logoUrl: info?.logoUrl ?? null, models: [] };
+    const base = { id, displayName: info?.displayName ?? displayName, logoUrl: info?.logoUrl ?? null, models: [], permissionModes: (info?.capabilities?.permissionModes ?? []).filter((mode): mode is Provider["permissionModes"][number] => mode === "accept-edits" || mode === "auto" || mode === "full") };
     let health: Health;
     try { health = await deps.health(id); } catch {
       installed = false;

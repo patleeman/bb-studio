@@ -238,4 +238,10 @@ export const MIGRATIONS = [
   `ALTER TABLE bots ADD COLUMN kind TEXT NOT NULL DEFAULT 'studio';
    ALTER TABLE bots ADD COLUMN provider_id TEXT;
    ALTER TABLE bots ADD COLUMN model TEXT;`,
+  // A bot's provider and model are its own and swappable (bot_set_model); its
+  // kind is derived from the provider. Imported bots so far ran with full
+  // permission; Studio bots' provider and model fill in from their thread.
+  `ALTER TABLE bots ADD COLUMN permission_mode TEXT;
+   ALTER TABLE bots ADD COLUMN reasoning_level TEXT;
+   UPDATE bots SET permission_mode = 'full' WHERE kind = 'external';`,
 ];

@@ -21,7 +21,13 @@ async function setup(migrations = MIGRATIONS) {
   const threads = new Map<string, Thread>();
   let count = 0;
   const add = (fields: Partial<Thread> & { id: string }) => { const thread = makeThreadResponse({ projectId: "p", providerId: "codex", updatedAt: 1000 + ++count, ...fields }); threads.set(thread.id, thread); return thread; };
-  const spawn = vi.fn(async (args: { projectId: string; title?: string }) => add({ id: `t${count + 1}`, projectId: args.projectId, title: args.title ?? null }));
+  // What each thread runs with, as BB resolves it (threads.defaultExecutionOptions).
+  const execution = new Map<string, { model: string; reasoningLevel: string; permissionMode: string }>();
+  const spawn = vi.fn(async (args: { projectId: string; title?: string; providerId?: string; model?: string; reasoningLevel?: string; permissionMode?: string }) => {
+    const thread = add({ id: `t${count + 1}`, projectId: args.projectId, title: args.title ?? null, providerId: args.providerId ?? "codex" });
+    execution.set(thread.id, { model: args.model ?? "model", reasoningLevel: args.reasoningLevel ?? "high", permissionMode: args.permissionMode ?? "accept-edits" });
+    return thread;
+  });
   const get = vi.fn(async ({ threadId }: { threadId: string }) => {
     const thread = threads.get(threadId);
     if (!thread) throw Object.assign(new Error("Not found"), { status: 404 });
@@ -40,17 +46,25 @@ async function setup(migrations = MIGRATIONS) {
     if (method === "automations_delete") { const at = automations.findIndex((a) => a.id === input.automationId); if (at >= 0) automations.splice(at, 1); return {}; }
     return {};
   });
+  const providers = [
+    { id: "codex", capabilities: { permissionModes: ["accept-edits", "auto", "full"] } },
+    { id: "claude", capabilities: { permissionModes: ["accept-edits", "auto", "full"] } },
+    { id: "hermes", capabilities: { permissionModes: ["accept-edits", "full"] } },
+    { id: "grok", capabilities: { permissionModes: ["full"] } },
+  ];
+  const update = vi.fn(async ({ threadId, ...fields }: { threadId: string; model?: string; reasoningLevel?: string }) => { execution.set(threadId, { ...execution.get(threadId)!, ...fields }); return {}; });
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
       spawn: spawn as never, get: get as never, archive: archive as never, list: list as never, stop: stop as never,
-      unpin: async () => ({}) as never, output: async () => ({ output: "All quiet." }),
+      unpin: async () => ({}) as never, update: update as never, output: async () => ({ output: "All quiet." }),
       search: (async ({ query }: { query: string }) => {
         const hit = (thread: Thread) => ({ thread, matches: [{ text: `${thread.title} mentions ${query}`, highlightRanges: [], sourceKind: "assistant_message", sourceSeq: 1 }] });
         return { active: { results: [...threads.values()].filter((thread) => !thread.archivedAt).map(hit) }, archived: { results: [...threads.values()].filter((thread) => thread.archivedAt).map(hit) } };
       }) as never,
-      defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
+      defaultExecutionOptions: (async ({ threadId }: { threadId: string }) => execution.get(threadId) ?? { model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
+    providers: { list: (async () => providers) as never },
   } });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database();
@@ -62,7 +76,7 @@ async function setup(migrations = MIGRATIONS) {
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
   const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
   bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, memory, userSkillsDir });
-  return { bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir };
+  return { bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update };
 }
 
 const prompts = (x: Awaited<ReturnType<typeof setup>>) => x.automations.map((a) => (a.execution as { prompt: string }).prompt);
@@ -340,7 +354,8 @@ it("imports an external bot: its thread runs on the provider and model, and Stud
   await expect(x.bots.create({ name: "X", avatar: "🤖", external: { providerId: "codex", model: "m" } })).rejects.toThrow(/isn't an external/);
   const made = await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "hermes-agent" } });
   expect(made.bot).toMatchObject({ kind: "external", providerId: "hermes", model: "hermes-agent", primary: false });
-  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "hermes", model: "hermes-agent", reasoningLevel: "none", permissionMode: "full", pluginMetadata: { bot: made.bot!.id } });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "hermes", model: "hermes-agent", reasoningLevel: "none", permissionMode: "accept-edits", pluginMetadata: { bot: made.bot!.id } });
+  expect(made.bot).toMatchObject({ permissionMode: "accept-edits" });
   expect(x.bots.memoryPage(made.bot!.id)).toBeNull();
   expect(() => x.bots.requireStudio(made.bot!.id, "skills")).toThrow("Herm has no Studio skills. Runs on Hermes — its memory and tools live there.");
   expect(() => x.bots.requireStudio(undefined, "skills")).not.toThrow();
@@ -373,4 +388,61 @@ it("resolves the Bot a thread acts for: own thread or handoff chain, its runners
   await x.bots.handedOff("t2", threadId);
   expect(await x.bots.actingFor("t2", runnerBot)).toEqual({ botId: scout, via: "own" });
   expect(await x.bots.actingFor(threadId, runnerBot)).toEqual({ botId: scout, via: "own" });
+});
+
+it("imports with the permission picked, falling back to what the provider supports", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  const full = await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "h", permissionMode: "full" } });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ permissionMode: "full" });
+  expect(full.bot).toMatchObject({ permissionMode: "full" });
+  // Grok runs with full access only.
+  await x.bots.create({ name: "G", avatar: "🤖", external: { providerId: "grok", model: "g" } });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ permissionMode: "full" });
+});
+
+it("derives a bot's kind from its current provider, and fills it in from its thread", async () => {
+  const { botKind, pickPermission, modelChange } = await import("./bot");
+  expect(botKind("hermes")).toBe("external");
+  expect(botKind("codex")).toBe("studio");
+  expect(botKind(null)).toBe("studio");
+  expect(pickPermission(["accept-edits", "full"])).toBe("accept-edits");
+  expect(pickPermission(["full"], "accept-edits")).toBe("full");
+  expect(pickPermission(["accept-edits", "auto", "full"], "auto")).toBe("auto");
+  const x = await setup();
+  const made = await x.bots.create({ name: "Dot", avatar: "🟣" });
+  // An existing Studio bot reads its provider and model off its thread.
+  expect(made.bot).toMatchObject({ kind: "studio", providerId: "codex", model: "model", reasoningLevel: "high" });
+  expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "sonnet" })).toBe("in-place");
+  expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "codex", model: "gpt" })).toBe("handoff");
+  expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "opus" })).toBe("unchanged");
+  expect(modelChange({ providerId: null, model: null }, { providerId: "claude", model: "opus" })).toBe("in-place");
+});
+
+it("switches a bot's model in place on the same provider, and hands it off to another provider", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  const first = scout.threadId!;
+  const same = await x.bots.setModel({ botId: scout.id, providerId: "codex", model: "faster", reasoning: "low" });
+  expect(same).toMatchObject({ change: "in-place", threadId: first });
+  expect(x.update).toHaveBeenCalledWith({ threadId: first, model: "faster", reasoningLevel: "low" });
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "09:00" });
+  const moved = await x.bots.setModel({ botId: scout.id, providerId: "claude", model: "sonnet", reasoning: "medium" });
+  expect(moved.change).toBe("handoff");
+  expect(moved.threadId).not.toBe(first);
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "claude", model: "sonnet", permissionMode: "accept-edits", pluginMetadata: { handoffFrom: first } });
+  expect((await x.bots.get(scout.id)).bot).toMatchObject({ threadId: moved.threadId, providerId: "claude", model: "sonnet", kind: "studio" });
+  // Its chain records the old thread; its check-in follows.
+  expect(x.bots.chain(scout.id)).toEqual([first, moved.threadId]);
+  expect(x.automations.at(-1)).toMatchObject({ execution: { targetThreadId: moved.threadId } });
+  // The new thread's first turn is the bot's, before it moves.
+  expect(x.bots.forThread("t99", { handoffFrom: moved.threadId })).toMatchObject({ id: scout.id });
+  // Onto an external provider: Studio's Memory, skills and runners are off.
+  const external = await x.bots.setModel({ botId: scout.id, providerId: "grok", model: "grok-4" });
+  expect(external).toMatchObject({ change: "handoff", bot: { kind: "external", permissionMode: "full", reasoningLevel: "none" } });
+  expect(() => x.bots.requireStudio(scout.id, "skills")).toThrow(/Runs on Grok/);
+  // The primary bot leads with Studio's tools.
+  await expect(x.bots.setModel({ providerId: "hermes", model: "h" })).rejects.toThrow(/personal project/);
+  await expect(x.bots.setModel({ providerId: "nope", model: "h" })).rejects.toThrow(/isn't an agent provider/);
 });

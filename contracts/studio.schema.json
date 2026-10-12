@@ -3374,6 +3374,41 @@
                     "null"
                   ]
                 },
+                "reasoningLevel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max",
+                        "ultra",
+                        "ultracode"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "permissionMode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "accept-edits",
+                        "auto",
+                        "full"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "createdAt": {
                   "type": "number"
                 },
@@ -3488,6 +3523,41 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "createdAt": {
@@ -3621,6 +3691,14 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 200
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "accept-edits",
+                  "auto",
+                  "full"
+                ]
               }
             },
             "required": [
@@ -3710,6 +3788,41 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "createdAt": {
@@ -3853,6 +3966,18 @@
                     ],
                     "additionalProperties": false
                   }
+                },
+                "permissionModes": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "accept-edits",
+                      "auto",
+                      "full"
+                    ]
+                  }
                 }
               },
               "required": [
@@ -3861,7 +3986,8 @@
                 "logoUrl",
                 "status",
                 "message",
-                "models"
+                "models",
+                "permissionModes"
               ],
               "additionalProperties": false
             }
@@ -3870,6 +3996,259 @@
         "required": [
           "installed",
           "providers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_set_model": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reasoning": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra",
+              "ultracode"
+            ]
+          },
+          "permission": {
+            "type": "string",
+            "enum": [
+              "accept-edits",
+              "auto",
+              "full"
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "model"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "bot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "avatar": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "paused",
+                      "stopped"
+                    ]
+                  },
+                  "threadId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "primary": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "studio",
+                      "external"
+                    ]
+                  },
+                  "providerId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "model": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "avatar",
+                  "state",
+                  "threadId",
+                  "createdAt",
+                  "updatedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "cadence": {
+                    "type": "string",
+                    "enum": [
+                      "hourly",
+                      "daily",
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
+                    ]
+                  },
+                  "time": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "cadence",
+                  "time"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "unchanged",
+              "in-place",
+              "handoff",
+              "stored"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "bot",
+          "run",
+          "change",
+          "threadId"
         ],
         "additionalProperties": false
       }
@@ -4001,6 +4380,41 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "createdAt": {
@@ -4170,6 +4584,41 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "createdAt": {
@@ -4369,6 +4818,41 @@
                       "null"
                     ]
                   },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -4533,6 +5017,41 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "createdAt": {
@@ -4701,6 +5220,41 @@
                       "null"
                     ]
                   },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -4865,6 +5419,41 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "createdAt": {
@@ -5411,6 +6000,41 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                          "ultra",
+                          "ultracode"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "accept-edits",
+                          "auto",
+                          "full"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "createdAt": {

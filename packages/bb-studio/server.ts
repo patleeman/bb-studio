@@ -508,6 +508,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_resume: ({ botId }) => bots.resume(botId),
     bot_stop: ({ botId }) => bots.stop(botId),
     bot_activity: ({ botId }) => bots.activity(botId),
+    bot_set_model: ({ botId, providerId, model, reasoning, permission }) => bots.setModel({ ...(botId ? { botId } : {}), providerId, model, ...(reasoning ? { reasoning } : {}), ...(permission ? { permission } : {}) }),
     bot_memory: ({ botId }) => { bots.requireStudio(botId, "Memory page"); return { pageId: bots.memoryPage(botId) }; },
     bot_external_providers: () => externalProviders({
       registered: () => bb.sdk.providers.list(),
@@ -534,7 +535,8 @@ export default async function plugin(bb: BbPluginApi) {
     chief_of_staff_set: async ({ threadId }) => { if (threadId) await bots.setThread(threadId); else await projectLeads.setChief(null); return projectLeads.chief(); },
     chief_of_staff_set_run: async (run) => { await bots.setRun(run); return projectLeads.chief(); },
     thread_handoff: async ({ threadId, request }) => {
-      const result = await projectLeads.handoff(threadId, request);
+      // A bot's handoff keeps its permission and moves it to the new provider and model.
+      const result = await projectLeads.handoff(threadId, await bots.handoffRequest(threadId, request));
       // An additional Bot's thread isn't a lead: it follows the handoff here.
       await bots.handedOff(threadId, result.threadId);
       return result;
