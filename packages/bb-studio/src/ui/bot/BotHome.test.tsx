@@ -233,7 +233,7 @@ test("shows the Bot's chat and status, and confirms Stop", async () => {
   expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("thr_bot");
   expect(container.querySelector("[data-testid=bot-status]")?.textContent).toBe("Working on 1 thread");
   act(() => button("Stop…").click());
-  expect(container.textContent).toContain("the 1 running thread it started stop");
+  expect(container.textContent).toContain("the threads it started stop (not your own forks of its chat)");
   await act(async () => click([...container.querySelectorAll("[role=dialog] button")].find((each) => each.textContent === "Stop")));
   expect(state.call).toHaveBeenCalledWith("bot_stop", { botId: "bot_main" });
 });

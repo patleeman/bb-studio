@@ -208,7 +208,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
             <DialogHeader>
               <DialogTitle>Stop {bot.name}?</DialogTitle>
               <DialogDescription>
-                It pauses, its check-ins and automations turn off{running ? `, and the ${running} running thread${running === 1 ? "" : "s"} it started stop` : ""}. Its chat and data are kept; you can resume it later.
+                It pauses, its check-ins and automations turn off{running ? ", and the threads it started stop (not your own forks of its chat)" : ""}. Its chat and data are kept; resuming turns its check-ins and automations back on.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
