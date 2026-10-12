@@ -137,7 +137,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "legacy-chats", component: LegacyChats });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // The user's Bot, on a page of its own: its chat, what needs them, its Activity.
-  app.slots.navPanel({ id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotHome });
+  app.slots.navPanel({ id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotHome, headerContent: StudioBarSlot });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });

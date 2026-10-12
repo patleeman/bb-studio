@@ -5,7 +5,7 @@
 // menu holds the rest. With no Bot yet, the page greets the user as one and
 // the first message makes it. Studio's old address redirects here.
 import { errorMessage } from "@bb-studio/kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, ICON_BUTTON, openAppPath, OUTLINE_BUTTON, PageColumn, PRIMARY_BUTTON } from "@bb-studio/kit/app";
+import { DANGER_BUTTON, GHOST_BUTTON, ICON_BUTTON, openAppPath, OUTLINE_BUTTON, PageColumn, PRIMARY_BUTTON, StudioBar } from "@bb-studio/kit/app";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -197,9 +197,18 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   return (
     <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
       <style>{BOT_STYLES}</style>
-      <header className="relative shrink-0 border-b border-border px-24 pt-2 pb-1.5">
-        <Identity avatar={bot.avatar} profile={profile} status={status} dot={STATE_DOT[bot.state]} working={running > 0} compact onEdit={() => setSheet("profile")} />
-        <div className="absolute top-3 right-3 flex items-center gap-0.5">
+      {/* Identity and controls live in the panel's title bar, like a thread's. */}
+      <StudioBar>
+        <button type="button" className="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" aria-label="Edit profile" title="Edit profile" onClick={() => setSheet("profile")}>
+          <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={20} working={running > 0} />
+          <span className="truncate text-sm font-medium">{profile.name}</span>
+        </button>
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-status">
+          <span className={`size-1.5 shrink-0 rounded-full ${STATE_DOT[bot.state]}`} aria-hidden />
+          <span className="truncate">{status}</span>
+        </span>
+        <span className="min-w-0 flex-1" />
+        <div className="flex shrink-0 items-center gap-0.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className={ICON_BUTTON} aria-label="Bot menu" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
@@ -222,7 +231,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
             {needsYou.length ? <span className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" aria-hidden /> : null}
           </button>
         </div>
-      </header>
+      </StudioBar>
 
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">

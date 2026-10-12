@@ -19,6 +19,7 @@ vi.mock("./Onboarding", () => ({
 }));
 vi.mock("@bb-studio/kit/app", () => ({
   PageColumn: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
+  StudioBar: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   openAppPath: vi.fn(), DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
 }));
 vi.mock("@bb-studio/kit/ui", () => ({
