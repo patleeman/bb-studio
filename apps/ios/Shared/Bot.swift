@@ -12,10 +12,7 @@ extension BBClient {
     public func bot() async throws -> BotInfo? {
         do {
             let output: BotWire = try await rpc("studio", Studio.Method.bot_get, .object([:]))
-            let info = output.bot.map { bot in
-                BotInfo(name: bot.name, avatar: bot.avatar, state: BotInfo.State(rawValue: bot.state) ?? .active,
-                        lead: ThreadLead(threadId: bot.threadId, enabled: output.run?.enabled, cadence: output.run?.cadence, time: output.run?.time, cron: output.run?.cron))
-            }
+            let info = output.info
             remember(info)
             return info
         } catch where Self.isMissingRPC(error) {
@@ -44,6 +41,54 @@ extension BBClient {
         AppGroup.defaults.set(info?.lead.threadId, forKey: ServerScope.key("botThreadId", serverURL: baseURL))
         AppGroup.defaults.set(info?.name, forKey: ServerScope.key("botName", serverURL: baseURL))
         AppGroup.defaults.set(info?.avatar, forKey: ServerScope.key("botAvatar", serverURL: baseURL))
+        AppGroup.defaults.set(info?.shape, forKey: ServerScope.key("botShape", serverURL: baseURL))
+        AppGroup.defaults.set(info?.color, forKey: ServerScope.key("botColor", serverURL: baseURL))
+    }
+
+    /// The Bot's look as last seen on this server, for widgets.
+    public var cachedBotLook: BotLook {
+        BotLook(shape: AppGroup.defaults.string(forKey: ServerScope.key("botShape", serverURL: baseURL)),
+                color: AppGroup.defaults.string(forKey: ServerScope.key("botColor", serverURL: baseURL)),
+                emoji: cachedBotAvatar ?? BotInfo.defaultAvatar)
+    }
+
+    /// Makes the Bot (`bot_create`); a `prompt` is its first message.
+    @discardableResult
+    public func createBot(name: String, shape: BotShape?, color: String?, prompt: String?) async throws -> BotInfo? {
+        let output: BotWire = try await rpc("studio", Studio.Method.bot_create, .object(omittingNil: [
+            "name": .string(name), "avatar": .string(BotInfo.defaultAvatar),
+            "shape": shape.map { .string($0.rawValue) }, "color": color.map(JSONValue.string),
+            "prompt": prompt.map(JSONValue.string),
+        ]))
+        let info = output.info
+        remember(info)
+        return info
+    }
+
+    /// Changes the Bot's name, look or role (`bot_set`).
+    @discardableResult
+    public func setBotProfile(name: String, shape: BotShape?, color: String?, role: String) async throws -> BotInfo? {
+        let output: BotWire = try await rpc("studio", Studio.Method.bot_set, .object(omittingNil: [
+            "name": .string(name), "shape": shape.map { .string($0.rawValue) } ?? .null,
+            "color": color.map(JSONValue.string), "role": .string(role),
+        ]))
+        let info = output.info
+        remember(info)
+        return info
+    }
+
+    /// The Bot's Memory page, made on first use.
+    public func botMemoryPageId() async throws -> String? {
+        struct Output: Decodable { var pageId: String? }
+        let output: Output = try await rpc("studio", Studio.Method.bot_memory, .object([:]))
+        return output.pageId
+    }
+
+    /// The Bot's own skills.
+    public func botSkills() async throws -> [BotSkill] {
+        struct Output: Decodable { var skills: [BotSkill] }
+        let output: Output = try await rpc("studio", Studio.Method.bot_skills, .object([:]))
+        return output.skills
     }
 
     public var cachedBotThreadId: String? {
@@ -107,13 +152,23 @@ public struct BotInfo: Hashable, Sendable {
     public var state: State
     /// Its thread and check-in (heartbeat).
     public var lead: ThreadLead
+    /// Its drawn avatar; nil shows the emoji.
+    public var shape: String?
+    public var color: String?
+    /// A sentence or two on its role.
+    public var role: String?
 
-    public init(name: String, avatar: String, state: State, lead: ThreadLead) {
+    public init(name: String, avatar: String, state: State, lead: ThreadLead, shape: String? = nil, color: String? = nil, role: String? = nil) {
         self.name = name
         self.avatar = avatar
         self.state = state
         self.lead = lead
+        self.shape = shape
+        self.color = color
+        self.role = role
     }
+
+    public var look: BotLook { BotLook(shape: shape, color: color, emoji: avatar) }
 
     /// "🧭 Chief of Staff".
     public var title: String { "\(avatar) \(name)" }
@@ -121,10 +176,29 @@ public struct BotInfo: Hashable, Sendable {
 
 /// `bot_get` and the other Bot RPCs' shared answer.
 struct BotWire: Decodable {
-    struct Bot: Decodable { var name: String; var avatar: String; var state: String; var threadId: String? }
+    struct Bot: Decodable {
+        var name: String; var avatar: String; var state: String; var threadId: String?
+        var shape: String?; var color: String?; var role: String?
+    }
     struct Run: Decodable { var enabled: Bool; var cadence: String; var time: String?; var cron: String? }
     var bot: Bot?
     var run: Run?
+
+    var info: BotInfo? {
+        bot.map { bot in
+            BotInfo(name: bot.name, avatar: bot.avatar, state: BotInfo.State(rawValue: bot.state) ?? .active,
+                    lead: ThreadLead(threadId: bot.threadId, enabled: run?.enabled, cadence: run?.cadence, time: run?.time, cron: run?.cron),
+                    shape: bot.shape, color: bot.color, role: bot.role)
+        }
+    }
+}
+
+/// One of the Bot's own skills.
+public struct BotSkill: Decodable, Hashable, Sendable, Identifiable {
+    public var name: String
+    public var description: String
+    public var updatedAt: Double
+    public var id: String { name }
 }
 
 /// The Bot's Activity (`bot_activity`).
@@ -147,6 +221,8 @@ public struct BotActivity: Decodable, Hashable, Sendable {
         public var nextRunAt: Double?
     }
     public var needsYou: [Thread]
+    /// Queued behind other work; older Studios leave it out.
+    public var waiting: [Thread]?
     public var inProgress: [Thread]
     public var scheduled: [Scheduled]
     public var completed: [Thread]

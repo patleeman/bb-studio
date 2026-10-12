@@ -1,0 +1,380 @@
+import SwiftUI
+
+// MARK: Activity
+
+/// What the Bot is doing: Needs you, Waiting, Running, Scheduled, Recent, only
+/// the sections with something in them.
+struct BotActivitySheet: View {
+    let bot: BotInfo?
+    let activity: BotActivity?
+    var open: (String) -> Void
+    var refresh: () async -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var name: String { bot?.name ?? BotInfo.defaultName }
+
+    var body: some View {
+        NavigationStack {
+            let sections = BotActivitySection.sections(activity)
+            List {
+                ForEach(sections) { section in
+                    Section {
+                        ForEach(section.rows) { row in
+                            switch row {
+                            case .thread(let thread): threadRow(thread, in: section.kind)
+                            case .scheduled(let item): scheduledRow(item)
+                            }
+                        }
+                    } header: {
+                        HStack(spacing: 6) {
+                            Text(section.title)
+                            if section.kind == .needsYou {
+                                Text("\(section.rows.count)")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6).padding(.vertical, 1)
+                                    .background(.orange, in: .capsule)
+                            }
+                        }
+                    }
+                }
+            }
+            .overlay {
+                if activity == nil {
+                    ProgressView()
+                } else if sections.isEmpty {
+                    ContentUnavailableView {
+                        Label { Text("All quiet") } icon: { if let bot { BotAvatar(bot.look, size: 56) } }
+                    } description: {
+                        Text("Threads \(name) starts, check-ins and anything that needs you show here.")
+                    }
+                }
+            }
+            .refreshable { await refresh() }
+            .navigationTitle("Activity")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func threadRow(_ thread: BotActivity.Thread, in kind: BotActivitySection.Kind) -> some View {
+        Button { open(thread.id) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon(thread, kind))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(tint(kind))
+                    .frame(width: 30, height: 30)
+                    .background(tint(kind).opacity(0.14), in: .circle)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(thread.relation == "self" ? "Chat with \(name)" : thread.title).lineLimit(1)
+                    Text(subtitle(thread, kind)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .foregroundStyle(.primary)
+        .accessibilityHint("Opens the thread")
+    }
+
+    private func scheduledRow(_ item: BotActivity.Scheduled) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: item.kind == "heartbeat" ? "alarm" : "clock.arrow.circlepath")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.blue)
+                .frame(width: 30, height: 30)
+                .background(Color.blue.opacity(0.14), in: .circle)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.kind == "heartbeat" ? "Check-in" : item.name).lineLimit(1)
+                Text(item.nextRunAt.map { "Next \(BotChatEntry.date($0)!.formatted(.relative(presentation: .named)))" } ?? "On")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func icon(_ thread: BotActivity.Thread, _ kind: BotActivitySection.Kind) -> String {
+        switch kind {
+        case .needsYou: "hand.raised.fill"
+        case .waiting: "hourglass"
+        case .running: "bolt.fill"
+        default: thread.status == "error" ? "exclamationmark.triangle.fill" : "checkmark"
+        }
+    }
+
+    private func tint(_ kind: BotActivitySection.Kind) -> Color {
+        switch kind {
+        case .needsYou: .orange
+        case .waiting: .secondary
+        case .running: .green
+        case .scheduled: .blue
+        case .recent: .secondary
+        }
+    }
+
+    private func subtitle(_ thread: BotActivity.Thread, _ kind: BotActivitySection.Kind) -> String {
+        let when = BotChatEntry.date(thread.updatedAt)?.formatted(.relative(presentation: .named)) ?? ""
+        switch kind {
+        case .needsYou: return "Waiting for you · \(when)"
+        case .waiting: return "Queued · \(when)"
+        case .running: return "Running · \(when)"
+        default: return thread.status == "error" ? "Failed · \(when)" : "Finished \(when)"
+        }
+    }
+}
+
+// MARK: Edit profile
+
+/// Who the Bot is: its avatar, name, role and check-ins. Makes the Bot when
+/// there is none.
+struct BotProfileSheet: View {
+    let bot: BotInfo?
+    var saved: (BotInfo?) -> Void
+    @EnvironmentObject private var app: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var role = ""
+    @State private var shape: BotShape = .default
+    @State private var color = BotPalette.hexes[0]
+    /// The color follows the name until one is picked.
+    @State private var matchName = true
+    @State private var checkIn = CheckIn.unchanged
+    @State private var busy = false
+    @State private var error: String?
+
+    enum CheckIn: String, CaseIterable, Identifiable {
+        case unchanged, morning, evening, every2hours, off
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .unchanged: "Keep current"
+            case .morning: "Morning brief"
+            case .evening: "Evening wrap-up"
+            case .every2hours: "Every 2 hours"
+            case .off: "Off"
+            }
+        }
+        var detail: String {
+            switch self {
+            case .unchanged: ""
+            case .morning: "Weekdays at 8:00"
+            case .evening: "Weekdays at 18:00"
+            case .every2hours: "Through the day"
+            case .off: "Only when you message"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .unchanged: "circle"
+            case .morning: "sunrise.fill"
+            case .evening: "sunset.fill"
+            case .every2hours: "clock.fill"
+            case .off: "moon.zzz.fill"
+            }
+        }
+        /// cadence and time for `bot_set_run`, nil for off.
+        var run: (cadence: String, time: String?)? {
+            switch self {
+            case .morning: ("weekdays", "08:00")
+            case .evening: ("weekdays", "18:00")
+            case .every2hours: ("every2hours", "00:00")
+            default: nil
+            }
+        }
+
+        static func of(_ lead: ThreadLead?) -> CheckIn {
+            switch (lead?.heartbeat, lead?.time) {
+            case (nil, _): .off
+            case ("weekdays", "08:00"): .morning
+            case ("weekdays", "18:00"): .evening
+            case ("every2hours", _): .every2hours
+            default: .unchanged
+            }
+        }
+    }
+
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var look: BotLook { BotLook(shape: shape.rawValue, color: color, emoji: bot?.avatar ?? BotInfo.defaultAvatar) }
+    private var tint: Color { BotPalette.color(color) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    VStack(spacing: 14) {
+                        BotAvatar(look, size: 96)
+                            .shadow(color: tint.opacity(0.4), radius: 20, y: 10)
+                            .animation(.bouncy, value: shape)
+                            .animation(.smooth, value: color)
+                            .padding(.top, 8)
+                        TextField("Name", text: $name)
+                            .font(.title2.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .textInputAutocapitalization(.words)
+                            .submitLabel(.done)
+                            .padding(.vertical, 10)
+                            .background(.fill.tertiary, in: .rect(cornerRadius: 14))
+                            .accessibilityLabel("Name")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                }
+                Section("Shape") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
+                        ForEach(BotShape.allCases) { option in
+                            Button { shape = option } label: {
+                                BotAvatar(BotLook(shape: option.rawValue, color: color, emoji: ""), size: 40)
+                                    .frame(width: 54, height: 54)
+                                    .background(option == shape ? tint.opacity(0.16) : Color.clear, in: .rect(cornerRadius: 14))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(option == shape ? tint : .clear, lineWidth: 2))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(option.label)
+                            .accessibilityAddTraits(option == shape ? .isSelected : [])
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .sensoryFeedback(.selection, trigger: shape)
+                }
+                Section {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 12) {
+                        ForEach(BotPalette.hexes, id: \.self) { hex in
+                            Button {
+                                matchName = false
+                                color = hex
+                            } label: {
+                                Circle().fill(BotPalette.color(hex))
+                                    .frame(width: 34, height: 34)
+                                    .padding(3)
+                                    .overlay(Circle().strokeBorder(hex == color ? BotPalette.color(hex) : .clear, lineWidth: 2.5))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Color \(BotPalette.hexes.firstIndex(of: hex)! + 1)")
+                            .accessibilityAddTraits(hex == color ? .isSelected : [])
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .sensoryFeedback(.selection, trigger: color)
+                    Toggle("Match the name", isOn: $matchName)
+                } header: { Text("Color") }
+                Section {
+                    TextField("You are my chief of staff. Keep me on top of…", text: $role, axis: .vertical)
+                        .lineLimit(2...5)
+                } header: { Text("Role") } footer: { Text("A sentence or two on what \(trimmedName.isEmpty ? "it" : trimmedName) does for you.") }
+                Section {
+                    ForEach(CheckIn.allCases.filter { $0 != .unchanged || checkIn == .unchanged }) { option in
+                        Button { checkIn = option } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: option.icon).foregroundStyle(tint).frame(width: 24)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(option.title).foregroundStyle(.primary)
+                                    if !option.detail.isEmpty { Text(option.detail).font(.caption).foregroundStyle(.secondary) }
+                                }
+                                Spacer()
+                                if option == checkIn { Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(tint) }
+                            }
+                        }
+                        .accessibilityAddTraits(option == checkIn ? .isSelected : [])
+                    }
+                } header: { Text("Check-ins") } footer: {
+                    Text(bot?.state == .active || bot == nil ? "When \(trimmedName.isEmpty ? "it" : trimmedName) wakes on its own to look around." : "Resume it to change its check-ins.")
+                }
+                .disabled(bot != nil && bot?.state != .active)
+                if let error { Section { Text(error).foregroundStyle(.red) } }
+            }
+            .tint(tint)
+            .navigationTitle(bot == nil ? "Make your Bot" : "Edit profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(bot == nil ? "Create" : "Save") { Task { await save() } }
+                        .disabled(busy || trimmedName.isEmpty)
+                }
+            }
+            .onChange(of: name) { _, value in if matchName { color = BotPalette.hex(forName: value) } }
+            .onChange(of: matchName) { _, on in if on { color = BotPalette.hex(forName: name) } }
+            .onAppear {
+                name = bot?.name ?? BotInfo.defaultName
+                role = bot?.role ?? ""
+                shape = bot?.shape.flatMap(BotShape.init(rawValue:)) ?? .default
+                color = bot?.color ?? BotPalette.hex(forName: name)
+                matchName = bot?.color == nil || bot?.color == BotPalette.hex(forName: name)
+                checkIn = bot == nil ? .morning : CheckIn.of(bot?.lead)
+            }
+        }
+    }
+
+    private func save() async {
+        busy = true
+        defer { busy = false }
+        let client = app.client
+        do {
+            var next: BotInfo?
+            if bot == nil {
+                next = try await client.createBot(name: trimmedName, shape: shape, color: color, prompt: nil)
+                if !role.trimmingCharacters(in: .whitespaces).isEmpty {
+                    next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role) ?? next
+                }
+            } else {
+                next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role)
+            }
+            if checkIn != .unchanged, next?.state == .active {
+                if let run = checkIn.run {
+                    try await client.setBotHeartbeat(enabled: true, cadence: run.cadence, time: run.time, cron: nil)
+                } else if next?.lead.heartbeat != nil {
+                    try await client.setBotHeartbeat(enabled: false, cadence: next?.lead.heartbeat ?? "hourly", time: next?.lead.time, cron: next?.lead.cron)
+                }
+                next = try await client.bot() ?? next
+            }
+            app.botTitle = next?.name
+            saved(next)
+            dismiss()
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+        }
+    }
+}
+
+// MARK: Skills
+
+/// The procedures the Bot saved for itself.
+struct BotSkillsSheet: View {
+    let name: String
+    @EnvironmentObject private var app: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var skills: [BotSkill]?
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(skills ?? []) { skill in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(skill.name).font(.body.monospaced().weight(.medium))
+                        Text(skill.description).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            .overlay {
+                if let error {
+                    ContentUnavailableView("Couldn't load skills", systemImage: "exclamationmark.triangle", description: Text(error))
+                } else if skills == nil {
+                    ProgressView()
+                } else if skills?.isEmpty == true {
+                    ContentUnavailableView("No skills yet", systemImage: "wand.and.stars",
+                                           description: Text("When \(name) works out how to do something, it saves the steps here and reuses them."))
+                }
+            }
+            .navigationTitle("Skills")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task {
+                do { skills = try await app.client.botSkills() } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}

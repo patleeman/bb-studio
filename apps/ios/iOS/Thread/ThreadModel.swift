@@ -176,6 +176,15 @@ final class ThreadModel: ObservableObject {
     }
 
     func load() async {
+        #if DEBUG
+        if let demo = BotDemo.current, threadId == BotDemo.threadId {
+            thread = demo.thread
+            rows = demo.rows
+            interactions = demo.interactions
+            loaded = true
+            return
+        }
+        #endif
         guard let client else { return }
         var fromCache = false
         if rows.isEmpty, let snapshot = DiskCache.load(Snapshot.self, key: "thread-\(threadId)", serverURL: serverURL) {
@@ -224,6 +233,9 @@ final class ThreadModel: ObservableObject {
     /// Streaming output arrives as a burst of change signals; coalesce them into
     /// at most one refresh every ~150ms.
     func scheduleRefresh(_ changes: Set<String>?) {
+        #if DEBUG
+        if BotDemo.current != nil, threadId == BotDemo.threadId { return }
+        #endif
         if let changes, let known = pending { pending = known.union(changes) } else { pending = nil }
         guard refreshTask == nil else { return }
         let run = refreshRun

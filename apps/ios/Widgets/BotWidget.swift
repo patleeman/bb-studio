@@ -14,6 +14,8 @@ struct BotEntry: TimelineEntry {
     var stale = false
     /// The Bot's name and emoji, as last loaded.
     var title = BotInfo.defaultName
+    /// Its drawn avatar, as last loaded.
+    var look = BotLook(shape: BotShape.default.rawValue, color: nil, emoji: BotInfo.defaultAvatar)
 
     static let placeholder = BotEntry(date: .now, message: "Your Bot's latest message shows here.")
 }
@@ -73,7 +75,8 @@ struct BotProvider: TimelineProvider {
             }
             entry.date = .now
             entry.serverURL = client.baseURL
-            entry.title = [client.cachedBotAvatar, client.cachedBotName].compactMap { $0 }.joined(separator: " ")
+            entry.title = client.cachedBotName
+            entry.look = client.cachedBotLook
             if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
             // The app reloads widgets when a thread starts or stops running.
             completion(Timeline(entries: [entry], policy: .after(.now + (entry.running ? 5 : 15) * 60)))
@@ -84,7 +87,7 @@ struct BotProvider: TimelineProvider {
         guard let value = DiskCache.load(BotCache.self, key: "chief-widget") else { return nil }
         let client = BBClient()
         return BotEntry(date: .now, threadId: value.threadId, message: value.message, running: value.running, approval: value.approval,
-                        title: [client.cachedBotAvatar, client.cachedBotName].compactMap { $0 }.joined(separator: " "))
+                        title: client.cachedBotName, look: client.cachedBotLook)
     }
 
     /// Markdown markers read as noise at widget size.
@@ -156,9 +159,11 @@ private struct BotWidgetView: View {
             .widgetURL(entry.approval != nil ? openURL : talkURL)
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 1) {
-                Label(entry.approval != nil ? "Needs approval" : entry.running ? "Working…" : entry.title,
-                      systemImage: "person.crop.circle.badge.checkmark")
-                    .font(.headline)
+                HStack(spacing: 4) {
+                    BotAvatar(entry.look, size: 16)
+                    Text(entry.approval != nil ? "Needs approval" : entry.running ? "\(entry.title) · Thinking…" : entry.title)
+                }
+                .font(.headline)
                 Text(entry.approval?.summary ?? message).font(.caption).lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -182,10 +187,14 @@ private struct BotWidgetView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Text(entry.approval != nil ? "Needs approval" : entry.running ? "Working…" : entry.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(entry.approval != nil ? Color.orange : entry.running ? .green : .secondary)
-                .lineLimit(1)
+            BotAvatar(entry.look, size: 30)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(entry.title).font(.caption.weight(.semibold)).lineLimit(1)
+                Text(entry.approval != nil ? "Needs you" : entry.running ? "Thinking…" : entry.stale ? "Offline" : "Ready")
+                    .font(.caption2)
+                    .foregroundStyle(entry.approval != nil ? Color.orange : entry.running ? BotPalette.color(entry.look.color) : .secondary)
+                    .lineLimit(1)
+            }
             if entry.stale { Image(systemName: "wifi.slash").font(.caption2).foregroundStyle(.secondary) }
             Spacer(minLength: 0)
             Link(destination: talkURL) {

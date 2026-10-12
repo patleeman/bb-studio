@@ -90,6 +90,8 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var talk: HoldToTalk?
     /// Opens the draft on a whole screen; shown only when set.
     var expand: (() -> Void)?
+    /// No fill of its own, for a composer on glass.
+    var clear = false
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -133,7 +135,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
             .padding(.horizontal, 6)
             .padding(.bottom, 6)
         }
-        .background(.fill.tertiary, in: .rect(cornerRadius: 22))
+        .background(clear ? AnyShapeStyle(.clear) : AnyShapeStyle(.fill.tertiary), in: .rect(cornerRadius: 22))
     }
 }
 

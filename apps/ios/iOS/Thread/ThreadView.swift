@@ -64,9 +64,15 @@ struct ThreadView: View {
     /// The Bot's thread: the Action button talks to it.
     private let answersActionButton: Bool
 
-    init(threadId: String, hidesTabBar: Bool = true, answersActionButton: Bool = false) {
+    /// Set for the Bot tab: draws the thread as the Bot's chat.
+    private let botChrome: BotChrome?
+    /// Counts sends, for the send haptic.
+    @State private var sends = 0
+
+    init(threadId: String, hidesTabBar: Bool = true, answersActionButton: Bool = false, botChrome: BotChrome? = nil) {
         self.hidesTabBar = hidesTabBar
         self.answersActionButton = answersActionButton
+        self.botChrome = botChrome
         _talk = StateObject(wrappedValue: HoldToTalk(threadId: threadId))
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
         _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
@@ -231,6 +237,7 @@ struct ThreadView: View {
         }
         .focusedSceneValue(\.thread, actions)
         .sensoryFeedback(.success, trigger: model.confirmations)
+        .modifier(BotThreadHooks(chrome: botChrome, sends: sends, running: model.thread?.isRunning == true, interactions: model.interactions.count))
         .sensoryFeedback(.warning, trigger: model.interactions.count) { old, new in new > old }
         .sensoryFeedback(.error, trigger: model.error) { _, new in new != nil }
         .sensoryFeedback(.selection, trigger: attachments.count) { old, new in new > old }
@@ -289,14 +296,15 @@ struct ThreadView: View {
             guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
                 return .systemAction
             }
-            app.path.append(.thread(id: id))
+            if let botChrome { botChrome.openThread(id) } else { app.path.append(.thread(id: id)) }
             return .handled
         })
-        .navigationTitle(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
+        .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, working: model.thread?.isRunning == true))
+        .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(sizeClass == .compact && hidesTabBar ? .hidden : .automatic, for: .tabBar)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            if botChrome == nil { ToolbarItemGroup(placement: .topBarTrailing) {
                 if model.thread?.isRunning == true {
                     Button { Task { await model.stop() } } label: { Image(systemName: "stop.circle") }
                         .accessibilityLabel("Stop")
@@ -372,8 +380,14 @@ struct ThreadView: View {
                     Image(systemName: "ellipsis")
                 }
                 .accessibilityLabel("More")
-            }
+            } }
         }
+    }
+
+    /// The Bot's status line, for its header.
+    private var botStatus: String {
+        BotStatus.line(state: botChrome?.bot.state, running: model.thread?.isRunning == true, thinking: model.shelf.thinking,
+                       needsYou: model.interactions.count, lead: botChrome?.bot.lead)
     }
 
     private var timeline: some View {
@@ -384,7 +398,15 @@ struct ThreadView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                 }
-                let items = TimelineItem.group(model.rows)
+                if let botChrome {
+                    if !model.hasOlder { BotHero(bot: botChrome.bot, status: botStatus, working: model.thread?.isRunning == true) }
+                    BotChatTimeline(
+                        bot: botChrome.bot, rows: model.rows, threadId: model.threadId, projectId: model.thread?.projectId,
+                        running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started,
+                        react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
+                        edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread)
+                }
+                let items = botChrome != nil ? [] : TimelineItem.group(model.rows)
                 let unread = unreadItem(in: items)
                 let editable = lastUserRowId
                 let sideChat = runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
@@ -419,7 +441,7 @@ struct ThreadView: View {
                 ForEach(outbox.messages(for: model.threadId)) { message in
                     PendingBubble(message: message)
                 }
-                ForEach(model.interactions) { interaction in
+                ForEach(botChrome == nil ? model.interactions : []) { interaction in
                     InteractionCard(
                         interaction: interaction,
                         resolve: { await model.resolve(interaction, $0) },
@@ -428,11 +450,17 @@ struct ThreadView: View {
                     .id(interaction.id)
                 }
                 if showsWorking {
-                    WorkingIndicator(thinking: model.shelf.thinking)
+                    if let botChrome {
+                        BotTypingRow(bot: botChrome.bot, thinking: model.shelf.thinking)
+                            .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottomLeading)))
+                    } else {
+                        WorkingIndicator(thinking: model.shelf.thinking)
+                    }
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, botChrome != nil ? 12 : 16)
             .padding(.vertical, 8)
+            .animation(botChrome != nil ? .smooth(duration: 0.3) : nil, value: showsWorking)
             .scrollTargetLayout()
             .frame(maxWidth: Self.readableWidth)
             .frame(maxWidth: .infinity)
@@ -532,6 +560,9 @@ struct ThreadView: View {
     /// under it unless there's a thought to show.
     private var showsWorking: Bool {
         guard model.thread?.isRunning == true, model.interactions.isEmpty else { return false }
+        // The Bot types while it thinks, and while it works between replies.
+        if botChrome != nil, let last = model.rows.last, last.isConversation, !last.isUser, !(last.text ?? "").isEmpty { return false }
+        if botChrome != nil { return true }
         if model.shelf.thinking?.isEmpty == false { return true }
         guard let last = model.rows.last, last.kind == "work" else { return true }
         return !["inProgress", "running", "pending"].contains(last.status ?? "")
@@ -618,9 +649,16 @@ struct ThreadView: View {
         talk.toggleHandsFree()
     }
 
+    /// Sends a quick reply or starter as it is.
+    private func send(text: String) {
+        sends += 1
+        Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
+    }
+
     /// Clears the field right away and puts the text back if sending fails.
     private func send() {
         if editing { return saveEdit() }
+        sends += 1
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let files = attachments
         let sentMentions = mentions
@@ -707,7 +745,17 @@ struct ThreadView: View {
 
 
     private var composer: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
+            if let botChrome {
+                BotNeedsYouCard(interactions: model.interactions,
+                                resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) },
+                                openWeb: { showingWeb = true })
+                let replies = BotQuickReplies.items(in: model.rows)
+                if model.interactions.isEmpty, model.thread?.isRunning != true, !replies.isEmpty, draft.isEmpty {
+                    BotQuickReplies(items: replies, tint: BotPalette.color(botChrome.bot.color)) { send(text: $0) }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             ThreadShelf(model: model)
             if model.thread?.status == "error", !editing {
                 ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
@@ -766,15 +814,37 @@ struct ThreadView: View {
             }
             ComposerBar(
                 text: $draft, focused: $composerFocused, attachments: $attachments,
-                dictate: { dictating = true }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil
+                placeholder: botChrome.map { "Message \($0.bot.name)" } ?? "Message",
+                dictate: { dictating = true }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil,
+                clear: botChrome != nil
             ) {
-                Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
-                    .accessibilityLabel("Model & permissions")
+                if botChrome == nil {
+                    Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
+                        .accessibilityLabel("Model & permissions")
+                }
             } send: {
+                if let botChrome, model.thread?.isRunning == true, !canSend {
+                    // Nothing typed while the Bot works: stop it.
+                    Button { Task { await model.stop() } } label: {
+                        Image(systemName: "stop.fill")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 32, height: 32)
+                            .background(Color.primary.opacity(0.85), in: .circle)
+                            .frame(width: 36, height: 36)
+                    }
+                    .accessibilityLabel("Stop \(botChrome.bot.name)")
+                } else {
                 Button(action: send) {
                     Group {
                         if model.sending {
                             ProgressView()
+                        } else if let botChrome {
+                            Image(systemName: model.thread?.isRunning == true ? "text.append" : "arrow.up")
+                                .font(.body.weight(.bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 32, height: 32)
+                                .background(canSend ? BotPalette.color(botChrome.bot.color) : Color.secondary.opacity(0.35), in: .circle)
                         } else {
                             Image(systemName: model.thread?.isRunning == true ? "text.append" : "arrow.up.circle.fill")
                                 .font(model.thread?.isRunning == true ? .body.weight(.semibold) : .title)
@@ -799,13 +869,16 @@ struct ThreadView: View {
                     }
                 }
                 .accessibilityLabel(editing ? "Save edit" : model.thread?.isRunning == true ? "Queue message" : "Send")
+                }
             }
+            .modifier(BotComposerGlass(active: botChrome != nil))
         }
-        .padding(.horizontal)
+        .animation(.smooth(duration: 0.25), value: model.interactions.first?.id)
+        .padding(.horizontal, botChrome != nil ? 12 : 16)
         .padding(.vertical, 8)
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .background { if botChrome == nil { Rectangle().fill(.bar).ignoresSafeArea() } }
         // A `bbstudio://reply/<id>` link lands here.
         .onChange(of: app.replyThreadId, initial: true) { _, id in
             guard id == model.threadId else { return }
