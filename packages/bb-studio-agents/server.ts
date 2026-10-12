@@ -4,21 +4,21 @@ import { hostContract, rpcContract } from "./src/contracts.js";
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
-    dotEnabled: { type: "boolean", label: "Enable Dot (experimental — one shared ChatGPT conversation; private API)", default: false },
-    hermesTokenEnvFile: { type: "string", label: "Hermes token dotenv file on the BB host", default: "" },
-    openclawTokenEnvFile: { type: "string", label: "OpenClaw token dotenv file on the BB host", default: "" },
     hermesEnabled: { type: "boolean", label: "Enable Hermes", default: false },
     hermesBaseUrl: { type: "string", label: "Hermes API URL", default: "http://127.0.0.1:8642" },
     hermesTokenEnv: { type: "string", label: "Hermes token environment variable", default: "RED4_HERMES_TOKEN", experimental_schema: z.string().regex(/^[A-Z_][A-Z0-9_]*$/) },
-    openclawStateDir: { type: "string", label: "OpenClaw paired client state directory", default: "" },
-    openclawAllowPrivateWs: { type: "boolean", label: "Allow OpenClaw WebSocket over a private encrypted network", default: false },
+    hermesTokenEnvFile: { type: "string", label: "Hermes token dotenv file on the BB host", default: "" },
     openclawEnabled: { type: "boolean", label: "Enable OpenClaw", default: false },
     openclawBaseUrl: { type: "string", label: "OpenClaw Gateway URL", default: "ws://127.0.0.1:18789" },
+    openclawTokenEnv: { type: "string", label: "OpenClaw token environment variable", default: "RED4_OPENCLAW_TOKEN", experimental_schema: z.string().regex(/^[A-Z_][A-Z0-9_]*$/) },
+    openclawTokenEnvFile: { type: "string", label: "OpenClaw token dotenv file on the BB host", default: "" },
+    openclawStateDir: { type: "string", label: "OpenClaw paired client state directory", default: "" },
+    openclawAllowPrivateWs: { type: "boolean", label: "Allow OpenClaw WebSocket over a private encrypted network", default: false },
     grokEnabled: { type: "boolean", label: "Enable Grok", default: false },
     grokBaseUrl: { type: "string", label: "xAI API URL", default: "https://api.x.ai/v1" },
     grokTokenEnv: { type: "string", label: "xAI API key environment variable", default: "XAI_API_KEY", experimental_schema: z.string().regex(/^[A-Z_][A-Z0-9_]*$/) },
     grokTokenEnvFile: { type: "string", label: "xAI API key dotenv file on the BB host", default: "" },
-    openclawTokenEnv: { type: "string", label: "OpenClaw token environment variable", default: "RED4_OPENCLAW_TOKEN", experimental_schema: z.string().regex(/^[A-Z_][A-Z0-9_]*$/) },
+    dotEnabled: { type: "boolean", label: "Enable Dot (experimental — one shared ChatGPT conversation; private API)", default: false },
   });
   let config = await settings.get();
   const connection = (provider: "hermes" | "openclaw" | "grok") => ({ baseUrl: config[`${provider}BaseUrl`], tokenEnv: config[`${provider}TokenEnv`], tokenEnvFile: config[`${provider}TokenEnvFile`], enabled: config[`${provider}Enabled`], ...(provider === "openclaw" ? { stateDir: config.openclawStateDir, allowPrivateWs: config.openclawAllowPrivateWs } : {}) });
