@@ -71,6 +71,7 @@ final class RecordingPlayer: ObservableObject {
 
     deinit {
         observers.forEach(NotificationCenter.default.removeObserver)
+        ticker?.invalidate()
     }
 
     func configure(client: BBClient, recordingId: String, title: String, segments: [Segment]) {
@@ -136,6 +137,7 @@ final class RecordingPlayer: ObservableObject {
             } catch {
                 guard generation == self.generation else { return }
                 loading = false
+                engine.pause()
                 self.error = "Couldn't play this recording: \(client.map { BBClient.describe(error, server: $0.baseURL) } ?? error.localizedDescription)"
             }
         }
@@ -144,6 +146,8 @@ final class RecordingPlayer: ObservableObject {
     func pause() {
         positionMs = currentPosition()
         reset()
+        // An idle running engine keeps the audio hardware rendering silence.
+        engine.pause()
         updateNowPlaying()
     }
 
@@ -212,6 +216,7 @@ final class RecordingPlayer: ObservableObject {
             } else {
                 positionMs = durationMs
                 reset()
+                engine.pause()
                 updateNowPlaying()
             }
         } else {

@@ -47,6 +47,15 @@ final class TalkRecorder: ObservableObject {
         outbox.kick()
     }
 
+    /// A recorder dropped mid-capture (its view went away) releases the
+    /// microphone and the audio session; what it captured stays in the journal.
+    deinit {
+        if capture.isCapturing {
+            _ = capture.stop()
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+
     func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil) async {
         guard !starting, !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
         starting = true
@@ -279,11 +288,13 @@ final class TalkRecorder: ObservableObject {
         }
     }
 
+    /// Ends with the capture, and with the recorder if it goes away mid-capture.
     private func startHeartbeat(_ id: String) {
         heartbeatTask?.cancel()
-        heartbeatTask = Task { [client] in
-            while !Task.isCancelled {
+        heartbeatTask = Task { [weak self, client] in
+            while true {
                 try? await Task.sleep(for: .seconds(20))
+                guard !Task.isCancelled, self != nil else { return }
                 try? await client.heartbeat(id)
             }
         }
@@ -334,6 +345,7 @@ final class SegmentCapture: @unchecked Sendable {
     private var onSegment: ((CapturedSegment) -> Void)?
     private var onLevel: ((Float) -> Void)?
     private var capturing = false
+    var isCapturing: Bool { capturing }
     private var observers: [NSObjectProtocol] = []
     private var peakRMS: Float = 0
     private var lastAudioAt = Date()
