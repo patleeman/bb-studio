@@ -27,8 +27,8 @@ type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
 /** BB's personal project. Its lead is the Chief of Staff. */
 export const PERSONAL_PROJECT_ID = "proj_personal";
 export const LEAD_ROLE = "project-lead";
-export const HEARTBEAT = "Heartbeat: check on this project's threads and Studio items. Steer only the workers you started; for threads the user started, read and report but don't steer them. Reply only when something changed or needs the user; otherwise finish without a final assistant message.";
-export const CHIEF_HEARTBEAT = "Heartbeat: you are the user's Chief of Staff, the lead of their personal project and above every other project. Check on the projects and their leads; hand work to a project's lead rather than doing it yourself. Steer only the workers and leads' work you started; read and report on threads the user started. Reply only when something changed or needs the user; otherwise finish without a final assistant message.";
+export const HEARTBEAT = "Heartbeat: check on this project's threads and Studio items. Steer only the workers you started; for threads the user started, read and report but don't steer them. Reply only when something changed or needs the user; otherwise finish without a final assistant message (no ✓ or other filler), and reuse a worker you started before rather than starting a new one for each heartbeat.";
+export const CHIEF_HEARTBEAT = "Heartbeat: you are the user's Chief of Staff, the lead of their personal project and above every other project. Check on the projects and their leads; hand work to a project's lead rather than doing it yourself. Steer only the workers and leads' work you started; read and report on threads the user started. Reply only when something changed or needs the user; otherwise finish without a final assistant message (no ✓ or other filler), and reuse a worker you started before rather than starting a new one for each heartbeat.";
 
 export interface ProjectLeadDeps {
   db: Database.Database;
