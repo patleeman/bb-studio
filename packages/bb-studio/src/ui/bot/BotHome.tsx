@@ -213,7 +213,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
     <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
       <style>{BOT_STYLES}</style>
       <header className="relative shrink-0 px-24 pt-4 pb-2">
-        <Identity avatar={bot.avatar} profile={profile} status={status} dot={chatWorking ? "bg-info" : STATE_DOT[bot.state]} working={chatWorking} onEdit={() => setSheet("profile")} />
+        <Identity avatar={bot.avatar} profile={profile} status={status} dot={chatWorking ? "bg-success animate-pulse motion-reduce:animate-none" : STATE_DOT[bot.state]} working={chatWorking} onEdit={() => setSheet("profile")} />
         <div className="absolute top-3 right-3 flex items-center gap-0.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

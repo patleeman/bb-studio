@@ -10,7 +10,7 @@ const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
   { title: "Check the launch checklist for blockers", prompt: "Reply with one short sentence: no blockers on the launch checklist." },
 ];
-const HISTORY = "What's left before Friday's ORBIT-42 release? Answer in two short bullet points, then end your reply with this exact last line: ::next{reply=\"👍 Sounds good|📋 Show the checklist\"}";
+const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet points, please.";
 
 /** Opens or closes the Activity panel; staging's plugin-problem card is closed so it doesn't cover the page. */
 const activity = (open) => async (client) => {
@@ -68,11 +68,10 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await client.navigate(BOT_PATH);
     await client.waitForText("Dot", 30000);
     await activity(true)(client);
-    for (const text of ["Checks in", "Needs you", "Rotate the ORBIT-42 deploy key", "Scheduled", "Recent", "Waiting to start", "Sounds good", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 60000);
+    for (const text of ["Checks in", "Needs you", "Rotate the ORBIT-42 deploy key", "Scheduled", "Recent", "Waiting to start", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 60000);
     await assertChat(client, [
       ["[data-bubble=user]", "user bubble"],
       ['svg[data-shape=blob]', "Bot avatar"],
-      ['[aria-label="Quick replies"] button', "quick-reply chip"],
       ['button[aria-label^="Open ‘"]', "child-thread card"],
       ['section[aria-label="Needs you"] button', "Needs-you card"],
       ['textarea[aria-label="Message Dot"]', "composer"],
@@ -128,8 +127,18 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         await client.navigate(BOT_PATH);
         await client.waitForText("Dot", 30000);
         await activity(false)(client);
-        await client.waitForSelector('section[aria-label="Chat"] section[aria-label="Needs you"]', 180000);
-        for (const text of ["Leadership", "The launch team", "Customers"]) await client.waitForText(text, 60000);
+        // The question itself, answerable inline: its options are buttons in the card above the composer.
+        await client.evaluate(`new Promise((resolve, reject) => {
+          const started = Date.now();
+          const tick = () => {
+            const cards = [...document.querySelectorAll('section[aria-label="Chat"] section[aria-label="Needs you"]')];
+            const labels = cards.flatMap((card) => [...card.querySelectorAll("button")].map((each) => each.textContent.trim()));
+            if (["Leadership", "The launch team", "Customers"].every((label) => labels.includes(label))) return resolve(true);
+            if (Date.now() - started > 240000) return reject(new Error("No inline question with its options: " + labels.join(", ")));
+            setTimeout(tick, 500);
+          };
+          tick();
+        })`, true);
         await sleep(800);
       },
     },

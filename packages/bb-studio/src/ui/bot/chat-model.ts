@@ -72,7 +72,8 @@ export function mergeChain(pages: readonly ChainPage[]): Row[] {
 /** Splits a trailing `::next{…}` line off a reply. */
 export function splitNext(text: string): { body: string; next: NextItems | null } {
   const match = /(?:^|\n)[ \t]*::next\{([^}\n]*)\}[ \t]*\s*$/.exec(text);
-  if (!match) return { body: text, next: null };
+  // A malformed or mid-reply Next line is plumbing too: it never shows as text.
+  if (!match) return { body: text.replace(/^[ \t]*::next\{[^\n]*(?:\n|$)/gm, "").trimEnd(), next: null };
   const attributes: Record<string, string> = {};
   for (const [, key, value] of match[1]!.matchAll(/([a-z]+)="([^"]*)"/g)) attributes[key!] = value!;
   const next = parseNextItems(attributes);

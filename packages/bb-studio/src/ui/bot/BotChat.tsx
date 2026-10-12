@@ -273,7 +273,7 @@ const Entry = memo(function Entry({ entry, bot, childStatus, previous, isLast, o
     case "work":
       return <WorkLine entry={entry} gap={gap} />;
     case "child":
-      return <ChildCard entry={entry} live={entry.threadId && entry.verb === "started" ? childStatus.get(entry.threadId) : undefined} gap={gap} />;
+      return <ChildCard entry={entry} live={entry.threadId ? childStatus.get(entry.threadId) : undefined} gap={gap} />;
     case "notice":
       return <p className={`${gap} pl-10 text-xs text-destructive`} role="status">{entry.text}</p>;
   }
@@ -331,7 +331,7 @@ function WorkLine({ entry, gap }: { entry: Extract<ChatEntry, { kind: "work" }>;
 }
 
 const CHILD_LABEL: Record<ChildStatus, string> = { running: "Running", finished: "Finished", failed: "Failed", stopped: "Stopped", "needs-you": "Needs you", waiting: "Waiting" };
-const CHILD_DOT: Record<ChildStatus, string> = { running: "bg-info animate-pulse motion-reduce:animate-none", finished: "bg-success", failed: "bg-destructive", stopped: "bg-muted-foreground/50", "needs-you": "bg-warning", waiting: "bg-muted-foreground/50" };
+const CHILD_DOT: Record<ChildStatus, string> = { running: "bg-success animate-pulse motion-reduce:animate-none", finished: "bg-success", failed: "bg-destructive", stopped: "bg-muted-foreground/50", "needs-you": "bg-warning", waiting: "bg-muted-foreground/50" };
 
 /** A thread the Bot started or heard back from, as one compact card linking to it. */
 function ChildCard({ entry, live, gap }: { entry: Extract<ChatEntry, { kind: "child" }>; live?: ChildStatus; gap: string }) {

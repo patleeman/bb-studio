@@ -81,6 +81,10 @@ describe("splitNext", () => {
     expect(next?.do.map((item) => item.label)).toEqual(["Write it up"]);
   });
 
+  it("drops a malformed Next line from the text", () => {
+    expect(splitNext('Two points.\n::next{reply="👍 Sounds\nMore')).toEqual({ body: "Two points.\nMore", next: null });
+  });
+
   it("leaves other text alone", () => {
     expect(splitNext("Just text")).toEqual({ body: "Just text", next: null });
   });
