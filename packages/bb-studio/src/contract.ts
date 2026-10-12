@@ -130,9 +130,14 @@ const bot = z.object({
   avatar: z.string(),
   state: botStateSchema,
   threadId: z.string().nullable(),
+  /** Its Memory page (a Studio page), once made. */
+  memoryPageId: z.string().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
+/** One of the Bot's own skills: only its thread loads them, until shared. */
+const botSkill = z.object({ name: z.string(), description: z.string(), updatedAt: z.number() });
+export type BotSkillView = z.infer<typeof botSkill>;
 /** The Bot, or null before one is made, and its heartbeat. */
 const botView = z.object({ bot: bot.nullable(), run: heartbeatRunSchema.nullable() });
 export type BotView = z.infer<typeof botView>;
@@ -161,6 +166,8 @@ export type BotScheduledView = z.infer<typeof botScheduled>;
 const botActivity = z.object({
   needsYou: z.array(botThread),
   inProgress: z.array(botThread),
+  /** Queued threads, or ones whose message is scheduled for later. */
+  waiting: z.array(botThread).default([]),
   scheduled: z.array(botScheduled),
   completed: z.array(botThread),
   /** The end of the Bot thread's latest reply, for the home's chat preview. */
@@ -260,6 +267,14 @@ export const rpcContract = defineRpcContract({
   bot_stop: { input: z.object({}), output: botView.extend({ stoppedThreadIds: z.array(z.string()), pausedAutomationIds: z.array(z.string()) }) },
   /** What the Bot is doing: Needs you, In progress, Scheduled, Completed. */
   bot_activity: { input: z.object({}), output: botActivity },
+  /** The Bot's Memory page, made on first need. */
+  bot_memory: { input: z.object({}), output: z.object({ pageId: z.string().nullable() }) },
+  /** The Bot's own skills. */
+  bot_skills: { input: z.object({}), output: z.object({ skills: z.array(botSkill) }) },
+  /** Shares a Bot skill: it moves into BB's user skills, for every agent. */
+  bot_skill_share: { input: z.object({ name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },
+  /** Deletes a Bot skill. */
+  bot_skill_delete: { input: z.object({ name: z.string().min(1).max(100) }), output: z.object({ deleted: z.boolean() }) },
   /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and the Bot keeps its new thread. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** Saves a collection query by name, replacing a view with that name. */

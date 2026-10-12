@@ -39,7 +39,7 @@ import { errorText, StudioHub, type HubItem } from "./src/hub";
 import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
-import { botInstructions, Bots } from "./src/bot";
+import { Bots, SKILL_NAME } from "./src/bot";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { formatWorkspace, openHrefs, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
 import { WORKSPACE_CHANNEL } from "./src/ids";
@@ -54,7 +54,7 @@ import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
 import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { zipFiles } from "./src/export-zip";
-import { ProjectLeads } from "./src/project-lead";
+import { PERSONAL_PROJECT_ID, ProjectLeads } from "./src/project-lead";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -144,6 +144,8 @@ export default async function plugin(bb: BbPluginApi) {
     .finally(() => { routesRefresh = null; });
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
+  /** Only the Bot's own thread gets these: its skills and its history. */
+  const BOT_OWN_TOOLS = ["bot_skill_write", "bot_skill_read", "bot_skill_delete", "bot_history_search"] as const;
   const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS };
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
@@ -154,10 +156,10 @@ export default async function plugin(bb: BbPluginApi) {
     const off = new Set(kindSettings.current.off);
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
-    const bot = bots.forThread(context.thread.id);
-    if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS], skills: [], instructions: botInstructions(bot) };
-    const instructions = [bot ? botInstructions(bot) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
-    return { tools: [...tools, ...BOT_TOOLS], skills: [], instructions };
+    const bot = bots.forThread(context.thread.id, context.pluginMetadata);
+    if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS], skills: [], instructions: bots.instructions(bot) };
+    const instructions = [bot ? bots.instructions(bot) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+    return { tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : [])], skills: [], instructions };
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
   // (callProvider in the kit), as they reach an add-on's over RPC.
@@ -316,11 +318,24 @@ export default async function plugin(bb: BbPluginApi) {
   // The heartbeat of the personal project is the Bot's check-in, under its name.
   const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, changed: tagsChanged, personalPrompt: (): string => bots.prompt() });
   // The user's Bot (src/bot.ts): the personal project's lead, with a name, avatar and state.
-  const bots: Bots = new Bots({ db, sdk: bb.sdk, leads: projectLeads, changed: tagsChanged });
+  // Its Memory page is a Studio page in the personal project; a shared skill goes to BB's user skills.
+  const bots: Bots = new Bots({
+    db, sdk: bb.sdk, leads: projectLeads, changed: tagsChanged,
+    memory: {
+      exists: (pageId) => { const page = pages.store.meta(pageId); return !!page && !page.archived_at; },
+      create: ({ title, markdown }) => pages.createPage({ projectId: PERSONAL_PROJECT_ID, title, icon: "🧠", markdown }),
+    },
+    userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
+  });
   // Moves Spaces' leads to projects, retires old heartbeat automations and turns
   // migrated heartbeats back on; whatever fails is retried next startup.
   void projectLeads.finishMoves()
     .then(() => projectLeads.runs.repair((projectId) => projectLeads.storedLead(projectId)))
+    // An enabled check-in picks up the current prompt (botHeartbeat), same schedule.
+    .then(async () => {
+      const run = projectLeads.runs.get(PERSONAL_PROJECT_ID);
+      if (run?.enabled && bots.stored()) await projectLeads.setRun(PERSONAL_PROJECT_ID, run);
+    })
     .catch((error) => console.warn("[studio] heartbeat repair failed; retrying next startup", error));
   /**
    * Moves items to a project. Items already there stay; kinds that can't move
@@ -469,6 +484,10 @@ export default async function plugin(bb: BbPluginApi) {
     bot_resume: () => bots.resume(),
     bot_stop: () => bots.stop(),
     bot_activity: () => bots.activity(),
+    bot_memory: () => ({ pageId: bots.memoryPage() }),
+    bot_skills: () => ({ skills: bots.skills() }),
+    bot_skill_share: ({ name }) => bots.shareSkill(name),
+    bot_skill_delete: ({ name }) => ({ deleted: bots.deleteSkill(name) }),
     // Deprecated aliases of bot_get, bot_set_thread and bot_set_run, for one release.
     chief_of_staff: () => projectLeads.chief(),
     chief_of_staff_set: async ({ threadId }) => { if (threadId) await bots.setThread(threadId); else await projectLeads.setChief(null); return projectLeads.chief(); },
@@ -737,6 +756,36 @@ export default async function plugin(bb: BbPluginApi) {
         ...listThreads("Completed", activity.completed),
       ];
       return lines.length ? lines.join("\n") : "Nothing to show yet.";
+    },
+  });
+
+  // The Bot's own tools: given only to its thread (agents.configure above).
+  const ownBot = (threadId: string | undefined) => { if (!bots.forThread(threadId)) throw new Error("Only the user's Bot has its own skills and history."); };
+  bb.agents.registerTool({
+    name: "bot_skill_write",
+    description: "Save a reusable procedure you learned as one of your own skills (only you load them; the user can share one with every agent). Same name replaces it. Keep it short: when to use it, then the steps.",
+    parameters: z.object({
+      name: z.string().regex(SKILL_NAME).max(64).describe("lowercase-with-hyphens"),
+      description: z.string().trim().min(1).max(500).describe("When to use it, in one sentence"),
+      body: z.string().min(1).max(20_000).describe("Markdown instructions"),
+    }),
+    execute: (input, ctx) => { ownBot(ctx.threadId); const skill = bots.writeSkill(input); return `Saved your skill ${skill.name}.`; },
+  });
+  bb.agents.registerTool({
+    name: "bot_skill_read", description: "Read one of your own skills.", parameters: z.object({ name: z.string().min(1).max(64) }),
+    execute: ({ name }, ctx) => { ownBot(ctx.threadId); const skill = bots.skill(name); return skill ? `# ${skill.name}\n${skill.description}\n\n${skill.body}` : `No skill "${name}". Yours: ${bots.skills().map((each) => each.name).join(", ") || "none"}.`; },
+  });
+  bb.agents.registerTool({
+    name: "bot_skill_delete", description: "Delete one of your own skills.", parameters: z.object({ name: z.string().min(1).max(64) }),
+    execute: ({ name }, ctx) => { ownBot(ctx.threadId); return bots.deleteSkill(name) ? `Deleted ${name}.` : `No skill "${name}".`; },
+  });
+  bb.agents.registerTool({
+    name: "bot_history_search", description: "Search your own past threads (your earlier threads and the threads you started) for words.",
+    parameters: z.object({ query: z.string().trim().min(1).max(200) }),
+    execute: async ({ query }, ctx) => {
+      ownBot(ctx.threadId);
+      const hits = await bots.historySearch(query);
+      return hits.length ? hits.map((hit) => `- [${hit.title}](/threads/${hit.threadId}): ${hit.text.replace(/\s+/g, " ")}`).join("\n") : "No matches in your threads.";
     },
   });
 

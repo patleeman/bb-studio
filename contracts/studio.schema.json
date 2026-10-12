@@ -3328,6 +3328,12 @@
                       "null"
                     ]
                   },
+                  "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -3467,6 +3473,12 @@
                       "null"
                     ]
                   },
+                  "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -3592,6 +3604,12 @@
                       "null"
                     ]
                   },
+                  "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -3710,6 +3728,12 @@
                     ]
                   },
                   "threadId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "memoryPageId": {
                     "type": [
                       "string",
                       "null"
@@ -3861,6 +3885,12 @@
                       "null"
                     ]
                   },
+                  "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -3970,6 +4000,12 @@
                     ]
                   },
                   "threadId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "memoryPageId": {
                     "type": [
                       "string",
                       "null"
@@ -4089,6 +4125,12 @@
                       "null"
                     ]
                   },
+                  "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -4198,6 +4240,12 @@
                     ]
                   },
                   "threadId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "memoryPageId": {
                     "type": [
                       "string",
                       "null"
@@ -4395,6 +4443,53 @@
               "additionalProperties": false
             }
           },
+          "waiting": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "relation": {
+                  "type": "string",
+                  "enum": [
+                    "self",
+                    "started"
+                  ]
+                },
+                "needsYou": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "status",
+                "projectId",
+                "updatedAt",
+                "relation",
+                "needsYou"
+              ],
+              "additionalProperties": false
+            }
+          },
           "scheduled": {
             "type": "array",
             "items": {
@@ -4496,9 +4591,131 @@
         "required": [
           "needsYou",
           "inProgress",
+          "waiting",
           "scheduled",
           "completed",
           "latest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_memory": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "pageId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_skills": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "skills"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_skill_share": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_skill_delete": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
         ],
         "additionalProperties": false
       }

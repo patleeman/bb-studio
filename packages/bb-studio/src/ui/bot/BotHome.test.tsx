@@ -66,3 +66,24 @@ test("shows the Bot's chat, Needs you and Activity, and confirms Stop", async ()
   await act(async () => [...container.querySelectorAll("[role=dialog] button")].find((each) => each.textContent === "Stop")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   expect(state.call).toHaveBeenCalledWith("bot_stop", {});
 });
+
+test("links its Memory page, lists its skills with Share and Delete, and shows Waiting to start", async () => {
+  vi.stubGlobal("confirm", () => true);
+  state.data = {
+    bot_get: { bot: { id: "bot_main", name: "Dot", avatar: "🟣", state: "active", threadId: "thr_bot", memoryPageId: "pg_mem", createdAt: 1, updatedAt: 1 }, run: null },
+    bot_activity: {
+      needsYou: [], inProgress: [], scheduled: [], completed: [], latest: null,
+      waiting: [{ id: "t3", title: "Friday digest", status: "idle", projectId: "p", updatedAt: 1, relation: "started", needsYou: false }],
+    },
+    bot_skills: { skills: [{ name: "weekly-review", description: "Fridays: sum up the week", updatedAt: 1 }] },
+  };
+  act(() => root.render(<BotHome />));
+  for (const text of ["Waiting to start", "Friday digest", "Skills", "weekly-review", "Fridays: sum up the week"]) expect(container.textContent).toContain(text);
+  const { openAppPath } = await import("@bb-studio/kit/app");
+  await act(async () => button("Memory").click());
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
+  await act(async () => button("Share").click());
+  expect(state.call).toHaveBeenCalledWith("bot_skill_share", { name: "weekly-review" });
+  await act(async () => button("Delete").click());
+  expect(state.call).toHaveBeenCalledWith("bot_skill_delete", { name: "weekly-review" });
+});

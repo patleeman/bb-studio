@@ -45,6 +45,8 @@ export interface BuiltinPages {
   backup: BackupHandlers;
   /** `bb studio pages …` */
   cli: PluginCliRegistration["run"];
+  /** Makes a page as Studio (the Bot's Memory page), returning its id. */
+  createPage(input: { projectId: string | null; title: string; icon?: string; markdown: string }): string;
   dispose(): void;
 }
 
@@ -431,6 +433,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     provider,
     backup,
     cli: (argv, ctx) => cli.run(argv, ctx),
+    createPage: (input) => service.createPage({ ...input, parentId: null, actor: PLUGIN_RPC_ACTOR }).id,
     dispose() {
       studioNotifier.dispose();
       service.onPublish = null;

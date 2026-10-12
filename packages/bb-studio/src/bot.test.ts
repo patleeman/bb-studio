@@ -1,7 +1,10 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { botHeartbeat, BOT_ID, Bots, classifyActivity, startedBy } from "./bot";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, classifyActivity, MEMORY_TEMPLATE, startedBy } from "./bot";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -41,6 +44,10 @@ async function setup(migrations = MIGRATIONS) {
     threads: {
       spawn: spawn as never, get: get as never, archive: archive as never, list: list as never, stop: stop as never,
       unpin: async () => ({}) as never, output: async () => ({ output: "All quiet." }),
+      search: (async ({ query }: { query: string }) => {
+        const hit = (thread: Thread) => ({ thread, matches: [{ text: `${thread.title} mentions ${query}`, highlightRanges: [], sourceKind: "assistant_message", sourceSeq: 1 }] });
+        return { active: { results: [...threads.values()].filter((thread) => !thread.archivedAt).map(hit) }, archived: { results: [...threads.values()].filter((thread) => thread.archivedAt).map(hit) } };
+      }) as never,
       defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
@@ -50,8 +57,12 @@ async function setup(migrations = MIGRATIONS) {
   bb.storage.migrate(db, migrations);
   const bots = { current: null as Bots | null };
   const leads = new ProjectLeads({ db, sdk: bb.sdk, changed: () => {}, personalPrompt: () => bots.current!.prompt() });
-  bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {} });
-  return { bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations };
+  const pages = new Map<string, { title: string; markdown: string }>();
+  let made = 0;
+  const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
+  const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
+  bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, memory, userSkillsDir });
+  return { bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir };
 }
 
 const prompts = (x: Awaited<ReturnType<typeof setup>>) => x.automations.map((a) => (a.execution as { prompt: string }).prompt);
@@ -73,7 +84,8 @@ it("makes no Bot when there was no Chief of Staff", async () => {
 it("creates a Bot with a new chat in the personal project and names it in the heartbeat", async () => {
   const x = await setup();
   const view = await x.bots.create({ name: "Dot", avatar: "🟣", prompt: "Watch my inbox" });
-  expect(x.spawn).toHaveBeenCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Dot" }));
+  // Its instructions come from agents.configure, so its only message is the user's, and the title isn't the instructions.
+  expect(x.spawn).toHaveBeenCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Dot", pluginMetadata: { bot: BOT_ID }, input: [expect.objectContaining({ text: "Watch my inbox" })] }));
   expect(view.bot).toMatchObject({ name: "Dot", avatar: "🟣", threadId: "t1" });
   await expect(x.bots.create({ name: "Two", avatar: "2" })).rejects.toThrow(/already/);
   await x.bots.setRun({ enabled: true, cadence: "hourly" });
@@ -149,4 +161,77 @@ it("keeps the chief_of_staff view in step with the Bot (deprecated aliases)", as
   await x.bots.setThread("bot1");
   expect(await x.leads.chief()).toEqual({ threadId: "bot1", run: null });
   expect((await x.bots.get()).bot?.threadId).toBe("bot1");
+});
+
+it("knows its new thread by spawn metadata before it becomes the lead", async () => {
+  const x = await setup();
+  x.db.prepare("INSERT INTO bots (id, name, avatar, state, created_at, updated_at) VALUES (?, 'Dot', '🟣', 'active', 1, 1)").run(BOT_ID);
+  expect(x.bots.forThread("t9", { bot: BOT_ID })).toMatchObject({ name: "Dot", threadId: "t9" });
+  expect(x.bots.forThread("t9", {})).toBeNull();
+  x.add({ id: "bot1" });
+  await x.leads.setLead(PERSONAL_PROJECT_ID, "bot1");
+  expect(x.bots.forThread("t9", { bot: BOT_ID })).toBeNull();
+});
+
+it("makes one Memory page on first need and points the Bot at it briefly", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  const bot = x.bots.forThread("bot1")!;
+  const text = x.bots.instructions(bot);
+  expect(x.pages.size).toBe(1);
+  expect(x.pages.get("pg1")).toEqual({ title: "Bot's Memory", markdown: MEMORY_TEMPLATE });
+  expect(MEMORY_TEMPLATE.startsWith("## Check-in")).toBe(true);
+  expect(text).toContain("pg1");
+  expect(text.length).toBeLessThan(800);
+  x.bots.instructions(bot);
+  expect(x.pages.size).toBe(1);
+  expect((await x.bots.get()).bot?.memoryPageId).toBe("pg1");
+  // Deleted: a new one next time.
+  x.pages.delete("pg1");
+  expect(x.bots.memoryPage()).toBe("pg2");
+  expect(botHeartbeat("Dot")).toMatch(/Memory page/);
+  expect(botInstructions({ name: "Dot", state: "paused", memoryPageId: "pg1" })).not.toContain("pg1");
+});
+
+it("keeps skills to the Bot until shared into BB's user skills, and deletes them", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  expect(() => x.bots.writeSkill({ name: "Bad Name", description: "d", body: "b" })).toThrow(/lowercase/);
+  x.bots.writeSkill({ name: "weekly-review", description: "Fridays: sum up the week", body: "1. Read threads" });
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "Steps" });
+  expect(x.bots.skills().map((skill) => skill.name)).toEqual(["inbox", "weekly-review"]);
+  expect(x.bots.instructions(x.bots.forThread("bot1")!)).toContain("inbox, weekly-review");
+  const { path } = await x.bots.shareSkill("weekly-review");
+  expect(path).toBe(join(x.userSkillsDir, "weekly-review", "SKILL.md"));
+  expect(await readFile(path, "utf8")).toBe('---\nname: weekly-review\ndescription: "Fridays: sum up the week"\n---\n\n1. Read threads\n');
+  expect(x.bots.skills().map((skill) => skill.name)).toEqual(["inbox"]);
+  x.bots.writeSkill({ name: "weekly-review", description: "again", body: "b" });
+  await expect(x.bots.shareSkill("weekly-review")).rejects.toThrow(/already shared/);
+  expect(x.bots.deleteSkill("inbox")).toBe(true);
+  expect(x.bots.deleteSkill("inbox")).toBe(false);
+});
+
+it("searches only its own threads", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", title: "Bot chat" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "w1", sourceThreadId: "bot1", title: "Worker" });
+  x.add({ id: "other", title: "Someone else's" });
+  const hits = await x.bots.historySearch("invoice");
+  expect(hits.map((hit) => hit.threadId).sort()).toEqual(["bot1", "w1"]);
+  expect(hits[0]!.text).toContain("invoice");
+});
+
+it("puts queued threads under Waiting to start, not In progress", () => {
+  const t = (id: string, { queuedWork = "none", ...fields }: Partial<Thread> & { queuedWork?: "none" | "waiting" }) => ({ ...makeThreadResponse({ id, projectId: "p", providerId: "codex", ...fields }), queuedWork });
+  const result = classifyActivity([
+    t("queued", { status: "pending" }),
+    t("later", { status: "idle", queuedWork: "waiting" }),
+    t("run", { status: "active", queuedWork: "waiting" }),
+  ], "bot");
+  expect(result.waiting.map((each) => each.id).sort()).toEqual(["later", "queued"]);
+  expect(result.inProgress.map((each) => each.id)).toEqual(["run"]);
+  expect(result.completed).toEqual([]);
 });

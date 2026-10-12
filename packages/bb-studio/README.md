@@ -985,9 +985,34 @@ of Staff", with the same thread and check-ins; rename it in its home.
   `ThreadChat`); **Open chat** opens the thread.
 - **Needs you**: its thread, or a thread it started, waiting on you (a
   question or an approval).
-- **Activity**: **In progress** (running), **Scheduled** (its check-in and
-  any automation that wakes its thread, with the next run), **Completed**
+- **Activity**: **In progress** (running), **Waiting to start** (queued, or
+  a message scheduled for later), **Scheduled** (its check-in and any
+  automation that wakes its thread, with the next run), **Completed**
   (threads it started that finished).
+- **Memory**: one Studio page per Bot, "<name>'s Memory" in the personal
+  project, made the first time it's needed (its thread starts, or
+  **Memory** in the home). Its top section, `## Check-in`, is what the Bot
+  looks at on each check-in; the rest is what it remembers. The Bot keeps
+  it short and edits it with the Pages tools; you can edit it too. The Bot
+  is told only the page's id, not its text, and the check-in prompt says:
+  read the page, do its `## Check-in`, and stay silent unless something
+  matters.
+- **Skills**: when the Bot learns a reusable procedure it saves a skill with
+  `bot_skill_write` (name, one-line description, Markdown steps). Only the
+  Bot's thread has these: they live in Studio's `bot_skills` table and it
+  reads one with `bot_skill_read` (its instructions list their names). BB
+  selects plugin skills only from a plugin's manifest, so a skill a plugin
+  makes at runtime can't be a native per-thread skill. The home's
+  **Skills** list has **Share**, which moves the skill to BB's user skills
+  (`<BB data dir>/skills/<name>/SKILL.md`, scope `bb-user`; see
+  `bb skill list`), where every agent finds it; it refuses a name that's
+  already there. **Delete** removes it.
+- **Recall**: `bot_history_search` searches BB's thread search, keeping
+  only the Bot's threads (its handoff chain and threads it started).
+- **Phone**: questions and approvals it, or a thread it started, raises push
+  with Answer / Approve as before; every finished turn, the Bot's messages
+  included, now pushes with **Reply**, which sends to the thread
+  (`BB_REPLY`, see the Mobile plugin).
 - **Threads it started**: BB's thread metadata names the thread that made
   each thread. A thread whose `sourceThreadId`, `parentThreadId` or
   `lifecycleOwnerThreadId` is the Bot's thread, or a thread it handed off
@@ -997,14 +1022,23 @@ of Staff", with the same thread and check-ins; rename it in its home.
   on. **Stop** (confirmed) pauses it, stops the running threads it started,
   and pauses automations that wake it. Nothing is deleted.
 - **No Bot yet**: the home offers **Create your bot**: a name, an emoji and
-  an optional first message start its chat in your personal project.
+  an optional first message start its chat in your personal project. Its
+  instructions come from Studio's agent configuration for its thread, not a
+  first message, so its title isn't the instructions.
 - Its thread is an implementation detail. A handoff (`thread_handoff`)
   moves the Bot to the new thread. It is the personal project's lead, so it
   sees every project.
 - RPCs: `bot_get`, `bot_create`, `bot_set` (name, avatar), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
-  `bot_activity`. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
-  `bot_resume`, `bot_stop`, `bot_activity`. `chief_of_staff`,
+  `bot_activity`, `bot_memory`, `bot_skills`, `bot_skill_share`,
+  `bot_skill_delete`. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
+  `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
+  `bot_skill_write`, `bot_skill_read`, `bot_skill_delete` and
+  `bot_history_search`.
+- **Backup**: a Studio backup includes the Bot (name, avatar, state, Memory
+  page id) and its skills; they're restored only on a BB without a Bot. The
+  Memory page itself comes back with Pages.
+- No per-action rules or approval gates: the Bot works like any agent. `chief_of_staff`,
   `chief_of_staff_set` and `chief_of_staff_set_run` remain as deprecated
   aliases for one release.
 

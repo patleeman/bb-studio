@@ -6,7 +6,8 @@ import { Badge, DANGER_BUTTON, GHOST_BUTTON, openAppPath, OUTLINE_BUTTON, PageCo
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "@bb-studio/kit/ui";
 import { ThreadChat } from "@get-bb/plugin-sdk/app";
 import { useState, type ReactNode } from "react";
-import type { BotActivityView, BotScheduledView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
+import type { BotActivityView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
+import { pagePath } from "../../pages/constants";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 
@@ -137,6 +138,10 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
             <span>{describeRun(view.run, bot.state)}</span>
           </div>
         </div>
+        <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} title="What it remembers, and its check-in list"
+          onClick={async () => { const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null; if (memory?.pageId) openAppPath(pagePath(memory.pageId)); }}>
+          <Icon name="FileText" />Memory
+        </button>
         <AvatarPicker value={bot.avatar} onPick={(avatar) => void run("bot_set", { avatar })} />
         {bot.state === "active"
           ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" />Pause</button>
@@ -165,8 +170,10 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
         <aside className="flex min-w-0 flex-col gap-5">
           <ThreadSection title="Needs you" threads={activity.data?.needsYou} empty="Nothing needs you." loading={activity.loading} />
           <ThreadSection title="In progress" threads={activity.data?.inProgress} empty="Nothing running." loading={activity.loading} />
+          {activity.data?.waiting?.length ? <ThreadSection title="Waiting to start" threads={activity.data.waiting} empty="" loading={false} /> : null}
           <ScheduledSection items={activity.data?.scheduled} run={view.run} state={bot.state} onSave={(input) => void run("bot_set_run", input)} busy={!!busy} />
           <ThreadSection title="Completed" threads={activity.data?.completed} empty="Threads it starts show here when they finish." loading={activity.loading} />
+          <SkillsSection name={bot.name} />
           {activity.error ? <p role="alert" className="text-xs text-destructive">{activity.error}</p> : null}
         </aside>
       </div>
@@ -270,6 +277,33 @@ function ScheduledSection({ items, run, state, onSave, busy }: { items: BotSched
           </div>
         ) : <div><button type="button" className={GHOST_BUTTON} onClick={() => setEditing(true)}>Edit check-ins</button></div>
       ) : null}
+    </Section>
+  );
+}
+
+/** The Bot's own skills: only its thread loads them. Share moves one into BB's user skills, for every agent. */
+function SkillsSection({ name }: { name: string }) {
+  const skills = useLive<{ skills: BotSkillView[] }>("bot_skills", {}, { pollMs: 30_000 });
+  const { run, busy, error } = useAction(skills.refresh);
+  const list = skills.data?.skills ?? [];
+  return (
+    <Section title="Skills" count={list.length}>
+      {!list.length ? <p className="text-xs text-muted-foreground">{skills.loading && !skills.data ? "Loading…" : `${name} saves procedures it learns here. Only it uses them until you share one.`}</p> : (
+        <ul className="flex flex-col">
+          {list.map((skill) => (
+            <li key={skill.name} className="flex min-w-0 items-center gap-2 px-1.5 py-1 text-sm">
+              <Icon name="ListTodo" className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{skill.name}</span>
+                <span className="block truncate text-xs text-muted-foreground">{skill.description}</span>
+              </span>
+              <button type="button" className={GHOST_BUTTON} disabled={!!busy} title="Make it a skill every agent can use" onClick={() => void run("bot_skill_share", { name: skill.name })}>Share</button>
+              <button type="button" className={GHOST_BUTTON} disabled={!!busy} aria-label={`Delete ${skill.name}`} onClick={() => { if (confirm(`Delete the skill ${skill.name}?`)) void run("bot_skill_delete", { name: skill.name }); }}>Delete</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
     </Section>
   );
 }

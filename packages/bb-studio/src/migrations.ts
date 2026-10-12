@@ -211,4 +211,10 @@ export const MIGRATIONS = [
    INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at)
      SELECT 'bot_main', 'Chief of Staff', '🧭', 'active', lead_thread_id, 0, created_at, updated_at
      FROM project_leads WHERE project_id = 'proj_personal' AND lead_thread_id IS NOT NULL;`,
+  // Step 2 (src/bot.ts): the Bot's Memory page, and skills only its thread loads.
+  `ALTER TABLE bots ADD COLUMN memory_page_id TEXT;
+   CREATE TABLE bot_skills (
+       bot_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL, body TEXT NOT NULL,
+       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (bot_id, name)
+     );`,
 ];

@@ -43,6 +43,10 @@ public enum Studio {
     public static let bot_resume = "bot_resume"
     public static let bot_stop = "bot_stop"
     public static let bot_activity = "bot_activity"
+    public static let bot_memory = "bot_memory"
+    public static let bot_skills = "bot_skills"
+    public static let bot_skill_share = "bot_skill_share"
+    public static let bot_skill_delete = "bot_skill_delete"
     public static let thread_handoff = "thread_handoff"
     public static let saveView = "saveView"
     public static let deleteView = "deleteView"
@@ -248,6 +252,14 @@ public enum Studio {
   public typealias BotStop = BotStopOutput
 
   public typealias BotActivity = BotActivityOutput
+
+  public typealias BotMemory = BotMemoryOutput
+
+  public typealias BotSkills = BotSkillsOutput
+
+  public typealias BotSkillShare = BotSkillShareOutput
+
+  public typealias BotSkillDelete = BotSkillDeleteOutput
 
   public typealias ThreadHandoff = ThreadHandoffOutput
 
@@ -2916,15 +2928,17 @@ public enum Studio {
     public var avatar: String?
     public var state: BotGetOutputBotState?
     public var threadId: String?
+    public var memoryPageId: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
+      self.memoryPageId = memoryPageId
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3049,15 +3063,17 @@ public enum Studio {
     public var avatar: String?
     public var state: BotCreateOutputBotState?
     public var threadId: String?
+    public var memoryPageId: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
+      self.memoryPageId = memoryPageId
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3178,15 +3194,17 @@ public enum Studio {
     public var avatar: String?
     public var state: BotSetOutputBotState?
     public var threadId: String?
+    public var memoryPageId: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
+      self.memoryPageId = memoryPageId
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3305,15 +3323,17 @@ public enum Studio {
     public var avatar: String?
     public var state: BotSetThreadOutputBotState?
     public var threadId: String?
+    public var memoryPageId: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
+      self.memoryPageId = memoryPageId
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3486,15 +3506,17 @@ public enum Studio {
     public var avatar: String?
     public var state: BotSetRunOutputBotState?
     public var threadId: String?
+    public var memoryPageId: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
+      self.memoryPageId = memoryPageId
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3611,15 +3633,17 @@ public enum Studio {
     public var avatar: String?
     public var state: BotPauseOutputBotState?
     public var threadId: String?
+    public var memoryPageId: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
+      self.memoryPageId = memoryPageId
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3736,15 +3760,17 @@ public enum Studio {
     public var avatar: String?
     public var state: BotResumeOutputBotState?
     public var threadId: String?
+    public var memoryPageId: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
+      self.memoryPageId = memoryPageId
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -3861,15 +3887,17 @@ public enum Studio {
     public var avatar: String?
     public var state: BotStopOutputBotState?
     public var threadId: String?
+    public var memoryPageId: String?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
       self.state = state
       self.threadId = threadId
+      self.memoryPageId = memoryPageId
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -4045,6 +4073,50 @@ public enum Studio {
     }
   }
 
+  public enum BotActivityOutputWaitingItemRelation: Sendable, Hashable, Codable {
+    case `self`
+    case started
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "self": self = .`self`
+      case "started": self = .started
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`self`: try container.encode("self")
+      case .started: try container.encode("started")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotActivityOutputWaitingItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var relation: BotActivityOutputWaitingItemRelation?
+    public var needsYou: Bool?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, needsYou: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.projectId = projectId
+      self.updatedAt = updatedAt
+      self.relation = relation
+      self.needsYou = needsYou
+    }
+  }
+
   public enum BotActivityOutputScheduledItemKind: Sendable, Hashable, Codable {
     case heartbeat
     case automation
@@ -4134,16 +4206,90 @@ public enum Studio {
   public struct BotActivityOutput: Sendable, Hashable, Codable {
     public var needsYou: [BotActivityOutputNeedsYouItem]?
     public var inProgress: [BotActivityOutputInProgressItem]?
+    public var waiting: [BotActivityOutputWaitingItem]?
     public var scheduled: [BotActivityOutputScheduledItem]?
     public var completed: [BotActivityOutputCompletedItem]?
     public var latest: String?
 
-    public init(needsYou: [BotActivityOutputNeedsYouItem]? = nil, inProgress: [BotActivityOutputInProgressItem]? = nil, scheduled: [BotActivityOutputScheduledItem]? = nil, completed: [BotActivityOutputCompletedItem]? = nil, latest: String? = nil) {
+    public init(needsYou: [BotActivityOutputNeedsYouItem]? = nil, inProgress: [BotActivityOutputInProgressItem]? = nil, waiting: [BotActivityOutputWaitingItem]? = nil, scheduled: [BotActivityOutputScheduledItem]? = nil, completed: [BotActivityOutputCompletedItem]? = nil, latest: String? = nil) {
       self.needsYou = needsYou
       self.inProgress = inProgress
+      self.waiting = waiting
       self.scheduled = scheduled
       self.completed = completed
       self.latest = latest
+    }
+  }
+
+  public struct BotMemoryInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct BotMemoryOutput: Sendable, Hashable, Codable {
+    public var pageId: String?
+
+    public init(pageId: String? = nil) {
+      self.pageId = pageId
+    }
+  }
+
+  public struct BotSkillsInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct BotSkillsOutputSkillsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var description: String?
+    public var updatedAt: Double?
+
+    public init(name: String? = nil, description: String? = nil, updatedAt: Double? = nil) {
+      self.name = name
+      self.description = description
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct BotSkillsOutput: Sendable, Hashable, Codable {
+    public var skills: [BotSkillsOutputSkillsItem]?
+
+    public init(skills: [BotSkillsOutputSkillsItem]? = nil) {
+      self.skills = skills
+    }
+  }
+
+  public struct BotSkillShareInput: Sendable, Hashable, Codable {
+    public var name: String?
+
+    public init(name: String? = nil) {
+      self.name = name
+    }
+  }
+
+  public struct BotSkillShareOutput: Sendable, Hashable, Codable {
+    public var path: String?
+
+    public init(path: String? = nil) {
+      self.path = path
+    }
+  }
+
+  public struct BotSkillDeleteInput: Sendable, Hashable, Codable {
+    public var name: String?
+
+    public init(name: String? = nil) {
+      self.name = name
+    }
+  }
+
+  public struct BotSkillDeleteOutput: Sendable, Hashable, Codable {
+    public var deleted: Bool?
+
+    public init(deleted: Bool? = nil) {
+      self.deleted = deleted
     }
   }
 
