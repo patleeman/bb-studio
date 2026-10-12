@@ -161,6 +161,8 @@ const botThread = z.object({
   updatedAt: z.number(),
   relation: z.enum(["self", "started"]),
   needsYou: z.boolean(),
+  /** The listed thread that started this one; null when the Bot did (or for its own). */
+  parentId: z.string().nullable().default(null),
 });
 export type BotThreadView = z.infer<typeof botThread>;
 const botScheduled = z.object({

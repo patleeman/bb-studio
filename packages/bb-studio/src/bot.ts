@@ -21,7 +21,7 @@ import { PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 type Sdk = BbPluginApi["sdk"];
 type ListedThread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
 /** What Activity reads from a thread, listed or fetched. */
-type ActivityThread = Pick<ListedThread, "id" | "title" | "titleFallback" | "status" | "projectId" | "updatedAt" | "archivedAt"> & { hasPendingInteraction?: boolean; queuedWork?: ListedThread["queuedWork"] };
+type ActivityThread = Pick<ListedThread, "id" | "title" | "titleFallback" | "status" | "projectId" | "updatedAt" | "archivedAt"> & Partial<Pick<ListedThread, "sourceThreadId" | "parentThreadId" | "lifecycleOwnerThreadId">> & { hasPendingInteraction?: boolean; queuedWork?: ListedThread["queuedWork"] };
 export type BotState = "active" | "paused" | "stopped";
 export const BOT_ID = "bot_main";
 export const DEFAULT_BOT_NAME = "Bot";
@@ -82,6 +82,9 @@ type SkillRow = { bot_id: string; name: string; description: string; body: strin
 
 /** Sorts threads into the Bot's Activity. Pending interactions win; then running; then queued; the rest are done. */
 export function classifyActivity(threads: readonly ActivityThread[], botThreadId: string | null, limit = 15): Pick<BotActivityView, "needsYou" | "inProgress" | "waiting" | "completed"> {
+  // A thread started by another listed thread nests under it; the rest hang off the Bot.
+  const listed = new Set(threads.map((thread) => thread.id).filter((id) => id !== botThreadId));
+  const parentOf = (thread: ActivityThread) => [thread.parentThreadId, thread.sourceThreadId, thread.lifecycleOwnerThreadId].find((id) => !!id && id !== thread.id && listed.has(id)) ?? null;
   const view = (thread: ActivityThread): BotThreadView & { queued: boolean } => ({
     id: thread.id,
     title: thread.title || thread.titleFallback || "Untitled thread",
@@ -90,6 +93,7 @@ export function classifyActivity(threads: readonly ActivityThread[], botThreadId
     updatedAt: thread.updatedAt ?? 0,
     relation: thread.id === botThreadId ? "self" : "started",
     needsYou: !!thread.hasPendingInteraction,
+    parentId: thread.id === botThreadId ? null : parentOf(thread),
     queued: thread.status === "pending" || (thread.queuedWork === "waiting" && !WORKING.has(thread.status)),
   });
   const seen = new Set<string>();
@@ -101,6 +105,22 @@ export function classifyActivity(threads: readonly ActivityThread[], botThreadId
   const inProgress = unique.filter((thread) => !thread.needsYou && !thread.queued && WORKING.has(thread.status)).sort(newest).map(strip);
   const completed = unique.filter((thread) => !thread.needsYou && !thread.queued && !WORKING.has(thread.status) && thread.relation === "started").sort(newest).slice(0, limit).map(strip);
   return { needsYou, inProgress, waiting, completed };
+}
+
+/** Threads in `threads` started (at any depth) by one of `roots`, not including the roots. */
+export function descendants<T extends Pick<ListedThread, "id" | "sourceThreadId" | "parentThreadId" | "lifecycleOwnerThreadId">>(threads: readonly T[], roots: ReadonlySet<string>): T[] {
+  const known = new Set(roots);
+  const found: T[] = [];
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const thread of threads) {
+      if (known.has(thread.id) || !startedBy(thread, known)) continue;
+      known.add(thread.id);
+      found.push(thread);
+      grew = true;
+    }
+  }
+  return found;
 }
 
 /** Whether BB's metadata says one of `botThreads` started this thread. */
@@ -423,6 +443,15 @@ export class Bots {
     return [...(own ? [own as ActivityThread] : []), ...lists.flat().filter((thread) => thread.id !== threadId && startedBy(thread, chain))];
   }
 
+  /** startedThreads plus the threads those started, at any depth, from the recent list. */
+  private async workThreads(threadId: string): Promise<(ActivityThread & Partial<ListedThread>)[]> {
+    const [started, recent] = await Promise.all([
+      this.startedThreads(threadId),
+      this.deps.sdk.threads.list({ archived: false, limit: 200 }).catch(() => [] as ListedThread[]),
+    ]);
+    return [...started, ...descendants(recent, new Set(started.map((thread) => thread.id).filter((id) => id !== threadId)))];
+  }
+
   private async automations(threadId: string): Promise<{ projectId: string | null; rows: AutomationRow[] }> {
     const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null);
     const projectId = thread?.projectId ?? PERSONAL_PROJECT_ID;
@@ -438,7 +467,7 @@ export class Bots {
     const { bot, run } = await this.get();
     if (!bot?.threadId) return { needsYou: [], inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
     const [threads, automations, output] = await Promise.all([
-      this.startedThreads(bot.threadId),
+      this.workThreads(bot.threadId),
       this.automations(bot.threadId),
       this.deps.sdk.threads.output({ threadId: bot.threadId }).catch(() => ({ output: null })),
     ]);

@@ -4,7 +4,7 @@ import { MIGRATIONS } from "./migrations";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, MEMORY_TEMPLATE, startedBy } from "./bot";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, startedBy } from "./bot";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -276,4 +276,17 @@ it("keeps the Bot paused, and the heartbeat remembered, when resuming fails to r
   expect((await x.bots.get()).bot?.state).toBe("paused");
   x.callRpc.mockImplementation(real);
   expect(await x.bots.resume()).toMatchObject({ bot: { state: "active" }, run: { enabled: true } });
+});
+
+it("threads its threads started count too, nested by parentId", () => {
+  const row = (id: string, parentThreadId: string | null, sourceThreadId: string | null = null) => ({ id, parentThreadId, sourceThreadId, lifecycleOwnerThreadId: null });
+  const recent = [row("grand", "child"), row("child", null, "top"), row("stranger", "elsewhere"), row("top", "bot")];
+  expect(descendants(recent, new Set(["top"])).map((thread) => thread.id)).toEqual(["child", "grand"]);
+  const base = { title: "x", titleFallback: null, status: "idle", projectId: null, updatedAt: 1, archivedAt: null };
+  const result = classifyActivity([
+    { ...base, id: "bot" },
+    { ...base, id: "top", parentThreadId: "bot" },
+    { ...base, id: "child", sourceThreadId: "top" },
+  ] as never, "bot");
+  expect(Object.fromEntries(result.completed.map((thread) => [thread.id, thread.parentId]))).toEqual({ top: null, child: "top" });
 });

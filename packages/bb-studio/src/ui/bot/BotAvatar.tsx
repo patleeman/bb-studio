@@ -45,8 +45,10 @@ export const BOT_STYLES = `
 .bb-bot-dot { animation: bb-bot-dot 1.2s ease-in-out infinite; }
 .bb-bot-shimmer { background: linear-gradient(90deg, currentColor 0%, currentColor 40%, transparent 50%, currentColor 60%, currentColor 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; animation: bb-bot-shimmer 2.2s linear infinite; }
 .bb-bot-shimmer { -webkit-text-fill-color: transparent; opacity: .75; }
+@keyframes bb-bot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.bot-pulse { animation: bb-bot-pulse 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .bb-bot-eyes, .bb-bot-pupils, .bb-bot-in, .bb-bot-dot, .bb-bot-shimmer { animation: none !important; }
+  .bb-bot-eyes, .bb-bot-pupils, .bb-bot-in, .bb-bot-dot, .bb-bot-shimmer, .bot-pulse { animation: none !important; }
   .bb-bot-shimmer { -webkit-text-fill-color: currentColor; }
 }
 `;

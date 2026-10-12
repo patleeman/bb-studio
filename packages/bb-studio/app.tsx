@@ -32,6 +32,8 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { BOT_PANEL, BOT_SUBPATH, BotHome, BotRedirect } from "./src/ui/bot/BotHome";
+import { BotInfoTab, BotThreadsTab } from "./src/ui/bot/BotTabs";
+import { INFO_TAB, THREADS_TAB } from "./src/ui/bot/workspace";
 import { registerThreadAutomations } from "./src/ui/automations/register";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 
@@ -137,7 +139,14 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "legacy-chats", component: LegacyChats });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // The user's Bot, on a page of its own: its chat, what needs them, its Activity.
-  app.slots.navPanel({ id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotHome, headerContent: StudioBarSlot });
+  // The Bot's workspace: its main thread fills the page; Info and the sub-threads opened from its sidebar live in the right panel.
+  app.slots.navPanel({
+    id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotHome, headerContent: StudioBarSlot,
+    fixedTabs: [
+      { ...INFO_TAB, title: "Info", icon: "Info", component: BotInfoTab, layout: "flush" },
+      { ...THREADS_TAB, title: "Threads", icon: "MessageSquare", component: BotThreadsTab, layout: "flush" },
+    ],
+  });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });

@@ -4574,6 +4574,13 @@
                 },
                 "needsYou": {
                   "type": "boolean"
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -4583,7 +4590,8 @@
                 "projectId",
                 "updatedAt",
                 "relation",
-                "needsYou"
+                "needsYou",
+                "parentId"
               ],
               "additionalProperties": false
             }
@@ -4620,6 +4628,13 @@
                 },
                 "needsYou": {
                   "type": "boolean"
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -4629,7 +4644,8 @@
                 "projectId",
                 "updatedAt",
                 "relation",
-                "needsYou"
+                "needsYou",
+                "parentId"
               ],
               "additionalProperties": false
             }
@@ -4667,6 +4683,13 @@
                 },
                 "needsYou": {
                   "type": "boolean"
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -4676,7 +4699,8 @@
                 "projectId",
                 "updatedAt",
                 "relation",
-                "needsYou"
+                "needsYou",
+                "parentId"
               ],
               "additionalProperties": false
             }
@@ -4758,6 +4782,13 @@
                 },
                 "needsYou": {
                   "type": "boolean"
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -4767,7 +4798,8 @@
                 "projectId",
                 "updatedAt",
                 "relation",
-                "needsYou"
+                "needsYou",
+                "parentId"
               ],
               "additionalProperties": false
             }

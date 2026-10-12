@@ -3,7 +3,12 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ data: {} as Record<string, unknown>, call: vi.fn(async () => ({})) }));
+const state = vi.hoisted(() => ({
+  data: {} as Record<string, unknown>,
+  call: vi.fn(async () => ({})),
+  openFixedTab: vi.fn((_options: unknown) => true),
+  target: null as null | { sequence: number; target: { threadId: string }; clear(): void },
+}));
 vi.mock("../live", () => ({
   useCall: () => state.call,
   useLive: (method: string) => ({ data: state.data[method] ?? null, error: null, loading: false, refresh: () => {} }),
@@ -11,6 +16,9 @@ vi.mock("../live", () => ({
 vi.mock("../ProjectLeads", () => ({ HeartbeatFields: () => null, useHeartbeatForm: () => ({ input: () => ({}) }) }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   ThreadChat: ({ threadId }: { threadId: string }) => React.createElement("div", { "data-chat": threadId }),
+  ThreadTitle: ({ threadId }: { threadId: string }) => React.createElement("span", null, `title:${threadId}`),
+  experimental_useAppPanel: () => ({ openFixedTab: state.openFixedTab }),
+  experimental_useFixedTabTarget: () => state.target,
 }));
 vi.mock("./Onboarding", () => ({
   Greeting: ({ lines, onStarter }: { lines: string[]; onStarter(starter: unknown): void }) => React.createElement("div", null, lines.join(" "),
@@ -40,11 +48,14 @@ vi.mock("@bb-studio/kit/ui", () => ({
 }));
 
 const { ActivityPanel, BOT_PATH, BotHome, BotRedirect } = await import("./BotHome");
+const { BotInfoTab, BotThreadsTab } = await import("./BotTabs");
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   state.call.mockClear();
+  state.openFixedTab.mockClear();
+  state.target = null;
   localStorage.clear();
   container = document.createElement("div");
   document.body.append(container);
@@ -59,7 +70,7 @@ const show = async (node: React.ReactNode) => {
 const button = (label: string) => [...container.querySelectorAll("button")].find((each) => each.textContent === label)!;
 
 const click = (el: Element | null | undefined) => (el as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-const thread = (id: string, title: string) => ({ id, title, status: "idle", projectId: "p", updatedAt: 1, relation: "started" as const, needsYou: false });
+const thread = (id: string, title: string) => ({ id, title, status: "idle", projectId: "p", updatedAt: 1, relation: "started" as const, needsYou: false, parentId: null as string | null });
 const empty = { needsYou: [], inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
 const dot = { id: "bot_main", name: "Dot", avatar: "🟣", shape: "blob", color: "#5b8def", state: "active", threadId: "thr_bot", createdAt: 1, updatedAt: 1 };
 
@@ -97,16 +108,84 @@ test("Activity: one quiet line when all is empty, sections only when non-empty, 
   expect(container.textContent).toContain("Done e");
 });
 
-test("Activity is a side panel, closed until opened, then remembered", async () => {
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty };
+test("the sidebar: the bot on top, Needs you flat, started threads nested under the one that started them; a row opens the Threads tab", async () => {
+  state.data = {
+    bot_get: { bot: dot, run: null },
+    bot_activity: {
+      ...empty,
+      needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }],
+      inProgress: [{ ...thread("t3", "Fix flaky test"), status: "active", parentId: "t2" }],
+      completed: [thread("t2", "Research CI"), thread("t4", "Weekly digest")],
+      scheduled: [{ id: "a1", kind: "automation", name: "Inbox sweep", cron: "0 * * * *", enabled: true, nextRunAt: null }],
+    },
+    bot_chain: { threadIds: ["thr_old", "thr_bot"] },
+  };
   await show(<BotHome />);
+  const nav = container.querySelector('nav[aria-label="Dot threads"]')!;
+  expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Dot");
+  const groups = [...nav.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"));
+  expect(groups).toEqual(["Needs you", "Running", "Recurring", "Recent", "Earlier conversations"]);
+  // The running child pulls its parent into Running and nests under it.
+  const running = nav.querySelector('section[aria-label="Running"]')!;
+  expect(running.querySelector('li > button[data-thread="t2"] + ul button[data-thread="t3"]')).not.toBeNull();
+  expect(nav.querySelector('section[aria-label="Recent"]')?.textContent).toContain("Weekly digest");
+  expect(nav.querySelector('section[aria-label="Recurring"]')?.textContent).toContain("Inbox sweep");
+  // Earlier conversations start closed.
+  expect(nav.textContent).not.toContain("title:thr_old");
+  await act(async () => click(nav.querySelector('[data-thread="t4"]')));
+  expect(state.openFixedTab).toHaveBeenCalledWith({ surface: { kind: "current" }, tab: expect.objectContaining({ panelId: "bot", id: "threads" }), target: { threadId: "t4" } });
+  expect(JSON.parse(localStorage.getItem("studio.bot.bot_main.threads")!)).toEqual({ open: ["t4"], active: "t4" });
+  expect(nav.querySelector('[data-thread="t4"]')?.getAttribute("aria-current")).toBe("true");
+  // No in-page Activity panel or banner; a quiet needs-you indicator in the title bar.
   expect(container.querySelector('aside[aria-label="Activity"]')).toBeNull();
-  act(() => click(container.querySelector('[aria-label="Show activity"]')));
-  expect(container.querySelector('aside[aria-label="Activity"]')).not.toBeNull();
-  expect(localStorage.getItem("studio.bot.activity")).toBe("open");
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }] } };
-  await show(<BotHome key="again" />);
-  expect(container.querySelector('aside[aria-label="Activity"] section[aria-label="Needs you"]')?.textContent).toContain("Approve deploy");
+  expect(container.querySelector('[aria-label="1 needs you"]')).not.toBeNull();
+  // Collapse is remembered.
+  act(() => click(nav.querySelector('[aria-label="Hide bot sidebar"]')));
+  expect(JSON.parse(localStorage.getItem("studio.bot.sidebar")!).collapsed).toBe(true);
+  expect(container.querySelector('[aria-label="Show bot sidebar"]')).not.toBeNull();
+});
+
+test("when the host declines the Threads tab, the sub-thread opens as a BB thread", async () => {
+  const { openAppPath } = await import("@bb-studio/kit/app");
+  state.openFixedTab.mockReturnValueOnce(false);
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, completed: [thread("t4", "Weekly digest")] } };
+  await show(<BotHome />);
+  await act(async () => click(container.querySelector('[data-thread="t4"]')));
+  expect(openAppPath).toHaveBeenCalledWith("/threads/t4");
+});
+
+test("Threads tab: a target adds and focuses the thread, then clears; tabs close and focus moves on", async () => {
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, completed: [thread("t1", "One"), thread("t2", "Two")] } };
+  await show(<BotThreadsTab />);
+  expect(container.textContent).toContain("Open a thread Dot started");
+  const clear = vi.fn();
+  state.target = { sequence: 1, target: { threadId: "t1" }, clear };
+  await show(<BotThreadsTab />);
+  state.target = { sequence: 2, target: { threadId: "t2" }, clear };
+  await show(<BotThreadsTab />);
+  expect(clear).toHaveBeenCalledTimes(2);
+  expect([...container.querySelectorAll("[role=tab]")].map((tab) => tab.textContent)).toEqual(["One", "Two"]);
+  expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("t2");
+  act(() => click(container.querySelector('[role=tab][data-thread="t1"]')));
+  expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("t1");
+  act(() => click(container.querySelector('[aria-label="Close One"]')));
+  expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("t2");
+  expect(JSON.parse(localStorage.getItem("studio.bot.bot_main.threads")!)).toEqual({ open: ["t2"], active: "t2" });
+});
+
+test("Info tab: profile, controls, check-ins, and activity whose rows open the Threads tab", async () => {
+  state.data = {
+    bot_get: { bot: { ...dot, role: "You are my chief of staff." }, run: { enabled: true, cadence: "weekdays", time: "08:00" } },
+    bot_activity: { ...empty, needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }] },
+  };
+  await show(<BotInfoTab />);
+  expect(container.querySelector("h2")?.textContent).toBe("Dot");
+  expect(container.textContent).toContain("You are my chief of staff.");
+  expect(container.textContent).toContain("Morning brief");
+  await act(async () => [...container.querySelectorAll("button")].find((each) => each.textContent?.startsWith("Approve deploy"))!.click());
+  expect(state.openFixedTab).toHaveBeenCalledWith(expect.objectContaining({ target: { threadId: "t1" } }));
+  await act(async () => button("Pause").click());
+  expect(state.call).toHaveBeenCalledWith("bot_pause", {});
 });
 
 test("shows the Bot's chat and status, and confirms Stop", async () => {
@@ -148,22 +227,10 @@ test("Edit profile saves shape, color and role; Skills (Share/Delete) live under
   expect(state.call).toHaveBeenCalledWith("bot_set", { shape: "star", color: "#e5484d", role: "You are my chief of staff." });
 });
 
-test("BB's thread view shows the current thread; Earlier conversation opens the one it handed off from", async () => {
-  const { openAppPath } = await import("@bb-studio/kit/app");
+test("BB's thread view always shows the Bot's main thread", async () => {
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, bot_chain: { threadIds: ["thr_old", "thr_bot"] } };
   await show(<BotHome />);
   expect(container.querySelector("[data-chat]")?.getAttribute("data-chat")).toBe("thr_bot");
-  act(() => button("Earlier conversation").click());
-  expect(openAppPath).toHaveBeenCalledWith("/threads/thr_old");
-});
-
-test("Needs you banner: only for threads the Bot started, not its own (ThreadChat shows that inline)", async () => {
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, needsYou: [{ ...thread("thr_bot", "Its chat"), relation: "self", needsYou: true }] } };
-  await show(<BotHome />);
-  expect(container.querySelector('[role=status][aria-label="Needs you"]')).toBeNull();
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }] } };
-  await show(<BotHome key="again" />);
-  expect(container.querySelector('[role=status][aria-label="Needs you"]')?.textContent).toContain("Approve deploy");
 });
 
 test("Check-ins offers presets, marks the current one, and applies one in a click", async () => {

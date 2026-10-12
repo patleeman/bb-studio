@@ -4174,8 +4174,9 @@ public enum Studio {
     public var updatedAt: Double?
     public var relation: BotActivityOutputNeedsYouItemRelation?
     public var needsYou: Bool?
+    public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputNeedsYouItemRelation? = nil, needsYou: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputNeedsYouItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -4183,6 +4184,7 @@ public enum Studio {
       self.updatedAt = updatedAt
       self.relation = relation
       self.needsYou = needsYou
+      self.parentId = parentId
     }
   }
 
@@ -4218,8 +4220,9 @@ public enum Studio {
     public var updatedAt: Double?
     public var relation: BotActivityOutputInProgressItemRelation?
     public var needsYou: Bool?
+    public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputInProgressItemRelation? = nil, needsYou: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputInProgressItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -4227,6 +4230,7 @@ public enum Studio {
       self.updatedAt = updatedAt
       self.relation = relation
       self.needsYou = needsYou
+      self.parentId = parentId
     }
   }
 
@@ -4262,8 +4266,9 @@ public enum Studio {
     public var updatedAt: Double?
     public var relation: BotActivityOutputWaitingItemRelation?
     public var needsYou: Bool?
+    public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, needsYou: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -4271,6 +4276,7 @@ public enum Studio {
       self.updatedAt = updatedAt
       self.relation = relation
       self.needsYou = needsYou
+      self.parentId = parentId
     }
   }
 
@@ -4348,8 +4354,9 @@ public enum Studio {
     public var updatedAt: Double?
     public var relation: BotActivityOutputCompletedItemRelation?
     public var needsYou: Bool?
+    public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputCompletedItemRelation? = nil, needsYou: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputCompletedItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -4357,6 +4364,7 @@ public enum Studio {
       self.updatedAt = updatedAt
       self.relation = relation
       self.needsYou = needsYou
+      self.parentId = parentId
     }
   }
 

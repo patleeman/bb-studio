@@ -1,8 +1,8 @@
-// The Bot's own page (nav panel `bot`, /plugins/studio/bot), chat-first like
-// a messaging app: its drawn avatar, name and live status centered on top,
-// BB's own thread view (ThreadChat) of its current thread filling the page,
-// and Activity as a side panel that pushes the chat over. The ⋯
-// menu holds the rest. With no Bot yet, the page greets the user as one and
+// The Bot's workspace (nav panel `bot`, /plugins/studio/bot): its main
+// thread (BB's ThreadChat) always fills the page, its sidebar on the left
+// lists the threads it started, and the right panel's fixed tabs hold its
+// Info and the sub-threads the user opened (BotTabs.tsx). Identity, status
+// and the ⋯ menu sit in the panel's title bar. With no Bot yet, the page greets the user as one and
 // the first message makes it. Studio's old address redirects here.
 import { errorMessage } from "@bb-studio/kit/format";
 import { DANGER_BUTTON, GHOST_BUTTON, ICON_BUTTON, openAppPath, OUTLINE_BUTTON, PageColumn, PRIMARY_BUTTON, StudioBar } from "@bb-studio/kit/app";
@@ -18,14 +18,15 @@ import { pagePath } from "../../pages/constants";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
+import { BotSidebar } from "./BotSidebar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
+import { useOpenInfo, useOpenSubThread } from "./workspace";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
 export const BOT_PANEL = "bot";
 export const BOT_PATH = `/plugins/studio/${BOT_PANEL}`;
 /** Studio's old address for the Bot (/plugins/studio/studio/bot), which redirects. */
 export const BOT_SUBPATH = "bot";
-const ACTIVITY_KEY = "studio.bot.activity";
 type Preset = "morning" | "evening" | "working" | "off";
 /** Check-in presets (bot_checkin_preset): one schedule and one line on the Memory page each. */
 export const PRESETS: { id: Preset; label: string; hint: string }[] = [
@@ -159,127 +160,20 @@ function CreateBot({ onCreated }: { onCreated(): void }) {
   );
 }
 
-/** Whether the Activity panel is open; closed by default, remembered on this device. */
-function useActivityOpen(): [boolean, (open: boolean) => void] {
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem(ACTIVITY_KEY) === "open"; } catch { return false; } });
-  const set = (next: boolean) => {
-    try { localStorage.setItem(ACTIVITY_KEY, next ? "open" : "closed"); } catch { /* private mode */ }
-    setOpen(next);
-  };
-  return [open, set];
-}
+export type Sheet = "profile" | "skills" | "checkins" | "stop" | null;
 
-type Sheet = "profile" | "skills" | "checkins" | "stop" | null;
-
-function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
+/** The Bot's controls, shared by the page and its Info tab: RPCs, dialogs, and opening its Memory. */
+export function useBotControls(view: BotView, refresh: () => void, running: number) {
   const bot = view.bot!;
-  const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 15_000 });
-  const chain = useLive<{ threadIds: string[] }>("bot_chain", {}, { pollMs: 120_000 });
-  const refreshAll = () => { refresh(); activity.refresh(); };
-  const { run, busy, error } = useAction(refreshAll);
+  const { run, busy, error } = useAction(refresh);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [activityOpen, setActivityOpen] = useActivityOpen();
-  const data = activity.data;
-  const needsYou = data?.needsYou ?? [];
-  // ThreadChat shows the Bot's own pending question inline; the banner is for threads it started.
-  const startedNeedsYou = needsYou.filter((thread) => thread.relation === "started");
-  const running = data?.inProgress.filter((thread) => thread.relation === "started").length ?? 0;
   const profile: Profile = { name: bot.name, shape: bot.shape ?? null, color: bot.color ?? null, role: bot.role ?? "" };
-  const status = statusLabel(view.run, bot.state, running);
-  // The thread it handed off from, when the chain has one (bot_chain ends at its thread).
-  const ids = chain.data?.threadIds ?? [];
-  const earlier = bot.threadId && ids.at(-1) === bot.threadId && ids.length > 1 ? ids.at(-2)! : null;
-
   const openMemory = async () => {
     const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null;
     if (memory?.pageId) openAppPath(pagePath(memory.pageId));
   };
-  return (
-    <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
-      <style>{BOT_STYLES}</style>
-      {/* Identity and controls live in the panel's title bar, like a thread's. */}
-      <StudioBar>
-        <button type="button" className="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" aria-label="Edit profile" title="Edit profile" onClick={() => setSheet("profile")}>
-          <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={20} working={running > 0} />
-          <span className="truncate text-sm font-medium">{profile.name}</span>
-        </button>
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-status">
-          <span className={`size-1.5 shrink-0 rounded-full ${STATE_DOT[bot.state]}`} aria-hidden />
-          <span className="truncate">{status}</span>
-        </span>
-        <span className="min-w-0 flex-1" />
-        <div className="flex shrink-0 items-center gap-0.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" className={ICON_BUTTON} aria-label="Bot menu" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-44">
-              <DropdownMenuItem onSelect={() => setSheet("profile")}><Icon name="Edit" />Edit profile…</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setSheet("skills")}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
-              {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
-              {bot.threadId ? <DropdownMenuItem onSelect={() => openAppPath(threadPath(bot.threadId!))}><Icon name="ExternalLink" />Open as thread</DropdownMenuItem> : null}
-              <DropdownMenuSeparator />
-              {bot.state === "active"
-                ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
-                : <DropdownMenuItem onSelect={() => void run("bot_resume")}><Icon name="Play" />Resume</DropdownMenuItem>}
-              {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button type="button" className={`${ICON_BUTTON} relative ${activityOpen ? "bg-state-active" : ""}`} aria-label={activityOpen ? "Hide activity" : "Show activity"} aria-pressed={activityOpen} title="Activity" onClick={() => setActivityOpen(!activityOpen)}>
-            <Icon name="ListView" />
-            {needsYou.length ? <span className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" aria-hidden /> : null}
-          </button>
-        </div>
-      </StudioBar>
-
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {error ? <p role="alert" className="shrink-0 px-4 py-1.5 text-sm text-destructive">{error}</p> : null}
-          {bot.state !== "active" ? (
-            <div className="flex shrink-0 items-center justify-center gap-3 border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
-              <span className="min-w-0">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
-              <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>
-            </div>
-          ) : null}
-          {startedNeedsYou.length ? (
-            <div role="status" aria-label="Needs you" className="flex shrink-0 items-center gap-2 border-b border-border bg-warning/10 px-4 py-1.5 text-sm">
-              <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden />
-              <span className="shrink-0 font-medium">Needs you</span>
-              <span className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
-                {startedNeedsYou.map((thread) => (
-                  <button key={thread.id} type="button" className="max-w-64 shrink-0 truncate rounded-md px-1.5 py-0.5 hover:bg-state-hover" onClick={() => openAppPath(threadPath(thread.id))}>{thread.title}</button>
-                ))}
-              </span>
-            </div>
-          ) : null}
-          {earlier ? (
-            <div className="flex shrink-0 justify-center pt-1.5">
-              <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => openAppPath(threadPath(earlier))}>
-                <Icon name="ArrowUp" className="size-3.5" />Earlier conversation
-              </button>
-            </div>
-          ) : null}
-          {bot.threadId ? (
-            <section aria-label="Chat" className="min-h-0 flex-1">
-              <ThreadChat key={bot.threadId} threadId={bot.threadId} variant="full" className="h-full" />
-            </section>
-          ) : (
-            <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. Make a thread your Bot from its ⋯ menu.</p>
-          )}
-        </div>
-        {activityOpen ? (
-          <aside aria-label="Activity" className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border xl:w-80">
-            <div className="flex items-center gap-2 px-4 pt-3 pb-1">
-              <h2 className="min-w-0 flex-1 text-sm font-semibold">Activity</h2>
-              {bot.state === "active" ? <button type="button" className={GHOST_BUTTON} onClick={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins</button> : null}
-              <button type="button" className={ICON_BUTTON} aria-label="Close activity" onClick={() => setActivityOpen(false)}><Icon name="X" /></button>
-            </div>
-            <ActivityPanel data={data} loading={activity.loading} error={activity.error} />
-          </aside>
-        ) : null}
-      </div>
-
+  const sheets = (
+    <>
       {sheet === "profile" || sheet === "skills" ? (
         <ProfileDialog value={profile} advancedOpen={sheet === "skills"} advanced={<SkillsList name={bot.name} />} onClose={() => setSheet(null)}
           onSave={(next) => {
@@ -314,11 +208,101 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
           </DialogContent>
         </Dialog>
       ) : null}
+    </>
+  );
+  return { bot, profile, run, busy, error, setSheet, openMemory, sheets };
+}
+
+/** Threads it started that are running now. */
+export const runningCount = (activity: BotActivityView | null | undefined) => activity?.inProgress.filter((thread) => thread.relation === "started").length ?? 0;
+export const openThreadPage = (threadId: string) => openAppPath(threadPath(threadId));
+
+/**
+ * The Bot's workspace: its sidebar on the left, its main thread filling the
+ * page, and the right panel's Info and Threads tabs (src/ui/bot/BotTabs.tsx).
+ */
+function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
+  const activity = useLive<BotActivityView>("bot_activity", {}, { pollMs: 15_000 });
+  const chain = useLive<{ threadIds: string[] }>("bot_chain", {}, { pollMs: 120_000 });
+  const running = runningCount(activity.data);
+  const controls = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
+  const { bot, profile, run, busy, error, setSheet } = controls;
+  const openInfo = useOpenInfo();
+  const openSub = useOpenSubThread(bot.id, openThreadPage);
+  const startedNeedsYou = (activity.data?.needsYou ?? []).filter((thread) => thread.relation === "started");
+  const status = statusLabel(view.run, bot.state, running);
+  // Earlier conversations: the handoff chain before its current thread (bot_chain ends at it), newest first.
+  const ids = chain.data?.threadIds ?? [];
+  const earlier = bot.threadId && ids.at(-1) === bot.threadId ? ids.slice(0, -1).reverse() : [];
+
+  return (
+    <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
+      <style>{BOT_STYLES}</style>
+      {/* Identity and controls live in the panel's title bar, like a thread's. */}
+      <StudioBar>
+        <button type="button" className="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" aria-label="Edit profile" title="Edit profile" onClick={() => setSheet("profile")}>
+          <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={20} working={running > 0} />
+          <span className="truncate text-sm font-medium">{profile.name}</span>
+        </button>
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-status">
+          <span className={`size-1.5 shrink-0 rounded-full ${STATE_DOT[bot.state]}`} aria-hidden />
+          <span className="truncate">{status}</span>
+        </span>
+        {startedNeedsYou.length ? (
+          <button type="button" className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground" aria-label={`${startedNeedsYou.length} need${startedNeedsYou.length === 1 ? "s" : ""} you`}
+            onClick={() => startedNeedsYou.length === 1 ? openSub(startedNeedsYou[0]!.id) : openInfo()}>
+            <span className="size-1.5 rounded-full bg-warning" aria-hidden />
+            {startedNeedsYou.length === 1 ? "Needs you" : `${startedNeedsYou.length} need you`}
+          </button>
+        ) : null}
+        <span className="min-w-0 flex-1" />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className={ICON_BUTTON} aria-label="Bot menu" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              <DropdownMenuItem onSelect={() => setSheet("profile")}><Icon name="Edit" />Edit profile…</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void controls.openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSheet("skills")}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
+              {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
+              {bot.threadId ? <DropdownMenuItem onSelect={() => openThreadPage(bot.threadId!)}><Icon name="ExternalLink" />Open as thread</DropdownMenuItem> : null}
+              <DropdownMenuSeparator />
+              {bot.state === "active"
+                ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
+                : <DropdownMenuItem onSelect={() => void run("bot_resume")}><Icon name="Play" />Resume</DropdownMenuItem>}
+              {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <button type="button" className={ICON_BUTTON} aria-label="Bot info" title="Info" onClick={() => openInfo()}><Icon name="Info" /></button>
+        </div>
+      </StudioBar>
+
+      <div className="flex min-h-0 flex-1">
+        <BotSidebar bot={bot} status={status} working={running > 0} activity={activity.data} earlier={earlier} onOpen={openSub} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          {error ? <p role="alert" className="shrink-0 px-4 py-1.5 text-sm text-destructive">{error}</p> : null}
+          {bot.state !== "active" ? (
+            <div className="flex shrink-0 items-center justify-center gap-3 border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
+              <span className="min-w-0">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
+              <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>
+            </div>
+          ) : null}
+          {bot.threadId ? (
+            <section aria-label="Chat" className="min-h-0 flex-1">
+              <ThreadChat key={bot.threadId} threadId={bot.threadId} variant="full" className="h-full" />
+            </section>
+          ) : (
+            <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. Make a thread your Bot from its ⋯ menu.</p>
+          )}
+        </div>
+      </div>
+      {controls.sheets}
     </div>
   );
 }
 
-function statusLabel(run: HeartbeatRun | null, state: keyof typeof STATE_LABEL, running = 0): string {
+export function statusLabel(run: HeartbeatRun | null, state: keyof typeof STATE_LABEL, running = 0): string {
   if (state !== "active") return STATE_LABEL[state];
   if (running) return `Working on ${running} thread${running === 1 ? "" : "s"}`;
   if (!run?.enabled) return "Idle";
@@ -327,7 +311,7 @@ function statusLabel(run: HeartbeatRun | null, state: keyof typeof STATE_LABEL, 
 }
 
 /** Activity's sections, only those with something in them; one quiet line when all are empty. */
-export function ActivityPanel({ data, loading, error }: { data: BotActivityView | null | undefined; loading: boolean; error?: string | null }) {
+export function ActivityPanel({ data, loading, error, onOpen = openThreadPage }: { data: BotActivityView | null | undefined; loading: boolean; error?: string | null; onOpen?(threadId: string): void }) {
   const [allRecent, setAllRecent] = useState(false);
   if (!data) return <p className="px-4 py-3 text-xs text-muted-foreground">{loading ? "Loading…" : ""}</p>;
   const recent = allRecent ? data.completed : data.completed.slice(0, COMPLETED_PREVIEW);
@@ -335,13 +319,13 @@ export function ActivityPanel({ data, loading, error }: { data: BotActivityView 
   return (
     <div className="flex flex-col gap-4 px-2.5 pt-2 pb-3">
       {empty ? <p className="px-1.5 text-sm text-muted-foreground">Nothing going on right now.</p> : null}
-      {data.needsYou.length ? <Section title="Needs you"><ThreadList threads={data.needsYou} /></Section> : null}
-      {data.inProgress.length ? <Section title="Running"><ThreadList threads={data.inProgress} /></Section> : null}
-      {data.waiting?.length ? <Section title="Waiting to start"><ThreadList threads={data.waiting} /></Section> : null}
+      {data.needsYou.length ? <Section title="Needs you"><ThreadList threads={data.needsYou} onOpen={onOpen} /></Section> : null}
+      {data.inProgress.length ? <Section title="Running"><ThreadList threads={data.inProgress} onOpen={onOpen} /></Section> : null}
+      {data.waiting?.length ? <Section title="Waiting to start"><ThreadList threads={data.waiting} onOpen={onOpen} /></Section> : null}
       {data.scheduled.length ? <Section title="Scheduled"><ScheduledList items={data.scheduled} /></Section> : null}
       {data.completed.length ? (
         <Section title="Recent">
-          <ThreadList threads={recent} />
+          <ThreadList threads={recent} onOpen={onOpen} />
           {data.completed.length > COMPLETED_PREVIEW ? (
             <button type="button" className="self-start px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground" onClick={() => setAllRecent(!allRecent)}>
               {allRecent ? "Show fewer" : `Show all ${data.completed.length}`}
@@ -363,12 +347,12 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function ThreadList({ threads }: { threads: BotThreadView[] }) {
+function ThreadList({ threads, onOpen }: { threads: BotThreadView[]; onOpen(threadId: string): void }) {
   return (
     <ul className="flex flex-col">
       {threads.map((thread) => (
         <li key={thread.id}>
-          <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-state-hover" onClick={() => openAppPath(threadPath(thread.id))}>
+          <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-state-hover" onClick={() => onOpen(thread.id)}>
             <span className="min-w-0 flex-1 truncate">{thread.relation === "self" ? "Its chat" : thread.title}</span>
             <span className="shrink-0 text-xs text-muted-foreground">{ago(thread.updatedAt)}</span>
           </button>
