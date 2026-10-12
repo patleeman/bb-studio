@@ -139,7 +139,8 @@ export interface SidebarGroups {
 /**
  * Groups the Bot's threads for its sidebar. Needs you is flat (each one is a
  * thing to do); Running and Recent are trees, a thread under the thread that
- * started it at any depth, placed by its root.
+ * started it at any depth, placed by its root. A childless thread that
+ * needs the user is only under Needs you.
  */
 export function sidebarGroups(activity: BotActivityView | null | undefined): SidebarGroups {
   if (!activity) return { needsYou: [], running: [], recurring: [], recent: [] };
@@ -161,7 +162,8 @@ export function sidebarGroups(activity: BotActivityView | null | undefined): Sid
     return { thread, children: kids.map((kid) => build(kid, seen)) };
   };
   const hasBusy = (node: TreeNode): boolean => busy.has(node.thread.id) || node.children.some(hasBusy);
-  const roots = (children.get(null) ?? []).sort(newest).map((thread) => build(thread, new Set()));
+  // A thread waiting on the user is already under Needs you; it stays in a tree only to hold its children.
+  const roots = (children.get(null) ?? []).sort(newest).map((thread) => build(thread, new Set())).filter((node) => !node.thread.needsYou || node.children.length);
   return {
     needsYou: started(activity.needsYou),
     running: roots.filter(hasBusy),

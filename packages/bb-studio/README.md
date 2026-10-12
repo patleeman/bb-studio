@@ -923,8 +923,9 @@ open in the background, so it's as you left it when you come back.
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
   The tag menu also renames and deletes the active tag.
 - **Bot.** Your always-on agent (it replaces the Chief of Staff): a name, a
-  drawn avatar, and a page of its own (the **Bot** rail item) that is its
-  chat, with **Needs you** and **Activity** a click away. See [Bot](#bot).
+  drawn avatar, and a workspace of its own (the **Bot** rail item): its
+  chat, a sidebar of the threads it started, and Info and Threads tabs in
+  the right panel. See [Bot](#bot).
 - **Project leads.** A BB project can have a lead thread, which a
   Heartbeat wakes on a schedule; the personal project's lead is your Bot.
   Set them in Setup under **Project leads**. BB's own sidebar groups
@@ -970,7 +971,9 @@ bb studio reindex
 
 ## Bot
 
-![The Bot's page in a staged BB: Dot's avatar, name and status in a compact header; below it BB's own thread view of its chat, the same as any thread, with a Needs-you banner for a thread it started and Activity open beside the chat with Needs you, Waiting to start, Scheduled and Recent](assets/bot.png)
+![The Bot's workspace in a staged BB: Dot's avatar, name and status in the title bar; on the left its sidebar, tinted in Dot's color, with Dot on top and the threads it started under Needs you, Running, Recurring (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it; BB's own thread view of its chat in the middle; and the right panel's Info tab with its profile, Pause and Stop, Check-ins (Morning brief), Memory, Skills and Activity](assets/bot.png)
+
+![The same workspace with two sub-threads opened from the sidebar in the right panel's Threads tab: a strip of two tabs over BB's thread view of the deploy-key thread, whose question waits on the user](assets/bot-threads.png)
 
 ![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
 
@@ -978,13 +981,34 @@ The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
 the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
 of Staff", with the same thread and check-ins; rename it from its page.
 
-- **Page**: its own nav panel, **Bot** in the rail (`/plugins/studio/bot`;
-  the old `/plugins/studio/studio/bot` redirects there). The page is its
-  chat: BB's own thread view (below). On top, a compact centered header: its
-  avatar (the pencil opens **Edit profile**), name, and live status
-  (Working on N threads, Checks in …, Idle, Paused, Stopped). Top right: ⋯
-  (Edit profile, Memory, Skills, Check-ins, Open as thread, Pause / Resume,
-  Stop…) and the Activity button.
+- **Workspace**: its own nav panel, **Bot** in the rail (`/plugins/studio/bot`;
+  the old `/plugins/studio/studio/bot` redirects there). Its main thread
+  always fills the page (below). The panel's title bar has its avatar and
+  name (**Edit profile**), live status (Working on N threads, Checks in …,
+  Idle, Paused, Stopped), a quiet **Needs you** marker when a thread it
+  started waits on you, ⋯ (Edit profile, Memory, Skills, Check-ins, Open as
+  thread, Pause / Resume, Stop…) and **Info**.
+- **Sidebar**: a column inside the page, tinted in the Bot's color: the Bot
+  on top (always selected; its thread is the page), then the threads it
+  started: **Needs you**, **Running** (a thread that is running or queued,
+  or has one below it), **Recurring** (automations that wake it, other than
+  its check-in), **Recent**, and **Earlier conversations** (its handoff
+  chain, closed by default). A thread another of its threads started nests
+  under that one, at any depth (`bot_activity` returns each thread's
+  `parentId`). A row opens the thread in the right panel's **Threads** tab;
+  the page stays put. Drag its edge to resize; hide it to a slim rail. Width,
+  hidden groups and collapse are remembered on this device. BB's own sidebar
+  stays as it is: the plugin SDK can't hide it.
+- **Right panel**: two fixed tabs beside BB's Browser and Terminal.
+  **Info** is the Bot's profile, Pause / Resume and Stop, Check-ins, Memory,
+  Skills and Activity: **Needs you**, **Running**, **Waiting to start**,
+  **Scheduled** (its check-in and automations, with the next run) and
+  **Recent** (the last three, then Show all). **Threads** holds every
+  sub-thread you opened as a strip of tabs over BB's thread view: click to
+  switch, × or middle-click to close, drag to reorder, ↗ to open it as a
+  BB thread. The strip is saved per Bot on this device (at most 12; the
+  oldest one not showing closes first). With the panel split, both panes
+  share one strip. If the host can't open the tab, the thread opens in BB.
 - **Edit profile**: a drawn avatar (one of nine shapes with two eyes, in one
   of twelve colors, or **Match the name**), its name, and a Description: a
   sentence or two on its role ("You are my chief of staff."), which it's
@@ -992,12 +1016,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   its emoji until you pick a shape; the emoji stays for older clients.
 - **Chat**: BB's `ThreadChat` for the Bot's current thread, filling the
   page, so it looks and works exactly like any thread: the same timeline,
-  composer, queued messages, questions and approvals inline. When the Bot
-  has handed off, **Earlier conversation** above the chat opens the thread
-  before (`bot_chain`, which the iOS app also reads for its history).
-- **Needs you**: a banner under the header, only when a thread the Bot
-  started waits on you; it lists them and opens one in a click. The Bot's
-  own questions show inline in the chat, so they aren't repeated.
+  composer, queued messages, questions and approvals inline. Threads it
+  handed off from are under **Earlier conversations** in its sidebar
+  (`bot_chain`, which the iOS app also reads for its history).
 - **Quiet**: the Bot is told its chat is your inbox. With nothing new (a
   check-in with nothing to report, a notice that a thread it started
   finished fine, an automation result like `[PASS]`) it finishes without a
@@ -1009,12 +1030,6 @@ of Staff", with the same thread and check-ins; rename it from its page.
   chips: **Plan my week**, **What needs me today?** (both send), **Set up a
   morning brief** (the Morning brief preset) and **Customize me** (Edit
   profile).
-- **Activity**: a side panel (closed by default; remembered per device)
-  that pushes the chat over, with **Check-ins** and the sections that have
-  something: **Needs you**, **Running**, **Waiting to start**, **Scheduled**
-  (its check-in and any automation that wakes its thread, with the next
-  run) and **Recent** (threads it started that finished; the last three,
-  then Show all). With nothing in any, one quiet line.
 - **Check-ins**: four presets, one click each: **Morning brief** (weekdays
   8:00), **Evening wrap-up** (weekdays 18:00), **Every 2 hours while I'm
   working** (weekdays 9–17) and **Off**. A preset sets the schedule and adds

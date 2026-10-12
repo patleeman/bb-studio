@@ -59,6 +59,12 @@ test("sidebar groups: Needs you flat; trees placed by their root; grandchildren 
   expect(sidebarGroups(null)).toEqual({ needsYou: [], running: [], recurring: [], recent: [] });
 });
 
+test("a thread that needs the user isn't repeated in the trees unless it holds children", () => {
+  const groups = sidebarGroups(view({ needsYou: [t("ask", { needsYou: true }), t("parent", { needsYou: true })], completed: [t("kid", { parentId: "parent" })] }));
+  expect(groups.needsYou.map((each) => each.id)).toEqual(["ask", "parent"]);
+  expect(groups.recent.map((node) => node.thread.id)).toEqual(["parent"]);
+});
+
 test("a parent cycle can't loop the tree", () => {
   const groups = sidebarGroups(view({ completed: [t("a", { parentId: "b" }), t("b", { parentId: "a" }), t("c")] }));
   expect(groups.recent.map((node) => node.thread.id)).toEqual(["c"]);

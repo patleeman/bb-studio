@@ -41,7 +41,8 @@ A migration made an existing Chief of Staff the Bot, named "Chief of
 Staff", with the same thread and Heartbeat. `chief_of_staff`,
 `chief_of_staff_set` and `chief_of_staff_set_run` are deprecated aliases of
 `bot_get`, `bot_set_thread` and `bot_set_run` for one release. See the
-Studio README's **Bot** section for pause, stop and Activity.
+Studio README's **Bot** section for its workspace (sidebar, Info and
+Threads tabs), pause and stop.
 
 ## RPCs
 

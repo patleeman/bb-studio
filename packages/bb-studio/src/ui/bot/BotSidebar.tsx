@@ -82,7 +82,7 @@ export function BotSidebar({ bot, status, working, activity, earlier, onOpen }: 
   const [strip] = useStrip(bot.id);
   const groups = sidebarGroups(activity);
   const color = bot.color ?? colorForName(bot.name);
-  const surface = { "--bot-accent": color, background: `color-mix(in oklab, ${color} 4%, transparent)` } as CSSProperties;
+  const surface = { "--bot-accent": color, background: `color-mix(in oklab, ${color} 6%, transparent)` } as CSSProperties;
   const toggle = (id: string) => setLayout({ closed: layout.closed.includes(id) ? layout.closed.filter((each) => each !== id) : [...layout.closed, id] });
   const active = strip.active;
 

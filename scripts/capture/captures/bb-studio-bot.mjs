@@ -1,7 +1,9 @@
-// The Bot's own page (/plugins/studio/bot). First its onboarding, while the
+// The Bot's workspace (/plugins/studio/bot). First its onboarding, while the
 // staged BB has no Bot (greeting and starter chips); then a Bot with history:
-// BB's own thread view (ThreadChat) of its thread under the compact header,
-// a Needs-you banner for a thread it started, and Activity open beside it.
+// its sidebar of the threads it started (one needing the user, one running,
+// a nested follow-up, a recurring automation), its main thread in BB's own
+// thread view, and the right panel's Info tab; then two sub-threads open in
+// the right panel's Threads tab.
 const BOT_PATH = "/plugins/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
@@ -9,13 +11,16 @@ const CHILDREN = [
 ];
 const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet points, please.";
 
-/** Opens or closes the Activity panel; staging's plugin-problem card is closed so it doesn't cover the page. */
-const activity = (open) => async (client) => {
-  await client.waitForSelector('button[aria-label="Show activity"], button[aria-label="Hide activity"]', 30000);
-  await client.evaluate(`(() => { document.querySelector('button[aria-label="${open ? "Show" : "Hide"} activity"]')?.click(); return true; })()`);
-  await client.waitForSelector(open ? 'aside[aria-label="Activity"]' : 'button[aria-label="Show activity"]');
-  await client.evaluate(`(() => { [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide")?.click(); return true; })()`);
-};
+/** Staging's plugin-problem card is closed so it doesn't cover the page. */
+const dismissProblems = (client) => client.evaluate(`(() => { [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide")?.click(); return true; })()`);
+const SIDEBAR = 'nav[aria-label="Dot threads"]';
+/** Clicks a sidebar row by its title. */
+const openRow = (client, title) => client.evaluate(`(() => {
+  const row = [...document.querySelectorAll('${SIDEBAR} button[data-thread]')].find((each) => each.textContent.includes(${JSON.stringify(title)}));
+  if (!row) throw new Error("No sidebar row " + ${JSON.stringify(title)});
+  row.click();
+  return true;
+})()`);
 const assertChat = (client) => client.evaluate(`(() => {
   const chat = document.querySelector('section[aria-label="Chat"]');
   if (!chat) throw new Error("No Bot chat");
@@ -26,6 +31,25 @@ const assertChat = (client) => client.evaluate(`(() => {
 
 export default ({ projectId, pluginRpc, bbCli, sleep }) => {
   const json = async (args) => JSON.parse(await bbCli([...args, "--json"]));
+  /** For the workspace: a nested follow-up, a thread still running, and an automation that wakes the Bot. */
+  const workspaceExtras = async (botThread) => {
+    const titles = async (parent) => (await json(["thread", "list", "--parent-thread", parent]).catch(() => [])).map((thread) => thread.title);
+    const children = await json(["thread", "list", "--parent-thread", botThread]).catch(() => []);
+    const first = children.find((thread) => thread.title === CHILDREN[0].title);
+    if (first && !(await titles(first.id)).includes("Pull the ORBIT-42 thread digests")) {
+      await json(["thread", "spawn", "--project", projectId, "--parent-thread", first.id, "--title", "Pull the ORBIT-42 thread digests", "--prompt", "Reply with one short sentence: three digests pulled."]);
+    }
+    if (!children.some((thread) => thread.title === "Watch the ORBIT-42 staging deploy")) {
+      await json(["thread", "spawn", "--project", projectId, "--parent-thread", botThread, "--title", "Watch the ORBIT-42 staging deploy", "--prompt", "Use the shell to run `sleep 900`, then reply in one sentence that the staging deploy looks healthy."]);
+    }
+    const shown = await json(["thread", "show", botThread]).catch(() => null);
+    const botProject = shown?.thread?.projectId;
+    if (!botProject) throw new Error("The Bot's thread has no project");
+    const automations = await json(["automation", "list", "--project", botProject]).catch(() => []);
+    if (!(Array.isArray(automations) ? automations : automations.automations ?? []).some((each) => each.name === "Inbox sweep")) {
+      await bbCli(["automation", "create", "--project", botProject, "--name", "Inbox sweep", "--cron", "0 */3 * * 1-5", "--timezone", "America/New_York", "--prompt", "Sweep my inbox for anything about ORBIT-42.", "--provider", "codex", "--model", "gpt-6.1-sol", "--target-thread", botThread]);
+    }
+  };
   /** The Bot, with its first exchange and some history; made once per staging. */
   const seededBot = async () => {
     let { bot } = await pluginRpc("studio", "bot_get", {});
@@ -51,20 +75,53 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
       await bbCli(["thread", "tell", botThread, HISTORY]);
       await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "240"]).catch(() => {});
     }
+    await workspaceExtras(botThread);
     for (let i = 0; i < 60 && !(await pluginRpc("studio", "bot_activity", {})).needsYou.length; i++) await sleep(3000);
     await pluginRpc("studio", "bot_checkin_preset", { preset: "morning" });
     return bot;
   };
 
-  const history = async (client) => {
+  const workspace = async (client) => {
     await seededBot();
     await client.navigate(BOT_PATH);
-    await client.waitForText("Dot", 30000);
-    await activity(true)(client);
-    for (const text of ["Checks in", "Needs you", "Rotate the ORBIT-42 deploy key", "Scheduled", "Recent", "Waiting to start", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 60000);
-    await client.waitForSelector('[role=status][aria-label="Needs you"] button', 30000);
+    await client.waitForSelector(SIDEBAR, 30000);
+    await dismissProblems(client);
+    // The Bot's own sidebar replaces BB's here; hide BB's the way a user would (the SDK can't).
+    await client.evaluate(`(() => { const nav = document.querySelector('${SIDEBAR}'); if (nav && nav.getBoundingClientRect().left > 120) document.querySelector('button[aria-label="Toggle Sidebar"]')?.click(); return true; })()`);
+    for (const text of ["Needs you", "Running", "Recurring", "Recent", "Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", "Inbox sweep", "Pull the ORBIT-42 thread digests", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 90000);
+    // The follow-up nests under the thread that started it.
+    await client.evaluate(`(() => {
+      if (!document.querySelector('${SIDEBAR} li > button[data-thread] + ul button[data-thread]')) throw new Error("No nested sub-thread in the Bot sidebar");
+      return true;
+    })()`);
     await client.waitForText("ORBIT-42", 60000);
     await assertChat(client);
+  };
+
+  const info = async (client) => {
+    await workspace(client);
+    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await client.waitForSelector('[aria-label="Dot info"]', 30000);
+    for (const text of ["Check-ins", "Morning brief", "Memory", "Skills", "Activity", "Scheduled"]) await client.waitForText(text, 30000);
+    await sleep(1500);
+  };
+
+  const threads = async (client) => {
+    await workspace(client);
+    await openRow(client, CHILDREN[0].title);
+    await client.waitForSelector('[role=tablist][aria-label="Open threads"]', 30000);
+    await openRow(client, "Rotate the ORBIT-42 deploy key");
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const tabs = document.querySelectorAll('[role=tablist][aria-label="Open threads"] [role=tab]');
+        const chat = document.querySelector('section[aria-label="Thread"]');
+        if (tabs.length === 2 && chat && /vault|1Password|deploy key/i.test(chat.textContent)) return resolve(true);
+        if (Date.now() - started > 60000) return reject(new Error("The Threads tab doesn't show two sub-threads with the deploy-key question"));
+        setTimeout(tick, 300);
+      };
+      tick();
+    }))()`);
     await sleep(1500);
   };
 
@@ -84,6 +141,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         await sleep(600);
       },
     },
-    { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: history },
+    { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: info },
+    { id: "studio-bot-threads", packageDir: "bb-studio", fileName: "bot-threads.png", setup: threads },
   ];
 };
