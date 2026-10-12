@@ -239,6 +239,53 @@ export type RunnerView = z.infer<typeof runner>;
 /** A thread the Bot started that an automation wakes: it can be adopted as a runner. */
 const runnerAdoptable = z.object({ threadId: z.string(), title: z.string(), automationId: z.string(), automationName: z.string(), projectId: z.string(), cron: z.string().nullable(), enabled: z.boolean() });
 export type RunnerAdoptableView = z.infer<typeof runnerAdoptable>;
+/** A Bot automation's schedule (src/schedule.ts): times on days, an interval in a window, a raw cron, or once. */
+const hhmm = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+const weekday = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]);
+const scheduleCommon = {
+  timezone: z.string().min(1).max(100).optional(),
+  quiet: z.object({ from: hhmm, to: hhmm }).nullish(),
+  until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+};
+export const scheduleSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("times"), days: z.array(weekday).min(1).max(7), times: z.array(hhmm).min(1).max(24), ...scheduleCommon }),
+  z.object({ type: z.literal("interval"), every: z.number().int().min(1).max(1440), unit: z.enum(["minutes", "hours"]), days: z.array(weekday).min(1).max(7), from: hhmm.optional(), to: hhmm.optional(), ...scheduleCommon }),
+  z.object({ type: z.literal("cron"), cron: z.string().trim().min(1).max(100), ...scheduleCommon }),
+  z.object({ type: z.literal("once"), at: z.number() }),
+]);
+const automationKind = z.enum(["checkin", "runner", "reminder", "watcher"]);
+const interpreter = z.enum(["bash", "sh", "node", "python3"]);
+/** One of a Bot's automations (src/automations.ts): check-in, runner, reminder or watcher. */
+const botAutomation = z.object({
+  id: z.string(),
+  kind: automationKind,
+  name: z.string(),
+  /** The Bot's original check-in (its heartbeat): its instruction is the Memory page's Check-in section. */
+  original: z.boolean(),
+  instruction: z.string(),
+  schedule: scheduleSchema,
+  scheduleText: z.string(),
+  state: z.enum(["active", "paused", "done", "ended"]),
+  nextRunAt: z.number().nullable(),
+  lastRunAt: z.number().nullable(),
+  lastOutcome: z.string().nullable(),
+  /** Check-ins and reminders: a model and reasoning other than the Bot thread's; null fields use the thread's. */
+  model: z.object({ model: z.string().nullable(), reasoning: z.string().nullable() }).nullable(),
+  /** Watchers: the script (env values aren't sent back). */
+  script: z.object({ body: z.string(), interpreter, timeoutMs: z.number(), workingDirectory: z.string().nullable(), envKeys: z.array(z.string()) }).nullable(),
+  /** Who it wakes: "main" (the Bot's thread), a runner id (watchers), or "own" (a runner's own thread). */
+  target: z.string(),
+  targetName: z.string(),
+  threadId: z.string().nullable(),
+});
+export type BotAutomationView = z.infer<typeof botAutomation>;
+const botAutomationRun = z.object({ id: z.string(), at: z.number(), status: z.string(), manual: z.boolean(), outcome: z.string(), threadId: z.string().nullable() });
+export type BotAutomationRunView = z.infer<typeof botAutomationRun>;
+const automationName = z.string().trim().min(1).max(60);
+const automationInstruction = z.string().trim().max(2000);
+const automationModel = z.object({ model: z.string().max(200).nullish(), reasoning: z.string().max(40).nullish() }).nullish();
+const automationScript = z.object({ body: z.string().min(1).max(262_144), interpreter, timeoutMs: z.number().int().min(1000).max(900_000).optional(), env: z.record(z.string(), z.string()).optional(), workingDirectory: z.string().max(4096).nullish() });
+const automationId = z.string().min(1).max(200);
 const runnerName = z.string().trim().min(1).max(60);
 const runnerJob = z.string().trim().min(1).max(2000);
 const runnerId = z.string().min(1).max(200);
@@ -377,6 +424,16 @@ export const rpcContract = defineRpcContract({
   bot_runner_seen: { input: z.object({ botId, id: runnerId }), output: z.object({ ok: z.literal(true) }) },
   /** Adopt as runner: registers the thread, keeps its automation, switches it to runner_report. The user's choice only. */
   bot_runner_adopt: { input: z.object({ botId, threadId: z.string().min(1).max(200), automationId: z.string().min(1).max(200), name: runnerName.optional(), job: runnerJob.optional() }), output: runner },
+  /** A Bot's automations: check-ins (its original one first), reminders, watchers and runners. */
+  bot_automations: { input: forBot, output: z.object({ automations: z.array(botAutomation) }) },
+  bot_automation_create: { input: z.object({ botId, kind: automationKind, name: automationName, instruction: automationInstruction.optional(), schedule: scheduleSchema, model: automationModel, script: automationScript.nullish(), target: z.string().max(200).nullish() }), output: botAutomation },
+  bot_automation_update: { input: z.object({ botId, id: automationId, name: automationName.optional(), instruction: automationInstruction.optional(), schedule: scheduleSchema.optional(), model: automationModel, script: automationScript.nullish(), target: z.string().max(200).nullish() }), output: botAutomation },
+  bot_automation_pause: { input: z.object({ botId, id: automationId }), output: botAutomation },
+  bot_automation_resume: { input: z.object({ botId, id: automationId }), output: botAutomation },
+  bot_automation_run_now: { input: z.object({ botId, id: automationId }), output: botAutomation },
+  bot_automation_delete: { input: z.object({ botId, id: automationId }), output: z.object({ deleted: z.literal(true) }) },
+  /** Recent runs, newest first, with what came of each. */
+  bot_automation_runs: { input: z.object({ botId, id: automationId, limit: z.number().int().min(1).max(50).optional() }), output: z.object({ runs: z.array(botAutomationRun) }) },
   /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and the Bot keeps its new thread. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** Saves a collection query by name, replacing a view with that name. */

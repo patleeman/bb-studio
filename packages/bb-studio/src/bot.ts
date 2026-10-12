@@ -96,7 +96,7 @@ export function botInstructions(bot: { name: string; state: BotState; role?: str
     const memory = bot.memoryPageId ? `Your Memory page is ${bot.memoryPageId}: read it with pages_read when you wake up, keep it short and edit it yourself with pages_edit; its "## Check-in" section is your check-in list.` : "";
     const skills = `Save a reusable procedure as your own skill with bot_skill_write${bot.skills?.length ? `; yours: ${bot.skills.join(", ")} (bot_skill_read)` : ""}. Search your past threads with bot_history_search.`;
     const quiet = "Your chat is the user's inbox: post only what changed or needs them. When nothing did (a check-in with nothing new, a notice that a thread you started finished fine, an automation result like [PASS]), reply exactly [PASS]: no \"✓\", \"noted\" or other acknowledgement.";
-    const runners = "Give recurring work to a runner (runner_create).";
+    const runners = "Schedule with automation_create: check-ins, reminders, watchers, runners.";
     return [who, memory, quiet, runners, skills].filter(Boolean).join("\n");
   }
   return `${who}\nYou are ${bot.state} by the user. Don't start new work: don't spawn or steer threads, change Studio items or schedule anything. Answer questions, and tell the user to resume you (Studio → Bot → Resume) for anything else.`;
@@ -244,6 +244,13 @@ export interface BotDeps {
     /** Turns a runner Stop paused back on; false when it was deleted since. */
     restore(id: string): Promise<boolean>;
   };
+  /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
+  automations?: {
+    pauseAll(botId: string, onPaused?: (id: string) => void): Promise<string[]>;
+    restore(id: string): Promise<boolean>;
+    /** The Bot's thread changed: check-ins and reminders follow it. */
+    follow(botId: string): Promise<void>;
+  };
 }
 
 export class Bots {
@@ -273,6 +280,12 @@ export class Bots {
 
   private isPrimary(row: BotRow): boolean {
     return row.id === this.primaryId();
+  }
+
+  /** Where a Bot's original check-in (heartbeat) lives in ProjectRuns. */
+  heartbeatKey(botId?: string): string | null {
+    const row = this.row(botId);
+    return row ? this.runKey(row) : null;
   }
 
   /** Where the Bot's check-in lives in ProjectRuns: the personal project's for the primary, its own otherwise. */
@@ -589,6 +602,10 @@ export class Bots {
       if (run?.enabled) await this.deps.leads.runs.set(this.runKey(row), newThreadId, run);
       this.deps.changed();
     }
+    // Check-ins and reminders follow whichever Bot's thread this was (the primary's too).
+    for (const row of this.rows()) {
+      if (this.view(row).threadId === newThreadId) await this.deps.automations?.follow(row.id).catch(() => {});
+    }
   }
 
   /** Heartbeat off, remembering whether it was on; the Bot is told it's paused (botInstructions). */
@@ -597,7 +614,9 @@ export class Bots {
     if (row.state === "active") {
       const run = this.deps.leads.runs.get(this.runKey(row));
       if (run?.enabled) await this.writeRun(row, { ...run, enabled: false });
-      this.update(row, { state: "paused", heartbeat_was_on: run?.enabled ? 1 : 0 });
+      // Its other check-ins, reminders and watchers too; Resume turns back on these.
+      await this.deps.automations?.pauseAll(row.id, (id) => this.rememberPaused(row.id, "bot-automation", id));
+      this.update(this.need(row.id), { state: "paused", heartbeat_was_on: run?.enabled ? 1 : 0 });
     }
     return this.get(row.id);
   }
@@ -634,6 +653,8 @@ export class Bots {
           if (enabled === false) await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_resume", input: { projectId, automationId: each.item_id } as never, outputSchema: z.unknown() });
         } else if (each.kind === "runner") {
           await this.deps.runners?.restore(each.item_id);
+        } else if (each.kind === "bot-automation") {
+          await this.deps.automations?.restore(each.item_id);
         }
         forget.run(botId, each.kind, each.item_id);
       } catch (error) {
@@ -651,7 +672,7 @@ export class Bots {
   }
 
   /** Records what Stop paused, for Resume. */
-  private rememberPaused(botId: string, kind: "automation" | "runner", itemId: string, projectId: string | null = null): void {
+  private rememberPaused(botId: string, kind: "automation" | "runner" | "bot-automation", itemId: string, projectId: string | null = null): void {
     this.deps.db.prepare("INSERT OR IGNORE INTO bot_stop_paused (bot_id, kind, item_id, project_id) VALUES (?, ?, ?, ?)").run(botId, kind, itemId, projectId);
   }
 

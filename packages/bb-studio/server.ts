@@ -43,6 +43,8 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { Bots, SKILL_NAME } from "./src/bot";
 import { parseSchedule, Runners } from "./src/runners";
+import { Automations } from "./src/automations";
+import { parseDuration, type Schedule } from "./src/schedule";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { formatWorkspace, openHrefs, WorkspacePresence, type WorkspaceCommand } from "./src/workspace-presence";
 import { WORKSPACE_CHANNEL } from "./src/ids";
@@ -148,7 +150,7 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_skill_write", "bot_skill_read", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now"] as const;
+  const BOT_OWN_TOOLS = ["bot_skill_write", "bot_skill_read", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
   const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS };
@@ -337,6 +339,11 @@ export default async function plugin(bb: BbPluginApi) {
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
+    automations: {
+      pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
+      restore: (id) => automations.restore(id),
+      follow: async (botId) => { const bot = automationBot(botId); if (bot) await automations.follow(bot); },
+    },
   });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
@@ -345,6 +352,28 @@ export default async function plugin(bb: BbPluginApi) {
     startedThreads: (botId) => bots.started(botId),
     chain: (botId) => bots.chain(botId),
   });
+  // A Bot's automations (src/automations.ts): check-ins, reminders, watchers, and its runners in the same list.
+  const automationBot = (botId?: string) => { const bot = bots.stored(botId); return bot ? { id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, primary: bot.primary !== false, kind: bot.kind ?? "studio" } : null; };
+  const automations: Automations = new Automations({
+    db, sdk: bb.sdk, changed: tagsChanged,
+    bot: automationBot,
+    heartbeat: {
+      get: (botId) => { const key = bots.heartbeatKey(botId); return key ? projectLeads.runs.get(key) : null; },
+      set: async (botId, run) => { await bots.setRun({ botId, ...run }); },
+      automation: (botId) => { const key = bots.heartbeatKey(botId); return key ? projectLeads.runs.automation(key) : null; },
+    },
+    runners: {
+      list: (botId) => runners.list(botId),
+      create: (input, botId) => { bots.requireStudio(botId, "runners"); return runners.create(input, botId); },
+      update: (input, botId) => runners.update(input, botId),
+      setState: (id, state, botId) => runners.setState(id, state, botId),
+      runNow: (id, botId) => runners.runNow(id, botId),
+      delete: (id, botId) => runners.delete(id, botId),
+      automation: (id) => runners.automation(id),
+    },
+  });
+  // Watchers' findings and end dates, once a minute.
+  const automationTimer = setInterval(() => void automations.tick().catch((error) => bb.log.warn(`Automations tick failed: ${errorText(error)}`)), 60_000);
   // Moves Spaces' leads to projects, retires old heartbeat automations and turns
   // migrated heartbeats back on; whatever fails is retried next startup.
   void projectLeads.finishMoves()
@@ -521,6 +550,14 @@ export default async function plugin(bb: BbPluginApi) {
     bot_skill_write: ({ botId, ...input }) => { bots.requireStudio(botId, "skills"); return bots.writeSkill(input, botId); },
     bot_skill_share: ({ botId, name }) => bots.shareSkill(name, botId),
     bot_skill_delete: ({ botId, name }) => ({ deleted: bots.deleteSkill(name, botId) }),
+    bot_automations: async ({ botId }) => ({ automations: await automations.list(botId) }),
+    bot_automation_create: ({ botId, ...input }) => automations.create(input as never, botId),
+    bot_automation_update: ({ botId, ...input }) => automations.update(input as never, botId),
+    bot_automation_pause: ({ botId, id }) => automations.setState(id, "paused", botId),
+    bot_automation_resume: ({ botId, id }) => automations.setState(id, "active", botId),
+    bot_automation_run_now: ({ botId, id }) => automations.runNow(id, botId),
+    bot_automation_delete: ({ botId, id }) => automations.delete(id, botId),
+    bot_automation_runs: async ({ botId, id, limit }) => ({ runs: await automations.runs(id, botId, limit) }),
     bot_runners: async ({ botId }) => { const [list, adoptable] = await Promise.all([runners.list(botId), runners.adoptable(botId)]); return { runners: list, adoptable }; },
     bot_runner_create: ({ botId, ...input }) => { bots.requireStudio(botId, "runners"); return runners.create(input, botId); },
     bot_runner_update: ({ botId, ...input }) => runners.update(input, botId),
@@ -854,6 +891,66 @@ export default async function plugin(bb: BbPluginApi) {
   runnerTool("runner_delete", "Delete a runner you made: its schedule is deleted and its thread archived. An adopted runner is only let go (its thread and automation stay). Only when the user asks or the job is over.",
     z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => (await runners.delete(id, botId)).kept ? "Let go of the adopted runner; its thread and automation stay." : "Deleted the runner; its thread is archived.");
   runnerTool("runner_list", "List your runners: schedule, state, next run and last report.", z.object({}), async (_input: unknown, botId) => (await runners.list(botId)).map(describeRunner).join("\n") || "No runners yet.");
+  // The Bot's automations: check-ins, reminders, watchers and runners in one list (src/automations.ts).
+  const hhmm = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+  const toolSchedule = z.object({
+    times: z.array(hhmm).max(24).optional().describe("HH:MM run times, e.g. [\"08:00\",\"18:00\"]"),
+    every: z.string().regex(/^\d+\s*(m|min|minutes?|h|hours?)$/).optional().describe("Instead of times: an interval, e.g. 15m or 2h"),
+    from: hhmm.optional().describe("With every: active window start"), to: hhmm.optional().describe("With every: window end"),
+    days: z.array(z.number().int().min(0).max(6)).optional().describe("0=Sun..6=Sat; default every day"),
+    quiet: z.object({ from: hhmm, to: hhmm }).optional().describe("Skip runs in these hours, e.g. 22:00-07:00"),
+    until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Last day, YYYY-MM-DD"),
+    cron: z.string().max(100).optional().describe("Raw five-field cron instead"),
+    timezone: z.string().max(100).optional(),
+    at: z.string().max(60).optional().describe("Reminders: ISO date-time"), in: z.string().max(20).optional().describe("Reminders: delay like 30m, 2h, 1d"),
+  });
+  const toSchedule = (input: z.infer<typeof toolSchedule>): Schedule => {
+    if (input.at || input.in) {
+      const at = input.at ? Date.parse(input.at) : Date.now() + parseDuration(input.in!);
+      if (!Number.isFinite(at)) throw new Error(`"${input.at}" isn't a date-time.`);
+      return { type: "once", at };
+    }
+    const common = { ...(input.timezone ? { timezone: input.timezone } : {}), ...(input.quiet ? { quiet: input.quiet } : {}), ...(input.until ? { until: input.until } : {}) };
+    const days = (input.days ?? [0, 1, 2, 3, 4, 5, 6]) as (0 | 1 | 2 | 3 | 4 | 5 | 6)[];
+    if (input.cron) return { type: "cron", cron: input.cron, ...common };
+    if (input.every) {
+      const [, n, unit] = /^(\d+)\s*(\w+)$/.exec(input.every)!;
+      return { type: "interval", every: Number(n), unit: unit!.startsWith("h") ? "hours" : "minutes", days, ...(input.from ? { from: input.from } : {}), ...(input.to ? { to: input.to } : {}), ...common };
+    }
+    if (!input.times?.length) throw new Error("Give times, every, cron, at or in.");
+    return { type: "times", days, times: input.times, ...common };
+  };
+  const describeAutomation = (each: Awaited<ReturnType<typeof automations.list>>[number]) =>
+    `- ${each.name} (${each.kind}, ${each.id}, ${each.state}): ${each.scheduleText}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toLocaleString()}` : ""}${each.kind === "watcher" ? ` → wakes ${each.targetName}` : ""}. ${each.kind === "watcher" ? `Script (${each.script?.interpreter})` : each.instruction}${each.model?.model ? ` [${each.model.model}${each.model.reasoning ? `/${each.model.reasoning}` : ""}]` : ""}${each.lastOutcome ? `\n  Last: ${each.lastOutcome}` : ""}`;
+  const automationFields = {
+    instruction: z.string().trim().max(2000).optional().describe("Check-in/reminder: what to do when it fires. Runner: its job. Watcher: what to do with the script's output"),
+    schedule: toolSchedule.optional(),
+    model: z.string().max(200).optional().describe("Check-in/reminder: a cheaper model on your provider for routine runs"),
+    reasoning: z.string().max(40).optional(),
+    script: z.string().max(262_144).optional().describe("Watcher: the script. Exit 0 and print the finding to stdout to wake you; print nothing when nothing changed"),
+    interpreter: z.enum(["bash", "sh", "node", "python3"]).optional(),
+    target: z.string().max(200).optional().describe("Watcher: \"main\" (you, default) or a runner id/name to wake"),
+  };
+  type AutomationToolInput = { name?: string; instruction?: string; schedule?: z.infer<typeof toolSchedule>; model?: string; reasoning?: string; script?: string; interpreter?: "bash" | "sh" | "node" | "python3"; target?: string };
+  const automationChanges = (input: AutomationToolInput) => ({
+    ...(input.name ? { name: input.name } : {}), ...(input.instruction !== undefined ? { instruction: input.instruction } : {}),
+    ...(input.schedule ? { schedule: toSchedule(input.schedule) } : {}),
+    ...(input.model || input.reasoning ? { model: { model: input.model ?? null, reasoning: input.reasoning ?? null } } : {}),
+    ...(input.script ? { script: { body: input.script, interpreter: input.interpreter ?? "bash" } } : {}),
+    ...(input.target ? { target: input.target } : {}),
+  });
+  runnerTool("automation_list", "List your automations: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome.", z.object({}),
+    async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "No automations yet.");
+  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"). watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread.",
+    z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
+    async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule: toSchedule(input.schedule!), ...automationChanges(input) } as never, botId))}`);
+  runnerTool("automation_update", "Change an automation's name, instruction, schedule, model or script.",
+    z.object({ id: z.string().min(1).describe("Automation id or name"), name: z.string().trim().min(1).max(60).optional(), ...automationFields }),
+    async (input: AutomationToolInput & { id: string }, botId) => describeAutomation(await automations.update({ id: input.id, ...automationChanges(input) } as never, botId)));
+  runnerTool("automation_pause", "Pause an automation.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeAutomation(await automations.setState(id, "paused", botId)));
+  runnerTool("automation_resume", "Resume a paused automation.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeAutomation(await automations.setState(id, "active", botId)));
+  runnerTool("automation_run_now", "Run an automation now, outside its schedule.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeAutomation(await automations.runNow(id, botId)));
+  runnerTool("automation_delete", "Delete an automation. Only when the user asks or it's no longer needed.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => { await automations.delete(id, botId); return "Deleted."; });
   bb.agents.registerTool({
     name: "runner_report",
     description: "Report from this run. log: kept in this thread and the Bot's Activity. tell: one short line to the user in the Bot's chat. urgent: tell plus Needs you and a phone push, only when the user must act now. With nothing new, don't call it and finish without a final message.",
@@ -1074,7 +1171,7 @@ export default async function plugin(bb: BbPluginApi) {
     "health.disable": ({ pluginId }) => health.disable(pluginId),
   });
   const healthTimer = setInterval(() => void health.check().catch((error) => bb.log.warn(`Plugin health check failed: ${errorText(error)}`)), HEALTH_INTERVAL_MS);
-  bb.onDispose(() => { clearInterval(healthTimer); health.dispose(); });
+  bb.onDispose(() => { clearInterval(healthTimer); clearInterval(automationTimer); health.dispose(); });
   // BB Studio setup: add-ons, retired plugins and what to run; see src/setup.ts.
   const setup = new SetupService({
     sdk: bb.sdk,

@@ -278,6 +278,12 @@ export class Runners {
     return true;
   }
 
+  /** A runner's BB automation, for its runs. */
+  automation(id: string): { id: string; projectId: string } | null {
+    const row = this.deps.db.prepare("SELECT automation_id, automation_project_id, project_id FROM bot_runners WHERE id = ?").get(id) as Pick<RunnerRow, "automation_id" | "automation_project_id" | "project_id"> | undefined;
+    return row?.automation_id ? { id: row.automation_id, projectId: row.automation_project_id ?? row.project_id } : null;
+  }
+
   /** Runs it now, through its automation (so the run counts like a scheduled one). */
   async runNow(id: string, botId?: string): Promise<RunnerView> {
     const row = this.row(id, botId);

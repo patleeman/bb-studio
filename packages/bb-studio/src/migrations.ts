@@ -256,4 +256,16 @@ export const MIGRATIONS = [
        bot_id TEXT NOT NULL, kind TEXT NOT NULL, item_id TEXT NOT NULL, project_id TEXT,
        PRIMARY KEY (bot_id, kind, item_id)
      );`,
+  // Bot automations (src/automations.ts): check-ins, reminders and watchers,
+  // each one or more BB automations (bb_ids) Studio keeps as one.
+  `CREATE TABLE bot_automations (
+       id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, instruction TEXT NOT NULL DEFAULT '',
+       script TEXT, interpreter TEXT, timeout_ms INTEGER, env_json TEXT, working_dir TEXT,
+       target TEXT NOT NULL DEFAULT 'main', schedule_json TEXT NOT NULL,
+       provider_id TEXT, model TEXT, reasoning TEXT,
+       state TEXT NOT NULL, project_id TEXT NOT NULL, bb_ids TEXT NOT NULL DEFAULT '[]', target_thread_id TEXT,
+       seen_until INTEGER NOT NULL DEFAULT 0, last_fired_at INTEGER, last_fire TEXT,
+       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+     );
+   CREATE INDEX bot_automations_bot ON bot_automations (bot_id);`,
 ];

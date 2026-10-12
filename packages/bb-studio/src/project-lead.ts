@@ -282,6 +282,12 @@ export class ProjectRuns {
     return this.db.prepare("SELECT project_id, enabled, cadence, time, cron, automation_id, automation_project_id FROM project_runs WHERE project_id = ?").get(projectId) as RunRow | undefined;
   }
 
+  /** The heartbeat's BB automation, if it has one. */
+  automation(projectId: string): { id: string; projectId: string } | null {
+    const row = this.row(projectId);
+    return row?.automation_id ? { id: row.automation_id, projectId: row.automation_project_id ?? PERSONAL_PROJECT_ID } : null;
+  }
+
   get(projectId: string): HeartbeatRun | null {
     const row = this.row(projectId);
     return row ? { enabled: !!row.enabled, cadence: row.cadence, time: row.time, ...(row.cron == null ? {} : { cron: row.cron }) } : null;

@@ -504,3 +504,26 @@ it("switches a thread's model in place on the same provider, and hands a bot's t
   await expect(x.bots.switchModel(primary, { providerId: "hermes", model: "h" })).rejects.toThrow(/personal project/);
   await expect(x.bots.switchModel(primary, { providerId: "nope", model: "h" })).rejects.toThrow(/isn't an agent provider/);
 });
+
+it("Pause and Stop turn the Bot's own automations off; Resume turns back on only those", async () => {
+  const x = await setup();
+  const states = new Map([["aut_on", "active"], ["aut_off", "paused"]]);
+  const automations = {
+    pauseAll: async (_botId: string, onPaused?: (id: string) => void) => {
+      const paused = [...states].filter(([, state]) => state === "active").map(([id]) => id);
+      for (const id of paused) { states.set(id, "paused"); onPaused?.(id); }
+      return paused;
+    },
+    restore: vi.fn(async (id: string) => { states.set(id, "active"); return true; }),
+    follow: vi.fn(async () => {}),
+  };
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, automations });
+  x.add({ id: "bot1" });
+  await bots.setThread("bot1");
+  await bots.pause();
+  expect(states.get("aut_on")).toBe("paused");
+  await bots.stop();
+  await bots.resume();
+  expect(automations.restore.mock.calls.map(([id]) => id)).toEqual(["aut_on"]);
+  expect([...states.values()]).toEqual(["active", "paused"]);
+});

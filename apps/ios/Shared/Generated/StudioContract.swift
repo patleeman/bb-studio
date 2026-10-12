@@ -62,6 +62,14 @@ public enum Studio {
     public static let bot_runner_delete = "bot_runner_delete"
     public static let bot_runner_seen = "bot_runner_seen"
     public static let bot_runner_adopt = "bot_runner_adopt"
+    public static let bot_automations = "bot_automations"
+    public static let bot_automation_create = "bot_automation_create"
+    public static let bot_automation_update = "bot_automation_update"
+    public static let bot_automation_pause = "bot_automation_pause"
+    public static let bot_automation_resume = "bot_automation_resume"
+    public static let bot_automation_run_now = "bot_automation_run_now"
+    public static let bot_automation_delete = "bot_automation_delete"
+    public static let bot_automation_runs = "bot_automation_runs"
     public static let thread_handoff = "thread_handoff"
     public static let saveView = "saveView"
     public static let deleteView = "deleteView"
@@ -305,6 +313,22 @@ public enum Studio {
   public typealias BotRunnerSeen = BotRunnerSeenOutput
 
   public typealias BotRunnerAdopt = BotRunnerAdoptOutput
+
+  public typealias BotAutomations = BotAutomationsOutput
+
+  public typealias BotAutomationCreate = BotAutomationCreateOutput
+
+  public typealias BotAutomationUpdate = BotAutomationUpdateOutput
+
+  public typealias BotAutomationPause = BotAutomationPauseOutput
+
+  public typealias BotAutomationResume = BotAutomationResumeOutput
+
+  public typealias BotAutomationRunNow = BotAutomationRunNowOutput
+
+  public typealias BotAutomationDelete = BotAutomationDeleteOutput
+
+  public typealias BotAutomationRuns = BotAutomationRunsOutput
 
   public typealias ThreadHandoff = ThreadHandoffOutput
 
@@ -6626,6 +6650,1218 @@ public enum Studio {
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
       self.urgent = urgent
+    }
+  }
+
+  public struct BotAutomationsInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public enum BotAutomationsOutputAutomationsItemKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case reminder
+    case watcher
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "reminder": self = .reminder
+      case "watcher": self = .watcher
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .reminder: try container.encode("reminder")
+      case .watcher: try container.encode("watcher")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotAutomationsOutputAutomationsItemState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case done
+    case ended
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "done": self = .done
+      case "ended": self = .ended
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .done: try container.encode("done")
+      case .ended: try container.encode("ended")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationsOutputAutomationsItemModel: Sendable, Hashable, Codable {
+    public var model: String?
+    public var reasoning: String?
+
+    public init(model: String? = nil, reasoning: String? = nil) {
+      self.model = model
+      self.reasoning = reasoning
+    }
+  }
+
+  public enum BotAutomationsOutputAutomationsItemScriptInterpreter: Sendable, Hashable, Codable {
+    case bash
+    case sh
+    case node
+    case python3
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "bash": self = .bash
+      case "sh": self = .sh
+      case "node": self = .node
+      case "python3": self = .python3
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .bash: try container.encode("bash")
+      case .sh: try container.encode("sh")
+      case .node: try container.encode("node")
+      case .python3: try container.encode("python3")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationsOutputAutomationsItemScript: Sendable, Hashable, Codable {
+    public var body: String?
+    public var interpreter: BotAutomationsOutputAutomationsItemScriptInterpreter?
+    public var timeoutMs: Double?
+    public var workingDirectory: String?
+    public var envKeys: [String]?
+
+    public init(body: String? = nil, interpreter: BotAutomationsOutputAutomationsItemScriptInterpreter? = nil, timeoutMs: Double? = nil, workingDirectory: String? = nil, envKeys: [String]? = nil) {
+      self.body = body
+      self.interpreter = interpreter
+      self.timeoutMs = timeoutMs
+      self.workingDirectory = workingDirectory
+      self.envKeys = envKeys
+    }
+  }
+
+  public struct BotAutomationsOutputAutomationsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: BotAutomationsOutputAutomationsItemKind?
+    public var name: String?
+    public var original: Bool?
+    public var instruction: String?
+    public var schedule: StudioJSONValue?
+    public var scheduleText: String?
+    public var state: BotAutomationsOutputAutomationsItemState?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastOutcome: String?
+    public var model: BotAutomationsOutputAutomationsItemModel?
+    public var script: BotAutomationsOutputAutomationsItemScript?
+    public var target: String?
+    public var targetName: String?
+    public var threadId: String?
+
+    public init(id: String? = nil, kind: BotAutomationsOutputAutomationsItemKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationsOutputAutomationsItemState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationsOutputAutomationsItemModel? = nil, script: BotAutomationsOutputAutomationsItemScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.id = id
+      self.kind = kind
+      self.name = name
+      self.original = original
+      self.instruction = instruction
+      self.schedule = schedule
+      self.scheduleText = scheduleText
+      self.state = state
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastOutcome = lastOutcome
+      self.model = model
+      self.script = script
+      self.target = target
+      self.targetName = targetName
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotAutomationsOutput: Sendable, Hashable, Codable {
+    public var automations: [BotAutomationsOutputAutomationsItem]?
+
+    public init(automations: [BotAutomationsOutputAutomationsItem]? = nil) {
+      self.automations = automations
+    }
+  }
+
+  public enum BotAutomationCreateInputKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case reminder
+    case watcher
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "reminder": self = .reminder
+      case "watcher": self = .watcher
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .reminder: try container.encode("reminder")
+      case .watcher: try container.encode("watcher")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationCreateInputModel: Sendable, Hashable, Codable {
+    public var model: String?
+    public var reasoning: String?
+
+    public init(model: String? = nil, reasoning: String? = nil) {
+      self.model = model
+      self.reasoning = reasoning
+    }
+  }
+
+  public enum BotAutomationCreateInputScriptInterpreter: Sendable, Hashable, Codable {
+    case bash
+    case sh
+    case node
+    case python3
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "bash": self = .bash
+      case "sh": self = .sh
+      case "node": self = .node
+      case "python3": self = .python3
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .bash: try container.encode("bash")
+      case .sh: try container.encode("sh")
+      case .node: try container.encode("node")
+      case .python3: try container.encode("python3")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationCreateInputScript: Sendable, Hashable, Codable {
+    public var body: String?
+    public var interpreter: BotAutomationCreateInputScriptInterpreter?
+    public var timeoutMs: Int?
+    public var env: [String: String]?
+    public var workingDirectory: String?
+
+    public init(body: String? = nil, interpreter: BotAutomationCreateInputScriptInterpreter? = nil, timeoutMs: Int? = nil, env: [String: String]? = nil, workingDirectory: String? = nil) {
+      self.body = body
+      self.interpreter = interpreter
+      self.timeoutMs = timeoutMs
+      self.env = env
+      self.workingDirectory = workingDirectory
+    }
+  }
+
+  public struct BotAutomationCreateInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var kind: BotAutomationCreateInputKind?
+    public var name: String?
+    public var instruction: String?
+    public var schedule: StudioJSONValue?
+    public var model: BotAutomationCreateInputModel?
+    public var script: BotAutomationCreateInputScript?
+    public var target: String?
+
+    public init(botId: String? = nil, kind: BotAutomationCreateInputKind? = nil, name: String? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, model: BotAutomationCreateInputModel? = nil, script: BotAutomationCreateInputScript? = nil, target: String? = nil) {
+      self.botId = botId
+      self.kind = kind
+      self.name = name
+      self.instruction = instruction
+      self.schedule = schedule
+      self.model = model
+      self.script = script
+      self.target = target
+    }
+  }
+
+  public enum BotAutomationCreateOutputKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case reminder
+    case watcher
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "reminder": self = .reminder
+      case "watcher": self = .watcher
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .reminder: try container.encode("reminder")
+      case .watcher: try container.encode("watcher")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotAutomationCreateOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case done
+    case ended
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "done": self = .done
+      case "ended": self = .ended
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .done: try container.encode("done")
+      case .ended: try container.encode("ended")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationCreateOutputModel: Sendable, Hashable, Codable {
+    public var model: String?
+    public var reasoning: String?
+
+    public init(model: String? = nil, reasoning: String? = nil) {
+      self.model = model
+      self.reasoning = reasoning
+    }
+  }
+
+  public enum BotAutomationCreateOutputScriptInterpreter: Sendable, Hashable, Codable {
+    case bash
+    case sh
+    case node
+    case python3
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "bash": self = .bash
+      case "sh": self = .sh
+      case "node": self = .node
+      case "python3": self = .python3
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .bash: try container.encode("bash")
+      case .sh: try container.encode("sh")
+      case .node: try container.encode("node")
+      case .python3: try container.encode("python3")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationCreateOutputScript: Sendable, Hashable, Codable {
+    public var body: String?
+    public var interpreter: BotAutomationCreateOutputScriptInterpreter?
+    public var timeoutMs: Double?
+    public var workingDirectory: String?
+    public var envKeys: [String]?
+
+    public init(body: String? = nil, interpreter: BotAutomationCreateOutputScriptInterpreter? = nil, timeoutMs: Double? = nil, workingDirectory: String? = nil, envKeys: [String]? = nil) {
+      self.body = body
+      self.interpreter = interpreter
+      self.timeoutMs = timeoutMs
+      self.workingDirectory = workingDirectory
+      self.envKeys = envKeys
+    }
+  }
+
+  public struct BotAutomationCreateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: BotAutomationCreateOutputKind?
+    public var name: String?
+    public var original: Bool?
+    public var instruction: String?
+    public var schedule: StudioJSONValue?
+    public var scheduleText: String?
+    public var state: BotAutomationCreateOutputState?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastOutcome: String?
+    public var model: BotAutomationCreateOutputModel?
+    public var script: BotAutomationCreateOutputScript?
+    public var target: String?
+    public var targetName: String?
+    public var threadId: String?
+
+    public init(id: String? = nil, kind: BotAutomationCreateOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationCreateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationCreateOutputModel? = nil, script: BotAutomationCreateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.id = id
+      self.kind = kind
+      self.name = name
+      self.original = original
+      self.instruction = instruction
+      self.schedule = schedule
+      self.scheduleText = scheduleText
+      self.state = state
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastOutcome = lastOutcome
+      self.model = model
+      self.script = script
+      self.target = target
+      self.targetName = targetName
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotAutomationUpdateInputModel: Sendable, Hashable, Codable {
+    public var model: String?
+    public var reasoning: String?
+
+    public init(model: String? = nil, reasoning: String? = nil) {
+      self.model = model
+      self.reasoning = reasoning
+    }
+  }
+
+  public enum BotAutomationUpdateInputScriptInterpreter: Sendable, Hashable, Codable {
+    case bash
+    case sh
+    case node
+    case python3
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "bash": self = .bash
+      case "sh": self = .sh
+      case "node": self = .node
+      case "python3": self = .python3
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .bash: try container.encode("bash")
+      case .sh: try container.encode("sh")
+      case .node: try container.encode("node")
+      case .python3: try container.encode("python3")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationUpdateInputScript: Sendable, Hashable, Codable {
+    public var body: String?
+    public var interpreter: BotAutomationUpdateInputScriptInterpreter?
+    public var timeoutMs: Int?
+    public var env: [String: String]?
+    public var workingDirectory: String?
+
+    public init(body: String? = nil, interpreter: BotAutomationUpdateInputScriptInterpreter? = nil, timeoutMs: Int? = nil, env: [String: String]? = nil, workingDirectory: String? = nil) {
+      self.body = body
+      self.interpreter = interpreter
+      self.timeoutMs = timeoutMs
+      self.env = env
+      self.workingDirectory = workingDirectory
+    }
+  }
+
+  public struct BotAutomationUpdateInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+    public var name: String?
+    public var instruction: String?
+    public var schedule: StudioJSONValue?
+    public var model: BotAutomationUpdateInputModel?
+    public var script: BotAutomationUpdateInputScript?
+    public var target: String?
+
+    public init(botId: String? = nil, id: String? = nil, name: String? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, model: BotAutomationUpdateInputModel? = nil, script: BotAutomationUpdateInputScript? = nil, target: String? = nil) {
+      self.botId = botId
+      self.id = id
+      self.name = name
+      self.instruction = instruction
+      self.schedule = schedule
+      self.model = model
+      self.script = script
+      self.target = target
+    }
+  }
+
+  public enum BotAutomationUpdateOutputKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case reminder
+    case watcher
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "reminder": self = .reminder
+      case "watcher": self = .watcher
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .reminder: try container.encode("reminder")
+      case .watcher: try container.encode("watcher")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotAutomationUpdateOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case done
+    case ended
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "done": self = .done
+      case "ended": self = .ended
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .done: try container.encode("done")
+      case .ended: try container.encode("ended")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationUpdateOutputModel: Sendable, Hashable, Codable {
+    public var model: String?
+    public var reasoning: String?
+
+    public init(model: String? = nil, reasoning: String? = nil) {
+      self.model = model
+      self.reasoning = reasoning
+    }
+  }
+
+  public enum BotAutomationUpdateOutputScriptInterpreter: Sendable, Hashable, Codable {
+    case bash
+    case sh
+    case node
+    case python3
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "bash": self = .bash
+      case "sh": self = .sh
+      case "node": self = .node
+      case "python3": self = .python3
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .bash: try container.encode("bash")
+      case .sh: try container.encode("sh")
+      case .node: try container.encode("node")
+      case .python3: try container.encode("python3")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationUpdateOutputScript: Sendable, Hashable, Codable {
+    public var body: String?
+    public var interpreter: BotAutomationUpdateOutputScriptInterpreter?
+    public var timeoutMs: Double?
+    public var workingDirectory: String?
+    public var envKeys: [String]?
+
+    public init(body: String? = nil, interpreter: BotAutomationUpdateOutputScriptInterpreter? = nil, timeoutMs: Double? = nil, workingDirectory: String? = nil, envKeys: [String]? = nil) {
+      self.body = body
+      self.interpreter = interpreter
+      self.timeoutMs = timeoutMs
+      self.workingDirectory = workingDirectory
+      self.envKeys = envKeys
+    }
+  }
+
+  public struct BotAutomationUpdateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: BotAutomationUpdateOutputKind?
+    public var name: String?
+    public var original: Bool?
+    public var instruction: String?
+    public var schedule: StudioJSONValue?
+    public var scheduleText: String?
+    public var state: BotAutomationUpdateOutputState?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastOutcome: String?
+    public var model: BotAutomationUpdateOutputModel?
+    public var script: BotAutomationUpdateOutputScript?
+    public var target: String?
+    public var targetName: String?
+    public var threadId: String?
+
+    public init(id: String? = nil, kind: BotAutomationUpdateOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationUpdateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationUpdateOutputModel? = nil, script: BotAutomationUpdateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.id = id
+      self.kind = kind
+      self.name = name
+      self.original = original
+      self.instruction = instruction
+      self.schedule = schedule
+      self.scheduleText = scheduleText
+      self.state = state
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastOutcome = lastOutcome
+      self.model = model
+      self.script = script
+      self.target = target
+      self.targetName = targetName
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotAutomationPauseInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
+      self.id = id
+    }
+  }
+
+  public enum BotAutomationPauseOutputKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case reminder
+    case watcher
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "reminder": self = .reminder
+      case "watcher": self = .watcher
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .reminder: try container.encode("reminder")
+      case .watcher: try container.encode("watcher")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotAutomationPauseOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case done
+    case ended
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "done": self = .done
+      case "ended": self = .ended
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .done: try container.encode("done")
+      case .ended: try container.encode("ended")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationPauseOutputModel: Sendable, Hashable, Codable {
+    public var model: String?
+    public var reasoning: String?
+
+    public init(model: String? = nil, reasoning: String? = nil) {
+      self.model = model
+      self.reasoning = reasoning
+    }
+  }
+
+  public enum BotAutomationPauseOutputScriptInterpreter: Sendable, Hashable, Codable {
+    case bash
+    case sh
+    case node
+    case python3
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "bash": self = .bash
+      case "sh": self = .sh
+      case "node": self = .node
+      case "python3": self = .python3
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .bash: try container.encode("bash")
+      case .sh: try container.encode("sh")
+      case .node: try container.encode("node")
+      case .python3: try container.encode("python3")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationPauseOutputScript: Sendable, Hashable, Codable {
+    public var body: String?
+    public var interpreter: BotAutomationPauseOutputScriptInterpreter?
+    public var timeoutMs: Double?
+    public var workingDirectory: String?
+    public var envKeys: [String]?
+
+    public init(body: String? = nil, interpreter: BotAutomationPauseOutputScriptInterpreter? = nil, timeoutMs: Double? = nil, workingDirectory: String? = nil, envKeys: [String]? = nil) {
+      self.body = body
+      self.interpreter = interpreter
+      self.timeoutMs = timeoutMs
+      self.workingDirectory = workingDirectory
+      self.envKeys = envKeys
+    }
+  }
+
+  public struct BotAutomationPauseOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: BotAutomationPauseOutputKind?
+    public var name: String?
+    public var original: Bool?
+    public var instruction: String?
+    public var schedule: StudioJSONValue?
+    public var scheduleText: String?
+    public var state: BotAutomationPauseOutputState?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastOutcome: String?
+    public var model: BotAutomationPauseOutputModel?
+    public var script: BotAutomationPauseOutputScript?
+    public var target: String?
+    public var targetName: String?
+    public var threadId: String?
+
+    public init(id: String? = nil, kind: BotAutomationPauseOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationPauseOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationPauseOutputModel? = nil, script: BotAutomationPauseOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.id = id
+      self.kind = kind
+      self.name = name
+      self.original = original
+      self.instruction = instruction
+      self.schedule = schedule
+      self.scheduleText = scheduleText
+      self.state = state
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastOutcome = lastOutcome
+      self.model = model
+      self.script = script
+      self.target = target
+      self.targetName = targetName
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotAutomationResumeInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
+      self.id = id
+    }
+  }
+
+  public enum BotAutomationResumeOutputKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case reminder
+    case watcher
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "reminder": self = .reminder
+      case "watcher": self = .watcher
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .reminder: try container.encode("reminder")
+      case .watcher: try container.encode("watcher")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotAutomationResumeOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case done
+    case ended
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "done": self = .done
+      case "ended": self = .ended
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .done: try container.encode("done")
+      case .ended: try container.encode("ended")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationResumeOutputModel: Sendable, Hashable, Codable {
+    public var model: String?
+    public var reasoning: String?
+
+    public init(model: String? = nil, reasoning: String? = nil) {
+      self.model = model
+      self.reasoning = reasoning
+    }
+  }
+
+  public enum BotAutomationResumeOutputScriptInterpreter: Sendable, Hashable, Codable {
+    case bash
+    case sh
+    case node
+    case python3
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "bash": self = .bash
+      case "sh": self = .sh
+      case "node": self = .node
+      case "python3": self = .python3
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .bash: try container.encode("bash")
+      case .sh: try container.encode("sh")
+      case .node: try container.encode("node")
+      case .python3: try container.encode("python3")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationResumeOutputScript: Sendable, Hashable, Codable {
+    public var body: String?
+    public var interpreter: BotAutomationResumeOutputScriptInterpreter?
+    public var timeoutMs: Double?
+    public var workingDirectory: String?
+    public var envKeys: [String]?
+
+    public init(body: String? = nil, interpreter: BotAutomationResumeOutputScriptInterpreter? = nil, timeoutMs: Double? = nil, workingDirectory: String? = nil, envKeys: [String]? = nil) {
+      self.body = body
+      self.interpreter = interpreter
+      self.timeoutMs = timeoutMs
+      self.workingDirectory = workingDirectory
+      self.envKeys = envKeys
+    }
+  }
+
+  public struct BotAutomationResumeOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: BotAutomationResumeOutputKind?
+    public var name: String?
+    public var original: Bool?
+    public var instruction: String?
+    public var schedule: StudioJSONValue?
+    public var scheduleText: String?
+    public var state: BotAutomationResumeOutputState?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastOutcome: String?
+    public var model: BotAutomationResumeOutputModel?
+    public var script: BotAutomationResumeOutputScript?
+    public var target: String?
+    public var targetName: String?
+    public var threadId: String?
+
+    public init(id: String? = nil, kind: BotAutomationResumeOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationResumeOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationResumeOutputModel? = nil, script: BotAutomationResumeOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.id = id
+      self.kind = kind
+      self.name = name
+      self.original = original
+      self.instruction = instruction
+      self.schedule = schedule
+      self.scheduleText = scheduleText
+      self.state = state
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastOutcome = lastOutcome
+      self.model = model
+      self.script = script
+      self.target = target
+      self.targetName = targetName
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotAutomationRunNowInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
+      self.id = id
+    }
+  }
+
+  public enum BotAutomationRunNowOutputKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case reminder
+    case watcher
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "reminder": self = .reminder
+      case "watcher": self = .watcher
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .reminder: try container.encode("reminder")
+      case .watcher: try container.encode("watcher")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotAutomationRunNowOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case done
+    case ended
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "done": self = .done
+      case "ended": self = .ended
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .done: try container.encode("done")
+      case .ended: try container.encode("ended")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationRunNowOutputModel: Sendable, Hashable, Codable {
+    public var model: String?
+    public var reasoning: String?
+
+    public init(model: String? = nil, reasoning: String? = nil) {
+      self.model = model
+      self.reasoning = reasoning
+    }
+  }
+
+  public enum BotAutomationRunNowOutputScriptInterpreter: Sendable, Hashable, Codable {
+    case bash
+    case sh
+    case node
+    case python3
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "bash": self = .bash
+      case "sh": self = .sh
+      case "node": self = .node
+      case "python3": self = .python3
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .bash: try container.encode("bash")
+      case .sh: try container.encode("sh")
+      case .node: try container.encode("node")
+      case .python3: try container.encode("python3")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotAutomationRunNowOutputScript: Sendable, Hashable, Codable {
+    public var body: String?
+    public var interpreter: BotAutomationRunNowOutputScriptInterpreter?
+    public var timeoutMs: Double?
+    public var workingDirectory: String?
+    public var envKeys: [String]?
+
+    public init(body: String? = nil, interpreter: BotAutomationRunNowOutputScriptInterpreter? = nil, timeoutMs: Double? = nil, workingDirectory: String? = nil, envKeys: [String]? = nil) {
+      self.body = body
+      self.interpreter = interpreter
+      self.timeoutMs = timeoutMs
+      self.workingDirectory = workingDirectory
+      self.envKeys = envKeys
+    }
+  }
+
+  public struct BotAutomationRunNowOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: BotAutomationRunNowOutputKind?
+    public var name: String?
+    public var original: Bool?
+    public var instruction: String?
+    public var schedule: StudioJSONValue?
+    public var scheduleText: String?
+    public var state: BotAutomationRunNowOutputState?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastOutcome: String?
+    public var model: BotAutomationRunNowOutputModel?
+    public var script: BotAutomationRunNowOutputScript?
+    public var target: String?
+    public var targetName: String?
+    public var threadId: String?
+
+    public init(id: String? = nil, kind: BotAutomationRunNowOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationRunNowOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationRunNowOutputModel? = nil, script: BotAutomationRunNowOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.id = id
+      self.kind = kind
+      self.name = name
+      self.original = original
+      self.instruction = instruction
+      self.schedule = schedule
+      self.scheduleText = scheduleText
+      self.state = state
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastOutcome = lastOutcome
+      self.model = model
+      self.script = script
+      self.target = target
+      self.targetName = targetName
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotAutomationDeleteInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+
+    public init(botId: String? = nil, id: String? = nil) {
+      self.botId = botId
+      self.id = id
+    }
+  }
+
+  public struct BotAutomationDeleteOutput: Sendable, Hashable, Codable {
+    public var deleted: Bool?
+
+    public init(deleted: Bool? = nil) {
+      self.deleted = deleted
+    }
+  }
+
+  public struct BotAutomationRunsInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+    public var limit: Int?
+
+    public init(botId: String? = nil, id: String? = nil, limit: Int? = nil) {
+      self.botId = botId
+      self.id = id
+      self.limit = limit
+    }
+  }
+
+  public struct BotAutomationRunsOutputRunsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var at: Double?
+    public var status: String?
+    public var manual: Bool?
+    public var outcome: String?
+    public var threadId: String?
+
+    public init(id: String? = nil, at: Double? = nil, status: String? = nil, manual: Bool? = nil, outcome: String? = nil, threadId: String? = nil) {
+      self.id = id
+      self.at = at
+      self.status = status
+      self.manual = manual
+      self.outcome = outcome
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotAutomationRunsOutput: Sendable, Hashable, Codable {
+    public var runs: [BotAutomationRunsOutputRunsItem]?
+
+    public init(runs: [BotAutomationRunsOutputRunsItem]? = nil) {
+      self.runs = runs
     }
   }
 
