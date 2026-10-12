@@ -22,6 +22,10 @@
     {
       "name": "applets",
       "source": "./packages/bb-studio-applets"
+    },
+    {
+      "name": "external-agents",
+      "source": "./packages/bb-studio-agents"
     }
   ]
 }

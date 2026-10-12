@@ -131,6 +131,29 @@
           "ref": "stable"
         }
       }
+    },
+    {
+      "id": "external-agents",
+      "displayName": "Studio Agents",
+      "description": "Part of BB Studio. External agent providers for Studio bots: Hermes, OpenClaw and Grok, plus experimental ChatGPT Dot.",
+      "icon": "Cloud",
+      "tags": [
+        "agents",
+        "providers",
+        "bots",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-agents",
+          "ref": "stable"
+        }
+      }
     }
   ]
 }
