@@ -233,4 +233,9 @@ export const MIGRATIONS = [
        last_run_at INTEGER, last_level TEXT, last_report TEXT, last_report_at INTEGER, urgent INTEGER NOT NULL DEFAULT 0,
        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
      );`,
+  // External bots (src/bot.ts): a Bot whose thread runs on an external agent
+  // provider (Studio Agents: Hermes, OpenClaw, Grok, Dot), with its model.
+  `ALTER TABLE bots ADD COLUMN kind TEXT NOT NULL DEFAULT 'studio';
+   ALTER TABLE bots ADD COLUMN provider_id TEXT;
+   ALTER TABLE bots ADD COLUMN model TEXT;`,
 ];

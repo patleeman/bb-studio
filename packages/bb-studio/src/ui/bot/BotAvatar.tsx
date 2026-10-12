@@ -1,5 +1,6 @@
 // The Bot's drawn avatar: a solid shape in a color with two dot eyes. A Bot
 // without a shape (made before avatars were drawn) shows its emoji.
+import * as BbApp from "@get-bb/plugin-sdk/app";
 import { BOT_SHAPES } from "../../bot-shapes";
 
 export type BotShape = (typeof BOT_SHAPES)[number];
@@ -53,7 +54,33 @@ export const BOT_STYLES = `
 }
 `;
 
-export function BotAvatar({ shape, color, emoji, size = 28, className, working = false }: { shape?: string | null; color?: string | null; emoji: string; size?: number; className?: string; working?: boolean }) {
+/** An external bot's provider (Import bot), for its logo badge; null for a Studio bot. */
+export function botProvider(bot: { kind?: string | null; providerId?: string | null }): { id: string; logoUrl: string } | null {
+  return bot.kind === "external" && bot.providerId ? { id: bot.providerId, logoUrl: `/api/v1/system/providers/${encodeURIComponent(bot.providerId)}/logo` } : null;
+}
+
+/** A provider's logo, as BB's own pickers draw it. */
+export function ProviderLogo({ provider, className }: { provider: { id: string; logoUrl?: string | null }; className?: string }) {
+  // Read off the module, so a BB without the component draws a plain glyph.
+  const ProviderIcon = (BbApp as Partial<typeof BbApp>).experimental_ProviderIcon;
+  return ProviderIcon ? <ProviderIcon providerKind="agent" provider={provider} fallback="Bot" className={className} aria-hidden /> : <span className={className} aria-hidden>●</span>;
+}
+
+export function BotAvatar({ provider, ...props }: { shape?: string | null; color?: string | null; emoji: string; size?: number; className?: string; working?: boolean; provider?: { id: string; logoUrl?: string | null } | null }) {
+  if (!provider) return <Drawn {...props} />;
+  const size = props.size ?? 28;
+  const badge = Math.max(12, Math.round(size * 0.45));
+  return (
+    <span className="relative inline-flex shrink-0" data-provider={provider.id}>
+      <Drawn {...props} />
+      <span className="absolute -right-1 -bottom-1 flex items-center justify-center rounded-full border border-border bg-background" style={{ width: badge, height: badge }} title={`Runs on ${provider.id}`}>
+        <ProviderLogo provider={provider} className="size-[70%]" />
+      </span>
+    </span>
+  );
+}
+
+function Drawn({ shape, color, emoji, size = 28, className, working = false }: { shape?: string | null; color?: string | null; emoji: string; size?: number; className?: string; working?: boolean }) {
   if (!isBotShape(shape)) {
     return <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] leading-none ${className ?? ""}`} style={{ width: size, height: size, fontSize: size * 0.55 }} aria-hidden>{emoji}</span>;
   }

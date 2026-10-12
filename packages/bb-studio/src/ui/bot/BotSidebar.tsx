@@ -16,8 +16,9 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
 import { useLive } from "../live";
 import { openThreadPage, runningCount, statusLabel } from "./BotHome";
-import { BOT_STYLES, BotAvatar, colorForName } from "./BotAvatar";
+import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
 import { isBotPath, syncThreadList } from "./threadListSwitch";
+import { ImportBotDialog } from "./ImportBot";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { sidebarGroups, useOpenSubThread, useStrip, type TreeNode } from "./workspace";
 
@@ -181,6 +182,7 @@ function BotsList({ onNavigate }: { onNavigate(): void }) {
   const view = useLive<BotView>("bot_get", forBot(botId), { pollMs: 30_000 });
   const bots = list.data?.bots ?? [];
   const selected = creating ? null : view.data?.bot ?? null;
+  const [importing, setImporting] = useState(false);
   return (
     <nav aria-label="Bots" className="studio-root flex flex-col gap-0.5 px-1.5 pb-3">
       <style>{BOT_STYLES}</style>
@@ -189,7 +191,10 @@ function BotsList({ onNavigate }: { onNavigate(): void }) {
         <span className="min-w-0 flex-1">Bots</span>
         <button type="button" aria-label="New bot" title="New bot" data-testid="bot-new" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}
           className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-3.5" /></button>
+        <button type="button" aria-label="Import bot" title="Import bot from an external agent" data-testid="bot-import" onClick={() => setImporting(true)}
+          className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Download" className="size-3.5" /></button>
       </div>
+      {importing ? <ImportBotDialog onClose={() => setImporting(false)} /> : null}
       {creating && bots.length ? (
         <div aria-current="page" data-testid="bot-new-row" className="flex min-w-0 items-center gap-2.5 rounded-md bg-state-active px-2 py-1.5 text-sm">
           <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50"><Icon name="Plus" className="size-3" /></span>
@@ -210,7 +215,7 @@ function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
     <button type="button" data-testid="bot-row" data-bot={bot.id} title={bot.name}
       onClick={() => { openAppPath(botPath(bot.id, bot.primary !== false)); onNavigate(); }}
       className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-state-hover">
-      <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={22} />
+      <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={22} provider={botProvider(bot)} />
       <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
       {bot.state !== "active" ? <span className="shrink-0 text-[11px] text-muted-foreground">{bot.state}</span> : null}
     </button>
@@ -247,7 +252,7 @@ function BotEntry({ view, onNavigate }: { view: BotView; onNavigate(): void }) {
         className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:brightness-110"
         style={{ background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" }}>
         <span className="relative shrink-0">
-          <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={28} working={running > 0} />
+          <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={28} working={running > 0} provider={botProvider(bot)} />
           {groups.needsYou.length ? <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label="Needs you" /> : null}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">

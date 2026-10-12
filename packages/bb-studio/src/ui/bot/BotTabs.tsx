@@ -9,7 +9,8 @@ import { useEffect, useState } from "react";
 import type { BotActivityView, BotThreadView, BotView } from "../../contract";
 import { useLive } from "../live";
 import { ActivityPanel, openThreadPage, PRESETS, presetOf, runningCount, statusLabel, useBotControls } from "./BotHome";
-import { BotAvatar } from "./BotAvatar";
+import { BotAvatar, botProvider } from "./BotAvatar";
+import { externalName, externalNote } from "../../external-providers";
 import { RunnersSection } from "./Runners";
 import { forBot, useBotSelection } from "./selection";
 import { stripClose, stripFocus, stripMove, stripOpen, THREADS_TAB, useOpenSubThread, useStrip } from "./workspace";
@@ -39,7 +40,7 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
   return (
     <div className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground" aria-label={`${bot.name} info`}>
       <header className="flex items-start gap-3 px-4 pt-4 pb-3">
-        <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={44} working={running > 0} />
+        <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={44} working={running > 0} provider={botProvider(bot)} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h2 className="truncate text-base font-semibold">{bot.name}</h2>
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-info-status">
@@ -61,11 +62,15 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
 
       <dl className="mx-4 flex flex-col divide-y divide-border border-y border-border text-sm">
         <InfoRow label="Check-ins" value={bot.state === "active" ? checkins : "Off while " + bot.state} action={bot.state === "active" ? { label: "Change", run: () => setSheet("checkins") } : null} />
-        <InfoRow label="Memory" value="What it keeps in mind" action={{ label: "Open", run: () => void openMemory() }} />
-        <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: () => setSheet("skills") }} />
+        {bot.kind === "external" ? <InfoRow label="Runs on" value={`${externalName(bot.providerId)}${bot.model ? ` · ${bot.model}` : ""}`} action={null} /> : <>
+          <InfoRow label="Memory" value="What it keeps in mind" action={{ label: "Open", run: () => void openMemory() }} />
+          <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: () => setSheet("skills") }} />
+        </>}
       </dl>
 
-      <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} />
+      {bot.kind === "external"
+        ? <p className="px-4 pt-3 text-xs text-muted-foreground" data-testid="bot-external-note">{externalNote(bot.providerId)} Studio's Memory page, skills and runners don't reach it; chat, threads, check-ins and pause work as usual.</p>
+        : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} />}
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
       <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} />

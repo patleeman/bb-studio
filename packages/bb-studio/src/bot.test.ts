@@ -332,3 +332,23 @@ it("threads its threads started count too, nested by parentId", () => {
   ] as never, "bot");
   expect(Object.fromEntries(result.completed.map((thread) => [thread.id, thread.parentId]))).toEqual({ top: null, child: "top" });
 });
+
+it("imports an external bot: its thread runs on the provider and model, and Studio-local features are off", async () => {
+  const x = await setup();
+  await expect(x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "hermes-agent" } })).rejects.toThrow(/first bot/);
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  await expect(x.bots.create({ name: "X", avatar: "🤖", external: { providerId: "codex", model: "m" } })).rejects.toThrow(/isn't an external/);
+  const made = await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "hermes-agent" } });
+  expect(made.bot).toMatchObject({ kind: "external", providerId: "hermes", model: "hermes-agent", primary: false });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "hermes", model: "hermes-agent", pluginMetadata: { bot: made.bot!.id } });
+  expect(x.bots.memoryPage(made.bot!.id)).toBeNull();
+  expect(() => x.bots.requireStudio(made.bot!.id, "skills")).toThrow("Herm has no Studio skills. Runs on Hermes — its memory and tools live there.");
+  expect(() => x.bots.requireStudio(undefined, "skills")).not.toThrow();
+  const told = x.bots.instructions(made.bot!);
+  expect(told).toContain("check-in message");
+  expect(told).not.toMatch(/bot_skill|runner_create|pages_read/);
+  // Check-ins still work: an automation that messages its thread.
+  await x.bots.setRun({ botId: made.bot!.id, enabled: true, cadence: "daily", time: "09:00" });
+  expect(x.automations.at(-1)).toMatchObject({ execution: { targetThreadId: made.bot!.threadId } });
+  expect((await x.bots.pause(made.bot!.id)).bot!.state).toBe("paused");
+});

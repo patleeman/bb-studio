@@ -16,9 +16,10 @@ import { ThreadChat } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
+import { externalNote } from "../../external-providers";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
-import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
+import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
 import { useOpenInfo, useOpenSubThread } from "./workspace";
 import { BOT_PATH, botPath, forBot, useBotSelection } from "./selection";
@@ -183,7 +184,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
   const sheets = (
     <>
       {sheet === "profile" || sheet === "skills" ? (
-        <ProfileDialog value={profile} advancedOpen={sheet === "skills"} advanced={<SkillsList botId={bot.id} name={bot.name} />} onClose={() => setSheet(null)}
+        <ProfileDialog value={profile} advancedOpen={sheet === "skills"} advanced={bot.kind === "external" ? undefined : <SkillsList botId={bot.id} name={bot.name} />} onClose={() => setSheet(null)}
           onSave={(next) => {
             setSheet(null);
             const input = {
@@ -245,7 +246,7 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
       {/* Identity and controls live in the panel's title bar, like a thread's. */}
       <StudioBar>
         <button type="button" className="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" aria-label="Edit profile" title="Edit profile" onClick={() => setSheet("profile")}>
-          <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={20} working={running > 0} />
+          <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={20} working={running > 0} provider={botProvider(bot)} />
           <span className="truncate text-sm font-medium">{profile.name}</span>
         </button>
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-status">
@@ -267,8 +268,12 @@ function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-44">
               <DropdownMenuItem onSelect={() => setSheet("profile")}><Icon name="Edit" />Edit profile…</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void controls.openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setSheet("skills")}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
+              {bot.kind === "external"
+                ? <DropdownMenuItem disabled data-testid="bot-external-note"><Icon name="Info" />{externalNote(bot.providerId)}</DropdownMenuItem>
+                : <>
+                  <DropdownMenuItem onSelect={() => void controls.openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setSheet("skills")}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
+                </>}
               {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
               {bot.threadId ? <DropdownMenuItem onSelect={() => openThreadPage(bot.threadId!)}><Icon name="ExternalLink" />Open as thread</DropdownMenuItem> : null}
               <DropdownMenuSeparator />

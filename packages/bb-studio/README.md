@@ -1180,6 +1180,27 @@ of Staff", with the same thread and check-ins; rename it from its page.
     `bot_runner_delete`, `bot_runner_seen`, `bot_runner_adopt`. The Bot's
     tools: `runner_create`, `runner_update`, `runner_pause`,
     `runner_resume`, `runner_delete`, `runner_list`, `runner_run_now`.
+- **External bots** (**Import bot**, the ⤓ beside **+** over the Bots list):
+  a bot whose thread runs on an external agent through
+  [Studio Agents](../bb-studio-agents/README.md): Hermes, OpenClaw, Grok or
+  the experimental Dot. The dialog lists those providers with their state
+  from Studio Agents' `health` RPC (Ready, Not configured, Offline, Needs a
+  key, Not installed) and links to Studio Agents settings when none is
+  ready. Pick one, its model (OpenClaw: its Gateway agent), a name, shape
+  and color; `bot_create` with `external: { providerId, model }` starts the
+  bot's thread on that provider and model and stores `kind: "external"`,
+  `providerId` and `model` on the bot (`bot_external_providers` lists the
+  choices). Your first bot is always a Studio bot.
+  - **What works**: its chat, the Bots sidebar, sub-threads, Needs you,
+    check-ins (Studio's automation sends its thread the check-in message),
+    Pause, Resume and Stop. Its avatar carries the provider's logo.
+  - **What doesn't**: Studio's Memory page, bot skills, runners and the
+    `bot_*`/Studio tools can't reach a remote agent, so the bot gets none:
+    the Info tab and ⋯ menu say "Runs on Hermes — its memory and tools live
+    there.", and `bot_memory`, `bot_skill_write`, `bot_runner_create` and
+    `bot_runner_adopt` refuse an external bot. Its instructions only say who
+    it is. A Studio backup doesn't carry the provider yet: a restored
+    external bot comes back as a Studio bot.
 - **Backup**: a Studio backup includes the Bot (name, avatar, shape, color,
   role, state, Memory page id) and its skills; they're restored only on a BB without a Bot. The
   Memory page itself comes back with Pages.

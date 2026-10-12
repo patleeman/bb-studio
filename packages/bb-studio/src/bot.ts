@@ -22,6 +22,8 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { BotActivityView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "./contract";
+import { EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
+export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 
 type Sdk = BbPluginApi["sdk"];
@@ -63,6 +65,18 @@ export const MEMORY_TEMPLATE = `## Check-in
 
 `;
 
+/**
+ * External bots ("Import bot"): the Studio Agents providers a Bot's thread can
+ * run on. Their agent keeps its own memory and tools, so Studio's Memory page,
+ * skills, runners and bot_* tools don't reach it; chat, sub-threads, Needs
+ * you, check-ins (a message to its thread) and pause/stop still work.
+ */
+/** An external bot's instructions: who it is, nothing about Studio tools it can't call. */
+export function externalBotInstructions(bot: { name: string; state: BotState; role?: string | null }): string {
+  const who = `You are ${JSON.stringify(bot.name)}, one of the user's bots in BB Studio. The user can rename, pause or stop you in Studio, and Studio sends you a check-in message on their schedule.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
+  return bot.state === "active" ? who : `${who}\nYou are ${bot.state} by the user. Answer questions, but don't start new work until they resume you.`;
+}
+
 /** Instructions for the Bot's own thread, given at each session start. Short: they point at the page and tools. */
 export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly string[]; primary?: boolean }): string {
   const who = `You are ${JSON.stringify(bot.name)}, ${bot.primary === false ? "one of the user's Bots: an always-on agent that sees every project" : "the user's Bot: an always-on agent that leads their personal project and sees every project"}. The user can rename, pause or stop you in Studio.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
@@ -84,7 +98,7 @@ export function skillMarkdown(skill: { name: string; description: string; body: 
   return `---\nname: ${skill.name}\ndescription: ${JSON.stringify(skill.description)}\n---\n\n${skill.body.trim()}\n`;
 }
 
-type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; memory_page_id: string | null; shape: string | null; color: string | null; role: string | null; created_at: number; updated_at: number };
+type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; memory_page_id: string | null; shape: string | null; color: string | null; role: string | null; kind?: string | null; provider_id?: string | null; model?: string | null; created_at: number; updated_at: number };
 type SkillRow = { bot_id: string; name: string; description: string; body: string; created_at: number; updated_at: number };
 
 /** Sorts threads into the Bot's Activity. Pending interactions win; then running; then queued; the rest are done. */
@@ -208,7 +222,7 @@ export class Bots {
       if (threadId !== row.thread_id) this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
     }
     const memoryPageId = row.memory_page_id && this.deps.memory?.exists(row.memory_page_id) ? row.memory_page_id : null;
-    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, primary, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, primary, kind: row.kind === "external" ? "external" as const : "studio" as const, providerId: row.provider_id ?? null, model: row.model ?? null, createdAt: row.created_at, updatedAt: row.updated_at };
   }
 
   /** A Bot as stored (the primary without an id); its thread read from the personal project's lead for the primary. */
@@ -263,9 +277,16 @@ export class Bots {
     return { bot: this.view(row), run: this.deps.leads.runs.get(this.runKey(row)) };
   }
 
-  private insert(id: string, name: string, avatar: string, shape: string | null = null, color: string | null = null) {
+  private insert(id: string, name: string, avatar: string, shape: string | null = null, color: string | null = null, external?: { providerId: string; model: string }) {
     const now = Date.now();
-    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, shape, color, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'active', NULL, 0, ?, ?)").run(id, name, avatar, shape, color, now, now);
+    this.deps.db.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, shape, color, state, thread_id, heartbeat_was_on, kind, provider_id, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'active', NULL, 0, ?, ?, ?, ?, ?)")
+      .run(id, name, avatar, shape, color, external ? "external" : "studio", external?.providerId ?? null, external?.model ?? null, now, now);
+  }
+
+  /** Throws for an external bot: `what` (its Memory page, skills, runners) lives on its provider. */
+  requireStudio(botId: string | undefined, what: string): void {
+    const row = this.row(botId);
+    if (row?.kind === "external") throw new Error(`${row.name} has no Studio ${what}. ${externalNote(row.provider_id)}`);
   }
 
   private update(row: BotRow, fields: Partial<Pick<BotRow, "name" | "avatar" | "shape" | "color" | "role" | "state" | "heartbeat_was_on">>) {
@@ -279,11 +300,16 @@ export class Bots {
    * first is the primary (the personal project's lead); later ones are
    * additional Bots with their own thread.
    */
-  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string }): Promise<BotView> {
+  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string; external?: { providerId: string; model: string } }): Promise<BotView> {
+    const external = input.external;
+    if (external && !EXTERNAL_PROVIDERS.some((each) => each.id === external.providerId)) throw new Error(`${external.providerId} isn't an external agent provider.`);
+    if (external && input.threadId) throw new Error("An imported bot starts its own thread on its provider.");
+    // The primary Bot leads the personal project with Studio's tools, so an import is always an additional Bot.
+    if (external && !this.row()) throw new Error("Make your first bot in Studio, then import others.");
     const primary = !this.row();
     const id = primary ? BOT_ID : `bot_${Math.random().toString(36).slice(2, 12)}`;
     // The row comes first, so the new thread's first turn gets the Bot's instructions (forThread).
-    this.insert(id, input.name, input.avatar, input.shape ?? null, input.color ?? null);
+    this.insert(id, input.name, input.avatar, input.shape ?? null, input.color ?? null, external);
     let threadId = input.threadId;
     try {
       if (threadId && this.forThread(threadId)) throw new Error("That thread is already a Bot's.");
@@ -293,6 +319,7 @@ export class Bots {
           title: input.name,
           environment: { type: "project-default" },
           pluginMetadata: { bot: id },
+          ...(external ? { providerId: external.providerId, model: external.model, executionInputSources: { providerId: "explicit", model: "explicit" } } : {}),
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
           input: [{ type: "text", text: input.prompt ?? `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`, mentions: [] }],
         } as never);
@@ -444,7 +471,7 @@ export class Bots {
   memoryPage(botId?: string): string | null {
     const row = this.row(botId);
     const pages = this.deps.memory;
-    if (!row || !pages) return null;
+    if (!row || !pages || row.kind === "external") return null;
     if (row.memory_page_id && pages.exists(row.memory_page_id)) return row.memory_page_id;
     const pageId = pages.create({ title: `${row.name}'s Memory`, markdown: MEMORY_TEMPLATE });
     this.deps.db.prepare("UPDATE bots SET memory_page_id = ?, updated_at = ? WHERE id = ?").run(pageId, Date.now(), row.id);
@@ -454,6 +481,7 @@ export class Bots {
 
   /** What a Bot's own thread is told; its Memory page is made here on first need. */
   instructions(bot: NonNullable<BotView["bot"]>): string {
+    if (bot.kind === "external") return externalBotInstructions(bot);
     if (bot.state !== "active") return botInstructions(bot);
     let memoryPageId: string | null = null;
     try { memoryPageId = this.memoryPage(bot.id); } catch { /* Pages unavailable: no memory line. */ }

@@ -140,6 +140,10 @@ const bot = z.object({
   role: z.string().nullable().optional(),
   /** The primary Bot: the personal project's lead. Additional Bots ("New bot") have their own thread. */
   primary: z.boolean().optional(),
+  /** "external": its thread runs on an external agent provider (Import bot), with that provider's memory and tools. */
+  kind: z.enum(["studio", "external"]).optional(),
+  providerId: z.string().nullable().optional(),
+  model: z.string().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -156,6 +160,22 @@ const botColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const botRole = z.string().trim().max(400);
 /** Which Bot a bot_* call acts on; the primary Bot when absent. */
 const botId = z.string().min(1).max(100).optional();
+/** Import bot: the provider (one of EXTERNAL_PROVIDERS) and model its thread runs on. */
+const externalBot = z.object({ providerId: z.string().min(1).max(100), model: z.string().min(1).max(200) });
+const externalProviders = z.object({
+  /** Studio Agents (plugin id external-agents) is installed and answering. */
+  installed: z.boolean(),
+  providers: z.array(z.object({
+    id: z.string(),
+    displayName: z.string(),
+    logoUrl: z.string().nullable(),
+    /** ready: registered and reachable; disabled: off in Studio Agents settings; offline/unauthenticated: its health check failed. */
+    status: z.enum(["ready", "disabled", "offline", "unauthenticated", "missing"]),
+    message: z.string(),
+    models: z.array(z.object({ id: z.string(), displayName: z.string(), isDefault: z.boolean() })),
+  })),
+});
+export type ExternalProvidersView = z.infer<typeof externalProviders>;
 const forBot = z.object({ botId });
 /** A thread in the Bot's Activity: its own thread ("self") or one it started. */
 const botThread = z.object({
@@ -297,7 +317,9 @@ export const rpcContract = defineRpcContract({
   /** A Bot (the primary without botId) and its heartbeat; bot null before one is made. */
   bot_get: { input: forBot, output: botView },
   /** Makes a Bot: from an existing thread, or a new chat in the personal project started with `prompt`. The first is the primary; later ones are additional Bots. */
-  bot_create: { input: z.object({ name: botName, avatar: botAvatar, shape: botShape.optional(), color: botColor.optional(), threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional() }), output: botView },
+  bot_create: { input: z.object({ name: botName, avatar: botAvatar, shape: botShape.optional(), color: botColor.optional(), threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional(), external: externalBot.optional() }), output: botView },
+  /** The external agent providers a bot can be imported from (Studio Agents), with their status and models. */
+  bot_external_providers: { input: z.object({}), output: externalProviders },
   /** Renames the Bot or changes its avatar. */
   bot_set: { input: z.object({ botId, name: botName.optional(), avatar: botAvatar.optional(), shape: botShape.nullable().optional(), color: botColor.optional(), role: botRole.optional() }), output: botView },
   /** Makes a thread the Bot's thread ("Make this my Bot"); makes the Bot if there is none. */

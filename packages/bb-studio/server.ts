@@ -36,6 +36,8 @@ import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type ThreadOptionView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
+import { externalProviders } from "./src/external-bots";
+import { EXTERNAL_AGENTS_PLUGIN_ID } from "./src/bot";
 import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
@@ -160,6 +162,8 @@ export default async function plugin(bb: BbPluginApi) {
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     const bot = bots.forThread(context.thread.id, context.pluginMetadata);
+    // An external bot's agent has its own memory and tools; Studio's don't reach it.
+    if (bot?.kind === "external") return { tools: [], skills: [], instructions: bots.instructions(bot) };
     if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS], skills: [], instructions: bots.instructions(bot) };
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
@@ -504,22 +508,27 @@ export default async function plugin(bb: BbPluginApi) {
     bot_resume: ({ botId }) => bots.resume(botId),
     bot_stop: ({ botId }) => bots.stop(botId),
     bot_activity: ({ botId }) => bots.activity(botId),
-    bot_memory: ({ botId }) => ({ pageId: bots.memoryPage(botId) }),
+    bot_memory: ({ botId }) => { bots.requireStudio(botId, "Memory page"); return { pageId: bots.memoryPage(botId) }; },
+    bot_external_providers: () => externalProviders({
+      registered: () => bb.sdk.providers.list(),
+      health: (provider) => bb.sdk.plugins.callRpc({ pluginId: EXTERNAL_AGENTS_PLUGIN_ID, method: "health", input: { provider } as never, outputSchema: z.object({ online: z.boolean(), status: z.string(), message: z.string() }) }),
+      models: async (providerId) => (await bb.sdk.providers.models({ providerId })).models,
+    }),
     bot_chain: ({ botId }) => ({ threadIds: bots.chain(botId) }),
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),
     bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),
-    bot_skill_write: ({ botId, ...input }) => bots.writeSkill(input, botId),
+    bot_skill_write: ({ botId, ...input }) => { bots.requireStudio(botId, "skills"); return bots.writeSkill(input, botId); },
     bot_skill_share: ({ botId, name }) => bots.shareSkill(name, botId),
     bot_skill_delete: ({ botId, name }) => ({ deleted: bots.deleteSkill(name, botId) }),
     bot_runners: async ({ botId }) => { const [list, adoptable] = await Promise.all([runners.list(botId), runners.adoptable(botId)]); return { runners: list, adoptable }; },
-    bot_runner_create: ({ botId, ...input }) => runners.create(input, botId),
+    bot_runner_create: ({ botId, ...input }) => { bots.requireStudio(botId, "runners"); return runners.create(input, botId); },
     bot_runner_update: ({ botId, ...input }) => runners.update(input, botId),
     bot_runner_pause: ({ botId, id }) => runners.setState(id, "paused", botId),
     bot_runner_resume: ({ botId, id }) => runners.setState(id, "active", botId),
     bot_runner_run_now: ({ botId, id }) => runners.runNow(id, botId),
     bot_runner_delete: ({ botId, id }) => runners.delete(id, botId),
     bot_runner_seen: ({ botId, id }) => { runners.seen(id, botId); return { ok: true as const }; },
-    bot_runner_adopt: ({ botId, ...input }) => runners.adopt(input, botId),
+    bot_runner_adopt: ({ botId, ...input }) => { bots.requireStudio(botId, "runners"); return runners.adopt(input, botId); },
     // Deprecated aliases of bot_get, bot_set_thread and bot_set_run, for one release.
     chief_of_staff: () => projectLeads.chief(),
     chief_of_staff_set: async ({ threadId }) => { if (threadId) await bots.setThread(threadId); else await projectLeads.setChief(null); return projectLeads.chief(); },
