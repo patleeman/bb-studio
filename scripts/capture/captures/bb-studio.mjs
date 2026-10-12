@@ -206,6 +206,56 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       return cleanup;
     },
   },
+  {
+    // The Studio sidebar (src/ui/StudioSidebar.tsx): on the Studio panel BB's
+    // thread list becomes Studio's kinds, saved views, tags and recent items.
+    id: "studio-sidebar",
+    packageDir: "bb-studio",
+    fileName: "studio-sidebar.png",
+    showSidebar: true,
+    setup: async (client) => {
+      const pages = await seedPages();
+      const drawing = await seedDrawing();
+      let tagId = null, viewId = null;
+      const cleanup = async () => {
+        if (tagId) await pluginRpc("studio", "deleteTag", { id: tagId }).catch(() => {});
+        if (viewId) await pluginRpc("studio", "deleteView", { id: viewId }).catch(() => {});
+        await pages.cleanup();
+        await drawing.cleanup();
+      };
+      try {
+        const { tag } = await pluginRpc("studio", "createTag", { name: "Launch" });
+        tagId = tag.id;
+        const overview = await pluginRpc("studio", "overview", null);
+        const tagged = overview.items.filter((item) => ["Offline mode launch", "Checkout flow"].includes(item.title));
+        if (!tagged.length) throw new Error("No seeded items to tag");
+        await pluginRpc("studio", "tagItems", { items: tagged.map((item) => ({ pluginId: item.pluginId, id: item.id })), add: [tag.id], remove: [] });
+        viewId = (await pluginRpc("studio", "saveView", { name: "Launch pages", query: "kind:page tag:Launch" }))?.view?.id ?? null;
+        await client.navigate("/plugins/studio/studio");
+        await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem('studio:query:all', '')`);
+        await client.navigate("/plugins/studio/studio");
+        await client.waitForSelector('nav[aria-label="Studio"]', 30000);
+        for (let i = 0; i < 40 && JSON.parse(await bbCli(["settings", "ui", "get", "sidebar.threadListProvider"])) !== "studio/studio-items"; i++) await sleep(500);
+        const pref = JSON.parse(await bbCli(["settings", "ui", "get", "sidebar.threadListProvider"]));
+        if (pref !== "studio/studio-items") throw new Error(`On the Studio page the thread list is ${pref}, not studio/studio-items`);
+        if (!viewId) viewId = (await pluginRpc("studio", "overview", null)).views.find((view) => view.name === "Launch pages")?.id ?? null;
+        for (const text of ["All items", "Pages", "Drawings", "Saved views", "Launch pages", "Tags", "Launch", "Recent", "Offline mode launch", "Checkout flow"]) await client.waitForText(text, 30000);
+        await client.evaluate(`(() => {
+          const nav = document.querySelector('nav[aria-label="Studio"]');
+          if (nav.getBoundingClientRect().left > 120) throw new Error("The Studio list isn't in BB's sidebar");
+          const pages = nav.querySelector('[data-kind="page"]');
+          if (!pages || !/\\d/.test(pages.textContent)) throw new Error("The Pages kind has no count");
+          pages.click();
+          return true;
+        })()`);
+        await client.waitForSelector('nav[aria-label="Studio"] [data-kind="page"][aria-current="page"]', 15000);
+        await client.waitForAriaButton("Remove Kind page").catch(() => client.waitForText("Offline mode launch"));
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 900, y: 900 });
+        await sleep(2000);
+      } catch (error) { await cleanup(); throw error; }
+      return cleanup;
+    },
+  },
   ...[false, true].map((mobile) => ({
     id: mobile ? "studio-filters-mobile" : "studio-filters",
     packageDir: "bb-studio",
