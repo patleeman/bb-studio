@@ -937,7 +937,7 @@ open in the background, so it's as you left it when you come back.
   The tag menu also renames and deletes the active tag.
 - **Bot.** Your always-on agent (it replaces the Chief of Staff): a name, a
   drawn avatar, and a workspace of its own (the **Bot** rail item): its
-  chat, a Bots list in BB's sidebar with the threads it started, and Info and Threads tabs in
+  chat, a Bots list in BB's sidebar with the threads it started, and an Info tab in
   the right panel. See [Bot](#bot).
 - **Project leads.** A BB project can have a lead thread, which a
   Heartbeat wakes on a schedule; the personal project's lead is your Bot.
@@ -987,13 +987,11 @@ bb studio reindex
 
 ![The Bot's workspace in a staged BB: Dot's avatar, name and status in the title bar; in BB's sidebar the Bots list, tinted in Dot's color, with Dot on top and the threads it started under Needs you, Running, Recurring (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it; BB's own thread view of its chat in the middle; and the right panel's Info tab with its profile, Pause and Stop, Check-ins (Morning brief), Memory, Skills and Activity](assets/bot.png)
 
-![The same workspace with two sub-threads opened from the sidebar in the right panel's Threads tab: a strip of two tabs over BB's thread view of the deploy-key thread, whose question waits on the user](assets/bot-threads.png)
-
 ![After leaving the Bot page: Dot's main thread as a normal BB thread page, with BB's own thread list back in the sidebar (Dot and the threads it started, nested, then the project's other threads)](assets/bot-leave.png)
 
 ![Runners: the Bots sidebar's Runners group (Inbox watch, Deploy watch with a Needs you dot) and the Info tab's Runners section with each runner's schedule, last report (Inbox watch logged "two newsletters"; Deploy watch's urgent "health check failing") and Pause, Run now, Edit, Delete](assets/bot-runners.png)
 
-![The Deploy watch runner's thread, opened from the Runners group: its job prompt, its first run and an automation run, each ending without a message (their runner_report calls fold into Worked for). Stable BB declines the Threads tab's target, so it opens as BB's thread page; the runner is unnested in BB's list, not under Dot](assets/bot-runner-thread.png)
+![The Deploy watch runner's thread, opened from the Runners group: its job prompt, its first run and an automation run, each ending without a message (their runner_report calls fold into Worked for). It opens as BB's thread page](assets/bot-runner-thread.png)
 
 ![New bot: the + beside Bots opens the create flow, a "New bot" row selected above Dot, the greeting "Hey! I'm a new bot." with Customize me, and a message box whose first message makes it](assets/bot-new.png)
 
@@ -1058,18 +1056,15 @@ of Staff", with the same thread and check-ins; rename it from its page.
   on its thread (`Studio project heartbeat bot:<id>`). Every bot has the same
   powers: it sees every project. The page shows the selected bot: the
   primary at `/plugins/studio/bot`, another at `/plugins/studio/bot/<botId>`;
-  its title bar, Info, Threads, runners, check-ins, Memory and skills are
+  its title bar, Info, runners, check-ins, Memory and skills are
   that bot's. In a bot's own thread its tools act on that bot.
-- **Right panel**: two fixed tabs beside BB's Browser and Terminal.
+- **Right panel**: an **Info** tab beside BB's Browser and Terminal.
   **Info** is the Bot's profile, Pause / Resume and Stop, Check-ins, Memory,
   Skills and Activity: **Needs you**, **Running**, **Waiting to start**,
   **Scheduled** (its check-in and automations, with the next run) and
-  **Recent** (the last three, then Show all). **Threads** holds every
-  sub-thread you opened as a strip of tabs over BB's thread view: click to
-  switch, × or middle-click to close, drag to reorder, ↗ to open it as a
-  BB thread. The strip is saved per Bot on this device (at most 12; the
-  oldest one not showing closes first). With the panel split, both panes
-  share one strip. If the host can't open the tab, the thread opens in BB.
+  **Recent** (the last three, then Show all). A thread clicked in the
+  Bots sidebar, Activity or Needs you opens as a normal BB thread in the
+  main pane.
 - **Edit profile**: a drawn avatar (one of nine shapes with two eyes, in one
   of twelve colors, or **Match the name**), its name, and a Description: a
   sentence or two on its role ("You are my chief of staff."), which it's
@@ -1312,8 +1307,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
     thread only once, so one you show again in BB stays visible. BB's thread
     search skips hidden threads, so the Bot's history search does too.
   - **Sidebar**: a **Runners** group (status dot, next run; hover for the
-    schedule and last report). A click opens the runner's thread in the
-    Threads tab.
+    schedule and last report). A click opens the runner's thread as a
+    normal BB thread.
   - **Info**: a **Runners** section with each runner's schedule and last
     report, **Pause**/**Resume**, **Run now** (the automation's run),
     **Edit** (name, job, schedule with the heartbeat's fields) and
