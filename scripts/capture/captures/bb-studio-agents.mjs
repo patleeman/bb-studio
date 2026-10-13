@@ -3,15 +3,26 @@
 // HERMES_FIXTURE_REPLY set, and Grok) and points Studio Agents at them, with
 // hermes and grok enabled; OpenClaw and Dot stay off. Captures: the plugin's settings
 // page; Import bot's dialog (Hermes and Grok ready, OpenClaw and Dot not
-// configured); an imported Hermes bot and an imported Grok bot after one
-// chat each, the Info tab saying its memory and tools live on the provider.
+// configured); an imported Hermes bot's Info (the Bot page, saying its memory
+// and tools live on the provider) and an imported Grok bot's chat (BB's
+// thread page) after one exchange each.
 const BOT_PATH = "/plugins/studio/bot";
 const SIDEBAR = 'nav[aria-label="Bots"]';
 const IMPORTS = [
   { name: "Hermes", shape: "cloud", color: "#7c66dc", providerId: "hermes", reply: /I'm Hermes/ },
   { name: "Grok", shape: "star", color: "#1f9d75", providerId: "grok", reply: /Grok fixture/ },
 ];
-const dismissProblems = (client) => client.evaluate(`(() => { [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide")?.click(); return true; })()`);
+const dismissProblems = (client) => client.evaluate(`(() => new Promise((resolve) => {
+  // The card can render a moment after the page: look for it for a few seconds.
+  const started = Date.now();
+  const tick = () => {
+    const hide = [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide");
+    if (hide) { hide.click(); return resolve(true); }
+    if (Date.now() - started > 4000) return resolve(false);
+    setTimeout(tick, 200);
+  };
+  tick();
+}))()`, true);
 
 export default ({ pluginRpc, bbCli, sleep }) => {
   /** A Studio bot first (an import is never the primary), without waiting on its reply. */
@@ -42,25 +53,32 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "120"]).catch(() => {});
     return bot;
   };
-  const botPage = (spec) => async (client) => {
+  /** An imported bot's Info (the Bot page), or with `chat` its chat, opened from its row as BB's thread page. */
+  const botPage = (spec, { chat = false } = {}) => async (client) => {
     const bot = await imported(spec);
+    // Its first exchange reached the provider and came back.
+    const log = await bbCli(["thread", "log", bot.threadId]).catch(() => "");
+    if (!spec.reply.test(log)) throw new Error(`${spec.name}'s chat has no reply from its provider`);
     await client.navigate(`${BOT_PATH}/${bot.id}`);
     await client.waitForSelector(SIDEBAR, 30000);
     await dismissProblems(client);
-    await client.evaluate(`(() => new Promise((resolve, reject) => {
-      const started = Date.now();
-      const tick = () => {
-        const chat = document.querySelector('section[aria-label="Chat"]');
-        const badge = document.querySelector('${SIDEBAR} [data-provider="${spec.providerId}"]');
-        if (chat && ${spec.reply}.test(chat.textContent) && badge) return resolve(true);
-        if (Date.now() - started > 60000) return reject(new Error("${spec.name}'s chat doesn't show its provider's reply, or the sidebar has no provider badge"));
-        setTimeout(tick, 300);
-      };
-      tick();
-    }))()`, true);
-    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await client.waitForSelector(`${SIDEBAR} [data-testid=bot-main] [data-provider="${spec.providerId}"]`, 30000);
     await client.waitForSelector(`[aria-label="${spec.name} info"]`, 30000);
     await client.waitForText(`Runs on ${spec.name} — its memory and tools live there.`, 30000);
+    if (chat) {
+      await client.evaluate(`(() => { document.querySelector('${SIDEBAR} [data-testid=bot-main]').click(); return true; })()`);
+      await client.evaluate(`(() => new Promise((resolve, reject) => {
+        const started = Date.now();
+        const tick = () => {
+          const nav = document.querySelector('${SIDEBAR}');
+          const outside = nav ? document.body.textContent.replace(nav.textContent, "") : "";
+          if (location.pathname.endsWith("/threads/${bot.threadId}") && nav?.querySelector('[data-provider="${spec.providerId}"]') && ${spec.reply}.test(outside)) return resolve(true);
+          if (Date.now() - started > 60000) return reject(new Error("${spec.name}'s chat didn't open as BB's thread page with its provider's reply and the Bots list"));
+          setTimeout(tick, 300);
+        };
+        tick();
+      }))()`, true);
+    }
     await sleep(1200);
   };
   return [
@@ -120,6 +138,6 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       },
     },
     { id: "studio-bot-external", packageDir: "bb-studio", fileName: "bot-external.png", setup: botPage(IMPORTS[0]) },
-    { id: "studio-bot-external-grok", packageDir: "bb-studio", fileName: "bot-external-grok.png", setup: botPage(IMPORTS[1]) },
+    { id: "studio-bot-external-grok", packageDir: "bb-studio", fileName: "bot-external-grok.png", setup: botPage(IMPORTS[1], { chat: true }) },
   ];
 };

@@ -985,25 +985,25 @@ bb studio reindex
 
 ## Bot
 
-![The Bot's workspace in a staged BB: Dot's avatar, name and status in the title bar; in BB's sidebar the Bots list, tinted in Dot's color, with Dot on top and the threads it started under Needs you, Running, Recurring (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it; BB's own thread view of its chat in the middle; and the right panel's Info tab with its profile, Pause and Stop, Check-ins (Morning brief), Memory, Skills and Activity](assets/bot.png)
+![The Bot's chat in a staged BB: BB's own thread page for Dot, with its first exchange, a finished-thread notice and its two-bullet answer on what's left before Friday's ORBIT-42 release; in BB's sidebar the Bots list, Dot on top (Working on 1 thread, its ⓘ beside it) and the threads it started under Needs you, Running, Recurring (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it](assets/bot.png)
 
-![After leaving the Bot page: Dot's main thread as a normal BB thread page, with BB's own thread list back in the sidebar (Dot and the threads it started, nested, then the project's other threads)](assets/bot-leave.png)
+![Leaving the Bots: Plan the ORBIT-42 retro, a thread no bot owns, on BB's thread page with BB's own thread list back in the sidebar; it lists the project's threads and leaves out the threads Dot started, which Studio hides from it](assets/bot-leave.png)
 
-![Runners: the Bots sidebar's Runners group (Inbox watch, Deploy watch with a Needs you dot) and the Info tab's Runners section with each runner's schedule, last report (Inbox watch logged "two newsletters"; Deploy watch's urgent "health check failing") and Pause, Run now, Edit, Delete](assets/bot-runners.png)
+![Runners: Dot's Info, the Bot page opened from its ⓘ, with the Bots sidebar's Runners group (Inbox watch, and Deploy watch also under Needs you); Info's Automations list both runners with their schedules and last reports (Inbox watch logged "two newsletters"; Deploy watch's urgent "health check failing since build 419"), above Activity](assets/bot-runners.png)
 
-![The Deploy watch runner's thread, opened from the Runners group: its job prompt, its first run and an automation run, each ending without a message (their runner_report calls fold into Worked for). It opens as BB's thread page](assets/bot-runner-thread.png)
+![The Deploy watch runner's thread, opened from the Runners group as BB's thread page, the Bots list still beside it: its job prompt and first run, then an automation run, each ending [PASS] (their runner_report calls fold into Worked for)](assets/bot-runner-thread.png)
 
 ![New bot: the + beside Bots opens the create flow, a "New bot" row selected above Dot, the greeting "Hey! I'm a new bot." with Customize me, and a message box whose first message makes it](assets/bot-new.png)
 
-![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; Scout's own chat, its title bar status (Checks in weekdays at 18:00) and its Info tab with its own check-in (Evening wrap-up), Memory, Skills and Runners](assets/bot-two.png)
+![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; the Bot page is Scout's Info: Checks in weekdays at 18:00, Open chat, Pause and Stop, Memory and Skills, its own Check-in (Weekdays 18:00) and Skill curator under Automations, and Activity](assets/bot-two.png)
 
-![Import bot: the dialog over Dot's page lists Hermes (picked, Ready) and Grok (Ready) with their logos, OpenClaw and Dot as Not configured with a pointer to Studio Agents settings, the model hermes-fixture, and a name, shape and color for the new bot](assets/bot-import.png)
+![Import bot: the dialog over Dot's Info lists Hermes (picked, Ready) and Grok (Ready) with their logos, OpenClaw and Dot as Not configured with a pointer to Studio Agents settings, the model hermes-fixture, Accept edits, and a name, shape and color for the new bot](assets/bot-import.png)
 
-![An imported Hermes bot: its avatar carries the Hermes logo in the Bots list and title bar; its chat shows the first exchange answered by the staged Hermes fixture; the Info tab says Runs on Hermes · hermes-fixture and that its memory and tools live there, with no Memory, Skills or Runners](assets/bot-external.png)
+![An imported Hermes bot's Info: its avatar carries the Hermes logo in the Bots list and on the page; Runs on Hermes · hermes-fixture, and a note that its memory and tools live on Hermes, so Studio's Memory page, skills and runners don't reach it](assets/bot-external.png)
 
-![An imported Grok bot: the Grok logo on its avatar, Dot and Hermes listed above it, and its first reply streamed from the staged xAI fixture](assets/bot-external-grok.png)
+![An imported Grok bot's chat, opened from its row as BB's thread page: the Grok logo on its avatar, Dot, Scout, Relay and Hermes listed above it, and its first reply streamed from the staged xAI fixture](assets/bot-external-grok.png)
 
-![Switch model… on Relay, a staged bot whose thread was handed off from Codex to Claude Code Opus and then switched in place to Sonnet: the dialog says Now on Claude Code · claude-sonnet-5-5 over BB's own provider/model picker, with Relay's Claude reply in the chat](assets/bot-switch-model.png)
+![Switch model… on Relay's Info, a staged bot whose thread was handed off from Codex to Claude Code Opus and then switched in place to Sonnet: the dialog says Now on Claude Code · claude-sonnet-5-5 over BB's own provider/model picker set to Sonnet 5.5](assets/bot-switch-model.png)
 
 ![Relay after a Claude Code → Codex handoff: the chat is the new Codex thread, whose real reply says it's here on Codex (gpt-6.1-sol), and its two earlier threads are under Earlier conversations in the Bots sidebar](assets/bot-handoff.png)
 
@@ -1126,7 +1126,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `automation_update`, `automation_pause`, `automation_resume`,
   `automation_run_now` and `automation_delete` ("in 2h check the deploy" is
   a reminder); `runner_*` still work.
-  ![The Info tab's Automations in a staged BB: Dot's original Check-in (weekdays 8:00), the Skill curator (weekly, when idle) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; Dot's chat shows the watcher's line and its one-line reply](assets/bot-automations.png)
+  ![Info's Automations in a staged BB: Dot's original Check-in (weekdays 8:00), the Skill curator (weekly, when idle) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; the Bots sidebar lists the reminder and the evening check-in under Recurring](assets/bot-automations.png)
 
 - **Schedule editor** (`src/ui/bot/ScheduleEditor.tsx`, compiled by
   `src/schedule.ts`): presets, weekday chips, several times a day, every N
@@ -1203,7 +1203,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     list. iOS: the Skills sheet has Learn from work, approvals, pins (swipe)
     and Archived with Restore.
 
-  ![Skills in a staged BB, opened from Info → Manage skills: Learn from work on, every 10 turns; the last review "Saved 1 skill · Updated Memory · 2m ago" with Review now; Review model Cheapest (gpt-6-luna); Review skills before saving and Curator merges overlapping skills off; and the system-checks skill Dot's review fork saved after the user corrected how a system report should look (Dot's chat behind shows the four-row table)](assets/bot-skills.png)
+  ![Skills in a staged BB, opened from Info → Manage skills: Edit profile's Advanced section with Learn from work on, every 10 turns; the last review "Saved 1 skill · 2m ago" with Review now; Review model Cheapest (gpt-6-luna); Review skills before saving and Curator merges overlapping skills off; and the system-report skill Dot's review fork saved after the user corrected how a system report should look, with Pin, Share and Delete](assets/bot-skills.png)
 - **Recall**: `bot_history_search` searches BB's thread search, keeping
   only the Bot's threads (its handoff chain and threads it started).
 - **Phone**: questions and approvals it, or a thread it started, raises push

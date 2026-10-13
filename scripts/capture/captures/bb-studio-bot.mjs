@@ -1,15 +1,15 @@
-// The Bot's workspace (/plugins/studio/bot). First its onboarding, while the
-// staged BB has no Bot (greeting and starter chips); then a Bot with history:
-// the Bots list in BB's sidebar (it replaces BB's thread list on the Bot page
-// and on the Bot's threads) with the threads it started (one needing the
-// user, one running, a nested follow-up, a recurring automation), its chat
-// opened from its row as BB's own thread page, and its Info beside it (the
-// row's ⓘ: the Bot info thread panel tab); then a thread no Bot owns, where
-// BB's own thread list is back. Last, two runners (src/runners.ts): one
-// that logs, one that tells and then raises something urgent; the Bots
-// sidebar's Runners group, the Info tab's Runners section, and a runner's
-// thread opened from the sidebar as BB's thread page, with the Bot's chat
-// holding only the runner's lines.
+// The Bot's workspace. First its onboarding, while the staged BB has no Bot
+// (greeting and starter chips); then a Bot with history: the Bots list in
+// BB's sidebar (it replaces BB's thread list on the Bot page and on the Bot's
+// threads) with the threads it started (one needing the user, one running, a
+// nested follow-up, a recurring automation), and its chat opened from its row
+// as BB's own thread page. The row's ⓘ opens its Info, the Bot page
+// (/plugins/studio/bot[/<botId>]). Then a thread no Bot owns, where BB's own
+// thread list is back without the Bot's threads, which Studio hides from it.
+// Last, two runners (src/runners.ts): one that logs, one that tells and then
+// raises something urgent; the Bots sidebar's Runners group, Info's Runners
+// in Automations, and a runner's thread opened from the sidebar as BB's
+// thread page, with the Bot's chat holding only the runner's lines.
 // Then several bots: New bot opening the create flow, and a second bot,
 // Scout, selected, with Dot listed above it. Where BB has a sidebar
 // navigation provider preference, the navigation row says New bot (Studio's
@@ -20,14 +20,26 @@ const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
   { title: "Check the launch checklist for blockers", prompt: "Reply with one short sentence: no blockers on the launch checklist." },
 ];
+/** The staged project's own threads (staged-bb.mjs), in BB's list. */
+const ORBIT_TITLES = ["Draft the ORBIT-42 release notes", "Review the launch checklist"];
 const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet points, please.";
 
 /** Staging's plugin-problem card is closed so it doesn't cover the page. */
-const dismissProblems = (client) => client.evaluate(`(() => { [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide")?.click(); return true; })()`);
+const dismissProblems = (client) => client.evaluate(`(() => new Promise((resolve) => {
+  // The card can render a moment after the page: look for it for a few seconds.
+  const started = Date.now();
+  const tick = () => {
+    const hide = [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Hide");
+    if (hide) { hide.click(); return resolve(true); }
+    if (Date.now() - started > 4000) return resolve(false);
+    setTimeout(tick, 200);
+  };
+  tick();
+}))()`, true);
 const SIDEBAR = 'nav[aria-label="Bots"]';
 const LIST_PREF = "sidebar.threadListProvider";
 const SCOUT = { name: "Scout", avatar: "🛰️", shape: "hexagon", color: "#2ba59a", prompt: "Hi Scout. In one short sentence, say you'll watch competitors' release notes for anything that affects ORBIT-42." };
-/** The selected Bot's row opens its chat as BB's thread page; the Bots list stays. `text` must show in it. */
+/** The selected Bot's row opens its chat as BB's thread page; the Bots list stays. `text` must show in the chat, outside the sidebar. */
 const openChat = async (client, threadId, text) => {
   await client.evaluate(`(() => { document.querySelector('${SIDEBAR} [data-testid=bot-main]').click(); return true; })()`);
   await client.evaluate(`(() => new Promise((resolve, reject) => {
@@ -35,22 +47,35 @@ const openChat = async (client, threadId, text) => {
     const tick = () => {
       const onThread = location.pathname.endsWith("/threads/${threadId}");
       const composer = document.querySelector('textarea, [contenteditable="true"]');
-      if (onThread && composer && document.querySelector('${SIDEBAR}') && ${text}.test(document.body.textContent)) return resolve(true);
-      if (Date.now() - started > 90000) return reject(new Error("The Bot's chat didn't open as BB's thread page with the Bots list and its history"));
+      const nav = document.querySelector('${SIDEBAR}');
+      const outside = nav ? document.body.textContent.replace(nav.textContent, "") : "";
+      if (onThread && composer && nav && ${text}.test(outside)) return resolve(true);
+      if (Date.now() - started > 55000) return reject(new Error("The Bot's chat didn't open as BB's thread page with the Bots list and its history"));
       setTimeout(tick, 300);
     };
     tick();
-  }))()`);
+  }))()`, true);
 };
-/** The selected Bot's ⓘ: on its thread, Info opens beside the chat (the Bot info panel tab). */
-const openInfo = (client) => client.evaluate(`(() => { document.querySelector('${SIDEBAR} [data-testid=bot-main] + [data-testid=bot-info]').click(); return true; })()`);
+/** The selected Bot's ⓘ: its Info, the Bot page, with the Bots list still in the sidebar. */
+const openInfo = async (client, name = "Dot") => {
+  await client.evaluate(`(() => { document.querySelector('${SIDEBAR} [data-testid=bot-main] + [data-testid=bot-info]').click(); return true; })()`);
+  await client.evaluate(`(() => new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      if (location.pathname.includes("${BOT_PATH}") && document.querySelector('[aria-label="${name} info"]') && document.querySelector('${SIDEBAR}')) return resolve(true);
+      if (Date.now() - started > 30000) return reject(new Error("The ⓘ didn't open ${name}'s Info as the Bot page with the Bots list"));
+      setTimeout(tick, 300);
+    };
+    tick();
+  }))()`, true);
+};
 
 export default ({ projectId, pluginRpc, bbCli, sleep }) => {
   const json = async (args) => JSON.parse(await bbCli([...args, "--json"]));
   /** For the workspace: a nested follow-up, a thread still running, and an automation that wakes the Bot. */
   const workspaceExtras = async (botThread) => {
-    const titles = async (parent) => (await json(["thread", "list", "--parent-thread", parent]).catch(() => [])).map((thread) => thread.title);
-    const children = await json(["thread", "list", "--parent-thread", botThread]).catch(() => []);
+    const titles = async (parent) => (await json(["thread", "list", "--parent-thread", parent, "--include-hidden"]).catch(() => [])).map((thread) => thread.title);
+    const children = await json(["thread", "list", "--parent-thread", botThread, "--include-hidden"]).catch(() => []);
     const first = children.find((thread) => thread.title === CHILDREN[0].title);
     if (first && !(await titles(first.id)).includes("Pull the ORBIT-42 thread digests")) {
       await json(["thread", "spawn", "--project", projectId, "--parent-thread", first.id, "--title", "Pull the ORBIT-42 thread digests", "--prompt", "Reply with one short sentence: three digests pulled."]);
@@ -77,7 +102,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     }
     const botThread = bot.threadId;
     await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "180"]).catch(() => {});
-    const started = await json(["thread", "list", "--parent-thread", botThread]).catch(() => []);
+    const started = await json(["thread", "list", "--parent-thread", botThread, "--include-hidden"]).catch(() => []);
     if (!started.length) {
       for (const child of CHILDREN) {
         const thread = await json(["thread", "spawn", "--project", projectId, "--parent-thread", botThread, "--title", child.title, "--prompt", child.prompt]);
@@ -113,16 +138,15 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
       return true;
     })()`);
     // The bot's row opens its chat as BB's thread page, and the Bots list stays.
-    await openChat(client, bot.threadId, "/ORBIT-42/");
+    await openChat(client, bot.threadId, "/What's left before Friday/");
     const still = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
     if (still !== "studio/bot") throw new Error(`On the Bot's chat the thread list is ${still}, not studio/bot`);
   };
 
-  const info = async (client) => {
+  /** The Bot's chat, BB's own thread page, with the Bots list and the threads it started in the sidebar. */
+  const chat = async (client) => {
     await workspace(client);
-    await openInfo(client);
-    await client.waitForSelector('[aria-label="Dot info"]', 30000);
-    for (const text of ["Automations", "Check-in", "Weekdays 8:00", "Memory", "Skills", "Activity", "Scheduled"]) await client.waitForText(text, 30000);
+    await dismissProblems(client);
     await sleep(1500);
   };
 
@@ -169,6 +193,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await workspace(client);
     for (const text of ["Runners", "Inbox watch", "Deploy watch"]) await client.waitForText(text, 60000);
     await openInfo(client);
+    for (const text of ["Memory", "Skills", "Activity", "Weekdays 8:00"]) await client.waitForText(text, 30000);
     await client.waitForSelector('[aria-label$=" info"] section[aria-label=Automations] [data-kind=runner]', 30000);
     await client.evaluate(`(() => new Promise((resolve, reject) => {
       const started = Date.now();
@@ -179,11 +204,11 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
           section.scrollIntoView({ block: "start" });
           return resolve(true);
         }
-        if (Date.now() - started > 60000) return reject(new Error("The Info tab's Automations don't show both runners and their reports"));
+        if (Date.now() - started > 60000) return reject(new Error("Info's Automations don't show both runners and their reports"));
         setTimeout(tick, 300);
       };
       tick();
-    }))()`);
+    }))()`, true);
     await sleep(1500);
   };
 
@@ -202,13 +227,14 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
       const started = Date.now();
       const tick = () => {
         // BB's own thread page, as from BB's thread list.
+        // The Bots list stays beside it.
         const page = location.pathname.includes("/threads/thr_") ? document.body : null;
-        if (page && /Deploy watch/.test(page.textContent) && /runner_report/.test(page.textContent)) return resolve(true);
-        if (Date.now() - started > 60000) return reject(new Error("The Deploy watch runner's thread didn't open as BB's thread page"));
+        if (page && document.querySelector('${SIDEBAR}') && /Deploy watch/.test(page.textContent) && /runner_report/.test(page.textContent)) return resolve(true);
+        if (Date.now() - started > 60000) return reject(new Error("The Deploy watch runner's thread didn't open as BB's thread page with the Bots list"));
         setTimeout(tick, 300);
       };
       tick();
-    }))()`);
+    }))()`, true);
     // The Bot's own thread holds the runner's tell lines and no notice about a runner's thread.
     const { bot, runners } = await seededRunners();
     const log = JSON.stringify(await json(["thread", "log", bot.threadId, "--all"]));
@@ -217,7 +243,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
-  /** Leaving the Bot page for a thread no Bot owns: BB's own thread list is back. */
+  /** Leaving the Bot page for a thread no Bot owns: BB's own thread list is back, without the threads the Bot started. */
   const OTHER = "Plan the ORBIT-42 retro";
   const leave = async (client) => {
     await seededBot();
@@ -235,6 +261,21 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await client.waitForText("New thread", 30000);
     await client.waitForText(OTHER, 30000);
     await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}')) throw new Error("The Bots list is still showing"); return true; })()`);
+    // Studio hides the Bot's threads from BB's list: the CLI's list and the sidebar both leave them out.
+    const botOwned = ["Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", ...CHILDREN.map((child) => child.title)];
+    const all = await json(["thread", "list", "--project", projectId, "--include-hidden"]);
+    const visible = (await json(["thread", "list", "--project", projectId])).map((thread) => thread.title);
+    for (const title of botOwned) {
+      if (!all.some((thread) => thread.title === title)) throw new Error(`The Bot's thread ${title} wasn't seeded`);
+      if (visible.includes(title)) throw new Error(`The Bot's thread ${title} isn't hidden from BB's list`);
+    }
+    for (const title of ORBIT_TITLES) await client.waitForText(title, 30000);
+    await client.evaluate(`(() => {
+      const text = document.body.textContent;
+      const shown = ${JSON.stringify(botOwned)}.filter((title) => text.includes(title));
+      if (shown.length) throw new Error("BB's list shows the Bot's threads: " + shown.join(", "));
+      return true;
+    })()`);
     await dismissProblems(client);
     await sleep(1500);
   };
@@ -282,12 +323,13 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         const other = nav?.querySelector('[data-testid=bot-row]');
         const info = document.querySelector('[aria-label="Scout info"]');
         if (main && /Scout/.test(main.textContent) && other && /Dot/.test(other.textContent) && info) return resolve(true);
-        if (Date.now() - started > 90000) return reject(new Error("The Bot page doesn't show Scout selected with Dot listed and Scout's Info"));
+        if (Date.now() - started > 55000) return reject(new Error("The Bot page doesn't show Scout selected with Dot listed and Scout's Info"));
         setTimeout(tick, 300);
       };
       tick();
-    }))()`);
-    for (const text of ["Evening wrap-up", "Memory", "Runners"]) await client.waitForText(text, 30000);
+    }))()`, true);
+    // Scout's own check-in (the Evening wrap-up preset) and its own Memory and Skills.
+    for (const text of ["Checks in weekdays at 18:00", "Weekdays 18:00", "Memory", "Skills", "Open chat"]) await client.waitForText(text, 30000);
     await sleep(1500);
   };
 
@@ -360,13 +402,14 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await client.evaluate(`(() => new Promise((resolve, reject) => {
       const started = Date.now();
       const tick = () => {
-        const earlier = document.querySelectorAll('${SIDEBAR} section[aria-label="Earlier conversations"] button[type=button]');
-        if (earlier.length >= 3) return resolve(true);
-        if (Date.now() - started > 90000) return reject(new Error("The handoff chat or its earlier conversations aren't showing"));
+        // The group's toggle and one titled row per earlier thread.
+        const rows = [...document.querySelectorAll('${SIDEBAR} section[aria-label="Earlier conversations"] button[type=button]:not([aria-expanded])')];
+        if (rows.length >= 2 && rows.every((row) => row.textContent.trim())) return resolve(true);
+        if (Date.now() - started > 55000) return reject(new Error("The handoff chat or its earlier conversations (with their titles) aren't showing"));
         setTimeout(tick, 300);
       };
       tick();
-    }))()`);
+    }))()`, true);
     await sleep(1500);
   };
 
@@ -429,7 +472,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         setTimeout(tick, 300);
       };
       tick();
-    }))()`);
+    }))()`, true);
     await sleep(1500);
   };
   const scheduleEditor = async (client) => {
@@ -449,7 +492,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         setTimeout(tick, 200);
       };
       tick();
-    }))()`);
+    }))()`, true);
     await client.waitForSelector('[data-testid=automation-editor] [data-testid=schedule-preview]', 30000);
     await client.evaluate(`(() => {
       const editor = document.querySelector('[data-testid=automation-editor]');
@@ -499,7 +542,10 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
   };
   const skillsSection = async (client) => {
     const skills = await seededSkills();
-    await workspace(client);
+    // From the Bot page: the lessons made the chat long, so it isn't the way in.
+    await client.navigate(BOT_PATH);
+    await client.waitForSelector(SIDEBAR, 30000);
+    await dismissProblems(client);
     await openInfo(client);
     await client.waitForSelector('button[aria-label="Manage skills"]', 30000);
     await client.evaluate(`(() => { document.querySelector('button[aria-label="Manage skills"]').click(); return true; })()`);
@@ -514,7 +560,6 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
   };
 
   return [
-    { id: "studio-bot-skills", packageDir: "bb-studio", fileName: "bot-skills.png", setup: skillsSection },
     {
       id: "studio-bot-create",
       packageDir: "bb-studio",
@@ -530,7 +575,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         await sleep(600);
       },
     },
-    { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: info },
+    { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: chat },
     { id: "studio-bot-leave", packageDir: "bb-studio", fileName: "bot-leave.png", setup: leave },
     { id: "studio-bot-runners", packageDir: "bb-studio", fileName: "bot-runners.png", setup: runnersInfo },
     { id: "studio-bot-automations", packageDir: "bb-studio", fileName: "bot-automations.png", setup: automationsList },
@@ -540,5 +585,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     { id: "studio-bot-two", packageDir: "bb-studio", fileName: "bot-two.png", setup: twoBots },
     { id: "studio-bot-switch-model", packageDir: "bb-studio", fileName: "bot-switch-model.png", setup: switchModel },
     { id: "studio-bot-handoff", packageDir: "bb-studio", fileName: "bot-handoff.png", setup: handoff },
+    // Last: teaching Dot a skill adds turns to its chat that other shots should not show.
+    { id: "studio-bot-skills", packageDir: "bb-studio", fileName: "bot-skills.png", setup: skillsSection },
   ];
 };
