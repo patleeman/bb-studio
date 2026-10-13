@@ -23,6 +23,8 @@ struct BotProfileSheet: View {
     @State private var checkIn = CheckIn.unchanged
     @State private var busy = false
     @State private var error: String?
+    /// What the Bot changed about itself, each with Revert.
+    @State private var changes: [BotProfileChange] = []
 
     /// Check-ins as Studio's presets (`bot_checkin_preset`); `unchanged` keeps a hand-made schedule.
     enum CheckIn: Hashable, Identifiable {
@@ -112,6 +114,24 @@ struct BotProfileSheet: View {
                     TextField("You are my chief of staff. Keep me on top of…", text: $role, axis: .vertical)
                         .lineLimit(2...5)
                 } header: { Text("Role") } footer: { Text("A sentence or two on what \(trimmedName.isEmpty ? "it" : trimmedName) does for you.") }
+                if !changes.isEmpty {
+                    Section {
+                        ForEach(changes.prefix(5)) { change in
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(change.byLine).font(.caption).foregroundStyle(.secondary)
+                                    Text(change.summary).font(.subheadline).lineLimit(2)
+                                }
+                                Spacer()
+                                if change.canRevert {
+                                    Button("Revert") { Task { await revert(change) } }.buttonStyle(.borderless).disabled(busy)
+                                } else if change.revertedAt != nil {
+                                    Text("Reverted").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } header: { Text("Profile changes") } footer: { Text("Changes \(bot?.name ?? "it") made to itself. Revert puts back what it replaced.") }
+                }
                 Section {
                     ForEach(CheckIn.allCases.filter { $0 != .unchanged || checkIn == .unchanged }) { option in
                         Button { checkIn = option } label: {
@@ -153,6 +173,30 @@ struct BotProfileSheet: View {
                 matchName = bot?.color == nil || bot?.color == BotPalette.hex(forName: name)
                 checkIn = bot == nil ? .preset(.morning) : CheckIn.of(bot?.lead)
             }
+            .task { await loadChanges() }
+        }
+    }
+
+    private func loadChanges() async {
+        guard bot != nil else { return }
+        // An older Studio has no change log; the sheet works without it.
+        changes = (try? await app.client.botProfileChanges(botId: botId)) ?? []
+    }
+
+    private func revert(_ change: BotProfileChange) async {
+        busy = true
+        defer { busy = false }
+        do {
+            if let next = try await app.client.revertBotProfileChange(change.id, botId: botId) {
+                name = next.name
+                role = next.role ?? ""
+                shape = next.shape.flatMap(BotShape.init(rawValue:)) ?? shape
+                color = next.color ?? color
+                saved(next)
+            }
+            await loadChanges()
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
         }
     }
 

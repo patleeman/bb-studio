@@ -44,6 +44,8 @@ public enum Studio {
     public static let bot_avatar_use = "bot_avatar_use"
     public static let bot_avatar_revert = "bot_avatar_revert"
     public static let bot_avatar_upload = "bot_avatar_upload"
+    public static let bot_profile_changes = "bot_profile_changes"
+    public static let bot_profile_revert = "bot_profile_revert"
     public static let bot_set_thread = "bot_set_thread"
     public static let bot_set_run = "bot_set_run"
     public static let bot_pause = "bot_pause"
@@ -289,6 +291,10 @@ public enum Studio {
   public typealias BotAvatarRevert = BotAvatarRevertOutput
 
   public typealias BotAvatarUpload = BotAvatarUploadOutput
+
+  public typealias BotProfileChanges = BotProfileChangesOutput
+
+  public typealias BotProfileRevert = BotProfileRevertOutput
 
   public typealias BotSetThread = BotSetThreadOutput
 
@@ -4526,6 +4532,259 @@ public enum Studio {
     public var run: BotAvatarUploadOutputRun?
 
     public init(bot: BotAvatarUploadOutputBot? = nil, run: BotAvatarUploadOutputRun? = nil) {
+      self.bot = bot
+      self.run = run
+    }
+  }
+
+  public struct BotProfileChangesInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public enum BotProfileChangesOutputChangesItemField: Sendable, Hashable, Codable {
+    case name
+    case role
+    case avatar
+    case shape
+    case color
+    case avatarImage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "name": self = .name
+      case "role": self = .role
+      case "avatar": self = .avatar
+      case "shape": self = .shape
+      case "color": self = .color
+      case "avatarImage": self = .avatarImage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .name: try container.encode("name")
+      case .role: try container.encode("role")
+      case .avatar: try container.encode("avatar")
+      case .shape: try container.encode("shape")
+      case .color: try container.encode("color")
+      case .avatarImage: try container.encode("avatarImage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotProfileChangesOutputChangesItem: Sendable, Hashable, Codable {
+    public var id: Double?
+    public var field: BotProfileChangesOutputChangesItemField?
+    public var oldValue: String?
+    public var newValue: String?
+    public var oldImageUrl: String?
+    public var newImageUrl: String?
+    public var actorBotId: String?
+    public var actorName: String?
+    public var threadId: String?
+    public var at: Double?
+    public var reverts: Double?
+    public var revertedAt: Double?
+
+    public init(id: Double? = nil, field: BotProfileChangesOutputChangesItemField? = nil, oldValue: String? = nil, newValue: String? = nil, oldImageUrl: String? = nil, newImageUrl: String? = nil, actorBotId: String? = nil, actorName: String? = nil, threadId: String? = nil, at: Double? = nil, reverts: Double? = nil, revertedAt: Double? = nil) {
+      self.id = id
+      self.field = field
+      self.oldValue = oldValue
+      self.newValue = newValue
+      self.oldImageUrl = oldImageUrl
+      self.newImageUrl = newImageUrl
+      self.actorBotId = actorBotId
+      self.actorName = actorName
+      self.threadId = threadId
+      self.at = at
+      self.reverts = reverts
+      self.revertedAt = revertedAt
+    }
+  }
+
+  public struct BotProfileChangesOutput: Sendable, Hashable, Codable {
+    public var changes: [BotProfileChangesOutputChangesItem]?
+
+    public init(changes: [BotProfileChangesOutputChangesItem]? = nil) {
+      self.changes = changes
+    }
+  }
+
+  public struct BotProfileRevertInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var changeId: Int?
+
+    public init(botId: String? = nil, changeId: Int? = nil) {
+      self.botId = botId
+      self.changeId = changeId
+    }
+  }
+
+  public enum BotProfileRevertOutputBotState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case stopped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "stopped": self = .stopped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .stopped: try container.encode("stopped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotProfileRevertOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotProfileRevertOutputBot: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var avatar: String?
+    public var state: BotProfileRevertOutputBotState?
+    public var threadId: String?
+    public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
+    public var avatarImageUrl: String?
+    public var primary: Bool?
+    public var kind: BotProfileRevertOutputBotKind?
+    public var providerId: String?
+    public var model: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotProfileRevertOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, avatarImageUrl: String? = nil, primary: Bool? = nil, kind: BotProfileRevertOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.avatar = avatar
+      self.state = state
+      self.threadId = threadId
+      self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
+      self.avatarImageUrl = avatarImageUrl
+      self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public enum BotProfileRevertOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotProfileRevertOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: BotProfileRevertOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: BotProfileRevertOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct BotProfileRevertOutput: Sendable, Hashable, Codable {
+    public var bot: BotProfileRevertOutputBot?
+    public var run: BotProfileRevertOutputRun?
+
+    public init(bot: BotProfileRevertOutputBot? = nil, run: BotProfileRevertOutputRun? = nil) {
       self.bot = bot
       self.run = run
     }

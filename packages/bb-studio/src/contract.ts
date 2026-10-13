@@ -189,6 +189,30 @@ const botAvatarHistory = z.object({
   images: z.array(z.object({ id: z.string(), url: z.string(), mime: z.string(), source: z.enum(["generated", "upload"]), prompt: z.string().nullable(), provider: z.string().nullable(), createdAt: z.number() })),
 });
 export type BotAvatarHistoryView = z.infer<typeof botAvatarHistory>;
+/**
+ * One edit to a Bot's profile (src/bot.ts, table bot_profile_changes): one
+ * the Bot made itself (`actorBotId`), or the user's revert of one
+ * (`reverts`, actorBotId null). avatarImage values are image ids ("" or null
+ * for the drawn avatar), with their URLs while the image is kept.
+ */
+const botProfileChange = z.object({
+  id: z.number(),
+  field: z.enum(["name", "role", "avatar", "shape", "color", "avatarImage"]),
+  oldValue: z.string().nullable(),
+  newValue: z.string().nullable(),
+  oldImageUrl: z.string().nullable(),
+  newImageUrl: z.string().nullable(),
+  actorBotId: z.string().nullable(),
+  /** The Bot that made it, by its current name; null for the user's reverts. */
+  actorName: z.string().nullable(),
+  threadId: z.string().nullable(),
+  at: z.number(),
+  /** The change this one undid. */
+  reverts: z.number().nullable(),
+  /** When the user reverted this change; null while it stands. */
+  revertedAt: z.number().nullable(),
+});
+export type BotProfileChangeView = z.infer<typeof botProfileChange>;
 /** Which Bot a bot_* call acts on; the primary Bot when absent. */
 const botId = z.string().min(1).max(100).optional();
 /** Import bot: the provider (one of EXTERNAL_PROVIDERS) and model its thread runs on. */
@@ -420,6 +444,10 @@ export const rpcContract = defineRpcContract({
   bot_avatar_revert: { input: forBot, output: botView },
   /** Uploads an image (PNG, JPEG, WebP or GIF, base64, at most 4 MB) and shows it. */
   bot_avatar_upload: { input: z.object({ botId, data: z.string().min(1).max(6_000_000) }), output: botView },
+  /** Edits the Bot made to its own profile, and the user's reverts of them, newest first. */
+  bot_profile_changes: { input: forBot, output: z.object({ changes: z.array(botProfileChange) }) },
+  /** Restores the value a Bot's own edit replaced, recording the revert. */
+  bot_profile_revert: { input: z.object({ botId, changeId: z.number().int().positive() }), output: botView },
   /** Makes a thread the Bot's thread ("Make this my Bot"); makes the Bot if there is none. */
   bot_set_thread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: botView },
   /** The Bot's heartbeat (check-ins); on needs an active Bot. */

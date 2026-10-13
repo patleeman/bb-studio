@@ -16,6 +16,7 @@ import { SwitchModelDialog } from "./BotModel";
 import { externalName, externalNote } from "../../external-providers";
 import { RunnersSection } from "./Runners";
 import { AutomationsSection } from "./Automations";
+import { ProfileChanges } from "./ProfileChanges";
 import { useOpenThread } from "./workspace";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
@@ -122,6 +123,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
         : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} adoptOnly />}
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
+      <ProfileChanges botId={bot.id} onChanged={refresh} />
       <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} />
       {sheets}
     </div>

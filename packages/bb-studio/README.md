@@ -1119,6 +1119,19 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `OPENAI_API_KEY` or `XAI_API_KEY` in the BB server's environment. With
   neither the tool fails with "Image generation isn't set up: …" before any
   call. A runner can't change its Bot's avatar.
+- **Self-managed profile**: a Bot can change its own name, description
+  (role), emoji, and drawn shape and color with `bot_profile_update`, from
+  its own thread only, and draw its avatar with `bot_avatar_generate`.
+  `bot_set` called from a Bot's threads counts as the Bot's edit too. Every
+  such edit lands in `bot_profile_changes`, an append-only table (triggers
+  refuse updates and deletes): who, when, from which thread, the field, the
+  old and the new value. Info's Activity lists them under **Profile
+  changes** ("Changed by Dot · description: … → …") with **Revert**, which
+  restores the old value and records the revert; the iOS Edit profile sheet
+  shows the same list. What's the user's alone (pause, resume, stop,
+  delete, model and provider, reasoning, permission mode, turning check-ins
+  on or off) isn't in the tool's schema, which rejects unknown keys, and
+  `Bots.selfEdit` refuses it as well.
 - **Chat**: the Bot's current thread, opened as BB's own thread page, so it
   is exactly any thread: the same timeline, composer, message actions, side
   chat, queued messages, questions and approvals inline. Threads it handed
@@ -1300,7 +1313,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   moves the Bot to the new thread. It is the personal project's lead, so it
   sees every project.
 - RPCs: `bot_list`, `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role), `bot_avatar_history`,
-  `bot_avatar_use` (an image id, or null for the drawn avatar), `bot_avatar_revert`, `bot_avatar_upload` (base64), `bot_set_thread`,
+  `bot_avatar_use` (an image id, or null for the drawn avatar), `bot_avatar_revert`, `bot_avatar_upload` (base64),
+  `bot_profile_changes`, `bot_profile_revert` (a change id), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
   `bot_activity`, `bot_memory`, `bot_chain` (its thread and the ones it
   handed off from, oldest first), `bot_checkin_preset` (`morning`,
@@ -1311,7 +1325,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `botId` (the primary when absent); `bot_create` makes the primary first,
   then additional bots. Agent tools: `bot_get`, `bot_set`, `bot_avatar_generate`, `bot_pause`,
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
-  `bot_skill_list`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
+  `bot_profile_update`, `bot_skill_list`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
   `bot_skill_delete` and `bot_history_search`.
 - **Watchers**, for script authors. Studio creates a BB script automation
   (bash, sh, node or python3; timeout up to 15 minutes; working directory

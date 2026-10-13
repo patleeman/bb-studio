@@ -101,6 +101,22 @@ extension BBClient {
         return info
     }
 
+    /// Edits the Bot made to its own profile, and your reverts of them, newest first. Empty from an older Studio.
+    public func botProfileChanges(botId: String? = nil) async throws -> [BotProfileChange] {
+        struct Output: Decodable { var changes: [BotProfileChange] }
+        let output: Output = try await rpc("studio", Studio.Method.bot_profile_changes, Self.scoped(botId))
+        return output.changes
+    }
+
+    /// Restores what one of the Bot's own edits replaced.
+    @discardableResult
+    public func revertBotProfileChange(_ id: Int, botId: String? = nil) async throws -> BotInfo? {
+        let output: BotWire = try await rpc("studio", Studio.Method.bot_profile_revert, Self.scoped(botId, ["changeId": .number(Double(id))]))
+        let info = output.info
+        remember(info)
+        return info
+    }
+
     /// The Bot's Memory page, made on first use.
     public func botMemoryPageId(botId: String? = nil) async throws -> String? {
         struct Output: Decodable { var pageId: String? }
@@ -359,6 +375,48 @@ extension BotInfo {
         copy.external = external
         return copy
     }
+}
+
+/// An edit a Bot made to its own profile (`bot_profile_changes`), or your revert of one.
+public struct BotProfileChange: Decodable, Hashable, Sendable, Identifiable {
+    public var id: Int
+    public var field: String
+    public var oldValue: String?
+    public var newValue: String?
+    public var oldImageUrl: String?
+    public var newImageUrl: String?
+    public var actorName: String?
+    public var at: Double
+    /// The change this one undid; set on your reverts.
+    public var reverts: Int?
+    /// When you reverted this one.
+    public var revertedAt: Double?
+
+    public var canRevert: Bool { reverts == nil && revertedAt == nil }
+
+    /// "Changed by Dot", or "You reverted".
+    public var byLine: String { reverts != nil ? "You reverted" : "Changed by \(actorName ?? "an agent")" }
+
+    public var fieldLabel: String {
+        switch field {
+        case "role": "description"
+        case "avatar": "emoji"
+        case "avatarImage": "avatar"
+        default: field
+        }
+    }
+
+    /// One side of the diff, in words.
+    public func describe(_ value: String?) -> String {
+        switch field {
+        case "avatarImage": value?.isEmpty == false ? "an image" : "drawn"
+        case "shape": value ?? "emoji"
+        default: value?.isEmpty == false ? value! : "empty"
+        }
+    }
+
+    /// "name: Bot → Dot".
+    public var summary: String { "\(fieldLabel): \(describe(oldValue)) → \(describe(newValue))" }
 }
 
 /// One of a bot's runners: a scheduled job that reports back to it.

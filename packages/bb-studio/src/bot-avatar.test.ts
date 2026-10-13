@@ -1,37 +1,11 @@
-import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
-import { afterEach, expect, it, vi } from "vitest";
-import { Bots, BOT_ID } from "./bot";
+import { expect, it, vi } from "vitest";
+import { BOT_ID } from "./bot";
 import { AVATAR_HISTORY, avatarImageUrl, ImageNotSetUpError, imageMime, openaiImageProvider, pickImageProvider, xaiImageProvider, type ImageProvider } from "./bot-avatar";
 import { registerBotProfileTools } from "./bot-profile-tools";
-import { MIGRATIONS } from "./migrations";
-import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
-
-const dispose: (() => Promise<void>)[] = [];
-afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
+import { twoBots } from "./test/bot-fixture";
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
-
-/** Two Bots: the primary (thr_main) and Scout (thr_scout); thr_child was started by Scout's thread. */
-async function setup() {
-  const parents: Record<string, string> = { thr_child: "thr_scout" };
-  const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
-    threads: {
-      get: (async ({ threadId }: { threadId: string }) => ({ id: threadId, parentThreadId: parents[threadId] ?? null })) as never,
-      defaultExecutionOptions: (async () => ({ model: "model" })) as never,
-    },
-  } });
-  dispose.push(() => harness.lifecycle.dispose());
-  const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
-  const leads = new ProjectLeads({ db, sdk: bb.sdk, changed: () => {}, personalPrompt: () => "", botPrompt: () => null });
-  const bots = new Bots({ db, sdk: bb.sdk, leads, changed: () => {} });
-  db.prepare("INSERT INTO project_leads VALUES (?, ?, 1, 2)").run(PERSONAL_PROJECT_ID, "thr_main");
-  const insert = db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, ?, '🤖', 'active', ?, 0, ?, ?)");
-  insert.run(BOT_ID, "Dot", "thr_main", 1, 1);
-  insert.run("bot_scout", "Scout", "thr_scout", 2, 2);
-  return { bb, harness, db, bots };
-}
 
 it("tells an image's type from its bytes", () => {
   expect(imageMime(PNG)).toBe("image/png");
@@ -66,7 +40,7 @@ it("reports a provider's error without the key", async () => {
 });
 
 it("keeps a Bot's last few images, never pruning the shown one or Revert's, and Revert flips back", async () => {
-  const { bots } = await setup();
+  const { bots } = await twoBots();
   expect(bots.stored()?.avatarImageUrl).toBeNull();
   const first = bots.addAvatarImage(undefined, { data: PNG, mime: "image/png", source: "generated", prompt: "one" });
   const firstId = bots.avatarHistory().current!;
@@ -93,7 +67,7 @@ it("keeps a Bot's last few images, never pruning the shown one or Revert's, and 
 });
 
 it("bot_avatar_generate sets the calling Bot's avatar, from its own thread or one it started", async () => {
-  const { bb, harness, bots } = await setup();
+  const { bb, harness, bots } = await twoBots();
   const generate = vi.fn(async () => ({ data: PNG, mime: "image/png", model: "test-model" }));
   const provider: ImageProvider = { id: "test", label: "Test", generate };
   registerBotProfileTools(bb, { bots, acting: (threadId) => bots.actingFor(threadId), imageProvider: () => provider });
@@ -108,7 +82,7 @@ it("bot_avatar_generate sets the calling Bot's avatar, from its own thread or on
 });
 
 it("bot_avatar_generate fails before any spend when image generation isn't set up", async () => {
-  const { bb, harness, bots } = await setup();
+  const { bb, harness, bots } = await twoBots();
   registerBotProfileTools(bb, { bots, acting: (threadId) => bots.actingFor(threadId), imageProvider: () => pickImageProvider({ settings: {}, env: {} }) });
   await expect(harness.callAgentTool("bot_avatar_generate", { prompt: "a fox" }, { threadId: "thr_main" })).rejects.toThrow(/^Image generation isn't set up/);
   expect(bots.avatarHistory().images).toEqual([]);

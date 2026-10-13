@@ -325,4 +325,17 @@ export const MIGRATIONS = [
        source TEXT NOT NULL, prompt TEXT, provider TEXT, created_at INTEGER NOT NULL
      );
    CREATE INDEX bot_avatar_images_bot ON bot_avatar_images (bot_id, created_at);`,
+  // Edits a Bot made to its own profile (bot_profile_update, bot_set and
+  // bot_avatar_generate from its thread), and the user's reverts of them
+  // (`reverts` names the change undone). Append-only: triggers refuse
+  // updates and deletes, so the record can't be rewritten.
+  `CREATE TABLE bot_profile_changes (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, actor_bot_id TEXT, thread_id TEXT,
+       field TEXT NOT NULL, old_value TEXT, new_value TEXT, reverts INTEGER, at INTEGER NOT NULL
+     );
+   CREATE INDEX bot_profile_changes_bot ON bot_profile_changes (bot_id, id);
+   CREATE TRIGGER bot_profile_changes_no_update BEFORE UPDATE ON bot_profile_changes
+     BEGIN SELECT RAISE(ABORT, 'bot_profile_changes is append-only'); END;
+   CREATE TRIGGER bot_profile_changes_no_delete BEFORE DELETE ON bot_profile_changes
+     BEGIN SELECT RAISE(ABORT, 'bot_profile_changes is append-only'); END;`,
 ];

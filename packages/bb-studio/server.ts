@@ -156,7 +156,7 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_avatar_generate", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
+  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
   const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS };
@@ -634,6 +634,8 @@ export default async function plugin(bb: BbPluginApi) {
     bot_create: (input) => bots.create(input),
     bot_set: (input) => bots.set(input),
     bot_avatar_history: ({ botId }) => bots.avatarHistory(botId),
+    bot_profile_changes: ({ botId }) => ({ changes: bots.profileChanges(botId) }),
+    bot_profile_revert: ({ botId, changeId }) => bots.revertChange(botId, changeId),
     bot_avatar_use: ({ botId, imageId }) => { const bot = bots.useAvatarImage(botId, imageId); return bots.get(bot.id); },
     bot_avatar_revert: ({ botId }) => { const bot = bots.revertAvatar(botId); return bots.get(bot.id); },
     bot_avatar_upload: ({ botId, data }) => {
@@ -943,9 +945,15 @@ export default async function plugin(bb: BbPluginApi) {
   const runnerCantControl = async (threadId: string | undefined) => (await acting(threadId))?.via === "runner" ? "A runner can't pause, stop or resume its Bot; tell the user instead (runner_report)." : null;
   bb.agents.registerTool({ name: "bot_get", description: "Show the user's Bot (their always-on agent, formerly the Chief of Staff): name, avatar, state (active, paused, stopped), its thread and check-ins. In a Bot's own thread, that Bot.", parameters: z.object({}), execute: async (_input, ctx) => describeBot(await bots.get(await selfBot(ctx.threadId))) });
   bb.agents.registerTool({
-    name: "bot_set", description: "Rename the user's Bot, change its avatar emoji, or set its role (a sentence or two it's given). Only when the user asks.",
+    name: "bot_set", description: "Rename the user's Bot, change its avatar emoji, or set its role (a sentence or two it's given). Only when the user asks. A Bot changing its own profile on its own uses bot_profile_update; from a Bot's threads either is recorded for the user to revert.",
     parameters: z.object({ name: z.string().trim().min(1).max(60).optional(), avatar: z.string().trim().min(1).max(16).optional().describe("One emoji"), role: z.string().trim().max(400).optional().describe("Its role in the user's words; empty clears it") }),
-    execute: async (input, ctx) => describeBot(await bots.set({ ...input, botId: await selfBot(ctx.threadId) })),
+    execute: async (input, ctx) => {
+      const self = await acting(ctx.threadId);
+      if (self?.via === "runner") return "A runner can't change its Bot's profile; tell the user instead (runner_report).";
+      // From a Bot's own threads it's the Bot's edit: recorded, for the user to see and revert.
+      if (self) return describeBot((await bots.selfEdit(self.botId, input, { botId: self.botId, threadId: ctx.threadId ?? null })).view);
+      return describeBot(await bots.set({ ...input, botId: undefined }));
+    },
   });
   registerBotProfileTools(bb, { bots, acting, imageProvider: () => pickImageProvider({ settings: settingValues }) });
   // A Bot's image avatar, for the desktop and the iOS app. The URL names the image, so it never goes stale.

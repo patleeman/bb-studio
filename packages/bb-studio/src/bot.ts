@@ -28,10 +28,11 @@ import { join } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import type { BotActivityView, BotAvatarHistoryView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "./contract";
+import type { BotActivityView, BotAvatarHistoryView, BotProfileChangeView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "./contract";
 import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-providers";
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
+import { BOT_SHAPES } from "./bot-shapes";
 import { AvatarImages, avatarImageUrl, type AvatarImageMeta, type AvatarImageRow } from "./bot-avatar";
 
 type Sdk = BbPluginApi["sdk"];
@@ -149,6 +150,51 @@ export function modelChange(current: ThreadExecution, next: ThreadExecution): "u
   if (current.providerId && next.providerId !== current.providerId) return "handoff";
   return next.model === current.model && (next.reasoning ?? current.reasoning ?? null) === (current.reasoning ?? null) ? "unchanged" : "in-place";
 }
+/**
+ * What a Bot may change about itself (bot_profile_update, and bot_set or
+ * bot_avatar_generate from its thread). Every such edit is recorded in
+ * bot_profile_changes, and the user can revert it.
+ */
+export const SELF_EDITABLE = ["name", "role", "avatar", "shape", "color"] as const;
+export type SelfEditField = (typeof SELF_EDITABLE)[number];
+export type ProfileField = SelfEditField | "avatarImage";
+/** The user's alone, with how a Bot that tries is told. Anything not in SELF_EDITABLE is refused too. */
+export const USER_ONLY_FIELDS: Readonly<Record<string, string>> = {
+  state: "pause, resume or stop a Bot", paused: "pause a Bot", stopped: "stop a Bot", deleted: "delete a Bot", delete: "delete a Bot",
+  model: "switch its model", providerId: "switch its provider", provider: "switch its provider", reasoning: "change its reasoning level",
+  permissionMode: "change its permission mode", permission: "change its permission mode", enabled: "turn its check-ins and automations on or off",
+  threadId: "move it to another thread", primary: "change which Bot is primary",
+};
+/** Who made an edit: a Bot (from one of its threads) or, with botId null, an agent elsewhere. */
+export type ProfileActor = { botId: string | null; threadId?: string | null };
+type ProfileChangeRow = { id: number; bot_id: string; actor_bot_id: string | null; thread_id: string | null; field: ProfileField; old_value: string | null; new_value: string | null; reverts: number | null; at: number };
+
+/** Checks a self-edit: only SELF_EDITABLE fields, each valid; throws naming what's the user's. */
+export function checkSelfEdit(changes: Record<string, unknown>): Partial<Record<SelfEditField, string | null>> {
+  const refused = Object.keys(changes).filter((key) => !(SELF_EDITABLE as readonly string[]).includes(key));
+  if (refused.length) {
+    const why = [...new Set(refused.map((key) => USER_ONLY_FIELDS[key] ?? `change "${key}"`))];
+    throw new Error(`Only the user can ${why.join(", ")}. A Bot can change its own ${SELF_EDITABLE.join(", ")} and avatar image.`);
+  }
+  const out: Partial<Record<SelfEditField, string | null>> = {};
+  for (const [key, raw] of Object.entries(changes) as [SelfEditField, unknown][]) {
+    if (raw === undefined) continue;
+    const value = typeof raw === "string" ? raw.trim() : raw;
+    if (key === "shape") {
+      if (value !== null && !(BOT_SHAPES as readonly unknown[]).includes(value)) throw new Error(`shape is one of ${BOT_SHAPES.join(", ")}, or null for the emoji.`);
+      out.shape = value as string | null;
+      continue;
+    }
+    if (typeof value !== "string") throw new Error(`${key} must be text.`);
+    if (key === "name" && (!value || value.length > 60)) throw new Error("A name is 1 to 60 characters.");
+    if (key === "role" && value.length > 400) throw new Error("A description is at most 400 characters.");
+    if (key === "avatar" && (!value || value.length > 16)) throw new Error("avatar is one emoji.");
+    if (key === "color" && !/^#[0-9a-fA-F]{6}$/.test(value)) throw new Error("color is #rrggbb.");
+    out[key] = value;
+  }
+  return out;
+}
+
 type SkillRow = { bot_id: string; name: string; description: string; body: string; created_at: number; updated_at: number; state: "active" | "stale" | "archived"; pinned: number; used_at: number | null };
 const skillView = (skill: SkillRow): BotSkillView => ({ name: skill.name, description: skill.description, updatedAt: skill.updated_at, state: skill.state, pinned: !!skill.pinned, usedAt: skill.used_at ?? null });
 
@@ -587,11 +633,82 @@ export class Bots {
     return this.view(this.need(row.id));
   }
 
-  /** Saves a new image and shows it. */
-  addAvatarImage(botId: string | undefined, image: { data: Buffer; mime: string; source: "generated" | "upload"; prompt?: string | null; provider?: string | null }): NonNullable<BotView["bot"]> {
+  /** Saves a new image and shows it. With an `actor` (an agent's edit), it's recorded for the user to see and revert. */
+  addAvatarImage(botId: string | undefined, image: { data: Buffer; mime: string; source: "generated" | "upload"; prompt?: string | null; provider?: string | null }, actor?: ProfileActor): NonNullable<BotView["bot"]> {
     const row = this.need(botId);
     const saved = this.images.add({ botId: row.id, ...image });
-    return this.useAvatarImage(row.id, saved.id);
+    const view = this.useAvatarImage(row.id, saved.id);
+    if (actor) this.recordChange(row.id, actor, "avatarImage", row.avatar_image_id ?? "", saved.id);
+    return view;
+  }
+
+  // -------------------------------------------------------------------------
+  // Self-edits: a Bot changing its own profile, recorded in bot_profile_changes
+  // (append-only) so the user sees "Changed by <Bot>" and can revert.
+  // -------------------------------------------------------------------------
+
+  private recordChange(botId: string, actor: ProfileActor, field: ProfileField, oldValue: string | null, newValue: string | null, reverts: number | null = null): void {
+    this.deps.db.prepare("INSERT INTO bot_profile_changes (bot_id, actor_bot_id, thread_id, field, old_value, new_value, reverts, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(botId, actor.botId, actor.threadId ?? null, field, oldValue, newValue, reverts, Date.now());
+  }
+
+  /**
+   * A Bot (or an agent elsewhere, actor.botId null) edits a Bot's profile:
+   * only SELF_EDITABLE fields (checkSelfEdit throws on the rest, state, model
+   * and permissions included). Each field that changed is recorded.
+   */
+  async selfEdit(botId: string | undefined, changes: Record<string, unknown>, actor: ProfileActor): Promise<{ view: BotView; changed: SelfEditField[] }> {
+    const input = checkSelfEdit(changes);
+    const before = this.need(botId);
+    const changed = (Object.keys(input) as SelfEditField[]).filter((key) => (before[key] ?? null) !== (key === "role" ? input.role || null : input[key]));
+    if (!changed.length) return { view: await this.get(before.id), changed };
+    const view = await this.set({
+      botId: before.id,
+      ...(changed.includes("name") ? { name: input.name! } : {}), ...(changed.includes("avatar") ? { avatar: input.avatar! } : {}),
+      ...(changed.includes("shape") ? { shape: input.shape ?? null } : {}), ...(changed.includes("color") ? { color: input.color! } : {}),
+      ...(changed.includes("role") ? { role: input.role ?? "" } : {}),
+    });
+    for (const field of changed) this.recordChange(before.id, actor, field, before[field] ?? null, field === "role" ? input.role || null : input[field] ?? null);
+    this.deps.changed();
+    return { view, changed };
+  }
+
+  /** The Bot's own edits and the user's reverts, newest first. */
+  profileChanges(botId?: string, limit = 50): BotProfileChangeView[] {
+    const row = this.need(botId);
+    const rows = this.deps.db.prepare("SELECT * FROM bot_profile_changes WHERE bot_id = ? ORDER BY id DESC LIMIT ?").all(row.id, limit) as ProfileChangeRow[];
+    const reverted = new Map((this.deps.db.prepare("SELECT reverts, at FROM bot_profile_changes WHERE bot_id = ? AND reverts IS NOT NULL").all(row.id) as { reverts: number; at: number }[]).map((each) => [each.reverts, each.at]));
+    const names = new Map(this.rows().map((each) => [each.id, each.name]));
+    const imageUrl = (field: ProfileField, value: string | null) => field === "avatarImage" && value && this.images.get(row.id, value) ? avatarImageUrl(row.id, value) : null;
+    return rows.map((each) => ({
+      id: each.id, field: each.field, oldValue: each.old_value, newValue: each.new_value,
+      oldImageUrl: imageUrl(each.field, each.old_value), newImageUrl: imageUrl(each.field, each.new_value),
+      actorBotId: each.actor_bot_id, actorName: each.actor_bot_id ? names.get(each.actor_bot_id) ?? null : null, threadId: each.thread_id,
+      at: each.at, reverts: each.reverts, revertedAt: reverted.get(each.id) ?? null,
+    }));
+  }
+
+  /** The user restores what a Bot's edit replaced; the revert is recorded too, so it can't be reverted twice. */
+  async revertChange(botId: string | undefined, changeId: number): Promise<BotView> {
+    const row = this.need(botId);
+    const change = this.deps.db.prepare("SELECT * FROM bot_profile_changes WHERE id = ? AND bot_id = ?").get(changeId, row.id) as ProfileChangeRow | undefined;
+    if (!change) throw new Error("No such change.");
+    if (change.reverts !== null) throw new Error("That's a revert; change it in Edit profile instead.");
+    if (this.deps.db.prepare("SELECT 1 FROM bot_profile_changes WHERE reverts = ?").get(change.id)) throw new Error("That change is already reverted.");
+    const user: ProfileActor = { botId: null };
+    if (change.field === "avatarImage") {
+      const current = row.avatar_image_id ?? "";
+      this.useAvatarImage(row.id, change.old_value || null);
+      this.recordChange(row.id, user, "avatarImage", current, change.old_value, change.id);
+      return this.get(row.id);
+    }
+    const field = change.field as SelfEditField;
+    const current = row[field] ?? null;
+    if (field === "name") await this.set({ botId: row.id, name: change.old_value ?? DEFAULT_BOT_NAME });
+    else this.update(row, { [field]: field === "avatar" ? change.old_value ?? DEFAULT_BOT_AVATAR : change.old_value });
+    this.recordChange(row.id, user, field, current, change.old_value, change.id);
+    this.deps.changed();
+    return this.get(row.id);
   }
 
   /** Back to the avatar the last change replaced (an image or the drawn one). */

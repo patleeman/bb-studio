@@ -4812,6 +4812,303 @@
         "additionalProperties": false
       }
     },
+    "bot_profile_changes": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number"
+                },
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "name",
+                    "role",
+                    "avatar",
+                    "shape",
+                    "color",
+                    "avatarImage"
+                  ]
+                },
+                "oldValue": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "newValue": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "oldImageUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "newImageUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actorBotId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actorName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "threadId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "type": "number"
+                },
+                "reverts": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "revertedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "field",
+                "oldValue",
+                "newValue",
+                "oldImageUrl",
+                "newImageUrl",
+                "actorBotId",
+                "actorName",
+                "threadId",
+                "at",
+                "reverts",
+                "revertedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_profile_revert": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "changeId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "changeId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "bot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "avatar": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "paused",
+                      "stopped"
+                    ]
+                  },
+                  "threadId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "avatarImageUrl": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "primary": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "studio",
+                      "external"
+                    ]
+                  },
+                  "providerId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "model": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "avatar",
+                  "state",
+                  "threadId",
+                  "createdAt",
+                  "updatedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "cadence": {
+                    "type": "string",
+                    "enum": [
+                      "hourly",
+                      "daily",
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
+                    ]
+                  },
+                  "time": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "cadence",
+                  "time"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "bot",
+          "run"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_set_thread": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
