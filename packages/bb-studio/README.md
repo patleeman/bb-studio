@@ -523,11 +523,39 @@ responsive grid, which you and your agents build together. Items are
 ![Live BB screenshot of a dashboard open as a Studio tab](assets/dashboards-preview.png)
 
 The seeded "Launch metrics" dashboard as a Studio tab in a staged BB, in
-view mode: four stat tiles with deltas and sparklines (churn counts down as
-good), an area chart of weekly signups and trials, a custom gauge widget
-running in its sandboxed frame, a table and a changelog feed, all with
-static data. Recapture with `BB_CAPTURE_ONLY=dashboards`; the capture checks
-every tile, the chart and the custom widget's sandbox.
+view mode: four stat tiles with deltas and sparklines (churn and incidents
+count down as good, so the extra incident is red), "Active users" pushed a
+moment ago, an area chart of weekly signups and trials, a custom gauge
+widget running in its sandboxed frame, a table and a changelog feed.
+
+![The same dashboard in BB's light theme](assets/dashboards-light.png)
+
+The same dashboard in BB's light theme.
+
+![A dashboard of tiles that have nothing to show yet](assets/dashboards-states.png)
+
+Tiles with nothing to show yet: a push tile waiting for an agent's data, a
+script waiting for approval (its command, and **Review command…**), a URL
+that couldn't be reached (the reason, and **Try again**), and an empty note,
+next to a working stat. A new dashboard offers **Add widget**:
+
+![A new dashboard with no widgets](assets/dashboards-empty.png)
+
+![Edit mode with the widget picker open](assets/dashboards-edit.png)
+
+Edit mode: dashed tiles with a drag handle, settings and remove in each
+header and a resize corner, over a faint dot grid, with the widget picker
+grouped into numbers, charts, lists and content.
+
+![The script approval dialog](assets/dashboards-approval.png)
+
+The approval dialog for a proposed script (the BB host's name is blurred
+for this README). Recapture all six with
+`BB_CAPTURE_ONLY=dashboards,dashboards-light,dashboards-empty,dashboards-states,dashboards-edit,dashboards-approval`;
+the captures check every tile and its state, the chart, the custom widget's
+sandbox, the edit-mode handles and picker groups, and that the dialog shows
+the full wrapped command with Deny focused, after a forged approve is
+refused.
 
 - **In the library.** Dashboards list next to pages and drawings, with
   search over their names, widget titles and notes, tags, Move to,
@@ -538,7 +566,10 @@ every tile, the chart and the custom widget's sandbox.
   2.3.0 (MIT), 12 columns wide, 8 below 1100 px and 4 below 700 px. **Edit**
   lets you drag tiles by their header, resize them from the corner, **Add
   widget** (each starts with sample data) and open each widget's settings:
-  title, type, options and data source. **Done** goes back to viewing.
+  title, type, options and data source. **Done** goes back to viewing. In
+  view mode each tile's header shows when it updated (or that it failed or
+  waits for approval), and its **⋯** menu refreshes it, opens its settings,
+  reviews or revokes its script, or removes it.
   Layouts save per breakpoint. The clock button lists the last 20 versions;
   restoring one keeps the current one in history.
 - **Widgets.** Stat (value, delta and sparkline), line, bar, area and pie
@@ -1109,6 +1140,8 @@ bb studio reindex
 ![Relay after a Claude Code → Codex handoff: the chat is the new Codex thread, whose real reply says it's here on Codex (gpt-6.1-sol), and its two earlier threads, each titled Relay, are under Earlier conversations in the Bots sidebar](assets/bot-handoff.png)
 
 ![No Bot yet: a centered welcome, Meet your Bot, with a drawn blob avatar, one question (What should your Bot help with?), Create Bot, and ideas that fill it (Watch my projects, Morning brief, Plan my week, Triage threads); the Bots sidebar shows a Your first bot row](assets/bot-create.png)
+
+![The first chat after Create: Chief of Staff's chat as BB's thread page, the setup message with what it should help with (the ORBIT-42 launch), and its reply introducing itself and asking where to track the launch, what needs you and when the morning update should arrive, before it picks its own name and look; the new Bot in the Bots sidebar](assets/bot-first-chat.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
 the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
