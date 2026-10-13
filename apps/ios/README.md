@@ -93,6 +93,30 @@ are unchanged, and old `bbgo://` links still open.
 | APNs push relay for BB's push-notifications plugin, with notification categories | `packages/bb-studio-mobile/` |
 | Push registration replaces this install's prior subscription when APNs changes its token. Simulator and QA runs skip registration | `iOS/App/PushRegistration.swift` |
 
+## Dashboards
+
+Studio Dashboards render read-only as cards in one column on iPhone, and in as
+many columns as fit on iPad. Each card's title sits on the left and when its
+data came in on the right. A widget that can't show data yet says why in its
+body instead: waiting for an agent's data, a failed fetch (with the error and
+"Pull down to try again"), or a script that needs approval on the desktop.
+
+| Light | Dark | Charts |
+| --- | --- | --- |
+| ![Dashboard, light](docs/dashboards/light.png) | ![Dashboard, dark](docs/dashboards/dark.png) | ![Line, bar and pie charts](docs/dashboards/charts-dark.png) |
+
+| Gauge, table, list | Tile states | No widgets yet | Accessibility type size |
+| --- | --- | --- | --- |
+| ![Gauge, table, list and countdown](docs/dashboards/widgets-light.png) | ![Custom widget, waiting, failed and approve-on-desktop tiles](docs/dashboards/states-light.png) | ![Empty dashboard](docs/dashboards/empty.png) | ![Dashboard at an accessibility text size](docs/dashboards/large-type.png) |
+
+![Dashboard on iPad](docs/dashboards/ipad.png)
+
+Debug builds draw these from a local fixture with every widget type, without a
+server: `-qaDashboardDemo -openURL bbstudio://dashboard/qa-demo`
+(`qa-empty` for a dashboard with no widgets). Add
+`-qaDashboardWidgets w_signups,w_plans` to keep only some widgets; the IDs are
+in `iOS/Studio/DashboardDemo.swift`.
+
 ## Connection
 
 The app talks to `https://patricks-megamac.tail5a01ec.ts.net`, which

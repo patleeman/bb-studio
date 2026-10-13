@@ -10,6 +10,7 @@ import WebKit
 struct DashboardView: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var sizeClass
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     let id: String
@@ -110,17 +111,24 @@ struct DashboardView: View {
     }
 
     private func content(_ dashboard: Dashboard) -> some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                if dashboard.widgets.isEmpty {
-                    ContentUnavailableView("No widgets yet", systemImage: StudioKind.of("dashboard").symbol,
-                        description: Text("Add widgets on the desktop, or ask an agent to."))
+        // One column on a phone; on an iPad, as many as fit, still in the phone layout's order.
+        let columns = sizeClass == .regular
+            ? [GridItem(.adaptive(minimum: 320), spacing: 16, alignment: .top)]
+            : [GridItem(.flexible(), alignment: .top)]
+        return ScrollView {
+            if dashboard.widgets.isEmpty {
+                ContentUnavailableView("No widgets yet", systemImage: StudioKind.of("dashboard").symbol,
+                    description: Text("Add widgets in BB on the desktop, or ask an agent to."))
+                    .padding(.top, 48)
+            } else {
+                LazyVGrid(columns: columns, spacing: sizeClass == .regular ? 16 : 12) {
+                    ForEach(dashboard.stacked) { widget in
+                        DashboardTile(dashboard: dashboard, widget: widget, data: dashboard.data[widget.id], now: now)
+                    }
                 }
-                ForEach(dashboard.stacked) { widget in
-                    DashboardTile(dashboard: dashboard, widget: widget, data: dashboard.data[widget.id], now: now)
-                }
+                .padding(.horizontal, sizeClass == .regular ? 20 : 16)
+                .padding(.vertical, 12)
             }
-            .padding()
         }
         .background(Color(.systemGroupedBackground))
     }
@@ -151,6 +159,13 @@ struct DashboardView: View {
     private func load() async {
         loads += 1
         let load = loads
+        #if DEBUG
+        if let demo = DashboardDemo.dashboard(id) {
+            now = .now
+            if demo != dashboard { dashboard = demo }
+            return
+        }
+        #endif
         do {
             let found = try await client.dashboard(id)
             guard load == loads else { return }
@@ -171,68 +186,129 @@ struct DashboardView: View {
 
 // MARK: Tile
 
-/// One widget: its title, its body, and when its data came in.
+/// One widget: its title, when its data came in, and its body. A widget that
+/// can't show data yet says why in its body instead.
 private struct DashboardTile: View {
     let dashboard: Dashboard
     let widget: Dashboard.Widget
     let data: Dashboard.DataView?
     let now: Date
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let heading = widget.heading {
-                Text(heading)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            content
-            if let freshness = DashboardTime.freshness(data, now: now.timeIntervalSince1970 * 1000) {
-                HStack(spacing: 4) {
-                    if freshness.tone == .error { Image(systemName: "exclamationmark.circle") }
-                    if freshness.tone == .warning { Image(systemName: "lock") }
-                    Text(freshness.text).lineLimit(1)
+        let freshness = DashboardTime.freshness(data, now: now.timeIntervalSince1970 * 1000)
+        let state = DashboardTileState(data: data, widget: widget)
+        VStack(alignment: .leading, spacing: 10) {
+            header(freshness: state == .data && freshness?.tone == .normal ? freshness?.text : nil)
+            switch state {
+            case .approval:
+                DashboardNotice(
+                    symbol: "desktopcomputer", tint: StudioKind.of("dashboard").tint, title: "Approve on desktop",
+                    detail: "This widget runs a script on your computer. Approve it once in BB on the desktop and its data shows here.")
+            case .error:
+                DashboardNotice(
+                    symbol: "exclamationmark.triangle.fill", tint: .orange, title: "Couldn't load",
+                    detail: [data?.error, "Pull down to try again."].compactMap { $0 }.joined(separator: "\n"))
+            case .waiting:
+                DashboardEmpty(
+                    text: widget.sourceKind == "push" ? "No data yet. An agent sends it." : "Loading…",
+                    symbol: widget.sourceKind == "push" ? "tray" : nil)
+            case .data:
+                DashboardWidgetBody(dashboard: dashboard, widget: widget, value: data?.value ?? .null)
+                // Older data shown while the source fails, or waits for approval again.
+                if let freshness, freshness.tone != .normal {
+                    Label(freshness.text, systemImage: freshness.tone == .error ? "exclamationmark.circle" : "desktopcomputer")
+                        .font(.caption)
+                        .foregroundStyle(freshness.tone == .error ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                 }
-                .font(.caption2)
-                .foregroundStyle(freshness.tone == .error ? AnyShapeStyle(.red) : freshness.tone == .warning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
             }
         }
-        .padding(12)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(widget.heading ?? widget.type.capitalized)
     }
 
+    /// The title on the left and "2m ago" on the right; stacked at accessibility sizes.
     @ViewBuilder
-    private var content: some View {
-        let value = data?.value ?? .null
-        if data?.status == "approval", value.isNull {
-            DashboardEmpty(text: "This script widget needs approval. Approve on desktop.", symbol: "lock")
-        } else if data?.status == "error", value.isNull {
-            DashboardEmpty(text: data?.error ?? "Couldn't load", symbol: "exclamationmark.triangle", tint: .red)
-        } else if data?.status == "pending", widget.usesData {
-            DashboardEmpty(text: widget.sourceKind == "push" ? "No data yet. An agent sends it with widget_set_data." : "Loading…")
-        } else {
-            DashboardWidgetBody(dashboard: dashboard, widget: widget, value: value)
+    private func header(freshness: String?) -> some View {
+        let heading = widget.heading
+        if heading != nil || freshness != nil {
+            let layout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+            layout {
+                if let heading {
+                    Text(heading)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+                }
+                if !typeSize.isAccessibilitySize { Spacer(minLength: 0) }
+                if let freshness {
+                    Text(freshness.replacingOccurrences(of: "Updated ", with: ""))
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .accessibilityLabel(freshness)
+                }
+            }
         }
     }
 }
 
+/// What a tile's body shows.
+private enum DashboardTileState: Equatable {
+    case data, approval, error, waiting
+
+    init(data: Dashboard.DataView?, widget: Dashboard.Widget) {
+        let empty = (data?.value ?? .null).isNull
+        switch data?.status {
+        case "approval"? where empty: self = .approval
+        case "error"? where empty: self = .error
+        case "pending"? where widget.usesData: self = .waiting
+        default: self = .data
+        }
+    }
+}
+
+/// A calm, tinted box for a widget that needs something before it can show data.
+private struct DashboardNotice: View {
+    let symbol: String
+    let tint: Color
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: symbol).foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(detail).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(tint.opacity(0.1), in: .rect(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A widget with nothing to show: a quiet, centered line.
 private struct DashboardEmpty: View {
     let text: String
     var symbol: String?
-    var tint: Color = .secondary
 
     var body: some View {
-        HStack(spacing: 6) {
-            if let symbol { Image(systemName: symbol) }
-            Text(text)
+        VStack(spacing: 6) {
+            if let symbol { Image(systemName: symbol).font(.title3).foregroundStyle(.tertiary) }
+            Text(text).font(.footnote).foregroundStyle(.secondary)
         }
-        .font(.footnote)
-        .foregroundStyle(tint)
-        .frame(maxWidth: .infinity, minHeight: 44)
         .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, minHeight: 64)
     }
 }
 
@@ -283,10 +359,19 @@ private struct StatWidget: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                 if let delta = stat.delta {
-                    Text((stat.trend == "up" ? "▲ " : stat.trend == "down" ? "▼ " : "") + delta)
-                        .font(.subheadline.weight(.medium))
-                        .monospacedDigit()
-                        .foregroundStyle(tint)
+                    HStack(spacing: 3) {
+                        if stat.trend == "up" || stat.trend == "down" {
+                            Image(systemName: stat.trend == "up" ? "arrow.up.right" : "arrow.down.right")
+                                .font(.caption.weight(.bold))
+                        }
+                        Text(delta).monospacedDigit().lineLimit(1)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(tint.opacity(0.12), in: .capsule)
+                    .fixedSize()
                 }
             }
             if let caption = stat.caption {
@@ -302,7 +387,8 @@ private struct StatWidget: View {
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
                 .chartYScale(domain: .automatic(includesZero: false))
-                .frame(height: 32)
+                .frame(height: 36)
+                .padding(.top, 2)
                 .accessibilityLabel("Trend: \(stat.series.map { OrderedJSON.jsNumber($0) }.joined(separator: ", "))")
             }
         }
@@ -325,13 +411,14 @@ private struct ChartWidget: View {
                 case "line":
                     LineMark(x: .value(chart.x, point.x), y: .value("Value", point.value))
                         .foregroundStyle(by: .value("Series", point.series))
-                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        .lineStyle(StrokeStyle(lineWidth: 2.25, lineCap: .round, lineJoin: .round))
                 case "area":
                     AreaMark(x: .value(chart.x, point.x), y: .value("Value", point.value), stacking: stacked ? .standard : .unstacked)
                         .foregroundStyle(by: .value("Series", point.series))
-                        .opacity(0.35)
+                        .opacity(stacked ? 0.75 : 0.35)
                 case "pie":
-                    SectorMark(angle: .value("Value", point.value), innerRadius: .ratio(0.5), angularInset: 1)
+                    SectorMark(angle: .value("Value", point.value), innerRadius: .ratio(0.58), angularInset: 1.5)
+                        .cornerRadius(3)
                         .foregroundStyle(by: .value(chart.x, point.x))
                 default:
                     if stacked {
@@ -341,13 +428,29 @@ private struct ChartWidget: View {
                         BarMark(x: .value(chart.x, point.x), y: .value("Value", point.value))
                             .foregroundStyle(by: .value("Series", point.series))
                             .position(by: .value("Series", point.series))
+                            .cornerRadius(3)
                     }
                 }
             }
             .chartForegroundStyleScale(range: (0..<max(1, colors)).map(seriesColor))
             .chartLegend(chart.series.count > 1 || widget.type == "pie" ? .visible : .hidden)
+            .chartLegend(position: .top, alignment: .leading, spacing: 12)
+            // Categories along the bottom without grid lines; a few quiet value lines.
+            .chartXAxis {
+                AxisMarks { _ in
+                    AxisValueLabel(collisionResolution: .greedy).font(.caption2)
+                }
+            }
+            .chartYAxis {
+                AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(Color.secondary.opacity(0.35))
+                    AxisValueLabel().font(.caption2)
+                }
+            }
             .chartYAxisLabel(unit)
-            .frame(height: widget.type == "pie" ? 240 : 200)
+            // Axis labels stop growing before they crowd out the plot.
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .frame(height: widget.type == "pie" ? 200 : 190)
             .accessibilityLabel("\(widget.type) chart of \(chart.series.joined(separator: ", ")) by \(chart.x), \(chart.rows) rows")
         } else {
             DashboardEmpty(text: "No rows to chart yet.")
@@ -365,18 +468,19 @@ private struct TableWidget: View {
         if let table = DashboardRead.table(value, options: widget.options) {
             VStack(alignment: .leading, spacing: 6) {
                 ScrollView(.horizontal) {
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                    Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 7) {
                         GridRow {
                             ForEach(Array(table.columns.enumerated()), id: \.offset) { _, column in
-                                Text(column).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                Text(column).font(.caption.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
                             }
                         }
                         Divider()
-                        ForEach(Array(table.rows.prefix(Self.phoneRows).enumerated()), id: \.offset) { _, row in
+                        ForEach(Array(table.rows.prefix(Self.phoneRows).enumerated()), id: \.offset) { index, row in
+                            if index > 0 { Divider().opacity(0.5) }
                             GridRow {
                                 ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
                                     Text(DashboardRead.cellText(cell))
-                                        .font(.caption)
+                                        .font(.footnote)
                                         .monospacedDigit()
                                         .lineLimit(2)
                                         .frame(maxWidth: 240, alignment: .leading)
@@ -463,19 +567,29 @@ private struct TickerWidget: View {
             DashboardEmpty(text: "Nothing to show yet.")
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 24) {
+                HStack(spacing: 22) {
                     ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(entry.label).font(.subheadline.weight(.medium))
-                            if !entry.value.isEmpty { Text(entry.value).font(.subheadline).monospacedDigit().foregroundStyle(.secondary) }
+                            Text(entry.label).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                            if !entry.value.isEmpty { Text(entry.value).font(.subheadline.weight(.medium)).monospacedDigit() }
                             if !entry.delta.isEmpty {
-                                Text(entry.delta).font(.caption).monospacedDigit()
-                                    .foregroundStyle(entry.delta.hasPrefix("-") ? .red : .green)
+                                let down = entry.delta.hasPrefix("-") || entry.delta.hasPrefix("−")
+                                Text(entry.delta).font(.footnote.weight(.medium)).monospacedDigit()
+                                    .foregroundStyle(down ? .red : .green)
                             }
                         }
+                        .accessibilityElement(children: .combine)
                     }
                 }
                 .padding(.vertical, 4)
+                .padding(.trailing, 24)
+            }
+            // Fades at the trailing edge, so it reads as a strip that scrolls.
+            .mask {
+                HStack(spacing: 0) {
+                    Rectangle()
+                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 24)
+                }
             }
         }
     }
@@ -515,7 +629,9 @@ private struct EmbedWidget: View {
         case .thread(let threadId):
             row(title: "Open thread", detail: nil, symbol: Symbols.thread) { app.push(.thread(id: threadId)) }
         case .web(let url):
-            row(title: url.host() ?? url.absoluteString, detail: url.absoluteString, symbol: "safari") { openURL(url) }
+            let host = url.host() ?? url.absoluteString
+            let rest = url.absoluteString.replacingOccurrences(of: #"^https?://"#, with: "", options: .regularExpression)
+            row(title: host, detail: rest.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == host ? nil : rest, symbol: "safari") { openURL(url) }
         case .none:
             DashboardEmpty(text: "This embed has nothing to show yet.")
         }
@@ -524,7 +640,11 @@ private struct EmbedWidget: View {
     private func row(title: String, detail: String?, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: symbol).foregroundStyle(.tint).frame(width: 24)
+                Image(systemName: symbol)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.tint)
+                    .frame(width: 36, height: 36)
+                    .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.subheadline.weight(.medium)).foregroundStyle(.primary).lineLimit(2)
                     if let detail, !detail.isEmpty { Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
@@ -550,18 +670,22 @@ private struct ClockWidget: View {
                 if let target = DashboardTime.parse(options["target"]?.text ?? "") {
                     TimelineView(.everyMinute) { context in
                         VStack(spacing: 2) {
-                            // Under an hour the system counts the seconds; above, minutes are enough.
-                            if target.timeIntervalSince(context.date) < 3600, target > context.date {
-                                Text(timerInterval: context.date...target, countsDown: true)
-                            } else {
-                                Text(DashboardTime.countdown(target.timeIntervalSince1970 * 1000, now: context.date.timeIntervalSince1970 * 1000))
+                            Group {
+                                // Under an hour the system counts the seconds; above, minutes are enough.
+                                if target.timeIntervalSince(context.date) < 3600, target > context.date {
+                                    Text(timerInterval: context.date...target, countsDown: true)
+                                } else {
+                                    Text(DashboardTime.countdown(target.timeIntervalSince1970 * 1000, now: context.date.timeIntervalSince1970 * 1000))
+                                }
                             }
+                            .font(.largeTitle.weight(.semibold))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            Text(label.isEmpty ? target.formatted(date: .abbreviated, time: .shortened) : label)
+                                .font(.footnote).foregroundStyle(.secondary)
                         }
-                        .font(.title.weight(.semibold))
-                        .monospacedDigit()
                     }
-                    Text(label.isEmpty ? target.formatted(date: .abbreviated, time: .shortened) : label)
-                        .font(.caption).foregroundStyle(.secondary)
                 } else {
                     DashboardEmpty(text: "Set a target time")
                 }
@@ -573,9 +697,11 @@ private struct ClockWidget: View {
                             Text(Self.time(context.date, zone: zone, hour12: options["hour12"]?.bool))
                                 .font(.largeTitle.weight(.semibold))
                                 .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                             let place = label.isEmpty ? (zoneName.split(separator: "/").last.map { $0.replacingOccurrences(of: "_", with: " ") } ?? "") : label
                             Text([place, Self.day(context.date, zone: zone)].filter { !$0.isEmpty }.joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.footnote).foregroundStyle(.secondary)
                         }
                     }
                 } else {
@@ -584,6 +710,7 @@ private struct ClockWidget: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 4)
     }
 
     static func time(_ date: Date, zone: TimeZone, hour12: Bool?) -> String {
@@ -636,38 +763,54 @@ private struct ImageWidget: View {
 private struct ProgressWidget: View {
     let widget: Dashboard.Widget
     let value: OrderedJSON
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         if let progress = DashboardRead.progress(value, options: widget.options) {
             let unit = widget.options["unit"]?.text ?? ""
             let text = DashboardRead.cellText(.number(progress.value)) + unit
-            let max = OrderedJSON.jsNumber(progress.max) + unit
+            let max = DashboardRead.cellText(.number(progress.max)) + unit
             Group {
                 if widget.options["style"]?.string == "gauge" {
-                    VStack(spacing: 0) {
-                        ZStack {
-                            GaugeArc(fraction: 1).stroke(Color.primary.opacity(0.12), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    VStack(spacing: 6) {
+                        // The value sits inside the arc, the label under it.
+                        ZStack(alignment: .bottom) {
+                            GaugeArc(fraction: 1).stroke(Color.primary.opacity(0.1), style: StrokeStyle(lineWidth: 12, lineCap: .round))
                             if progress.fraction > 0 {
-                                GaugeArc(fraction: progress.fraction).stroke(seriesColor(0), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                                GaugeArc(fraction: progress.fraction).stroke(seriesColor(0), style: StrokeStyle(lineWidth: 12, lineCap: .round))
                             }
+                            Text(text)
+                                .font(.title.weight(.semibold))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .frame(maxWidth: 130)
                         }
-                        .frame(width: 180, height: 90)
-                        Text(text).font(.title2.weight(.semibold)).monospacedDigit()
-                        if !progress.label.isEmpty { Text(progress.label).font(.caption).foregroundStyle(.secondary) }
+                        .frame(width: 200, height: 106)
+                        if !progress.label.isEmpty { Text(progress.label).font(.footnote).foregroundStyle(.secondary) }
                     }
                     .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(progress.label).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                            Spacer()
+                        let row = typeSize.isAccessibilitySize
+                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+                        row {
+                            if !progress.label.isEmpty {
+                                Text(progress.label).font(.subheadline).foregroundStyle(.secondary).lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
+                            }
+                            if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
                             HStack(spacing: 0) {
                                 Text(text).font(.subheadline.weight(.semibold)).monospacedDigit()
-                                Text(" / \(max)").font(.subheadline).foregroundStyle(.secondary)
+                                Text(" / \(max)").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
                             }
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .layoutPriority(1)
                         }
                         Capsule().fill(Color.primary.opacity(0.1))
-                            .frame(height: 10)
+                            .frame(height: 8)
                             .overlay(alignment: .leading) {
                                 GeometryReader { proxy in
                                     Capsule().fill(seriesColor(0)).frame(width: proxy.size.width * progress.fraction)

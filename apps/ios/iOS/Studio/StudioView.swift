@@ -570,8 +570,9 @@ struct StudioView: View {
             } else if visible.isEmpty, showArchived {
                 ContentUnavailableView("Nothing archived", systemImage: "archivebox")
             } else if visible.isEmpty, store.error == nil {
-                ContentUnavailableView("Nothing here yet", systemImage: "square.stack",
-                    description: Text(emptyText(kind)))
+                let known = kind.flatMap { $0.isEmpty ? nil : StudioKind.of($0) }
+                ContentUnavailableView(known.map { "No \($0.plural.lowercased()) yet" } ?? "Nothing here yet",
+                    systemImage: known?.symbol ?? "square.stack", description: Text(emptyText(kind)))
             }
         }
     }
