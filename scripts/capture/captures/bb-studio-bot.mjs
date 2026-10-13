@@ -4,7 +4,7 @@
 // threads) with the threads it started (one needing the user, one running, a
 // nested follow-up, a recurring automation), and its chat opened from its row
 // as BB's own thread page. The row's ⓘ opens its Info, the Bot page
-// (/plugins/studio/bot[/<botId>]). Then a thread no Bot owns, where BB's own
+// (/plugins/studio/bot[/<botId>]). Then Home on the rail and a thread no Bot owns opened from BB's list, where BB's own
 // thread list is back without the Bot's threads, which Studio hides from it.
 // Last, two runners (src/runners.ts): one that logs, one that tells and then
 // raises something urgent; the Bots sidebar's Runners group, Info's Runners
@@ -15,17 +15,17 @@
 // navigation provider preference, the navigation row says New bot (Studio's
 // replaces BB's on the Bot page); BB 0.46 has none, so New bot is the Bots
 // list's + and the row keeps BB's New thread.
-const BOT_PATH = "/plugins/studio/bot";
+export const BOT_PATH = "/plugins/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
   { title: "Check the launch checklist for blockers", prompt: "Reply with one short sentence: no blockers on the launch checklist." },
 ];
 /** The staged project's own threads (staged-bb.mjs), in BB's list. */
-const ORBIT_TITLES = ["Draft the ORBIT-42 release notes", "Review the launch checklist"];
+export const ORBIT_TITLES = ["Draft the ORBIT-42 release notes", "Review the launch checklist"];
 const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet points, please.";
 
 /** Staging's plugin-problem card is closed so it doesn't cover the page. */
-const dismissProblems = (client) => client.evaluate(`(() => new Promise((resolve) => {
+export const dismissProblems = (client) => client.evaluate(`(() => new Promise((resolve) => {
   // The card can render a moment after the page: look for it for a few seconds.
   const started = Date.now();
   const tick = () => {
@@ -36,8 +36,8 @@ const dismissProblems = (client) => client.evaluate(`(() => new Promise((resolve
   };
   tick();
 }))()`, true);
-const SIDEBAR = 'nav[aria-label="Bots"]';
-const LIST_PREF = "sidebar.threadListProvider";
+export const SIDEBAR = 'nav[aria-label="Bots"]';
+export const LIST_PREF = "sidebar.threadListProvider";
 const SCOUT = { name: "Scout", avatar: "🛰️", shape: "hexagon", color: "#2ba59a", prompt: "Hi Scout. In one short sentence, say you'll watch competitors' release notes for anything that affects ORBIT-42." };
 /** The selected Bot's row opens its chat as BB's thread page; the Bots list stays. `text` must show in the chat, outside the sidebar. */
 const openChat = async (client, threadId, text) => {
@@ -70,7 +70,53 @@ const openInfo = async (client, name = "Dot") => {
   }))()`, true);
 };
 
-export default ({ projectId, pluginRpc, bbCli, sleep }) => {
+/** Home on BB's rail: a different rail destination, so the window leaves the Bots list. */
+export const clickHome = async (client) => {
+  await client.clickAriaButtonWithPointer("Home", 'nav[aria-label="Primary navigation"]');
+  await client.evaluate(`(() => new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      if (!/\\/threads\\//.test(location.pathname) && !location.pathname.startsWith("${BOT_PATH}")) return resolve(true);
+      if (Date.now() - started > 15000) return reject(new Error("Home didn't leave for a non-thread page: " + location.pathname));
+      setTimeout(tick, 200);
+    };
+    tick();
+  }))()`, true);
+};
+/** Opens a thread from BB's own thread list by its title, with the pointer, and waits for its thread page. */
+export const openFromBbList = async (client, title) => {
+  const point = await client.evaluate(`(() => new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      const sidebar = document.querySelector('[data-sidebar="sidebar"]');
+      const hit = sidebar && [...sidebar.querySelectorAll("a, button, [role=button], [role=link]")].filter((each) => each.textContent.includes(${JSON.stringify(title)}) && each.getBoundingClientRect().height > 0)
+        .sort((a, b) => a.textContent.length - b.textContent.length)[0];
+      if (hit) {
+        hit.scrollIntoView({ block: "center" });
+        const rect = hit.getBoundingClientRect();
+        return resolve({ x: rect.left + Math.min(rect.width / 2, 80), y: rect.top + rect.height / 2 });
+      }
+      if (Date.now() - started > 30000) return reject(new Error("BB's thread list has no row ${title.replace(/"/g, "")}"));
+      setTimeout(tick, 300);
+    };
+    tick();
+  }))()`, true);
+  for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+    await client.command("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: type === "mouseMoved" ? "none" : "left", buttons: type === "mousePressed" ? 1 : 0, clickCount: type === "mouseMoved" ? 0 : 1 });
+  }
+  await client.evaluate(`(() => new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      if (/\\/threads\\/[^/]+/.test(location.pathname)) return resolve(true);
+      if (Date.now() - started > 15000) return reject(new Error("${title.replace(/"/g, "")} didn't open from BB's list"));
+      setTimeout(tick, 200);
+    };
+    tick();
+  }))()`, true);
+};
+
+/** The Bot fixtures (seeders) and its captures; scripts/check-bot-sidebar.mjs seeds with them too. */
+export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
   const json = async (args) => JSON.parse(await bbCli([...args, "--json"]));
   /** For the workspace: a nested follow-up, a thread still running, and an automation that wakes the Bot. */
   const workspaceExtras = async (botThread) => {
@@ -243,7 +289,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
-  /** Leaving the Bot page for a thread no Bot owns: BB's own thread list is back, without the threads the Bot started. */
+  /** Leaving the Bot page (Home on the rail) and opening a thread no Bot owns from BB's list: BB's own thread list, without the threads the Bot started. */
   const OTHER = "Plan the ORBIT-42 retro";
   const leave = async (client) => {
     await seededBot();
@@ -254,7 +300,10 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     }
     await client.navigate(BOT_PATH);
     await client.waitForSelector(SIDEBAR, 30000);
-    await client.navigate(`/projects/${projectId}/threads/${other.id}`);
+    // The window keeps the Bots list on any thread until another rail destination: Home, then the thread from BB's list.
+    await clickHome(client);
+    await openFromBbList(client, OTHER);
+    if (!(await client.evaluate("location.pathname")).endsWith(`/threads/${other.id}`)) throw new Error(`BB's list didn't open ${OTHER}`);
     for (let i = 0; i < 40 && JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF])) !== "thread-list/thread-list"; i++) await sleep(500);
     const pref = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
     if (pref !== "thread-list/thread-list") throw new Error(`After leaving the Bot page the thread list is ${pref}, not BB's`);
@@ -559,7 +608,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1000);
   };
 
-  return [
+  const captures = [
     {
       id: "studio-bot-create",
       packageDir: "bb-studio",
@@ -588,4 +637,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     // Last: teaching Dot a skill adds turns to its chat that other shots should not show.
     { id: "studio-bot-skills", packageDir: "bb-studio", fileName: "bot-skills.png", setup: skillsSection },
   ];
-};
+  return { captures, json, seededBot, seededRunners, CHILDREN };
+}
+
+export default (context) => botFixtures(context).captures;

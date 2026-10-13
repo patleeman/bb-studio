@@ -41,6 +41,8 @@ try {
   });
   for (const capture of selected) {
     process.stdout.write(`Capturing ${capture.id}...\n`);
+    // Each capture starts as a fresh window: Studio keeps a sticky sidebar mode per window (sessionStorage).
+    await client.evaluate(`(() => { try { sessionStorage.removeItem("studio.sidebar.listMode"); } catch {} return true; })()`).catch(() => {});
     const cleanup = await capture.setup(client);
     try {
       const outputPath = join(repoRoot, "packages", capture.packageDir, "assets", capture.fileName ?? "staged-preview.png");
