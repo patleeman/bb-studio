@@ -132,8 +132,13 @@ final class HoldToTalk: ObservableObject {
 
     /// The hold ended without `onEnded` (the system cancelled the gesture):
     /// stop unsent, so the mic doesn't stay stuck recording.
+    /// Checked a turn later: SwiftUI may reset the gesture state before
+    /// `onEnded` runs, and a normal release must reach `release()` first.
     func holdLost() {
-        if state == .recording || state == .cancelling { cancel() }
+        Task { @MainActor [weak self] in
+            guard let self, state == .recording || state == .cancelling else { return }
+            cancel()
+        }
     }
 
     /// The Action button: start hands-free, or send what it started.
