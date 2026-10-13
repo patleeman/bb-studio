@@ -23,6 +23,7 @@ import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
 import { isPageId, PAGE_TAB, PageCard } from "./src/pages/ui/PageCard";
 import { ThreadPageLink } from "./src/pages/ui/ThreadPageLink";
+import { ExpandToPage, NotesInProgress } from "./src/pages/ui/notes/composer";
 import { TalkBridge } from "./src/pages/ui/talk-bridge";
 import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
@@ -176,6 +177,15 @@ export default definePluginApp((app) => {
     });
     app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
     app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
+    // Notes (src/pages/notes.ts): the composer's Expand to page, which moves
+    // the draft into a temp page beside the thread, and the "Notes in
+    // progress" chip that reopens it.
+    app.composer.customize({
+      id: "notes",
+      scopes: ["thread"],
+      actions: [{ id: "expand", component: ExpandToPage }],
+      banners: [{ id: "in-progress", chrome: "bare", component: NotesInProgress }],
+    });
   }
   app.slots.messageDirective({ id: "page", component: whenOn(kinds, "page", PageCard) });
   // Explore (built in, as it was in Pages): the Next row and "along the way" findings.

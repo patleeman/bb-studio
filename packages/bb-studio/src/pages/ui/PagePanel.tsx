@@ -9,6 +9,7 @@ import { OpenInPages, PanelShell, usePanelPage } from "./PanelShell";
 import { MissingPageRecovery } from "./MissingPageRecovery";
 import { usePageProvider } from "./provider";
 import { relativeTime } from "./shared";
+import { NoteActions } from "./notes/NoteActions";
 
 /** What the `page` thread panel tab is opened with: a page. */
 export type PagePanelParams = { pageId: string };
@@ -64,6 +65,7 @@ function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: st
     <PanelShell
       page={page}
       header={
+        <>
         <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
           {onBack ? (
             <button
@@ -83,6 +85,9 @@ function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: st
           </div>
           <OpenInPages onOpen={() => openAppPath(pagePath(page.id))} />
         </header>
+        {/* A temp note from the composer: Send to thread, Keep, Discard. */}
+        <NoteActions pageId={page.id} layout="row" onDiscarded={onBack} />
+        </>
       }
     />
   );

@@ -20,6 +20,7 @@ import { PageEditor, type SidePanel } from "./PageEditor";
 import { actorName, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
 import { usePageTitle } from "./use-page-title";
+import { NoteActions } from "./notes/NoteActions";
 
 const PAGE_ICONS = ["📄", "📝", "📋", "✅", "📊", "📈", "🗺️", "🧭", "💡", "🚀", "🧪", "🛠️", "📚", "🗓️", "🎯", "🔥", "⭐", "🧠", "🤖", "📣"];
 type Chat = { threadId: string; createdAt: number };
@@ -528,6 +529,7 @@ export function PageView({
         </>}
         trailing={
           <>
+          <NoteActions pageId={page.id} onDiscarded={onDeleted} />
           <ActivityPill
             requests={requests}
             chats={chats}

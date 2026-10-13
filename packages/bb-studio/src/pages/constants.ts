@@ -31,4 +31,6 @@ export type RealtimeEvent =
   | { type: "page"; pageId: string }
   | { type: "requests"; pageId: string }
   | { type: "chats"; pageId: string; threadId: string }
-  | { type: "deleted"; pageIds: string[] };
+  | { type: "deleted"; pageIds: string[] }
+  /** A thread's note was made, added to, sent, kept or discarded (src/pages/notes.ts). */
+  | { type: "note"; pageId: string; threadId: string };

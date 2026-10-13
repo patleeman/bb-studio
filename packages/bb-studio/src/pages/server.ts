@@ -32,6 +32,8 @@ import { outgoingStudioLinks } from "./studio-links";
 import { registerTools } from "./tools";
 import { Checklists } from "./checklists";
 import { pagesCli } from "./cli";
+import { registerNotes } from "./notes";
+import { TagStore } from "../tags";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
@@ -417,6 +419,18 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
   }));
 
   const cli = pagesCli(service, created);
+
+  // Notes: a thread's draft expanded into a page beside it (notes.ts).
+  registerNotes(bb, {
+    db,
+    service,
+    tags: new TagStore(db),
+    linkThread: (pageId, threadId, state) => {
+      const at = Date.now();
+      void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id: pageId }, role: "notes", state: state === "open" ? "working" : "idle", createdAt: at, updatedAt: at, metadata: { note: state } }).catch(() => { /* Best effort. */ });
+    },
+    publish: (pageId, threadId) => service.publish({ type: "note", pageId, threadId }),
+  });
 
   // Bot request lifecycle -----------------------------------------------------
 

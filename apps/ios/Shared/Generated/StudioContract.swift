@@ -200,6 +200,12 @@ public enum Studio {
     public static let pages_commentCreate = "pages.commentCreate"
     public static let pages_commentReply = "pages.commentReply"
     public static let pages_commentResolve = "pages.commentResolve"
+    public static let notes_create = "notes.create"
+    public static let notes_forThread = "notes.forThread"
+    public static let notes_forPage = "notes.forPage"
+    public static let notes_send = "notes.send"
+    public static let notes_keep = "notes.keep"
+    public static let notes_discard = "notes.discard"
     public static let dashboards_list = "dashboards.list"
     public static let dashboards_get = "dashboards.get"
     public static let dashboards_create = "dashboards.create"
@@ -642,6 +648,18 @@ public enum Studio {
   public typealias PagesCommentReply = PagesCommentReplyOutput
 
   public typealias PagesCommentResolve = PagesCommentResolveOutput
+
+  public typealias NotesCreate = NotesCreateOutput
+
+  public typealias NotesForThread = NotesForThreadOutput
+
+  public typealias NotesForPage = NotesForPageOutput
+
+  public typealias NotesSend = NotesSendOutput
+
+  public typealias NotesKeep = NotesKeepOutput
+
+  public typealias NotesDiscard = NotesDiscardOutput
 
   public typealias DashboardsListInput = StudioJSONValue
 
@@ -16805,6 +16823,410 @@ public enum Studio {
   }
 
   public struct PagesCommentResolveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct NotesCreateInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var text: String?
+    public var timeZone: String?
+
+    public init(threadId: String? = nil, text: String? = nil, timeZone: String? = nil) {
+      self.threadId = threadId
+      self.text = text
+      self.timeZone = timeZone
+    }
+  }
+
+  public enum NotesCreateOutputNoteState: Sendable, Hashable, Codable {
+    case `open`
+    case sent
+    case kept
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "open": self = .`open`
+      case "sent": self = .sent
+      case "kept": self = .kept
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`open`: try container.encode("open")
+      case .sent: try container.encode("sent")
+      case .kept: try container.encode("kept")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotesCreateOutputNote: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var threadId: String?
+    public var title: String?
+    public var state: NotesCreateOutputNoteState?
+    public var href: String?
+    public var length: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(pageId: String? = nil, threadId: String? = nil, title: String? = nil, state: NotesCreateOutputNoteState? = nil, href: String? = nil, length: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.pageId = pageId
+      self.threadId = threadId
+      self.title = title
+      self.state = state
+      self.href = href
+      self.length = length
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct NotesCreateOutput: Sendable, Hashable, Codable {
+    public var note: NotesCreateOutputNote?
+    public var appended: Bool?
+
+    public init(note: NotesCreateOutputNote? = nil, appended: Bool? = nil) {
+      self.note = note
+      self.appended = appended
+    }
+  }
+
+  public struct NotesForThreadInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public enum NotesForThreadOutputNoteState: Sendable, Hashable, Codable {
+    case `open`
+    case sent
+    case kept
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "open": self = .`open`
+      case "sent": self = .sent
+      case "kept": self = .kept
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`open`: try container.encode("open")
+      case .sent: try container.encode("sent")
+      case .kept: try container.encode("kept")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotesForThreadOutputNote: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var threadId: String?
+    public var title: String?
+    public var state: NotesForThreadOutputNoteState?
+    public var href: String?
+    public var length: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(pageId: String? = nil, threadId: String? = nil, title: String? = nil, state: NotesForThreadOutputNoteState? = nil, href: String? = nil, length: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.pageId = pageId
+      self.threadId = threadId
+      self.title = title
+      self.state = state
+      self.href = href
+      self.length = length
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct NotesForThreadOutput: Sendable, Hashable, Codable {
+    public var note: NotesForThreadOutputNote?
+
+    public init(note: NotesForThreadOutputNote? = nil) {
+      self.note = note
+    }
+  }
+
+  public struct NotesForPageInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+
+    public init(pageId: String? = nil) {
+      self.pageId = pageId
+    }
+  }
+
+  public enum NotesForPageOutputNoteState: Sendable, Hashable, Codable {
+    case `open`
+    case sent
+    case kept
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "open": self = .`open`
+      case "sent": self = .sent
+      case "kept": self = .kept
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`open`: try container.encode("open")
+      case .sent: try container.encode("sent")
+      case .kept: try container.encode("kept")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotesForPageOutputNote: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var threadId: String?
+    public var title: String?
+    public var state: NotesForPageOutputNoteState?
+    public var href: String?
+    public var length: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(pageId: String? = nil, threadId: String? = nil, title: String? = nil, state: NotesForPageOutputNoteState? = nil, href: String? = nil, length: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.pageId = pageId
+      self.threadId = threadId
+      self.title = title
+      self.state = state
+      self.href = href
+      self.length = length
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct NotesForPageOutput: Sendable, Hashable, Codable {
+    public var note: NotesForPageOutputNote?
+
+    public init(note: NotesForPageOutputNote? = nil) {
+      self.note = note
+    }
+  }
+
+  public enum NotesSendInputMode: Sendable, Hashable, Codable {
+    case auto
+    case content
+    case summarize
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "auto": self = .auto
+      case "content": self = .content
+      case "summarize": self = .summarize
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .auto: try container.encode("auto")
+      case .content: try container.encode("content")
+      case .summarize: try container.encode("summarize")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotesSendInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var mode: NotesSendInputMode?
+
+    public init(pageId: String? = nil, mode: NotesSendInputMode? = nil) {
+      self.pageId = pageId
+      self.mode = mode
+    }
+  }
+
+  public enum NotesSendOutputNoteState: Sendable, Hashable, Codable {
+    case `open`
+    case sent
+    case kept
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "open": self = .`open`
+      case "sent": self = .sent
+      case "kept": self = .kept
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`open`: try container.encode("open")
+      case .sent: try container.encode("sent")
+      case .kept: try container.encode("kept")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotesSendOutputNote: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var threadId: String?
+    public var title: String?
+    public var state: NotesSendOutputNoteState?
+    public var href: String?
+    public var length: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(pageId: String? = nil, threadId: String? = nil, title: String? = nil, state: NotesSendOutputNoteState? = nil, href: String? = nil, length: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.pageId = pageId
+      self.threadId = threadId
+      self.title = title
+      self.state = state
+      self.href = href
+      self.length = length
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public enum NotesSendOutputSent: Sendable, Hashable, Codable {
+    case content
+    case summarize
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "content": self = .content
+      case "summarize": self = .summarize
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .content: try container.encode("content")
+      case .summarize: try container.encode("summarize")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotesSendOutput: Sendable, Hashable, Codable {
+    public var note: NotesSendOutputNote?
+    public var sent: NotesSendOutputSent?
+
+    public init(note: NotesSendOutputNote? = nil, sent: NotesSendOutputSent? = nil) {
+      self.note = note
+      self.sent = sent
+    }
+  }
+
+  public struct NotesKeepInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var title: String?
+
+    public init(pageId: String? = nil, title: String? = nil) {
+      self.pageId = pageId
+      self.title = title
+    }
+  }
+
+  public enum NotesKeepOutputNoteState: Sendable, Hashable, Codable {
+    case `open`
+    case sent
+    case kept
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "open": self = .`open`
+      case "sent": self = .sent
+      case "kept": self = .kept
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`open`: try container.encode("open")
+      case .sent: try container.encode("sent")
+      case .kept: try container.encode("kept")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotesKeepOutputNote: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var threadId: String?
+    public var title: String?
+    public var state: NotesKeepOutputNoteState?
+    public var href: String?
+    public var length: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(pageId: String? = nil, threadId: String? = nil, title: String? = nil, state: NotesKeepOutputNoteState? = nil, href: String? = nil, length: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.pageId = pageId
+      self.threadId = threadId
+      self.title = title
+      self.state = state
+      self.href = href
+      self.length = length
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct NotesKeepOutput: Sendable, Hashable, Codable {
+    public var note: NotesKeepOutputNote?
+
+    public init(note: NotesKeepOutputNote? = nil) {
+      self.note = note
+    }
+  }
+
+  public struct NotesDiscardInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+
+    public init(pageId: String? = nil) {
+      self.pageId = pageId
+    }
+  }
+
+  public struct NotesDiscardOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {
