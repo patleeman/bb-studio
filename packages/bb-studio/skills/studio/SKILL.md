@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (pages, recordings, drawings, designs and artifacts are built into Studio) fit together.
+description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings, dashboards and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (pages, recordings, drawings, designs, dashboards and artifacts are built into Studio) fit together.
 ---
 
 # Studio
@@ -13,6 +13,7 @@ the core: one collection that lists every item from every installed add-on.
 | Pages (built into Studio) | `pages` | Pages | the `pages` skill, `pages_*` tools and `bb studio pages` |
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Drawings (built into Studio) | `excalidraw` | Drawings | the `draw` skill, `excalidraw_*` tools and `bb studio drawings` |
+| Dashboards (built into Studio) | `dashboards` | Dashboards: live stats, charts, tables and feeds | the `dashboards` skill, `dashboard_*` and `widget_*` tools and `bb studio dashboards` |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
 
 Items belong to a BB project or are global. Every item has a link

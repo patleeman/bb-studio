@@ -514,6 +514,72 @@ sandbox CSP, so a screen gets an opaque origin with no access to BB.
 `bb studio backup` includes each design with its rounds, screens and
 comments; saved styles aren't in backups yet.
 
+## Dashboards
+
+Dashboards are built into Studio: live tiles, charts, tables and feeds on a
+responsive grid, which you and your agents build together. Items are
+`dashboards:<id>` and open at `/plugins/studio/studio/dashboards/<id>`.
+
+- **In the library.** Dashboards list next to pages and drawings, with
+  search over their names, widget titles and notes, tags, Move to,
+  archive, duplicate, templates and **Export → Dashboard JSON**.
+  `/plugins/studio/studio/dashboards` opens the library filtered to them.
+  **Setup → Kinds** turns them off (their data stays; nothing refreshes).
+- **The grid.** [react-grid-layout](https://github.com/react-grid-layout/react-grid-layout)
+  2.3.0 (MIT), 12 columns wide, 8 below 1100 px and 4 below 700 px. **Edit**
+  lets you drag tiles by their header, resize them from the corner, **Add
+  widget** (each starts with sample data) and open each widget's settings:
+  title, type, options and data source. **Done** goes back to viewing.
+  Layouts save per breakpoint. The clock button lists the last 20 versions;
+  restoring one keeps the current one in history.
+- **Widgets.** Stat (value, delta and sparkline), line, bar, area and pie
+  charts (Pages' chart colors), table, list or feed, ticker, Markdown note,
+  embed (a Studio item, a thread, or a web page in a sandboxed frame),
+  clock or countdown, image, progress bar or gauge, and custom widgets. All
+  follow BB's light and dark themes.
+- **Data.** Each widget reads one source:
+  - *Static*: JSON stored on the widget (256 KB).
+  - *URL*: JSON or RSS/Atom, fetched by Studio's server (so no CORS):
+    http and https only, at most 5 redirects, 2 MB, 15 s. Private and
+    localhost addresses work: it's your machine.
+  - *Script*: a shell command on the BB host that prints JSON or text. It
+    runs only after you approve its exact command and folder in the
+    dashboard; the approval is pinned to their SHA-256, so any change needs a
+    new approval. Agents can propose a script but can't approve one. 30 s
+    and 1 MB per run.
+  - *Push*: an agent sends data with `widget_set_data`, or a script with
+    `bb studio dashboards set-data <id> <widget> '<json>'`. Never polled.
+
+  URL widgets refresh at most every 60 s and scripts every 5 minutes, and
+  only while a dashboard is open in a BB window (each sends a heartbeat every
+  30 s); otherwise every 30 minutes. **Refresh** fetches now, at most every
+  10 s per widget. Studio keeps the last good value with its time and the
+  last error, so a tile shows "Updated 2m ago" or what went wrong, still
+  with its last data.
+- **Custom widgets.** HTML, CSS and JavaScript in an iframe with
+  `sandbox="allow-scripts"` (no same-origin) and a CSP with
+  `connect-src 'none'`, like Pages' HTML blocks. Studio posts
+  `{data, options, theme, size}` to it (also `window.bbWidget` and the
+  `bbwidget` event); it may post back `{height}`. Agents save reusable types
+  to your library with `widget_define`, or give one widget its own HTML.
+- **Agent tools and skill.** `dashboard_create` (with widgets in one call),
+  `dashboard_list`, `dashboard_read` (a readable summary with ids, sources,
+  values and errors), `dashboard_edit` (`add`, `move`, `resize`, `remove`,
+  `update`; all or nothing), `widget_define` and `widget_set_data`, all
+  checked with zod and capped in size, and the `dashboards` skill.
+  `@dashboard` mentions give the agent the summary.
+- **Commands.** `bb studio dashboards list`, `show <id>` and
+  `set-data <id> <widget-id> <json>`.
+- **Backup.** `bb studio backup` saves dashboards, their layouts, pushed
+  data and your widget library. Fetched data is fetched again, and script
+  approvals are never restored: a restored script waits for you.
+
+Dashboards live in Studio's SQLite database: `dashboards`,
+`dashboard_widgets`, `dashboard_layouts` (one per breakpoint),
+`dashboard_widget_types` (the library), `dashboard_data` (value, fetched
+time, error), `dashboard_script_approvals` and `dashboard_versions`. A
+dashboard holds at most 60 widgets.
+
 ## Recordings
 
 Talk is built into Studio: long-form, durable dictation and recording. It
@@ -1584,7 +1650,7 @@ commands left to run; `--json` prints the whole summary.
 ## Kinds
 
 **Setup → Kinds** lists the kinds built into Studio: pages, drawings,
-recordings and dictation, artifacts and designs.
+recordings and dictation, artifacts, designs and dashboards.
 
 ![Live BB screenshot of the Kinds section in Studio's Setup page](assets/kinds.png)
 
@@ -1621,7 +1687,7 @@ transcribing finish on the server.
 
 A Studio provider (`studio_describe` version 2) may declare that one of its
 kinds stands in for a built-in kind with `replaces`, set to `page`,
-`drawing`, `recording`, `artifact` or `design`:
+`drawing`, `recording`, `artifact`, `design` or `dashboard`:
 
 ```ts
 studio_describe: () => ({

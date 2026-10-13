@@ -29,6 +29,7 @@ use the CLI.
 | `excalidraw/` | Studio (built-in drawings) | Each drawing's scene, and its images as separate files. Studio writes this section itself, under the old Draw plugin's id, so backups from before the merge restore into it. |
 | `artifacts/` | Studio (built-in Artifacts) | Each artifact with every version's bytes. Studio writes this section itself, under the old plugin's id, so backups from before the merge restore into it. |
 | `design/` | Studio (built-in designs) | Each design with its rounds, screens (as HTML files) and comments. Studio writes this section itself, under the old Design plugin's id, so backups from before the merge restore into it. Saved styles aren't included. |
+| `dashboards/` | Studio (built-in dashboards) | Each dashboard's widgets, layouts and pushed data, and the custom widget library. Fetched URL and script data is fetched again; script approvals are never restored, so a restored script waits for the user's approval. |
 | `studio/` | Studio | Tags and which items have them, saved views, project leads (the personal project's lead is the user's Bot) and their Heartbeat settings, the Bot (name, avatar, state, Memory page id) and its own skills (restored only when this BB has no Bot), item links, item chats, comments, versions and activity. |
 
 ## What isn't
@@ -90,6 +91,7 @@ Section layouts:
 - `excalidraw/`: `items/<id>.json`, `files/<id>/<n>`; each image's path and MIME type are in the item JSON.
 - `artifacts/`: `items/<id>.json`, `files/<id>/<version id>`.
 - `design/`: `items/<id>.json`, `files/<id>/screens/<screen id>.html`.
+- `dashboards/`: `items/<id>.json`, `types/<id>.json`.
 - `studio/`: `tags.json`, `item-tags.json`, `views.json`, `project-leads.json`, `links.json`, `item-chats.json`, `comments.json`, `versions.json`, `activity.json`, `blobs/<sha256>`.
 
 ## How it works
