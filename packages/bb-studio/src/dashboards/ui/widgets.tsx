@@ -30,8 +30,16 @@ const safeUrl = (value: unknown): string | null => {
   return /^https?:\/\//i.test(url) ? url : null;
 };
 
-export function Empty({ children }: { children: ReactNode }) {
-  return <div className="flex h-full items-center justify-center p-3 text-center text-xs text-muted-foreground">{children}</div>;
+/** A tile with nothing to show yet: an icon, a short title and what to do. Small tiles keep just the text. */
+export function Empty({ children, icon, title, tone, spin, action }: { children?: ReactNode; icon?: string; title?: string; tone?: "error"; spin?: boolean; action?: ReactNode }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-1 overflow-hidden p-3 text-center text-xs text-muted-foreground" data-tile-empty>
+      {icon ? <Icon name={icon} className={cn("mb-0.5 size-4 shrink-0", tone === "error" ? "text-red-600 dark:text-red-400" : "text-muted-foreground/70", spin && "animate-spin")} /> : null}
+      {title ? <div className={cn("font-medium", tone === "error" ? "text-red-700 dark:text-red-300" : "text-foreground/80")}>{title}</div> : null}
+      {children ? <div className="max-w-[28ch] leading-snug">{children}</div> : null}
+      {action ? <div className="mt-1.5">{action}</div> : null}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +144,7 @@ export function chartRows(value: unknown): Row[] | null {
 
 function ChartWidget({ widget, value }: WidgetProps) {
   const rows = chartRows(value);
-  if (!rows) return <Empty>No rows to chart yet.</Empty>;
+  if (!rows) return <Empty icon="ChartColumn" title="No rows to chart">Give it a list of rows in its settings.</Empty>;
   const type = widget.type as "line" | "bar" | "area" | "pie";
   const options = widget.options;
   const { x, series } = resolveChart({
@@ -204,21 +212,24 @@ export function tableOf(value: unknown, options: Row): { columns: string[]; rows
   return { columns, rows: rows.slice(0, max).map((row) => columns.map((column) => row[column])) };
 }
 
+/** A column key as a header: "due_date" reads "Due date"; anything else stays as written. */
+export const columnLabel = (key: string) => (/^[a-z][a-z0-9_]*$/.test(key) ? `${key[0]!.toUpperCase()}${key.slice(1).replace(/_/g, " ")}` : key);
+
 const cellText = (value: unknown) => (value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : typeof value === "number" ? new Intl.NumberFormat().format(value) : String(value));
 
 function TableWidget({ widget, value }: WidgetProps) {
   const table = tableOf(value, widget.options);
-  if (!table) return <Empty>No rows yet.</Empty>;
+  if (!table) return <Empty icon="Rows2" title="No rows yet" />;
   return (
     <div className="h-full min-h-0 overflow-auto" data-widget-body="table">
       <table className="w-full border-collapse text-xs">
         <thead className="sticky top-0 bg-card">
-          <tr>{table.columns.map((column) => <th key={column} scope="col" className="border-b border-border px-2.5 py-1.5 text-left font-medium text-muted-foreground">{column}</th>)}</tr>
+          <tr>{table.columns.map((column) => <th key={column} scope="col" className="border-b border-border px-3 py-1.5 text-left font-medium text-muted-foreground">{columnLabel(column)}</th>)}</tr>
         </thead>
         <tbody>
           {table.rows.map((row, index) => (
             <tr key={index} className="hover:bg-state-hover">
-              {row.map((cell, column) => <td key={column} className={cn("border-b border-border/50 px-2.5 py-1.5 text-foreground", typeof cell === "number" && "text-right tabular-nums")}>{cellText(cell)}</td>)}
+              {row.map((cell, column) => <td key={column} className={cn("border-b border-border/50 px-3 py-1.5 text-foreground", typeof cell === "number" && "text-right tabular-nums")}>{cellText(cell)}</td>)}
             </tr>
           ))}
         </tbody>
@@ -253,8 +264,8 @@ const shortDate = (text: string) => {
 
 function ListWidget({ widget, value }: WidgetProps) {
   const items = listItems(value);
-  if (!items) return <Empty>Nothing here yet.</Empty>;
-  if (!items.length) return <Empty>The list is empty.</Empty>;
+  if (!items) return <Empty icon="ListView" title="Nothing here yet">Point it at a feed or a JSON list in settings.</Empty>;
+  if (!items.length) return <Empty icon="ListView" title="The list is empty" />;
   const max = Math.max(1, num(widget.options.maxItems) ?? 50);
   return (
     <ul className="h-full min-h-0 divide-y divide-border/60 overflow-auto" data-widget-body="list">
@@ -283,7 +294,7 @@ function TickerWidget({ widget, value }: WidgetProps) {
     if (!isRow(item)) return [];
     return [{ label: str(item.label ?? item.title ?? item.name ?? item.symbol), value: str(item.value ?? item.price), delta: str(item.delta ?? item.change) }];
   }).filter((entry) => entry.label || entry.value);
-  if (!entries.length) return <Empty>Nothing to show yet.</Empty>;
+  if (!entries.length) return <Empty title="Nothing to show yet" />;
   const seconds = Math.min(600, Math.max(5, num(widget.options.speed) ?? 30));
   const strip = (hidden: boolean) => (
     <div className="dashboard-ticker-strip flex shrink-0 items-center gap-8 pr-8" aria-hidden={hidden || undefined}>
@@ -311,7 +322,7 @@ function TickerWidget({ widget, value }: WidgetProps) {
 
 function NoteWidget({ widget, value }: WidgetProps) {
   const source = typeof value === "string" ? value : str(widget.options.markdown);
-  if (!source.trim()) return <Empty>Write a note in this widget's settings.</Empty>;
+  if (!source.trim()) return <Empty icon="FileText" title="Empty note">Write Markdown in its settings.</Empty>;
   return <div className="h-full min-h-0 overflow-auto px-3 py-2" data-widget-body="note"><Markdown source={source} /></div>;
 }
 
@@ -323,8 +334,8 @@ function ItemEmbed({ href }: { href: string }) {
     rpc.call("itemAt", { path: href }).then((result) => live && setItem(result.item ? { title: result.item.title, preview: result.item.preview, href: result.item.href } : null), () => live && setItem(null));
     return () => { live = false; };
   }, [href, rpc]);
-  if (item === undefined) return <Empty>Loading…</Empty>;
-  if (!item) return <Empty>That Studio item wasn't found.</Empty>;
+  if (item === undefined) return <Empty icon="Loading" spin />;
+  if (!item) return <Empty icon="FileQuestion" title="Item not found">It may have been deleted or moved.</Empty>;
   return (
     <button type="button" className="flex h-full w-full flex-col items-start gap-1 p-3 text-left hover:bg-state-hover" onClick={() => openAppPath(item.href)} {...studioItemProps({ href: item.href, title: item.title })}>
       <span className="flex w-full items-center gap-1.5 text-sm font-medium text-foreground"><span className="truncate">{item.title || "Untitled"}</span><Icon name="ArrowUpRight" className="size-3.5 shrink-0 text-muted-foreground" /></span>
@@ -354,7 +365,7 @@ function EmbedWidget({ widget }: WidgetProps) {
     );
   }
   if (url) return <iframe title={widget.title ?? "Embedded page"} src={url} sandbox={embedSandbox(url)} referrerPolicy="no-referrer" loading="lazy" className="block h-full w-full border-0 bg-background" data-widget-body="embed" />;
-  return <Empty>Set a Studio item link, a thread, or an http(s) URL in this widget's settings.</Empty>;
+  return <Empty icon="Layers" title="Nothing to embed">Set a Studio item, a thread or a web page in its settings.</Empty>;
 }
 
 function useNow(ms: number): number {
@@ -396,7 +407,7 @@ function ClockWidget({ widget }: WidgetProps) {
     time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", ...(options.seconds ? { second: "2-digit" } : {}), hour12: typeof options.hour12 === "boolean" ? options.hour12 : undefined, timeZone }).format(now);
     date = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", timeZone }).format(now);
   } catch {
-    return <Empty>Unknown time zone {timeZone}.</Empty>;
+    return <Empty icon="Clock" tone="error" title="Unknown time zone">{timeZone}</Empty>;
   }
   return (
     <div className="flex h-full flex-col items-center justify-center gap-0.5 p-2 text-center" data-widget-body="clock">
@@ -415,7 +426,7 @@ export function imageSrc(value: unknown): string | null {
 
 function ImageWidget({ widget, value }: WidgetProps) {
   const src = imageSrc(typeof value === "string" ? value : widget.options.url);
-  if (!src) return <Empty>Set an image URL in this widget's settings.</Empty>;
+  if (!src) return <Empty icon="Palette" title="No image">Set an image URL in its settings.</Empty>;
   return <img src={src} alt={str(widget.options.alt) || widget.title || ""} referrerPolicy="no-referrer" loading="lazy" className="block h-full w-full" style={{ objectFit: widget.options.fit === "contain" ? "contain" : "cover" }} data-widget-body="image" />;
 }
 
@@ -429,7 +440,7 @@ export function readProgress(value: unknown, options: Row): { value: number; min
 
 function ProgressWidget({ widget, value }: WidgetProps) {
   const progress = readProgress(value, widget.options);
-  if (!progress) return <Empty>No value yet.</Empty>;
+  if (!progress) return <Empty icon="SlidersHorizontal" title="No value yet" />;
   const fraction = Math.min(1, Math.max(0, (progress.value - progress.min) / (progress.max - progress.min)));
   const unit = str(widget.options.unit);
   const text = `${new Intl.NumberFormat().format(progress.value)}${unit}`;
@@ -465,7 +476,7 @@ function ProgressWidget({ widget, value }: WidgetProps) {
 function CustomWidget({ widget, value, theme, width, height, types }: WidgetProps) {
   const type = widget.customType ? types.find((each) => each.id === widget.customType) : undefined;
   const html = widget.html ?? type?.html;
-  if (!html) return <Empty>{widget.customType ? "This widget's library type is gone." : "Give this widget some HTML in its settings."}</Empty>;
+  if (!html) return <Empty icon="Code" title={widget.customType ? "Library type missing" : "No HTML yet"}>{widget.customType ? "Its library type was deleted." : "Give it HTML in its settings."}</Empty>;
   return (
     <div className="h-full min-h-0 overflow-auto" data-widget-body="custom">
       <CustomFrame html={html} title={widget.title ?? type?.name ?? "Custom widget"} data={value} options={{ ...(type?.defaultOptions ?? {}), ...widget.options }} theme={theme} width={width} height={height} />

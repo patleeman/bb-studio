@@ -11,7 +11,7 @@
 .dashboard-grid .react-grid-item.react-grid-placeholder {
   background: var(--primary, #6366f1);
   border-radius: 0.5rem;
-  opacity: 0.15;
+  opacity: 0.12;
   transition-duration: 100ms;
   z-index: 2;
   user-select: none;
@@ -19,28 +19,40 @@
 .dashboard-grid .react-grid-item.react-grid-placeholder.placeholder-resizing { transition: none; }
 .dashboard-grid .react-grid-item > .react-resizable-handle {
   position: absolute;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   bottom: 0;
   right: 0;
   cursor: se-resize;
   z-index: 4;
+  color: var(--muted-foreground, #71717a);
 }
+/* The resize corner: two short diagonal strokes, darker on hover. */
 .dashboard-grid .react-grid-item > .react-resizable-handle::after {
   content: "";
   position: absolute;
   right: 4px;
   bottom: 4px;
-  width: 7px;
-  height: 7px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  opacity: 0.45;
+  width: 9px;
+  height: 9px;
+  background:
+    linear-gradient(135deg, transparent 0 45%, currentColor 45% 55%, transparent 55% 100%) right bottom / 9px 9px no-repeat,
+    linear-gradient(135deg, transparent 0 45%, currentColor 45% 55%, transparent 55% 100%) right bottom / 5px 5px no-repeat;
+  opacity: 0.7;
 }
+.dashboard-grid .react-grid-item > .react-resizable-handle:hover { color: var(--foreground, currentColor); }
+.dashboard-grid .react-grid-item > .react-resizable-handle:hover::after { opacity: 1; }
 .dashboard-grid .react-resizable-hide > .react-resizable-handle { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .dashboard-grid .react-grid-layout,
   .dashboard-grid .react-grid-item { transition: none; }
+}
+
+/* Edit mode: a faint dot grid behind the tiles. */
+[data-dashboard-grid][data-editing] .react-grid-layout {
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--muted-foreground, #71717a) 35%, transparent) 1px, transparent 1.5px);
+  background-size: 16px 16px;
+  background-position: 4px 4px;
 }
 
 /* The ticker scrolls its two copies of the strip; with reduced motion it

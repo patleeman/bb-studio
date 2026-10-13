@@ -3,6 +3,8 @@
 // the grid and the charts.
 import { openAppPath, WORKSPACE_PATH } from "@bb-studio/kit/app";
 import { openCollection } from "../../ui/StudioPanel";
+import { closeWorkspaceTabs } from "../../ui/Workspace";
+import { dashboardHref } from "../shared";
 import { DashboardPage } from "./dashboard-view";
 
 export default function DashboardRoute({ id }: { id: string }) {
@@ -15,6 +17,7 @@ export default function DashboardRoute({ id }: { id: string }) {
         openCollection("dashboard");
         openAppPath(WORKSPACE_PATH, { replace });
       }}
+      onGone={() => closeWorkspaceTabs([dashboardHref(id)])}
     />
   );
 }

@@ -4,9 +4,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ResponsiveGridLayout, useContainerWidth, type Layout, type ResponsiveLayouts } from "react-grid-layout";
 import { toast } from "sonner";
-import { BAR_BUTTON, BarTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, ICON_BUTTON, Icon, ItemHeader, cn } from "@bb-studio/kit/app";
+import { BAR_BUTTON, BarTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, ICON_BUTTON, Icon, ItemHeader, OUTLINE_BUTTON, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { ago, BREAKPOINTS, COLS, dashboardHref, GRID_MARGIN, ROW_HEIGHT, WIDGET_TYPES, WIDGETS, type DashboardView, type DataView, type Layouts, type Op, type VersionView, type WidgetTypeView, type WidgetView } from "../shared";
+import { ago, BREAKPOINTS, COLS, dashboardHref, GRID_MARGIN, ROW_HEIGHT, WIDGETS, type DashboardView, type DataView, type Layouts, type Op, type VersionView, type WidgetType, type WidgetTypeView, type WidgetView } from "../shared";
 import type { WidgetTheme } from "./custom-frame";
 import { sampleOp } from "./samples";
 import { ApprovalDialog } from "./approval-dialog";
@@ -15,14 +15,16 @@ import { useDashboard } from "./use-dashboard";
 import { Empty, WidgetBody } from "./widgets";
 
 /** The page in Studio: header, toolbar, grid. */
-export function DashboardPage({ dashboardId, backLabel, onBack }: { dashboardId: string; backLabel: string; onBack(replace?: boolean): void }) {
+export function DashboardPage({ dashboardId, backLabel, onBack, onGone }: { dashboardId: string; backLabel: string; onBack(replace?: boolean): void; /** Deleted while in a background tab. */ onGone?(): void }) {
   const state = useDashboard(dashboardId);
   const { dashboard } = state;
   useEffect(() => {
     if (dashboard !== null) return;
+    // Only the page on screen goes back; one in a background tab just closes.
+    if (window.location.pathname !== dashboardHref(dashboardId)) return onGone?.();
     toast.info("This dashboard was deleted.");
     onBack(true);
-  }, [dashboard, onBack]);
+  }, [dashboard, dashboardId, onBack, onGone]);
   const name = dashboard?.name.trim() || "Untitled dashboard";
   const item = { title: name, href: dashboardHref(dashboardId) };
   return (
@@ -130,6 +132,7 @@ export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView;
         <Icon name={editing ? "Check" : "Edit"} /> {editing ? "Done" : "Edit"}
       </button>
       {editing ? <button type="button" className={BAR_BUTTON} aria-expanded={picking} onClick={() => setPicking((on) => !on)}><Icon name="Plus" /> Add widget</button> : null}
+      {editing && dashboard.widgets.length ? <span className="ml-2 hidden truncate text-xs text-muted-foreground md:inline">Drag a tile by its header; resize it from the corner.</span> : null}
       <span className="flex-1" />
       <button type="button" aria-label="Refresh data" title="Refresh data" className={ICON_BUTTON} onClick={() => void state.refresh()}><Icon name="ArrowReloadHorizontal" /></button>
       <History dashboard={dashboard} state={state} />
@@ -143,10 +146,17 @@ export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView;
       <div className="min-h-0 flex-1 overflow-auto" data-dashboard-grid data-editing={editing || undefined}>
         <div ref={containerRef} className="dashboard-grid min-h-full p-1">
           {!dashboard.widgets.length ? (
-            <div className="flex flex-col items-center gap-3 p-12 text-center text-sm text-muted-foreground">
-              <p>No widgets yet. Add stats, charts, tables and feeds, or ask an agent to build this dashboard.</p>
-              <button type="button" className={BAR_BUTTON} onClick={() => { setEditing(true); setPicking(true); }}><Icon name="Plus" /> Add widget</button>
-            </div>
+            picking ? null : (
+              <div data-dashboard-empty>
+                <EmptyState
+                  icon="GridView"
+                  title="No widgets yet"
+                  actions={<button type="button" className={PRIMARY_BUTTON} onClick={() => { setEditing(true); setPicking(true); }}><Icon name="Plus" /> Add widget</button>}
+                >
+                  Add stat tiles, charts, tables and feeds. Or ask an agent to build it: mention this dashboard in a thread and say what to track.
+                </EmptyState>
+              </div>
+            )
           ) : mounted ? (
             <ResponsiveGridLayout
               width={width}
@@ -180,6 +190,7 @@ export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView;
                     onRemove={() => void state.edit([{ op: "remove", widgetId: widget.id }])}
                     onRefresh={() => void state.refresh(widget.id)}
                     onReview={() => setApprovalFor(widget.id)}
+                    onRevoke={() => void state.revoke(widget.id)}
                   />
                 </div>
               ))}
@@ -222,26 +233,59 @@ function sizeOf(layouts: Layouts, id: string, width: number): { width: number; h
   const colWidth = (width - GRID_MARGIN * (cols + 1)) / cols;
   const w = item?.w ?? 3;
   const h = item?.h ?? 3;
-  return { width: Math.max(0, Math.round(colWidth * w + GRID_MARGIN * (w - 1))), height: Math.max(0, Math.round(ROW_HEIGHT * h + GRID_MARGIN * (h - 1)) - 34) };
+  // The body sits inside the 1 px border, under the 36 px header.
+  return { width: Math.max(0, Math.round(colWidth * w + GRID_MARGIN * (w - 1)) - 2), height: Math.max(0, Math.round(ROW_HEIGHT * h + GRID_MARGIN * (h - 1)) - 38) };
 }
 
-/** "Updated 2m ago", or what went wrong. */
+/** A tile's status in its header: "2m ago", what went wrong, or that it waits for approval. */
 export function Freshness({ data, now }: { data: DataView | undefined; now: number }) {
   if (!data || data.status === "none" || data.status === "static") return null;
   if (data.status === "error") {
+    const detail = data.fetchedAt ? `Last attempt failed ${data.errorAt ? ago(data.errorAt, now) : ""}: ${data.error ?? ""}. Showing data from ${ago(data.fetchedAt, now)}.` : data.error ?? undefined;
     return (
-      <span className="flex min-w-0 items-center gap-1 text-red-600 dark:text-red-400" title={data.error ?? undefined}>
+      <span className="flex min-w-0 items-center gap-1 text-red-600 dark:text-red-400" title={detail} data-tile-status="error">
         <Icon name="AlertCircle" className="size-3 shrink-0" />
-        <span className="truncate">{data.fetchedAt ? `Failed ${data.errorAt ? ago(data.errorAt, now) : ""}; showing ${ago(data.fetchedAt, now)}` : "Couldn't load"}</span>
+        <span className="truncate">{data.fetchedAt ? `Failed · ${ago(data.fetchedAt, now)}` : "Failed"}</span>
       </span>
     );
   }
-  if (data.status === "approval") return <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400"><Icon name="Lock" className="size-3" /> Needs approval</span>;
-  if (data.status === "pending") return <span>{data.error ? "Couldn't load" : "Waiting for data"}</span>;
-  return <span title={data.fetchedAt ? new Date(data.fetchedAt).toLocaleString() : undefined}>Updated {data.fetchedAt ? ago(data.fetchedAt, now) : ""}</span>;
+  if (data.status === "approval") return <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400" data-tile-status="approval"><Icon name="Lock" className="size-3" /> Needs approval</span>;
+  // The body says what it's waiting for.
+  if (data.status === "pending") return null;
+  return <span className="tabular-nums" title={data.fetchedAt ? `Updated ${new Date(data.fetchedAt).toLocaleString()}` : undefined} data-tile-status="ok">{data.fetchedAt ? ago(data.fetchedAt, now) : ""}</span>;
 }
 
-export function Tile({ widget, data, editing, now, theme, types, size, onSettings, onRemove, onRefresh, onReview }: {
+/** The tile's ⋯ menu in view mode: refresh, settings, the script's approval, remove. */
+function TileMenu({ name, widget, fetchable, onRefresh, onSettings, onReview, onRevoke, onRemove }: {
+  name: string;
+  widget: WidgetView;
+  fetchable: boolean;
+  onRefresh(): void;
+  onSettings(): void;
+  onReview(): void;
+  onRevoke(): void;
+  onRemove(): void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" aria-label={`More for ${name}`} title="More" className={cn(ICON_BUTTON, "size-6 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100")}>
+          <Icon name="MoreHorizontal" className="size-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        {fetchable ? <DropdownMenuItem onSelect={onRefresh}><Icon name="ArrowReloadHorizontal" /> Refresh</DropdownMenuItem> : null}
+        <DropdownMenuItem onSelect={onSettings}><Icon name="SlidersHorizontal" /> Settings…</DropdownMenuItem>
+        {widget.script && !widget.script.approved ? <DropdownMenuItem onSelect={onReview}><Icon name="Lock" /> Review command…</DropdownMenuItem> : null}
+        {widget.script?.approved ? <DropdownMenuItem onSelect={onRevoke}><Icon name="Unavailable" /> Revoke approval</DropdownMenuItem> : null}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={onRemove}><Icon name="Trash2" /> Remove</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function Tile({ widget, data, editing, now, theme, types, size, onSettings, onRemove, onRefresh, onReview, onRevoke }: {
   widget: WidgetView;
   data: DataView | undefined;
   editing: boolean;
@@ -254,80 +298,115 @@ export function Tile({ widget, data, editing, now, theme, types, size, onSetting
   onRefresh(): void;
   /** Opens the approval dialog for a script widget. */
   onReview(): void;
+  onRevoke?(): void;
 }) {
   const info = WIDGETS[widget.type];
   const label = widget.title ?? (widget.type === "stat" && typeof widget.options.label === "string" ? widget.options.label : null);
-  const fetchable = widget.source.kind === "url" || (widget.source.kind === "script" && widget.script?.approved);
+  const name = label ?? info.label;
+  const fetchable = widget.source.kind === "url" || (widget.source.kind === "script" && Boolean(widget.script?.approved));
   let body: ReactNode;
   if (data?.status === "approval" && data.value === null) {
     body = <ApprovalCard compact command={widget.source.command ?? ""} onReview={onReview} />;
   } else if (data?.status === "error" && data.value === null) {
-    body = <Empty><span className="text-red-600 dark:text-red-400" role="alert">{data.error}</span></Empty>;
+    body = (
+      <Empty icon="AlertCircle" tone="error" title="Couldn't load" action={fetchable ? <button type="button" className={cn(OUTLINE_BUTTON, "h-7 px-2.5 text-xs")} onClick={onRefresh}>Try again</button> : undefined}>
+        <span role="alert" className="line-clamp-3 break-words">{data.error}</span>
+      </Empty>
+    );
   } else if (data?.status === "pending" && info.usesData) {
-    body = <Empty>{widget.source.kind === "push" ? "No data yet. An agent sends it with widget_set_data." : "Loading…"}</Empty>;
+    body = widget.source.kind === "push"
+      ? <Empty icon="Sent" title="No data yet">An agent sends it with <code className="font-mono text-[11px]">widget_set_data</code>.</Empty>
+      : <Empty icon="Loading" spin title={widget.source.kind === "script" ? "Running the command…" : "Fetching…"} />;
   } else {
     body = <WidgetBody widget={widget} value={data?.value ?? null} width={size.width} height={size.height} theme={theme} types={types} />;
   }
+  const menu = <TileMenu name={name} widget={widget} fetchable={fetchable} onRefresh={onRefresh} onSettings={onSettings} onReview={onReview} onRevoke={onRevoke ?? (() => {})} onRemove={onRemove} />;
   return (
-    <section className={cn("dashboard-tile group flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card text-card-foreground", editing && "ring-1 ring-border")} aria-label={label ?? info.label} data-widget-type={widget.type}>
+    <section
+      className={cn(
+        "dashboard-tile group relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card text-card-foreground",
+        editing ? "border-dashed border-foreground/25 shadow-sm" : "border-border",
+        data?.status === "error" && !editing && "border-red-500/30",
+      )}
+      aria-label={name}
+      data-widget-type={widget.type}
+    >
       {label || editing ? (
-        <header className={cn("flex h-8 shrink-0 items-center gap-1 px-2.5", editing && "dashboard-drag cursor-move")}>
-          {editing ? <Icon name="DragDropVertical" className="size-3.5 shrink-0 text-muted-foreground" /> : null}
-          <h3 className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">{label ?? info.label}</h3>
+        <header className={cn("flex h-9 shrink-0 items-center gap-1.5 pl-3 pr-1.5", editing && "dashboard-drag cursor-grab active:cursor-grabbing")}>
+          {editing ? <Icon name="DragDropVertical" className="-ml-1 size-3.5 shrink-0 text-muted-foreground/70" aria-hidden /> : null}
+          <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground/80">{name}</h3>
           {editing ? (
             <span className="dashboard-no-drag flex items-center">
-              <button type="button" aria-label={`Settings for ${label ?? info.label}`} title="Settings" className={ICON_BUTTON} onClick={onSettings}><Icon name="SlidersHorizontal" /></button>
-              <button type="button" aria-label={`Remove ${label ?? info.label}`} title="Remove" className={ICON_BUTTON} onClick={onRemove}><Icon name="Trash2" /></button>
+              <button type="button" aria-label={`Settings for ${name}`} title="Settings" className={cn(ICON_BUTTON, "size-6")} onClick={onSettings}><Icon name="SlidersHorizontal" className="size-3.5" /></button>
+              <button type="button" aria-label={`Remove ${name}`} title="Remove" className={cn(ICON_BUTTON, "size-6 hover:text-destructive")} onClick={onRemove}><Icon name="Trash2" className="size-3.5" /></button>
             </span>
-          ) : fetchable ? (
-            <button type="button" aria-label={`Refresh ${label ?? info.label}`} title="Refresh" className={cn(ICON_BUTTON, "size-6 opacity-0 focus-visible:opacity-100 group-hover:opacity-100")} onClick={onRefresh}><Icon name="ArrowReloadHorizontal" className="size-3.5" /></button>
-          ) : null}
+          ) : (
+            <span className="dashboard-no-drag flex min-w-0 shrink items-center gap-1 text-[11px] text-muted-foreground" aria-live="polite">
+              <Freshness data={data} now={now} />
+              {menu}
+            </span>
+          )}
         </header>
-      ) : null}
+      ) : (
+        // Untitled tiles (a clock, a ticker) keep all their space; the menu floats.
+        <span className="dashboard-no-drag absolute right-1 top-1 z-10 flex items-center gap-1 rounded-md bg-card/90 text-[11px] text-muted-foreground">
+          {data?.status === "error" || data?.status === "approval" ? <Freshness data={data} now={now} /> : null}
+          {menu}
+        </span>
+      )}
       <div className="dashboard-no-drag relative min-h-0 flex-1">{body}</div>
-      {data && data.status !== "none" && data.status !== "static" ? (
-        <footer className="flex h-6 shrink-0 items-center px-2.5 text-[11px] text-muted-foreground" aria-live="polite">
-          <Freshness data={data} now={now} />
-        </footer>
-      ) : null}
     </section>
   );
 }
 
-export function WidgetPicker({ library, onPick, onClose }: { library: readonly WidgetTypeView[]; onPick(op: Op): void; onClose(): void }) {
+const PICKER_GROUPS: { label: string; types: WidgetType[] }[] = [
+  { label: "Numbers", types: ["stat", "progress"] },
+  { label: "Charts", types: ["line", "bar", "area", "pie"] },
+  { label: "Lists", types: ["table", "list", "ticker"] },
+  { label: "Content", types: ["note", "embed", "image", "clock", "custom"] },
+];
+
+function PickerCard({ icon, label, description, onPick }: { icon: string; label: string; description?: string; onPick(): void }) {
   return (
-    <div role="dialog" aria-label="Add a widget" className="border-b border-border bg-background px-3 py-3">
-      <div className="mb-2 flex items-center">
+    <button type="button" className="group/card flex items-start gap-2.5 rounded-lg border border-border bg-card p-2.5 text-left outline-none transition-colors hover:border-foreground/20 hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" onClick={onPick}>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground group-hover/card:text-foreground"><Icon name={icon} className="size-4" /></span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium text-foreground">{label}</span>
+        {description ? <span className="line-clamp-2 block text-xs leading-snug text-muted-foreground">{description}</span> : null}
+      </span>
+    </button>
+  );
+}
+
+export function WidgetPicker({ library, onPick, onClose }: { library: readonly WidgetTypeView[]; onPick(op: Op): void; onClose(): void }) {
+  const grid = "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(14rem,1fr))]";
+  return (
+    <div role="dialog" aria-label="Add a widget" className="max-h-[55%] shrink-0 overflow-auto border-b border-border bg-background px-4 pb-4 pt-3" data-dashboard-picker>
+      <div className="mb-3 flex items-center gap-2">
         <h2 className="flex-1 text-sm font-semibold">Add a widget</h2>
+        <span className="text-xs text-muted-foreground">Each starts with sample data; change it in its settings.</span>
         <button type="button" aria-label="Close" title="Close" className={ICON_BUTTON} onClick={onClose}><Icon name="X" /></button>
       </div>
-      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(11rem, 1fr))" }}>
-        {WIDGET_TYPES.map((type) => (
-          <button key={type} type="button" className="flex items-start gap-2 rounded-md border border-border p-2 text-left hover:bg-state-hover" onClick={() => onPick(sampleOp(type))}>
-            <Icon name={WIDGETS[type].icon} className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-foreground">{WIDGETS[type].label}</span>
-              <span className="block text-xs text-muted-foreground">{WIDGETS[type].description}</span>
-            </span>
-          </button>
+      <div className="flex flex-col gap-3">
+        {PICKER_GROUPS.map((group) => (
+          <section key={group.label} aria-label={group.label}>
+            <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{group.label}</h3>
+            <div className={grid}>
+              {group.types.map((type) => <PickerCard key={type} icon={WIDGETS[type].icon} label={WIDGETS[type].label} description={WIDGETS[type].description} onPick={() => onPick(sampleOp(type))} />)}
+            </div>
+          </section>
         ))}
+        {library.length ? (
+          <section aria-label="Your library">
+            <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Your library</h3>
+            <div className={grid}>
+              {library.map((type) => (
+                <PickerCard key={type.id} icon="Code" label={type.name} description={type.description || undefined} onPick={() => onPick({ op: "add", type: "custom", customType: type.id, title: type.name, ...(type.sampleData !== null ? { source: { kind: "static", data: type.sampleData } } : {}) })} />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
-      {library.length ? (
-        <>
-          <h3 className="mb-1.5 mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your library</h3>
-          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(11rem, 1fr))" }}>
-            {library.map((type) => (
-              <button key={type.id} type="button" className="flex items-start gap-2 rounded-md border border-border p-2 text-left hover:bg-state-hover" onClick={() => onPick({ op: "add", type: "custom", customType: type.id, title: type.name, ...(type.sampleData !== null ? { source: { kind: "static", data: type.sampleData } } : {}) })}>
-                <Icon name="Code" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">{type.name}</span>
-                  {type.description ? <span className="line-clamp-2 block text-xs text-muted-foreground">{type.description}</span> : null}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
-      ) : null}
     </div>
   );
 }

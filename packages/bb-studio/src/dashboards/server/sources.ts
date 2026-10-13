@@ -75,8 +75,30 @@ export async function fetchUrl(address: string, options: { fetch?: Fetch; timeou
     }
   } catch (error) {
     if (signal.aborted) throw new Error(`Timed out after ${Math.round(timeoutMs / 1000)} s.`);
-    throw error;
+    throw unreachable(error, url);
   }
+}
+
+const NETWORK_ERRORS: Record<string, string> = {
+  ECONNREFUSED: "connection refused",
+  ENOTFOUND: "no such host",
+  EAI_AGAIN: "DNS lookup failed",
+  ECONNRESET: "connection reset",
+  EHOSTUNREACH: "host unreachable",
+  ENETUNREACH: "network unreachable",
+  ETIMEDOUT: "timed out",
+  CERT_HAS_EXPIRED: "its certificate has expired",
+  DEPTH_ZERO_SELF_SIGNED_CERT: "its certificate is self-signed",
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: "its certificate can't be verified",
+};
+
+/** fetch's bare "fetch failed", with the reason its cause holds: "Couldn't reach api.example (connection refused)". */
+function unreachable(error: unknown, url: URL): unknown {
+  if (!(error instanceof TypeError) || error.message !== "fetch failed") return error;
+  const cause = (error as { cause?: { code?: unknown; message?: unknown } }).cause;
+  const code = typeof cause?.code === "string" ? cause.code : null;
+  const reason = (code && NETWORK_ERRORS[code]) ?? code ?? (typeof cause?.message === "string" ? cause.message : null);
+  return new Error(`Couldn't reach ${url.host}${reason ? ` (${reason})` : ""}.`);
 }
 
 // ---------------------------------------------------------------------------

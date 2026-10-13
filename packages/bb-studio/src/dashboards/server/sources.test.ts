@@ -22,6 +22,8 @@ describe("fetchUrl", () => {
     expect(hops).toBe(6);
     const toFile: Fetch = async () => respond("", { status: 302, headers: { location: "file:///etc/passwd" } });
     await expect(fetchUrl("https://example.com/", { fetch: toFile })).rejects.toThrow(/Only http and https/);
+    const refused = (async () => { throw Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }); }) as Fetch;
+    await expect(fetchUrl("http://127.0.0.1:9/x", { fetch: refused })).rejects.toThrow("Couldn't reach 127.0.0.1:9 (connection refused).");
     await expect(fetchUrl("ftp://example.com/", { fetch: toFile })).rejects.toThrow(/Only http and https/);
   });
 

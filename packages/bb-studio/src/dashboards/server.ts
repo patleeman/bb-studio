@@ -218,7 +218,7 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
           command: widget.source.command ?? "",
           cwd: widget.source.cwd || homedir(),
           cwdIsHome: !widget.source.cwd,
-          host: hostname(),
+          host: hostname().replace(/\.local$/i, ""),
           intervalSec: widget.source.intervalSec ?? LIMITS.scriptMinIntervalSec,
           backgroundSec: Math.round(LIMITS.backgroundMs / 1000),
           timeoutSec: Math.round(LIMITS.scriptTimeoutMs / 1000),

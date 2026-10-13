@@ -76,7 +76,8 @@ describe("the dashboard grid", () => {
     await render(state);
     expect(container.querySelectorAll("[data-widget-id]")).toHaveLength(2);
     expect(container.textContent).toContain("1,200");
-    expect(container.textContent).toContain("Updated 2m ago");
+    expect(container.querySelector("[data-widget-id=w1] [data-tile-status=ok]")?.textContent).toBe("2m ago");
+    expect(container.querySelector("[data-widget-id=w2] [data-tile-status=approval]")?.textContent).toContain("Needs approval");
     expect(button("Settings for Revenue")).toBeUndefined();
     expect(container.querySelector(".dashboard-drag")).toBeNull();
     expect(container.querySelector(".react-grid-item:not(.react-resizable-hide) > .react-resizable-handle")).toBeNull();

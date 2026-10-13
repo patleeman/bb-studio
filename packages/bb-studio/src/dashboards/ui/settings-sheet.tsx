@@ -232,11 +232,24 @@ export function ApprovedState({ onRevoke }: { onRevoke(): void }) {
 
 /** A script waiting for the user: the start of its command, and Review, which opens the approval dialog. */
 export function ApprovalCard({ command, onReview, compact = false }: { command: string; onReview(): void; compact?: boolean }) {
+  const review = <button type="button" className={cn(OUTLINE_BUTTON, "h-7 shrink-0 px-2.5 text-xs")} onClick={onReview}>Review command…</button>;
+  if (compact) {
+    // In a tile, under a header that already says "Needs approval".
+    return (
+      <div className="flex h-full min-h-0 flex-col justify-center gap-2 px-3 pb-3 text-xs" role="group" aria-label="Script approval">
+        <code className="block truncate rounded bg-muted/70 px-2 py-1 font-mono text-[11px] text-muted-foreground" title={command}>{command}</code>
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">Runs only after you approve it.</span>
+          {review}
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className={cn("flex flex-col gap-2 text-xs", compact ? "h-full justify-center p-3" : "rounded-md border border-border bg-muted/40 p-2.5")} role="group" aria-label="Script approval">
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 p-2.5 text-xs" role="group" aria-label="Script approval">
       <div className="flex items-center gap-1.5 font-medium text-foreground"><Icon name="Lock" className="size-3.5 text-amber-600 dark:text-amber-400" /> Waiting for your approval</div>
       <code className="line-clamp-2 break-all rounded bg-muted/70 px-1.5 py-1 font-mono text-[11px] leading-snug text-muted-foreground">{command}</code>
-      <button type="button" className={cn(OUTLINE_BUTTON, "h-7 self-start px-2.5 text-xs")} onClick={onReview}>Review command…</button>
+      <div className="self-start">{review}</div>
     </div>
   );
 }

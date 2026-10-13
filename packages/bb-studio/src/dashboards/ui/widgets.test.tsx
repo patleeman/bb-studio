@@ -55,7 +55,7 @@ describe("built-in widgets render", () => {
 
   it("table: header and cells", async () => {
     const el = await show(widget("table"), [{ name: "Alpha", count: 1200 }, { name: "Beta", count: 7 }]);
-    expect([...el.querySelectorAll("th")].map((th) => th.textContent)).toEqual(["name", "count"]);
+    expect([...el.querySelectorAll("th")].map((th) => th.textContent)).toEqual(["Name", "Count"]);
     expect(el.querySelectorAll("tbody tr")).toHaveLength(2);
     expect(el.textContent).toContain("1,200");
   });
