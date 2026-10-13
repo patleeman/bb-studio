@@ -116,10 +116,8 @@ struct BotTab: View {
                 }
             }
         case .none:
-            BotOnboardingView { prompt in
-                try await create(prompt: prompt)
-            } customize: {
-                sheet = .profile
+            BotOnboardingView { goal in
+                try await create(goal: goal)
             }
         case .unavailable(let message):
             ContentUnavailableView {
@@ -284,10 +282,12 @@ struct BotTab: View {
         for thread in fetched { startedThreads[thread.id] = thread }
     }
 
-    private func create(prompt: String) async throws {
-        let name = BotInfo.defaultName
-        let made = try await model.client.createBot(name: name, shape: .default, color: BotPalette.hex(forName: name), prompt: prompt)
+    /// The welcome's Create: the first Bot, with Studio's setup as its first message.
+    private func create(goal: String) async throws {
+        let made = try await model.client.createBot(name: BotSetup.name(first: true), shape: BotSetup.shape(first: true),
+                                                    color: BotSetup.color(first: true), setup: goal)
         lead = BotLead(made)
+        if let threadId = made?.lead.threadId { chain = [threadId] }
     }
 
     private func openMemory() {

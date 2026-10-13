@@ -179,6 +179,26 @@ final class BotTests: XCTestCase {
         XCTAssertEqual(primaryCalls.all.first?.1, "{}")
     }
 
+    func testFirstTimeSetupSendsTheGoalAsSetup() async throws {
+        let calls = Calls()
+        let client = client(a, ["bot_create": bot("thr_new", name: "Chief of Staff")], sent: { calls.add($0, $1) })
+        let goal = BotSetup.goal("  Watch my PRs \n")
+        XCTAssertEqual(goal, "Watch my PRs")
+        let made = try await client.createBot(name: BotSetup.name(first: true), shape: BotSetup.shape(first: true), color: BotSetup.color(first: true), setup: goal)
+        XCTAssertEqual(made?.lead.threadId, "thr_new")
+        let body = try XCTUnwrap(calls.all.first?.1)
+        XCTAssertTrue(body.contains(#""setup":"Watch my PRs""#), body)
+        XCTAssertTrue(body.contains(#""name":"Chief of Staff""#), body)
+        XCTAssertTrue(body.contains(#""shape":"blob""#), body)
+        XCTAssertTrue(body.contains(##""color":"#5b8def""##), body)
+        XCTAssertFalse(body.contains("prompt"), body)
+        // Another bot: desktop's New bot defaults.
+        XCTAssertEqual(BotSetup.name(first: false), "New bot")
+        XCTAssertEqual(BotSetup.shape(first: false), .hexagon)
+        XCTAssertEqual(BotSetup.color(first: false), "#c862c6")
+        XCTAssertEqual(BotSetup.ideas.map(\.label), ["Watch my projects", "Morning brief", "Plan my week", "Triage threads"])
+    }
+
     func testListPreviewIsPlainText() {
         XCTAssertEqual(BotSummary.plain("**Hi** there\n\n- see [docs](https://x)\n::next{reply=\"a|b\"}"), "Hi there - see docs")
         let bot = BotInfo(name: "B", avatar: "🤖", state: .active, lead: ThreadLead(threadId: nil))

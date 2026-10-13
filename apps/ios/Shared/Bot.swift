@@ -76,13 +76,15 @@ extension BBClient {
                 emoji: cachedBotAvatar ?? BotInfo.defaultAvatar)
     }
 
-    /// Makes the Bot (`bot_create`); a `prompt` is its first message.
+    /// Makes the Bot (`bot_create`); a `prompt` is its first message. A `setup`
+    /// (what it should help with, possibly empty) makes Studio's setup its first
+    /// message instead: it asks a couple of questions, then names itself.
     @discardableResult
-    public func createBot(name: String, shape: BotShape?, color: String?, prompt: String?) async throws -> BotInfo? {
+    public func createBot(name: String, shape: BotShape?, color: String?, prompt: String? = nil, setup: String? = nil) async throws -> BotInfo? {
         let output: BotWire = try await rpc("studio", Studio.Method.bot_create, .object(omittingNil: [
             "name": .string(name), "avatar": .string(BotInfo.defaultAvatar),
             "shape": shape.map { .string($0.rawValue) }, "color": color.map(JSONValue.string),
-            "prompt": prompt.map(JSONValue.string),
+            "prompt": prompt.map(JSONValue.string), "setup": setup.map(JSONValue.string),
         ]))
         let info = output.info
         if info?.primary == true { remember(info) }
@@ -301,6 +303,34 @@ public enum BotCheckinPreset: String, CaseIterable, Identifiable, Sendable {
         if cadence == "custom", lead?.cron == "0 9-17/2 * * 1-5" { return .working }
         return nil
     }
+}
+
+/// The first-time flow, as on desktop (Onboarding.tsx): a new Bot's default
+/// name and look, ideas for what it should help with, and Create, which sends
+/// that as `bot_create`'s `setup`.
+public enum BotSetup {
+    public struct Idea: Hashable, Sendable {
+        public let label: String
+        public let text: String
+    }
+
+    /// The same ideas as desktop's; a tap fills the field.
+    public static let ideas = [
+        Idea(label: "Watch my projects", text: "Keep an eye on my projects and tell me what needs me."),
+        Idea(label: "Morning brief", text: "Give me a short brief every weekday morning: what changed, what's stuck, what needs me."),
+        Idea(label: "Plan my week", text: "Help me plan my week and keep me on track."),
+        Idea(label: "Triage threads", text: "Watch my threads, nudge the stuck ones and tell me which need an answer."),
+    ]
+
+    /// Its name until it picks its own: the first is the Chief of Staff.
+    public static func name(first: Bool) -> String { first ? "Chief of Staff" : "New bot" }
+    public static func shape(first: Bool) -> BotShape { first ? .default : .hexagon }
+    public static func color(first: Bool) -> String { BotPalette.hexes[first ? 0 : 2] }
+    public static func look(first: Bool) -> BotLook {
+        BotLook(shape: shape(first: first).rawValue, color: color(first: first), emoji: BotInfo.defaultAvatar)
+    }
+    /// What goes out as `setup`: the field, trimmed (empty is fine: the Bot asks).
+    public static func goal(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
 }
 
 /// The Bot: who it is, its state, and its thread and check-ins.

@@ -60,8 +60,12 @@ struct BotsTab: View {
                 } else if bots == nil {
                     ProgressView()
                 } else if bots?.isEmpty == true {
-                    ContentUnavailableView("No bots yet", systemImage: "face.smiling",
-                                           description: Text("Tap + to make one."))
+                    // Only from a bbstudio://bots link: the tab itself opens the welcome.
+                    ContentUnavailableView {
+                        Label("No bots yet", systemImage: "face.smiling")
+                    } actions: {
+                        Button("Make your Bot") { adding = true }.buttonStyle(.glassProminent)
+                    }
                 }
             }
             .refreshable { await load() }
@@ -73,12 +77,17 @@ struct BotsTab: View {
                 }
             }
             .sheet(isPresented: $adding) {
-                BotProfileSheet(bot: nil, adding: true) { made in
-                    Task {
+                NavigationStack {
+                    BotOnboardingView(first: bots?.isEmpty != false) { goal in
+                        let first = bots?.isEmpty != false
+                        let made = try await model.client.createBot(name: BotSetup.name(first: first), shape: BotSetup.shape(first: first),
+                                                                    color: BotSetup.color(first: first), setup: goal)
+                        adding = false
                         await load()
                         guard let made else { return }
                         withAnimation(.snappy) { open = made.primary ? .primary : made.id.map(BotRoute.bot) ?? .primary }
                     }
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { adding = false } } }
                 }
             }
         }

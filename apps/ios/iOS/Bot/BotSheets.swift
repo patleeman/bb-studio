@@ -2,20 +2,17 @@ import SwiftUI
 
 // MARK: Edit profile
 
-/// Who the Bot is: its avatar, name, role and check-ins. Makes the Bot when
-/// there is none.
+/// Who the Bot is: its avatar, name, role and check-ins. A new Bot is made
+/// by the welcome (BotOnboarding.swift), not here.
 struct BotProfileSheet: View {
     let bot: BotInfo?
     /// The bot being edited; nil for the primary.
     var botId: String? = nil
-    /// Making another bot (the Bots list's +): asks for its first message.
-    var adding = false
     var saved: (BotInfo?) -> Void
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var role = ""
-    @State private var prompt = ""
     @State private var shape: BotShape = .default
     @State private var color = BotPalette.hexes[0]
     /// The color follows the name until one is picked.
@@ -102,14 +99,6 @@ struct BotProfileSheet: View {
                     .sensoryFeedback(.selection, trigger: color)
                     Toggle("Match the name", isOn: $matchName)
                 } header: { Text("Color") }
-                if adding {
-                    Section {
-                        TextField("What should it start on?", text: $prompt, axis: .vertical)
-                            .lineLimit(2...6)
-                    } header: { Text("First message") } footer: {
-                        Text("Bots that run on another provider can't be added here yet. Import them on desktop.")
-                    }
-                }
                 Section {
                     TextField("You are my chief of staff. Keep me on top of…", text: $role, axis: .vertical)
                         .lineLimit(2...5)
@@ -154,24 +143,24 @@ struct BotProfileSheet: View {
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
             .tint(tint)
-            .navigationTitle(adding ? "New bot" : bot == nil ? "Make your Bot" : "Edit profile")
+            .navigationTitle("Edit profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(bot == nil ? "Create" : "Save") { Task { await save() } }
+                    Button("Save") { Task { await save() } }
                         .disabled(busy || trimmedName.isEmpty)
                 }
             }
             .onChange(of: name) { _, value in if matchName { color = BotPalette.hex(forName: value) } }
             .onChange(of: matchName) { _, on in if on { color = BotPalette.hex(forName: name) } }
             .onAppear {
-                name = bot?.name ?? (adding ? "" : BotInfo.defaultName)
+                name = bot?.name ?? BotInfo.defaultName
                 role = bot?.role ?? ""
                 shape = bot?.shape.flatMap(BotShape.init(rawValue:)) ?? .default
                 color = bot?.color ?? BotPalette.hex(forName: name)
                 matchName = bot?.color == nil || bot?.color == BotPalette.hex(forName: name)
-                checkIn = bot == nil ? .preset(.morning) : CheckIn.of(bot?.lead)
+                checkIn = CheckIn.of(bot?.lead)
             }
             .task { await loadChanges() }
         }
@@ -205,18 +194,8 @@ struct BotProfileSheet: View {
         defer { busy = false }
         let client = app.client
         do {
-            var next: BotInfo?
-            var target = botId
-            if bot == nil {
-                let first = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-                next = try await client.createBot(name: trimmedName, shape: shape, color: color, prompt: first.isEmpty ? nil : first)
-                if next?.primary == false { target = next?.id }
-                if !role.trimmingCharacters(in: .whitespaces).isEmpty {
-                    next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role, botId: target) ?? next
-                }
-            } else {
-                next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role, botId: target)
-            }
+            let target = botId
+            var next = try await client.setBotProfile(name: trimmedName, shape: shape, color: color, role: role, botId: target)
             if case .preset(let preset) = checkIn, next?.state == .active, preset != BotCheckinPreset.of(next?.lead) {
                 next = try await client.setBotCheckinPreset(preset, botId: target) ?? next
             }

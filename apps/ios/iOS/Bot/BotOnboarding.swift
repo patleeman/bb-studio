@@ -1,129 +1,128 @@
 import SwiftUI
 
-/// Before there is a Bot: it says hello in chat with a few starters. The first
-/// message makes it (`bot_create` with that prompt).
+/// Before there is a Bot (and the Bots list's +): a welcome with one question,
+/// what it should help with, as on desktop. Create makes it with that as its
+/// setup (`bot_create`'s `setup`); its chat then opens, where it introduces
+/// itself, asks a couple of questions and picks its own name and look.
 struct BotOnboardingView: View {
+    var first = true
     var create: (String) async throws -> Void
-    var customize: () -> Void
-    @State private var draft = ""
-    @State private var sending: String?
+    @State private var goal = ""
+    @State private var creating = false
     @State private var error: String?
     @State private var appeared = false
-    @State private var sends = 0
+    @State private var creates = 0
     @FocusState private var focused: Bool
 
-    static let starters = ["What needs me today?", "Plan my week", "Set up a morning brief", "Customize me"]
-    private let look = BotLook(shape: BotShape.default.rawValue, color: BotPalette.hex(forName: BotInfo.defaultName), emoji: BotInfo.defaultAvatar)
-    private var bot: BotInfo { BotInfo(name: BotInfo.defaultName, avatar: look.emoji, state: .active, lead: ThreadLead(threadId: nil), shape: look.shape?.rawValue, color: look.color) }
+    private var look: BotLook { BotSetup.look(first: first) }
+    private var tint: Color { BotPalette.color(look.color) }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                BotHero(bot: bot, status: "Your always-on agent", working: sending != nil)
-                    .scaleEffect(appeared ? 1 : 0.92)
+            VStack(spacing: 0) {
+                BotAvatar(look, size: 88, working: creating)
+                    .shadow(color: tint.opacity(0.35), radius: 22, y: 10)
+                    .scaleEffect(appeared ? 1 : 0.9)
                     .opacity(appeared ? 1 : 0)
-                greeting("Hi! I'm your Bot. I see every project, start threads for you, and check in on my own.", first: true, last: false)
-                    .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 12)
-                greeting("What should I take off your plate first?", first: false, last: true)
-                    .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 12)
-                if let sending {
-                    Text(sending)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14).padding(.vertical, 9)
-                        .background(BotPalette.color(look.color), in: .rect(cornerRadius: 20, style: .continuous))
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.leading, 56)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    BotTypingRow(bot: bot, thinking: nil)
+                    .padding(.bottom, 20)
+                Text(first ? "Meet your Bot" : "Make another Bot")
+                    .font(.title.weight(.bold))
+                    .multilineTextAlignment(.center)
+                Text(first
+                     ? "An always-on agent with its own chat. It sees every project, checks in on a schedule and tells you what needs you."
+                     : "Each Bot has its own chat, memory, skills and check-ins, and sees every project.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 8)
+                    .padding(.horizontal, 12)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("What should your Bot help with?")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.leading, 4)
+                    TextField("e.g. Keep an eye on my projects and tell me each morning what needs me.", text: $goal, axis: .vertical)
+                        .lineLimit(3...6)
+                        .focused($focused)
+                        .disabled(creating)
+                        .padding(14)
+                        .background(Color(uiColor: .secondarySystemBackground), in: .rect(cornerRadius: 18, style: .continuous))
+                        .accessibilityLabel("What should your Bot help with?")
+                    FlowLayout(spacing: 8) {
+                        ForEach(BotSetup.ideas, id: \.self) { idea in
+                            let picked = goal == idea.text
+                            Button { goal = idea.text } label: {
+                                Text(idea.label)
+                                    .font(.subheadline)
+                                    .foregroundStyle(picked ? tint : .primary)
+                                    .padding(.horizontal, 12).padding(.vertical, 7)
+                                    .background(picked ? tint.opacity(0.12) : Color.clear, in: .capsule)
+                                    .overlay(Capsule().strokeBorder(picked ? tint.opacity(0.6) : Color(uiColor: .separator), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(creating)
+                            .accessibilityAddTraits(picked ? .isSelected : [])
+                        }
+                    }
                 }
+                .padding(.top, 32)
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 12)
+
+                Text("It introduces itself, asks a couple of questions, then picks its own name and look. You can change anything later.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 28)
+                    .padding(.horizontal, 16)
             }
-            .padding(.horizontal, 12)
-            .frame(maxWidth: 760)
+            .padding(.horizontal, 20)
+            .padding(.top, 36)
+            .padding(.bottom, 16)
+            .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
         }
-        .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 if let error {
                     Text(error).font(.footnote).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
                 }
-                if sending == nil {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(Self.starters, id: \.self) { starter in
-                                Button { pick(starter) } label: {
-                                    Text(starter).font(.subheadline.weight(.medium)).padding(.horizontal, 14).padding(.vertical, 8)
-                                }
-                                .buttonStyle(.glass)
-                            }
-                        }
-                        .padding(2)
+                Button(action: submit) {
+                    HStack(spacing: 8) {
+                        if creating { ProgressView().tint(.white) }
+                        Text(creating ? "Creating…" : "Create Bot").font(.body.weight(.semibold))
                     }
-                    .scrollClipDisabled()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
                 }
-                HStack(alignment: .bottom, spacing: 8) {
-                    TextField("Message your Bot", text: $draft, axis: .vertical)
-                        .lineLimit(1...6)
-                        .focused($focused)
-                        .submitLabel(.send)
-                        .onSubmit { send(draft) }
-                        .padding(.leading, 16).padding(.vertical, 12)
-                    Button { send(draft) } label: {
-                        Image(systemName: "arrow.up")
-                            .font(.body.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 32, height: 32)
-                            .background(canSend ? BotPalette.color(look.color) : Color.secondary.opacity(0.35), in: .circle)
-                    }
-                    .disabled(!canSend)
-                    .padding(6)
-                    .accessibilityLabel("Send")
-                }
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
+                .buttonStyle(.glassProminent)
+                .tint(tint)
+                .disabled(creating)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 20)
             .padding(.vertical, 8)
-            .frame(maxWidth: 760)
+            .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
         }
-        .sensoryFeedback(.impact(weight: .medium), trigger: sends)
-        .animation(.smooth(duration: 0.3), value: sending)
+        .sensoryFeedback(.impact(weight: .medium), trigger: creates)
         .onAppear { withAnimation(.smooth(duration: 0.6).delay(0.05)) { appeared = true } }
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var canSend: Bool { sending == nil && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
-    private func greeting(_ text: String, first: Bool, last: Bool) -> some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            Group { if last { BotAvatar(look, size: 28) } else { Color.clear } }.frame(width: 28, height: 28)
-            Text(text)
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(Color(uiColor: .secondarySystemBackground),
-                            in: UnevenRoundedRectangle(topLeadingRadius: first ? 20 : 6, bottomLeadingRadius: 6, bottomTrailingRadius: 20, topTrailingRadius: 20, style: .continuous))
-            Spacer(minLength: 24)
-        }
-    }
-
-    private func pick(_ starter: String) {
-        if starter == "Customize me" { customize() } else { send(starter) }
-    }
-
-    private func send(_ text: String) {
-        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, sending == nil else { return }
-        sends += 1
-        sending = text
-        draft = ""
+    private func submit() {
+        guard !creating else { return }
+        let text = BotSetup.goal(goal)
+        creates += 1
+        creating = true
+        focused = false
         error = nil
         Task {
             do {
                 try await create(text)
             } catch {
                 self.error = BBClient.describe(error)
-                draft = text
-                sending = nil
+                creating = false
             }
         }
     }
