@@ -3621,6 +3621,10 @@
             "minLength": 1,
             "maxLength": 20000
           },
+          "setup": {
+            "type": "string",
+            "maxLength": 2000
+          },
           "external": {
             "type": "object",
             "properties": {

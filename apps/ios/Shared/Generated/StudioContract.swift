@@ -3436,15 +3436,17 @@ public enum Studio {
     public var color: String?
     public var threadId: String?
     public var prompt: String?
+    public var setup: String?
     public var external: BotCreateInputExternal?
 
-    public init(name: String? = nil, avatar: String? = nil, shape: BotCreateInputShape? = nil, color: String? = nil, threadId: String? = nil, prompt: String? = nil, external: BotCreateInputExternal? = nil) {
+    public init(name: String? = nil, avatar: String? = nil, shape: BotCreateInputShape? = nil, color: String? = nil, threadId: String? = nil, prompt: String? = nil, setup: String? = nil, external: BotCreateInputExternal? = nil) {
       self.name = name
       self.avatar = avatar
       self.shape = shape
       self.color = color
       self.threadId = threadId
       self.prompt = prompt
+      self.setup = setup
       self.external = external
     }
   }
