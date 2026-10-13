@@ -1,7 +1,7 @@
 // "Expand to page" in a thread's composer, and the "Notes in progress" chip
 // above it. Registered by app.tsx with app.composer.customize.
 import { errorMessage } from "@bb-studio/kit/format";
-import { Icon } from "@bb-studio/kit/ui";
+import { Icon, Tooltip } from "@bb-studio/kit/ui";
 import { useComposer, useRpc, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -55,17 +55,18 @@ function ExpandButton({ composer, threadId }: { composer: PluginComposerApi; thr
   };
   return (
     <>
-      <button
-        type="button"
-        aria-label={label}
-        title={label}
-        data-notes-expand=""
-        className={ACTION_BUTTON}
-        disabled={busy || composer.isSubmitting}
-        onClick={() => void run()}
-      >
-        <Icon name="Maximize2" className="size-4" />
-      </button>
+      <Tooltip label={label} side="top">
+        <button
+          type="button"
+          aria-label={label}
+          data-notes-expand=""
+          className={ACTION_BUTTON}
+          disabled={busy || composer.isSubmitting}
+          onClick={() => void run()}
+        >
+          <Icon name="Maximize2" className="size-4" />
+        </button>
+      </Tooltip>
       {anchor}
     </>
   );

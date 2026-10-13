@@ -65,7 +65,7 @@ function OpenNoteActions({ note, row, onChanged, onDiscarded }: { note: NoteView
             <DropdownMenuItem onSelect={() => send("content")}>
               <div className="min-w-0">
                 <div>Send the notes as the message{defaultSendMode(note.length) === "content" ? " (default)" : ""}</div>
-                <div className="text-xs text-muted-foreground">The page's Markdown, as you'd typed it in the composer.</div>
+                <div className="text-xs text-muted-foreground">The page's Markdown, as your message.</div>
               </div>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => send("summarize")}>
