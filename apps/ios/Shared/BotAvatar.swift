@@ -67,17 +67,24 @@ public enum BotPalette {
     }
 }
 
-/// What a Bot looks like: its shape and color, or its emoji when it has no shape.
+/// What a Bot looks like: its image avatar if it has one, else its shape and
+/// color, or its emoji when it has no shape.
 public struct BotLook: Hashable, Sendable {
     public var shape: BotShape?
     public var color: String?
     public var emoji: String
+    /// Its image avatar's server path (Studio's `/bots/avatar` route); the drawn avatar shows while it loads or if it fails.
+    public var image: String?
 
-    public init(shape: String?, color: String?, emoji: String) {
+    public init(shape: String?, color: String?, emoji: String, image: String? = nil) {
         self.shape = shape.flatMap(BotShape.init(rawValue:))
         self.color = color
         self.emoji = emoji
+        self.image = image
     }
+
+    /// The image avatar's URL on the selected server.
+    var imageURL: URL? { image.flatMap { URL(string: $0, relativeTo: BBClient.storedServerURL) } }
 }
 
 /// The avatar. While `working`, the eyes glance and blink now and then (not
@@ -99,6 +106,22 @@ public struct BotAvatar: View {
     private var animates: Bool { working && !reduceMotion && scenePhase == .active }
 
     public var body: some View {
+        if let url = look.imageURL {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill().frame(width: size, height: size).clipShape(.circle)
+                } else {
+                    face
+                }
+            }
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+        } else {
+            face
+        }
+    }
+
+    private var face: some View {
         Group {
             if let shape = look.shape {
                 // A still avatar never reads the clock, so its ticks don't redraw it.

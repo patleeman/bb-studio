@@ -8,7 +8,7 @@ import { BotAvatar } from "./BotAvatar";
 
 const TALK_FIELD = "studio-bot-onboarding";
 
-export interface BotIdentity { name: string; avatar: string; shape: string | null; color: string | null }
+export interface BotIdentity { name: string; avatar: string; shape: string | null; color: string | null; avatarImageUrl?: string | null }
 
 export type Starter = { kind: "send"; text: string } | { kind: "preset"; preset: "morning" } | { kind: "customize" };
 export const STARTERS: { label: string; starter: Starter }[] = [
@@ -22,7 +22,7 @@ export const STARTERS: { label: string; starter: Starter }[] = [
 export function Greeting({ bot, onStarter, lines }: { bot: BotIdentity; onStarter(starter: Starter): void; lines: string[] }) {
   return (
     <div className="bb-bot-in mt-1 grid grid-cols-[28px_minmax(0,1fr)] gap-x-3">
-      <BotAvatar shape={bot.shape} color={bot.color} emoji={bot.avatar} size={28} />
+      <BotAvatar shape={bot.shape} color={bot.color} emoji={bot.avatar} image={bot.avatarImageUrl} size={28} />
       <div className="min-w-0">
         <div className="mb-0.5 text-xs font-medium text-muted-foreground">{bot.name}</div>
         {lines.map((line) => <p key={line} className="mb-1.5 text-[15px] leading-relaxed">{line}</p>)}

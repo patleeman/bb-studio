@@ -1098,10 +1098,27 @@ of Staff", with the same thread and check-ins; rename it from its page.
   last three, then Show all). A thread clicked in the Bots sidebar,
   Activity or Needs you opens as a normal BB thread in the main pane.
 - **Edit profile**: a drawn avatar (one of nine shapes with two eyes, in one
-  of twelve colors, or **Match the name**), its name, and a Description: a
-  sentence or two on its role ("You are my chief of staff."), which it's
-  told. **Advanced** lists its skills. A Bot made before drawn avatars shows
-  its emoji until you pick a shape; the emoji stays for older clients.
+  of twelve colors, or **Match the name**), or an emoji, its name, and a
+  Description: a sentence or two on its role ("You are my chief of staff."),
+  which it's told. **Advanced** lists its skills. A Bot made before drawn
+  avatars shows its emoji until you pick a shape; the emoji stays for older
+  clients.
+- **Image avatar** (`src/bot-avatar.ts`, table `bot_avatar_images`): a Bot
+  can draw its own with `bot_avatar_generate({ prompt })`, and you can
+  **Upload…** one (PNG, JPEG, WebP or GIF, up to 4 MB) in Edit profile. The
+  row of images there (**Drawn**, then its last five, newest first) picks one
+  at once; **Revert** goes back to the avatar the last change replaced (the
+  drawn one included), and again flips forward. The image shows in the Bots
+  list, Info and the chat greeting, and in the iOS app; it's served at
+  `/api/v1/plugins/studio/http/bots/avatar?bot=…&image=…` (the URL names the
+  image, so it caches for good), and the drawn avatar shows while it loads
+  or if it fails. Generation uses the first configured provider: **OpenAI**
+  `gpt-image-1` at low quality (about 1¢ an image), then **xAI**
+  `grok-2-image` (about 7¢). Keys come from Studio's secret settings
+  (**Bot avatars: OpenAI API key**, **Bot avatars: xAI API key**), else
+  `OPENAI_API_KEY` or `XAI_API_KEY` in the BB server's environment. With
+  neither the tool fails with "Image generation isn't set up: …" before any
+  call. A runner can't change its Bot's avatar.
 - **Chat**: the Bot's current thread, opened as BB's own thread page, so it
   is exactly any thread: the same timeline, composer, message actions, side
   chat, queued messages, questions and approvals inline. Threads it handed
@@ -1282,7 +1299,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - Its thread is an implementation detail. A handoff (`thread_handoff`)
   moves the Bot to the new thread. It is the personal project's lead, so it
   sees every project.
-- RPCs: `bot_list`, `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role), `bot_set_thread`,
+- RPCs: `bot_list`, `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role), `bot_avatar_history`,
+  `bot_avatar_use` (an image id, or null for the drawn avatar), `bot_avatar_revert`, `bot_avatar_upload` (base64), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
   `bot_activity`, `bot_memory`, `bot_chain` (its thread and the ones it
   handed off from, oldest first), `bot_checkin_preset` (`morning`,
@@ -1291,7 +1309,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_learning_set`, `bot_learning_review`, `bot_skill_curate` (`dryRun`
   lists what it would change), `bot_skill_pending_resolve`, and the runner RPCs below. Each takes an optional
   `botId` (the primary when absent); `bot_create` makes the primary first,
-  then additional bots. Agent tools: `bot_get`, `bot_set`, `bot_pause`,
+  then additional bots. Agent tools: `bot_get`, `bot_set`, `bot_avatar_generate`, `bot_pause`,
   `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
   `bot_skill_list`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
   `bot_skill_delete` and `bot_history_search`.

@@ -1,6 +1,9 @@
 // The Bot's drawn avatar: a solid shape in a color with two dot eyes. A Bot
-// without a shape (made before avatars were drawn) shows its emoji.
+// without a shape (made before avatars were drawn) shows its emoji. A Bot
+// with an image avatar (generated or uploaded, src/bot-avatar.ts) shows the
+// image, and the drawn avatar if it doesn't load.
 import * as BbApp from "@get-bb/plugin-sdk/app";
+import { useState } from "react";
 import { BOT_SHAPES } from "../../bot-shapes";
 
 export type BotShape = (typeof BOT_SHAPES)[number];
@@ -66,13 +69,15 @@ export function ProviderLogo({ provider, className }: { provider: { id: string; 
   return ProviderIcon ? <ProviderIcon providerKind="agent" provider={provider} fallback="Bot" className={className} aria-hidden /> : <span className={className} aria-hidden>●</span>;
 }
 
-export function BotAvatar({ provider, ...props }: { shape?: string | null; color?: string | null; emoji: string; size?: number; className?: string; working?: boolean; provider?: { id: string; logoUrl?: string | null } | null }) {
-  if (!provider) return <Drawn {...props} />;
+type AvatarProps = { shape?: string | null; color?: string | null; emoji: string; size?: number; className?: string; working?: boolean; image?: string | null };
+
+export function BotAvatar({ provider, ...props }: AvatarProps & { provider?: { id: string; logoUrl?: string | null } | null }) {
+  if (!provider) return <Face {...props} />;
   const size = props.size ?? 28;
   const badge = Math.max(12, Math.round(size * 0.45));
   return (
     <span className="relative inline-flex shrink-0" data-provider={provider.id}>
-      <Drawn {...props} />
+      <Face {...props} />
       <span className="absolute -right-1 -bottom-1 flex items-center justify-center rounded-full border border-border bg-background" style={{ width: badge, height: badge }} title={`Runs on ${provider.id}`}>
         <ProviderLogo provider={provider} className="size-[70%]" />
       </span>
@@ -80,7 +85,15 @@ export function BotAvatar({ provider, ...props }: { shape?: string | null; color
   );
 }
 
-function Drawn({ shape, color, emoji, size = 28, className, working = false }: { shape?: string | null; color?: string | null; emoji: string; size?: number; className?: string; working?: boolean }) {
+/** The image avatar when there is one and it loads; the drawn one otherwise. */
+function Face({ image, ...props }: AvatarProps) {
+  const [failed, setFailed] = useState<string | null>(null);
+  if (!image || failed === image) return <Drawn {...props} />;
+  const size = props.size ?? 28;
+  return <img src={image} alt="" aria-hidden width={size} height={size} data-avatar-image className={`shrink-0 rounded-full bg-foreground/[0.06] object-cover ${props.className ?? ""}`} style={{ width: size, height: size }} onError={() => setFailed(image)} />;
+}
+
+function Drawn({ shape, color, emoji, size = 28, className, working = false }: Omit<AvatarProps, "image">) {
   if (!isBotShape(shape)) {
     return <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] leading-none ${className ?? ""}`} style={{ width: size, height: size, fontSize: size * 0.55 }} aria-hidden>{emoji}</span>;
   }

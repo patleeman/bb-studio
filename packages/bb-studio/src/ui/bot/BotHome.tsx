@@ -8,11 +8,11 @@
 // chat; "New bot" (/plugins/studio/bot/new) does the same for another Bot.
 // The route picks the Bot (selection.ts); Studio's old address redirects here.
 import { errorMessage, relativeTime } from "@bb-studio/kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "@bb-studio/kit/app";
+import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "@bb-studio/kit/app";
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "@bb-studio/kit/ui";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
-import type { BotActivityView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
+import type { BotActivityView, BotAvatarHistoryView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
 import { describeCron } from "../../schedule";
 import { useCall, useLive } from "../live";
@@ -144,7 +144,8 @@ export function BotRedirect() {
   return null;
 }
 
-type Profile = { name: string; shape: string | null; color: string | null; role: string };
+/** shape null: the emoji avatar. */
+type Profile = { name: string; shape: string | null; color: string | null; role: string; emoji: string };
 
 /** The centered top of the page: avatar (its pencil edits the profile), name and live status. */
 function Identity({ avatar, profile, status, dot, onEdit, working = false, compact = false }: { avatar: string; profile: Profile; status: string; dot: string; onEdit(): void; working?: boolean; compact?: boolean }) {
@@ -169,14 +170,14 @@ function Identity({ avatar, profile, status, dot, onEdit, working = false, compa
  */
 function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) {
   const [profile, setProfile] = useState<Profile>(() => first
-    ? { name: "Bot", shape: DEFAULT_SHAPE, color: BOT_COLORS[0], role: "" }
-    : { name: "New bot", shape: BOT_SHAPES[3] ?? DEFAULT_SHAPE, color: BOT_COLORS[2] ?? BOT_COLORS[0], role: "" });
+    ? { name: "Bot", shape: DEFAULT_SHAPE, color: BOT_COLORS[0], role: "", emoji: "🤖" }
+    : { name: "New bot", shape: BOT_SHAPES[3] ?? DEFAULT_SHAPE, color: BOT_COLORS[2] ?? BOT_COLORS[0], role: "", emoji: "🤖" });
   const [editing, setEditing] = useState(false);
   const { run, busy, error } = useAction(onCreated);
   const openThread = useOpenThread();
   const make = async (message: string) => {
     if (busy) return false;
-    const made = await run("bot_create", { name: profile.name, avatar: "🤖", shape: profile.shape ?? DEFAULT_SHAPE, color: profile.color ?? BOT_COLORS[0], ...(message.trim() ? { prompt: message.trim() } : {}) }) as BotView | null;
+    const made = await run("bot_create", { name: profile.name, avatar: profile.emoji || "🤖", ...(profile.shape ? { shape: profile.shape } : {}), color: profile.color ?? BOT_COLORS[0], ...(message.trim() ? { prompt: message.trim() } : {}) }) as BotView | null;
     if (made?.bot && profile.role.trim()) await run("bot_set", { botId: made.bot.id, role: profile.role.trim() });
     // Its chat opens as BB's thread page; with no chat yet, the page moves to the new Bot's Info.
     if (made?.bot) {
@@ -191,11 +192,11 @@ function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) 
     else if (next.kind === "send") void make(next.text);
     else void make("Set up a morning brief for me: weekdays at 8:00.");
   };
-  const identity = { name: profile.name, avatar: "🤖", shape: profile.shape, color: profile.color };
+  const identity = { name: profile.name, avatar: profile.emoji || "🤖", shape: profile.shape, color: profile.color };
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
       <style>{BOT_STYLES}</style>
-      <header className="shrink-0 px-24 pt-5 pb-3"><Identity avatar="🤖" profile={profile} status="New" dot="bg-muted-foreground/50" onEdit={() => setEditing(true)} /></header>
+      <header className="shrink-0 px-24 pt-5 pb-3"><Identity avatar={profile.emoji || "🤖"} profile={profile} status="New" dot="bg-muted-foreground/50" onEdit={() => setEditing(true)} /></header>
       <>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex min-h-full w-full max-w-[44rem] flex-col justify-end px-4 py-6">
@@ -221,7 +222,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
   const bot = view.bot!;
   const { run, busy, error } = useAction(refresh, bot.id);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const profile: Profile = { name: bot.name, shape: bot.shape ?? null, color: bot.color ?? null, role: bot.role ?? "" };
+  const profile: Profile = { name: bot.name, shape: bot.shape ?? null, color: bot.color ?? null, role: bot.role ?? "", emoji: bot.avatar };
   const openMemory = async () => {
     const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null;
     if (memory?.pageId) openAppPath(pagePath(memory.pageId));
@@ -230,11 +231,13 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
     <>
       {sheet === "profile" || sheet === "skills" ? (
         <ProfileDialog value={profile} advancedOpen={sheet === "skills"} advanced={bot.kind === "external" ? undefined : <SkillsList botId={bot.id} name={bot.name} />} onClose={() => setSheet(null)}
+          images={<AvatarImages botId={bot.id} onChanged={refresh} />}
           onSave={(next) => {
             setSheet(null);
             const input = {
               ...(next.name !== bot.name ? { name: next.name } : {}),
-              ...(next.shape && next.shape !== bot.shape ? { shape: next.shape } : {}),
+              ...(next.shape !== (bot.shape ?? null) ? { shape: next.shape } : {}),
+              ...(next.emoji.trim() && next.emoji.trim() !== bot.avatar ? { avatar: next.emoji.trim() } : {}),
               ...(next.color && next.color !== bot.color ? { color: next.color } : {}),
               ...(next.role.trim() !== (bot.role ?? "") ? { role: next.role.trim() } : {}),
             };
@@ -379,26 +382,41 @@ function CheckinsDialog({ run, busy, onClose, onPreset, onSave }: { run: Heartbe
   );
 }
 
-/** Edit profile: the drawn avatar (shape and color), its name, and the role it's given. Advanced holds its skills. */
-function ProfileDialog({ value, advanced, advancedOpen = false, onClose, onSave }: { value: Profile; advanced?: ReactNode; advancedOpen?: boolean; onClose(): void; onSave(next: Profile): void }) {
-  const [draft, setDraft] = useState<Profile>({ ...value, shape: value.shape ?? DEFAULT_SHAPE, color: value.color ?? colorForName(value.name) });
+/**
+ * Edit profile: the avatar (an image it made or you uploaded, else drawn: a
+ * shape and color, or an emoji), its name, and the role it's given. Advanced
+ * holds its skills. Picking an image applies at once; the rest on Save.
+ */
+function ProfileDialog({ value, advanced, advancedOpen = false, images, onClose, onSave }: { value: Profile; advanced?: ReactNode; advancedOpen?: boolean; images?: ReactNode; onClose(): void; onSave(next: Profile): void }) {
+  const [draft, setDraft] = useState<Profile>({ ...value, color: value.color ?? colorForName(value.name) });
   const [showAdvanced, setShowAdvanced] = useState(advancedOpen);
   const patch = (next: Partial<Profile>) => setDraft({ ...draft, ...next });
-  const save = () => { if (draft.name.trim()) onSave({ ...draft, name: draft.name.trim() }); };
+  const save = () => { if (draft.name.trim()) onSave({ ...draft, name: draft.name.trim(), emoji: draft.emoji.trim() || value.emoji }); };
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>Edit profile</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-4 text-sm">
-          <div className="flex justify-center"><BotAvatar shape={draft.shape} color={draft.color} emoji="🤖" size={72} /></div>
-          <div className="grid grid-cols-9 gap-1" role="radiogroup" aria-label="Shape">
+          <div className="flex justify-center"><BotAvatar shape={draft.shape} color={draft.color} emoji={draft.emoji || "🤖"} size={72} /></div>
+          {images}
+          <div className="grid grid-cols-10 gap-1" role="radiogroup" aria-label="Shape">
             {BOT_SHAPES.map((shape) => (
               <button key={shape} type="button" role="radio" aria-checked={draft.shape === shape} aria-label={`Shape ${shape}`} onClick={() => patch({ shape })}
                 className="flex aspect-square items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
                 <BotAvatar shape={shape} color={draft.color} emoji="" size={26} />
               </button>
             ))}
+            <button type="button" role="radio" aria-checked={draft.shape === null} aria-label="Emoji" title="Emoji" onClick={() => patch({ shape: null })}
+              className="flex aspect-square items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
+              <BotAvatar shape={null} emoji={draft.emoji || "🤖"} size={26} />
+            </button>
           </div>
+          {draft.shape === null ? (
+            <label className="flex items-center gap-2">
+              <span className="font-medium">Emoji</span>
+              <Input aria-label="Avatar emoji" className="w-20 text-center" value={draft.emoji} maxLength={16} onChange={(event) => patch({ emoji: event.target.value })} />
+            </label>
+          ) : null}
           <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Color">
             {BOT_COLORS.map((color) => (
               <button key={color} type="button" role="radio" aria-checked={draft.color === color} aria-label={`Color ${color}`} onClick={() => patch({ color })}
@@ -429,6 +447,46 @@ function ProfileDialog({ value, advanced, advancedOpen = false, onClose, onSave 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The largest image Upload sends (Studio keeps at most 4 MB). */
+const UPLOAD_MAX = 4 * 1024 * 1024;
+
+/** Its image avatars: the drawn one, the last few images (made by it or uploaded), Upload, and Revert to the one before. */
+function AvatarImages({ botId, onChanged }: { botId: string; onChanged(): void }) {
+  const history = useLive<BotAvatarHistoryView>("bot_avatar_history", { botId }, { pollMs: 60_000 });
+  const { run, busy, error } = useAction(() => { history.refresh(); onChanged(); }, botId);
+  const [tooBig, setTooBig] = useState(false);
+  const data = history.data;
+  const tile = "flex size-10 items-center justify-center overflow-hidden rounded-full ring-offset-2 ring-offset-background hover:opacity-90 aria-checked:ring-2 aria-checked:ring-foreground";
+  const upload = (file: File | undefined) => {
+    setTooBig(false);
+    if (!file) return;
+    if (file.size > UPLOAD_MAX) { setTooBig(true); return; }
+    const reader = new FileReader();
+    reader.onload = () => { if (typeof reader.result === "string") void run("bot_avatar_upload", { data: reader.result }); };
+    reader.readAsDataURL(file);
+  };
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Avatar image">
+        <button type="button" role="radio" aria-checked={!data?.current} disabled={!!busy} className={`${tile} bg-foreground/[0.06] text-[10px] text-muted-foreground`} onClick={() => void run("bot_avatar_use", { imageId: null })} title="The drawn avatar below">Drawn</button>
+        {(data?.images ?? []).map((image) => (
+          <button key={image.id} type="button" role="radio" aria-checked={data?.current === image.id} disabled={!!busy} className={tile} data-testid="bot-avatar-image"
+            title={image.source === "generated" ? `It made this${image.prompt ? `: ${image.prompt}` : ""}` : "Uploaded"} onClick={() => void run("bot_avatar_use", { imageId: image.id })}>
+            <img src={image.url} alt={image.prompt ?? "Uploaded avatar"} className="size-full object-cover" />
+          </button>
+        ))}
+        <label className={`${OUTLINE_BUTTON} cursor-pointer`}>
+          <Icon name="Plus" />Upload…
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" disabled={!!busy} onChange={(event) => { upload(event.target.files?.[0]); event.target.value = ""; }} />
+        </label>
+        {data?.previous != null ? <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => void run("bot_avatar_revert")} data-testid="bot-avatar-revert"><Icon name="RotateCcw" />Revert</button> : null}
+      </div>
+      {tooBig ? <p role="alert" className="text-xs text-destructive">That image is over 4 MB.</p> : null}
+      {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+    </div>
   );
 }
 

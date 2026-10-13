@@ -140,6 +140,8 @@ const bot = z.object({
   color: z.string().nullable().optional(),
   /** A sentence or two on its role, given to it ("You are my chief of staff."). */
   role: z.string().nullable().optional(),
+  /** Its image avatar (generated or uploaded), served by Studio; null shows the drawn avatar. Clients that can't load it draw the avatar. */
+  avatarImageUrl: z.string().nullable().optional(),
   /** The primary Bot: the personal project's lead. Additional Bots ("New bot") have their own thread. */
   primary: z.boolean().optional(),
   /** From its current thread's provider: "external" runs on an external agent provider (Studio Agents), with that provider's memory and tools; "studio" runs BB's tools (Memory, skills, runners). */
@@ -180,6 +182,13 @@ const botAvatar = z.string().trim().min(1).max(16);
 const botShape = z.enum(BOT_SHAPES);
 const botColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const botRole = z.string().trim().max(400);
+/** A Bot's image avatars (src/bot-avatar.ts). */
+const botAvatarHistory = z.object({
+  current: z.string().nullable(),
+  previous: z.string().nullable(),
+  images: z.array(z.object({ id: z.string(), url: z.string(), mime: z.string(), source: z.enum(["generated", "upload"]), prompt: z.string().nullable(), provider: z.string().nullable(), createdAt: z.number() })),
+});
+export type BotAvatarHistoryView = z.infer<typeof botAvatarHistory>;
 /** Which Bot a bot_* call acts on; the primary Bot when absent. */
 const botId = z.string().min(1).max(100).optional();
 /** Import bot: the provider (one of EXTERNAL_PROVIDERS) and model its thread runs on. */
@@ -403,6 +412,14 @@ export const rpcContract = defineRpcContract({
   },
   /** Renames the Bot or changes its avatar. */
   bot_set: { input: z.object({ botId, name: botName.optional(), avatar: botAvatar.optional(), shape: botShape.nullable().optional(), color: botColor.optional(), role: botRole.optional() }), output: botView },
+  /** Its image avatars, newest first (the last few), the one shown and the one Revert goes back to ("" for the drawn avatar, null for nothing). */
+  bot_avatar_history: { input: forBot, output: botAvatarHistory },
+  /** Shows one of its images, or the drawn avatar (imageId null). */
+  bot_avatar_use: { input: z.object({ botId, imageId: z.string().min(1).max(100).nullable() }), output: botView },
+  /** Back to the avatar the last change replaced. */
+  bot_avatar_revert: { input: forBot, output: botView },
+  /** Uploads an image (PNG, JPEG, WebP or GIF, base64, at most 4 MB) and shows it. */
+  bot_avatar_upload: { input: z.object({ botId, data: z.string().min(1).max(6_000_000) }), output: botView },
   /** Makes a thread the Bot's thread ("Make this my Bot"); makes the Bot if there is none. */
   bot_set_thread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: botView },
   /** The Bot's heartbeat (check-ins); on needs an active Bot. */

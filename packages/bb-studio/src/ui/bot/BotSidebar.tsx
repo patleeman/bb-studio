@@ -198,7 +198,7 @@ function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
     <div className="group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover">
       <button type="button" data-testid="bot-row" data-bot={bot.id} title={bot.name} onClick={() => openBot(bot)}
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left">
-        <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={22} provider={botProvider(bot)} />
+        <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={22} provider={botProvider(bot)} />
         <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
         {bot.state !== "active" ? <span className="shrink-0 text-[11px] text-muted-foreground">{bot.state}</span> : null}
       </button>
@@ -240,7 +240,7 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
         onClick={() => openBot(bot)}
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left hover:brightness-110">
         <span className="relative shrink-0">
-          <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={28} working={running > 0} provider={botProvider(bot)} />
+          <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={28} working={running > 0} provider={botProvider(bot)} />
           {groups.needsYou.length ? <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label="Needs you" /> : null}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">

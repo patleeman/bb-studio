@@ -61,7 +61,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
   return (
     <div className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground" aria-label={`${bot.name} info`}>
       <header className="flex items-start gap-3 px-4 pt-4 pb-3">
-        <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={44} working={running > 0} provider={botProvider(bot)} />
+        <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} image={bot.avatarImageUrl} size={44} working={running > 0} provider={botProvider(bot)} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h2 className="truncate text-base font-semibold">{bot.name}</h2>
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-info-status">

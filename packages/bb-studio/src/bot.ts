@@ -28,10 +28,11 @@ import { join } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import type { BotActivityView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "./contract";
+import type { BotActivityView, BotAvatarHistoryView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "./contract";
 import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-providers";
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
+import { AvatarImages, avatarImageUrl, type AvatarImageMeta, type AvatarImageRow } from "./bot-avatar";
 
 type Sdk = BbPluginApi["sdk"];
 type ListedThread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
@@ -114,7 +115,7 @@ export function skillMarkdown(skill: { name: string; description: string; body: 
   return `---\nname: ${skill.name}\ndescription: ${JSON.stringify(skill.description)}\n---\n\n${skill.body.trim()}\n`;
 }
 
-type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; memory_page_id: string | null; shape: string | null; color: string | null; role: string | null; provider_id?: string | null; created_at: number; updated_at: number };
+type BotRow = { id: string; name: string; avatar: string; state: BotState; thread_id: string | null; heartbeat_was_on: number; memory_page_id: string | null; shape: string | null; color: string | null; role: string | null; provider_id?: string | null; avatar_image_id?: string | null; avatar_image_prev?: string | null; created_at: number; updated_at: number };
 
 export type PermissionMode = "accept-edits" | "auto" | "full";
 export type ReasoningLevel = "none" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra" | "ultracode";
@@ -272,7 +273,11 @@ export interface BotDeps {
 }
 
 export class Bots {
-  constructor(private readonly deps: BotDeps) {}
+  /** Its image avatars (src/bot-avatar.ts). */
+  readonly images: AvatarImages;
+  constructor(private readonly deps: BotDeps) {
+    this.images = new AvatarImages(deps.db);
+  }
 
   /** Every Bot, the primary first (BOT_ID, else the oldest). */
   private rows(): BotRow[] {
@@ -319,7 +324,7 @@ export class Bots {
       if (threadId !== row.thread_id) this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
     }
     const memoryPageId = row.memory_page_id && this.deps.memory?.exists(row.memory_page_id) ? row.memory_page_id : null;
-    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, primary, kind: botKind(row.provider_id), providerId: row.provider_id ?? null, model: (threadId ? this.models.get(threadId) : null) ?? null, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, avatarImageUrl: row.avatar_image_id ? avatarImageUrl(row.id, row.avatar_image_id) : null, primary, kind: botKind(row.provider_id), providerId: row.provider_id ?? null, model: (threadId ? this.models.get(threadId) : null) ?? null, createdAt: row.created_at, updatedAt: row.updated_at };
   }
 
   /** A Bot as stored (the primary without an id); its thread read from the personal project's lead for the primary. */
@@ -553,6 +558,47 @@ export class Bots {
       else await this.deps.leads.runs.set(key, this.view(before).threadId, run);
     }
     return this.get(before.id);
+  }
+
+  /** The image a Bot shows, by id; undefined when it's gone. For the avatar route. */
+  avatarImage(botId: string, imageId: string): AvatarImageRow | undefined {
+    return this.images.get(botId, imageId);
+  }
+
+  /** A Bot's image avatars, newest first: the one shown, and the one Revert goes back to ("" for the drawn avatar, null for nothing). */
+  avatarHistory(botId?: string): BotAvatarHistoryView {
+    const row = this.need(botId);
+    const view = (image: AvatarImageMeta) => ({ id: image.id, url: avatarImageUrl(row.id, image.id), mime: image.mime, source: image.source, prompt: image.prompt, provider: image.provider, createdAt: image.created_at });
+    return { current: row.avatar_image_id ?? null, previous: row.avatar_image_prev ?? null, images: this.images.list(row.id).map(view) };
+  }
+
+  /**
+   * Shows one of the Bot's images, or the drawn avatar (null). What it
+   * replaces becomes Revert's target, so Revert flips between the two.
+   */
+  useAvatarImage(botId: string | undefined, imageId: string | null): NonNullable<BotView["bot"]> {
+    const row = this.need(botId);
+    if (imageId && !this.images.get(row.id, imageId)) throw new Error("That avatar image is gone; Bots keep their last few.");
+    const current = row.avatar_image_id ?? null;
+    if (imageId === current) return this.view(row);
+    this.deps.db.prepare("UPDATE bots SET avatar_image_id = ?, avatar_image_prev = ?, updated_at = ? WHERE id = ?").run(imageId, current ?? "", Date.now(), row.id);
+    this.images.prune(row.id, [imageId, current]);
+    this.deps.changed();
+    return this.view(this.need(row.id));
+  }
+
+  /** Saves a new image and shows it. */
+  addAvatarImage(botId: string | undefined, image: { data: Buffer; mime: string; source: "generated" | "upload"; prompt?: string | null; provider?: string | null }): NonNullable<BotView["bot"]> {
+    const row = this.need(botId);
+    const saved = this.images.add({ botId: row.id, ...image });
+    return this.useAvatarImage(row.id, saved.id);
+  }
+
+  /** Back to the avatar the last change replaced (an image or the drawn one). */
+  revertAvatar(botId?: string): NonNullable<BotView["bot"]> {
+    const row = this.need(botId);
+    if (row.avatar_image_prev == null) throw new Error(`${row.name} has no earlier avatar to go back to.`);
+    return this.useAvatarImage(row.id, row.avatar_image_prev || null);
   }
 
   /** Makes a thread the primary Bot's ("Make this my Bot"), making the Bot if there is none. */

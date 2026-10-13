@@ -33,6 +33,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
+import { serveBytes } from "@bb-studio/kit/server";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type ThreadOptionView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
@@ -41,6 +42,8 @@ import { EXTERNAL_AGENTS_PLUGIN_ID } from "./src/bot";
 import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
+import { AVATAR_ROUTE, BOT_AVATAR_SETTINGS, imageMime, pickImageProvider } from "./src/bot-avatar";
+import { registerBotProfileTools } from "./src/bot-profile-tools";
 import { Bots, SKILL_NAME } from "./src/bot";
 import { alertBot, parseSchedule, Runners } from "./src/runners";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
@@ -103,7 +106,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => designs.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins.
-  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS });
+  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS });
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
   let settingValues: Record<string, unknown> = await settings.get();
@@ -151,7 +154,7 @@ export default async function plugin(bb: BbPluginApi) {
     .catch(() => kindRoutes)
     .finally(() => { routesRefresh = null; });
   void refreshRoutes();
-  const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
+  const BOT_TOOLS = ["bot_get", "bot_set", "bot_avatar_generate", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
   const BOT_OWN_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /** Only a runner's thread gets this (src/runners.ts). */
@@ -630,6 +633,16 @@ export default async function plugin(bb: BbPluginApi) {
     bot_get: ({ botId }) => bots.get(botId),
     bot_create: (input) => bots.create(input),
     bot_set: (input) => bots.set(input),
+    bot_avatar_history: ({ botId }) => bots.avatarHistory(botId),
+    bot_avatar_use: ({ botId, imageId }) => { const bot = bots.useAvatarImage(botId, imageId); return bots.get(bot.id); },
+    bot_avatar_revert: ({ botId }) => { const bot = bots.revertAvatar(botId); return bots.get(bot.id); },
+    bot_avatar_upload: ({ botId, data }) => {
+      const bytes = Buffer.from(data.replace(/^data:[^,]*,/, ""), "base64");
+      const mime = imageMime(bytes);
+      if (!mime) throw new Error("Upload a PNG, JPEG, WebP or GIF image.");
+      const bot = bots.addAvatarImage(botId, { data: bytes, mime, source: "upload" });
+      return bots.get(bot.id);
+    },
     bot_set_thread: ({ threadId }) => bots.setThread(threadId),
     bot_set_run: (run) => bots.setRun(run),
     bot_pause: ({ botId }) => bots.pause(botId),
@@ -933,6 +946,13 @@ export default async function plugin(bb: BbPluginApi) {
     name: "bot_set", description: "Rename the user's Bot, change its avatar emoji, or set its role (a sentence or two it's given). Only when the user asks.",
     parameters: z.object({ name: z.string().trim().min(1).max(60).optional(), avatar: z.string().trim().min(1).max(16).optional().describe("One emoji"), role: z.string().trim().max(400).optional().describe("Its role in the user's words; empty clears it") }),
     execute: async (input, ctx) => describeBot(await bots.set({ ...input, botId: await selfBot(ctx.threadId) })),
+  });
+  registerBotProfileTools(bb, { bots, acting, imageProvider: () => pickImageProvider({ settings: settingValues }) });
+  // A Bot's image avatar, for the desktop and the iOS app. The URL names the image, so it never goes stale.
+  bb.http.route("GET", AVATAR_ROUTE, (context) => {
+    const image = bots.avatarImage(context.req.query("bot") ?? "", context.req.query("image") ?? "");
+    if (!image) return context.text("Not found", 404);
+    return serveBytes(new Uint8Array(image.data), { "content-type": image.mime, "content-security-policy": "default-src 'none'" });
   });
   bb.agents.registerTool({ name: "bot_pause", description: "Pause the user's Bot: its check-ins stop and it takes on no new work until resumed. Only when the user asks.", parameters: z.object({}), execute: async (_input, ctx) => (await runnerCantControl(ctx.threadId)) ?? describeBot(await bots.pause(await selfBot(ctx.threadId))) });
   bb.agents.registerTool({
