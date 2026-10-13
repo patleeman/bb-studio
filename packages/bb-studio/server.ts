@@ -44,6 +44,7 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { AVATAR_ROUTE, BOT_AVATAR_SETTINGS, imageMime, pickImageProvider } from "./src/bot-avatar";
 import { registerBotProfileTools } from "./src/bot-profile-tools";
+import { BotCacheWarmer } from "./src/bot-cache";
 import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
 import { alertBot, parseSchedule, Runners } from "./src/runners";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
@@ -460,11 +461,23 @@ export default async function plugin(bb: BbPluginApi) {
     writeSkill: (botId, input) => { bots.writeSkill(input, botId); },
     deleteSkill: (botId, name) => bots.deleteSkill(name, botId),
     log: (message) => bb.log.warn(message),
+    quietSince: (threadId, updatedAt) => warmer.quietSince(threadId, updatedAt),
   });
+  // Prompt-cache warming for Bot chats (src/bot-cache.ts): a tiny ping about
+  // every 55 minutes while the user is around; nothing in the first 5 minutes.
+  const warmer: BotCacheWarmer = new BotCacheWarmer({
+    db, sdk: bb.sdk, pluginId: "studio", changed: tagsChanged, log: (message) => bb.log.warn(message),
+    bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, state: bot.state, threadId: bot.threadId, kind: bot.kind ?? "studio" })),
+  });
+  bb.events.on("thread.idle", ({ thread }) => void warmer.idle(thread.id).catch(() => {}));
+  bb.events.on("thread.failed", ({ thread }) => warmer.failed(thread.id));
+  const warmTimer = setInterval(() => void warmer.tick().catch((error) => bb.log.warn(`Cache warming tick failed: ${errorText(error)}`)), 60_000);
+  bb.onDispose(() => clearInterval(warmTimer));
   /** A Studio bot's id for its learning settings (the primary without one). */
   const learnerId = (botId?: string) => { const bot = bots.stored(botId); if (!bot) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first."); bots.requireStudio(bot.id, "skill learning"); return bot.id; };
   bb.events.on("thread.idle", ({ thread, lastAssistantText }) => void learning.idle(thread, lastAssistantText).catch((error) => bb.log.warn(`Skill learning: ${errorText(error)}`)));
-  bb.events.on("thread.active", ({ thread }) => void learning.active(thread.id).catch(() => {}));
+  // A cache-warming ping isn't a new turn by the user: it leaves a running review alone.
+  bb.events.on("thread.active", ({ thread }) => { if (!warmer.pinging(thread.id)) void learning.active(thread.id).catch(() => {}); });
   bb.events.on("thread.failed", ({ thread, error }) => void learning.failed(thread.id, error).catch(() => {}));
   // Watchers' findings and end dates, once a minute; the skill curator and stuck reviews too.
   const automationTimer = setInterval(() => {
@@ -557,6 +570,13 @@ export default async function plugin(bb: BbPluginApi) {
     return { panels: panels.map((panel) => ({ ...panel, visible: isPanelVisible(order, visible, panel.id) })) };
   };
 
+  /** The thread a cache RPC is about: the one given, else the Bot's chat. */
+  const cacheThread = (threadId: string | undefined, botId: string | undefined): string => {
+    if (threadId) return threadId;
+    const bot = bots.stored(botId);
+    if (!bot?.threadId) throw new Error(bot ? `${bot.name} has no chat.` : "Make your Bot first.");
+    return bot.threadId;
+  };
   bb.rpc.register(rpcContract, {
     overview: () => overview(),
     search: ({ query }) => contentSearch(query),
@@ -651,6 +671,17 @@ export default async function plugin(bb: BbPluginApi) {
     bot_resume: ({ botId }) => bots.resume(botId),
     bot_stop: ({ botId }) => bots.stop(botId),
     bot_activity: ({ botId }) => bots.activity(botId),
+    bot_cache_state: ({ threadId, botId }) => warmer.state(cacheThread(threadId, botId)),
+    bot_cache_set: ({ botId, ...patch }) => {
+      const bot = bots.stored(botId);
+      if (!bot) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first.");
+      const next = { ...warmer.settings(bot.id), ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)) };
+      if (next.wakeStart === next.wakeEnd) throw new Error("Waking hours need a start and an end that differ.");
+      warmer.setSettings(bot.id, next);
+      return warmer.state(cacheThread(undefined, bot.id));
+    },
+    bot_cache_banner_hide: ({ threadId }) => { warmer.hideBanner(threadId); return { ok: true as const }; },
+    bot_cache_compact: async ({ threadId }) => { await warmer.compact(threadId); return { ok: true as const }; },
     thread_handoff_to_model: ({ threadId, providerId, model, reasoning }) => bots.switchModel(threadId, { providerId, model, ...(reasoning ? { reasoning } : {}) }),
     bot_memory: ({ botId }) => { bots.requireStudio(botId, "Memory page"); return { pageId: bots.memoryPage(botId) }; },
     bot_external_providers: () => externalProviders({

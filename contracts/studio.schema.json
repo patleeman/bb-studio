@@ -6313,6 +6313,422 @@
         "additionalProperties": false
       }
     },
+    "bot_cache_state": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "warm",
+              "cold",
+              "off"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "warmUntil": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contextTokens": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "warming": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "nextPingAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lastPingAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "active",
+              "nextPingAt",
+              "reason",
+              "lastPingAt"
+            ],
+            "additionalProperties": false
+          },
+          "costs": {
+            "type": "object",
+            "properties": {
+              "warmingPerHour": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "coldSend": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "warmSend": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "warmingPerHour",
+              "coldSend",
+              "warmSend"
+            ],
+            "additionalProperties": false
+          },
+          "banner": {
+            "type": "boolean"
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "thresholdTokens": {
+                "type": "number"
+              },
+              "idleHours": {
+                "type": "number"
+              },
+              "wakeStart": {
+                "type": "number"
+              },
+              "wakeEnd": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "enabled",
+              "thresholdTokens",
+              "idleHours",
+              "wakeStart",
+              "wakeEnd"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "botId",
+          "threadId",
+          "state",
+          "label",
+          "warmUntil",
+          "model",
+          "contextTokens",
+          "warming",
+          "costs",
+          "banner",
+          "settings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_cache_set": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "thresholdTokens": {
+            "type": "integer",
+            "minimum": 10000,
+            "maximum": 2000000
+          },
+          "idleHours": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 24
+          },
+          "wakeStart": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1439
+          },
+          "wakeEnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1440
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "warm",
+              "cold",
+              "off"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "warmUntil": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contextTokens": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "warming": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "nextPingAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lastPingAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "active",
+              "nextPingAt",
+              "reason",
+              "lastPingAt"
+            ],
+            "additionalProperties": false
+          },
+          "costs": {
+            "type": "object",
+            "properties": {
+              "warmingPerHour": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "coldSend": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "warmSend": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "warmingPerHour",
+              "coldSend",
+              "warmSend"
+            ],
+            "additionalProperties": false
+          },
+          "banner": {
+            "type": "boolean"
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "thresholdTokens": {
+                "type": "number"
+              },
+              "idleHours": {
+                "type": "number"
+              },
+              "wakeStart": {
+                "type": "number"
+              },
+              "wakeEnd": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "enabled",
+              "thresholdTokens",
+              "idleHours",
+              "wakeStart",
+              "wakeEnd"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "botId",
+          "threadId",
+          "state",
+          "label",
+          "warmUntil",
+          "model",
+          "contextTokens",
+          "warming",
+          "costs",
+          "banner",
+          "settings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_cache_banner_hide": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_cache_compact": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_memory": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

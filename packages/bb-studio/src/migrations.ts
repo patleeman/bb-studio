@@ -338,4 +338,17 @@ export const MIGRATIONS = [
      BEGIN SELECT RAISE(ABORT, 'bot_profile_changes is append-only'); END;
    CREATE TRIGGER bot_profile_changes_no_delete BEFORE DELETE ON bot_profile_changes
      BEGIN SELECT RAISE(ABORT, 'bot_profile_changes is append-only'); END;`,
+  // Prompt-cache warming for Bot chats (src/bot-cache.ts): each Bot's
+  // settings (no row: the defaults), the pings Studio sent (quiet_since is
+  // the chat's updatedAt before them, for the skill curator's idle wait), and
+  // chats where the user turned the cold-send banner off.
+  `CREATE TABLE bot_cache_settings (
+       bot_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL, threshold_tokens INTEGER NOT NULL, idle_hours REAL NOT NULL,
+       wake_start INTEGER NOT NULL, wake_end INTEGER NOT NULL, updated_at INTEGER NOT NULL
+     );
+   CREATE TABLE bot_cache_pings (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, thread_id TEXT NOT NULL, sent_at INTEGER NOT NULL, quiet_since INTEGER
+     );
+   CREATE INDEX bot_cache_pings_thread ON bot_cache_pings (thread_id, sent_at);
+   CREATE TABLE bot_cache_banner_off (thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL);`,
 ];

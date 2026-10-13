@@ -17,6 +17,7 @@ import { externalName, externalNote } from "../../external-providers";
 import { RunnersSection } from "./Runners";
 import { AutomationsSection } from "./Automations";
 import { ProfileChanges } from "./ProfileChanges";
+import { BotCacheSection } from "./BotCache";
 import { useOpenThread } from "./workspace";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
@@ -116,6 +117,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
           <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: () => setSheet("skills") }} />
         </>}
       </dl>
+      {bot.kind === "external" ? null : <BotCacheSection botId={bot.id} threadId={bot.threadId} />}
 
       <AutomationsSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} external={bot.kind === "external"} />
       {bot.kind === "external"

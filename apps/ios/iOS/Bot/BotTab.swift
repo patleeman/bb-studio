@@ -21,6 +21,8 @@ struct BotTab: View {
     @State private var sheet: BotSheet?
     @State private var confirmingStop = false
     @State private var error: String?
+    /// The chat's prompt cache (`bot_cache_state`), for the header.
+    @State private var cache: BotCacheState?
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
     private struct PollKey: Hashable { let interval: Duration?; let server: URL; let botId: String? }
 
@@ -137,7 +139,8 @@ struct BotTab: View {
         return BotChrome(bot: bot, chain: chain, started: BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain),
                          openThread: { path.append(.thread(id: $0)) },
                          runningChanged: { _ in Task { await loadActivity() } },
-                         followThread: { _ in attempt += 1 })
+                         followThread: { _ in attempt += 1 },
+                         cache: cache)
     }
 
     @ToolbarContentBuilder
@@ -264,6 +267,7 @@ struct BotTab: View {
     private func loadActivity() async {
         guard bot != nil else { activity = nil; return }
         let client = model.client
+        if let threadId = bot?.lead.threadId, let state = try? await client.botCacheState(threadId: threadId), state != cache { cache = state }
         guard let next = try? await client.botActivity(botId: botId) else { return }
         // An unchanged Activity redraws nothing.
         if next != activity { activity = next }

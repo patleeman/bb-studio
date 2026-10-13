@@ -229,6 +229,16 @@ extension BBClient {
         try await rpc("studio", Studio.Method.bot_activity, Self.scoped(botId))
     }
 
+    /// A Bot chat's prompt cache (`bot_cache_state`); nil on a Studio without it.
+    public func botCacheState(threadId: String) async throws -> BotCacheState? {
+        do {
+            let state: BotCacheState = try await rpc("studio", Studio.Method.bot_cache_state, Self.scoped(nil, ["threadId": .string(threadId)]))
+            return state
+        } catch where Self.isMissingRPC(error) {
+            return nil
+        }
+    }
+
     /// The bot's runners (`bot_runners`): scheduled jobs that report back to it.
     public func botRunners(botId: String? = nil) async throws -> [BotRunner] {
         struct Output: Decodable { var runners: [BotRunner]? }
@@ -546,4 +556,30 @@ public struct ThreadLead: Hashable, Sendable {
         ("hourly", "Hourly"), ("every2hours", "Every 2 hours"), ("every6hours", "Every 6 hours"),
         ("daily", "Daily"), ("weekdays", "Weekdays"), ("weekly", "Weekly"), ("custom", "Custom"),
     ]
+}
+
+/// A Bot chat's prompt cache (`bot_cache_state`, src/bot-cache.ts in Studio):
+/// warm while Studio keeps it so, cold once it expired, or not warmed.
+public struct BotCacheState: Decodable, Hashable, Sendable {
+    public struct Warming: Decodable, Hashable, Sendable {
+        public var active: Bool
+        public var reason: String?
+    }
+    public var botId: String?
+    /// "warm", "cold" or "off".
+    public var state: String
+    public var label: String
+    /// Milliseconds since 1970.
+    public var warmUntil: Double?
+    public var warming: Warming
+
+    /// "Warm · 42m" counted down to `now`, "Cold" or "Warming off"; nil when it isn't a Bot's chat.
+    public func line(now: Date = .now) -> String? {
+        guard botId != nil, !label.isEmpty else { return nil }
+        if state == "warm", let warmUntil {
+            let left = warmUntil / 1000 - now.timeIntervalSince1970
+            return left > 0 ? "Warm · \(max(1, Int((left / 60).rounded(.up))))m" : "Cold"
+        }
+        return label
+    }
 }

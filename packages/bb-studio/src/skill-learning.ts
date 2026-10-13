@@ -37,6 +37,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { isPassOutput } from "@bb-studio/kit/silent";
+import { isPingRequest } from "./bot-cache";
 
 type Sdk = BbPluginApi["sdk"];
 type ThreadLike = { id: string; status?: string; updatedAt?: number | null; archivedAt?: number | null };
@@ -69,7 +70,8 @@ export function tallyTurns(events: readonly EventRow[]): { toolTurns: number; us
   for (const event of events) {
     lastSeq = Math.max(lastSeq, event.seq ?? 0);
     const data = (event.data ?? {}) as { initiator?: string; item?: { type?: string; tool?: string; name?: string } };
-    if (event.type === "client/turn/requested" && data.initiator === "user") userTurns++;
+    // Studio's cache-warming pings (src/bot-cache.ts) are sent as the user but aren't from them.
+    if (event.type === "client/turn/requested" && data.initiator === "user" && !isPingRequest(data)) userTurns++;
     else if (event.type === "item/completed" && data.item?.type && !NOT_TOOLS.has(data.item.type)) {
       inTurn++;
       if (SKILL_WRITE_TOOL.test(String(data.item.tool ?? data.item.name ?? ""))) { skillWrite = true; toolTurns = 0; inTurn = 0; }
@@ -222,6 +224,8 @@ export interface LearningDeps {
   writeSkill(botId: string, input: { name: string; description: string; body: string }): void;
   deleteSkill(botId: string, name: string): boolean;
   log?(message: string): void;
+  /** When a Bot's chat was last really active, discounting cache-warming pings (BotCacheWarmer.quietSince). */
+  quietSince?(threadId: string, updatedAt: number | null): number | null;
   /** How often to look for a fork's workspace; tests make it fast. */
   pollMs?: number;
 }
@@ -539,7 +543,8 @@ export class SkillLearning {
       const since = row.curator_last_at ?? row.curator_since ?? now;
       if (row.curator_paused || now - since < CURATOR_EVERY_MS) continue;
       const thread = await this.deps.sdk.threads.get({ threadId: bot.threadId }).catch(() => null);
-      if (!thread || thread.status !== "idle" || now - (thread.updatedAt ?? now) < CURATOR_IDLE_MS) continue;
+      const quiet = this.deps.quietSince ? this.deps.quietSince(bot.threadId, thread?.updatedAt ?? null) : thread?.updatedAt;
+      if (!thread || thread.status !== "idle" || now - (quiet ?? now) < CURATOR_IDLE_MS) continue;
       await this.curate(bot.id, { now }).catch((error) => this.deps.log?.(`Skill curator for ${bot.id} failed: ${error instanceof Error ? error.message : String(error)}`));
     }
   }

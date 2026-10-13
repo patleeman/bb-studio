@@ -52,6 +52,10 @@ public enum Studio {
     public static let bot_resume = "bot_resume"
     public static let bot_stop = "bot_stop"
     public static let bot_activity = "bot_activity"
+    public static let bot_cache_state = "bot_cache_state"
+    public static let bot_cache_set = "bot_cache_set"
+    public static let bot_cache_banner_hide = "bot_cache_banner_hide"
+    public static let bot_cache_compact = "bot_cache_compact"
     public static let bot_memory = "bot_memory"
     public static let bot_chain = "bot_chain"
     public static let bot_thread_owner = "bot_thread_owner"
@@ -307,6 +311,14 @@ public enum Studio {
   public typealias BotStop = BotStopOutput
 
   public typealias BotActivity = BotActivityOutput
+
+  public typealias BotCacheState = BotCacheStateOutput
+
+  public typealias BotCacheSet = BotCacheSetOutput
+
+  public typealias BotCacheBannerHide = BotCacheBannerHideOutput
+
+  public typealias BotCacheCompact = BotCacheCompactOutput
 
   public typealias BotMemory = BotMemoryOutput
 
@@ -5944,6 +5956,260 @@ public enum Studio {
       self.scheduled = scheduled
       self.completed = completed
       self.latest = latest
+    }
+  }
+
+  public struct BotCacheStateInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+
+    public init(threadId: String? = nil, botId: String? = nil) {
+      self.threadId = threadId
+      self.botId = botId
+    }
+  }
+
+  public enum BotCacheStateOutputState: Sendable, Hashable, Codable {
+    case warm
+    case cold
+    case off
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "warm": self = .warm
+      case "cold": self = .cold
+      case "off": self = .off
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .warm: try container.encode("warm")
+      case .cold: try container.encode("cold")
+      case .off: try container.encode("off")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotCacheStateOutputWarming: Sendable, Hashable, Codable {
+    public var active: Bool?
+    public var nextPingAt: Double?
+    public var reason: String?
+    public var lastPingAt: Double?
+
+    public init(active: Bool? = nil, nextPingAt: Double? = nil, reason: String? = nil, lastPingAt: Double? = nil) {
+      self.active = active
+      self.nextPingAt = nextPingAt
+      self.reason = reason
+      self.lastPingAt = lastPingAt
+    }
+  }
+
+  public struct BotCacheStateOutputCosts: Sendable, Hashable, Codable {
+    public var warmingPerHour: Double?
+    public var coldSend: Double?
+    public var warmSend: Double?
+
+    public init(warmingPerHour: Double? = nil, coldSend: Double? = nil, warmSend: Double? = nil) {
+      self.warmingPerHour = warmingPerHour
+      self.coldSend = coldSend
+      self.warmSend = warmSend
+    }
+  }
+
+  public struct BotCacheStateOutputSettings: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var thresholdTokens: Double?
+    public var idleHours: Double?
+    public var wakeStart: Double?
+    public var wakeEnd: Double?
+
+    public init(enabled: Bool? = nil, thresholdTokens: Double? = nil, idleHours: Double? = nil, wakeStart: Double? = nil, wakeEnd: Double? = nil) {
+      self.enabled = enabled
+      self.thresholdTokens = thresholdTokens
+      self.idleHours = idleHours
+      self.wakeStart = wakeStart
+      self.wakeEnd = wakeEnd
+    }
+  }
+
+  public struct BotCacheStateOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var threadId: String?
+    public var state: BotCacheStateOutputState?
+    public var label: String?
+    public var warmUntil: Double?
+    public var model: String?
+    public var contextTokens: Double?
+    public var warming: BotCacheStateOutputWarming?
+    public var costs: BotCacheStateOutputCosts?
+    public var banner: Bool?
+    public var settings: BotCacheStateOutputSettings?
+
+    public init(botId: String? = nil, threadId: String? = nil, state: BotCacheStateOutputState? = nil, label: String? = nil, warmUntil: Double? = nil, model: String? = nil, contextTokens: Double? = nil, warming: BotCacheStateOutputWarming? = nil, costs: BotCacheStateOutputCosts? = nil, banner: Bool? = nil, settings: BotCacheStateOutputSettings? = nil) {
+      self.botId = botId
+      self.threadId = threadId
+      self.state = state
+      self.label = label
+      self.warmUntil = warmUntil
+      self.model = model
+      self.contextTokens = contextTokens
+      self.warming = warming
+      self.costs = costs
+      self.banner = banner
+      self.settings = settings
+    }
+  }
+
+  public struct BotCacheSetInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var enabled: Bool?
+    public var thresholdTokens: Int?
+    public var idleHours: Double?
+    public var wakeStart: Int?
+    public var wakeEnd: Int?
+
+    public init(botId: String? = nil, enabled: Bool? = nil, thresholdTokens: Int? = nil, idleHours: Double? = nil, wakeStart: Int? = nil, wakeEnd: Int? = nil) {
+      self.botId = botId
+      self.enabled = enabled
+      self.thresholdTokens = thresholdTokens
+      self.idleHours = idleHours
+      self.wakeStart = wakeStart
+      self.wakeEnd = wakeEnd
+    }
+  }
+
+  public enum BotCacheSetOutputState: Sendable, Hashable, Codable {
+    case warm
+    case cold
+    case off
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "warm": self = .warm
+      case "cold": self = .cold
+      case "off": self = .off
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .warm: try container.encode("warm")
+      case .cold: try container.encode("cold")
+      case .off: try container.encode("off")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotCacheSetOutputWarming: Sendable, Hashable, Codable {
+    public var active: Bool?
+    public var nextPingAt: Double?
+    public var reason: String?
+    public var lastPingAt: Double?
+
+    public init(active: Bool? = nil, nextPingAt: Double? = nil, reason: String? = nil, lastPingAt: Double? = nil) {
+      self.active = active
+      self.nextPingAt = nextPingAt
+      self.reason = reason
+      self.lastPingAt = lastPingAt
+    }
+  }
+
+  public struct BotCacheSetOutputCosts: Sendable, Hashable, Codable {
+    public var warmingPerHour: Double?
+    public var coldSend: Double?
+    public var warmSend: Double?
+
+    public init(warmingPerHour: Double? = nil, coldSend: Double? = nil, warmSend: Double? = nil) {
+      self.warmingPerHour = warmingPerHour
+      self.coldSend = coldSend
+      self.warmSend = warmSend
+    }
+  }
+
+  public struct BotCacheSetOutputSettings: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var thresholdTokens: Double?
+    public var idleHours: Double?
+    public var wakeStart: Double?
+    public var wakeEnd: Double?
+
+    public init(enabled: Bool? = nil, thresholdTokens: Double? = nil, idleHours: Double? = nil, wakeStart: Double? = nil, wakeEnd: Double? = nil) {
+      self.enabled = enabled
+      self.thresholdTokens = thresholdTokens
+      self.idleHours = idleHours
+      self.wakeStart = wakeStart
+      self.wakeEnd = wakeEnd
+    }
+  }
+
+  public struct BotCacheSetOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var threadId: String?
+    public var state: BotCacheSetOutputState?
+    public var label: String?
+    public var warmUntil: Double?
+    public var model: String?
+    public var contextTokens: Double?
+    public var warming: BotCacheSetOutputWarming?
+    public var costs: BotCacheSetOutputCosts?
+    public var banner: Bool?
+    public var settings: BotCacheSetOutputSettings?
+
+    public init(botId: String? = nil, threadId: String? = nil, state: BotCacheSetOutputState? = nil, label: String? = nil, warmUntil: Double? = nil, model: String? = nil, contextTokens: Double? = nil, warming: BotCacheSetOutputWarming? = nil, costs: BotCacheSetOutputCosts? = nil, banner: Bool? = nil, settings: BotCacheSetOutputSettings? = nil) {
+      self.botId = botId
+      self.threadId = threadId
+      self.state = state
+      self.label = label
+      self.warmUntil = warmUntil
+      self.model = model
+      self.contextTokens = contextTokens
+      self.warming = warming
+      self.costs = costs
+      self.banner = banner
+      self.settings = settings
+    }
+  }
+
+  public struct BotCacheBannerHideInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotCacheBannerHideOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BotCacheCompactInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotCacheCompactOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 

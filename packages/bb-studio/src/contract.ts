@@ -234,6 +234,26 @@ const externalProviders = z.object({
 });
 export type ExternalProvidersView = z.infer<typeof externalProviders>;
 const forBot = z.object({ botId });
+/** A Bot's prompt-cache warming settings (src/bot-cache.ts); wakeStart and wakeEnd are minutes after the host's local midnight. */
+const warmSettings = z.object({ enabled: z.boolean(), thresholdTokens: z.number(), idleHours: z.number(), wakeStart: z.number(), wakeEnd: z.number() });
+/** A Bot chat's prompt cache: warm (and until when), cold, or not warmed, with the cost estimates from Studio's price table. */
+const botCacheState = z.object({
+  botId: z.string().nullable(),
+  threadId: z.string(),
+  state: z.enum(["warm", "cold", "off"]),
+  /** "Warm · 42m", "Cold" or "Warming off"; empty when it isn't a Bot's chat. */
+  label: z.string(),
+  warmUntil: z.number().nullable(),
+  model: z.string().nullable(),
+  contextTokens: z.number().nullable(),
+  warming: z.object({ active: z.boolean(), nextPingAt: z.number().nullable(), reason: z.string().nullable(), lastPingAt: z.number().nullable() }),
+  /** US dollars; null when the model isn't in the price table. */
+  costs: z.object({ warmingPerHour: z.number().nullable(), coldSend: z.number().nullable(), warmSend: z.number().nullable() }),
+  banner: z.boolean(),
+  settings: warmSettings,
+});
+export type BotCacheStateView = z.infer<typeof botCacheState>;
+const threadIdInput = z.string().min(1).max(200);
 /** A thread in the Bot's Activity: its own thread ("self") or one it started. */
 const botThread = z.object({
   id: z.string(),
@@ -460,6 +480,14 @@ export const rpcContract = defineRpcContract({
   bot_stop: { input: forBot, output: botView.extend({ stoppedThreadIds: z.array(z.string()), pausedAutomationIds: z.array(z.string()) }) },
   /** What the Bot is doing: Needs you, In progress, Scheduled, Completed. */
   bot_activity: { input: forBot, output: botActivity },
+  /** A thread's prompt cache when it's a Bot's chat (botId null otherwise); with botId alone, that Bot's chat. */
+  bot_cache_state: { input: z.object({ threadId: threadIdInput.optional(), botId }), output: botCacheState },
+  /** Changes a Bot's cache-warming settings; returns its chat's cache state. */
+  bot_cache_set: { input: z.object({ botId, enabled: z.boolean().optional(), thresholdTokens: z.number().int().min(10_000).max(2_000_000).optional(), idleHours: z.number().min(0.5).max(24).optional(), wakeStart: z.number().int().min(0).max(1439).optional(), wakeEnd: z.number().int().min(0).max(1440).optional() }), output: botCacheState },
+  /** "Don't show for this thread": no cold-send banner in this chat again. */
+  bot_cache_banner_hide: { input: z.object({ threadId: threadIdInput }), output: z.object({ ok: z.literal(true) }) },
+  /** Starts BB's compaction of an idle Bot chat (the user's manual action). */
+  bot_cache_compact: { input: z.object({ threadId: threadIdInput }), output: z.object({ ok: z.literal(true) }) },
   /** The Bot's Memory page, made on first need. */
   bot_memory: { input: forBot, output: z.object({ pageId: z.string().nullable() }) },
   /** The Bot's chat as one conversation: its thread and the ones it handed off from, oldest first. `threads` carries each one's title: they're hidden, so BB's title lookup shows nothing. */

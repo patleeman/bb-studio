@@ -13,6 +13,8 @@ struct BotChrome {
     var runningChanged: (Bool) -> Void = { _ in }
     /// The chat moved to a new thread (a handoff to another provider).
     var followThread: (String) -> Void = { _ in }
+    /// Its prompt cache, shown small beside the status while it's idle.
+    var cache: BotCacheState? = nil
 }
 
 /// The Bot's name and live status in the middle of the navigation bar.
@@ -29,11 +31,21 @@ struct BotChromeToolbar: ViewModifier {
                         BotAvatar(chrome.bot.look, size: 26, working: working)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(chrome.bot.name).font(.subheadline.weight(.semibold)).lineLimit(1)
-                            Text(status)
-                                .font(.caption2)
-                                .foregroundStyle(working ? AnyShapeStyle(BotPalette.color(chrome.bot.color)) : AnyShapeStyle(.secondary))
-                                .lineLimit(1)
-                                .contentTransition(.opacity)
+                            HStack(spacing: 4) {
+                                Text(status)
+                                    .foregroundStyle(working ? AnyShapeStyle(BotPalette.color(chrome.bot.color)) : AnyShapeStyle(.secondary))
+                                    .contentTransition(.opacity)
+                                if !working, let cache = chrome.cache {
+                                    // Minutes left, counted down between loads.
+                                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                                        if let line = cache.line(now: context.date) {
+                                            Text("· \(line)").foregroundStyle(.tertiary)
+                                        }
+                                    }
+                                }
+                            }
+                            .font(.caption2)
+                            .lineLimit(1)
                         }
                     }
                     .animation(.smooth, value: status)

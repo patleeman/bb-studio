@@ -33,6 +33,7 @@ import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { BOT_PANEL, BOT_SUBPATH, BotRedirect } from "./src/ui/bot/BotHome";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
+import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
 import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
 import { BotThreadList, ThreadListSwitcher } from "./src/ui/bot/BotSidebar";
 import { StudioThreadList } from "./src/ui/StudioSidebar";
@@ -146,6 +147,10 @@ export default definePluginApp((app) => {
   // sidebar. Beside a Bot's thread, the "Bot info" panel action shows the same Info.
   app.slots.navPanel({ id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotPanel, headerContent: StudioBarSlot });
   app.slots.threadPanelAction({ id: BOT_INFO_ACTION, title: "Bot info", icon: "Bot", layout: "flush", component: BotInfoPanel });
+  // A Bot chat's prompt cache (src/bot-cache.ts): "Warm · 42m" in its header,
+  // and a banner in its composer when the cache expired on a big chat.
+  app.slots.experimental_threadHeaderAction({ id: "bot-cache", title: "Prompt cache", component: BotCacheChip });
+  app.composer.customize({ id: "bot-cache", banners: [{ id: "cold", chrome: "bare", component: BotCacheBanner }] });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });
