@@ -1,25 +1,24 @@
-// Which list BB's sidebar shows, by page. Studio switches the global UI
-// preference `sidebar.threadListProvider`: the Studio panel
-// (/plugins/studio/studio and below) shows the Studio list (StudioSidebar,
-// `studio/studio-items`), the Bot page (/plugins/studio/bot) and a Bot-owned
-// thread (/threads/<id>: a Bot's chat or handoff chain, a runner, a thread it
-// spawned, an automation's run; /projects/<id>/threads/<id> outside Personal)
-// the Bots list (BotSidebar, `studio/bot`), and
-// every other page BB's list, or the list the user picked before Studio
-// switched. Bot-owned threads are hidden from BB's list, so one opened from
-// the Bots list keeps it.
+// Which list BB's sidebar shows. Studio switches the global UI preference
+// `sidebar.threadListProvider` between its Bots list (BotSidebar, `studio/bot`),
+// its Studio list (StudioSidebar, `studio/studio-items`, on the Studio panel
+// /plugins/studio/studio), and BB's list or the list the user picked before
+// Studio switched.
 //
-// Ownership: a thread opened from the Bot's lists (useOpenThread) is the Bot's
-// for good in this window (kept in sessionStorage over a reload), whatever the
-// server says later (a runner let go); any other comes from `bot_thread_owner`,
-// cached here. Until the answer comes, or when it can't be had, the sidebar
-// stays as it is, so it doesn't flicker to BB's list. "__automatic__" would pick a Studio list
-// everywhere (it picks the first non-bundled one), so off Studio's pages it
-// becomes BB's bundled list.
+// Each window keeps a sticky mode in sessionStorage (it survives a reload):
+// "bots" once the user goes to the Bot page or opens anything from the Bots
+// list (useOpenThread), kept on every thread route after that (a runner, a
+// worker, a thread in another project, an archived one) until the user goes
+// to another rail destination (any route that is neither a thread nor the Bot
+// page: Home, another plugin, settings, extensions). Opening a thread from
+// BB's list in "native" mode keeps "native". The decision is nextListMode, a
+// pure function of (previous mode, route, how it was reached). Only a window
+// with no mode yet, opened straight on a thread, asks `bot_thread_owner`,
+// once, and keeps the answer; until it comes the sidebar stays as it is.
+// "__automatic__" would pick a Studio list everywhere (it picks the first
+// non-bundled one), so off Studio's lists it becomes BB's bundled list.
 //
 // Windows: the preference is global, so the focused window decides. A window
-// re-checks when its route changes and when it gains focus; with the Bot page
-// in one window and a thread in another, the sidebar follows the last one used.
+// re-applies its mode when its route changes and when it gains focus.
 //
 // A BB without the preference (an older or newer build) has nothing to switch:
 // the sidebar keeps BB's own. BB's "New thread" row can't be hidden (BB always
@@ -48,13 +47,6 @@ export const isBotPath = (pathname: string) => /^\/plugins\/studio\/bot(\/|$)/.t
 /** True on the Studio panel (/plugins/studio/studio and anything under it). */
 export const isStudioPath = (pathname: string) => /^\/plugins\/studio\/studio(\/|$)/.test(pathname);
 
-/** The Studio list a page shows, or null for BB's (or the user's) list. */
-export function providerForPath(pathname: string): string | null {
-  if (isBotPath(pathname)) return BOT_LIST_PROVIDER;
-  if (isStudioPath(pathname)) return STUDIO_LIST_PROVIDER;
-  return null;
-}
-
 /**
  * The thread a BB thread page shows, or null. BB routes a Personal thread at
  * /threads/<id> and any other at /projects/<project>/threads/<id>
@@ -66,82 +58,73 @@ export function threadIdForPath(pathname: string): string | null {
   try { return decodeURIComponent(match[1]!); } catch { return match[1]!; }
 }
 
-// --- Bot-owned threads -----------------------------------------------------
+// --- This window's mode ------------------------------------------------------
 
-/** A "not the Bot's" answer is rechecked after this: an automation's run is linked to its thread a little after BB makes it. */
-export const NOT_OWNED_TTL_MS = 30_000;
-const ownership = new Map<string, { owned: boolean; at: number }>();
-const asking = new Map<string, Promise<boolean | undefined>>();
-/** Where this window keeps the threads opened from the Bots list, over a reload. */
-export const OPENED_KEY = "studio.bot.openedThreads";
-const OPENED_MAX = 200;
-let opened: string[] | null = null;
-
-function openedThreads(): string[] {
-  if (!opened) {
-    try {
-      const raw = JSON.parse(sessionStorage.getItem(OPENED_KEY) ?? "[]") as unknown;
-      opened = Array.isArray(raw) ? raw.filter((each): each is string => typeof each === "string") : [];
-    } catch { opened = []; }
-  }
-  return opened;
-}
-
-/** Records that a thread is a Bot's (the Bots list, Activity and Needs you open only those). It stays the Bot's in this window. */
-export function markBotOwned(threadId: string): void {
-  ownership.set(threadId, { owned: true, at: Date.now() });
-  const list = openedThreads().filter((each) => each !== threadId);
-  list.push(threadId);
-  opened = list.slice(-OPENED_MAX);
-  try { sessionStorage.setItem(OPENED_KEY, JSON.stringify(opened)); } catch { /* private mode */ }
-}
-
-/** What's known about a thread: true or false, or undefined while unknown (or a stale "no"). */
-export function knownBotOwned(threadId: string, now = Date.now()): boolean | undefined {
-  if (openedThreads().includes(threadId)) return true;
-  const known = ownership.get(threadId);
-  if (!known) return undefined;
-  return known.owned || now - known.at < NOT_OWNED_TTL_MS ? known.owned : undefined;
-}
-
-/** Whether a Bot owns the thread: from the cache, or asked once (concurrent asks share it). A failed ask is unknown (undefined), not cached. */
-export function botOwnsThread(threadId: string, call: Call): Promise<boolean | undefined> {
-  const known = knownBotOwned(threadId);
-  if (known !== undefined) return Promise.resolve(known);
-  let pending = asking.get(threadId);
-  if (!pending) {
-    pending = call("bot_thread_owner", { threadId })
-      .then((result) => {
-        const owned = !!(result as { botId?: string | null } | null)?.botId;
-        // A thread opened from the Bots list while this was asked stays the Bot's.
-        if (!ownership.get(threadId)?.owned) ownership.set(threadId, { owned, at: Date.now() });
-        return knownBotOwned(threadId) ?? owned;
-      }, () => knownBotOwned(threadId))
-      .finally(() => asking.delete(threadId));
-    asking.set(threadId, pending);
-  }
-  return pending;
-}
-
-/** Forgets what's known (tests); `keepSession` acts as a reload, keeping what sessionStorage holds. */
-export function forgetBotOwnership({ keepSession = false } = {}): void {
-  ownership.clear();
-  asking.clear();
-  opened = null;
-  if (!keepSession) try { sessionStorage.removeItem(OPENED_KEY); } catch { /* private mode */ }
-}
+/** The list a window wants: Studio's Bots list, Studio's items list, or BB's (or the user's own). */
+export type ListMode = "bots" | "studio" | "native";
+/** How the route was reached: from a Bots list entry, or any other way (rail, BB's list, a link, a reload, focus). */
+export type ListNavigation = "bots-list" | "route";
+/** Where this window keeps its mode, over a reload. */
+export const MODE_KEY = "studio.sidebar.listMode";
 
 /**
- * The list a page wants: providerForPath, or the Bots list on a Bot-owned
- * thread; undefined when the owner couldn't be asked (leave the sidebar).
+ * The mode after reaching `pathname`, or "detect" when only the thread's
+ * owner can say (a window with no mode yet, opened on a thread). Pure.
+ *
+ * - Opening anything from the Bots list, or the Bot page: "bots".
+ * - The Studio panel: "studio".
+ * - A thread route (any project, archived, sub-paths) keeps "bots" or
+ *   "native"; Studio's list never shows on a thread, so "studio" becomes
+ *   "native".
+ * - Any other route is a different rail destination: "native".
  */
-export async function wantedProvider(pathname: string, call?: Call): Promise<string | null | undefined> {
-  const page = providerForPath(pathname);
-  if (page) return page;
-  const threadId = threadIdForPath(pathname);
-  if (!threadId) return null;
-  const owned = call ? await botOwnsThread(threadId, call) : knownBotOwned(threadId) === true;
-  return owned === undefined ? undefined : owned ? BOT_LIST_PROVIDER : null;
+export function nextListMode(previous: ListMode | null, pathname: string, via: ListNavigation): ListMode | "detect" {
+  if (via === "bots-list" || isBotPath(pathname)) return "bots";
+  if (isStudioPath(pathname)) return "studio";
+  if (threadIdForPath(pathname) !== null) {
+    if (previous === null) return "detect";
+    return previous === "studio" ? "native" : previous;
+  }
+  return "native";
+}
+
+/** The list a mode shows: a Studio list, or null for BB's (or the user's). */
+export function providerForMode(mode: ListMode): string | null {
+  return mode === "bots" ? BOT_LIST_PROVIDER : mode === "studio" ? STUDIO_LIST_PROVIDER : null;
+}
+
+const MODES = new Set<string>(["bots", "studio", "native"]);
+const listeners = new Set<() => void>();
+
+/** This window's mode, or null before it has one. */
+export function readListMode(): ListMode | null {
+  try {
+    const value = sessionStorage.getItem(MODE_KEY);
+    return value && MODES.has(value) ? (value as ListMode) : null;
+  } catch { return null; }
+}
+
+function writeListMode(mode: ListMode): void {
+  if (readListMode() === mode) return;
+  try { sessionStorage.setItem(MODE_KEY, mode); } catch { /* private mode */ }
+  for (const listener of [...listeners]) listener();
+}
+
+/** Calls `listener` when this window's mode changes (useSyncExternalStore). */
+export function subscribeListMode(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
+/** Records that the user opened something from the Bots list (or the Bot page's lists): this window shows the Bots list until they leave. */
+export function openedFromBotsList(): void {
+  writeListMode(nextListMode(readListMode(), "", "bots-list") as ListMode);
+}
+
+/** Forgets this window's mode (tests: a fresh window). */
+export function forgetListMode(): void {
+  try { sessionStorage.removeItem(MODE_KEY); } catch { /* private mode */ }
+  for (const listener of [...listeners]) listener();
 }
 
 export interface ListSwitch {
@@ -185,10 +168,11 @@ let running: Promise<void> | null = null;
 let again: { path: string; call?: Call } | null = null;
 
 /**
- * Brings the preference in line with this route. Serialized: a call while one
- * runs is folded into one more pass with the latest route. `call` asks the
- * server whether a thread is a Bot's; without it only threads already known
- * to be one keep the Bots list.
+ * Brings this window's mode and the preference in line with this route.
+ * Serialized: a call while one runs is folded into one more pass with the
+ * latest route. `call` asks the server who owns a thread, used only when
+ * this window has no mode yet; without it, or while it's asked, or if it
+ * fails, the sidebar stays as it is.
  */
 export function syncThreadList(sdk: PluginBrowserBbSdk, pathname: string, call?: Call): Promise<void> {
   if (running) { again = { path: pathname, call }; return running; }
@@ -197,15 +181,30 @@ export function syncThreadList(sdk: PluginBrowserBbSdk, pathname: string, call?:
     while (next) {
       again = null;
       try {
-        // Ownership first: while it loads, or if it can't be had, the sidebar stays as it is.
-        const want = await wantedProvider(next.path, next.call);
-        if (want !== undefined) await apply(sdk, want);
+        const mode = await modeFor(next.path, next.call);
+        if (mode) { writeListMode(mode); await apply(sdk, providerForMode(mode)); }
       } catch { /* next route change or focus tries again */ }
       next = again as { path: string; call?: Call } | null;
     }
   })().finally(() => { running = null; });
   running = next;
   return next;
+}
+
+/** The mode for a route; null when it can't be known yet. */
+async function modeFor(pathname: string, call?: Call): Promise<ListMode | null> {
+  const mode = nextListMode(readListMode(), pathname, "route");
+  if (mode !== "detect") return mode;
+  const threadId = threadIdForPath(pathname)!;
+  if (!call) return null;
+  let owned: boolean;
+  try {
+    const result = await call("bot_thread_owner", { threadId }) as { botId?: string | null } | null;
+    owned = !!result?.botId;
+  } catch { return null; }
+  // A Bots list open while this was asked decides instead.
+  const now = nextListMode(readListMode(), pathname, "route");
+  return now !== "detect" ? now : owned ? "bots" : "native";
 }
 
 async function apply(sdk: PluginBrowserBbSdk, want: string | null) {

@@ -1020,11 +1020,11 @@ of Staff", with the same thread and check-ins; rename it from its page.
   thread has, plugin message actions (Studio's reactions) and **Reply in
   side chat** included. With no bot yet, or on **New bot**, the page is the
   create flow, and the first message opens the new bot's chat.
-- **Sidebar**: on the Bot page and on a Bot-owned thread (its chat and
-  handoff chain, a runner, a thread it spawned, an automation's run), BB's
-  sidebar shows the **Bots** list in place of its thread list; everywhere
-  else it is BB's normal thread list. Bot-owned threads are hidden from BB's
-  list, so a thread opened from the Bots list keeps it.
+- **Sidebar**: from the Bot page, and on every thread you open from the
+  Bots list (a bot's chat and handoff chain, a runner, a worker, an archived
+  thread), BB's sidebar shows the **Bots** list in place of its thread list,
+  until you go somewhere else on the rail; there it is BB's normal thread
+  list again. Bot-owned threads are hidden from BB's list.
   The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
   Settings → Appearance). Under **Bots**, every bot (the primary first) with
   its avatar, tinted in its color; the selected one opens into the
@@ -1042,21 +1042,24 @@ of Staff", with the same thread and check-ins; rename it from its page.
   **Bot info** opens beside it once; if you close it, it stays closed until
   you open the chat again. Closed groups are remembered on this device.
 - **Switching the list**: BB's `sidebar.threadListProvider` preference is
-  global, and Studio sets it by page: the Bot page and Bot-owned threads
-  show `studio/bot`, the Studio panel `studio/studio-items` (see
-  Workspace), and every other page BB's own list. Thread pages are
-  `/threads/<id>` in Personal and `/projects/<id>/threads/<id>` elsewhere.
-  A thread opened from the Bots list counts as the Bot's at once and stays
-  so in that window, even after a runner is let go; for any other thread
-  Studio asks `bot_thread_owner` (cached), and the sidebar stays as it is
-  until the answer comes, or if it can't be had. Entering a Studio page remembers your choice (in this
+  global. Each window keeps a sidebar mode in session storage, so a reload
+  keeps it: **bots** once you go to the Bot page or open anything from the
+  Bots list, **studio** on the Studio panel (`studio/studio-items`, see
+  Workspace), else **native**. On any thread page (`/threads/<id>` in
+  Personal, `/projects/<id>/threads/<id>` elsewhere, and anything under
+  them) the mode stays as it was, so a thread opened from BB's list keeps
+  BB's list and one opened from the Bots list keeps the Bots list. Any
+  other page (Home, another plugin, settings, extensions) sets **native**.
+  Only a window with no mode yet, opened straight on a thread, asks
+  `bot_thread_owner` once and keeps the answer; the sidebar stays as it is
+  until then. Entering a Studio list remembers your choice (in this
   device's storage); leaving puts it back. "Automatic" would pick a Studio
-  list everywhere, so off Studio's pages it becomes BB's own list
+  list everywhere, so off Studio's lists it becomes BB's own list
   (`thread-list/thread-list`); a list you pinned yourself comes back as it
-  was. If a Studio list ever shows on the wrong page (a reload mid-switch),
-  it switches to that page's list at once. With several windows, the window
-  you use decides: a window re-checks when its route changes or it gains
-  focus.
+  was. If a Studio list shows in a window whose mode wants another (a
+  second window), it switches at once. With several windows, the window
+  you use decides: a window re-applies its mode when its route changes or
+  it gains focus.
 - **New bot**: **+** next to **Bots** makes a new bot (BB's own **New
   thread** row stays above the list; BB always shows it). **New bot** opens
   `/plugins/studio/bot/new`: the same greeting and **Customize me** as a

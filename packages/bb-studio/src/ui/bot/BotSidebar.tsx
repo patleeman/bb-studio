@@ -1,5 +1,6 @@
 // The Bots sidebar: Studio's thread list provider ("Bot (Studio)"), which
-// replaces BB's thread list while the Bot page or a Bot-owned thread shows
+// replaces BB's thread list in a window in "bots" mode: from the Bot page or a
+// Bots list open until the user goes to another rail destination
 // (threadListSwitch.ts).
 // A "Bots" list: every Bot (the primary first), the selected one (the Bot
 // page's route, selection.ts; on a thread, the thread's owner) expanded under
@@ -13,12 +14,12 @@ import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
-import { isBotPath, knownBotOwned, syncThreadList, threadIdForPath } from "./threadListSwitch";
+import { isBotPath, readListMode, subscribeListMode, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import { ImportBotDialog } from "./ImportBot";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
@@ -73,28 +74,35 @@ function age(at: number, now = Date.now()): string {
   return relative.format(-Math.round(minutes / 10080), "week").replace(/\s?ago$/, "");
 }
 
+/** This window's sidebar mode (threadListSwitch.ts), re-rendering when it changes. */
+const useListMode = () => useSyncExternalStore(subscribeListMode, readListMode);
+
 /**
- * The provider's component, on the Bot page and on a Bot-owned thread. On a
- * thread whose owner is still being asked it stays (no flicker); anywhere
- * else it shows only by mistake (a reload mid-switch, a second window): it
- * puts BB's list back at once and shows a quiet placeholder for that moment.
+ * The provider's component, in a window in "bots" mode (and on the Bot page).
+ * A window with no mode yet, on a thread, keeps it while the owner is asked
+ * (no flicker). Anywhere else it shows only by mistake (a second window, a
+ * reload mid-switch): it puts this window's list back at once and shows a
+ * quiet placeholder for that moment.
  */
 export function BotThreadList({ onNavigate, activeThreadId }: PluginThreadListProps) {
   const sdk = useSdk();
   const call = useCall();
   const pathname = usePathname();
+  const mode = useListMode();
   const onBotPage = isBotPath(pathname);
   const threadId = threadIdForPath(pathname);
-  useEffect(() => { if (!onBotPage) void syncThreadList(sdk, pathname, call); }, [sdk, call, onBotPage, pathname]);
-  if (!onBotPage && (!threadId || knownBotOwned(threadId) === false)) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
+  const shows = onBotPage || mode === "bots" || (mode === null && !!threadId);
+  useEffect(() => { if (mode !== "bots") void syncThreadList(sdk, pathname, call); }, [sdk, call, mode, pathname]);
+  if (!shows) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
   return <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} threadId={onBotPage ? null : threadId} />;
 }
 
 /**
- * Mounted in every window (an app overlay): sets BB's sidebar to the list this
- * window's page wants (the Bots list, also on a Bot-owned thread; the Studio
- * list; or BB's), and re-checks
- * when the window gains focus, so the window in use decides.
+ * Mounted in every window (an app overlay): keeps this window's mode and BB's
+ * sidebar in line with its route (the Bots list, the Studio list, or BB's),
+ * and re-applies it when the window gains focus, so the window in use decides.
+ * A Bots list open sets the mode before it navigates, so it isn't synced here
+ * against the route being left.
  */
 export function ThreadListSwitcher() {
   const sdk = useSdk();

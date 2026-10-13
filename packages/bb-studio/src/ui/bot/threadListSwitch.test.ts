@@ -1,20 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, botOwnsThread, forgetBotOwnership, isBotPath, isStudioPath, knownBotOwned, listSwitch, markBotOwned, NATIVE_LIST_PROVIDER as NATIVE, NOT_OWNED_TTL_MS, providerForPath, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath, wantedProvider } from "./threadListSwitch";
+import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, forgetListMode, isBotPath, isStudioPath, listSwitch, MODE_KEY, NATIVE_LIST_PROVIDER as NATIVE, nextListMode, openedFromBotsList, providerForMode, readListMode, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath, type ListMode } from "./threadListSwitch";
 
-describe("providerForPath", () => {
-  it("maps the Bot page, the Studio panel and everything else", () => {
-    expect(providerForPath("/plugins/studio/bot")).toBe(BOT);
-    expect(providerForPath("/plugins/studio/bot/bot_1")).toBe(BOT);
-    expect(providerForPath("/plugins/studio/studio")).toBe(STUDIO);
-    expect(providerForPath("/plugins/studio/studio/browse")).toBe(STUDIO);
-    expect(providerForPath("/threads/thr_1")).toBeNull();
-    expect(providerForPath("/plugins/studio/studios")).toBeNull();
-    expect(providerForPath("/plugins/studio/botany")).toBeNull();
-  });
-  it("matches paths exactly", () => {
+describe("paths", () => {
+  it("matches the Bot page and the Studio panel exactly", () => {
+    expect(isBotPath("/plugins/studio/bot")).toBe(true);
     expect(isBotPath("/plugins/studio/bot/")).toBe(true);
+    expect(isBotPath("/plugins/studio/bot/bot_1")).toBe(true);
+    expect(isBotPath("/plugins/studio/botany")).toBe(false);
     expect(isStudioPath("/plugins/studio/studio/")).toBe(true);
+    expect(isStudioPath("/plugins/studio/studios")).toBe(false);
     expect(isStudioPath("/plugins/pages/pages")).toBe(false);
   });
 });
@@ -39,59 +34,67 @@ describe("threadIdForPath", () => {
   });
 });
 
-describe("Bot-owned threads", () => {
-  afterEach(() => forgetBotOwnership());
-  const owner = (botId: string | null) => vi.fn(async (_method: string, _input?: unknown) => ({ botId }));
-  it("wants the Bots list on a Bot-owned thread, the page's list elsewhere", async () => {
-    expect(await wantedProvider("/threads/thr_run", owner("bot_main"))).toBe(BOT);
-    expect(await wantedProvider("/threads/thr_user", owner(null))).toBeNull();
-    expect(await wantedProvider("/plugins/studio/studio", owner("bot_main"))).toBe(STUDIO);
-    expect(await wantedProvider("/plugins/pages/pages", owner("bot_main"))).toBeNull();
+describe("nextListMode", () => {
+  // Thread routes as BB's navigate.toThread makes them: Personal, other projects, sub-paths.
+  const threads = [
+    "/threads/thr_5gn5rp5knj",
+    "/projects/proj_hp88nshh8g/threads/thr_9s7rehr925",
+    "/projects/proj_8ztiq6dkh5/threads/thr_jbjiha9hqc",
+    "/threads/thr_1/files",
+    "/projects/proj_1/threads/thr_1/files/a",
+  ];
+  // Rail destinations and other non-thread routes (AppNavRail, sidebarNavigationItems, route-paths).
+  const leaving = [
+    "/", "/plugins/pages/pages", "/plugins/automations/automations", "/plugins/studio/page/b",
+    "/plugins/studio/settings", "/plugins/studio/botany", "/settings", "/settings/plugins/studio",
+    "/extensions", "/extensions/plugins/browse", "/skills", "/plugins", "/archived",
+    "/projects/proj_1", "/projects/proj_1/archived",
+  ];
+  const modes: (ListMode | null)[] = [null, "bots", "native", "studio"];
+  it("opening anything from the Bots list is bots, from any mode, on any route", () => {
+    for (const previous of modes) for (const path of [...threads, ...leaving, "/plugins/studio/bot", ""]) {
+      expect(nextListMode(previous, path, "bots-list")).toBe("bots");
+    }
   });
-  it("knows a thread opened from the Bots list at once, without asking", async () => {
-    const call = owner(null);
-    markBotOwned("thr_spawned");
-    expect(knownBotOwned("thr_spawned")).toBe(true);
-    expect(await wantedProvider("/threads/thr_spawned", call)).toBe(BOT);
-    // Without a client, only what's known counts.
-    expect(await wantedProvider("/threads/thr_spawned")).toBe(BOT);
-    expect(await wantedProvider("/threads/thr_other")).toBeNull();
-    expect(call).not.toHaveBeenCalled();
+  it("the Bot page (the rail's Bot) is bots", () => {
+    for (const previous of modes) for (const path of ["/plugins/studio/bot", "/plugins/studio/bot/bot_1", "/plugins/studio/bot/new"]) {
+      expect(nextListMode(previous, path, "route")).toBe("bots");
+    }
   });
-  it("asks once per thread, shares concurrent asks, and rechecks a no later", async () => {
-    vi.useFakeTimers();
-    try {
-      const call = owner(null);
-      await Promise.all([botOwnsThread("thr_a", call), botOwnsThread("thr_a", call)]);
-      expect(call).toHaveBeenCalledTimes(1);
-      expect(call).toHaveBeenCalledWith("bot_thread_owner", { threadId: "thr_a" });
-      expect(knownBotOwned("thr_a")).toBe(false);
-      await botOwnsThread("thr_a", call);
-      expect(call).toHaveBeenCalledTimes(1);
-      // An automation's run is linked a little after BB makes it.
-      vi.advanceTimersByTime(NOT_OWNED_TTL_MS + 1);
-      expect(knownBotOwned("thr_a")).toBeUndefined();
-      expect(await botOwnsThread("thr_a", owner("bot_main"))).toBe(true);
-      expect(knownBotOwned("thr_a")).toBe(true);
-    } finally { vi.useRealTimers(); }
+  it("the Studio panel is studio", () => {
+    for (const previous of modes) expect(nextListMode(previous, "/plugins/studio/studio/browse", "route")).toBe("studio");
   });
-  it("treats a failed ask as unknown, without remembering it", async () => {
-    expect(await botOwnsThread("thr_x", vi.fn(async () => { throw new Error("offline"); }))).toBeUndefined();
-    expect(knownBotOwned("thr_x")).toBeUndefined();
-    expect(await wantedProvider("/threads/thr_x", vi.fn(async () => { throw new Error("offline"); }))).toBeUndefined();
+  it("bots stays on every thread route: opens, reloads, runners, workers, other projects, archived, sub-paths", () => {
+    for (const path of threads) expect(nextListMode("bots", path, "route")).toBe("bots");
   });
-  it("keeps a thread opened from the Bots list the Bot's over a cached or later no", async () => {
-    await botOwnsThread("thr_let_go", owner(null));
-    expect(knownBotOwned("thr_let_go")).toBe(false);
-    markBotOwned("thr_let_go");
-    expect(await wantedProvider("/projects/proj_8ztiq6dkh5/threads/thr_let_go", owner(null))).toBe(BOT);
+  it("native stays on every thread route: a thread opened from BB's list", () => {
+    for (const path of threads) expect(nextListMode("native", path, "route")).toBe("native");
   });
-  it("remembers threads opened from the Bots list across a reload of this window", () => {
-    markBotOwned("thr_9s7rehr925");
-    forgetBotOwnership({ keepSession: true });
-    expect(knownBotOwned("thr_9s7rehr925")).toBe(true);
-    forgetBotOwnership();
-    expect(knownBotOwned("thr_9s7rehr925")).toBeUndefined();
+  it("a thread after the Studio panel is BB's list", () => {
+    for (const path of threads) expect(nextListMode("studio", path, "route")).toBe("native");
+  });
+  it("any other route leaves: native", () => {
+    for (const previous of modes) for (const path of leaving) expect(nextListMode(previous, path, "route")).toBe("native");
+  });
+  it("a window with no mode on a thread asks the owner", () => {
+    for (const path of threads) expect(nextListMode(null, path, "route")).toBe("detect");
+  });
+  it("maps modes to lists", () => {
+    expect(providerForMode("bots")).toBe(BOT);
+    expect(providerForMode("studio")).toBe(STUDIO);
+    expect(providerForMode("native")).toBeNull();
+  });
+});
+
+describe("this window's mode", () => {
+  afterEach(() => forgetListMode());
+  it("is kept in sessionStorage, so a reload keeps it", () => {
+    expect(readListMode()).toBeNull();
+    openedFromBotsList();
+    expect(sessionStorage.getItem(MODE_KEY)).toBe("bots");
+    expect(readListMode()).toBe("bots");
+    sessionStorage.setItem(MODE_KEY, "junk");
+    expect(readListMode()).toBeNull();
   });
 });
 
@@ -123,7 +126,7 @@ describe("listSwitch", () => {
 });
 
 describe("syncThreadList", () => {
-  afterEach(() => { localStorage.clear(); forgetBotOwnership(); });
+  afterEach(() => { localStorage.clear(); forgetListMode(); });
   const fake = (prefs: Record<string, unknown>) => {
     const values = { ...prefs };
     const set = vi.fn(async ({ key, value }: { key: string; value: unknown }) => { values[key] = value; });
@@ -134,6 +137,7 @@ describe("syncThreadList", () => {
     return { sdk: sdk as never, values, set };
   };
   const KEY = "sidebar.threadListProvider";
+  const owner = (botId: string | null) => vi.fn(async (_method: string, _input?: unknown) => ({ botId }));
   it("follows the route and puts the user's list back", async () => {
     const x = fake({ [KEY]: "other/list" });
     await syncThreadList(x.sdk, "/plugins/studio/studio");
@@ -141,7 +145,7 @@ describe("syncThreadList", () => {
     expect(localStorage.getItem(SAVED_KEY)).toBe("other/list");
     await syncThreadList(x.sdk, "/plugins/studio/bot");
     expect(x.values[KEY]).toBe(BOT);
-    await syncThreadList(x.sdk, "/threads/thr_1");
+    await syncThreadList(x.sdk, "/");
     expect(x.values[KEY]).toBe("other/list");
     expect(localStorage.getItem(SAVED_KEY)).toBeNull();
   });
@@ -154,67 +158,63 @@ describe("syncThreadList", () => {
     expect(x.values[KEY]).toBe(STUDIO);
     expect(x.set).toHaveBeenCalledTimes(2);
   });
-  it("keeps the Bots list on a Bot-owned thread and restores the user's list off it", async () => {
+  it("keeps the Bots list on every thread after the Bot page, whoever owns it, until a rail destination", async () => {
     const x = fake({ [KEY]: AUTO });
-    const call = vi.fn(async (_method: string, input?: unknown) => ({ botId: (input as { threadId: string }).threadId === "thr_run" ? "bot_main" : null }));
+    const call = owner(null);
     await syncThreadList(x.sdk, "/plugins/studio/bot", call);
     expect(x.values[KEY]).toBe(BOT);
     expect(localStorage.getItem(SAVED_KEY)).toBe(AUTO);
-    markBotOwned("thr_spawned");
-    await syncThreadList(x.sdk, "/threads/thr_spawned", call);
-    await syncThreadList(x.sdk, "/threads/thr_run", call);
+    for (const path of ["/threads/thr_bot", "/threads/thr_run", "/projects/proj_8ztiq6dkh5/threads/thr_archived", "/threads/thr_worker/files"]) {
+      openedFromBotsList();
+      await syncThreadList(x.sdk, path, call);
+    }
+    // A reload: same window, same route.
+    await syncThreadList(x.sdk, "/threads/thr_worker/files", call);
     expect(x.values[KEY]).toBe(BOT);
     expect(x.set).toHaveBeenCalledTimes(1);
-    // Automatic was the user's choice: off the Bot's threads it becomes BB's list.
-    await syncThreadList(x.sdk, "/threads/thr_user", call);
+    expect(call).not.toHaveBeenCalled();
+    // Home on the rail: automatic was the user's choice, so BB's list.
+    await syncThreadList(x.sdk, "/", call);
     expect(x.values[KEY]).toBe(NATIVE);
-    expect(localStorage.getItem(SAVED_KEY)).toBeNull();
-    // From BB's list onto a Bot-owned thread: the Bots list, remembering BB's.
-    await syncThreadList(x.sdk, "/threads/thr_run", call);
-    expect(x.values[KEY]).toBe(BOT);
-    expect(localStorage.getItem(SAVED_KEY)).toBe(NATIVE);
+    expect(readListMode()).toBe("native");
+    // A thread from BB's list, even a Bot's: BB's list stays.
+    await syncThreadList(x.sdk, "/threads/thr_run", owner("bot_main"));
+    expect(x.values[KEY]).toBe(NATIVE);
+    expect(x.set).toHaveBeenCalledTimes(2);
   });
-  it("leaves the sidebar alone while ownership loads", async () => {
-    const x = fake({ [KEY]: BOT });
+  it("a window with no mode on a thread asks the owner once and keeps the answer", async () => {
+    const x = fake({ [KEY]: NATIVE });
+    const call = owner("bot_main");
+    await syncThreadList(x.sdk, "/threads/thr_run", call);
+    expect(call).toHaveBeenCalledWith("bot_thread_owner", { threadId: "thr_run" });
+    expect(x.values[KEY]).toBe(BOT);
+    expect(readListMode()).toBe("bots");
+    await syncThreadList(x.sdk, "/threads/thr_other", call);
+    expect(call).toHaveBeenCalledTimes(1);
+    forgetListMode();
+    const y = fake({ [KEY]: BOT });
+    await syncThreadList(y.sdk, "/threads/thr_user", owner(null));
+    expect(y.values[KEY]).toBe(NATIVE);
+    expect(readListMode()).toBe("native");
+  });
+  it("leaves the sidebar alone while the owner is asked, and lets a Bots list open decide", async () => {
+    const x = fake({ [KEY]: NATIVE });
     let answer!: (value: { botId: string | null }) => void;
     const call = vi.fn(() => new Promise<{ botId: string | null }>((resolve) => { answer = resolve; }));
     const sync = syncThreadList(x.sdk, "/threads/thr_run", call);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(x.set).not.toHaveBeenCalled();
-    answer({ botId: "bot_main" });
+    openedFromBotsList();
+    answer({ botId: null });
     await sync;
-    expect(x.set).not.toHaveBeenCalled();
     expect(x.values[KEY]).toBe(BOT);
   });
-  // Threads Patrick opened from the Bots list (Runners and Recent), at the routes BB's navigate.toThread uses.
-  const reported = [
-    ["Staff", "/threads/thr_5gn5rp5knj"],
-    ["Project Lead", "/projects/proj_hp88nshh8g/threads/thr_9s7rehr925"],
-    ["Verizon gift card watch", "/threads/thr_2ydbj29je7"],
-    ["GitHub watch", "/threads/thr_9wi75jarmc"],
-    ["Experiment article backlog", "/projects/proj_8a9v3g9zxy/threads/thr_g3hgcvzv2n"],
-    ["Claim our Verizon credit (archived, let go)", "/projects/proj_8ztiq6dkh5/threads/thr_jbjiha9hqc"],
-  ] as const;
-  for (const [name, path] of reported) {
-    it(`keeps the Bots list on "${name}" opened from it`, async () => {
-      const x = fake({ [KEY]: BOT });
-      // Let go: the server no longer counts it the Bot's; the click still does.
-      const call = vi.fn(async () => ({ botId: null }));
-      markBotOwned(threadIdForPath(path)!);
-      await syncThreadList(x.sdk, path, call);
-      expect(x.set).not.toHaveBeenCalled();
-      expect(x.values[KEY]).toBe(BOT);
-    });
-    it(`switches to the Bots list on "${name}" reached elsewhere when the Bot owns it`, async () => {
-      const x = fake({ [KEY]: NATIVE });
-      await syncThreadList(x.sdk, path, vi.fn(async () => ({ botId: "bot_main" })));
-      expect(x.values[KEY]).toBe(BOT);
-    });
-  }
-  it("leaves the sidebar alone when the owner can't be asked", async () => {
+  it("leaves the sidebar alone, without a mode, when the owner can't be asked", async () => {
     const x = fake({ [KEY]: BOT });
     await syncThreadList(x.sdk, "/projects/proj_1/threads/thr_q", vi.fn(async () => { throw new Error("offline"); }));
+    await syncThreadList(x.sdk, "/projects/proj_1/threads/thr_q");
     expect(x.set).not.toHaveBeenCalled();
+    expect(readListMode()).toBeNull();
   });
   it("skips a BB without the preference", async () => {
     const x = fake({});
