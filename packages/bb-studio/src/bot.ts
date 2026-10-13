@@ -175,11 +175,7 @@ export function setupPrompt(goal: string): string {
   return [
     want ? `Hi! You're my new Bot. I'd like help with: ${want}` : "Hi! You're my new Bot. I haven't decided what you should help with yet.",
     "",
-    "Let's set you up:",
-    "1. Introduce yourself in a sentence or two.",
-    want ? "2. Ask me one or two short questions about what I need, then wait for my answers." : "2. Ask me what I'd like help with, and one short follow-up, then wait for my answers.",
-    "3. Then pick a short name, a one-line description of your job, and a look (an emoji, a shape and a color) that fit it, and set them with bot_profile_update.",
-    "4. Say in a sentence what you'll keep an eye on, and offer a check-in schedule if one would help.",
+    `Start by introducing yourself in a sentence, then ask me ${want ? "one or two short questions about what I need" : "what I'd like help with"}. Once I've answered, pick a name, a one-line description and a look that fit the job, set them with bot_profile_update, and offer a check-in if one would help.`,
   ].join("\n");
 }
 
