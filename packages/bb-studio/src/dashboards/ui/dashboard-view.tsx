@@ -9,6 +9,7 @@ import { errorMessage } from "@bb-studio/kit/format";
 import { ago, BREAKPOINTS, COLS, dashboardHref, GRID_MARGIN, ROW_HEIGHT, WIDGET_TYPES, WIDGETS, type DashboardView, type DataView, type Layouts, type Op, type VersionView, type WidgetTypeView, type WidgetView } from "../shared";
 import type { WidgetTheme } from "./custom-frame";
 import { sampleOp } from "./samples";
+import { ApprovalDialog } from "./approval-dialog";
 import { ApprovalCard, SettingsSheet } from "./settings-sheet";
 import { useDashboard } from "./use-dashboard";
 import { Empty, WidgetBody } from "./widgets";
@@ -86,6 +87,7 @@ export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView;
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState(false);
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
+  const [approvalFor, setApprovalFor] = useState<string | null>(null);
   const [library, setLibrary] = useState<WidgetTypeView[]>([]);
   const now = useMinuteClock();
   const theme = useWidgetTheme();
@@ -107,6 +109,7 @@ export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView;
   const data = useMemo(() => new Map(dashboard.data.map((each) => [each.widgetId, each])), [dashboard.data]);
   const allTypes = useMemo(() => [...dashboard.widgetTypes, ...library.filter((type) => !dashboard.widgetTypes.some((each) => each.id === type.id))], [dashboard.widgetTypes, library]);
   const settingsWidget = settingsFor ? dashboard.widgets.find((widget) => widget.id === settingsFor) : undefined;
+  const approvalWidget = approvalFor ? dashboard.widgets.find((widget) => widget.id === approvalFor && widget.source.kind === "script") : undefined;
 
   const save = useCallback(() => {
     dragging.current = false;
@@ -176,7 +179,7 @@ export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView;
                     onSettings={() => setSettingsFor(widget.id)}
                     onRemove={() => void state.edit([{ op: "remove", widgetId: widget.id }])}
                     onRefresh={() => void state.refresh(widget.id)}
-                    onApprove={(sha) => void state.approve(widget.id, sha)}
+                    onReview={() => setApprovalFor(widget.id)}
                   />
                 </div>
               ))}
@@ -191,8 +194,18 @@ export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView;
           library={allTypes}
           onClose={() => setSettingsFor(null)}
           onSave={async (op) => Boolean(await state.edit([op]))}
-          onApprove={(sha) => void state.approve(settingsWidget.id, sha)}
+          onReview={() => setApprovalFor(settingsWidget.id)}
           onRevoke={() => void state.revoke(settingsWidget.id)}
+        />
+      ) : null}
+      {approvalWidget ? (
+        <ApprovalDialog
+          key={`${approvalWidget.id}:${approvalWidget.script?.sha256}`}
+          dashboardId={dashboard.id}
+          widget={approvalWidget}
+          rpc={state.rpc}
+          onClose={() => setApprovalFor(null)}
+          onApproved={() => void state.load()}
         />
       ) : null}
     </div>
@@ -228,7 +241,7 @@ export function Freshness({ data, now }: { data: DataView | undefined; now: numb
   return <span title={data.fetchedAt ? new Date(data.fetchedAt).toLocaleString() : undefined}>Updated {data.fetchedAt ? ago(data.fetchedAt, now) : ""}</span>;
 }
 
-export function Tile({ widget, data, editing, now, theme, types, size, onSettings, onRemove, onRefresh, onApprove }: {
+export function Tile({ widget, data, editing, now, theme, types, size, onSettings, onRemove, onRefresh, onReview }: {
   widget: WidgetView;
   data: DataView | undefined;
   editing: boolean;
@@ -239,14 +252,15 @@ export function Tile({ widget, data, editing, now, theme, types, size, onSetting
   onSettings(): void;
   onRemove(): void;
   onRefresh(): void;
-  onApprove(sha256: string): void;
+  /** Opens the approval dialog for a script widget. */
+  onReview(): void;
 }) {
   const info = WIDGETS[widget.type];
   const label = widget.title ?? (widget.type === "stat" && typeof widget.options.label === "string" ? widget.options.label : null);
   const fetchable = widget.source.kind === "url" || (widget.source.kind === "script" && widget.script?.approved);
   let body: ReactNode;
   if (data?.status === "approval" && data.value === null) {
-    body = <ApprovalCard compact command={widget.source.command ?? ""} cwd={widget.source.cwd} onApprove={() => onApprove(widget.script!.sha256)} />;
+    body = <ApprovalCard compact command={widget.source.command ?? ""} onReview={onReview} />;
   } else if (data?.status === "error" && data.value === null) {
     body = <Empty><span className="text-red-600 dark:text-red-400" role="alert">{data.error}</span></Empty>;
   } else if (data?.status === "pending" && info.usesData) {

@@ -24370,6 +24370,165 @@
         "additionalProperties": false
       }
     },
+    "dashboards.requestApproval": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "widgetId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "widgetId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "object",
+            "properties": {
+              "nonce": {
+                "type": "string"
+              },
+              "notBefore": {
+                "type": "number"
+              },
+              "expiresAt": {
+                "type": "number"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "cwd": {
+                "type": "string"
+              },
+              "cwdIsHome": {
+                "type": "boolean"
+              },
+              "host": {
+                "type": "string"
+              },
+              "intervalSec": {
+                "type": "number"
+              },
+              "backgroundSec": {
+                "type": "number"
+              },
+              "timeoutSec": {
+                "type": "number"
+              },
+              "maxOutputBytes": {
+                "type": "number"
+              },
+              "proposedBy": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "actor": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "agent"
+                        ]
+                      },
+                      "threadId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "threadTitle": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "at": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "actor",
+                      "threadId",
+                      "threadTitle",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "nonce",
+              "notBefore",
+              "expiresAt",
+              "sha256",
+              "command",
+              "cwd",
+              "cwdIsHome",
+              "host",
+              "intervalSec",
+              "backgroundSec",
+              "timeoutSec",
+              "maxOutputBytes",
+              "proposedBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "dashboards.cancelApproval": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "nonce": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "nonce"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "dashboards.approveScript": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -24388,12 +24547,18 @@
           "sha256": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "nonce": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 200
           }
         },
         "required": [
           "id",
           "widgetId",
-          "sha256"
+          "sha256",
+          "nonce"
         ]
       },
       "output": {

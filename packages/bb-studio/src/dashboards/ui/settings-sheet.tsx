@@ -1,6 +1,6 @@
 // A widget's settings, in a sheet beside the grid: its type and options,
 // and where its data comes from. Scripts show their exact command and wait
-// for Approve.
+// for the user to review and approve them in the approval dialog.
 import { useMemo, useState, type ReactNode } from "react";
 import { GHOST_BUTTON, ICON_BUTTON, Icon, OUTLINE_BUTTON, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
 import { LIMITS, WIDGET_TYPES, WIDGETS, type Op, type Source, type WidgetTypeView, type WidgetView } from "../shared";
@@ -27,11 +27,12 @@ const parseJson = (text: string): { ok: true; value: unknown } | { ok: false; er
 };
 const pretty = (value: unknown) => JSON.stringify(value ?? null, null, 2);
 
-export function SettingsSheet({ widget, library, onSave, onApprove, onRevoke, onClose }: {
+export function SettingsSheet({ widget, library, onSave, onReview, onRevoke, onClose }: {
   widget: WidgetView;
   library: readonly WidgetTypeView[];
   onSave(op: Op): Promise<boolean>;
-  onApprove(sha256: string): void;
+  /** Opens the approval dialog. */
+  onReview(): void;
   onRevoke(): void;
   onClose(): void;
 }) {
@@ -198,8 +199,8 @@ export function SettingsSheet({ widget, library, onSave, onApprove, onRevoke, on
                 {scriptChanged
                   ? <p className="text-xs text-muted-foreground">Save first. The changed command runs only after you approve it.</p>
                   : widget.script?.approved
-                    ? <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon name="CircleCheck" className="size-3.5 text-emerald-500" /> Approved. Any change needs approval again. <button type="button" className={GHOST_BUTTON} onClick={onRevoke}>Revoke</button></div>
-                    : widget.script ? <ApprovalCard command={widget.source.command ?? ""} cwd={widget.source.cwd} onApprove={() => onApprove(widget.script!.sha256)} /> : null}
+                    ? <ApprovedState onRevoke={onRevoke} />
+                    : widget.script ? <ApprovalCard command={widget.source.command ?? ""} onReview={onReview} /> : null}
               </>
             ) : null}
             {source.kind === "push" ? <p className="text-xs text-muted-foreground">Agents send data with <code>widget_set_data</code>; a script can run <code>bb studio dashboards set-data &lt;dashboard&gt; {widget.id} '&lt;json&gt;'</code>.</p> : null}
@@ -218,14 +219,24 @@ export function SettingsSheet({ widget, library, onSave, onApprove, onRevoke, on
   );
 }
 
-/** A script waiting for the user: the exact command, and Approve. */
-export function ApprovalCard({ command, cwd, onApprove, compact = false }: { command: string; cwd?: string; onApprove(): void; compact?: boolean }) {
+/** An approved script, quietly: it runs, and Revoke stops it. */
+export function ApprovedState({ onRevoke }: { onRevoke(): void }) {
   return (
-    <div className={cn("flex flex-col gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs", compact && "m-2")} role="group" aria-label="Script approval">
-      <div className="flex items-center gap-1.5 font-medium text-foreground"><Icon name="Lock" className="size-3.5" /> Runs on this computer after you approve it</div>
-      <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-all rounded bg-background/80 p-1.5 font-mono text-[11px] text-foreground">{command}</pre>
-      {cwd ? <div className="text-muted-foreground">in {cwd}</div> : null}
-      <button type="button" className={cn(PRIMARY_BUTTON, "h-7 self-start text-xs")} onClick={onApprove}>Approve and run</button>
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground" data-script-approved>
+      <Icon name="CircleCheck" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+      <span className="flex-1">Approved. Any change needs a new approval.</span>
+      <button type="button" className={cn(GHOST_BUTTON, "h-7 px-2 text-xs")} onClick={onRevoke}>Revoke</button>
+    </div>
+  );
+}
+
+/** A script waiting for the user: the start of its command, and Review, which opens the approval dialog. */
+export function ApprovalCard({ command, onReview, compact = false }: { command: string; onReview(): void; compact?: boolean }) {
+  return (
+    <div className={cn("flex flex-col gap-2 text-xs", compact ? "h-full justify-center p-3" : "rounded-md border border-border bg-muted/40 p-2.5")} role="group" aria-label="Script approval">
+      <div className="flex items-center gap-1.5 font-medium text-foreground"><Icon name="Lock" className="size-3.5 text-amber-600 dark:text-amber-400" /> Waiting for your approval</div>
+      <code className="line-clamp-2 break-all rounded bg-muted/70 px-1.5 py-1 font-mono text-[11px] leading-snug text-muted-foreground">{command}</code>
+      <button type="button" className={cn(OUTLINE_BUTTON, "h-7 self-start px-2.5 text-xs")} onClick={onReview}>Review command…</button>
     </div>
   );
 }

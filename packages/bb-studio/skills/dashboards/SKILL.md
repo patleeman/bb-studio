@@ -57,7 +57,9 @@ Set `source` on add or update:
   a shell command on the BB host that prints JSON (or text). **It runs only
   after the user approves the exact command in the dashboard**, and any change
   to the command or folder needs approval again. You can propose one; you
-  can't approve it. Tell the user what the command does. 30 s and 1 MB at
+  can't approve it, and must not try through the RPC or CLI: approval takes
+  the user's own Approve in the dashboard's approval dialog. Tell the user
+  what the command does. 30 s and 1 MB at
   most; every 5 min at most while open.
 - `{"kind": "push"}`: you send data with `widget_set_data` (512 KB). A script
   can too: `bb studio dashboards set-data <dashboard-id> <widget-id> '<json>'`.

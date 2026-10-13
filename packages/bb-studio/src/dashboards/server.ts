@@ -15,9 +15,11 @@ import { createChangeBus, defineItemMention, studioServices, type BackupHandlers
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
+import { homedir, hostname } from "node:os";
 import { z } from "zod";
 import { rpcContract } from "./contract";
 import { acceptLayouts, applyOps } from "./ops";
+import { ApprovalNonces } from "./server/approvals";
 import { createDashboardBackup } from "./server/backup";
 import { dashboardProvider } from "./server/provider";
 import { isApproved, Refresher } from "./server/refresh";
@@ -93,8 +95,10 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
   };
   const ctx = { newId: () => `w_${randomBytes(6).toString("hex")}`, hasType: (typeId: string) => store.type(typeId) !== null };
 
-  /** Applies ops and saves, as one step. */
-  function edit(id: string, ops: readonly Op[], by: Actor, expectedUpdatedAt?: number) {
+  const nonces = new ApprovalNonces(now);
+
+  /** Applies ops and saves, as one step. Records who wrote each new script command. */
+  function edit(id: string, ops: readonly Op[], by: Actor, expectedUpdatedAt?: number, threadId?: string) {
     return db.transaction(() => {
       const row = mustGet(id);
       if (expectedUpdatedAt !== undefined && row.updated_at !== expectedUpdatedAt) throw new Error("The dashboard changed since you loaded it. Reload and try again.");
@@ -102,6 +106,10 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
       const label = ops.length === 1 ? `${ops[0]!.op[0]!.toUpperCase()}${ops[0]!.op.slice(1)} widget` : `${ops.length} edits`;
       store.write(id, result.doc, by, by === "agent" ? `Agent: ${label}` : label);
       for (const widgetId of result.sourceChanged) store.clearData(id, widgetId);
+      for (const widgetId of new Set([...result.sourceChanged, ...result.added])) {
+        const widget = result.doc.widgets.find((each) => each.id === widgetId);
+        if (widget?.source.kind === "script") store.propose(id, widgetId, scriptHash(widget.source), by, threadId ?? null);
+      }
       return result;
     }).immediate();
   }
@@ -141,6 +149,7 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
       return { ok: true, updatedAt };
     },
     "dashboards.delete"({ id }) {
+      nonces.forget(id);
       if (store.delete(id)) changed(id);
       return { ok: true };
     },
@@ -179,13 +188,58 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
     "dashboards.setData"({ id, widgetId, data }) {
       return { data: setData(id, widgetId, data) };
     },
-    "dashboards.approveScript"({ id, widgetId, sha256 }, context) {
-      // Only a client approves: the app's Approve button. Plugins can't, and
-      // there's no agent tool for it.
+    async "dashboards.requestApproval"({ id, widgetId }, context) {
+      // The approval dialog opens with this. Plugins can't open one, there's
+      // no agent tool for it, and it needs a BB window showing the dashboard.
       if (context?.experimental_caller?.kind === "plugin") throw new Error("Only the user can approve a script.");
-      const widget = store.doc(mustGet(id).id).widgets.find((each) => each.id === widgetId);
+      const row = mustGet(id);
+      const widget = store.doc(row.id).widgets.find((each) => each.id === widgetId);
+      if (widget?.source.kind !== "script") throw new Error("That widget doesn't run a script.");
+      if (!refresher.viewed(id)) throw new Error("Open the dashboard in BB to approve its script.");
+      const sha256 = scriptHash(widget.source);
+      const proposal = store.proposal(id, widgetId, sha256);
+      let title: string | null = null;
+      if (proposal?.thread_id) {
+        try {
+          title = ((await bb.sdk.threads.get({ threadId: proposal.thread_id })) as { title?: string | null }).title?.trim() || null;
+        } catch { /* a deleted thread: the dialog says "an agent" */ }
+      }
+      // Read the revision after the await, so a nonce never outlives an edit it didn't see.
+      const issued = nonces.issue({ dashboardId: id, widgetId, sha256, revision: mustGet(id).updated_at });
+      const current = store.doc(id).widgets.find((each) => each.id === widgetId);
+      if (current?.source.kind !== "script" || scriptHash(current.source) !== sha256) {
+        nonces.cancel(issued.nonce);
+        throw new Error("The command changed while the dialog opened. Try again.");
+      }
+      return {
+        prompt: {
+          ...issued,
+          sha256,
+          command: widget.source.command ?? "",
+          cwd: widget.source.cwd || homedir(),
+          cwdIsHome: !widget.source.cwd,
+          host: hostname(),
+          intervalSec: widget.source.intervalSec ?? LIMITS.scriptMinIntervalSec,
+          backgroundSec: Math.round(LIMITS.backgroundMs / 1000),
+          timeoutSec: Math.round(LIMITS.scriptTimeoutMs / 1000),
+          maxOutputBytes: LIMITS.scriptBytes,
+          proposedBy: proposal ? { actor: proposal.actor, threadId: proposal.thread_id, threadTitle: title, at: proposal.proposed_at } : null,
+        },
+      };
+    },
+    "dashboards.cancelApproval"({ nonce }) {
+      nonces.cancel(nonce);
+      return { ok: true };
+    },
+    "dashboards.approveScript"({ id, widgetId, sha256, nonce }, context) {
+      // Only the approval dialog's Approve: it holds a nonce from
+      // requestApproval for this command (server/approvals.ts).
+      if (context?.experimental_caller?.kind === "plugin") throw new Error("Only the user can approve a script.");
+      const row = mustGet(id);
+      const widget = store.doc(row.id).widgets.find((each) => each.id === widgetId);
       if (widget?.source.kind !== "script") throw new Error("That widget doesn't run a script.");
       const current = scriptHash(widget.source);
+      nonces.redeem(nonce, { dashboardId: id, widgetId, sha256, revision: row.updated_at });
       if (current !== sha256) throw new Error("The command changed since it was shown. Review the new command and approve it again.");
       store.approve(id, widgetId, current, widget.source.command ?? "", widget.source.cwd ?? null);
       changed(id);
@@ -259,7 +313,7 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
       let results: string[] = [];
       if (widgets?.length) {
         try {
-          const result = edit(row.id, widgets.map((op) => ({ ...op, op: "add" as const })), "agent");
+          const result = edit(row.id, widgets.map((op) => ({ ...op, op: "add" as const })), "agent", undefined, toolCtx.threadId);
           results = result.results;
         } catch (error) {
           store.delete(row.id);
@@ -303,7 +357,7 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
       if (!store.get(dashboardId)) return fail(`Dashboard ${dashboardId} not found.`);
       let result;
       try {
-        result = edit(dashboardId, ops, "agent");
+        result = edit(dashboardId, ops, "agent", undefined, toolCtx.threadId);
       } catch (error) {
         return fail(`Nothing changed: ${errorMessage(error)}`);
       }

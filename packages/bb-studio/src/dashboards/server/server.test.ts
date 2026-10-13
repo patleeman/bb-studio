@@ -16,6 +16,15 @@ async function withHost<T>(work: (host: ReturnType<typeof dashboardHost>) => Pro
 
 const call = (host: ReturnType<typeof dashboardHost>, method: string, input: unknown) => host.harness.behavior.callRpc(method, input) as Promise<any>;
 const tool = (host: ReturnType<typeof dashboardHost>, name: string, input: unknown) => host.harness.behavior.callAgentTool(name, input);
+const clock = { now: 1_700_000_000_000 };
+type Prompt = { nonce: string; command: string; cwd: string; cwdIsHome: boolean; host: string; intervalSec: number; proposedBy: { actor: string; threadId: string | null } | null };
+const openDialog = async (host: ReturnType<typeof dashboardHost>, id: string, widgetId: string) => (await call(host, "dashboards.requestApproval", { id, widgetId })).prompt as Prompt;
+/** What the dialog does: open, wait a moment, Approve. */
+async function approve(host: ReturnType<typeof dashboardHost>, id: string, widgetId: string, sha256: string) {
+  const prompt = await openDialog(host, id, widgetId);
+  clock.now += 1000;
+  await call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: prompt.nonce });
+}
 const text = (result: unknown) => (typeof result === "string" ? result : JSON.stringify(result));
 
 describe("storage", () => {
@@ -47,8 +56,9 @@ describe("storage", () => {
     store.write(row.id, doc, "user", "x");
     store.setValue(row.id, "w1", 5);
     store.approve(row.id, "w1", "a".repeat(64), "echo", null);
+    store.propose(row.id, "w1", "a".repeat(64), "agent", null);
     store.delete(row.id);
-    for (const table of ["dashboard_widgets", "dashboard_layouts", "dashboard_data", "dashboard_script_approvals", "dashboard_versions"]) {
+    for (const table of ["dashboard_widgets", "dashboard_layouts", "dashboard_data", "dashboard_script_approvals", "dashboard_script_proposals", "dashboard_versions"]) {
       expect((db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n).toBe(0);
     }
   });
@@ -103,10 +113,13 @@ describe("agent tools", () => {
     const widget = view.widgets[0]!;
     expect(widget.script).toMatchObject({ approved: false });
     expect(view.data[0]).toMatchObject({ status: "approval" });
-    await expect(call(host, "dashboards.approveScript", { id: dashboard.id, widgetId: widget.id, sha256: "0".repeat(64) })).rejects.toThrow(/command changed/);
-    // Another plugin can't approve on the user's behalf.
-    await expect(host.harness.behavior.callRpc("dashboards.approveScript", { id: dashboard.id, widgetId: widget.id, sha256: widget.script!.sha256 }, { experimental_caller: { kind: "plugin", pluginId: "other" } })).rejects.toThrow(/Only the user/);
-    await call(host, "dashboards.approveScript", { id: dashboard.id, widgetId: widget.id, sha256: widget.script!.sha256 });
+    await call(host, "dashboards.view", { id: dashboard.id, clientId: "c1" });
+    const prompt = await openDialog(host, dashboard.id, widget.id);
+    expect(prompt).toMatchObject({ command: "echo 1", cwdIsHome: true, intervalSec: 900, timeoutSec: 30, maxOutputBytes: 1024 * 1024, proposedBy: { actor: "agent", threadTitle: "Ops dashboard" } });
+    expect(prompt.host).toBeTruthy();
+    clock.now += 1000;
+    await expect(call(host, "dashboards.approveScript", { id: dashboard.id, widgetId: widget.id, sha256: "0".repeat(64), nonce: prompt.nonce })).rejects.toThrow(/command changed/);
+    await approve(host, dashboard.id, widget.id, widget.script!.sha256);
     view = (await call(host, "dashboards.get", { id: dashboard.id })).dashboard as View;
     expect(view.widgets[0]!.script).toMatchObject({ approved: true });
     // The agent renames it: still approved. It changes the command: approval is gone.
@@ -116,8 +129,95 @@ describe("agent tools", () => {
     view = (await call(host, "dashboards.get", { id: dashboard.id })).dashboard as View;
     expect(view.widgets[0]!.script).toMatchObject({ approved: false });
     expect(view.widgets[0]!.script!.sha256).not.toBe(widget.script!.sha256);
-  }));
+  }, { now: () => clock.now }));
+});
 
+describe("script approval", () => {
+  async function scripted(host: ReturnType<typeof dashboardHost>) {
+    const { dashboard } = await call(host, "dashboards.create", { name: "X" });
+    await tool(host, "dashboard_edit", { dashboardId: dashboard.id, ops: [{ op: "add", type: "stat", source: { kind: "script", command: "echo 1", cwd: "/tmp", intervalSec: 300 } }] });
+    const view = (await call(host, "dashboards.get", { id: dashboard.id })).dashboard as View;
+    await call(host, "dashboards.view", { id: dashboard.id, clientId: "c1" });
+    return { id: dashboard.id as string, widgetId: view.widgets[0]!.id, sha256: view.widgets[0]!.script!.sha256 };
+  }
+  const approved = async (host: ReturnType<typeof dashboardHost>, id: string) => ((await call(host, "dashboards.get", { id })).dashboard as View).widgets[0]!.script!.approved;
+
+  it("refuses a direct approve without the dialog's nonce", () => withHost(async (host) => {
+    const { id, widgetId, sha256 } = await scripted(host);
+    await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256 })).rejects.toThrow();
+    await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: "x".repeat(43) })).rejects.toThrow(/approval dialog/);
+    expect(await approved(host, id)).toBe(false);
+  }, { now: () => clock.now }));
+
+  it("refuses other plugins, and agents have no way in", () => withHost(async (host) => {
+    const { id, widgetId, sha256 } = await scripted(host);
+    const asPlugin = { experimental_caller: { kind: "plugin" as const, pluginId: "other" } };
+    await expect(host.harness.behavior.callRpc("dashboards.requestApproval", { id, widgetId }, asPlugin)).rejects.toThrow(/Only the user/);
+    const prompt = await openDialog(host, id, widgetId);
+    clock.now += 1000;
+    await expect(host.harness.behavior.callRpc("dashboards.approveScript", { id, widgetId, sha256, nonce: prompt.nonce }, asPlugin)).rejects.toThrow(/Only the user/);
+    for (const name of ["dashboard_approve", "dashboard_approve_script", "widget_approve"]) await expect(tool(host, name, { dashboardId: id, widgetId })).rejects.toThrow();
+    expect(await approved(host, id)).toBe(false);
+  }, { now: () => clock.now }));
+
+  it("needs a BB window showing the dashboard to open the dialog", () => withHost(async (host) => {
+    const { id, widgetId } = await scripted(host);
+    await call(host, "dashboards.view", { id, clientId: "c1", leave: true });
+    await expect(call(host, "dashboards.requestApproval", { id, widgetId })).rejects.toThrow(/Open the dashboard/);
+  }, { now: () => clock.now }));
+
+  it("accepts a nonce once, and not in the dialog's first moment", () => withHost(async (host) => {
+    const { id, widgetId, sha256 } = await scripted(host);
+    const prompt = await openDialog(host, id, widgetId);
+    expect(prompt).toMatchObject({ cwd: "/tmp", cwdIsHome: false, intervalSec: 300 });
+    await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: prompt.nonce })).rejects.toThrow(/Read the command first/);
+    clock.now += 1000;
+    await call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: prompt.nonce });
+    expect(await approved(host, id)).toBe(true);
+    await call(host, "dashboards.revokeScript", { id, widgetId });
+    await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: prompt.nonce })).rejects.toThrow(/approval dialog/);
+    expect(await approved(host, id)).toBe(false);
+  }, { now: () => clock.now }));
+
+  it("invalidates the nonce on any edit, on Deny, on a newer dialog and after 5 minutes", () => withHost(async (host) => {
+    const { id, widgetId, sha256 } = await scripted(host);
+    // Any edit, even a title, while the dialog is open.
+    let prompt = await openDialog(host, id, widgetId);
+    clock.now += 1000;
+    await tool(host, "dashboard_edit", { dashboardId: id, ops: [{ op: "update", widgetId, title: "Renamed" }] });
+    await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: prompt.nonce })).rejects.toThrow(/dashboard changed/);
+    // Deny.
+    prompt = await openDialog(host, id, widgetId);
+    clock.now += 1000;
+    await call(host, "dashboards.cancelApproval", { nonce: prompt.nonce });
+    await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: prompt.nonce })).rejects.toThrow(/approval dialog/);
+    // A newer dialog replaces the older one.
+    const older = await openDialog(host, id, widgetId);
+    const newer = await openDialog(host, id, widgetId);
+    clock.now += 1000;
+    await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: older.nonce })).rejects.toThrow(/approval dialog/);
+    // Expiry.
+    clock.now += 5 * 60_000;
+    await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256, nonce: newer.nonce })).rejects.toThrow(/expired/);
+    // A nonce is for its widget and dashboard only.
+    const { dashboard: other } = await call(host, "dashboards.create", { name: "Y" });
+    await call(host, "dashboards.view", { id, clientId: "c1" });
+    prompt = await openDialog(host, id, widgetId);
+    clock.now += 1000;
+    await expect(call(host, "dashboards.approveScript", { id: other.id, widgetId, sha256, nonce: prompt.nonce })).rejects.toThrow();
+    expect(await approved(host, id)).toBe(false);
+  }, { now: () => clock.now }));
+
+  it("names who proposed the command", () => withHost(async (host) => {
+    const { dashboard } = await call(host, "dashboards.create", { name: "X" });
+    await call(host, "dashboards.edit", { id: dashboard.id, ops: [{ op: "add", type: "stat", source: { kind: "script", command: "date" } }] });
+    const widgetId = ((await call(host, "dashboards.get", { id: dashboard.id })).dashboard as View).widgets[0]!.id;
+    await call(host, "dashboards.view", { id: dashboard.id, clientId: "c1" });
+    expect((await openDialog(host, dashboard.id, widgetId)).proposedBy).toMatchObject({ actor: "user", threadId: null });
+  }, { now: () => clock.now }));
+});
+
+describe("library widgets", () => {
   it("defines a library widget and uses it", () => withHost(async (host) => {
     const defined = text(await tool(host, "widget_define", { name: "Gauge", html: "<div id=g></div><script>addEventListener('bbwidget', e => g.textContent = e.detail.data)</script>" }));
     const typeId = /id (wt_[0-9a-f]{16})/.exec(defined)![1]!;

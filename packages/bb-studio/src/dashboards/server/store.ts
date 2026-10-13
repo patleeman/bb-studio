@@ -49,6 +49,18 @@ export const DASHBOARD_TABLES =
      );
    CREATE INDEX dashboard_versions_dashboard ON dashboard_versions (dashboard_id, id);`;
 
+/**
+ * Who proposed each script widget's command (src/migrations.ts appends it
+ * after DASHBOARD_TABLES): the approval prompt names them. Keyed by the
+ * command's hash, so a later change by someone else replaces the row.
+ */
+export const DASHBOARD_PROPOSALS_TABLE =
+  `CREATE TABLE dashboard_script_proposals (
+       dashboard_id TEXT NOT NULL, widget_id TEXT NOT NULL, sha256 TEXT NOT NULL,
+       actor TEXT NOT NULL, thread_id TEXT, proposed_at INTEGER NOT NULL,
+       PRIMARY KEY (dashboard_id, widget_id)
+     );`;
+
 export type DashboardRow = {
   id: string;
   name: string;
@@ -71,6 +83,8 @@ export type DataRow = {
   dashboard_id: string; widget_id: string; value: string | null; fetched_at: number | null;
   error: string | null; error_at: number | null; attempted_at: number | null;
 };
+
+export type ProposalRow = { dashboard_id: string; widget_id: string; sha256: string; actor: Actor; thread_id: string | null; proposed_at: number };
 
 export type ApprovalRow = { dashboard_id: string; widget_id: string; sha256: string; command: string; cwd: string | null; approved_at: number };
 
@@ -256,7 +270,7 @@ export class DashboardStore {
 
   delete(id: string): boolean {
     return this.db.transaction(() => {
-      for (const table of ["dashboard_widgets", "dashboard_layouts", "dashboard_data", "dashboard_script_approvals", "dashboard_versions"]) {
+      for (const table of ["dashboard_widgets", "dashboard_layouts", "dashboard_data", "dashboard_script_approvals", "dashboard_script_proposals", "dashboard_versions"]) {
         this.db.prepare(`DELETE FROM ${table} WHERE dashboard_id = ?`).run(id);
       }
       return this.db.prepare("DELETE FROM dashboards WHERE id = ?").run(id).changes > 0;
@@ -310,6 +324,18 @@ export class DashboardStore {
 
   revoke(id: string, widgetId: string): void {
     this.db.prepare("DELETE FROM dashboard_script_approvals WHERE dashboard_id = ? AND widget_id = ?").run(id, widgetId);
+  }
+
+  /** Records who wrote a script widget's command. */
+  propose(id: string, widgetId: string, sha256: string, actor: Actor, threadId: string | null): void {
+    this.db.prepare(`INSERT INTO dashboard_script_proposals (dashboard_id, widget_id, sha256, actor, thread_id, proposed_at) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(dashboard_id, widget_id) DO UPDATE SET sha256 = excluded.sha256, actor = excluded.actor, thread_id = excluded.thread_id, proposed_at = excluded.proposed_at`)
+      .run(id, widgetId, sha256, actor, threadId, this.now());
+  }
+
+  /** Who proposed the command with this hash, if Studio knows. */
+  proposal(id: string, widgetId: string, sha256: string): ProposalRow | null {
+    return (this.db.prepare("SELECT * FROM dashboard_script_proposals WHERE dashboard_id = ? AND widget_id = ? AND sha256 = ?").get(id, widgetId, sha256) as ProposalRow | undefined) ?? null;
   }
 
   // -- Custom widget library --------------------------------------------------

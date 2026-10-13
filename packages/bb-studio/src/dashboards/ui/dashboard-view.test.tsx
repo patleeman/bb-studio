@@ -38,7 +38,6 @@ function fakeState(current: DashboardView) {
     edit: vi.fn(async () => current),
     saveLayout: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
-    approve: vi.fn(async () => {}),
     revoke: vi.fn(async () => {}),
     apply: vi.fn(),
     load: vi.fn(async () => {}),
@@ -83,13 +82,41 @@ describe("the dashboard grid", () => {
     expect(container.querySelector(".react-grid-item:not(.react-resizable-hide) > .react-resizable-handle")).toBeNull();
   });
 
-  it("asks before running a script, and approves the hash it showed", async () => {
+  it("asks before running a script in a dialog with Deny focused, and approves with its nonce", async () => {
     const state = fakeState(view());
+    const prompt = {
+      nonce: "n".repeat(43), notBefore: Date.now() - 1, expiresAt: Date.now() + 300_000, sha256: "a".repeat(64),
+      command: "echo 3", cwd: "/Users/me", cwdIsHome: true, host: "studio-mac", intervalSec: 300, backgroundSec: 1800,
+      timeoutSec: 30, maxOutputBytes: 1024 * 1024, proposedBy: { actor: "agent", threadId: "thr_1", threadTitle: "Ops review", at: Date.now() - 60_000 },
+    };
+    state.rpc.call.mockImplementation(async (method: string) => (method === "dashboards.requestApproval" ? { prompt } : method === "dashboards.widgetTypes" ? { types: [] } : { ok: true }) as never);
     await render(state);
     const card = container.querySelector("[aria-label='Script approval']")!;
     expect(card.textContent).toContain("echo 3");
-    await click([...card.querySelectorAll("button")].find((each) => each.textContent === "Approve and run"));
-    expect(state.approve).toHaveBeenCalledWith("w2", "a".repeat(64));
+    expect(state.rpc.call).not.toHaveBeenCalledWith("dashboards.approveScript", expect.anything());
+    await click([...card.querySelectorAll("button")].find((each) => each.textContent === "Review command…"));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+    const dialog = document.querySelector("[data-dashboard-approval]")!;
+    expect(dialog.querySelector("[data-approval-command]")!.textContent).toBe("echo 3");
+    for (const text of ["/Users/me", "(home)", "studio-mac", "Every 5 minutes while the dashboard is open; every 30 minutes otherwise", "Stopped after 30 s; output up to 1 MB", "An agent in “Ops review”, 1m ago"]) expect(dialog.textContent).toContain(text);
+    expect(document.activeElement).toBe(dialog.querySelector("[data-approval-deny]"));
+    await click(dialog.querySelector("[data-approval-approve]")!);
+    expect(state.rpc.call).toHaveBeenCalledWith("dashboards.approveScript", { id: "dsh_0123456789abcdef", widgetId: "w2", sha256: "a".repeat(64), nonce: prompt.nonce });
+    expect(state.load).toHaveBeenCalled();
+    expect(document.querySelector("[data-dashboard-approval]")).toBeNull();
+  });
+
+  it("Deny closes the dialog and gives up its nonce", async () => {
+    const state = fakeState(view());
+    const prompt = { nonce: "m".repeat(43), notBefore: Date.now() - 1, expiresAt: Date.now() + 300_000, sha256: "a".repeat(64), command: "echo 3", cwd: "/tmp", cwdIsHome: false, host: "h", intervalSec: 300, backgroundSec: 1800, timeoutSec: 30, maxOutputBytes: 1048576, proposedBy: null };
+    state.rpc.call.mockImplementation(async (method: string) => (method === "dashboards.requestApproval" ? { prompt } : { ok: true }) as never);
+    await render(state);
+    await click(button("Review command…"));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
+    await click(document.querySelector("[data-approval-deny]")!);
+    expect(document.querySelector("[data-dashboard-approval]")).toBeNull();
+    expect(state.rpc.call).toHaveBeenCalledWith("dashboards.cancelApproval", { nonce: prompt.nonce });
+    expect(state.rpc.call).not.toHaveBeenCalledWith("dashboards.approveScript", expect.anything());
   });
 
   it("turns on dragging, resizing, settings and removal in edit mode", async () => {

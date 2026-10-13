@@ -292,6 +292,55 @@ export const scriptStateSchema = z.object({
   approved: z.boolean(),
 });
 
+/**
+ * What the approval dialog shows, from `dashboards.requestApproval`, with a
+ * one-time nonce that approves this exact command once.
+ */
+export const approvalPromptSchema = z.object({
+  /** Pass to dashboards.approveScript; one use, bound to this command. */
+  nonce: z.string(),
+  /** Approve is accepted from this time (ms): the dialog was open a moment. */
+  notBefore: z.number(),
+  expiresAt: z.number(),
+  sha256: z.string(),
+  command: z.string(),
+  /** The folder it runs in; the home folder when none was set. */
+  cwd: z.string(),
+  cwdIsHome: z.boolean(),
+  /** The BB host's machine name: where the command runs. */
+  host: z.string(),
+  intervalSec: z.number(),
+  /** While no BB window shows the dashboard. */
+  backgroundSec: z.number(),
+  timeoutSec: z.number(),
+  maxOutputBytes: z.number(),
+  /** Who wrote this command, when Studio knows. */
+  proposedBy: z.object({
+    actor: z.enum(["user", "agent"]),
+    threadId: z.string().nullable(),
+    threadTitle: z.string().nullable(),
+    at: z.number(),
+  }).nullable(),
+});
+export type ApprovalPrompt = z.infer<typeof approvalPromptSchema>;
+
+/** "Every 5 minutes", "Every hour", "Every 2 days". */
+export function describeEvery(seconds: number): string {
+  const units: [number, string][] = [[86_400, "day"], [3600, "hour"], [60, "minute"], [1, "second"]];
+  for (const [size, name] of units) {
+    if (seconds >= size && seconds % size === 0) {
+      const n = seconds / size;
+      return n === 1 ? `Every ${name}` : `Every ${n} ${name}s`;
+    }
+  }
+  return `Every ${seconds} seconds`;
+}
+
+/** "1 MB", "512 KB". */
+export function describeBytes(bytes: number): string {
+  return bytes >= 1024 * 1024 && bytes % (1024 * 1024) === 0 ? `${bytes / 1024 / 1024} MB` : `${Math.round(bytes / 1024)} KB`;
+}
+
 export const widgetViewSchema = widgetSchema.extend({
   /** For script sources: whether the exact command is approved. */
   script: scriptStateSchema.nullable(),

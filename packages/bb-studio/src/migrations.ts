@@ -4,7 +4,7 @@ import { DESIGN_MIGRATIONS } from "./design/server/store";
 import { TALK_MIGRATIONS } from "./talk/server/store";
 import { MIGRATIONS as PAGE_MIGRATIONS } from "./pages/store";
 import { NEXT_LOG_MIGRATIONS } from "./explore/store";
-import { DASHBOARD_TABLES } from "./dashboards/server/store";
+import { DASHBOARD_PROPOSALS_TABLE, DASHBOARD_TABLES } from "./dashboards/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
 // (src/search-index.ts) and project leads (src/project-lead.ts). The space
@@ -355,4 +355,6 @@ export const MIGRATIONS = [
   // Dashboards (src/dashboards): dashboards, their widgets and layouts, the
   // custom widget library, widget data, script approvals and versions.
   DASHBOARD_TABLES,
+  // Who proposed each script widget's command, for the approval prompt.
+  DASHBOARD_PROPOSALS_TABLE,
 ];

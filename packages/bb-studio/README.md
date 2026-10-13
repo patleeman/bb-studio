@@ -555,7 +555,7 @@ every tile, the chart and the custom widget's sandbox.
     runs only after you approve its exact command and folder in the
     dashboard; the approval is pinned to their SHA-256, so any change needs a
     new approval. Agents can propose a script but can't approve one. 30 s
-    and 1 MB per run.
+    and 1 MB per run. See [Script approval](#script-approval).
   - *Push*: an agent sends data with `widget_set_data`, or a script with
     `bb studio dashboards set-data <id> <widget> '<json>'`. Never polled.
 
@@ -583,11 +583,37 @@ every tile, the chart and the custom widget's sandbox.
   data and your widget library. Fetched data is fetched again, and script
   approvals are never restored: a restored script waits for you.
 
+### Script approval
+
+**Review command…** on a waiting script opens the approval dialog: the exact
+command in full, the folder it runs in, the BB host's machine name, the
+schedule ("Every 15 minutes while the dashboard is open; every 30 minutes
+otherwise"), the 30 s and 1 MB limits, and who proposed it (you, or an agent
+and its thread). **Deny** has the focus. An approved script shows a quiet
+"Approved" line with **Revoke** in its settings.
+
+BB's plugin RPC can't tell the app from the `bb` CLI or a request from an
+agent's shell, so approval is a handshake the dialog makes. Opening it asks
+Studio for a one-time nonce (`dashboards.requestApproval`), which Studio
+issues only while a BB window shows the dashboard. **Approve** sends it back
+with the command's SHA-256 (`dashboards.approveScript`). A nonce approves
+that one command on that one widget, once; it isn't accepted in the dialog's
+first 0.75 s, expires after 5 minutes, and dies with Deny, a newer dialog,
+a restart, or any change to the dashboard while the dialog is open. Other
+plugins are refused, and agents have no tool for either step.
+
+This stops an agent that calls `approveScript` directly, replays an old
+approval, or changes the command after you've seen it. It doesn't stop a
+process with shell access that deliberately scripts both steps the way the
+dialog does: on your machine that process already runs as you. Keep agents
+you don't trust out of a full-access shell.
+
 Dashboards live in Studio's SQLite database: `dashboards`,
 `dashboard_widgets`, `dashboard_layouts` (one per breakpoint),
 `dashboard_widget_types` (the library), `dashboard_data` (value, fetched
-time, error), `dashboard_script_approvals` and `dashboard_versions`. A
-dashboard holds at most 60 widgets.
+time, error), `dashboard_script_approvals`, `dashboard_script_proposals`
+(who wrote each command) and `dashboard_versions`. A dashboard holds at most
+60 widgets.
 
 ## Recordings
 

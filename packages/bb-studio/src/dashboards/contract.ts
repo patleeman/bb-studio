@@ -3,6 +3,7 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import {
+  approvalPromptSchema,
   dashboardMetaSchema,
   dashboardViewSchema,
   dataViewSchema,
@@ -65,9 +66,19 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id, widgetId, data: z.unknown() }),
     output: z.object({ data: dataViewSchema }),
   },
+  "dashboards.requestApproval": {
+    experimental_description: "Opens the approval dialog for a script widget: the exact command, folder, host, schedule and limits, and a one-time nonce. Only while a BB window shows the dashboard.",
+    input: z.object({ id, widgetId }),
+    output: z.object({ prompt: approvalPromptSchema }),
+  },
+  "dashboards.cancelApproval": {
+    experimental_description: "Deny, or the approval dialog closing: its nonce stops working.",
+    input: z.object({ nonce: z.string().min(16).max(200) }),
+    output: ok,
+  },
   "dashboards.approveScript": {
-    experimental_description: "The user approves a script widget's exact command. sha256 must match the command shown; any later change needs a new approval.",
-    input: z.object({ id, widgetId, sha256: z.string().regex(/^[0-9a-f]{64}$/) }),
+    experimental_description: "The user's Approve in the approval dialog. Needs the dialog's nonce: one use, at most 5 minutes old, for the command shown (sha256), on the dashboard as it was when the dialog opened.",
+    input: z.object({ id, widgetId, sha256: z.string().regex(/^[0-9a-f]{64}$/), nonce: z.string().min(16).max(200) }),
     output: ok,
   },
   "dashboards.revokeScript": {

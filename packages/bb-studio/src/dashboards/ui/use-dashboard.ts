@@ -110,19 +110,10 @@ export function useDashboard(id: string) {
     }
   }, [id, load, rpc]);
 
-  const approve = useCallback(async (widgetId: string, sha256: string) => {
-    try {
-      await rpc.call("dashboards.approveScript", { id, widgetId, sha256 });
-      await load();
-    } catch (error) {
-      toast.error(errorMessage(error));
-    }
-  }, [id, load, rpc]);
-
   const revoke = useCallback(async (widgetId: string) => {
     await rpc.call("dashboards.revokeScript", { id, widgetId }).catch((error) => toast.error(errorMessage(error)));
     await load();
   }, [id, load, rpc]);
 
-  return { dashboard, load, edit, saveLayout, rename, refresh, approve, revoke, apply, rpc };
+  return { dashboard, load, edit, saveLayout, rename, refresh, revoke, apply, rpc };
 }

@@ -210,6 +210,8 @@ public enum Studio {
     public static let dashboards_view = "dashboards.view"
     public static let dashboards_refresh = "dashboards.refresh"
     public static let dashboards_setData = "dashboards.setData"
+    public static let dashboards_requestApproval = "dashboards.requestApproval"
+    public static let dashboards_cancelApproval = "dashboards.cancelApproval"
     public static let dashboards_approveScript = "dashboards.approveScript"
     public static let dashboards_revokeScript = "dashboards.revokeScript"
     public static let dashboards_versions = "dashboards.versions"
@@ -662,6 +664,10 @@ public enum Studio {
   public typealias DashboardsRefresh = DashboardsRefreshOutput
 
   public typealias DashboardsSetData = DashboardsSetDataOutput
+
+  public typealias DashboardsRequestApproval = DashboardsRequestApprovalOutput
+
+  public typealias DashboardsCancelApproval = DashboardsCancelApprovalOutput
 
   public typealias DashboardsApproveScript = DashboardsApproveScriptOutput
 
@@ -18102,15 +18108,121 @@ public enum Studio {
     }
   }
 
+  public struct DashboardsRequestApprovalInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var widgetId: String?
+
+    public init(id: String? = nil, widgetId: String? = nil) {
+      self.id = id
+      self.widgetId = widgetId
+    }
+  }
+
+  public enum DashboardsRequestApprovalOutputPromptProposedByActor: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsRequestApprovalOutputPromptProposedBy: Sendable, Hashable, Codable {
+    public var `actor`: DashboardsRequestApprovalOutputPromptProposedByActor?
+    public var threadId: String?
+    public var threadTitle: String?
+    public var at: Double?
+
+    public init(`actor`: DashboardsRequestApprovalOutputPromptProposedByActor? = nil, threadId: String? = nil, threadTitle: String? = nil, at: Double? = nil) {
+      self.`actor` = `actor`
+      self.threadId = threadId
+      self.threadTitle = threadTitle
+      self.at = at
+    }
+  }
+
+  public struct DashboardsRequestApprovalOutputPrompt: Sendable, Hashable, Codable {
+    public var nonce: String?
+    public var notBefore: Double?
+    public var expiresAt: Double?
+    public var sha256: String?
+    public var command: String?
+    public var cwd: String?
+    public var cwdIsHome: Bool?
+    public var host: String?
+    public var intervalSec: Double?
+    public var backgroundSec: Double?
+    public var timeoutSec: Double?
+    public var maxOutputBytes: Double?
+    public var proposedBy: DashboardsRequestApprovalOutputPromptProposedBy?
+
+    public init(nonce: String? = nil, notBefore: Double? = nil, expiresAt: Double? = nil, sha256: String? = nil, command: String? = nil, cwd: String? = nil, cwdIsHome: Bool? = nil, host: String? = nil, intervalSec: Double? = nil, backgroundSec: Double? = nil, timeoutSec: Double? = nil, maxOutputBytes: Double? = nil, proposedBy: DashboardsRequestApprovalOutputPromptProposedBy? = nil) {
+      self.nonce = nonce
+      self.notBefore = notBefore
+      self.expiresAt = expiresAt
+      self.sha256 = sha256
+      self.command = command
+      self.cwd = cwd
+      self.cwdIsHome = cwdIsHome
+      self.host = host
+      self.intervalSec = intervalSec
+      self.backgroundSec = backgroundSec
+      self.timeoutSec = timeoutSec
+      self.maxOutputBytes = maxOutputBytes
+      self.proposedBy = proposedBy
+    }
+  }
+
+  public struct DashboardsRequestApprovalOutput: Sendable, Hashable, Codable {
+    public var prompt: DashboardsRequestApprovalOutputPrompt?
+
+    public init(prompt: DashboardsRequestApprovalOutputPrompt? = nil) {
+      self.prompt = prompt
+    }
+  }
+
+  public struct DashboardsCancelApprovalInput: Sendable, Hashable, Codable {
+    public var nonce: String?
+
+    public init(nonce: String? = nil) {
+      self.nonce = nonce
+    }
+  }
+
+  public struct DashboardsCancelApprovalOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
   public struct DashboardsApproveScriptInput: Sendable, Hashable, Codable {
     public var id: String?
     public var widgetId: String?
     public var sha256: String?
+    public var nonce: String?
 
-    public init(id: String? = nil, widgetId: String? = nil, sha256: String? = nil) {
+    public init(id: String? = nil, widgetId: String? = nil, sha256: String? = nil, nonce: String? = nil) {
       self.id = id
       self.widgetId = widgetId
       self.sha256 = sha256
+      self.nonce = nonce
     }
   }
 
