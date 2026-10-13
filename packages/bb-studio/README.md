@@ -520,6 +520,15 @@ Dashboards are built into Studio: live tiles, charts, tables and feeds on a
 responsive grid, which you and your agents build together. Items are
 `dashboards:<id>` and open at `/plugins/studio/studio/dashboards/<id>`.
 
+![Live BB screenshot of a dashboard open as a Studio tab](assets/dashboards-preview.png)
+
+The seeded "Launch metrics" dashboard as a Studio tab in a staged BB, in
+view mode: four stat tiles with deltas and sparklines (churn counts down as
+good), an area chart of weekly signups and trials, a custom gauge widget
+running in its sandboxed frame, a table and a changelog feed, all with
+static data. Recapture with `BB_CAPTURE_ONLY=dashboards`; the capture checks
+every tile, the chart and the custom widget's sandbox.
+
 - **In the library.** Dashboards list next to pages and drawings, with
   search over their names, widget titles and notes, tags, Move to,
   archive, duplicate, templates and **Export → Dashboard JSON**.
