@@ -44,7 +44,7 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { AVATAR_ROUTE, BOT_AVATAR_SETTINGS, imageMime, pickImageProvider } from "./src/bot-avatar";
 import { registerBotProfileTools } from "./src/bot-profile-tools";
-import { Bots, SKILL_NAME } from "./src/bot";
+import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
 import { alertBot, parseSchedule, Runners } from "./src/runners";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
@@ -941,8 +941,7 @@ export default async function plugin(bb: BbPluginApi) {
   // chain), one of its runners, or a thread it started; elsewhere the primary.
   const acting = (threadId: string | undefined) => bots.actingFor(threadId, (id) => runners.forThread(id)?.bot_id);
   const selfBot = async (threadId: string | undefined) => (await acting(threadId))?.botId;
-  // A runner works on its own; it never pauses, stops or resumes its Bot. And no Bot resumes itself.
-  const runnerCantControl = async (threadId: string | undefined) => (await acting(threadId))?.via === "runner" ? "A runner can't pause, stop or resume its Bot; tell the user instead (runner_report)." : null;
+  // Pause and stop only from the Bot's own chat (botControlRefusal); no Bot resumes itself.
   bb.agents.registerTool({ name: "bot_get", description: "Show the user's Bot (their always-on agent, formerly the Chief of Staff): name, avatar, state (active, paused, stopped), its thread and check-ins. In a Bot's own thread, that Bot.", parameters: z.object({}), execute: async (_input, ctx) => describeBot(await bots.get(await selfBot(ctx.threadId))) });
   bb.agents.registerTool({
     name: "bot_set", description: "Rename the user's Bot, change its avatar emoji, or set its role (a sentence or two it's given). Only when the user asks. A Bot changing its own profile on its own uses bot_profile_update; from a Bot's threads either is recorded for the user to revert.",
@@ -962,14 +961,17 @@ export default async function plugin(bb: BbPluginApi) {
     if (!image) return context.text("Not found", 404);
     return serveBytes(new Uint8Array(image.data), { "content-type": image.mime, "content-security-policy": "default-src 'none'" });
   });
-  bb.agents.registerTool({ name: "bot_pause", description: "Pause the user's Bot: its check-ins stop and it takes on no new work until resumed. Only when the user asks.", parameters: z.object({}), execute: async (_input, ctx) => (await runnerCantControl(ctx.threadId)) ?? describeBot(await bots.pause(await selfBot(ctx.threadId))) });
+  bb.agents.registerTool({
+    name: "bot_pause", description: "Pause the user's Bot: its check-ins stop and it takes on no new work until resumed. Only in the Bot's own chat, when the user asks; elsewhere the user uses Studio → Bot.", parameters: z.object({}),
+    execute: async (_input, ctx) => { const self = await acting(ctx.threadId); return botControlRefusal(self, "pause") ?? describeBot(await bots.pause(self!.botId)); },
+  });
   bb.agents.registerTool({
     name: "bot_resume", description: "Resume the user's paused or stopped Bot, its check-ins if they were on, and the automations and runners Stop paused. Only when the user asks; the Bot can't resume itself.", parameters: z.object({}),
     execute: async (_input, ctx) => (await acting(ctx.threadId)) ? "Only the user can resume their Bot: Studio → Bot → Resume." : describeBot(await bots.resume()),
   });
   bb.agents.registerTool({
-    name: "bot_stop", description: "Stop the user's Bot: pause it, stop the running threads it spawned (its sub-threads, not forks of its chat) and pause automations that wake it and its runners. Data is kept. Only when the user explicitly asks to stop it.", parameters: z.object({}),
-    execute: async (_input, ctx) => { const refused = await runnerCantControl(ctx.threadId); if (refused) return refused; const result = await bots.stop(await selfBot(ctx.threadId)); return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n"); },
+    name: "bot_stop", description: "Stop the user's Bot: pause it, stop the running threads it spawned (its sub-threads, not forks of its chat) and pause automations that wake it and its runners. Data is kept. Only in the Bot's own chat, when the user explicitly asks to stop it; elsewhere the user uses Studio → Bot.", parameters: z.object({}),
+    execute: async (_input, ctx) => { const self = await acting(ctx.threadId); const refused = botControlRefusal(self, "stop"); if (refused) return refused; const result = await bots.stop(self!.botId); return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n"); },
   });
   bb.agents.registerTool({
     name: "bot_activity", description: "What the user's Bot is doing: threads that need the user, in progress, scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({}),

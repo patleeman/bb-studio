@@ -1324,7 +1324,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   lists what it would change), `bot_skill_pending_resolve`, and the runner RPCs below. Each takes an optional
   `botId` (the primary when absent); `bot_create` makes the primary first,
   then additional bots. Agent tools: `bot_get`, `bot_set`, `bot_avatar_generate`, `bot_pause`,
-  `bot_resume`, `bot_stop`, `bot_activity`; only the Bot's thread also gets
+  `bot_resume`, `bot_stop`, `bot_activity` (`bot_pause` and `bot_stop` work only
+  in the Bot's own chat or its handoff chain; threads it started, its runners
+  and other threads are refused and the user uses Studio → Bot); only the Bot's thread also gets
   `bot_profile_update`, `bot_skill_list`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
   `bot_skill_delete` and `bot_history_search`.
 - **Watchers**, for script authors. Studio creates a BB script automation

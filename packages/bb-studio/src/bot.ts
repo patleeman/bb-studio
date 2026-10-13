@@ -108,6 +108,20 @@ export function botInstructions(bot: { name: string; state: BotState; role?: str
   return `${who}\nYou are ${bot.state} by the user. Don't start new work: don't spawn or steer threads, change Studio items or schedule anything. Answer questions, and tell the user to resume you (Studio → Bot → Resume) for anything else.`;
 }
 
+/**
+ * Whether an agent may pause or stop a Bot from this thread. Only the Bot's
+ * own chat (its handoff chain) may, when the user asks there; the user can
+ * always use Studio's UI or RPC. Threads the Bot started, its runners and
+ * threads that act for no Bot are refused, so delegated or unrelated work
+ * can't switch the Bot off. Null: allowed; else the reason to return.
+ */
+export function botControlRefusal(acting: { via: "own" | "runner" | "started" } | null, action: "pause" | "stop"): string | null {
+  if (acting?.via === "own") return null;
+  const where = !acting ? "This thread isn't a Bot's chat" : acting.via === "runner" ? "A runner can't" : "A thread the Bot started can't";
+  const reason = !acting ? `${where}, so it can't ${action} the Bot.` : `${where} ${action} its Bot.`;
+  return `Refused: ${reason} Only the Bot's own chat can, when the user asks there, or the user in Studio → Bot → ${action === "pause" ? "Pause" : "Stop"}. Tell the user instead${acting?.via === "runner" ? " (runner_report)" : ""}.`;
+}
+
 /** A skill name as BB and the skill-creator want it: lowercase words joined by hyphens. */
 export const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 

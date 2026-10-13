@@ -72,6 +72,8 @@ stuff".
   shows it, `bot_activity` lists what needs the user, what's in progress,
   what's scheduled and what finished. `bot_set` renames it; `bot_pause`,
   `bot_resume` and `bot_stop` change its state, only when the user asks.
+  Pause and stop work only in the Bot's own chat; elsewhere they're refused
+  and the user uses Studio → Bot.
   Paused or stopped, the Bot starts no new work. Its home is
   `/plugins/studio/bot`. The user can have several bots (New bot on that
   page); the first is the primary. In a bot's own thread these tools act on
