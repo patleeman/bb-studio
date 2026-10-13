@@ -616,6 +616,14 @@ export class Bots {
     return bot?.threadId ? this.threadChain(bot.threadId).reverse() : [];
   }
 
+  /** The chain with each thread's title, read by id (hidden threads don't show in BB's own title lookup). "Untitled" only when BB has neither title. */
+  async chainThreads(botId?: string): Promise<{ id: string; title: string }[]> {
+    return Promise.all(this.chain(botId).map(async (id) => {
+      const thread = await this.deps.sdk.threads.get({ threadId: id }).catch(() => null);
+      return { id, title: thread?.title?.trim() || thread?.titleFallback?.trim() || "Untitled" };
+    }));
+  }
+
   /** A thread was handed off (thread_handoff): an additional Bot follows its thread, check-in included. */
   async handedOff(oldThreadId: string, newThreadId: string): Promise<void> {
     for (const row of this.rows()) {

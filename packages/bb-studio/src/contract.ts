@@ -417,8 +417,8 @@ export const rpcContract = defineRpcContract({
   bot_activity: { input: forBot, output: botActivity },
   /** The Bot's Memory page, made on first need. */
   bot_memory: { input: forBot, output: z.object({ pageId: z.string().nullable() }) },
-  /** The Bot's chat as one conversation: its thread and the ones it handed off from, oldest first. */
-  bot_chain: { input: forBot, output: z.object({ threadIds: z.array(z.string()) }) },
+  /** The Bot's chat as one conversation: its thread and the ones it handed off from, oldest first. `threads` carries each one's title: they're hidden, so BB's title lookup shows nothing. */
+  bot_chain: { input: forBot, output: z.object({ threadIds: z.array(z.string()), threads: z.array(z.object({ id: z.string(), title: z.string() })) }) },
   /** The Bot a thread belongs to (its chat, a thread it started, a runner, an automation run), or null: the sidebar keeps the Bots list on it. */
   bot_thread_owner: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ botId: z.string().nullable() }) },
   /** A check-in preset: sets the schedule and adds its one-line instruction to the Memory page's Check-in section. */

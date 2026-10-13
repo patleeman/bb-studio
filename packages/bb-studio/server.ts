@@ -604,7 +604,7 @@ export default async function plugin(bb: BbPluginApi) {
       health: (provider) => bb.sdk.plugins.callRpc({ pluginId: EXTERNAL_AGENTS_PLUGIN_ID, method: "health", input: { provider } as never, outputSchema: z.object({ online: z.boolean(), status: z.string(), message: z.string() }) }),
       models: async (providerId) => (await bb.sdk.providers.models({ providerId })).models,
     }),
-    bot_chain: ({ botId }) => ({ threadIds: bots.chain(botId) }),
+    bot_chain: async ({ botId }) => { const threads = await bots.chainThreads(botId); return { threadIds: threads.map((thread) => thread.id), threads }; },
     bot_thread_owner: ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? null }),
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),
     bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),

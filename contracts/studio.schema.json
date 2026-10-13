@@ -5387,10 +5387,30 @@
             "items": {
               "type": "string"
             }
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
-          "threadIds"
+          "threadIds",
+          "threads"
         ],
         "additionalProperties": false
       }

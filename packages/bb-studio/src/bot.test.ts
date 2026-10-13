@@ -177,6 +177,12 @@ it("keeps the Bot across a handoff, and counts threads its old thread started", 
   expect(activity.completed.map((t) => t.id)).toEqual(["w2"]);
   // Its chat reads the chain as one conversation, oldest first.
   expect(x.bots.chain()).toEqual(["bot1", threadId]);
+  // With titles read by id, since chain threads are hidden: title, then titleFallback, then "Untitled".
+  x.threads.set("bot1", { ...x.threads.get("bot1")!, title: null, titleFallback: "Relay", visibility: "hidden" });
+  x.threads.set(threadId, { ...x.threads.get(threadId)!, title: "  ", titleFallback: null });
+  expect(await x.bots.chainThreads()).toEqual([{ id: "bot1", title: "Relay" }, { id: threadId, title: "Untitled" }]);
+  x.threads.set(threadId, { ...x.threads.get(threadId)!, title: "Today" });
+  expect((await x.bots.chainThreads()).map((t) => t.title)).toEqual(["Relay", "Today"]);
 });
 
 it("keeps hidden runner threads under the Bot: out of BB's list, still in Needs you when urgent; its chat isn't the runners' to hide", async () => {

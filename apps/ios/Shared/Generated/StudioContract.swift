@@ -5107,11 +5107,23 @@ public enum Studio {
     }
   }
 
+  public struct BotChainOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+
+    public init(id: String? = nil, title: String? = nil) {
+      self.id = id
+      self.title = title
+    }
+  }
+
   public struct BotChainOutput: Sendable, Hashable, Codable {
     public var threadIds: [String]?
+    public var threads: [BotChainOutputThreadsItem]?
 
-    public init(threadIds: [String]? = nil) {
+    public init(threadIds: [String]? = nil, threads: [BotChainOutputThreadsItem]? = nil) {
       self.threadIds = threadIds
+      self.threads = threads
     }
   }
 

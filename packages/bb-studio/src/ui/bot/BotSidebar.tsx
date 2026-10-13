@@ -10,7 +10,7 @@
 // Info, the Bot page.
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
-import { ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
@@ -192,7 +192,7 @@ function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
 function BotEntry({ view, onNavigate, active }: { view: BotView; onNavigate(): void; active: string | null }) {
   const bot = view.bot!;
   const activity = useLive<BotActivityView>("bot_activity", { botId: bot.id }, { pollMs: 15_000 });
-  const chain = useLive<{ threadIds: string[] }>("bot_chain", { botId: bot.id }, { pollMs: 120_000 });
+  const chain = useLive<{ threadIds: string[]; threads?: { id: string; title: string }[] }>("bot_chain", { botId: bot.id }, { pollMs: 120_000 });
   const [layout, setLayout] = useLayout();
   const openThread = useOpenThread();
   const openBot = useOpenBot(onNavigate);
@@ -201,6 +201,8 @@ function BotEntry({ view, onNavigate, active }: { view: BotView; onNavigate(): v
   const groups = sidebarGroups(activity.data);
   const ids = chain.data?.threadIds ?? [];
   const earlier = bot.threadId && ids.at(-1) === bot.threadId ? ids.slice(0, -1).reverse() : [];
+  // Chain threads are hidden, so BB's ThreadTitle shows nothing for them; bot_chain reads their titles.
+  const titles = new Map((chain.data?.threads ?? []).map((thread) => [thread.id, thread.title]));
   const color = bot.color ?? colorForName(bot.name);
   const accent = { "--bot-accent": color } as CSSProperties;
   const toggle = (id: string) => setLayout({ closed: layout.closed.includes(id) ? layout.closed.filter((each) => each !== id) : [...layout.closed, id] });
@@ -255,7 +257,7 @@ function BotEntry({ view, onNavigate, active }: { view: BotView; onNavigate(): v
               <button key={id} type="button" onClick={() => onOpen(id)} aria-current={active === id ? "true" : undefined}
                 className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">
                 <Icon name="Clock" className="size-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate"><ThreadTitle threadId={id} /></span>
+                <span className="min-w-0 flex-1 truncate">{titles.get(id) || "Untitled"}</span>
               </button>
             ))}
           </Group>

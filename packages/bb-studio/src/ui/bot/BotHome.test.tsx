@@ -145,7 +145,7 @@ test("the Bots list: the bot on top, Needs you flat, started threads nested unde
       completed: [thread("t2", "Research CI"), thread("t4", "Weekly digest")],
       scheduled: [{ id: "a1", kind: "automation", name: "Inbox sweep", cron: "0 * * * *", enabled: true, nextRunAt: null }],
     },
-    bot_chain: { threadIds: ["thr_old", "thr_bot"] },
+    bot_chain: { threadIds: ["thr_old", "thr_bot"], threads: [{ id: "thr_old", title: "Relay" }, { id: "thr_bot", title: "Dot" }] },
   };
   await show(<BotThreadList {...listProps} />);
   const nav = container.querySelector('nav[aria-label="Bots"]')!;
@@ -158,7 +158,12 @@ test("the Bots list: the bot on top, Needs you flat, started threads nested unde
   expect(nav.querySelector('section[aria-label="Recent"]')?.textContent).toContain("Weekly digest");
   expect(nav.querySelector('section[aria-label="Recurring"]')?.textContent).toContain("Inbox sweep");
   // Earlier conversations start closed.
+  expect(nav.textContent).not.toContain("Relay");
+  // Opened, each shows the title bot_chain read: chain threads are hidden, so BB's ThreadTitle has none.
+  act(() => click(nav.querySelector('section[aria-label="Earlier conversations"] > button')));
+  expect(nav.querySelector('section[aria-label="Earlier conversations"]')?.textContent).toContain("Relay");
   expect(nav.textContent).not.toContain("title:thr_old");
+  act(() => click(nav.querySelector('section[aria-label="Earlier conversations"] > button')));
   await act(async () => click(nav.querySelector('[data-thread="t4"]')));
   expect(state.toThread).toHaveBeenCalledWith("t4");
   // The bot's row opens its chat as a BB thread, like its other threads.
