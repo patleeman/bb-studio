@@ -16,6 +16,7 @@ enum Route: Hashable {
     case recording(id: String)
     case artifact(id: String)
     case design(id: String)
+    case dashboard(id: String)
     case terminals(scope: TerminalScope, title: String)
 }
 
@@ -35,6 +36,7 @@ extension Route {
             case "artifacts": self = .artifact(id: parts[4])
             case "drawings": self = .drawing(id: parts[4])
             case "designs": self = .design(id: parts[4])
+            case "dashboards": self = .dashboard(id: parts[4])
             case "recordings": self = .recording(id: parts[4])
             default: return nil
             }
@@ -189,7 +191,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`,
+    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://dashboard[/<id>]`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`).
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
@@ -211,6 +213,7 @@ final class AppModel: ObservableObject {
         case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
         case "design", "designs": openStudio(kind: "design", id.map { .design(id: $0) })
+        case "dashboard", "dashboards": openStudio(kind: "dashboard", id.map { .dashboard(id: $0) })
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write

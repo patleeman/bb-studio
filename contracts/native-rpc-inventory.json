@@ -410,6 +410,24 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/Dashboards.swift",
+      "plugin": "studio",
+      "method": "dashboards.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Dashboards.swift",
+      "plugin": "studio",
+      "method": "dashboards.view",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Dashboards.swift",
+      "plugin": "studio",
+      "method": "dashboards.refresh",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/Designs.swift",
       "plugin": "studio",
       "method": "designs.getDesign",
