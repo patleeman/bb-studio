@@ -223,6 +223,59 @@ of that thread at the end of the item, labelled with the thread's state:
 open the thread. Check the item off yourself after reviewing; the agent is
 told not to.
 
+### Notes from the composer
+
+When a message grows into meeting notes, **Expand to page** in a thread's
+composer (the ⤢ button beside the microphone) moves the draft into a temp
+page and opens it in the thread's side panel, beside the chat.
+
+![Meeting notes typed into a thread's composer, with the Expand to page tooltip](assets/notes-expand.png)
+
+Notes typed in the composer of a staged "Weekly launch sync" thread, with the
+pointer on **Expand to page**.
+
+- **Where it goes.** The page is tagged **Notes** in Studio, in the thread's
+  project, titled like "Notes · Oct 13, 2:05 PM · Weekly launch sync" (the
+  time in your time zone). Studio records the thread it came from, and lists
+  the page with that thread.
+- **The draft moves.** Once the page holds the text, the composer is cleared,
+  so there's only one copy and nothing is sent by accident. Each typed line
+  stays its own paragraph and `- ` lines stay one list. Attachments stay in
+  the composer. With a note already open, Expand adds the draft to the end
+  of it instead of starting another.
+- **Nothing is lost.** The page is saved to BB as it's made, and typing in it
+  autosaves like any page. When you come back to the thread, a **Notes in
+  progress** chip above the composer reopens it.
+
+![The temp note open beside its thread, with the Notes in progress chip above the empty composer](assets/notes-beside-thread.png)
+
+After Expand: the note open in the side panel with the draft's lines, the
+composer empty, and the **Notes in progress** chip above it.
+
+While the page is a temp note, its header (in the side panel and in Pages)
+has three done actions:
+
+- **Send to thread** sends the page's Markdown as your message. A note over
+  8,000 characters goes as a link to the page and "Summarize these notes"
+  instead, with the content for the agent. The ⌄ menu picks either one.
+- **Keep** asks for a title and keeps the page.
+- **Discard** asks first, then deletes the page.
+
+A sent or kept note stays tagged Notes as an ordinary page, so your meeting
+notes collect in one place; it's no longer a temp note, and the chip goes.
+
+![The note's done actions: Send to thread with its two ways open, Keep and Discard](assets/notes-done-actions.png)
+
+The note reopened from the chip after a reload, with Send's menu open: the
+notes as the message (the default for this length), or a link and a request
+to summarize. Captured in a staged BB (stable BB 0.46.0). Recapture with
+`BB_CAPTURE_ONLY=pages-notes`.
+
+The iOS app can do the same over Studio's `notes.*` RPC methods:
+`notes.create` (text and a thread; adds to the open note), `notes.forThread`,
+`notes.forPage`, `notes.send` (`auto`, `content` or `summarize`),
+`notes.keep` and `notes.discard`.
+
 ### For agents
 
 Agents get eight tools: `pages_list`, `pages_read`, `pages_create`,
@@ -252,7 +305,7 @@ retention. The default is 50. Set 1 to 1000 to keep that many versions, or 0
 to keep all. Lowering the limit removes older versions when that page next
 saves a version. Existing pages use the new limit without a restart.
 
-Pages, versions, uploads, and historical requests live in Studio's SQLite
+Pages, versions, uploads, notes' threads (`page_notes`), and historical requests live in Studio's SQLite
 database in the BB data directory. Uploads are limited to 15 MB each and are
 served back at `/api/v1/plugins/studio/http/pages/files`; a page saved before
 the merge, with `/api/v1/plugins/pages/http/files` addresses in it, shows its

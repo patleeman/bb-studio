@@ -3,6 +3,7 @@ import bb_studio_draw from "./captures/bb-studio-draw.mjs";
 import bb_studio_dashboards from "./captures/bb-studio-dashboards.mjs";
 import bb_studio_talk from "./captures/bb-studio-talk.mjs";
 import bb_studio_pages from "./captures/bb-studio-pages.mjs";
+import bb_studio_notes from "./captures/bb-studio-notes.mjs";
 import bb_studio from "./captures/bb-studio.mjs";
 import bb_studio_bot from "./captures/bb-studio-bot.mjs";
 import bb_studio_artifacts from "./captures/bb-studio-artifacts.mjs";
@@ -21,6 +22,7 @@ export function loadCaptures(context) {
     ...bb_studio_dashboards(context),
     ...bb_studio_talk(context),
     ...bb_studio_pages(context),
+    ...bb_studio_notes(context),
     ...bb_studio(context),
     ...bb_studio_bot(context),
     ...bb_studio_artifacts(context),
