@@ -1005,7 +1005,7 @@ bb studio reindex
 
 ![Switch model… on Relay's Info, a staged bot whose thread was handed off from Codex to Claude Code Opus and then switched in place to Sonnet: the dialog says Now on Claude Code · claude-sonnet-5-5 over BB's own provider/model picker set to Sonnet 5.5](assets/bot-switch-model.png)
 
-![Relay after a Claude Code → Codex handoff: the chat is the new Codex thread, whose real reply says it's here on Codex (gpt-6.1-sol), and its two earlier threads are under Earlier conversations in the Bots sidebar](assets/bot-handoff.png)
+![Relay after a Claude Code → Codex handoff: the chat is the new Codex thread, whose real reply says it's here on Codex (gpt-6.1-sol), and its two earlier threads, each titled Relay, are under Earlier conversations in the Bots sidebar](assets/bot-handoff.png)
 
 ![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
 
