@@ -183,3 +183,20 @@ it("lists the skill curator, pauses it and runs it now, but won't edit or delete
   x.bot.kind = "external";
   expect(await auto.list()).toEqual([]);
 });
+
+it("auto-resume: check-ins are on only while they and their Bot are active; resumes show among the runs", async () => {
+  const x = await setup();
+  const made = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "Summarize my day.", schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["08:00"], timezone: "America/New_York" } });
+  expect(x.auto.resumeTargets()).toEqual([expect.objectContaining({ automationId: "a1", ownerId: made.id, on: true })]);
+  x.bot.state = "paused";
+  expect(x.auto.resumeTargets()[0]!.on).toBe(false);
+  x.bot.state = "stopped";
+  expect(x.auto.resumeTargets()[0]!.on).toBe(false);
+  x.bot.state = "active";
+  await x.auto.setState(made.id, "paused");
+  expect(x.auto.resumeTargets()[0]!.on).toBe(false);
+  await x.auto.setState(made.id, "active");
+  x.db.prepare("INSERT INTO automation_auto_resumes (automation_id, bot_id, owner, owner_id, event, reason, run_id, message, at) VALUES ('a1', 'bot_main', 'automation', ?, 'resumed', 'host disconnected', 'arun_1', 'Resumed after BB turned it off (host disconnected) — 1 of 3 today', ?)").run(made.id, Date.now());
+  expect((await x.auto.runs(made.id))[0]).toMatchObject({ status: "resumed", outcome: expect.stringContaining("1 of 3 today") });
+  expect((await x.auto.list()).find((each) => each.id === made.id)?.lastOutcome).toContain("Resumed after BB");
+});

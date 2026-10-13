@@ -399,23 +399,39 @@ export class Runners {
     if (input.level === "log") return "Logged. Then reply exactly [PASS].";
     const bot = this.deps.bot(row.bot_id);
     if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Then reply exactly [PASS].";
-    // A plain message from this thread (senderThreadId), with an agent-only
-    // note so the Bot doesn't answer it: the user reads the line as it is.
-    await this.deps.sdk.threads.send({
-      threadId: bot.threadId, mode: "auto", senderThreadId: threadId,
-      input: [
-        { type: "text", text: tellLine(row.name, input.level, summary), mentions: [] },
-        { type: "text", text: "Runner report, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS] unless it asks you to act on something.", mentions: [], visibility: "agent-only" },
-      ],
-    } as never);
-    if (input.level === "urgent") {
-      await this.deps.sdk.plugins.callRpc({
-        pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
-        // turn-finished on the Bot's thread: the phone shows its Reply action, and a reply goes to the Bot.
-        input: { title: `${bot.name} · ${row.name}`, body: summary.slice(0, 4000), kind: "turn-finished", threadId: bot.threadId, projectId: PERSONAL_PROJECT_ID, coalesceKey: `runner:${row.id}` } as never,
-      }).catch(() => {});
-    }
+    await this.tell(row, input.level, summary, bot as RunnerBot & { threadId: string });
     return input.level === "urgent" ? "Told the user and pushed to their phone. Then reply exactly [PASS]." : "Told the user. Then reply exactly [PASS].";
+  }
+
+  /** A tell or urgent report's line in the Bot's thread; urgent also pushes to the phone. */
+  private async tell(row: RunnerRow, level: "tell" | "urgent", summary: string, bot: RunnerBot & { threadId: string }): Promise<void> {
+    await alertBot(this.deps.sdk, {
+      botThreadId: bot.threadId, senderThreadId: row.thread_id, line: tellLine(row.name, level, summary),
+      push: level === "urgent" ? { title: `${bot.name} · ${row.name}`, body: summary, coalesceKey: `runner:${row.id}` } : null,
+    });
+  }
+
+  /** Every runner's automation, for auto-resume (src/auto-resume.ts): on while the runner and its Bot are active. */
+  resumeTargets(): { automationId: string; projectId: string; botId: string; ownerId: string; name: string; on: boolean }[] {
+    const rows = this.deps.db.prepare("SELECT * FROM bot_runners WHERE automation_id IS NOT NULL").all() as RunnerRow[];
+    return rows.map((row) => ({
+      automationId: row.automation_id!, projectId: row.automation_project_id ?? row.project_id, botId: row.bot_id, ownerId: row.id, name: row.name,
+      on: row.state === "active" && this.deps.bot(row.bot_id)?.state === "active",
+    }));
+  }
+
+  /** A log entry Studio adds to a runner (an auto-resume): its last report, like runner_report's log. */
+  note(id: string, summary: string): void {
+    this.changedRow(id, { last_level: "log", last_report: summary, last_report_at: Date.now() });
+  }
+
+  /** Studio's own urgent report for a runner (auto-resume past its cap): Needs you, the phone and one line in the Bot's chat. */
+  async alert(id: string, summary: string): Promise<void> {
+    const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
+    if (!row) return;
+    this.changedRow(row.id, { last_level: "urgent", last_report: summary, last_report_at: Date.now(), urgent: 1 });
+    const bot = this.deps.bot(row.bot_id);
+    if (bot?.threadId) await this.tell(row, "urgent", summary, bot as RunnerBot & { threadId: string });
   }
 
   /** Threads the Bot started (or whose automation it made) that an automation wakes, not yet runners. */
@@ -464,6 +480,28 @@ export class Runners {
     await this.hide({ id, bot_id: bot.id, thread_id: input.threadId }, thread?.parentThreadId ? { parentThreadId: null } : {});
     this.deps.changed();
     return this.one(id);
+  }
+}
+
+/**
+ * One line in a Bot's thread the user reads as is (runner reports, Studio's
+ * own alerts), with an agent-only note so the Bot doesn't answer it; with
+ * `push`, also a phone push (Studio Mobile's notify) whose Reply goes to the Bot.
+ */
+export async function alertBot(sdk: Sdk, input: { botThreadId: string; senderThreadId?: string | null; line: string; note?: string; push?: { title: string; body: string; coalesceKey: string } | null }): Promise<void> {
+  await sdk.threads.send({
+    threadId: input.botThreadId, mode: "auto", ...(input.senderThreadId ? { senderThreadId: input.senderThreadId } : {}),
+    input: [
+      { type: "text", text: input.line, mentions: [] },
+      { type: "text", text: input.note ?? "Runner report, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS] unless it asks you to act on something.", mentions: [], visibility: "agent-only" },
+    ],
+  } as never);
+  if (input.push) {
+    await sdk.plugins.callRpc({
+      pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
+      // turn-finished on the Bot's thread: the phone shows its Reply action, and a reply goes to the Bot.
+      input: { title: input.push.title, body: input.push.body.slice(0, 4000), kind: "turn-finished", threadId: input.botThreadId, projectId: PERSONAL_PROJECT_ID, coalesceKey: input.push.coalesceKey } as never,
+    }).catch(() => {});
   }
 }
 

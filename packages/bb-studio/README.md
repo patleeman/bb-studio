@@ -1130,6 +1130,27 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `automation_update`, `automation_pause`, `automation_resume`,
   `automation_run_now` and `automation_delete` ("in 2h check the deploy" is
   a reminder); `runner_*` still work.
+
+  **Turned off by BB** (`src/auto-resume.ts`, table
+  `automation_auto_resumes`): BB turns an automation off after its runs
+  fail, even for a passing reason. Studio turns a runner's automation, the
+  Bot's check-in or a check-in or watcher back on when every failed run
+  since the last good one was transient: the host daemon disconnected or
+  restarted, the connection to the host was lost, the provider stopped
+  sending progress, or the target thread was "unavailable … or not
+  runnable" while it still exists, not archived or deleted (`threads.get`,
+  hidden threads included). It leaves off what you paused (no failed last
+  run, paused in BB after the failure, or paused through Studio's Pause or
+  Stop), anything of a paused or stopped Bot, reminders, and automations
+  whose target thread is gone or archived. Each resume logs a line,
+  "Resumed after BB turned it off (host disconnected) — 1 of 3 today": a
+  runner's last report (log level), or a check-in's or watcher's last
+  outcome and runs. At most three resumes per automation in a rolling 24
+  hours; past that it stays off and goes to the owning Bot's **Needs you**
+  with a phone push and one line in its chat (the urgent `runner_report`
+  path), once per failure, until it's on again. Studio checks at startup,
+  on the five-minute sweep and shortly after a runner's or Bot's thread
+  goes idle or fails; the plugin SDK has no automation events.
   ![Info's Automations in a staged BB: Dot's original Check-in (weekdays 8:00), the Skill curator (weekly, when idle) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; the Bots sidebar lists the reminder and the evening check-in under Recurring](assets/bot-automations.png)
 
 - **Schedule editor** (`src/ui/bot/ScheduleEditor.tsx`, compiled by

@@ -251,3 +251,25 @@ it("hides runners from before once at startup, retries a failed hide, and never 
   expect(x.threads.get("bot2")?.visibility).not.toBe("hidden");
   expect(x.update.mock.calls.filter(([args]) => args.threadId === "bot1" || args.threadId === "bot2")).toEqual([]);
 });
+
+it("auto-resume: a runner's automation is on only while the runner and its Bot are active; past the cap it reports urgent", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  expect(x.runners.resumeTargets()).toEqual([expect.objectContaining({ ownerId: runner.id, botId: "bot_main", on: true })]);
+  x.bot.state = "paused";
+  expect(x.runners.resumeTargets()[0]!.on).toBe(false);
+  x.bot.state = "stopped";
+  expect(x.runners.resumeTargets()[0]!.on).toBe(false);
+  x.bot.state = "active";
+  await x.runners.setState(runner.id, "paused");
+  expect(x.runners.resumeTargets()[0]!.on).toBe(false);
+  await x.runners.setState(runner.id, "active");
+  x.runners.note(runner.id, "Resumed after BB turned it off (host disconnected) — 1 of 3 today");
+  expect((await x.runners.list())[0]).toMatchObject({ lastLevel: "log", lastReport: expect.stringContaining("1 of 3"), urgent: false });
+  x.send.mockClear();
+  await x.runners.alert(runner.id, "Inbox is off");
+  expect((await x.runners.list())[0]).toMatchObject({ lastLevel: "urgent", urgent: true });
+  expect(x.runners.threads().get(runner.threadId!)).toEqual({ urgent: true });
+  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "bot1", input: expect.arrayContaining([expect.objectContaining({ text: tellLine("Inbox", "urgent", "Inbox is off") })]) }));
+  expect(x.calls.some((call) => call.pluginId === "mobile" && call.method === "notify")).toBe(true);
+});

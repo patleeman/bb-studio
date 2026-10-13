@@ -260,6 +260,8 @@ export interface BotDeps {
   ownedThreads?(botId: string): ReadonlySet<string>;
   /** A Bot got a thread (made, set or handed off): its chain leaves BB's thread list (src/bot-owned.ts). */
   claimChains?(): Promise<unknown>;
+  /** Automations BB kept turning off that Studio stopped resuming (src/auto-resume.ts): Needs you until they're on again. */
+  automationAlerts?(botId: string): readonly { name: string; message: string; at: number }[];
   /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
   automations?: {
     pauseAll(botId: string, onPaused?: (id: string) => void): Promise<string[]>;
@@ -931,6 +933,14 @@ export class Bots {
     const urgent = [...runnerThreads].filter(([, runner]) => runner.urgent).map(([id]) => id).filter((id) => !needsYou.some((thread) => thread.id === id));
     for (const thread of await Promise.all(urgent.map((threadId) => this.deps.sdk.threads.get({ threadId }).catch(() => null)))) {
       if (thread && !thread.archivedAt) needsYou.push({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled runner", status: thread.status, projectId: thread.projectId ?? null, updatedAt: thread.updatedAt ?? 0, relation: "started", needsYou: true, parentId: null });
+    }
+    // An automation past its auto-resume cap: one entry, opening the Bot's chat, where its line is.
+    const alerts = this.deps.automationAlerts?.(bot.id) ?? [];
+    if (alerts.length && !needsYou.some((thread) => thread.id === bot.threadId)) {
+      needsYou.unshift({
+        id: bot.threadId, title: alerts.length === 1 ? alerts[0]!.message : `${alerts.length} automations are off after failing: ${alerts.map((each) => each.name).join(", ")}`,
+        status: "idle", projectId: threads.find((thread) => thread.id === bot.threadId)?.projectId ?? PERSONAL_PROJECT_ID, updatedAt: Math.max(...alerts.map((each) => each.at)), relation: "self", needsYou: true, parentId: null,
+      });
     }
     const HEARTBEAT_NAME = heartbeatName(bot.primary === false ? `${BOT_RUN_PREFIX}${bot.id}` : PERSONAL_PROJECT_ID);
     const scheduled: BotScheduledView[] = automations.rows.filter((automation) => !automation.execution.targetThreadId || !runnerThreads.has(automation.execution.targetThreadId)).map((automation) => ({

@@ -304,4 +304,13 @@ export const MIGRATIONS = [
        thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, reason TEXT NOT NULL, hidden_at INTEGER NOT NULL
      );
    CREATE INDEX bot_hidden_threads_bot ON bot_hidden_threads (bot_id);`,
+  // Studio's auto-resumes of runner and Bot automations BB turned off after a
+  // transient failure (src/auto-resume.ts). Append-only: a resume, the cap
+  // reached (once per failed run) and cleared once it's on again; the cap
+  // counts resumes in the last 24 hours.
+  `CREATE TABLE automation_auto_resumes (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, automation_id TEXT NOT NULL, bot_id TEXT NOT NULL, owner TEXT NOT NULL, owner_id TEXT NOT NULL,
+       event TEXT NOT NULL, reason TEXT, run_id TEXT, message TEXT, at INTEGER NOT NULL
+     );
+   CREATE INDEX automation_auto_resumes_automation ON automation_auto_resumes (automation_id, at);`,
 ];

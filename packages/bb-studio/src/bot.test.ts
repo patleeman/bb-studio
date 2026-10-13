@@ -620,3 +620,14 @@ it("Pause and Stop turn the Bot's own automations off; Resume turns back on only
   expect(automations.restore.mock.calls.map(([id]) => id)).toEqual(["aut_on"]);
   expect([...states.values()]).toEqual(["active", "paused"]);
 });
+
+it("puts a Bot automation past its auto-resume cap in Needs you, opening the Bot's chat", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", status: "idle" });
+  await x.bots.setThread("bot1");
+  let alerts = [{ name: "Brief", message: "Brief is off: BB turned it off again (host disconnected) after 3 resumes today. Check it, then resume it.", at: 5 }];
+  (x.bots as unknown as { deps: { automationAlerts(): unknown } }).deps.automationAlerts = () => alerts;
+  expect((await x.bots.activity()).needsYou).toEqual([expect.objectContaining({ id: "bot1", relation: "self", needsYou: true, title: expect.stringContaining("Brief is off") })]);
+  alerts = [];
+  expect((await x.bots.activity()).needsYou).toEqual([]);
+});

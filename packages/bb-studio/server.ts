@@ -42,7 +42,8 @@ import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { Bots, SKILL_NAME } from "./src/bot";
-import { parseSchedule, Runners } from "./src/runners";
+import { alertBot, parseSchedule, Runners } from "./src/runners";
+import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
 import { Automations } from "./src/automations";
 import { lintSkill, patchText, REVIEW_TOOLS, SkillLearning } from "./src/skill-learning";
@@ -346,6 +347,7 @@ export default async function plugin(bb: BbPluginApi) {
     ownedThreads: (botId) => ownedThreads.owned(botId),
     claimChains: () => ownedThreads.claimChains(),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
+    automationAlerts: (botId) => autoResume.alerts(botId).filter((alert) => alert.owner !== "runner"),
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
       restore: (id) => automations.restore(id),
@@ -373,7 +375,8 @@ export default async function plugin(bb: BbPluginApi) {
   });
   const sweepOwned = () => void ownedThreads.sweep().catch((error) => bb.log.warn(`Hiding Bot threads failed: ${errorText(error)}`));
   bb.events.on("thread.created", ({ thread }) => void ownedThreads.created(thread).catch(() => {}));
-  const ownedTimer = setInterval(sweepOwned, 5 * 60_000);
+  // The same five-minute sweep turns back on automations BB turned off (resumeSweep, below).
+  const ownedTimer = setInterval(() => { sweepOwned(); resumeSweep(); }, 5 * 60_000);
   bb.onDispose(() => { clearInterval(ownedTimer); ownedThreads.dispose(); });
   void runners.hideThreads().catch((error) => bb.log.warn(`Hiding runner threads failed: ${errorText(error)}`)).finally(sweepOwned);
   // A Bot's automations (src/automations.ts): check-ins, reminders, watchers, and its runners in the same list.
@@ -406,6 +409,42 @@ export default async function plugin(bb: BbPluginApi) {
       run: async (botId) => { await learning.curate(botId); },
     },
   });
+  // Runner and Bot automations BB turned off after a transient failure come
+  // back on (src/auto-resume.ts), at most three times a day each; past that,
+  // Needs you. At startup, on the five-minute sweep, and soon after a
+  // target thread goes idle or fails.
+  const resumeTargets = (): ResumeTarget[] => [
+    ...runners.resumeTargets().map((target) => ({ ...target, owner: "runner" as const })),
+    ...bots.list().flatMap((bot) => {
+      const key = bots.heartbeatKey(bot.id);
+      const run = key ? projectLeads.runs.get(key) : null;
+      const automation = key ? projectLeads.runs.automation(key) : null;
+      return automation ? [{ automationId: automation.id, projectId: automation.projectId, botId: bot.id, owner: "checkin" as const, ownerId: "heartbeat", name: `${bot.name}'s check-in`, on: !!run?.enabled && bot.state === "active" }] : [];
+    }),
+    ...automations.resumeTargets().map((target) => ({ ...target, owner: "automation" as const })),
+  ];
+  const autoResume = new AutoResume({
+    db, sdk: bb.sdk, targets: resumeTargets, log: (message) => bb.log.warn(message),
+    resumed: (target, line) => { if (target.owner === "runner") runners.note(target.ownerId, line); else tagsChanged(); },
+    exhausted: async (target, line) => {
+      if (target.owner === "runner") { await runners.alert(target.ownerId, line); return; }
+      tagsChanged();
+      const bot = bots.stored(target.botId);
+      if (bot?.threadId) {
+        await alertBot(bb.sdk, {
+          botThreadId: bot.threadId, line: `⚠️ ${line}`,
+          note: "Studio notice, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS].",
+          push: { title: `${bot.name} · ${target.name}`, body: line, coalesceKey: `auto-resume:${target.automationId}` },
+        });
+      }
+    },
+  });
+  const resumeSweep = () => void autoResume.sweep().catch((error) => bb.log.warn(`Auto-resume failed: ${errorText(error)}`));
+  bb.onDispose(() => autoResume.dispose());
+  const resumeSoon = (threadId: string) => { if (runners.forThread(threadId) || bots.list().some((bot) => bot.threadId === threadId)) autoResume.later(); };
+  bb.events.on("thread.idle", ({ thread }) => resumeSoon(thread.id));
+  bb.events.on("thread.failed", ({ thread }) => resumeSoon(thread.id));
+  resumeSweep();
   // Skills that learn (src/skill-learning.ts): background reviews of a Bot's work and the weekly curator.
   const learningBot = (bot: NonNullable<ReturnType<typeof bots.stored>>) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, kind: bot.kind ?? "studio" });
   const learning: SkillLearning = new SkillLearning({

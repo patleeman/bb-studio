@@ -28,6 +28,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { BotAutomationRunView, BotAutomationView, HeartbeatRun } from "./contract";
+import { resumeLog } from "./auto-resume";
 import { compileSchedule, describeSchedule, endOfDay, fromHeartbeat, localZone, type Schedule, type Trigger } from "./schedule";
 
 type Sdk = BbPluginApi["sdk"];
@@ -287,7 +288,7 @@ export class Automations {
         instruction: "What your Memory page's Check-in section says.",
         schedule: fromHeartbeat(heartbeat), scheduleText: describeSchedule(fromHeartbeat(heartbeat)),
         state: heartbeat.enabled ? "active" : "paused", nextRunAt: heartbeat.enabled ? automation?.nextRunAt ?? null : null, lastRunAt: automation?.lastRunAt ?? null,
-        lastOutcome: automation?.lastRunStatus ?? null, model: null, script: null, target: "main", targetName: bot.name, threadId: bot.threadId,
+        lastOutcome: this.resumedSince(hbAutomation ? [hbAutomation.id] : [], automation?.lastRunAt) ?? automation?.lastRunStatus ?? null, model: null, script: null, target: "main", targetName: bot.name, threadId: bot.threadId,
       });
     }
     const curator = bot.kind === "external" ? null : this.deps.curator?.get(bot.id) ?? null;
@@ -313,7 +314,7 @@ export class Automations {
         id: row.id, kind: row.kind, name: row.name, original: false, instruction: row.instruction,
         schedule, scheduleText: describeSchedule(schedule),
         state, nextRunAt: state === "active" && Number.isFinite(next) ? next : null, lastRunAt: Math.max(last, row.last_fired_at ?? 0) || null,
-        lastOutcome: row.kind === "watcher" && row.last_fire ? `Woke it: ${row.last_fire.split("\n")[0]!.slice(0, 200)}` : automations.find((each) => each.lastRunAt === last)?.lastRunStatus ?? null,
+        lastOutcome: this.resumedSince(this.ids(row), Math.max(last, row.last_fired_at ?? 0)) ?? (row.kind === "watcher" && row.last_fire ? `Woke it: ${row.last_fire.split("\n")[0]!.slice(0, 200)}` : automations.find((each) => each.lastRunAt === last)?.lastRunStatus ?? null),
         model: row.kind === "watcher" ? null : { model: row.model, reasoning: row.reasoning },
         script: row.kind === "watcher" ? { body: row.script ?? "", interpreter: (row.interpreter ?? "bash") as Interpreter, timeoutMs: row.timeout_ms ?? 120_000, workingDirectory: row.working_dir ?? null, envKeys: row.env_json ? Object.keys(JSON.parse(row.env_json) as object) : [] } : null,
         target: row.target, targetName: runner?.name ?? bot.name, threadId: runner ? runner.threadId : bot.threadId,
@@ -329,6 +330,21 @@ export class Automations {
       });
     }
     return views;
+  }
+
+  /** Studio's latest auto-resume (src/auto-resume.ts) of these BB automations, when it came after their last run. */
+  private resumedSince(bbIds: string[], lastRunAt: number | null | undefined): string | null {
+    const latest = resumeLog(this.deps.db, bbIds, 1)[0];
+    return latest && latest.at > (lastRunAt ?? 0) ? latest.message : null;
+  }
+
+  /** The BB automations of check-ins and watchers, for auto-resume (src/auto-resume.ts): on while the row and its Bot are active. Reminders run once and aren't resumed. */
+  resumeTargets(): { automationId: string; projectId: string; botId: string; ownerId: string; name: string; on: boolean }[] {
+    const rows = this.deps.db.prepare("SELECT * FROM bot_automations WHERE kind != 'reminder'").all() as Row[];
+    return rows.flatMap((row) => {
+      const on = row.state === "active" && this.deps.bot(row.bot_id)?.state === "active";
+      return this.ids(row).map((automationId) => ({ automationId, projectId: row.project_id, botId: row.bot_id, ownerId: row.id, name: row.name, on }));
+    });
   }
 
   /** Check-ins and reminders follow the Bot's thread when it's handed off. */
@@ -522,9 +538,12 @@ export class Automations {
       else { const row = this.row(id, bot.id); kind = row.kind; targets = this.ids(row).map((bbId) => ({ id: bbId, projectId: row.project_id })); }
     }
     const runs = (await Promise.all(targets.map((target) => this.bbRuns(target, limit)))).flat();
-    return runs.sort((a, b) => (b.startedAt ?? b.scheduledFor ?? 0) - (a.startedAt ?? a.scheduledFor ?? 0)).slice(0, limit).map((run) => ({
+    const views: BotAutomationRunView[] = runs.map((run) => ({
       id: run.id, at: run.startedAt ?? run.scheduledFor ?? 0, status: run.status, manual: run.trigger === "manual", outcome: runOutcome(kind, run), threadId: run.threadId ?? null,
     }));
+    // Studio's auto-resumes show among the runs (src/auto-resume.ts).
+    for (const resume of resumeLog(this.deps.db, targets.map((target) => target.id), limit)) views.push({ id: resume.id, at: resume.at, status: "resumed", manual: false, outcome: resume.message, threadId: null });
+    return views.sort((a, b) => b.at - a.at).slice(0, limit);
   }
 
   private async bbRuns(target: { id: string; projectId: string }, limit: number): Promise<BbRun[]> {
