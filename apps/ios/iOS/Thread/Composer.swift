@@ -126,9 +126,12 @@ struct ComposerBar<Settings: View, Send: View>: View {
                 } else {
                     Button(action: dictate) {
                         Image(systemName: "mic").font(.title3).frame(width: 36, height: 36)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Dictate")
+                    .accessibilityIdentifier("composerMic")
                 }
                 send()
             }

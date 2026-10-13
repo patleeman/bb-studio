@@ -63,13 +63,15 @@ struct BotChromeToolbar: ViewModifier {
     }
 }
 
-/// The Bot's composer floats on Liquid Glass.
+/// The Bot's composer floats on Liquid Glass. Not `.interactive()`: that
+/// glass takes the touches meant for the mic's hold-to-talk gesture, so a tap
+/// on the mic focused the field instead.
 struct BotComposerGlass: ViewModifier {
     let active: Bool
 
     func body(content: Content) -> some View {
         if active {
-            content.glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
+            content.glassEffect(.regular, in: .rect(cornerRadius: 24))
         } else {
             content
         }

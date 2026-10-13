@@ -110,6 +110,32 @@ final class HoldToTalk: ObservableObject {
         }
     }
 
+    enum TapAction: Equatable { case dictate, send, none }
+
+    /// A tap on the mic: send a hands-free talk, else open dictation. While a
+    /// talk is still transcribing the mic looks idle, so it still dictates.
+    static func tapAction(for state: State) -> TapAction {
+        switch state {
+        case .handsFree: .send
+        case .idle, .sending: .dictate
+        case .recording, .cancelling: .none
+        }
+    }
+
+    func tap(dictate: () -> Void) {
+        switch Self.tapAction(for: state) {
+        case .send: release()
+        case .dictate: dictate()
+        case .none: break
+        }
+    }
+
+    /// The hold ended without `onEnded` (the system cancelled the gesture):
+    /// stop unsent, so the mic doesn't stay stuck recording.
+    func holdLost() {
+        if state == .recording || state == .cancelling { cancel() }
+    }
+
     /// The Action button: start hands-free, or send what it started.
     func toggleHandsFree() {
         if isActive { release() } else if state == .idle { press(handsFree: true) }
@@ -144,6 +170,8 @@ struct TalkLifecycle: ViewModifier {
 struct HoldToTalkMic: View {
     @ObservedObject var talk: HoldToTalk
     let tap: () -> Void
+    /// Resets when the hold ends any way, including a cancelled gesture.
+    @GestureState private var holding = false
 
     var body: some View {
         Image(systemName: talk.isActive ? "mic.fill" : "mic")
@@ -153,20 +181,26 @@ struct HoldToTalkMic: View {
             .background(talk.isActive ? (talk.state == .cancelling ? Color.gray : Color.red) : .clear, in: .circle)
             .scaleEffect(talk.isActive ? 1.15 : 1)
             .animation(.snappy, value: talk.state)
-            .contentShape(.circle)
+            // A 44pt target around the 36pt circle.
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
             .gesture(
                 LongPressGesture(minimumDuration: 0.25)
                     .sequenced(before: DragGesture(minimumDistance: 0))
+                    .updating($holding) { value, holding, _ in
+                        if case .second(true, _) = value { holding = true }
+                    }
                     .onChanged { value in
                         guard case .second(true, let drag) = value else { return }
                         if talk.state == .idle { talk.press() }
                         if let drag { talk.drag(drag.translation) }
                     }
                     .onEnded { _ in talk.release() }
-                    .exclusively(before: TapGesture().onEnded {
-                        if talk.state == .handsFree { talk.release() } else if talk.state == .idle { tap() }
-                    })
+                    .exclusively(before: TapGesture().onEnded { talk.tap(dictate: tap) })
             )
+            .onChange(of: holding) { _, holding in if !holding { talk.holdLost() } }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("composerMic")
             .accessibilityLabel("Dictate")
             .accessibilityHint("Hold to talk and send. Slide left before letting go to cancel.")
             .accessibilityAction(named: "Talk and send") { talk.toggleHandsFree() }
