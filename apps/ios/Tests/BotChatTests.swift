@@ -210,26 +210,11 @@ final class BotChatTests: XCTestCase {
         XCTAssertEqual(BotChatEntry.date(1_760_000_000_000), Date(timeIntervalSince1970: 1_760_000_000))
     }
 
-    // MARK: Activity sections
-
-    func testActivityShowsOnlyNonEmptySectionsInOrder() throws {
-        let activity = try JSONDecoder().decode(BotActivity.self, from: Data("""
-        {"needsYou":[{"id":"t1","title":"Deploy","status":"running","relation":"started","needsYou":true,"updatedAt":1}],
-         "waiting":[],
-         "inProgress":[{"id":"t2","title":"Research","status":"running","relation":"started","needsYou":false,"updatedAt":2}],
-         "scheduled":[{"id":"h","kind":"heartbeat","name":"Check-in","enabled":true,"nextRunAt":3},
-                      {"id":"a","kind":"automation","name":"Off one","enabled":false}],
-         "completed":[]}
-        """.utf8))
-        let sections = BotActivitySection.sections(activity)
-        XCTAssertEqual(sections.map(\.kind), [.needsYou, .running, .scheduled])
-        XCTAssertEqual(sections[2].rows.count, 1)
-        XCTAssertEqual(BotActivitySection.sections(nil), [])
-    }
+    // MARK: Activity
 
     func testOlderStudioWithoutWaitingStillDecodes() throws {
         let activity = try JSONDecoder().decode(BotActivity.self, from: Data(#"{"needsYou":[],"inProgress":[],"scheduled":[],"completed":[{"id":"t","title":"Done","status":"idle","relation":"started","needsYou":false,"updatedAt":1}]}"#.utf8))
         XCTAssertNil(activity.waiting)
-        XCTAssertEqual(BotActivitySection.sections(activity).map(\.title), ["Recent"])
+        XCTAssertEqual(BotThreadGroups(activity).recent.map(\.thread.id), ["t"])
     }
 }

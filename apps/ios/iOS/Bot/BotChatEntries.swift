@@ -216,47 +216,6 @@ enum BotChatEntry: Identifiable, Equatable {
     }
 }
 
-/// The Bot's Activity, as sections: only the ones with something in them.
-struct BotActivitySection: Identifiable, Equatable {
-    enum Kind: String { case needsYou, waiting, running, scheduled, recent }
-    enum Row: Equatable, Identifiable {
-        case thread(BotActivity.Thread)
-        case scheduled(BotActivity.Scheduled)
-        var id: String {
-            switch self {
-            case .thread(let thread): thread.id
-            case .scheduled(let item): "scheduled:\(item.id)"
-            }
-        }
-    }
-
-    let kind: Kind
-    let rows: [Row]
-    var id: String { kind.rawValue }
-
-    var title: String {
-        switch kind {
-        case .needsYou: "Needs you"
-        case .waiting: "Waiting"
-        case .running: "Running"
-        case .scheduled: "Scheduled"
-        case .recent: "Recent"
-        }
-    }
-
-    static func sections(_ activity: BotActivity?) -> [BotActivitySection] {
-        guard let activity else { return [] }
-        let all: [BotActivitySection] = [
-            .init(kind: .needsYou, rows: activity.needsYou.map(Row.thread)),
-            .init(kind: .waiting, rows: (activity.waiting ?? []).map(Row.thread)),
-            .init(kind: .running, rows: activity.inProgress.map(Row.thread)),
-            .init(kind: .scheduled, rows: activity.scheduled.filter(\.enabled).map(Row.scheduled)),
-            .init(kind: .recent, rows: activity.completed.map(Row.thread)),
-        ]
-        return all.filter { !$0.rows.isEmpty }
-    }
-}
-
 /// The Bot's status line under its name.
 enum BotStatus {
     static func line(state: BotInfo.State?, running: Bool, thinking: String?, needsYou: Int, lead: ThreadLead?) -> String {

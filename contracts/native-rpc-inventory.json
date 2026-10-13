@@ -380,6 +380,18 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/BotThreads.swift",
+      "plugin": "studio",
+      "method": "bot_chain",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BotThreads.swift",
+      "plugin": "studio",
+      "method": "bot_runner_seen",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/Designs.swift",
       "plugin": "studio",
       "method": "designs.getDesign",

@@ -35,7 +35,7 @@ struct BotTab: View {
                 .sheet(item: $sheet, onDismiss: { attempt += 1 }) { sheet in
                     switch sheet {
                     case .activity:
-                        BotActivitySheet(bot: bot, botId: botId, activity: activity) { id in
+                        BotThreadsSheet(bot: bot, botId: botId, activity: activity) { id in
                             self.sheet = nil
                             path.append(.thread(id: id))
                         } refresh: { await loadActivity() }

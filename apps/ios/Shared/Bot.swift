@@ -366,6 +366,8 @@ public struct BotRunner: Decodable, Hashable, Sendable, Identifiable {
     public struct Schedule: Decodable, Hashable, Sendable { public var cadence: String?; public var time: String?; public var cron: String? }
     public var id: String
     public var name: String
+    /// The runner's own thread; opening the runner opens it.
+    public var threadId: String?
     public var state: String?
     public var schedule: Schedule?
     public var nextRunAt: Double?
@@ -434,6 +436,8 @@ public struct BotActivity: Decodable, Hashable, Sendable {
         public var relation: String
         public var needsYou: Bool
         public var updatedAt: Double
+        /// The listed thread that started this one; nil when the Bot did (or older Studios).
+        public var parentId: String?
     }
     public struct Scheduled: Decodable, Hashable, Sendable, Identifiable {
         public var id: String
