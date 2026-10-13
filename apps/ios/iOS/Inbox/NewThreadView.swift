@@ -16,6 +16,7 @@ struct NewThreadView: View {
     @State private var focused = false
     @State private var creating = false
     @State private var error: String?
+    @State private var creatingProject = false
 
     // Execution options. Empty means the project default.
     @State private var defaults: ExecutionChoice?
@@ -56,9 +57,18 @@ struct NewThreadView: View {
             .sheet(isPresented: $dictating) {
                 DictationView(threadId: nil, autoStart: true) { text += (text.isEmpty ? "" : " ") + $0 }
             }
+            .sheet(isPresented: $creatingProject) {
+                NewProjectView { project in
+                    if !projects.contains(where: { $0.id == project.id }) { projects.append(project) }
+                    projectId = project.id
+                }
+            }
             .task {
-                projects = (try? await client.projects()) ?? []
-                if !projects.contains(where: { $0.id == projectId }) { projectId = projects.first?.id ?? "" }
+                // Like desktop, a thread needs no project: it starts in the personal one.
+                if projectId.isEmpty { projectId = NewThreadProject.personalId }
+                guard let loaded = try? await client.projects() else { return }
+                projects = loaded
+                projectId = NewThreadProject.resolve(saved: projectId, projects: loaded)
             }
             .task(id: projectId) {
                 guard !projectId.isEmpty else { return }
@@ -121,23 +131,24 @@ struct NewThreadView: View {
         (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty) && !projectId.isEmpty && !creating
     }
 
-    /// The project the thread starts in.
+    /// The project the thread starts in. Optional, as on desktop: "No project"
+    /// is BB's personal project.
     private var placeChip: some View {
         Menu {
             Section("Project") {
                 Picker("Project", selection: $projectId) {
+                    Text(NewThreadProject.personalLabel).tag(NewThreadProject.personalId)
                     ForEach(projects) { Text($0.name).tag($0.id) }
                 }
                 .pickerStyle(.inline)
             }
+            Button { creatingProject = true } label: { Label("New project…", systemImage: "folder.badge.plus") }
+                .accessibilityIdentifier("newThreadNewProject")
         } label: {
-            chip(placeLabel, systemImage: "folder")
+            chip(NewThreadProject.label(projectId, projects: projects),
+                 systemImage: projectId == NewThreadProject.personalId ? "folder.badge.minus" : "folder")
         }
         .accessibilityIdentifier("newThreadProject")
-    }
-
-    private var placeLabel: String {
-        projects.first { $0.id == projectId }?.name ?? "Project"
     }
 
     private var workspaceChip: some View {

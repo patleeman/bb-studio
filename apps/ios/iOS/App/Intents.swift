@@ -113,9 +113,7 @@ struct AskBBIntent: AppIntent {
             baseline = try await client.latestReply(threadId)?.id
             try await client.send(threadId, text: message)
         } else {
-            guard let projectId = try await defaultProjectId(client) else {
-                return .result(value: "", dialog: "BB has no projects to start a thread in.")
-            }
+            let projectId = try await defaultProjectId(client)
             threadId = try await client.createThread(projectId: projectId, text: message).id
             baseline = nil
         }
@@ -130,10 +128,10 @@ struct AskBBIntent: AppIntent {
         return .result(value: reply, dialog: IntentDialog(stringLiteral: dialog))
     }
 
-    private func defaultProjectId(_ client: BBClient) async throws -> String? {
+    private func defaultProjectId(_ client: BBClient) async throws -> String {
         let projects = try await client.projects()
         let saved = AppGroup.defaults.string(forKey: ServerScope.key("newThreadProjectId", serverURL: client.baseURL))
-        return projects.first { $0.id == saved }?.id ?? projects.first?.id
+        return NewThreadProject.resolve(saved: saved, projects: projects)
     }
 }
 
