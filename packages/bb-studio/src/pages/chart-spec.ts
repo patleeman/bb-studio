@@ -34,6 +34,9 @@ export const statItemSchema = z
 export const statItemsSchema = z.array(statItemSchema).min(1).max(6);
 export type StatItem = z.infer<typeof statItemSchema>;
 
+/** Series colors for charts: Pages' chart blocks and dashboard charts. */
+export const SERIES_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ec4899", "#0ea5e9", "#84cc16", "#a855f7", "#ef4444"];
+
 export interface ResolvedChart {
   spec: ChartSpec;
   x: string;

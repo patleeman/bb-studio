@@ -66,6 +66,11 @@ describe("frontend bundle", () => {
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(PageEditor|PageView|PanelShell|PagePanel|PagesPanel|connection)$/.test(spec))).toEqual([]);
   });
 
+  it("loads the dashboard grid only when a dashboard opens", () => {
+    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /^(react-grid-layout|react-draggable|react-resizable)/.test(spec))).toEqual([]);
+    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(dashboard-view|widgets|settings-sheet|custom-frame)$/.test(spec))).toEqual([]);
+  });
+
   it("loads Excalidraw only when a drawing opens", () => {
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => spec.startsWith("@excalidraw/"))).toEqual([]);
   });

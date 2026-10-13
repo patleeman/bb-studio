@@ -1,0 +1,54 @@
+/* Dashboards' grid: react-grid-layout's and react-resizable's styles
+   (MIT), in Studio's colors. Imported by app.tsx; only dashboard pages
+   use these classes. */
+.dashboard-grid .react-grid-layout { position: relative; transition: height 200ms ease; }
+.dashboard-grid .react-grid-item { transition: all 200ms ease; transition-property: left, top, width, height; }
+.dashboard-grid .react-grid-item img { pointer-events: none; user-select: none; }
+.dashboard-grid .react-grid-item.cssTransforms { transition-property: transform, width, height; }
+.dashboard-grid .react-grid-item.resizing { transition: none; z-index: 1; will-change: width, height; }
+.dashboard-grid .react-grid-item.react-draggable-dragging { transition: none; z-index: 3; will-change: transform; }
+.dashboard-grid .react-grid-item.dropping { visibility: hidden; }
+.dashboard-grid .react-grid-item.react-grid-placeholder {
+  background: var(--primary, #6366f1);
+  border-radius: 0.5rem;
+  opacity: 0.15;
+  transition-duration: 100ms;
+  z-index: 2;
+  user-select: none;
+}
+.dashboard-grid .react-grid-item.react-grid-placeholder.placeholder-resizing { transition: none; }
+.dashboard-grid .react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  z-index: 4;
+}
+.dashboard-grid .react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.45;
+}
+.dashboard-grid .react-resizable-hide > .react-resizable-handle { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-grid .react-grid-layout,
+  .dashboard-grid .react-grid-item { transition: none; }
+}
+
+/* The ticker scrolls its two copies of the strip; with reduced motion it
+   doesn't move and scrolls by hand instead. */
+@keyframes dashboard-ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.dashboard-ticker-track { animation: dashboard-ticker linear infinite; }
+.dashboard-ticker:hover .dashboard-ticker-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-ticker { overflow-x: auto; }
+  .dashboard-ticker-track { animation: none; }
+}

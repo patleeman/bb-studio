@@ -21,7 +21,7 @@ import {
 import { PRIMARY_BUTTON, studioItemProps, studioThreadProps } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
-import { chartSpecSchema, parseJsonWith, resolveChart, statItemsSchema, type StatItem } from "../chart-spec";
+import { chartSpecSchema, parseJsonWith, resolveChart, SERIES_COLORS, statItemsSchema, type StatItem } from "../chart-spec";
 import { ThreadTitle } from "@get-bb/plugin-sdk/app";
 import { calloutConfig, chartConfig, EMBED_KINDS, type EmbedKind, embedConfig, isStudioEmbed, mentionConfig, statsConfig } from "../schema-config";
 import { pagePath } from "../constants";
@@ -42,7 +42,7 @@ const TONES = {
 } as const;
 const TONE_ORDER = ["info", "success", "warning", "danger"] as const;
 
-export const SERIES_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ec4899", "#0ea5e9", "#84cc16", "#a855f7", "#ef4444"];
+export { SERIES_COLORS };
 
 const Callout = createReactBlockSpec(calloutConfig, {
   render: ({ block, editor, contentRef }) => {

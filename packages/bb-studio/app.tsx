@@ -17,6 +17,7 @@ import { ExcalidrawPicker } from "./src/draw/ui/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./src/draw/ui/composer-registration";
 import { DESIGN_ICON, DESIGN_TAB, isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
+import { isDashboardId } from "./src/dashboards/shared";
 import { QuestionFormView } from "./src/design/ui/question-form";
 import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
@@ -26,6 +27,7 @@ import { TalkBridge } from "./src/pages/ui/talk-bridge";
 import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
 import "./src/pages/ui/styles.css";
+import "./src/dashboards/ui/dashboards.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
@@ -82,6 +84,8 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   designs: { isId: isDesignId, View: lazy(() => import("./src/design/ui/route")) },
   // A recording's page, and the audio this device kept (`recordings/unsent`).
   recordings: { isId: (id) => isRecordingId(id) || id === UNSENT_PATH, View: lazy(() => import("./src/talk/ui/route")) },
+  // The grid (react-grid-layout) and the charts load when a dashboard first opens.
+  dashboards: { isId: isDashboardId, View: lazy(() => import("./src/dashboards/ui/route")) },
 };
 
 /** The thread's Pages tab; it brings the page editor, so it loads when first opened. */
@@ -129,7 +133,7 @@ function LegacyChats() {
  */
 function BuiltinRoutes() {
   useLayoutEffect(() => {
-    const disposers = BUILTIN_ROUTES.flatMap((route) => [registerWorkspaceProvider(`${STUDIO_ROOT}/${route.segment}`), registerWorkspaceProvider(route.legacyRoot)]);
+    const disposers = BUILTIN_ROUTES.flatMap((route) => [`${STUDIO_ROOT}/${route.segment}`, ...(route.legacyRoot ? [route.legacyRoot] : [])].map((root) => registerWorkspaceProvider(root)));
     return () => disposers.forEach((dispose) => dispose());
   }, []);
   return null;
