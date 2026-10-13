@@ -4,6 +4,7 @@ import { DESIGN_MIGRATIONS } from "./design/server/store";
 import { TALK_MIGRATIONS } from "./talk/server/store";
 import { MIGRATIONS as PAGE_MIGRATIONS } from "./pages/store";
 import { NEXT_LOG_MIGRATIONS } from "./explore/store";
+import { DASHBOARD_TABLES } from "./dashboards/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
 // (src/search-index.ts) and project leads (src/project-lead.ts). The space
@@ -351,4 +352,7 @@ export const MIGRATIONS = [
      );
    CREATE INDEX bot_cache_pings_thread ON bot_cache_pings (thread_id, sent_at);
    CREATE TABLE bot_cache_banner_off (thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL);`,
+  // Dashboards (src/dashboards): dashboards, their widgets and layouts, the
+  // custom widget library, widget data, script approvals and versions.
+  DASHBOARD_TABLES,
 ];

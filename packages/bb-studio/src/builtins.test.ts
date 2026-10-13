@@ -51,6 +51,12 @@ describe("built-in kinds' addresses", () => {
     expect(builtinSegment("recordings/unsent")).toMatchObject({ route: { kind: "recording", pluginId: "talk" }, rest: "unsent" });
   });
 
+  it("opens dashboards at their Studio address only: they never had another", () => {
+    expect(builtinItemAt("/plugins/studio/studio/dashboards/dsh_0123456789abcdef")).toMatchObject({ pluginId: "dashboards", id: "dsh_0123456789abcdef", href: "/plugins/studio/studio/dashboards/dsh_0123456789abcdef" });
+    expect(builtinItemAt("/plugins/dashboards/dashboards/dsh_1")).toBeNull();
+    expect(builtinSegment("dashboards")).toMatchObject({ route: { kind: "dashboard", pluginId: "dashboards" }, rest: "" });
+  });
+
   it("moves saved workspace tabs off the old address", () => {
     const tab = { href: "/plugins/artifacts/artifacts/art_1", title: "Report" };
     const state = parseWorkspace({ layout: { kind: "pane", id: "p", tabs: [tab], active: tab.href }, focused: "p" });

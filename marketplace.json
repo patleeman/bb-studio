@@ -3,12 +3,12 @@
   "schemaVersion": 1,
   "name": "bb-studio",
   "displayName": "BB Studio",
-  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs and artifacts built in, plus Code, Decisions and Mobile beside it.",
+  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs, dashboards and artifacts built in, plus Code, Decisions and Mobile beside it.",
   "plugins": [
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio, with pages, recordings, drawings, designs and artifacts built in: one collection with search, tags, project leads, item conversations, quotes and emoji reactions on replies.",
+      "description": "The home of BB Studio, with pages, recordings, drawings, designs, dashboards and artifacts built in: one collection with search, tags, project leads, item conversations, quotes and emoji reactions on replies.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },

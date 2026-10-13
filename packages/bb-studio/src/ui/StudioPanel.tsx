@@ -318,6 +318,7 @@ export function StudioPanel() {
       },
       exportFormats: (item) => item.kind === "page" ? [{ format: "markdown", label: "Markdown and assets" }, { format: "html", label: "HTML and assets" }, { format: "pdf", label: "PDF" }]
         : item.kind === "drawing" ? [{ format: "png", label: "PNG" }, { format: "svg", label: "SVG" }, { format: "excalidraw", label: "Excalidraw JSON" }]
+          : item.kind === "dashboard" ? [{ format: "json", label: "Dashboard JSON" }]
           : item.kind === "task" ? [{ format: "markdown", label: "Markdown" }, { format: "csv", label: "CSV" }]
           : item.kind === "table" ? [{ format: "csv", label: "CSV" }, { format: "markdown", label: "Markdown" }]
             : item.kind === "recording" || item.kind === "dictation" ? [{ format: "markdown", label: "Transcript Markdown" }, { format: "audio", label: "Audio segments" }, { format: "bundle", label: "Transcript and audio" }]

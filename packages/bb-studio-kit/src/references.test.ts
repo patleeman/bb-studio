@@ -47,6 +47,8 @@ describe("canonical Studio references", () => {
     expect(parseStudioItemHref("/plugins/studio/studio/drawings/drw_1")).toEqual({ pluginId: "excalidraw", id: "drw_1" });
     expect(parseStudioItemHref("/plugins/excalidraw/drawings/drw_1")).toEqual({ pluginId: "excalidraw", id: "drw_1" });
     expect(parseStudioMentionReference("studio", "design:dsn_1")).toEqual({ pluginId: "design", id: "dsn_1" });
+    expect(parseStudioMentionReference("studio", "dashboard:dsh_1")).toEqual({ pluginId: "dashboards", id: "dsh_1" });
+    expect(parseStudioItemHref("/plugins/studio/studio/dashboards/dsh_1")).toEqual({ pluginId: "dashboards", id: "dsh_1" });
     expect(parseStudioItemHref("/plugins/studio/studio/designs/dsn_1")).toEqual({ pluginId: "design", id: "dsn_1" });
     expect(parseStudioItemHref("/plugins/design/designs/dsn_1")).toEqual({ pluginId: "design", id: "dsn_1" });
     expect(parseStudioMentionReference("studio", "recordings:rec_1")).toEqual({ pluginId: "talk", id: "rec_1" });

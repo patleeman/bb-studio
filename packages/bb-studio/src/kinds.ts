@@ -32,6 +32,7 @@ export const BUILTIN_KINDS: readonly BuiltinKind[] = [
   { kind: "recording", pluginId: "talk", label: "Recordings and dictation", covers: "Recordings, the recorder, dictation, hold-to-talk, recording cards and Talk models." },
   { kind: "artifact", pluginId: "artifacts", label: "Artifacts", covers: "Artifacts, the thread's Artifacts tab and artifact cards." },
   { kind: "design", pluginId: "design", label: "Designs", covers: "Designs, the thread's Design tab and design cards." },
+  { kind: "dashboard", pluginId: "dashboards", label: "Dashboards", covers: "Dashboards, their agent tools and the refreshing of their widgets' data." },
 ];
 
 const BY_KIND = new Map(BUILTIN_KINDS.map((each) => [each.kind, each]));

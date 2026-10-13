@@ -6,4 +6,5 @@ import { rpcContract as drawings } from "./draw/contract";
 import { rpcContract as designs } from "./design/contract";
 import { rpcContract as recordings } from "./talk/shared/contract";
 import { rpcContract as pages } from "./pages/contract";
-export const rpcContract = defineRpcContract({ ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages });
+import { rpcContract as dashboards } from "./dashboards/contract";
+export const rpcContract = defineRpcContract({ ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...dashboards });

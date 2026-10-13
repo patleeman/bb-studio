@@ -200,6 +200,23 @@ public enum Studio {
     public static let pages_commentCreate = "pages.commentCreate"
     public static let pages_commentReply = "pages.commentReply"
     public static let pages_commentResolve = "pages.commentResolve"
+    public static let dashboards_list = "dashboards.list"
+    public static let dashboards_get = "dashboards.get"
+    public static let dashboards_create = "dashboards.create"
+    public static let dashboards_rename = "dashboards.rename"
+    public static let dashboards_delete = "dashboards.delete"
+    public static let dashboards_edit = "dashboards.edit"
+    public static let dashboards_saveLayout = "dashboards.saveLayout"
+    public static let dashboards_view = "dashboards.view"
+    public static let dashboards_refresh = "dashboards.refresh"
+    public static let dashboards_setData = "dashboards.setData"
+    public static let dashboards_approveScript = "dashboards.approveScript"
+    public static let dashboards_revokeScript = "dashboards.revokeScript"
+    public static let dashboards_versions = "dashboards.versions"
+    public static let dashboards_restoreVersion = "dashboards.restoreVersion"
+    public static let dashboards_widgetTypes = "dashboards.widgetTypes"
+    public static let dashboards_saveWidgetType = "dashboards.saveWidgetType"
+    public static let dashboards_deleteWidgetType = "dashboards.deleteWidgetType"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -623,6 +640,44 @@ public enum Studio {
   public typealias PagesCommentReply = PagesCommentReplyOutput
 
   public typealias PagesCommentResolve = PagesCommentResolveOutput
+
+  public typealias DashboardsListInput = StudioJSONValue
+
+  public typealias DashboardsList = DashboardsListOutput
+
+  public typealias DashboardsGet = DashboardsGetOutput
+
+  public typealias DashboardsCreate = DashboardsCreateOutput
+
+  public typealias DashboardsRename = DashboardsRenameOutput
+
+  public typealias DashboardsDelete = DashboardsDeleteOutput
+
+  public typealias DashboardsEdit = DashboardsEditOutput
+
+  public typealias DashboardsSaveLayout = DashboardsSaveLayoutOutput
+
+  public typealias DashboardsView = DashboardsViewOutput
+
+  public typealias DashboardsRefresh = DashboardsRefreshOutput
+
+  public typealias DashboardsSetData = DashboardsSetDataOutput
+
+  public typealias DashboardsApproveScript = DashboardsApproveScriptOutput
+
+  public typealias DashboardsRevokeScript = DashboardsRevokeScriptOutput
+
+  public typealias DashboardsVersions = DashboardsVersionsOutput
+
+  public typealias DashboardsRestoreVersion = DashboardsRestoreVersionOutput
+
+  public typealias DashboardsWidgetTypesInput = StudioJSONValue
+
+  public typealias DashboardsWidgetTypes = DashboardsWidgetTypesOutput
+
+  public typealias DashboardsSaveWidgetType = DashboardsSaveWidgetTypeOutput
+
+  public typealias DashboardsDeleteWidgetType = DashboardsDeleteWidgetTypeOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -16742,6 +16797,1822 @@ public enum Studio {
   }
 
   public struct PagesCommentResolveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DashboardsListOutputDashboardsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var widgetCount: Double?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, widgetCount: Double? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.widgetCount = widgetCount
+      self.archived = archived
+    }
+  }
+
+  public struct DashboardsListOutput: Sendable, Hashable, Codable {
+    public var dashboards: [DashboardsListOutputDashboardsItem]?
+
+    public init(dashboards: [DashboardsListOutputDashboardsItem]? = nil) {
+      self.dashboards = dashboards
+    }
+  }
+
+  public struct DashboardsGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum DashboardsGetOutputDashboardWidgetsItemType: Sendable, Hashable, Codable {
+    case stat
+    case line
+    case bar
+    case area
+    case pie
+    case table
+    case list
+    case ticker
+    case note
+    case embed
+    case clock
+    case image
+    case progress
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stat": self = .stat
+      case "line": self = .line
+      case "bar": self = .bar
+      case "area": self = .area
+      case "pie": self = .pie
+      case "table": self = .table
+      case "list": self = .list
+      case "ticker": self = .ticker
+      case "note": self = .note
+      case "embed": self = .embed
+      case "clock": self = .clock
+      case "image": self = .image
+      case "progress": self = .progress
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stat: try container.encode("stat")
+      case .line: try container.encode("line")
+      case .bar: try container.encode("bar")
+      case .area: try container.encode("area")
+      case .pie: try container.encode("pie")
+      case .table: try container.encode("table")
+      case .list: try container.encode("list")
+      case .ticker: try container.encode("ticker")
+      case .note: try container.encode("note")
+      case .embed: try container.encode("embed")
+      case .clock: try container.encode("clock")
+      case .image: try container.encode("image")
+      case .progress: try container.encode("progress")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsGetOutputDashboardWidgetsItemSourceKind: Sendable, Hashable, Codable {
+    case none
+    case `static`
+    case url
+    case script
+    case push
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "static": self = .`static`
+      case "url": self = .url
+      case "script": self = .script
+      case "push": self = .push
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .`static`: try container.encode("static")
+      case .url: try container.encode("url")
+      case .script: try container.encode("script")
+      case .push: try container.encode("push")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsGetOutputDashboardWidgetsItemSourceFormat: Sendable, Hashable, Codable {
+    case auto
+    case json
+    case rss
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "auto": self = .auto
+      case "json": self = .json
+      case "rss": self = .rss
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .auto: try container.encode("auto")
+      case .json: try container.encode("json")
+      case .rss: try container.encode("rss")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardWidgetsItemSource: Sendable, Hashable, Codable {
+    public var kind: DashboardsGetOutputDashboardWidgetsItemSourceKind?
+    public var data: StudioJSONValue?
+    public var url: String?
+    public var format: DashboardsGetOutputDashboardWidgetsItemSourceFormat?
+    public var command: String?
+    public var cwd: String?
+    public var intervalSec: Int?
+    public var select: String?
+
+    public init(kind: DashboardsGetOutputDashboardWidgetsItemSourceKind? = nil, data: StudioJSONValue? = nil, url: String? = nil, format: DashboardsGetOutputDashboardWidgetsItemSourceFormat? = nil, command: String? = nil, cwd: String? = nil, intervalSec: Int? = nil, select: String? = nil) {
+      self.kind = kind
+      self.data = data
+      self.url = url
+      self.format = format
+      self.command = command
+      self.cwd = cwd
+      self.intervalSec = intervalSec
+      self.select = select
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardWidgetsItemScript: Sendable, Hashable, Codable {
+    public var sha256: String?
+    public var approved: Bool?
+
+    public init(sha256: String? = nil, approved: Bool? = nil) {
+      self.sha256 = sha256
+      self.approved = approved
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardWidgetsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var type: DashboardsGetOutputDashboardWidgetsItemType?
+    public var title: String?
+    public var options: [String: StudioJSONValue]?
+    public var source: DashboardsGetOutputDashboardWidgetsItemSource?
+    public var customType: String?
+    public var html: String?
+    public var script: DashboardsGetOutputDashboardWidgetsItemScript?
+
+    public init(id: String? = nil, type: DashboardsGetOutputDashboardWidgetsItemType? = nil, title: String? = nil, options: [String: StudioJSONValue]? = nil, source: DashboardsGetOutputDashboardWidgetsItemSource? = nil, customType: String? = nil, html: String? = nil, script: DashboardsGetOutputDashboardWidgetsItemScript? = nil) {
+      self.id = id
+      self.type = type
+      self.title = title
+      self.options = options
+      self.source = source
+      self.customType = customType
+      self.html = html
+      self.script = script
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardLayoutsLgItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardLayoutsMdItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardLayoutsSmItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardLayouts: Sendable, Hashable, Codable {
+    public var lg: [DashboardsGetOutputDashboardLayoutsLgItem]?
+    public var md: [DashboardsGetOutputDashboardLayoutsMdItem]?
+    public var sm: [DashboardsGetOutputDashboardLayoutsSmItem]?
+
+    public init(lg: [DashboardsGetOutputDashboardLayoutsLgItem]? = nil, md: [DashboardsGetOutputDashboardLayoutsMdItem]? = nil, sm: [DashboardsGetOutputDashboardLayoutsSmItem]? = nil) {
+      self.lg = lg
+      self.md = md
+      self.sm = sm
+    }
+  }
+
+  public enum DashboardsGetOutputDashboardDataItemStatus: Sendable, Hashable, Codable {
+    case ok
+    case error
+    case pending
+    case approval
+    case `static`
+    case none
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "error": self = .error
+      case "pending": self = .pending
+      case "approval": self = .approval
+      case "static": self = .`static`
+      case "none": self = .none
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .error: try container.encode("error")
+      case .pending: try container.encode("pending")
+      case .approval: try container.encode("approval")
+      case .`static`: try container.encode("static")
+      case .none: try container.encode("none")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardDataItem: Sendable, Hashable, Codable {
+    public var widgetId: String?
+    public var value: StudioJSONValue?
+    public var fetchedAt: Double?
+    public var error: String?
+    public var errorAt: Double?
+    public var status: DashboardsGetOutputDashboardDataItemStatus?
+
+    public init(widgetId: String? = nil, value: StudioJSONValue? = nil, fetchedAt: Double? = nil, error: String? = nil, errorAt: Double? = nil, status: DashboardsGetOutputDashboardDataItemStatus? = nil) {
+      self.widgetId = widgetId
+      self.value = value
+      self.fetchedAt = fetchedAt
+      self.error = error
+      self.errorAt = errorAt
+      self.status = status
+    }
+  }
+
+  public struct DashboardsGetOutputDashboardWidgetTypesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var html: String?
+    public var defaultOptions: [String: StudioJSONValue]?
+    public var sampleData: StudioJSONValue?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, html: String? = nil, defaultOptions: [String: StudioJSONValue]? = nil, sampleData: StudioJSONValue? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.html = html
+      self.defaultOptions = defaultOptions
+      self.sampleData = sampleData
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DashboardsGetOutputDashboard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var widgetCount: Double?
+    public var archived: Bool?
+    public var widgets: [DashboardsGetOutputDashboardWidgetsItem]?
+    public var layouts: DashboardsGetOutputDashboardLayouts?
+    public var data: [DashboardsGetOutputDashboardDataItem]?
+    public var widgetTypes: [DashboardsGetOutputDashboardWidgetTypesItem]?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, widgetCount: Double? = nil, archived: Bool? = nil, widgets: [DashboardsGetOutputDashboardWidgetsItem]? = nil, layouts: DashboardsGetOutputDashboardLayouts? = nil, data: [DashboardsGetOutputDashboardDataItem]? = nil, widgetTypes: [DashboardsGetOutputDashboardWidgetTypesItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.widgetCount = widgetCount
+      self.archived = archived
+      self.widgets = widgets
+      self.layouts = layouts
+      self.data = data
+      self.widgetTypes = widgetTypes
+    }
+  }
+
+  public struct DashboardsGetOutput: Sendable, Hashable, Codable {
+    public var dashboard: DashboardsGetOutputDashboard?
+
+    public init(dashboard: DashboardsGetOutputDashboard? = nil) {
+      self.dashboard = dashboard
+    }
+  }
+
+  public struct DashboardsCreateInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var projectId: String?
+
+    public init(name: String? = nil, projectId: String? = nil) {
+      self.name = name
+      self.projectId = projectId
+    }
+  }
+
+  public struct DashboardsCreateOutputDashboard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var widgetCount: Double?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, widgetCount: Double? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.widgetCount = widgetCount
+      self.archived = archived
+    }
+  }
+
+  public struct DashboardsCreateOutput: Sendable, Hashable, Codable {
+    public var dashboard: DashboardsCreateOutputDashboard?
+
+    public init(dashboard: DashboardsCreateOutputDashboard? = nil) {
+      self.dashboard = dashboard
+    }
+  }
+
+  public struct DashboardsRenameInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct DashboardsRenameOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var updatedAt: Double?
+
+    public init(ok: Bool? = nil, updatedAt: Double? = nil) {
+      self.ok = ok
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DashboardsDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DashboardsDeleteOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public enum DashboardsEditInputOpsItemOp: Sendable, Hashable, Codable {
+    case add
+    case move
+    case resize
+    case remove
+    case update
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "add": self = .add
+      case "move": self = .move
+      case "resize": self = .resize
+      case "remove": self = .remove
+      case "update": self = .update
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .add: try container.encode("add")
+      case .move: try container.encode("move")
+      case .resize: try container.encode("resize")
+      case .remove: try container.encode("remove")
+      case .update: try container.encode("update")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsEditInputOpsItemType: Sendable, Hashable, Codable {
+    case stat
+    case line
+    case bar
+    case area
+    case pie
+    case table
+    case list
+    case ticker
+    case note
+    case embed
+    case clock
+    case image
+    case progress
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stat": self = .stat
+      case "line": self = .line
+      case "bar": self = .bar
+      case "area": self = .area
+      case "pie": self = .pie
+      case "table": self = .table
+      case "list": self = .list
+      case "ticker": self = .ticker
+      case "note": self = .note
+      case "embed": self = .embed
+      case "clock": self = .clock
+      case "image": self = .image
+      case "progress": self = .progress
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stat: try container.encode("stat")
+      case .line: try container.encode("line")
+      case .bar: try container.encode("bar")
+      case .area: try container.encode("area")
+      case .pie: try container.encode("pie")
+      case .table: try container.encode("table")
+      case .list: try container.encode("list")
+      case .ticker: try container.encode("ticker")
+      case .note: try container.encode("note")
+      case .embed: try container.encode("embed")
+      case .clock: try container.encode("clock")
+      case .image: try container.encode("image")
+      case .progress: try container.encode("progress")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsEditInputOpsItemSourceKind: Sendable, Hashable, Codable {
+    case none
+    case `static`
+    case url
+    case script
+    case push
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "static": self = .`static`
+      case "url": self = .url
+      case "script": self = .script
+      case "push": self = .push
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .`static`: try container.encode("static")
+      case .url: try container.encode("url")
+      case .script: try container.encode("script")
+      case .push: try container.encode("push")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsEditInputOpsItemSourceFormat: Sendable, Hashable, Codable {
+    case auto
+    case json
+    case rss
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "auto": self = .auto
+      case "json": self = .json
+      case "rss": self = .rss
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .auto: try container.encode("auto")
+      case .json: try container.encode("json")
+      case .rss: try container.encode("rss")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsEditInputOpsItemSource: Sendable, Hashable, Codable {
+    public var kind: DashboardsEditInputOpsItemSourceKind?
+    public var data: StudioJSONValue?
+    public var url: String?
+    public var format: DashboardsEditInputOpsItemSourceFormat?
+    public var command: String?
+    public var cwd: String?
+    public var intervalSec: Int?
+    public var select: String?
+
+    public init(kind: DashboardsEditInputOpsItemSourceKind? = nil, data: StudioJSONValue? = nil, url: String? = nil, format: DashboardsEditInputOpsItemSourceFormat? = nil, command: String? = nil, cwd: String? = nil, intervalSec: Int? = nil, select: String? = nil) {
+      self.kind = kind
+      self.data = data
+      self.url = url
+      self.format = format
+      self.command = command
+      self.cwd = cwd
+      self.intervalSec = intervalSec
+      self.select = select
+    }
+  }
+
+  public enum DashboardsEditInputOpsItemBreakpoint: Sendable, Hashable, Codable {
+    case lg
+    case md
+    case sm
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "lg": self = .lg
+      case "md": self = .md
+      case "sm": self = .sm
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .lg: try container.encode("lg")
+      case .md: try container.encode("md")
+      case .sm: try container.encode("sm")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsEditInputOpsItem: Sendable, Hashable, Codable {
+    public var op: DashboardsEditInputOpsItemOp?
+    public var widgetId: String?
+    public var type: DashboardsEditInputOpsItemType?
+    public var title: String?
+    public var options: [String: StudioJSONValue]?
+    public var replaceOptions: Bool?
+    public var source: DashboardsEditInputOpsItemSource?
+    public var customType: String?
+    public var html: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+    public var breakpoint: DashboardsEditInputOpsItemBreakpoint?
+
+    public init(op: DashboardsEditInputOpsItemOp? = nil, widgetId: String? = nil, type: DashboardsEditInputOpsItemType? = nil, title: String? = nil, options: [String: StudioJSONValue]? = nil, replaceOptions: Bool? = nil, source: DashboardsEditInputOpsItemSource? = nil, customType: String? = nil, html: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil, breakpoint: DashboardsEditInputOpsItemBreakpoint? = nil) {
+      self.op = op
+      self.widgetId = widgetId
+      self.type = type
+      self.title = title
+      self.options = options
+      self.replaceOptions = replaceOptions
+      self.source = source
+      self.customType = customType
+      self.html = html
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+      self.breakpoint = breakpoint
+    }
+  }
+
+  public struct DashboardsEditInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var ops: [DashboardsEditInputOpsItem]?
+    public var expectedUpdatedAt: Double?
+
+    public init(id: String? = nil, ops: [DashboardsEditInputOpsItem]? = nil, expectedUpdatedAt: Double? = nil) {
+      self.id = id
+      self.ops = ops
+      self.expectedUpdatedAt = expectedUpdatedAt
+    }
+  }
+
+  public enum DashboardsEditOutputDashboardWidgetsItemType: Sendable, Hashable, Codable {
+    case stat
+    case line
+    case bar
+    case area
+    case pie
+    case table
+    case list
+    case ticker
+    case note
+    case embed
+    case clock
+    case image
+    case progress
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stat": self = .stat
+      case "line": self = .line
+      case "bar": self = .bar
+      case "area": self = .area
+      case "pie": self = .pie
+      case "table": self = .table
+      case "list": self = .list
+      case "ticker": self = .ticker
+      case "note": self = .note
+      case "embed": self = .embed
+      case "clock": self = .clock
+      case "image": self = .image
+      case "progress": self = .progress
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stat: try container.encode("stat")
+      case .line: try container.encode("line")
+      case .bar: try container.encode("bar")
+      case .area: try container.encode("area")
+      case .pie: try container.encode("pie")
+      case .table: try container.encode("table")
+      case .list: try container.encode("list")
+      case .ticker: try container.encode("ticker")
+      case .note: try container.encode("note")
+      case .embed: try container.encode("embed")
+      case .clock: try container.encode("clock")
+      case .image: try container.encode("image")
+      case .progress: try container.encode("progress")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsEditOutputDashboardWidgetsItemSourceKind: Sendable, Hashable, Codable {
+    case none
+    case `static`
+    case url
+    case script
+    case push
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "static": self = .`static`
+      case "url": self = .url
+      case "script": self = .script
+      case "push": self = .push
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .`static`: try container.encode("static")
+      case .url: try container.encode("url")
+      case .script: try container.encode("script")
+      case .push: try container.encode("push")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsEditOutputDashboardWidgetsItemSourceFormat: Sendable, Hashable, Codable {
+    case auto
+    case json
+    case rss
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "auto": self = .auto
+      case "json": self = .json
+      case "rss": self = .rss
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .auto: try container.encode("auto")
+      case .json: try container.encode("json")
+      case .rss: try container.encode("rss")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardWidgetsItemSource: Sendable, Hashable, Codable {
+    public var kind: DashboardsEditOutputDashboardWidgetsItemSourceKind?
+    public var data: StudioJSONValue?
+    public var url: String?
+    public var format: DashboardsEditOutputDashboardWidgetsItemSourceFormat?
+    public var command: String?
+    public var cwd: String?
+    public var intervalSec: Int?
+    public var select: String?
+
+    public init(kind: DashboardsEditOutputDashboardWidgetsItemSourceKind? = nil, data: StudioJSONValue? = nil, url: String? = nil, format: DashboardsEditOutputDashboardWidgetsItemSourceFormat? = nil, command: String? = nil, cwd: String? = nil, intervalSec: Int? = nil, select: String? = nil) {
+      self.kind = kind
+      self.data = data
+      self.url = url
+      self.format = format
+      self.command = command
+      self.cwd = cwd
+      self.intervalSec = intervalSec
+      self.select = select
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardWidgetsItemScript: Sendable, Hashable, Codable {
+    public var sha256: String?
+    public var approved: Bool?
+
+    public init(sha256: String? = nil, approved: Bool? = nil) {
+      self.sha256 = sha256
+      self.approved = approved
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardWidgetsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var type: DashboardsEditOutputDashboardWidgetsItemType?
+    public var title: String?
+    public var options: [String: StudioJSONValue]?
+    public var source: DashboardsEditOutputDashboardWidgetsItemSource?
+    public var customType: String?
+    public var html: String?
+    public var script: DashboardsEditOutputDashboardWidgetsItemScript?
+
+    public init(id: String? = nil, type: DashboardsEditOutputDashboardWidgetsItemType? = nil, title: String? = nil, options: [String: StudioJSONValue]? = nil, source: DashboardsEditOutputDashboardWidgetsItemSource? = nil, customType: String? = nil, html: String? = nil, script: DashboardsEditOutputDashboardWidgetsItemScript? = nil) {
+      self.id = id
+      self.type = type
+      self.title = title
+      self.options = options
+      self.source = source
+      self.customType = customType
+      self.html = html
+      self.script = script
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardLayoutsLgItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardLayoutsMdItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardLayoutsSmItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardLayouts: Sendable, Hashable, Codable {
+    public var lg: [DashboardsEditOutputDashboardLayoutsLgItem]?
+    public var md: [DashboardsEditOutputDashboardLayoutsMdItem]?
+    public var sm: [DashboardsEditOutputDashboardLayoutsSmItem]?
+
+    public init(lg: [DashboardsEditOutputDashboardLayoutsLgItem]? = nil, md: [DashboardsEditOutputDashboardLayoutsMdItem]? = nil, sm: [DashboardsEditOutputDashboardLayoutsSmItem]? = nil) {
+      self.lg = lg
+      self.md = md
+      self.sm = sm
+    }
+  }
+
+  public enum DashboardsEditOutputDashboardDataItemStatus: Sendable, Hashable, Codable {
+    case ok
+    case error
+    case pending
+    case approval
+    case `static`
+    case none
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "error": self = .error
+      case "pending": self = .pending
+      case "approval": self = .approval
+      case "static": self = .`static`
+      case "none": self = .none
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .error: try container.encode("error")
+      case .pending: try container.encode("pending")
+      case .approval: try container.encode("approval")
+      case .`static`: try container.encode("static")
+      case .none: try container.encode("none")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardDataItem: Sendable, Hashable, Codable {
+    public var widgetId: String?
+    public var value: StudioJSONValue?
+    public var fetchedAt: Double?
+    public var error: String?
+    public var errorAt: Double?
+    public var status: DashboardsEditOutputDashboardDataItemStatus?
+
+    public init(widgetId: String? = nil, value: StudioJSONValue? = nil, fetchedAt: Double? = nil, error: String? = nil, errorAt: Double? = nil, status: DashboardsEditOutputDashboardDataItemStatus? = nil) {
+      self.widgetId = widgetId
+      self.value = value
+      self.fetchedAt = fetchedAt
+      self.error = error
+      self.errorAt = errorAt
+      self.status = status
+    }
+  }
+
+  public struct DashboardsEditOutputDashboardWidgetTypesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var html: String?
+    public var defaultOptions: [String: StudioJSONValue]?
+    public var sampleData: StudioJSONValue?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, html: String? = nil, defaultOptions: [String: StudioJSONValue]? = nil, sampleData: StudioJSONValue? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.html = html
+      self.defaultOptions = defaultOptions
+      self.sampleData = sampleData
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DashboardsEditOutputDashboard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var widgetCount: Double?
+    public var archived: Bool?
+    public var widgets: [DashboardsEditOutputDashboardWidgetsItem]?
+    public var layouts: DashboardsEditOutputDashboardLayouts?
+    public var data: [DashboardsEditOutputDashboardDataItem]?
+    public var widgetTypes: [DashboardsEditOutputDashboardWidgetTypesItem]?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, widgetCount: Double? = nil, archived: Bool? = nil, widgets: [DashboardsEditOutputDashboardWidgetsItem]? = nil, layouts: DashboardsEditOutputDashboardLayouts? = nil, data: [DashboardsEditOutputDashboardDataItem]? = nil, widgetTypes: [DashboardsEditOutputDashboardWidgetTypesItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.widgetCount = widgetCount
+      self.archived = archived
+      self.widgets = widgets
+      self.layouts = layouts
+      self.data = data
+      self.widgetTypes = widgetTypes
+    }
+  }
+
+  public struct DashboardsEditOutput: Sendable, Hashable, Codable {
+    public var dashboard: DashboardsEditOutputDashboard?
+    public var results: [String]?
+
+    public init(dashboard: DashboardsEditOutputDashboard? = nil, results: [String]? = nil) {
+      self.dashboard = dashboard
+      self.results = results
+    }
+  }
+
+  public struct DashboardsSaveLayoutInputLayoutsLgItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsSaveLayoutInputLayoutsMdItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsSaveLayoutInputLayoutsSmItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsSaveLayoutInputLayouts: Sendable, Hashable, Codable {
+    public var lg: [DashboardsSaveLayoutInputLayoutsLgItem]?
+    public var md: [DashboardsSaveLayoutInputLayoutsMdItem]?
+    public var sm: [DashboardsSaveLayoutInputLayoutsSmItem]?
+
+    public init(lg: [DashboardsSaveLayoutInputLayoutsLgItem]? = nil, md: [DashboardsSaveLayoutInputLayoutsMdItem]? = nil, sm: [DashboardsSaveLayoutInputLayoutsSmItem]? = nil) {
+      self.lg = lg
+      self.md = md
+      self.sm = sm
+    }
+  }
+
+  public struct DashboardsSaveLayoutInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var layouts: DashboardsSaveLayoutInputLayouts?
+
+    public init(id: String? = nil, layouts: DashboardsSaveLayoutInputLayouts? = nil) {
+      self.id = id
+      self.layouts = layouts
+    }
+  }
+
+  public struct DashboardsSaveLayoutOutput: Sendable, Hashable, Codable {
+    public var updatedAt: Double?
+
+    public init(updatedAt: Double? = nil) {
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DashboardsViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+    public var leave: Bool?
+
+    public init(id: String? = nil, clientId: String? = nil, leave: Bool? = nil) {
+      self.id = id
+      self.clientId = clientId
+      self.leave = leave
+    }
+  }
+
+  public struct DashboardsViewOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DashboardsRefreshInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var widgetId: String?
+
+    public init(id: String? = nil, widgetId: String? = nil) {
+      self.id = id
+      self.widgetId = widgetId
+    }
+  }
+
+  public enum DashboardsRefreshOutputDataItemStatus: Sendable, Hashable, Codable {
+    case ok
+    case error
+    case pending
+    case approval
+    case `static`
+    case none
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "error": self = .error
+      case "pending": self = .pending
+      case "approval": self = .approval
+      case "static": self = .`static`
+      case "none": self = .none
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .error: try container.encode("error")
+      case .pending: try container.encode("pending")
+      case .approval: try container.encode("approval")
+      case .`static`: try container.encode("static")
+      case .none: try container.encode("none")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsRefreshOutputDataItem: Sendable, Hashable, Codable {
+    public var widgetId: String?
+    public var value: StudioJSONValue?
+    public var fetchedAt: Double?
+    public var error: String?
+    public var errorAt: Double?
+    public var status: DashboardsRefreshOutputDataItemStatus?
+
+    public init(widgetId: String? = nil, value: StudioJSONValue? = nil, fetchedAt: Double? = nil, error: String? = nil, errorAt: Double? = nil, status: DashboardsRefreshOutputDataItemStatus? = nil) {
+      self.widgetId = widgetId
+      self.value = value
+      self.fetchedAt = fetchedAt
+      self.error = error
+      self.errorAt = errorAt
+      self.status = status
+    }
+  }
+
+  public struct DashboardsRefreshOutput: Sendable, Hashable, Codable {
+    public var refreshed: [String]?
+    public var data: [DashboardsRefreshOutputDataItem]?
+
+    public init(refreshed: [String]? = nil, data: [DashboardsRefreshOutputDataItem]? = nil) {
+      self.refreshed = refreshed
+      self.data = data
+    }
+  }
+
+  public struct DashboardsSetDataInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var widgetId: String?
+    public var data: StudioJSONValue?
+
+    public init(id: String? = nil, widgetId: String? = nil, data: StudioJSONValue? = nil) {
+      self.id = id
+      self.widgetId = widgetId
+      self.data = data
+    }
+  }
+
+  public enum DashboardsSetDataOutputDataStatus: Sendable, Hashable, Codable {
+    case ok
+    case error
+    case pending
+    case approval
+    case `static`
+    case none
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "error": self = .error
+      case "pending": self = .pending
+      case "approval": self = .approval
+      case "static": self = .`static`
+      case "none": self = .none
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .error: try container.encode("error")
+      case .pending: try container.encode("pending")
+      case .approval: try container.encode("approval")
+      case .`static`: try container.encode("static")
+      case .none: try container.encode("none")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsSetDataOutputData: Sendable, Hashable, Codable {
+    public var widgetId: String?
+    public var value: StudioJSONValue?
+    public var fetchedAt: Double?
+    public var error: String?
+    public var errorAt: Double?
+    public var status: DashboardsSetDataOutputDataStatus?
+
+    public init(widgetId: String? = nil, value: StudioJSONValue? = nil, fetchedAt: Double? = nil, error: String? = nil, errorAt: Double? = nil, status: DashboardsSetDataOutputDataStatus? = nil) {
+      self.widgetId = widgetId
+      self.value = value
+      self.fetchedAt = fetchedAt
+      self.error = error
+      self.errorAt = errorAt
+      self.status = status
+    }
+  }
+
+  public struct DashboardsSetDataOutput: Sendable, Hashable, Codable {
+    public var data: DashboardsSetDataOutputData?
+
+    public init(data: DashboardsSetDataOutputData? = nil) {
+      self.data = data
+    }
+  }
+
+  public struct DashboardsApproveScriptInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var widgetId: String?
+    public var sha256: String?
+
+    public init(id: String? = nil, widgetId: String? = nil, sha256: String? = nil) {
+      self.id = id
+      self.widgetId = widgetId
+      self.sha256 = sha256
+    }
+  }
+
+  public struct DashboardsApproveScriptOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DashboardsRevokeScriptInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var widgetId: String?
+
+    public init(id: String? = nil, widgetId: String? = nil) {
+      self.id = id
+      self.widgetId = widgetId
+    }
+  }
+
+  public struct DashboardsRevokeScriptOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct DashboardsVersionsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DashboardsVersionsOutputVersionsItem: Sendable, Hashable, Codable {
+    public var id: Double?
+    public var createdAt: Double?
+    public var `actor`: String?
+    public var label: String?
+    public var widgetCount: Double?
+
+    public init(id: Double? = nil, createdAt: Double? = nil, `actor`: String? = nil, label: String? = nil, widgetCount: Double? = nil) {
+      self.id = id
+      self.createdAt = createdAt
+      self.`actor` = `actor`
+      self.label = label
+      self.widgetCount = widgetCount
+    }
+  }
+
+  public struct DashboardsVersionsOutput: Sendable, Hashable, Codable {
+    public var versions: [DashboardsVersionsOutputVersionsItem]?
+
+    public init(versions: [DashboardsVersionsOutputVersionsItem]? = nil) {
+      self.versions = versions
+    }
+  }
+
+  public struct DashboardsRestoreVersionInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var versionId: Int?
+
+    public init(id: String? = nil, versionId: Int? = nil) {
+      self.id = id
+      self.versionId = versionId
+    }
+  }
+
+  public enum DashboardsRestoreVersionOutputDashboardWidgetsItemType: Sendable, Hashable, Codable {
+    case stat
+    case line
+    case bar
+    case area
+    case pie
+    case table
+    case list
+    case ticker
+    case note
+    case embed
+    case clock
+    case image
+    case progress
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stat": self = .stat
+      case "line": self = .line
+      case "bar": self = .bar
+      case "area": self = .area
+      case "pie": self = .pie
+      case "table": self = .table
+      case "list": self = .list
+      case "ticker": self = .ticker
+      case "note": self = .note
+      case "embed": self = .embed
+      case "clock": self = .clock
+      case "image": self = .image
+      case "progress": self = .progress
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stat: try container.encode("stat")
+      case .line: try container.encode("line")
+      case .bar: try container.encode("bar")
+      case .area: try container.encode("area")
+      case .pie: try container.encode("pie")
+      case .table: try container.encode("table")
+      case .list: try container.encode("list")
+      case .ticker: try container.encode("ticker")
+      case .note: try container.encode("note")
+      case .embed: try container.encode("embed")
+      case .clock: try container.encode("clock")
+      case .image: try container.encode("image")
+      case .progress: try container.encode("progress")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsRestoreVersionOutputDashboardWidgetsItemSourceKind: Sendable, Hashable, Codable {
+    case none
+    case `static`
+    case url
+    case script
+    case push
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "static": self = .`static`
+      case "url": self = .url
+      case "script": self = .script
+      case "push": self = .push
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .`static`: try container.encode("static")
+      case .url: try container.encode("url")
+      case .script: try container.encode("script")
+      case .push: try container.encode("push")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DashboardsRestoreVersionOutputDashboardWidgetsItemSourceFormat: Sendable, Hashable, Codable {
+    case auto
+    case json
+    case rss
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "auto": self = .auto
+      case "json": self = .json
+      case "rss": self = .rss
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .auto: try container.encode("auto")
+      case .json: try container.encode("json")
+      case .rss: try container.encode("rss")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardWidgetsItemSource: Sendable, Hashable, Codable {
+    public var kind: DashboardsRestoreVersionOutputDashboardWidgetsItemSourceKind?
+    public var data: StudioJSONValue?
+    public var url: String?
+    public var format: DashboardsRestoreVersionOutputDashboardWidgetsItemSourceFormat?
+    public var command: String?
+    public var cwd: String?
+    public var intervalSec: Int?
+    public var select: String?
+
+    public init(kind: DashboardsRestoreVersionOutputDashboardWidgetsItemSourceKind? = nil, data: StudioJSONValue? = nil, url: String? = nil, format: DashboardsRestoreVersionOutputDashboardWidgetsItemSourceFormat? = nil, command: String? = nil, cwd: String? = nil, intervalSec: Int? = nil, select: String? = nil) {
+      self.kind = kind
+      self.data = data
+      self.url = url
+      self.format = format
+      self.command = command
+      self.cwd = cwd
+      self.intervalSec = intervalSec
+      self.select = select
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardWidgetsItemScript: Sendable, Hashable, Codable {
+    public var sha256: String?
+    public var approved: Bool?
+
+    public init(sha256: String? = nil, approved: Bool? = nil) {
+      self.sha256 = sha256
+      self.approved = approved
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardWidgetsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var type: DashboardsRestoreVersionOutputDashboardWidgetsItemType?
+    public var title: String?
+    public var options: [String: StudioJSONValue]?
+    public var source: DashboardsRestoreVersionOutputDashboardWidgetsItemSource?
+    public var customType: String?
+    public var html: String?
+    public var script: DashboardsRestoreVersionOutputDashboardWidgetsItemScript?
+
+    public init(id: String? = nil, type: DashboardsRestoreVersionOutputDashboardWidgetsItemType? = nil, title: String? = nil, options: [String: StudioJSONValue]? = nil, source: DashboardsRestoreVersionOutputDashboardWidgetsItemSource? = nil, customType: String? = nil, html: String? = nil, script: DashboardsRestoreVersionOutputDashboardWidgetsItemScript? = nil) {
+      self.id = id
+      self.type = type
+      self.title = title
+      self.options = options
+      self.source = source
+      self.customType = customType
+      self.html = html
+      self.script = script
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardLayoutsLgItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardLayoutsMdItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardLayoutsSmItem: Sendable, Hashable, Codable {
+    public var i: String?
+    public var x: Int?
+    public var y: Int?
+    public var w: Int?
+    public var h: Int?
+
+    public init(i: String? = nil, x: Int? = nil, y: Int? = nil, w: Int? = nil, h: Int? = nil) {
+      self.i = i
+      self.x = x
+      self.y = y
+      self.w = w
+      self.h = h
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardLayouts: Sendable, Hashable, Codable {
+    public var lg: [DashboardsRestoreVersionOutputDashboardLayoutsLgItem]?
+    public var md: [DashboardsRestoreVersionOutputDashboardLayoutsMdItem]?
+    public var sm: [DashboardsRestoreVersionOutputDashboardLayoutsSmItem]?
+
+    public init(lg: [DashboardsRestoreVersionOutputDashboardLayoutsLgItem]? = nil, md: [DashboardsRestoreVersionOutputDashboardLayoutsMdItem]? = nil, sm: [DashboardsRestoreVersionOutputDashboardLayoutsSmItem]? = nil) {
+      self.lg = lg
+      self.md = md
+      self.sm = sm
+    }
+  }
+
+  public enum DashboardsRestoreVersionOutputDashboardDataItemStatus: Sendable, Hashable, Codable {
+    case ok
+    case error
+    case pending
+    case approval
+    case `static`
+    case none
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "error": self = .error
+      case "pending": self = .pending
+      case "approval": self = .approval
+      case "static": self = .`static`
+      case "none": self = .none
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .error: try container.encode("error")
+      case .pending: try container.encode("pending")
+      case .approval: try container.encode("approval")
+      case .`static`: try container.encode("static")
+      case .none: try container.encode("none")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardDataItem: Sendable, Hashable, Codable {
+    public var widgetId: String?
+    public var value: StudioJSONValue?
+    public var fetchedAt: Double?
+    public var error: String?
+    public var errorAt: Double?
+    public var status: DashboardsRestoreVersionOutputDashboardDataItemStatus?
+
+    public init(widgetId: String? = nil, value: StudioJSONValue? = nil, fetchedAt: Double? = nil, error: String? = nil, errorAt: Double? = nil, status: DashboardsRestoreVersionOutputDashboardDataItemStatus? = nil) {
+      self.widgetId = widgetId
+      self.value = value
+      self.fetchedAt = fetchedAt
+      self.error = error
+      self.errorAt = errorAt
+      self.status = status
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboardWidgetTypesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var html: String?
+    public var defaultOptions: [String: StudioJSONValue]?
+    public var sampleData: StudioJSONValue?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, html: String? = nil, defaultOptions: [String: StudioJSONValue]? = nil, sampleData: StudioJSONValue? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.html = html
+      self.defaultOptions = defaultOptions
+      self.sampleData = sampleData
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutputDashboard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var widgetCount: Double?
+    public var archived: Bool?
+    public var widgets: [DashboardsRestoreVersionOutputDashboardWidgetsItem]?
+    public var layouts: DashboardsRestoreVersionOutputDashboardLayouts?
+    public var data: [DashboardsRestoreVersionOutputDashboardDataItem]?
+    public var widgetTypes: [DashboardsRestoreVersionOutputDashboardWidgetTypesItem]?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, widgetCount: Double? = nil, archived: Bool? = nil, widgets: [DashboardsRestoreVersionOutputDashboardWidgetsItem]? = nil, layouts: DashboardsRestoreVersionOutputDashboardLayouts? = nil, data: [DashboardsRestoreVersionOutputDashboardDataItem]? = nil, widgetTypes: [DashboardsRestoreVersionOutputDashboardWidgetTypesItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.widgetCount = widgetCount
+      self.archived = archived
+      self.widgets = widgets
+      self.layouts = layouts
+      self.data = data
+      self.widgetTypes = widgetTypes
+    }
+  }
+
+  public struct DashboardsRestoreVersionOutput: Sendable, Hashable, Codable {
+    public var dashboard: DashboardsRestoreVersionOutputDashboard?
+
+    public init(dashboard: DashboardsRestoreVersionOutputDashboard? = nil) {
+      self.dashboard = dashboard
+    }
+  }
+
+  public struct DashboardsWidgetTypesOutputTypesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var html: String?
+    public var defaultOptions: [String: StudioJSONValue]?
+    public var sampleData: StudioJSONValue?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, html: String? = nil, defaultOptions: [String: StudioJSONValue]? = nil, sampleData: StudioJSONValue? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.html = html
+      self.defaultOptions = defaultOptions
+      self.sampleData = sampleData
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DashboardsWidgetTypesOutput: Sendable, Hashable, Codable {
+    public var types: [DashboardsWidgetTypesOutputTypesItem]?
+
+    public init(types: [DashboardsWidgetTypesOutputTypesItem]? = nil) {
+      self.types = types
+    }
+  }
+
+  public struct DashboardsSaveWidgetTypeInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var html: String?
+    public var defaultOptions: [String: StudioJSONValue]?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, html: String? = nil, defaultOptions: [String: StudioJSONValue]? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.html = html
+      self.defaultOptions = defaultOptions
+    }
+  }
+
+  public struct DashboardsSaveWidgetTypeOutputType: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var html: String?
+    public var defaultOptions: [String: StudioJSONValue]?
+    public var sampleData: StudioJSONValue?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, html: String? = nil, defaultOptions: [String: StudioJSONValue]? = nil, sampleData: StudioJSONValue? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.html = html
+      self.defaultOptions = defaultOptions
+      self.sampleData = sampleData
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DashboardsSaveWidgetTypeOutput: Sendable, Hashable, Codable {
+    public var type: DashboardsSaveWidgetTypeOutputType?
+
+    public init(type: DashboardsSaveWidgetTypeOutputType? = nil) {
+      self.type = type
+    }
+  }
+
+  public struct DashboardsDeleteWidgetTypeInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DashboardsDeleteWidgetTypeOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {

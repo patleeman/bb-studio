@@ -2,6 +2,7 @@ import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
 import { DRAW_TOOLS, registerDraw } from "./src/draw/server";
 import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
+import { DASHBOARD_TOOLS, registerDashboards } from "./src/dashboards/server";
 import { registerTalk, TALK_SETTINGS, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { AGENT_INSTRUCTIONS as PAGE_INSTRUCTIONS } from "./src/pages/tools";
@@ -105,6 +106,8 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => drawings.dispose());
   const designs = registerDesign(bb, db);
   bb.onDispose(() => designs.dispose());
+  const dashboards = registerDashboards(bb, db);
+  bb.onDispose(() => dashboards.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins.
   const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS });
@@ -135,12 +138,15 @@ export default async function plugin(bb: BbPluginApi) {
   // creates each (src/kinds.ts).
   const kindSettings = new KindSettingsStore(bb.storage.kv as never);
   await kindSettings.load();
+  // A dashboard kind that's off refreshes nothing.
+  dashboards.setEnabled(() => builtinOn(kindSettings.current, "dashboards"));
   const hub = new StudioHub(bb.sdk, [
     { pluginId: "pages", name: "Pages", handlers: pages.provider },
     { pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider },
     { pluginId: "excalidraw", name: "Drawings", handlers: drawings.provider },
     { pluginId: "design", name: "Designs", handlers: designs.provider },
     { pluginId: "talk", name: "Recordings", handlers: recordings.provider },
+    { pluginId: "dashboards", name: "Dashboards", handlers: dashboards.provider },
   ], {
     builtinOn: (pluginId) => builtinOn(kindSettings.current, pluginId),
     route: (providers) => routeProviders(providers, kindSettings.current),
@@ -160,7 +166,7 @@ export default async function plugin(bb: BbPluginApi) {
   const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
-  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS };
+  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS, dashboard: DASHBOARD_TOOLS };
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them. A kind turned off gives neither, from the next
@@ -1479,6 +1485,7 @@ export default async function plugin(bb: BbPluginApi) {
       excalidraw: { name: "Studio Draw", handlers: drawings.backup },
       design: { name: "Studio Design", handlers: designs.backup },
       talk: { name: "Studio Talk", handlers: recordings.backup },
+      dashboards: { name: "Studio Dashboards", handlers: dashboards.backup },
     },
   });
   registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));
@@ -1503,12 +1510,14 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "designs", summary: "List and read designs: list, show, html, rename, delete", usage: "bb studio designs <list|show|html|rename|delete> …" },
       { name: "recordings", summary: "Read Talk recordings and their transcripts: list, show, transcript, notes", usage: "bb studio recordings <list|show|transcript|notes> …" },
       { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
+      { name: "dashboards", summary: "List and read dashboards, and push data to their widgets", usage: "bb studio dashboards <list|show|set-data> …" },
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
       if (argv[0] === "artifacts") return artifacts.cli(argv.slice(1), ctx);
       if (argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
       if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
+      if (argv[0] === "dashboards") return dashboards.cli(argv.slice(1));
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
@@ -1601,7 +1610,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

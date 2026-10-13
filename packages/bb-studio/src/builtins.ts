@@ -26,8 +26,8 @@ export interface BuiltinRoute {
   segment: string;
   /** The kind Studio's library filters to at /plugins/studio/studio/<segment>. */
   kind: string;
-  /** The add-on's own item route before the merge, without a trailing slash. */
-  legacyRoot: string;
+  /** The add-on's own item route before the merge, without a trailing slash. Kinds Studio started with have none. */
+  legacyRoot?: string;
   /** Sub-paths under the route that are pages of Studio's, not items (Talk's `unsent`). */
   pages?: readonly string[];
 }
@@ -38,6 +38,8 @@ export const BUILTIN_ROUTES: readonly BuiltinRoute[] = [
   { pluginId: "excalidraw", segment: "drawings", kind: "drawing", legacyRoot: "/plugins/excalidraw/drawings" },
   { pluginId: "design", segment: "designs", kind: "design", legacyRoot: "/plugins/design/designs" },
   { pluginId: "talk", segment: "recordings", kind: "recording", legacyRoot: "/plugins/talk/recordings", pages: ["unsent"] },
+  // Built into Studio from the start, so there's no old address.
+  { pluginId: "dashboards", segment: "dashboards", kind: "dashboard" },
 ];
 
 export const BUILTIN_PLUGIN_IDS: ReadonlySet<string> = new Set(BUILTIN_ROUTES.map((route) => route.pluginId));
@@ -54,7 +56,7 @@ const decode = (segment: string) => {
 export function builtinItemAt(path: string): { route: BuiltinRoute; pluginId: string; id: string; href: string } | null {
   const clean = path.split(/[?#]/)[0]!.replace(/\/+$/, "");
   for (const route of BUILTIN_ROUTES) {
-    for (const root of [`${STUDIO_ROOT}/${route.segment}`, route.legacyRoot]) {
+    for (const root of [`${STUDIO_ROOT}/${route.segment}`, ...(route.legacyRoot ? [route.legacyRoot] : [])]) {
       if (!clean.startsWith(`${root}/`)) continue;
       const [raw, ...rest] = clean.slice(root.length + 1).split("/");
       const id = raw ? decode(raw) : null;
