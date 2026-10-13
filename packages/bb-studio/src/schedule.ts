@@ -148,9 +148,10 @@ export function endOfDay(date: string, timezone: string): number {
   return guess - offset(first) - 1;
 }
 
+// 12-hour, like describeCron, so the Automations list reads one way.
 const clock = (time: string) => {
-  const m = minuteOf(time);
-  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+  const { time: text, half } = clock12(minuteOf(time));
+  return `${text} ${half}`;
 };
 
 export function daysLabel(days: readonly number[]): string {

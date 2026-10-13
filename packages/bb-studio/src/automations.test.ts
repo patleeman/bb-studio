@@ -52,7 +52,7 @@ it("lists the original check-in first, unchanged, then new ones", async () => {
   const x = await setup();
   const list = await x.auto.list();
   expect(list).toHaveLength(1);
-  expect(list[0]).toMatchObject({ id: "heartbeat", kind: "checkin", name: "Check-in", original: true, state: "active", scheduleText: "Weekdays 8:00" });
+  expect(list[0]).toMatchObject({ id: "heartbeat", kind: "checkin", name: "Check-in", original: true, state: "active", scheduleText: "Weekdays 8:00 AM" });
   expect(x.setHeartbeat).not.toHaveBeenCalled();
   expect(x.calls.some((call) => call.method !== "automations_list")).toBe(false);
 });
@@ -65,7 +65,7 @@ it("makes a check-in with two times as one automation, on a cheaper model", asyn
   expect(x.automations.every((a) => a.enabled)).toBe(true);
   expect(x.automations[0]!.execution).toMatchObject({ mode: "agent", targetThreadId: "bot1", model: "gpt-mini", reasoningLevel: "low", prompt: checkinPrompt("Brief", "Summarize my day.") });
   expect(String((x.automations[0]!.execution as { prompt: string }).prompt)).toContain("[PASS]");
-  expect(made).toMatchObject({ kind: "checkin", state: "active", nextRunAt: 1000, scheduleText: "Weekdays 8:00, 18:30" });
+  expect(made).toMatchObject({ kind: "checkin", state: "active", nextRunAt: 1000, scheduleText: "Weekdays 8:00 AM, 6:30 PM" });
   // One time fewer: the extra BB automation goes.
   await x.auto.update({ id: made.id, schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["08:00"] } });
   expect(x.automations).toHaveLength(1);

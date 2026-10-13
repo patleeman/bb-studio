@@ -48,8 +48,8 @@ describe("fields and words", () => {
     expect(runMinutes({ type: "interval", every: 4, unit: "hours", days: ALL_DAYS, from: "08:15", to: "20:00" })).toEqual([495, 735, 975]);
   });
   it("describes schedules", () => {
-    expect(describeSchedule({ type: "times", days: WEEKDAYS, times: ["18:00", "08:00"] })).toBe("Weekdays 8:00, 18:00");
-    expect(describeSchedule({ type: "interval", every: 30, unit: "minutes", days: ALL_DAYS, quiet: { from: "22:00", to: "07:00" }, until: "2026-12-31" })).toBe("Every 30 min, every day · quiet 22:00–7:00 · until 2026-12-31");
+    expect(describeSchedule({ type: "times", days: WEEKDAYS, times: ["18:00", "08:00"] })).toBe("Weekdays 8:00 AM, 6:00 PM");
+    expect(describeSchedule({ type: "interval", every: 30, unit: "minutes", days: ALL_DAYS, quiet: { from: "22:00", to: "07:00" }, until: "2026-12-31" })).toBe("Every 30 min, every day · quiet 10:00 PM–7:00 AM · until 2026-12-31");
   });
   it("ends a day at midnight in its timezone", () => {
     expect(new Date(endOfDay("2026-10-12", "America/New_York") + 1).toISOString()).toBe("2026-10-13T04:00:00.000Z");
