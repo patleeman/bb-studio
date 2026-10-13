@@ -69,7 +69,7 @@ vi.mock("@bb-studio/kit/ui", () => ({
 
 const { ActivityPanel, BOT_PATH, BotRedirect } = await import("./BotHome");
 const { BotInfoPanel, BotPanel } = await import("./BotTabs");
-const { BotThreadList } = await import("./BotSidebar");
+const { BotThreadList, ThreadListSwitcher } = await import("./BotSidebar");
 const { forgetListMode } = await import("./threadListSwitch");
 const listProps = { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => {}, searchQuery: "" };
 
@@ -220,6 +220,22 @@ test("after a Bots list open the Bots list stays on any thread, without asking w
   expect(container.querySelector("nav")).not.toBeNull();
   expect(state.call).not.toHaveBeenCalledWith("bot_thread_owner", expect.anything());
   expect(state.setPref).not.toHaveBeenCalled();
+});
+
+test("Home on BB's rail leaves the Bots list, even on a thread where BB's Home doesn't navigate", async () => {
+  sessionStorage.setItem("studio.sidebar.listMode", "bots");
+  state.pathname = "/projects/proj_1/threads/thr_run";
+  await show(<ThreadListSwitcher />);
+  expect(state.setPref).not.toHaveBeenCalled();
+  const rail = document.createElement("nav");
+  rail.setAttribute("aria-label", "Primary navigation");
+  rail.innerHTML = '<button type="button" aria-label="Home"><span>icon</span></button>';
+  document.body.append(rail);
+  await act(async () => { rail.querySelector("span")!.click(); });
+  await act(async () => {});
+  expect(sessionStorage.getItem("studio.sidebar.listMode")).toBe("native");
+  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "thread-list/thread-list", expectedRevision: 1 });
+  rail.remove();
 });
 
 test("the Bots list forgets the removed Threads tab's saved strips", async () => {

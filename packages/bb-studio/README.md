@@ -1049,7 +1049,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   Personal, `/projects/<id>/threads/<id>` elsewhere, and anything under
   them) the mode stays as it was, so a thread opened from BB's list keeps
   BB's list and one opened from the Bots list keeps the Bots list. Any
-  other page (Home, another plugin, settings, extensions) sets **native**.
+  other page (another plugin, settings, extensions) sets **native**, and so
+  does **Home** on the rail, even on a thread page, where BB's Home is
+  already active and the click doesn't change the route.
   Only a window with no mode yet, opened straight on a thread, asks
   `bot_thread_owner` once and keeps the answer; the sidebar stays as it is
   until then. Entering a Studio list remembers your choice (in this

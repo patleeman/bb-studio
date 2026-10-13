@@ -70,19 +70,17 @@ const openInfo = async (client, name = "Dot") => {
   }))()`, true);
 };
 
-/** Home on BB's rail: a different rail destination, so the window leaves the Bots list. */
+/**
+ * Home on BB's rail: the window leaves the Bots list. BB counts thread pages
+ * as Home, so on a thread the click doesn't navigate; from elsewhere it goes
+ * back to the last Home route.
+ */
 export const clickHome = async (client) => {
   await client.clickAriaButtonWithPointer("Home", 'nav[aria-label="Primary navigation"]');
-  await client.evaluate(`(() => new Promise((resolve, reject) => {
-    const started = Date.now();
-    const tick = () => {
-      if (!/\\/threads\\//.test(location.pathname) && !location.pathname.startsWith("${BOT_PATH}")) return resolve(true);
-      if (Date.now() - started > 15000) return reject(new Error("Home didn't leave for a non-thread page: " + location.pathname));
-      setTimeout(tick, 200);
-    };
-    tick();
-  }))()`, true);
+  await sleepMs(1000);
+  if ((await client.evaluate("location.pathname")).startsWith(BOT_PATH)) throw new Error("Home stayed on the Bot page");
 };
+const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Opens a thread from BB's own thread list by its title, with the pointer, and waits for its thread page. */
 export const openFromBbList = async (client, title) => {
   const point = await client.evaluate(`(() => new Promise((resolve, reject) => {

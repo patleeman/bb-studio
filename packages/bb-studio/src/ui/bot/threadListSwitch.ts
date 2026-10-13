@@ -9,7 +9,8 @@
 // list (useOpenThread), kept on every thread route after that (a runner, a
 // worker, a thread in another project, an archived one) until the user goes
 // to another rail destination (any route that is neither a thread nor the Bot
-// page: Home, another plugin, settings, extensions). Opening a thread from
+// page: another plugin, settings, extensions), or clicks Home on the rail
+// (BB counts thread pages as Home, so that click is watched itself). Opening a thread from
 // BB's list in "native" mode keeps "native". The decision is nextListMode, a
 // pure function of (previous mode, route, how it was reached). Only a window
 // with no mode yet, opened straight on a thread, asks `bot_thread_owner`,
@@ -62,8 +63,13 @@ export function threadIdForPath(pathname: string): string | null {
 
 /** The list a window wants: Studio's Bots list, Studio's items list, or BB's (or the user's own). */
 export type ListMode = "bots" | "studio" | "native";
-/** How the route was reached: from a Bots list entry, or any other way (rail, BB's list, a link, a reload, focus). */
-export type ListNavigation = "bots-list" | "route";
+/**
+ * How the route was reached: from a Bots list entry; Home on BB's rail (BB
+ * counts thread pages as Home, so Home on a thread doesn't navigate, and from
+ * elsewhere it returns to the last Home route, often a thread); or any other
+ * way (another rail item, BB's list, a link, a reload, focus).
+ */
+export type ListNavigation = "bots-list" | "home" | "route";
 /** Where this window keeps its mode, over a reload. */
 export const MODE_KEY = "studio.sidebar.listMode";
 
@@ -71,6 +77,7 @@ export const MODE_KEY = "studio.sidebar.listMode";
  * The mode after reaching `pathname`, or "detect" when only the thread's
  * owner can say (a window with no mode yet, opened on a thread). Pure.
  *
+ * - Home on the rail: "native", wherever it lands.
  * - Opening anything from the Bots list, or the Bot page: "bots".
  * - The Studio panel: "studio".
  * - A thread route (any project, archived, sub-paths) keeps "bots" or
@@ -79,6 +86,7 @@ export const MODE_KEY = "studio.sidebar.listMode";
  * - Any other route is a different rail destination: "native".
  */
 export function nextListMode(previous: ListMode | null, pathname: string, via: ListNavigation): ListMode | "detect" {
+  if (via === "home") return "native";
   if (via === "bots-list" || isBotPath(pathname)) return "bots";
   if (isStudioPath(pathname)) return "studio";
   if (threadIdForPath(pathname) !== null) {
@@ -119,6 +127,14 @@ export function subscribeListMode(listener: () => void): () => void {
 /** Records that the user opened something from the Bots list (or the Bot page's lists): this window shows the Bots list until they leave. */
 export function openedFromBotsList(): void {
   writeListMode(nextListMode(readListMode(), "", "bots-list") as ListMode);
+}
+
+/** BB's rail Home button (AppNavRail). */
+export const HOME_RAIL_SELECTOR = 'nav[aria-label="Primary navigation"] button[aria-label="Home"]';
+
+/** Records that the user clicked Home on BB's rail: this window leaves the Bots list. */
+export function clickedHome(pathname: string): void {
+  writeListMode(nextListMode(readListMode(), pathname, "home") as ListMode);
 }
 
 /** Forgets this window's mode (tests: a fresh window). */

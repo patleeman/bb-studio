@@ -19,7 +19,7 @@ import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
-import { isBotPath, readListMode, subscribeListMode, syncThreadList, threadIdForPath } from "./threadListSwitch";
+import { clickedHome, HOME_RAIL_SELECTOR, isBotPath, readListMode, subscribeListMode, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import { ImportBotDialog } from "./ImportBot";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
@@ -100,7 +100,8 @@ export function BotThreadList({ onNavigate, activeThreadId }: PluginThreadListPr
 /**
  * Mounted in every window (an app overlay): keeps this window's mode and BB's
  * sidebar in line with its route (the Bots list, the Studio list, or BB's),
- * and re-applies it when the window gains focus, so the window in use decides.
+ * re-applies it when the window gains focus, so the window in use decides, and
+ * watches BB's rail Home button.
  * A Bots list open sets the mode before it navigates, so it isn't synced here
  * against the route being left.
  */
@@ -112,8 +113,15 @@ export function ThreadListSwitcher() {
     noteOpenThread(threadIdForPath(pathname));
     const sync = () => void syncThreadList(sdk, pathname, call);
     sync();
+    // Home on BB's rail leaves the Bots list, also when it doesn't change the route (on a thread, BB's Home is already active).
+    const home = (event: MouseEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(HOME_RAIL_SELECTOR)) return;
+      clickedHome(window.location.pathname);
+      sync();
+    };
     window.addEventListener("focus", sync);
-    return () => window.removeEventListener("focus", sync);
+    document.addEventListener("click", home, true);
+    return () => { window.removeEventListener("focus", sync); document.removeEventListener("click", home, true); };
   }, [sdk, call, pathname]);
   return null;
 }

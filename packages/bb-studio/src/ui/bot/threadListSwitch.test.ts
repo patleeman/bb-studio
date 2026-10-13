@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, forgetListMode, isBotPath, isStudioPath, listSwitch, MODE_KEY, NATIVE_LIST_PROVIDER as NATIVE, nextListMode, openedFromBotsList, providerForMode, readListMode, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath, type ListMode } from "./threadListSwitch";
+import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, clickedHome, forgetListMode, isBotPath, isStudioPath, listSwitch, MODE_KEY, NATIVE_LIST_PROVIDER as NATIVE, nextListMode, openedFromBotsList, providerForMode, readListMode, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath, type ListMode } from "./threadListSwitch";
 
 describe("paths", () => {
   it("matches the Bot page and the Studio panel exactly", () => {
@@ -76,6 +76,9 @@ describe("nextListMode", () => {
   it("any other route leaves: native", () => {
     for (const previous of modes) for (const path of leaving) expect(nextListMode(previous, path, "route")).toBe("native");
   });
+  it("Home on the rail is native wherever it lands, a thread included (BB's Home covers thread pages)", () => {
+    for (const previous of modes) for (const path of [...threads, ...leaving]) expect(nextListMode(previous, path, "home")).toBe("native");
+  });
   it("a window with no mode on a thread asks the owner", () => {
     for (const path of threads) expect(nextListMode(null, path, "route")).toBe("detect");
   });
@@ -93,6 +96,8 @@ describe("this window's mode", () => {
     openedFromBotsList();
     expect(sessionStorage.getItem(MODE_KEY)).toBe("bots");
     expect(readListMode()).toBe("bots");
+    clickedHome("/threads/thr_1");
+    expect(readListMode()).toBe("native");
     sessionStorage.setItem(MODE_KEY, "junk");
     expect(readListMode()).toBeNull();
   });
