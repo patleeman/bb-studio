@@ -6,7 +6,8 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogH
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import { toast } from "sonner";
-import { SEND_INLINE_LIMIT, type NoteSendMode, type NoteView, type rpcContract } from "../../notes-contract";
+import { SEND_INLINE_LIMIT } from "../../constants";
+import type { NoteSendMode, NoteView, rpcContract } from "../../notes-contract";
 import { usePageNote } from "./use-note";
 
 /** What Send does by default for a note this long. */

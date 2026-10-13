@@ -19,6 +19,10 @@ export const MERMAID_PATH = "/pages/mermaid.js";
 /** Studio's HTTP routes for Pages, e.g. `${HTTP_ROOT}/files?id=…`. */
 export const HTTP_ROOT = `/api/v1/plugins/${HOST_PLUGIN_ID}/http`;
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+/** Longest draft a note takes in one call (src/pages/notes.ts). */
+export const MAX_NOTE_TEXT = 200_000;
+/** Notes up to this many characters go to the thread as the message itself; longer ones as a link and a request to summarize. */
+export const SEND_INLINE_LIMIT = 8_000;
 export const HUMAN_USER_ID = "user";
 /**
  * Who a `replaceMarkdown` RPC call edits as. RPC calls carry no caller

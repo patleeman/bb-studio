@@ -1,13 +1,13 @@
 // Notes: a thread's composer draft expanded into a page (src/pages/notes.ts).
 // Studio's `notes.*` RPC methods. The desktop composer and iOS call them;
 // scripts/gen-contracts.mjs generates the Swift names from public-contract.ts.
+// The app imports only its types: values from here pull the root SDK into the
+// frontend bundle, which BB can't install.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { MAX_NOTE_TEXT } from "./constants";
 
-/** Longest draft a note takes in one call. */
-export const MAX_NOTE_TEXT = 200_000;
-/** Notes up to this many characters go to the thread as the message itself; longer ones as a link and a request to summarize. */
-export const SEND_INLINE_LIMIT = 8_000;
+export { MAX_NOTE_TEXT, SEND_INLINE_LIMIT } from "./constants";
 
 const pageId = z.string().min(1).max(200);
 const threadId = z.string().min(1).max(200);

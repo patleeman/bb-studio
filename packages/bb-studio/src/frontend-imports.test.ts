@@ -52,6 +52,12 @@ describe("frontend bundle", () => {
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => spec === "@get-bb/plugin-sdk")).toEqual([]);
   });
 
+  it("never imports the root plugin SDK from views loaded on demand", () => {
+    for (const entry of ["src/pages/ui/PagePanel.tsx", "src/pages/ui/route.tsx"]) {
+      expect(importersOf(join(packageDir, entry), (spec) => spec === "@get-bb/plugin-sdk")).toEqual([]);
+    }
+  });
+
   it("loads the design canvas only when a design opens", () => {
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(design-view|canvas|play-view|comments)$/.test(spec))).toEqual([]);
   });
