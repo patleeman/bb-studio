@@ -38,9 +38,11 @@ Copies that can't import the kit say so and are tested against it:
   the Bots list preview skips it.
 - **Runners and heartbeats:** `[PASS]` is the "nothing to report" reply, and
   runners report only through `runner_report`, so it adds no Activity.
-- **Desktop:** BB draws the chat rows. The pinned plugin SDK's timeline
-  renderers only target tool rows and plugin row kinds, not assistant
-  messages, so a `[PASS]` shows as text.
+- **Desktop:** BB draws the chat rows, including a Bot's chat and runner
+  threads, which open as BB's thread page. The pinned plugin SDK's timeline
+  renderers only target tool rows and plugin row kinds, and message
+  directives only render `::name` blocks inside a message, so nothing can
+  hide or restyle a whole assistant message: a `[PASS]` shows as text.
 
 ## What BB does not do yet
 
