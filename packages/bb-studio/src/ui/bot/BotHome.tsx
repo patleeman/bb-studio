@@ -1,29 +1,22 @@
-// The Bot's workspace (nav panel `bot`, /plugins/studio/bot): its main
-// thread (BB's ThreadChat) always fills the page, BB's sidebar shows the
-// Bots list with the threads it started (BotSidebar.tsx), and the right panel's fixed tabs hold its
-// Info and the sub-threads the user opened (BotTabs.tsx). Identity, status
-// and the ⋯ menu sit in the panel's title bar. With no Bot yet, the page greets the user as one and
-// the first message makes it; "New bot" (/plugins/studio/bot/new) does the same for another Bot.
+// The Bot page (nav panel `bot`, /plugins/studio/bot[/<botId>]): the
+// selected Bot's Info (BotTabs.tsx), with BB's sidebar showing the Bots list
+// (BotSidebar.tsx). A Bot's chat isn't embedded here: it opens as BB's own
+// thread page, from the Bots list or Info's Open chat. With no Bot yet, the
+// page greets the user as one and the first message makes it, then opens its
+// chat; "New bot" (/plugins/studio/bot/new) does the same for another Bot.
 // The route picks the Bot (selection.ts); Studio's old address redirects here.
 import { errorMessage, relativeTime } from "@bb-studio/kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, ICON_BUTTON, openAppPath, OUTLINE_BUTTON, PageColumn, PRIMARY_BUTTON, StudioBar } from "@bb-studio/kit/app";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-  Icon, Input, Textarea,
-} from "@bb-studio/kit/ui";
-import { ThreadChat } from "@get-bb/plugin-sdk/app";
-import { useEffect, useState, type ReactNode } from "react";
+import { DANGER_BUTTON, GHOST_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON } from "@bb-studio/kit/app";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "@bb-studio/kit/ui";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import type { BotActivityView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
-import { externalNote } from "../../external-providers";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
-import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
+import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
-import { SwitchModelDialog } from "./BotModel";
-import { useOpenInfo, useOpenThread } from "./workspace";
-import { BOT_PATH, botPath, forBot, useBotSelection } from "./selection";
+import { useOpenThread } from "./workspace";
+import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
 export const BOT_PANEL = "bot";
@@ -50,7 +43,6 @@ export function presetOf(run: HeartbeatRun | null): Preset | null {
 const COMPLETED_PREVIEW = 3;
 const threadPath = (id: string) => `/threads/${encodeURIComponent(id)}`;
 
-const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 const STATE_LABEL = { active: "Active", paused: "Paused", stopped: "Stopped" } as const;
 
 function ago(at: number, now = Date.now()): string {
@@ -89,14 +81,15 @@ export function useAction(refresh: () => void, botId?: string) {
   return { run, busy, error };
 }
 
-export function BotHome() {
+/** The Bot page: the selected Bot's `Info` (BotTabs.tsx passes it, so the two don't import each other), or the create flow. */
+export function BotHome({ Info }: { Info: ComponentType<{ view: BotView; refresh(): void }> }) {
   const { botId, creating } = useBotSelection();
   const view = useLive<BotView>("bot_get", forBot(creating ? undefined : botId), { pollMs: 30_000 });
   if (view.loading && !view.data) return <PageColumn><p className="text-sm text-muted-foreground">Loading…</p></PageColumn>;
   if (view.error && !view.data) return <PageColumn><p role="alert" className="text-sm text-destructive">{view.error}</p></PageColumn>;
   const bot = view.data?.bot;
   if (!bot || creating) return <CreateBot key={creating ? "new" : "first"} first={!bot} onCreated={view.refresh} />;
-  return <BotPage key={bot.id} view={view.data!} refresh={view.refresh} />;
+  return <Info key={bot.id} view={view.data!} refresh={view.refresh} />;
 }
 
 /** Studio's old address (/plugins/studio/studio/bot): replaced by the Bot's own panel. */
@@ -134,12 +127,17 @@ function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) 
     : { name: "New bot", shape: BOT_SHAPES[3] ?? DEFAULT_SHAPE, color: BOT_COLORS[2] ?? BOT_COLORS[0], role: "" });
   const [editing, setEditing] = useState(false);
   const { run, busy, error } = useAction(onCreated);
+  const openThread = useOpenThread();
   const make = async (message: string) => {
     if (busy) return false;
     const made = await run("bot_create", { name: profile.name, avatar: "🤖", shape: profile.shape ?? DEFAULT_SHAPE, color: profile.color ?? BOT_COLORS[0], ...(message.trim() ? { prompt: message.trim() } : {}) }) as BotView | null;
     if (made?.bot && profile.role.trim()) await run("bot_set", { botId: made.bot.id, role: profile.role.trim() });
-    // The page moves to the new Bot (the primary's is the plain Bot page).
-    if (made?.bot && !first) openAppPath(botPath(made.bot.id, made.bot.primary !== false), { replace: true });
+    // Its chat opens as BB's thread page; with no chat yet, the page moves to the new Bot's Info.
+    if (made?.bot) {
+      rememberBot(made.bot.id);
+      if (made.bot.threadId) openThread(made.bot.threadId);
+      else if (!first) openAppPath(botPath(made.bot.id, made.bot.primary !== false), { replace: true });
+    }
     return !!made;
   };
   const starter = (next: Starter) => {
@@ -226,93 +224,6 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
 /** Threads it started that are running now. */
 export const runningCount = (activity: BotActivityView | null | undefined) => activity?.inProgress.filter((thread) => thread.relation === "started").length ?? 0;
 export const openThreadPage = (threadId: string) => openAppPath(threadPath(threadId));
-
-/**
- * The Bot's workspace: its main thread filling the page (the Bots list
- * replaces BB's sidebar list), and the right panel's Info tab (src/ui/bot/BotTabs.tsx).
- */
-function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
-  const activity = useLive<BotActivityView>("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
-  const running = runningCount(activity.data);
-  const controls = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
-  const { bot, profile, run, busy, error, setSheet } = controls;
-  const openInfo = useOpenInfo();
-  const openSub = useOpenThread();
-  const startedNeedsYou = (activity.data?.needsYou ?? []).filter((thread) => thread.relation === "started");
-  const status = statusLabel(view.run, bot.state, running);
-  const [switching, setSwitching] = useState(false);
-
-  return (
-    <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
-      <style>{BOT_STYLES}</style>
-      {/* Identity and controls live in the panel's title bar, like a thread's. */}
-      <StudioBar>
-        <button type="button" className="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" aria-label="Edit profile" title="Edit profile" onClick={() => setSheet("profile")}>
-          <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} size={20} working={running > 0} provider={botProvider(bot)} />
-          <span className="truncate text-sm font-medium">{profile.name}</span>
-        </button>
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-status">
-          <span className={`size-1.5 shrink-0 rounded-full ${STATE_DOT[bot.state]}`} aria-hidden />
-          <span className="truncate">{status}</span>
-        </span>
-        {startedNeedsYou.length ? (
-          <button type="button" className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground" aria-label={`${startedNeedsYou.length} need${startedNeedsYou.length === 1 ? "s" : ""} you`}
-            onClick={() => startedNeedsYou.length === 1 ? openSub(startedNeedsYou[0]!.id) : openInfo()}>
-            <span className="size-1.5 rounded-full bg-warning" aria-hidden />
-            {startedNeedsYou.length === 1 ? "Needs you" : `${startedNeedsYou.length} need you`}
-          </button>
-        ) : null}
-        <span className="min-w-0 flex-1" />
-        <div className="flex shrink-0 items-center gap-0.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" className={ICON_BUTTON} aria-label="Bot menu" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-44">
-              <DropdownMenuItem onSelect={() => setSheet("profile")}><Icon name="Edit" />Edit profile…</DropdownMenuItem>
-              {bot.kind === "external"
-                ? <DropdownMenuItem disabled data-testid="bot-external-note"><Icon name="Info" />{externalNote(bot.providerId)}</DropdownMenuItem>
-                : <>
-                  <DropdownMenuItem onSelect={() => void controls.openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSheet("skills")}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
-                </>}
-              {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
-              {bot.threadId ? <DropdownMenuItem onSelect={() => openThreadPage(bot.threadId!)}><Icon name="ExternalLink" />Open as thread</DropdownMenuItem> : null}
-              {bot.threadId && bot.providerId && bot.model ? <DropdownMenuItem onSelect={() => setSwitching(true)}><Icon name="Repeat" />Switch model…</DropdownMenuItem> : null}
-              <DropdownMenuSeparator />
-              {bot.state === "active"
-                ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
-                : <DropdownMenuItem onSelect={() => void run("bot_resume")}><Icon name="Play" />Resume</DropdownMenuItem>}
-              {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button type="button" className={ICON_BUTTON} aria-label="Bot info" title="Info" onClick={() => openInfo()}><Icon name="Info" /></button>
-        </div>
-      </StudioBar>
-      {switching && bot.threadId && bot.providerId && bot.model
-        ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
-        : null}
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {error ? <p role="alert" className="shrink-0 px-4 py-1.5 text-sm text-destructive">{error}</p> : null}
-        {bot.state !== "active" ? (
-          <div className="flex shrink-0 items-center justify-center gap-3 border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
-            <span className="min-w-0">{bot.name} is {bot.state}. Check-ins are off and it won't start new work.</span>
-            <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>
-          </div>
-        ) : null}
-        {bot.threadId ? (
-          <section aria-label="Chat" className="min-h-0 flex-1">
-            <ThreadChat key={bot.threadId} threadId={bot.threadId} variant="full" className="h-full" />
-          </section>
-        ) : (
-          <p className="m-auto max-w-sm text-center text-sm text-muted-foreground">{bot.name} has no chat. {bot.primary === false ? "" : "Make a thread your Bot from its ⋯ menu."}</p>
-        )}
-      </div>
-      {controls.sheets}
-    </div>
-  );
-}
 
 export function statusLabel(run: HeartbeatRun | null, state: keyof typeof STATE_LABEL, running = 0): string {
   if (state !== "active") return STATE_LABEL[state];

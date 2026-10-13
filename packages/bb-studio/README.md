@@ -937,8 +937,8 @@ open in the background, so it's as you left it when you come back.
   The tag menu also renames and deletes the active tag.
 - **Bot.** Your always-on agent (it replaces the Chief of Staff): a name, a
   drawn avatar, and a workspace of its own (the **Bot** rail item): its
-  chat, a Bots list in BB's sidebar with the threads it started, and an Info tab in
-  the right panel. See [Bot](#bot).
+  Info page, a Bots list in BB's sidebar with the threads it started, and its
+  chat as a normal BB thread. See [Bot](#bot).
 - **Project leads.** A BB project can have a lead thread, which a
   Heartbeat wakes on a schedule; the personal project's lead is your Bot.
   Set them in Setup under **Project leads**. BB's own sidebar groups
@@ -1014,12 +1014,12 @@ the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
 of Staff", with the same thread and check-ins; rename it from its page.
 
 - **Workspace**: its own nav panel, **Bot** in the rail (`/plugins/studio/bot`;
-  the old `/plugins/studio/studio/bot` redirects there). Its main thread
-  always fills the page (below). The panel's title bar has its avatar and
-  name (**Edit profile**), live status (Working on N threads, Checks in …,
-  Idle, Paused, Stopped), a quiet **Needs you** marker when a thread it
-  started waits on you, ⋯ (Edit profile, Memory, Skills, Check-ins, Open as
-  thread, Pause / Resume, Stop…) and **Info**.
+  the old `/plugins/studio/studio/bot` redirects there). The Bot page is the
+  selected bot's **Info** (below), with **Open chat**. Its chat isn't
+  embedded: it opens as BB's normal thread page, so it has everything a
+  thread has, plugin message actions (Studio's reactions) and **Reply in
+  side chat** included. With no bot yet, or on **New bot**, the page is the
+  create flow, and the first message opens the new bot's chat.
 - **Sidebar**: on the Bot page and on a Bot-owned thread (its chat and
   handoff chain, a runner, a thread it spawned, an automation's run), BB's
   sidebar shows the **Bots** list in place of its thread list; everywhere
@@ -1033,9 +1033,12 @@ of Staff", with the same thread and check-ins; rename it from its page.
   other than its check-in), **Recent**, and **Earlier conversations** (its
   handoff chain, closed by default). A thread another of its threads started
   nests under that one, at any depth (`bot_activity` returns each thread's
-  `parentId`). A row opens the thread as a BB thread in the main pane; the
-  bot's row opens its main thread. Closed groups are remembered on this
-  device.
+  `parentId`). A row opens the thread as a BB thread in the main pane; a
+  bot's row opens its chat the same way, and the Bots list stays. On a
+  bot's thread the expanded bot is the thread's owner. Each bot's **ⓘ**
+  (shown on hover; always on the expanded one) opens its Info: beside the
+  chat as the **Bot info** panel tab when one of its threads is open, else
+  its Bot page. Closed groups are remembered on this device.
 - **Switching the list**: BB's `sidebar.threadListProvider` preference is
   global, and Studio sets it by page: the Bot page and Bot-owned threads
   show `studio/bot`, the Studio panel `studio/studio-items` (see
@@ -1062,27 +1065,30 @@ of Staff", with the same thread and check-ins; rename it from its page.
   thread in the personal project (not a lead; a handoff moves it too), Memory
   page, skills, runners and check-ins. Its check-ins are its own automation
   on its thread (`Studio project heartbeat bot:<id>`). Every bot has the same
-  powers: it sees every project. The page shows the selected bot: the
+  powers: it sees every project. The page shows the selected bot's Info: the
   primary at `/plugins/studio/bot`, another at `/plugins/studio/bot/<botId>`;
-  its title bar, Info, runners, check-ins, Memory and skills are
-  that bot's. In a bot's own thread its tools act on that bot.
-- **Right panel**: an **Info** tab beside BB's Browser and Terminal.
-  **Info** is the Bot's profile, Pause / Resume and Stop, Check-ins, Memory,
-  Skills and Activity: **Needs you**, **Running**, **Waiting to start**,
-  **Scheduled** (its check-in and automations, with the next run) and
-  **Recent** (the last three, then Show all). A thread clicked in the
-  Bots sidebar, Activity or Needs you opens as a normal BB thread in the
-  main pane.
+  its runners, check-ins, Memory and skills are that bot's. In a bot's own
+  thread its tools act on that bot.
+- **Info**: the Bot page, and the **Bot info** tab in a thread's side panel
+  (a thread panel action; on a thread no bot owns it says so). It has the
+  bot's avatar, name and live status (Working on N threads, Checks in …,
+  Idle, Paused, Stopped), **Edit profile**, ⋯ (Edit profile, Memory, Skills,
+  Check-ins, Switch model, Pause / Resume, Stop…), **Open chat** (not on the
+  chat itself), Pause / Resume and Stop, Memory, Skills, Automations and
+  Activity: **Needs you**, **Running**, **Waiting to start**, **Scheduled**
+  (its check-in and automations, with the next run) and **Recent** (the
+  last three, then Show all). A thread clicked in the Bots sidebar,
+  Activity or Needs you opens as a normal BB thread in the main pane.
 - **Edit profile**: a drawn avatar (one of nine shapes with two eyes, in one
   of twelve colors, or **Match the name**), its name, and a Description: a
   sentence or two on its role ("You are my chief of staff."), which it's
   told. **Advanced** lists its skills. A Bot made before drawn avatars shows
   its emoji until you pick a shape; the emoji stays for older clients.
-- **Chat**: BB's `ThreadChat` for the Bot's current thread, filling the
-  page, so it looks and works exactly like any thread: the same timeline,
-  composer, queued messages, questions and approvals inline. Threads it
-  handed off from are under **Earlier conversations** in its sidebar
-  (`bot_chain`, which the iOS app also reads for its history).
+- **Chat**: the Bot's current thread, opened as BB's own thread page, so it
+  is exactly any thread: the same timeline, composer, message actions, side
+  chat, queued messages, questions and approvals inline. Threads it handed
+  off from are under **Earlier conversations** in its sidebar (`bot_chain`,
+  which the iOS app also reads for its history).
 - **Quiet**: the Bot is told its chat is your inbox. With nothing new (a
   check-in with nothing to report, a notice that a thread it started
   finished fine, an automation result like `[PASS]`) it replies exactly
@@ -1096,7 +1102,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   chips: **Plan my week**, **What needs me today?** (both send), **Set up a
   morning brief** (the Morning brief preset) and **Customize me** (Edit
   profile).
-- **Automations** (`src/automations.ts`, table `bot_automations`; Info tab,
+- **Automations** (`src/automations.ts`, table `bot_automations`; Info,
   iOS ⋯ → Automations): one list of what wakes a Bot, four kinds.
   - **Check-in**: wakes the Bot's own thread with a short instruction on a
     schedule; have several (Morning brief 8:00, Evening wrap-up 18:00). The
@@ -1361,7 +1367,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     Pause, Resume and Stop. Its avatar carries the provider's logo.
   - **What doesn't**: Studio's Memory page, bot skills, runners and the
     `bot_*`/Studio tools can't reach a remote agent, so the bot gets none:
-    the Info tab and ⋯ menu say "Runs on Hermes — its memory and tools live
+    Info and its ⋯ menu say "Runs on Hermes — its memory and tools live
     there.", and `bot_memory`, `bot_skill_write`, `bot_runner_create` and
     `bot_runner_adopt` refuse an external bot. Its instructions only say who
     it is. A Studio backup doesn't carry the provider yet: a restored

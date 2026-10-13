@@ -1,38 +1,63 @@
-// The Bot page's right-panel fixed tab (nav panel `bot`, app.tsx): Info —
-// its profile, controls, Memory, skills, automations (check-ins, reminders,
-// watchers, runners) and activity. Threads it lists open as BB threads.
-import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON } from "@bb-studio/kit/app";
-import { Icon } from "@bb-studio/kit/ui";
+// A Bot's Info: its profile, controls (Pause/Resume, Stop, the ⋯ menu with
+// Edit profile, Memory, Skills, Check-ins and Switch model), Memory, skills,
+// automations (check-ins, reminders, watchers, runners) and activity. It is
+// the Bot page itself (/plugins/studio/bot[/<botId>], BotPanel), and the
+// "Bot info" thread panel action beside a Bot's thread (BotInfoPanel). Its
+// chat and the threads it lists open as BB threads.
+import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
+import { useState } from "react";
+import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { BotActivityView, BotView } from "../../contract";
 import { useLive } from "../live";
-import { ActivityPanel, runningCount, statusLabel, useBotControls } from "./BotHome";
-import { BotAvatar, botProvider } from "./BotAvatar";
+import { ActivityPanel, BotHome, runningCount, statusLabel, useBotControls } from "./BotHome";
+import { BOT_STYLES, BotAvatar, botProvider } from "./BotAvatar";
+import { SwitchModelDialog } from "./BotModel";
 import { externalName, externalNote } from "../../external-providers";
 import { RunnersSection } from "./Runners";
 import { AutomationsSection } from "./Automations";
-import { forBot, useBotSelection } from "./selection";
 import { useOpenThread } from "./workspace";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 
-/** The selected Bot (selection.ts): the primary on the plain Bot page. */
-function useSelectedBot(pollMs: number) {
-  const { botId, creating } = useBotSelection();
-  return { view: useLive<BotView>("bot_get", forBot(botId), { pollMs }), creating };
+/** The Bot page (nav panel `bot`): the selected Bot's Info, or the create flow. */
+export function BotPanel() {
+  return <BotHome Info={InfoPage} />;
 }
 
-export function BotInfoTab() {
-  const { view, creating } = useSelectedBot(30_000);
-  if (creating) return <p className="p-4 text-sm text-muted-foreground">Say hi to make the new bot.</p>;
-  if (!view.data?.bot) return <p className="p-4 text-sm text-muted-foreground">{view.loading ? "Loading…" : "No bot yet."}</p>;
-  return <Info key={view.data.bot.id} view={view.data} refresh={view.refresh} />;
+function InfoPage({ view, refresh }: { view: BotView; refresh(): void }) {
+  return (
+    <div className="studio-root h-full min-h-0 bg-background">
+      <style>{BOT_STYLES}</style>
+      <div className="mx-auto h-full w-full max-w-2xl">
+        <Info view={view} refresh={refresh} />
+      </div>
+    </div>
+  );
 }
 
-function Info({ view, refresh }: { view: BotView; refresh(): void }) {
+/** The "Bot info" thread panel tab: the Info of the Bot that owns the thread. */
+export function BotInfoPanel({ threadId }: PluginThreadPanelProps) {
+  const owner = useLive<{ botId: string | null }>("bot_thread_owner", { threadId }, { pollMs: 120_000 });
+  const botId = owner.data?.botId ?? null;
+  if (!botId) return <p className="p-4 text-sm text-muted-foreground">{owner.loading || !owner.data ? "Loading…" : "This thread isn't a Bot's. Bot info shows on a Bot's chat and the threads it started."}</p>;
+  return <BotInfo botId={botId} threadId={threadId} />;
+}
+
+/** One Bot's Info by id. */
+export function BotInfo({ botId, threadId }: { botId: string; threadId?: string }) {
+  const view = useLive<BotView>("bot_get", { botId }, { pollMs: 30_000 });
+  if (!view.data?.bot) return <p className="p-4 text-sm text-muted-foreground">{view.loading ? "Loading…" : view.error ?? "No bot."}</p>;
+  return <Info key={view.data.bot.id} view={view.data} refresh={view.refresh} threadId={threadId} />;
+}
+
+/** `threadId`: the thread it shows beside, if any (Open chat hides on the chat itself). */
+function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; threadId?: string }) {
   const activity = useLive<BotActivityView>("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
   const running = runningCount(activity.data);
   const { bot, profile, run, busy, error, setSheet, openMemory, sheets } = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
   const openSub = useOpenThread();
+  const [switching, setSwitching] = useState(false);
   return (
     <div className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground" aria-label={`${bot.name} info`}>
       <header className="flex items-start gap-3 px-4 pt-4 pb-3">
@@ -46,15 +71,43 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
           {profile.role ? <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{profile.role}</p> : null}
         </div>
         <button type="button" className={ICON_BUTTON} aria-label="Edit profile" title="Edit profile" onClick={() => setSheet("profile")}><Icon name="Edit" /></button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className={ICON_BUTTON} aria-label="Bot menu" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-44">
+            <DropdownMenuItem onSelect={() => setSheet("profile")}><Icon name="Edit" />Edit profile…</DropdownMenuItem>
+            {bot.kind === "external"
+              ? <DropdownMenuItem disabled data-testid="bot-external-note"><Icon name="Info" />{externalNote(bot.providerId)}</DropdownMenuItem>
+              : <>
+                <DropdownMenuItem onSelect={() => void openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSheet("skills")}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
+              </>}
+            {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
+            {bot.threadId && bot.providerId && bot.model ? <DropdownMenuItem onSelect={() => setSwitching(true)}><Icon name="Repeat" />Switch model…</DropdownMenuItem> : null}
+            <DropdownMenuSeparator />
+            {bot.state === "active"
+              ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
+              : <DropdownMenuItem onSelect={() => void run("bot_resume")}><Icon name="Play" />Resume</DropdownMenuItem>}
+            {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
+      {switching && bot.threadId && bot.providerId && bot.model
+        ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
+        : null}
 
       <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
+        {bot.threadId && bot.threadId !== threadId
+          ? <button type="button" className={PRIMARY_BUTTON} data-testid="bot-open-chat" onClick={() => openSub(bot.threadId!)}><Icon name="MessageSquare" />Open chat</button>
+          : null}
         {bot.state === "active"
           ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" />Pause</button>
           : <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>}
         {bot.state !== "stopped" ? <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" />Stop…</button> : null}
       </div>
       {error ? <p role="alert" className="px-4 pb-2 text-xs text-destructive">{error}</p> : null}
+      {!bot.threadId ? <p className="px-4 pb-2 text-xs text-muted-foreground">{bot.name} has no chat.{bot.primary === false ? "" : " Make a thread your Bot from its ⋯ menu."}</p> : null}
 
       <dl className="mx-4 flex flex-col divide-y divide-border border-y border-border text-sm">
         {bot.kind === "external" ? <InfoRow label="Runs on" value={`${externalName(bot.providerId)}${bot.model ? ` · ${bot.model}` : ""}`} action={null} /> : <>

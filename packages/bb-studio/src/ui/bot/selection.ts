@@ -33,3 +33,16 @@ export function useBotSelection(): BotSelection {
 
 /** A bot_* RPC input for the selected Bot. */
 export const forBot = <T extends object>(botId: string | undefined, input: T = {} as T): T & { botId?: string } => botId ? { ...input, botId } : input;
+
+/**
+ * On a Bot's thread the route names no Bot, so the Bots list expands the
+ * thread's owner (bot_thread_owner) or, until that answers, the Bot last
+ * selected in this window.
+ */
+const LAST_KEY = "studio.bot.lastSelected";
+export function rememberBot(botId: string): void {
+  try { sessionStorage.setItem(LAST_KEY, botId); } catch { /* private mode */ }
+}
+export function lastBot(): string | undefined {
+  try { return sessionStorage.getItem(LAST_KEY) ?? undefined; } catch { return undefined; }
+}

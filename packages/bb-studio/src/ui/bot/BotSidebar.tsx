@@ -2,14 +2,17 @@
 // replaces BB's thread list while the Bot page or a Bot-owned thread shows
 // (threadListSwitch.ts).
 // A "Bots" list: every Bot (the primary first), the selected one (the Bot
-// page's route, selection.ts) expanded under it into the threads it started: Needs you, Running,
-// Runners, Recurring, Recent (each nested under the thread that started it) and its
-// earlier conversations. A thread opens as a BB thread in the main pane, as
-// from BB's own list; the bot itself opens its main thread, the page.
+// page's route, selection.ts; on a thread, the thread's owner) expanded under
+// it into the threads it started: Needs you, Running, Runners, Recurring,
+// Recent (each nested under the thread that started it) and its earlier
+// conversations. A thread opens as a BB thread in the main pane, as from BB's
+// own list; so does a Bot's row, which opens its chat. Each Bot's ⓘ opens its
+// Info: beside the chat on its thread (the Bot info panel action), else its
+// Bot page.
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { ThreadTitle, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
-import { botPath, forBot, NEW_BOT_PATH, useBotSelection } from "./selection";
+import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
@@ -18,7 +21,7 @@ import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
 import { isBotPath, knownBotOwned, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import { ImportBotDialog } from "./ImportBot";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
-import { forgetThreadStrips, sidebarGroups, useOpenThread, type TreeNode } from "./workspace";
+import { forgetThreadStrips, sidebarGroups, useOpenBotInfo, useOpenThread, type TreeNode } from "./workspace";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
 type Layout = { closed: string[] };
@@ -84,7 +87,7 @@ export function BotThreadList({ onNavigate, activeThreadId }: PluginThreadListPr
   const threadId = threadIdForPath(pathname);
   useEffect(() => { if (!onBotPage) void syncThreadList(sdk, pathname, call); }, [sdk, call, onBotPage, pathname]);
   if (!onBotPage && (!threadId || knownBotOwned(threadId) === false)) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
-  return <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} />;
+  return <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} threadId={onBotPage ? null : threadId} />;
 }
 
 /**
@@ -108,14 +111,20 @@ export function ThreadListSwitcher() {
 
 type BotSummary = NonNullable<BotView["bot"]>;
 
-function BotsList({ onNavigate, activeThreadId }: { onNavigate(): void; activeThreadId: string | null }) {
+/** `threadId`: the Bot thread open in the main pane, if any (not on the Bot page). */
+function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(): void; activeThreadId: string | null; threadId: string | null }) {
   // The removed Threads tab kept its opened threads in localStorage; drop them once.
   useEffect(() => forgetThreadStrips(), []);
-  const { botId, creating } = useBotSelection();
+  const route = useBotSelection();
+  // On a thread the route names no Bot: its owner does, or the Bot last selected here until that answers.
+  const owner = useLive<{ botId: string | null }>("bot_thread_owner", { threadId: threadId ?? "" }, { pollMs: 120_000, enabled: !!threadId });
+  const botId = threadId ? owner.data?.botId ?? lastBot() : route.botId;
+  const creating = !threadId && route.creating;
   const list = useLive<{ bots: BotSummary[] }>("bot_list", {}, { pollMs: 30_000 });
   const view = useLive<BotView>("bot_get", forBot(botId), { pollMs: 30_000 });
   const bots = list.data?.bots ?? [];
   const selected = creating ? null : view.data?.bot ?? null;
+  useEffect(() => { if (selected) rememberBot(selected.id); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [importing, setImporting] = useState(false);
   return (
     <nav aria-label="Bots" className="studio-root flex flex-col gap-0.5 px-1.5 pb-3">
@@ -135,33 +144,60 @@ function BotsList({ onNavigate, activeThreadId }: { onNavigate(): void; activeTh
         </div>
       ) : null}
       {bots.length ? bots.map((bot) => bot.id === selected?.id
-        ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} active={activeThreadId} />
+        ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} active={activeThreadId} onThread={!!threadId} />
         : <BotRow key={bot.id} bot={bot} onNavigate={onNavigate} />)
         : <p className="px-2 text-xs text-muted-foreground">{list.loading || view.loading ? "Loading…" : list.error ?? view.error ?? "No bot yet. Say hi to make one."}</p>}
     </nav>
   );
 }
 
-/** A Bot that isn't selected: one row that opens its page. */
-function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
+/** Opens a Bot's chat as a BB thread (its Bot page when it has none). */
+function useOpenBot(onNavigate: () => void): (bot: BotSummary) => void {
+  const openThread = useOpenThread();
+  return (bot) => {
+    rememberBot(bot.id);
+    if (bot.threadId) openThread(bot.threadId);
+    else openAppPath(botPath(bot.id, bot.primary !== false));
+    onNavigate();
+  };
+}
+
+/** The ⓘ beside a Bot's row: its Info. Shown on hover or focus, always on the selected Bot. */
+function InfoButton({ bot, onThread, onNavigate, always = false }: { bot: BotSummary; onThread: boolean; onNavigate(): void; always?: boolean }) {
+  const openInfo = useOpenBotInfo();
   return (
-    <button type="button" data-testid="bot-row" data-bot={bot.id} title={bot.name}
-      onClick={() => { openAppPath(botPath(bot.id, bot.primary !== false)); onNavigate(); }}
-      className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-state-hover">
-      <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={22} provider={botProvider(bot)} />
-      <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
-      {bot.state !== "active" ? <span className="shrink-0 text-[11px] text-muted-foreground">{bot.state}</span> : null}
+    <button type="button" aria-label={`Open ${bot.name} info`} title="Bot info" data-testid="bot-info"
+      onClick={() => { rememberBot(bot.id); openInfo(bot, onThread); onNavigate(); }}
+      className={`flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 ${always ? "" : "opacity-0 group-hover/bot:opacity-100"}`}>
+      <Icon name="Info" className="size-3.5" />
     </button>
   );
 }
 
+/** A Bot that isn't selected: one row that opens its chat, and its ⓘ. */
+function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
+  const openBot = useOpenBot(onNavigate);
+  return (
+    <div className="group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover">
+      <button type="button" data-testid="bot-row" data-bot={bot.id} title={bot.name} onClick={() => openBot(bot)}
+        className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left">
+        <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={22} provider={botProvider(bot)} />
+        <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
+        {bot.state !== "active" ? <span className="shrink-0 text-[11px] text-muted-foreground">{bot.state}</span> : null}
+      </button>
+      <InfoButton bot={bot} onThread={false} onNavigate={onNavigate} />
+    </div>
+  );
+}
+
 /** One bot: its row, and (it's the selected bot) its threads under it. */
-function BotEntry({ view, onNavigate, active }: { view: BotView; onNavigate(): void; active: string | null }) {
+function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNavigate(): void; active: string | null; onThread: boolean }) {
   const bot = view.bot!;
   const activity = useLive<BotActivityView>("bot_activity", { botId: bot.id }, { pollMs: 15_000 });
   const chain = useLive<{ threadIds: string[] }>("bot_chain", { botId: bot.id }, { pollMs: 120_000 });
   const [layout, setLayout] = useLayout();
   const openThread = useOpenThread();
+  const openBot = useOpenBot(onNavigate);
   const running = runningCount(activity.data);
   const status = statusLabel(view.run, bot.state, running);
   const groups = sidebarGroups(activity.data);
@@ -177,11 +213,11 @@ function BotEntry({ view, onNavigate, active }: { view: BotView; onNavigate(): v
 
   return (
     <div className="flex flex-col" style={accent}>
-      {/* The bot: its main thread is the Bot page. */}
-      <button type="button" aria-current="page" data-testid="bot-main" title={`${bot.name}: ${status}`}
-        onClick={() => { openAppPath(botPath(bot.id, bot.primary !== false)); onNavigate(); }}
-        className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:brightness-110"
-        style={{ background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" }}>
+      {/* The bot: its row opens its chat as a BB thread; ⓘ opens its Info. */}
+      <div className="group/bot flex min-w-0 items-center rounded-md pr-1" style={{ background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" }}>
+      <button type="button" aria-current={!bot.threadId || active === bot.threadId ? "page" : undefined} data-testid="bot-main" title={`${bot.name}: ${status}`}
+        onClick={() => openBot(bot)}
+        className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left hover:brightness-110">
         <span className="relative shrink-0">
           <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} size={28} working={running > 0} provider={botProvider(bot)} />
           {groups.needsYou.length ? <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label="Needs you" /> : null}
@@ -191,6 +227,8 @@ function BotEntry({ view, onNavigate, active }: { view: BotView; onNavigate(): v
           <span className="truncate text-[11px] text-muted-foreground">{status}</span>
         </span>
       </button>
+      <InfoButton bot={bot} onThread={onThread} onNavigate={onNavigate} always />
+      </div>
 
       <div className="mt-2 ml-3 flex flex-col gap-2.5 border-l pl-1.5" style={{ borderColor: "color-mix(in oklab, var(--bot-accent) 35%, transparent)" }}>
         {groups.needsYou.length ? (

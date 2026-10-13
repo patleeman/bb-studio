@@ -1,17 +1,16 @@
-// The Bot's workspace: its right-panel Info tab, how its threads open (as
-// BB threads, in the main pane), and how its sidebar groups the threads it
-// started. No React components here, so app.tsx, the page and the tabs can
-// share it without import cycles.
-import { experimental_useAppPanel, useBbNavigate } from "@get-bb/plugin-sdk/app";
+// The Bot's workspace: how its threads open (as BB threads, in the main
+// pane, its chat included), where its Info opens, and how its sidebar groups
+// the threads it started. No React components here, so app.tsx, the page and
+// the tabs can share it without import cycles.
+import { openAppPath } from "@bb-studio/kit/app";
+import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
+import { botPath } from "./selection";
 import { markBotOwned } from "./threadListSwitch";
 
-/** The Bot's nav panel id (also BOT_PANEL in BotHome). */
-const PANEL = "bot";
-
-/** Info: the Bot's profile, controls, check-ins and activity. */
-export const INFO_TAB = { panelId: PANEL, id: "info" } as const;
+/** The thread panel action that shows a Bot thread's Info (app.tsx). */
+export const BOT_INFO_ACTION = "bot-info";
 
 /**
  * Opens one of the Bot's threads the way BB's own thread list does: as the
@@ -35,10 +34,16 @@ export function forgetThreadStrips(storage: Pick<Storage, "length" | "key" | "re
   } catch { /* private mode */ }
 }
 
-/** Selects the Info tab. */
-export function useOpenInfo(): () => boolean {
-  const panel = experimental_useAppPanel();
-  return useCallback(() => panel.openFixedTab({ surface: { kind: "current" }, tab: INFO_TAB }), [panel]);
+/**
+ * Opens a Bot's Info: beside the chat (the Bot info thread panel action) when
+ * one of its threads is open, else its Bot page, which is its Info.
+ */
+export function useOpenBotInfo(): (bot: { id: string; primary?: boolean }, onBotsThread: boolean) => void {
+  const navigate = useBbNavigate();
+  return useCallback((bot, onBotsThread) => {
+    if (onBotsThread && navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })) return;
+    openAppPath(botPath(bot.id, bot.primary !== false));
+  }, [navigate]);
 }
 
 // --- The Bot's sidebar -----------------------------------------------------

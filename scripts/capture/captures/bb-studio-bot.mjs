@@ -1,10 +1,11 @@
 // The Bot's workspace (/plugins/studio/bot). First its onboarding, while the
 // staged BB has no Bot (greeting and starter chips); then a Bot with history:
-// the Bots list in BB's sidebar (it replaces BB's thread list on the Bot page)
-// with the threads it started (one needing the user, one running,
-// a nested follow-up, a recurring automation), its main thread in BB's own
-// thread view, and the right panel's Info tab; then a normal thread page,
-// where BB's own thread list is back. Last, two runners (src/runners.ts): one
+// the Bots list in BB's sidebar (it replaces BB's thread list on the Bot page
+// and on the Bot's threads) with the threads it started (one needing the
+// user, one running, a nested follow-up, a recurring automation), its chat
+// opened from its row as BB's own thread page, and its Info beside it (the
+// row's ⓘ: the Bot info thread panel tab); then a thread no Bot owns, where
+// BB's own thread list is back. Last, two runners (src/runners.ts): one
 // that logs, one that tells and then raises something urgent; the Bots
 // sidebar's Runners group, the Info tab's Runners section, and a runner's
 // thread opened from the sidebar as BB's thread page, with the Bot's chat
@@ -26,13 +27,23 @@ const dismissProblems = (client) => client.evaluate(`(() => { [...document.query
 const SIDEBAR = 'nav[aria-label="Bots"]';
 const LIST_PREF = "sidebar.threadListProvider";
 const SCOUT = { name: "Scout", avatar: "🛰️", shape: "hexagon", color: "#2ba59a", prompt: "Hi Scout. In one short sentence, say you'll watch competitors' release notes for anything that affects ORBIT-42." };
-const assertChat = (client) => client.evaluate(`(() => {
-  const chat = document.querySelector('section[aria-label="Chat"]');
-  if (!chat) throw new Error("No Bot chat");
-  if (!/ORBIT-42/.test(chat.textContent)) throw new Error("The Bot chat shows none of its history");
-  if (!chat.querySelector('textarea, [contenteditable="true"]')) throw new Error("The Bot chat has no composer");
-  return true;
-})()`);
+/** The selected Bot's row opens its chat as BB's thread page; the Bots list stays. `text` must show in it. */
+const openChat = async (client, threadId, text) => {
+  await client.evaluate(`(() => { document.querySelector('${SIDEBAR} [data-testid=bot-main]').click(); return true; })()`);
+  await client.evaluate(`(() => new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      const onThread = location.pathname.endsWith("/threads/${threadId}");
+      const composer = document.querySelector('textarea, [contenteditable="true"]');
+      if (onThread && composer && document.querySelector('${SIDEBAR}') && ${text}.test(document.body.textContent)) return resolve(true);
+      if (Date.now() - started > 90000) return reject(new Error("The Bot's chat didn't open as BB's thread page with the Bots list and its history"));
+      setTimeout(tick, 300);
+    };
+    tick();
+  }))()`);
+};
+/** The selected Bot's ⓘ: on its thread, Info opens beside the chat (the Bot info panel tab). */
+const openInfo = (client) => client.evaluate(`(() => { document.querySelector('${SIDEBAR} [data-testid=bot-main] + [data-testid=bot-info]').click(); return true; })()`);
 
 export default ({ projectId, pluginRpc, bbCli, sleep }) => {
   const json = async (args) => JSON.parse(await bbCli([...args, "--json"]));
@@ -87,7 +98,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
   };
 
   const workspace = async (client) => {
-    await seededBot();
+    const bot = await seededBot();
     await client.navigate(BOT_PATH);
     await client.waitForSelector(SIDEBAR, 30000);
     await dismissProblems(client);
@@ -101,13 +112,15 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
       if (!document.querySelector('${SIDEBAR} li > button[data-thread] + ul button[data-thread]')) throw new Error("No nested sub-thread in the Bot sidebar");
       return true;
     })()`);
-    await client.waitForText("ORBIT-42", 60000);
-    await assertChat(client);
+    // The bot's row opens its chat as BB's thread page, and the Bots list stays.
+    await openChat(client, bot.threadId, "/ORBIT-42/");
+    const still = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
+    if (still !== "studio/bot") throw new Error(`On the Bot's chat the thread list is ${still}, not studio/bot`);
   };
 
   const info = async (client) => {
     await workspace(client);
-    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await openInfo(client);
     await client.waitForSelector('[aria-label="Dot info"]', 30000);
     for (const text of ["Automations", "Check-in", "Weekdays 8:00", "Memory", "Skills", "Activity", "Scheduled"]) await client.waitForText(text, 30000);
     await sleep(1500);
@@ -155,7 +168,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await seededRunners();
     await workspace(client);
     for (const text of ["Runners", "Inbox watch", "Deploy watch"]) await client.waitForText(text, 60000);
-    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await openInfo(client);
     await client.waitForSelector('[aria-label$=" info"] section[aria-label=Automations] [data-kind=runner]', 30000);
     await client.evaluate(`(() => new Promise((resolve, reject) => {
       const started = Date.now();
@@ -204,17 +217,23 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(1500);
   };
 
-  /** Leaving the Bot page: a normal thread, with BB's own thread list back. */
+  /** Leaving the Bot page for a thread no Bot owns: BB's own thread list is back. */
+  const OTHER = "Plan the ORBIT-42 retro";
   const leave = async (client) => {
-    const bot = await seededBot();
+    await seededBot();
+    let other = (await json(["thread", "list"]).catch(() => [])).find((thread) => thread.title === OTHER);
+    if (!other) {
+      other = await json(["thread", "spawn", "--project", projectId, "--title", OTHER, "--prompt", "Reply with one short sentence: the ORBIT-42 retro is Monday at 10."]);
+      await bbCli(["thread", "wait", other.id, "--status", "idle", "--timeout", "180"]).catch(() => {});
+    }
     await client.navigate(BOT_PATH);
     await client.waitForSelector(SIDEBAR, 30000);
-    await client.navigate(`/threads/${bot.threadId}`);
+    await client.navigate(`/projects/${projectId}/threads/${other.id}`);
     for (let i = 0; i < 40 && JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF])) !== "thread-list/thread-list"; i++) await sleep(500);
     const pref = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
     if (pref !== "thread-list/thread-list") throw new Error(`After leaving the Bot page the thread list is ${pref}, not BB's`);
     await client.waitForText("New thread", 30000);
-    await client.waitForText(CHILDREN[0].title, 30000);
+    await client.waitForText(OTHER, 30000);
     await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}')) throw new Error("The Bots list is still showing"); return true; })()`);
     await dismissProblems(client);
     await sleep(1500);
@@ -241,7 +260,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await sleep(800);
   };
 
-  /** A second bot, Scout, selected: its page, its expanded sidebar entry and Info; Dot is listed above it. */
+  /** A second bot, Scout, selected: its page (its Info), its expanded sidebar entry; Dot is listed above it. */
   const twoBots = async (client) => {
     await seededBot();
     let { bots } = await pluginRpc("studio", "bot_list", {});
@@ -261,15 +280,13 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
         const nav = document.querySelector('${SIDEBAR}');
         const main = nav?.querySelector('[data-testid=bot-main]');
         const other = nav?.querySelector('[data-testid=bot-row]');
-        const chat = document.querySelector('section[aria-label="Chat"]');
-        if (main && /Scout/.test(main.textContent) && other && /Dot/.test(other.textContent) && chat && /release notes|competitor/i.test(chat.textContent)) return resolve(true);
-        if (Date.now() - started > 90000) return reject(new Error("The Bot page doesn't show Scout selected with Dot listed and Scout's chat"));
+        const info = document.querySelector('[aria-label="Scout info"]');
+        if (main && /Scout/.test(main.textContent) && other && /Dot/.test(other.textContent) && info) return resolve(true);
+        if (Date.now() - started > 90000) return reject(new Error("The Bot page doesn't show Scout selected with Dot listed and Scout's Info"));
         setTimeout(tick, 300);
       };
       tick();
     }))()`);
-    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
-    await client.waitForSelector('[aria-label="Scout info"]', 30000);
     for (const text of ["Evening wrap-up", "Memory", "Runners"]) await client.waitForText(text, 30000);
     await sleep(1500);
   };
@@ -307,7 +324,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     await client.navigate(`${BOT_PATH}/${relay.id}`);
     await client.waitForSelector(SIDEBAR, 30000);
     await dismissProblems(client);
-    await client.waitForSelector('section[aria-label="Chat"]', 30000);
+    await client.waitForSelector('[aria-label="Relay info"]', 30000);
   };
   /** Switch model…: BB's picker, the bot's thread on Claude Code Sonnet after an in-place switch from Opus. */
   const switchModel = async (client) => {
@@ -337,13 +354,14 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
     const { threadIds } = await pluginRpc("studio", "bot_chain", { botId: relay.id });
     if (threadIds.length !== 3) throw new Error(`Relay's chain has ${threadIds.length} threads, not 3`);
     await openRelay(client, relay);
+    // Its chat, the new Codex thread, opens as BB's thread page from its row.
+    await openChat(client, relay.threadId, "/Codex|gpt-6/");
     await client.evaluate(`(() => { const group = document.querySelector('${SIDEBAR} section[aria-label="Earlier conversations"] > button'); if (!group) throw new Error("No Earlier conversations"); if (group.getAttribute("aria-expanded") !== "true") group.click(); return true; })()`);
     await client.evaluate(`(() => new Promise((resolve, reject) => {
       const started = Date.now();
       const tick = () => {
         const earlier = document.querySelectorAll('${SIDEBAR} section[aria-label="Earlier conversations"] button[type=button]');
-        const chat = document.querySelector('section[aria-label="Chat"]');
-        if (earlier.length >= 3 && chat && chat.textContent.trim().length > 40) return resolve(true);
+        if (earlier.length >= 3) return resolve(true);
         if (Date.now() - started > 90000) return reject(new Error("The handoff chat or its earlier conversations aren't showing"));
         setTimeout(tick, 300);
       };
@@ -388,7 +406,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
   };
   const openInfoAutomations = async (client) => {
     await workspace(client);
-    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await openInfo(client);
     await client.waitForSelector('[aria-label$=" info"] section[aria-label=Automations] [data-kind=watcher]', 30000);
   };
   const automationsList = async (client) => {
@@ -482,7 +500,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => {
   const skillsSection = async (client) => {
     const skills = await seededSkills();
     await workspace(client);
-    await client.evaluate(`(() => { document.querySelector('button[aria-label="Bot info"]').click(); return true; })()`);
+    await openInfo(client);
     await client.waitForSelector('button[aria-label="Manage skills"]', 30000);
     await client.evaluate(`(() => { document.querySelector('button[aria-label="Manage skills"]').click(); return true; })()`);
     await client.waitForSelector('[aria-label="Learn from work"]', 30000);
