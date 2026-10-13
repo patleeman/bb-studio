@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import type { BotActivityView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
+import { describeCron } from "../../schedule";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
@@ -291,7 +292,7 @@ function ScheduledList({ items }: { items: BotScheduledView[] }) {
       {items.map((item) => (
         <li key={item.id} className="flex min-w-0 items-center gap-2 px-1.5 py-1 text-sm">
           <span className="min-w-0 flex-1 truncate">{item.name}</span>
-          <span className="shrink-0 text-xs text-muted-foreground">{!item.enabled ? "off" : item.nextRunAt ? when(item.nextRunAt) : "on"}</span>
+          <span className="shrink-0 text-xs text-muted-foreground" title={item.cron ? describeCron(item.cron) : undefined}>{!item.enabled ? "off" : item.nextRunAt ? when(item.nextRunAt) : item.cron ? describeCron(item.cron) : "on"}</span>
         </li>
       ))}
     </ul>

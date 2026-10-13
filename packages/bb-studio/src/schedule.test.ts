@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileSchedule, cronField, describeSchedule, endOfDay, fromHeartbeat, runMinutes, WEEKDAYS, ALL_DAYS, type Schedule } from "./schedule";
+import { compileSchedule, cronField, describeCron, describeSchedule, endOfDay, fromHeartbeat, localZone, runMinutes, WEEKDAYS, ALL_DAYS, type Schedule } from "./schedule";
 
 const crons = (schedule: Schedule) => compileSchedule(schedule, { defaultTimezone: "America/New_York" }).map((t) => (t.triggerType === "schedule" ? t.cron : t.runAt));
 
@@ -60,5 +60,38 @@ describe("fields and words", () => {
       const expected = { weekdays: "0 8 * * 1-5", every2hours: "30 */2 * * *", custom: "0 9-17/2 * * 1-5", every15minutes: "*/15 * * * *" }[run.cadence];
       expect(crons(fromHeartbeat(run))).toEqual([expected]);
     }
+  });
+});
+
+describe("describeCron", () => {
+  it.each([
+    ["5 7,17 * * *", "Daily 7:05 AM and 5:05 PM"],
+    ["0 */2 * * *", "Every 2 hours"],
+    ["0 7,12,17,22 * * *", "4× daily: 7 AM, 12, 5, 10 PM"],
+    ["0 9 * * 1-5", "Weekdays 9:00 AM"],
+    ["30 8 * * 1", "Mondays 8:30 AM"],
+    ["30 8 * * MON", "Mondays 8:30 AM"],
+    ["*/15 * * * *", "Every 15 minutes"],
+    ["*/15 9-17 * * 1-5", "Every 15 minutes, 9 AM–6 PM on weekdays"],
+    ["0 * * * *", "Hourly"],
+    ["0 9-17/2 * * 1-5", "5× weekdays: 9, 11 AM, 1, 3, 5 PM"],
+    ["0 18 * * 0,6", "Weekends 6:00 PM"],
+    ["0 9 * * 1,3,5", "Mon, Wed, Fri 9:00 AM"],
+  ])("%s is %s", (cron, text) => {
+    expect(describeCron(cron)).toBe(text);
+  });
+  it("falls back to the cron itself", () => {
+    expect(describeCron("0 9 1 * *")).toBe("Custom: 0 9 1 * *");
+    expect(describeCron("0 9 * 1 *")).toBe("Custom: 0 9 * 1 *");
+    expect(describeCron("nonsense")).toBe("Custom: nonsense");
+    expect(describeCron("61 9 * * *")).toBe("Custom: 61 9 * * *");
+  });
+  it("names the timezone only when it isn't the local one", () => {
+    expect(describeCron("0 9 * * *", localZone())).toBe("Daily 9:00 AM");
+    const other = localZone() === "Europe/London" ? "Asia/Tokyo" : "Europe/London";
+    expect(describeCron("0 9 * * *", other)).toBe(`Daily 9:00 AM (${other === "Asia/Tokyo" ? "Tokyo" : "London"} time)`);
+  });
+  it("describes a cron schedule with it", () => {
+    expect(describeSchedule({ type: "cron", cron: "5 7,17 * * *" })).toBe("Daily 7:05 AM and 5:05 PM");
   });
 });

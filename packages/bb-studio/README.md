@@ -1168,6 +1168,14 @@ of Staff", with the same thread and check-ins; rename it from its page.
   one automation. More than eight is refused. The end date isn't a cron
   field: Studio pauses the group once the day has passed in its timezone.
   The preview shows the words and the crons.
+- **Schedules in words**: wherever the Bot UI would show a raw cron
+  (Automations, Runners, Scheduled), `describeCron` in `src/schedule.ts`
+  says it in plain English: `5 7,17 * * *` is "Daily 7:05 AM and 5:05 PM",
+  `0 */2 * * *` "Every 2 hours", `0 7,12,17,22 * * *` "4× daily: 7 AM, 12,
+  5, 10 PM", `0 9 * * 1-5` "Weekdays 9:00 AM", `30 8 * * 1` "Mondays
+  8:30 AM", `*/15 * * * *` "Every 15 minutes". A timezone other than this
+  machine's is named ("(London time)"). Anything else (a day of the month,
+  a month) shows as "Custom: <cron>".
 
   ![The schedule editor editing the Release watch watcher: its bash script and 30 s timeout, what to do with the output, Wakes: The bot; presets, the Every… mode, every day on, every 15 minutes from 0:00 to 23:59, quiet hours 22:00–7:00, no end date, the America/New_York timezone, and the preview "Every 15 min, every day · quiet 22:00–7:00" with its cron */15 7-21 * * *](assets/bot-schedule-editor.png)
 - **Memory**: one Studio page per Bot, "<name>'s Memory" in the personal

@@ -161,6 +161,114 @@ export function daysLabel(days: readonly number[]): string {
   return set.map((day) => DAY_NAMES[day]).join(", ");
 }
 
+// --- A cron in plain English ------------------------------------------------
+
+const DAY_WORDS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+const PLURAL_DAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+
+/** A cron field's values in [min, max] (*, n, a-b, lists, /steps, day names), or null if it isn't one. */
+function cronValues(field: string, min: number, max: number, names?: Record<string, number>): number[] | null {
+  const values = new Set<number>();
+  const value = (text: string) => {
+    const named = names?.[text.toLowerCase()];
+    if (named !== undefined) return named;
+    if (!/^\d+$/.test(text)) return NaN;
+    return Number(text);
+  };
+  for (const part of field.split(",")) {
+    const match = /^(\*|[^-/]+(?:-[^-/]+)?)(?:\/(\d+))?$/.exec(part);
+    if (!match) return null;
+    const step = match[2] ? Number(match[2]) : 1;
+    let from: number, to: number;
+    if (match[1] === "*") { from = min; to = max; } else {
+      const [a, b] = match[1]!.split("-");
+      from = value(a!); to = b === undefined ? (match[2] ? max : from) : value(b);
+    }
+    if (!Number.isInteger(from) || !Number.isInteger(to) || step < 1 || from < min || to > max || from > to) return null;
+    for (let v = from; v <= to; v += step) values.add(v);
+  }
+  return [...values].sort((a, b) => a - b);
+}
+
+/** A minute of the day on a 12-hour clock: "7:05" and its half. */
+function clock12(minute: number): { time: string; half: "AM" | "PM" } {
+  const h = Math.floor(minute / 60), m = minute % 60;
+  return { time: `${h % 12 || 12}:${String(m).padStart(2, "0")}`, half: h < 12 ? "AM" : "PM" };
+}
+const at12 = (minute: number) => { const { time, half } = clock12(minute); return `${time} ${half}`; };
+
+/** "7, 12, 5, 10 PM" style: whole hours lose ":00", and AM/PM follows the last time of each run of AM or PM times. */
+function shortTimes(minutes: number[]): string {
+  return minutes.map((minute, i) => {
+    const { time, half } = clock12(minute);
+    const text = minute % 60 ? time : time.replace(/:00$/, "");
+    const next = minutes[i + 1];
+    return next === undefined || clock12(next).half !== half ? `${text} ${half}` : text;
+  }).join(", ");
+}
+
+/** The days a weekday field names: "Daily", "Weekdays", "Weekends", "Mondays", "Mon, Wed". */
+function cronDays(days: number[]): string {
+  const set = [...new Set(days.map((day) => day % 7))].sort();
+  if (set.length === 7) return "Daily";
+  if (set.length === 1) return PLURAL_DAYS[set[0]!]!;
+  return daysLabel(set);
+}
+
+/** A label for `timezone` when it isn't this machine's: "(London time)". */
+function zoneNote(timezone?: string): string {
+  if (!timezone || timezone === localZone()) return "";
+  return ` (${timezone.split("/").pop()!.replace(/_/g, " ")} time)`;
+}
+
+/**
+ * A five-field cron in plain English: "Daily 7:05 AM and 5:05 PM", "Every 2
+ * hours", "4× daily: 7 AM, 12, 5, 10 PM", "Weekdays 9:00 AM", "Mondays
+ * 8:30 AM", "Every 15 minutes". The timezone shows only when it isn't the
+ * local one. Anything else is "Custom: <cron>". Pure.
+ */
+export function describeCron(expr: string, timezone?: string): string {
+  const cron = expr.trim().replace(/\s+/g, " ");
+  const custom = `Custom: ${cron}`;
+  const fields = cron.split(" ");
+  if (fields.length !== 5) return custom;
+  const [minField, hourField, dom, month, dowField] = fields as [string, string, string, string, string];
+  if (dom !== "*" || month !== "*") return custom;
+  const minutes = cronValues(minField, 0, 59);
+  const hours = cronValues(hourField, 0, 23);
+  const days = cronValues(dowField, 0, 7, DAY_WORDS);
+  if (!minutes || !hours || !days) return custom;
+  const dayText = cronDays(days);
+  // "daily", "weekdays", "weekends" lower-cased mid-sentence; day names stay capitalized.
+  const dayWord = /^(Daily|Weekdays|Weekends)$/.test(dayText) ? dayText.toLowerCase() : dayText;
+  const onDays = dayText === "Daily" ? "" : ` on ${dayWord}`;
+  const zone = zoneNote(timezone);
+  const allHours = hours.length === 24;
+  const hourStep = /^\*\/(\d+)$/.exec(hourField);
+  const minuteStep = /^\*\/(\d+)$/.exec(minField);
+  let text: string | null = null;
+  if (minutes.length === 60 && allHours) text = `Every minute${onDays}`;
+  else if (minuteStep && allHours) text = `Every ${Number(minuteStep[1])} minutes${onDays}`;
+  else if (minuteStep && hours.length > 1 && hours.every((h, i) => i === 0 || h === hours[i - 1]! + 1)) {
+    text = `Every ${Number(minuteStep[1])} minutes, ${at12(hours[0]! * 60).replace(":00", "")}–${at12(((hours.at(-1)! + 1) % 24) * 60).replace(":00", "")}${onDays}`;
+  } else if (minutes.length === 1) {
+    const minute = minutes[0]!;
+    const past = minute ? ` at :${String(minute).padStart(2, "0")}` : "";
+    if (allHours) text = `Hourly${past}${onDays}`;
+    else if (hourStep) text = `Every ${Number(hourStep[1])} hours${past}${onDays}`;
+    else {
+      const times = hours.map((hour) => hour * 60 + minute);
+      if (times.length === 1) text = `${dayText} ${at12(times[0]!)}`;
+      else if (times.length === 2) text = `${dayText} ${at12(times[0]!)} and ${at12(times[1]!)}`;
+      else text = `${times.length}× ${dayWord}: ${shortTimes(times)}`;
+    }
+  } else if (hours.length === 1 && minutes.length <= 4) {
+    const times = minutes.map((minute) => hours[0]! * 60 + minute);
+    text = times.length === 2 ? `${dayText} ${at12(times[0]!)} and ${at12(times[1]!)}` : `${times.length}× ${dayWord}: ${shortTimes(times)}`;
+  }
+  return text ? text + zone : custom;
+}
+
 /** The schedule in a few words, for lists and tools. */
 export function describeSchedule(schedule: Schedule, now = Date.now()): string {
   if (schedule.type === "once") {
@@ -169,7 +277,7 @@ export function describeSchedule(schedule: Schedule, now = Date.now()): string {
     return `Once, ${sameDay ? "today" : at.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ${at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
   }
   let text: string;
-  if (schedule.type === "cron") text = `Cron ${schedule.cron}`;
+  if (schedule.type === "cron") text = describeCron(schedule.cron, schedule.timezone);
   else if (schedule.type === "times") text = `${daysLabel(schedule.days)} ${[...schedule.times].sort().map(clock).join(", ")}`;
   else {
     const every = schedule.every === 1 ? (schedule.unit === "hours" ? "Hourly" : "Every minute") : `Every ${schedule.every} ${schedule.unit === "hours" ? "h" : "min"}`;

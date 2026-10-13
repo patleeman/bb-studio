@@ -8,6 +8,7 @@ import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "@bb
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input } from "@bb-studio/kit/ui";
 import { useState } from "react";
 import type { RunnerAdoptableView, RunnerView } from "../../contract";
+import { describeCron } from "../../schedule";
 import { useCall, useLive, type Cadence } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 
@@ -19,7 +20,7 @@ const CADENCE: Record<Cadence, string> = {
   every6hours: "Every 6 h", daily: "Daily", weekdays: "Weekdays", weekly: "Mondays", custom: "Custom",
 };
 export function scheduleLabel(schedule: RunnerView["schedule"]): string {
-  if (schedule.cadence === "custom") return schedule.cron ?? "Custom";
+  if (schedule.cadence === "custom") return schedule.cron ? describeCron(schedule.cron) : "Custom";
   return ["daily", "weekdays", "weekly"].includes(schedule.cadence) ? `${CADENCE[schedule.cadence]} ${schedule.time}` : CADENCE[schedule.cadence];
 }
 const at = (time: number) => new Date(time).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
@@ -150,7 +151,7 @@ function Adoptable({ adoptable, busy, disabled, onOpen, onAdopt }: { adoptable: 
 function AdoptConfirm({ candidate, botName, busy, error, onClose, onConfirm }: { candidate: RunnerAdoptableView; botName: string; busy: boolean; error: string | null; onClose(): void; onConfirm(): void }) {
   return (
     <Confirm title={`Adopt ${candidate.title}?`} busy={busy} error={error} action="Adopt" onClose={onClose} onConfirm={onConfirm}
-      text={`It becomes a runner on its automation "${candidate.automationName}"${candidate.cron ? ` (${candidate.cron})` : ""}, which stays. Its prompt gets one note: report with runner_report instead of messaging ${botName}. It's no longer nested under ${botName}, so BB stops posting its "completed" notices there. Delete undoes it.`} />
+      text={`It becomes a runner on its automation "${candidate.automationName}"${candidate.cron ? ` (${describeCron(candidate.cron).replace(/^Custom: /, "")})` : ""}, which stays. Its prompt gets one note: report with runner_report instead of messaging ${botName}. It's no longer nested under ${botName}, so BB stops posting its "completed" notices there. Delete undoes it.`} />
   );
 }
 
