@@ -296,7 +296,10 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
       other = await json(["thread", "spawn", "--project", projectId, "--title", OTHER, "--prompt", "Reply with one short sentence: the ORBIT-42 retro is Monday at 10."]);
       await bbCli(["thread", "wait", other.id, "--status", "idle", "--timeout", "180"]).catch(() => {});
     }
-    await client.navigate(BOT_PATH);
+    // Home, then the rail's Bot item, as a user arrives. (A page loaded straight on the Bot page makes BB's Home return to it:
+    // BB records the route Home was active on, and it counts the Bot page as Home until Studio's rail item registers.)
+    await client.navigate("/");
+    await client.clickAriaButtonWithPointer("Bot", 'nav[aria-label="Primary navigation"]');
     await client.waitForSelector(SIDEBAR, 30000);
     // The window keeps the Bots list on any thread until another rail destination: Home, then the thread from BB's list.
     await clickHome(client);
