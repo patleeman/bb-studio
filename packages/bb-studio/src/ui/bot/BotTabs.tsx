@@ -1,12 +1,13 @@
 // A Bot's Info: its profile, controls (Pause/Resume, Stop, the ⋯ menu with
 // Edit profile, Memory, Skills, Check-ins and Switch model), Memory, skills,
 // automations (check-ins, reminders, watchers, runners) and activity. It is
-// the Bot page itself (/plugins/studio/bot[/<botId>], BotPanel), which the
-// ⓘ on each Bot's row in the Bots list opens. Its chat and the threads it
-// lists open as BB threads.
+// the Bot page itself (/plugins/studio/bot[/<botId>], BotPanel), and the
+// "Bot info" thread panel action beside a Bot's thread (BotInfoPanel). Its
+// chat and the threads it lists open as BB threads.
 import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
 import { useState } from "react";
+import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { BotActivityView, BotView } from "../../contract";
 import { useLive } from "../live";
 import { ActivityPanel, BotHome, runningCount, statusLabel, useBotControls } from "./BotHome";
@@ -35,7 +36,23 @@ function InfoPage({ view, refresh }: { view: BotView; refresh(): void }) {
   );
 }
 
-function Info({ view, refresh }: { view: BotView; refresh(): void }) {
+/** The "Bot info" thread panel tab: the Info of the Bot that owns the thread. */
+export function BotInfoPanel({ threadId }: PluginThreadPanelProps) {
+  const owner = useLive<{ botId: string | null }>("bot_thread_owner", { threadId }, { pollMs: 120_000 });
+  const botId = owner.data?.botId ?? null;
+  if (!botId) return <p className="p-4 text-sm text-muted-foreground">{owner.loading || !owner.data ? "Loading…" : "Not a Bot thread. Bot info shows on a Bot's chat and the threads it started."}</p>;
+  return <BotInfo botId={botId} threadId={threadId} />;
+}
+
+/** One Bot's Info by id. */
+export function BotInfo({ botId, threadId }: { botId: string; threadId?: string }) {
+  const view = useLive<BotView>("bot_get", { botId }, { pollMs: 30_000 });
+  if (!view.data?.bot) return <p className="p-4 text-sm text-muted-foreground">{view.loading ? "Loading…" : view.error ?? "No bot."}</p>;
+  return <Info key={view.data.bot.id} view={view.data} refresh={view.refresh} threadId={threadId} />;
+}
+
+/** `threadId`: the thread it shows beside, if any (Open chat hides on the chat itself). */
+function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; threadId?: string }) {
   const activity = useLive<BotActivityView>("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
   const running = runningCount(activity.data);
   const { bot, profile, run, busy, error, setSheet, openMemory, sheets } = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
@@ -81,7 +98,7 @@ function Info({ view, refresh }: { view: BotView; refresh(): void }) {
         : null}
 
       <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
-        {bot.threadId
+        {bot.threadId && bot.threadId !== threadId
           ? <button type="button" className={PRIMARY_BUTTON} data-testid="bot-open-chat" onClick={() => openSub(bot.threadId!)}><Icon name="MessageSquare" />Open chat</button>
           : null}
         {bot.state === "active"

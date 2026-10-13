@@ -1,11 +1,16 @@
 // The Bot's workspace: how its threads open (as BB threads, in the main
-// pane, its chat included) and how its sidebar groups
+// pane, its chat included), where its Info opens, and how its sidebar groups
 // the threads it started. No React components here, so app.tsx, the page and
 // the tabs can share it without import cycles.
+import { openAppPath } from "@bb-studio/kit/app";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
+import { botPath } from "./selection";
 import { markBotOwned } from "./threadListSwitch";
+
+/** The thread panel action that shows a Bot thread's Info (app.tsx). */
+export const BOT_INFO_ACTION = "bot-info";
 
 /**
  * Opens one of the Bot's threads the way BB's own thread list does: as the
@@ -27,6 +32,51 @@ export function forgetThreadStrips(storage: Pick<Storage, "length" | "key" | "re
     }
     for (const key of keys) storage.removeItem(key);
   } catch { /* private mode */ }
+}
+
+/**
+ * Opens a Bot's Info: beside the chat (the Bot info thread panel action) when
+ * one of its threads is open, else its Bot page, which is its Info.
+ */
+export function useOpenBotInfo(): (bot: { id: string; primary?: boolean }, onBotsThread: boolean) => void {
+  const navigate = useBbNavigate();
+  return useCallback((bot, onBotsThread) => {
+    if (onBotsThread && navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })) return;
+    openAppPath(botPath(bot.id, bot.primary !== false));
+  }, [navigate]);
+}
+
+/** The thread open in the main pane, and whether Bot info was opened beside it yet. */
+let visit: { threadId: string | null; infoOpened: boolean } = { threadId: null, infoOpened: false };
+
+/** Notes the thread now open (null: none); a different one starts a new visit. */
+export function noteOpenThread(threadId: string | null): void {
+  if (threadId !== visit.threadId) visit = { threadId, infoOpened: false };
+}
+
+/**
+ * Opens Bot info beside a Bot's own chat (`chatIds`: its chain) once each
+ * time that thread opens. Closing it sticks until the user opens the thread
+ * again. The thread view may mount after the sidebar, so a declined open is
+ * retried briefly.
+ */
+export function useOpenBotInfoOnChat(activeThreadId: string | null, chatIds: readonly string[]): void {
+  const navigate = useBbNavigate();
+  const onChat = !!activeThreadId && chatIds.includes(activeThreadId);
+  useEffect(() => {
+    noteOpenThread(activeThreadId);
+    if (!activeThreadId || !onChat) return;
+    if (visit.infoOpened) return;
+    visit.infoOpened = true;
+    const current = visit;
+    let tries = 0;
+    const attempt = () => {
+      if (visit !== current) return;
+      if (navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })) return;
+      if (++tries < 6) setTimeout(attempt, 500);
+    };
+    attempt();
+  }, [activeThreadId, onChat, navigate]);
 }
 
 // --- The Bot's sidebar -----------------------------------------------------
