@@ -32,8 +32,7 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { BOT_PANEL, BOT_SUBPATH, BotRedirect } from "./src/ui/bot/BotHome";
-import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
-import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
+import { BotPanel } from "./src/ui/bot/BotTabs";
 import { BotThreadList, ThreadListSwitcher } from "./src/ui/bot/BotSidebar";
 import { StudioThreadList } from "./src/ui/StudioSidebar";
 import { BOT_LIST_ID, STUDIO_LIST_ID } from "./src/ui/bot/threadListSwitch";
@@ -143,9 +142,8 @@ export default definePluginApp((app) => {
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // The user's Bots: the Bot page is the selected Bot's Info (or the create
   // flow); its chat and threads open as BB threads, with the Bots list in BB's
-  // sidebar. Beside a Bot's thread, the "Bot info" panel action shows the same Info.
+  // sidebar, where each Bot's ⓘ opens this page.
   app.slots.navPanel({ id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotPanel, headerContent: StudioBarSlot });
-  app.slots.threadPanelAction({ id: BOT_INFO_ACTION, title: "Bot info", icon: "Bot", layout: "flush", component: BotInfoPanel });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });

@@ -7,7 +7,6 @@ const state = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
   call: vi.fn(async () => ({})),
   toThread: vi.fn((_threadId: string) => {}),
-  openThreadPanel: vi.fn((_options: unknown) => true),
   pathname: "/plugins/studio/bot",
   prefs: { value: "studio/bot", revision: 1 },
   setPref: vi.fn(async (_args: unknown) => ({})),
@@ -26,7 +25,7 @@ vi.mock("../live", () => ({
 vi.mock("../ProjectLeads", () => ({ HeartbeatFields: () => null, useHeartbeatForm: () => ({ input: () => ({}) }) }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   ThreadTitle: ({ threadId }: { threadId: string }) => React.createElement("span", null, `title:${threadId}`),
-  useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openThreadPanel }),
+  useBbNavigate: () => ({ toThread: state.toThread }),
   useSdk: () => sdk,
   experimental_ProviderIcon: ({ provider }: { provider: { id: string } }) => React.createElement("i", { "data-logo": provider.id }),
   experimental_useProviders: () => ({ status: "ready", providers: [{ id: "claude", displayName: "Claude" }, { id: "codex", displayName: "Codex" }] }),
@@ -68,7 +67,7 @@ vi.mock("@bb-studio/kit/ui", () => ({
 }));
 
 const { ActivityPanel, BOT_PATH, BotRedirect } = await import("./BotHome");
-const { BotInfoPanel, BotPanel } = await import("./BotTabs");
+const { BotPanel } = await import("./BotTabs");
 const { BotThreadList } = await import("./BotSidebar");
 const { forgetBotOwnership } = await import("./threadListSwitch");
 const listProps = { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => {}, searchQuery: "" };
@@ -78,7 +77,6 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   state.call.mockClear();
   state.toThread.mockClear();
-  state.openThreadPanel.mockClear();
   state.pathname = "/plugins/studio/bot";
   state.setPref.mockClear();
   state.activate.mockClear();
@@ -291,20 +289,6 @@ test("the Bot page embeds no chat; Open chat opens its main thread as a BB threa
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
 });
 
-test("Bot info beside a thread: the owner's Info, no Open chat on its own chat; a thread no Bot owns says so", async () => {
-  state.data = { bot_thread_owner: { botId: "bot_main" }, bot_get: { bot: dot, run: null }, bot_activity: empty };
-  await show(<BotInfoPanel threadId="thr_bot" params={null} />);
-  expect(state.inputs).toContainEqual(["bot_thread_owner", { threadId: "thr_bot" }]);
-  expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_main" }]);
-  expect(container.querySelector("h2")?.textContent).toBe("Dot");
-  expect(container.querySelector("[data-testid=bot-open-chat]")).toBeNull();
-  await show(<BotInfoPanel threadId="t9" params={null} />);
-  expect(container.querySelector("[data-testid=bot-open-chat]")).not.toBeNull();
-  state.data = { bot_thread_owner: { botId: null } };
-  await show(<BotInfoPanel threadId="t9" params={null} />);
-  expect(container.textContent).toContain("This thread isn't a Bot's.");
-});
-
 test("Check-ins offers presets, marks the current one, and applies one in a click", async () => {
   state.data = { bot_get: { bot: dot, run: { enabled: true, cadence: "weekdays", time: "08:00" } }, bot_activity: empty };
   await show(<BotPanel />);
@@ -358,7 +342,8 @@ test("New bot: the create flow greets as a new bot and the first message makes a
   state.call.mockImplementation(async () => ({}));
 });
 
-test("on a Bot's thread the Bots list expands the thread's owner; its ⓘ opens Bot info beside the chat", async () => {
+test("on a Bot's thread the Bots list expands the thread's owner; its ⓘ opens the Bot page, its Info", async () => {
+  const { openAppPath } = await import("@bb-studio/kit/app");
   state.pathname = "/threads/thr_s1";
   state.call.mockImplementation((async (method: string) => method === "bot_thread_owner" ? { botId: "bot_scout" } : {}) as never);
   state.data = { bot_list: { bots: [{ ...dot, primary: true }, scout] }, bot_thread_owner: { botId: "bot_scout" }, bot_get: { bot: scout, run: null }, bot_activity: empty };
@@ -368,7 +353,7 @@ test("on a Bot's thread the Bots list expands the thread's owner; its ⓘ opens 
   const nav = container.querySelector('nav[aria-label="Bots"]')!;
   expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Scout");
   act(() => click(nav.querySelector('[aria-label="Open Scout info"]')));
-  expect(state.openThreadPanel).toHaveBeenCalledWith({ actionId: "bot-info", title: "Bot info" });
+  expect(openAppPath).toHaveBeenLastCalledWith("/plugins/studio/bot/bot_scout");
   expect(sessionStorage.getItem("studio.bot.lastSelected")).toBe("bot_scout");
   state.call.mockImplementation(async () => ({}));
 });

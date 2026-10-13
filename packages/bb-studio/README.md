@@ -1036,9 +1036,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `parentId`). A row opens the thread as a BB thread in the main pane; a
   bot's row opens its chat the same way, and the Bots list stays. On a
   bot's thread the expanded bot is the thread's owner. Each bot's **ⓘ**
-  (shown on hover; always on the expanded one) opens its Info: beside the
-  chat as the **Bot info** panel tab when one of its threads is open, else
-  its Bot page. Closed groups are remembered on this device.
+  (shown on hover; always on the expanded one) opens its Info, the Bot
+  page (`/plugins/studio/bot[/<botId>]`). Closed groups are remembered on
+  this device.
 - **Switching the list**: BB's `sidebar.threadListProvider` preference is
   global, and Studio sets it by page: the Bot page and Bot-owned threads
   show `studio/bot`, the Studio panel `studio/studio-items` (see
@@ -1069,12 +1069,12 @@ of Staff", with the same thread and check-ins; rename it from its page.
   primary at `/plugins/studio/bot`, another at `/plugins/studio/bot/<botId>`;
   its runners, check-ins, Memory and skills are that bot's. In a bot's own
   thread its tools act on that bot.
-- **Info**: the Bot page, and the **Bot info** tab in a thread's side panel
-  (a thread panel action; on a thread no bot owns it says so). It has the
+- **Info**: the Bot page, opened by the **ⓘ** on a bot's row in the Bots
+  list. It has the
   bot's avatar, name and live status (Working on N threads, Checks in …,
   Idle, Paused, Stopped), **Edit profile**, ⋯ (Edit profile, Memory, Skills,
-  Check-ins, Switch model, Pause / Resume, Stop…), **Open chat** (not on the
-  chat itself), Pause / Resume and Stop, Memory, Skills, Automations and
+  Check-ins, Switch model, Pause / Resume, Stop…), **Open chat**,
+  Pause / Resume and Stop, Memory, Skills, Automations and
   Activity: **Needs you**, **Running**, **Waiting to start**, **Scheduled**
   (its check-in and automations, with the next run) and **Recent** (the
   last three, then Show all). A thread clicked in the Bots sidebar,
