@@ -82,6 +82,7 @@ private struct StudioChatSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start") { Task { await start() } }
                         .disabled(starting || project == nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .blockedWhileDictating()
                 }
             }
             .task {

@@ -137,6 +137,7 @@ struct CaptureSheet: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
+            .blockedWhileDictating()
             .accessibilityIdentifier("captureNoteSave")
             if let savedPageId {
                 HStack {

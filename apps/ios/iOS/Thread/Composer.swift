@@ -10,6 +10,8 @@ struct ComposerField: UIViewRepresentable {
     var maxLines = 6
     /// Room on the right for a button over the field.
     var trailingInset: CGFloat = 12
+    /// Told when the keyboard's dictation ends, fails, or holds a spot for a result.
+    var dictation: DictationGate? = nil
     var onPasteImages: ([UIImage]) -> Void
 
     func makeUIView(context: Context) -> PastingTextView {
@@ -30,6 +32,7 @@ struct ComposerField: UIViewRepresentable {
     func updateUIView(_ view: PastingTextView, context: Context) {
         context.coordinator.parent = self
         view.onPasteImages = onPasteImages
+        view.onDictation = { [weak dictation] event in dictation?.handle(event) }
         if view.textContainerInset.right != trailingInset {
             view.textContainerInset.right = trailingInset
             view.invalidateIntrinsicContentSize()
@@ -64,6 +67,7 @@ struct ComposerField: UIViewRepresentable {
         func textViewDidChange(_ view: UITextView) {
             parent.text = view.text
             (view as? PastingTextView)?.placeholder.isHidden = !view.text.isEmpty
+            parent.dictation?.handle(.edited)
         }
 
         func textViewDidBeginEditing(_ view: UITextView) {
@@ -72,13 +76,17 @@ struct ComposerField: UIViewRepresentable {
 
         func textViewDidEndEditing(_ view: UITextView) {
             if parent.focused { parent.focused = false }
+            // The keyboard's dictation ends with the field's focus.
+            parent.dictation?.handle(.cancelled(.keyboard))
         }
     }
 }
 
 /// The message box, as in ChatGPT: one card with any attachments, the field
 /// at full width, and a row under it with + (attach), the agent's settings,
-/// dictation and `send`.
+/// dictation and `send`. With a `dictation` gate, a "Listening…" or
+/// "Transcribing…" label sits beside `send` while words are on the way; the
+/// caller disables `send` on `dictation.blocksSend`.
 struct ComposerBar<Settings: View, Send: View>: View {
     @Binding var text: String
     @Binding var focused: Bool
@@ -92,6 +100,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var expand: (() -> Void)?
     /// No fill of its own, for a composer on glass.
     var clear = false
+    var dictation: DictationGate? = nil
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -99,12 +108,15 @@ struct ComposerBar<Settings: View, Send: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             AttachmentStrip(items: $attachments)
                 .padding([.horizontal, .top], 10)
-            ComposerField(text: $text, focused: $focused, placeholder: placeholder, maxLines: maxLines, trailingInset: expand == nil ? 12 : 36) { images in
+            ComposerField(
+                text: $text, focused: $focused, placeholder: placeholder, maxLines: maxLines,
+                trailingInset: expand == nil ? 12 : 36, dictation: dictation
+            ) { images in
                 attachments += images.compactMap { PendingAttachment.image($0, name: "pasted.jpg") }
             }
             .padding(.top, 4)
             .overlay {
-                if let talk { TalkOverlay(talk: talk) }
+                if let talk { TalkOverlay(talk: talk, dictation: dictation) }
             }
             .overlay(alignment: .topTrailing) {
                 if let expand {
@@ -133,6 +145,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
                     .accessibilityLabel("Dictate")
                     .accessibilityIdentifier("composerMic")
                 }
+                if let dictation { DictationSendStatus(gate: dictation) }
                 send()
             }
             .padding(.horizontal, 6)
@@ -145,15 +158,20 @@ struct ComposerBar<Settings: View, Send: View>: View {
 /// Covers the field while talking, so the draft underneath stays put.
 private struct TalkOverlay: View {
     @ObservedObject var talk: HoldToTalk
+    /// Holds Send while a talk records or transcribes.
+    let dictation: DictationGate?
 
     var body: some View {
-        if talk.state != .idle {
-            HoldToTalkStatus(talk: talk, cancel: talk.cancel)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .background(.background.secondary, in: .rect(cornerRadius: 16))
-                .padding(.horizontal, 4)
-                .transition(.opacity)
+        Group {
+            if talk.state != .idle {
+                HoldToTalkStatus(talk: talk, cancel: talk.cancel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .background(.background.secondary, in: .rect(cornerRadius: 16))
+                    .padding(.horizontal, 4)
+                    .transition(.opacity)
+            }
         }
+        .onChange(of: talk.state) { _, state in dictation?.handle(DictationState.talk(state)) }
     }
 }
 
@@ -177,6 +195,7 @@ struct ComposerSettingsLabel: View {
 
 final class PastingTextView: UITextView {
     var onPasteImages: (([UIImage]) -> Void)?
+    var onDictation: ((DictationState.Event) -> Void)?
     let placeholder = UILabel()
 
     override init(frame: CGRect, textContainer: NSTextContainer?) {
@@ -208,6 +227,26 @@ final class PastingTextView: UITextView {
             return
         }
         super.paste(sender)
+    }
+
+    // The keyboard's dictation, through UITextInput's optional methods.
+    // UITextView doesn't implement these two, so there is no `super` to call.
+
+    override func dictationRecordingDidEnd() { onDictation?(.transcribing(.keyboard)) }
+
+    override func dictationRecognitionFailed() { onDictation?(.failed(.keyboard)) }
+
+    // It does implement the placeholder for a result still on its way.
+
+    override var insertDictationResultPlaceholder: Any {
+        let placeholder = super.insertDictationResultPlaceholder
+        onDictation?(.placeholderAdded)
+        return placeholder
+    }
+
+    override func removeDictationResultPlaceholder(_ placeholder: Any, willInsertResult: Bool) {
+        super.removeDictationResultPlaceholder(placeholder, willInsertResult: willInsertResult)
+        onDictation?(.placeholderRemoved)
     }
 }
 

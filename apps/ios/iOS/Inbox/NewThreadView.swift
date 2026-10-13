@@ -13,6 +13,7 @@ struct NewThreadView: View {
     @State private var text: String
     @State private var attachments: [PendingAttachment] = []
     @State private var dictating = false
+    @StateObject private var dictation = DictationGate()
     @State private var focused = false
     @State private var creating = false
     @State private var error: String?
@@ -55,7 +56,7 @@ struct NewThreadView: View {
             }
             .onAppear { focused = true }
             .sheet(isPresented: $dictating) {
-                DictationView(threadId: nil, autoStart: true) { text += (text.isEmpty ? "" : " ") + $0 }
+                DictationView(threadId: nil, autoStart: true, gate: dictation) { text += (text.isEmpty ? "" : " ") + $0 }
             }
             .sheet(isPresented: $creatingProject) {
                 NewProjectView { project in
@@ -107,7 +108,7 @@ struct NewThreadView: View {
             }
             ComposerBar(
                 text: $text, focused: $focused, attachments: $attachments, placeholder: "What should the agent do?", maxLines: 10,
-                dictate: { dictating = true }
+                dictate: { dictating = true }, dictation: dictation
             ) {
                 agentMenu
             } send: {
@@ -129,6 +130,7 @@ struct NewThreadView: View {
 
     private var canStart: Bool {
         (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty) && !projectId.isEmpty && !creating
+            && !dictation.blocksSend
     }
 
     /// The project the thread starts in. Optional, as on desktop: "No project"
@@ -269,6 +271,7 @@ struct NewThreadView: View {
     private func permissionLabel(_ mode: String) -> String { PermissionMode.label(mode) }
 
     private func create() async {
+        guard !dictation.blocksSend else { return }
         creating = true
         defer { creating = false }
         do {

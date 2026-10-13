@@ -89,6 +89,7 @@ struct QuickWriteView: View {
             if running("studio") { Task { await savePage() } } else { startingThread = true }
         }
         .disabled(trimmed.isEmpty || saving)
+        .blockedWhileDictating()
         .accessibilityIdentifier("quickWriteSave")
     }
 

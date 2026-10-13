@@ -52,6 +52,7 @@ struct QueuedMessageEditor: View {
                     } else {
                         Button("Save") { Task { await save() } }
                             .disabled(!canSave)
+                            .blockedWhileDictating()
                     }
                 }
             }

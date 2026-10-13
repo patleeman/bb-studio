@@ -6,6 +6,8 @@ struct ThreadView: View {
     private var client: BBClient { operation.client }
     @StateObject private var model: ThreadModel
     @StateObject private var talk: HoldToTalk
+    /// Send waits while dictation (the mic, a talk, or the keyboard's) has words on the way.
+    @StateObject private var dictation = DictationGate()
     @StateObject private var bot = BotModel()
     @State private var draft = ""
     @State private var mentions: [Mention] = []
@@ -95,7 +97,7 @@ struct ThreadView: View {
             PlanReviewSheet(review: review) { await model.loadPlanReview() }
         }
         .sheet(isPresented: $dictating) {
-            DictationView(threadId: model.threadId, autoStart: true) { text in
+            DictationView(threadId: model.threadId, autoStart: true, gate: dictation) { text in
                 draft = draft.isEmpty ? text : draft + " " + text
                 composerFocused = true
             }
@@ -652,6 +654,7 @@ struct ThreadView: View {
 
     private var canSend: Bool {
         !(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachments.isEmpty) && !model.sending
+            && !dictation.blocksSend
     }
 
     private func takeActionButton() {
@@ -670,6 +673,7 @@ struct ThreadView: View {
 
     /// Clears the field right away and puts the text back if sending fails.
     private func send() {
+        guard !dictation.blocksSend else { return }
         if editing { return saveEdit() }
         sends += 1
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -706,6 +710,7 @@ struct ThreadView: View {
 
     /// Text only: a scheduled message can't carry attachments.
     private func send(at date: Date) {
+        guard !dictation.blocksSend else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let sentMentions = mentions
         draft = ""
@@ -865,13 +870,13 @@ struct ThreadView: View {
                 text: $draft, focused: $composerFocused, attachments: $attachments,
                 placeholder: botChrome.map { "Message \($0.bot.name)" } ?? "Message",
                 dictate: { dictating = true }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil,
-                clear: botChrome != nil
+                clear: botChrome != nil, dictation: dictation
             ) {
                 Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
                     .disabled(handoffStatus?.working == true)
                     .accessibilityLabel("Model & permissions")
             } send: {
-                if let botChrome, model.thread?.isRunning == true, !canSend {
+                if let botChrome, model.thread?.isRunning == true, !canSend, !dictation.blocksSend {
                     // Nothing typed while the Bot works: stop it.
                     Button { Task { await model.stop() } } label: {
                         Image(systemName: "stop.fill")

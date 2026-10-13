@@ -99,6 +99,7 @@ struct PageCommentsSheet: View {
             }
             .buttonStyle(.borderless)
             .disabled(text.isEmpty || sending != nil)
+            .blockedWhileDictating()
             .accessibilityLabel("Send Reply")
         }
     }
@@ -186,7 +187,7 @@ private struct NewPageCommentSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { Task { await post() } }.disabled(!canPost)
+                    Button("Post") { Task { await post() } }.disabled(!canPost).blockedWhileDictating()
                 }
             }
             .task {

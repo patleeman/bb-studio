@@ -16,6 +16,8 @@ struct DictationView: View {
     var onInsert: ((String) -> Void)?
     /// Label and symbol for the `onInsert` button.
     var insertLabel = ("Insert", "text.insert")
+    /// The calling composer's Send, held until the words are in its field.
+    var gate: DictationGate?
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
 
     @State private var text = ""
@@ -25,13 +27,14 @@ struct DictationView: View {
 
     init(
         threadId: String?, autoStart: Bool, kind: String = "dictation", insertLabel: (String, String) = ("Insert", "text.insert"),
-        onInsert: ((String) -> Void)? = nil
+        gate: DictationGate? = nil, onInsert: ((String) -> Void)? = nil
     ) {
         self.threadId = threadId
         self.autoStart = autoStart
         self.kind = kind
         self.insertLabel = insertLabel
         self.onInsert = onInsert
+        self.gate = gate
     }
 
     var body: some View {
@@ -101,6 +104,11 @@ struct DictationView: View {
         .task {
             if autoStart { await recorder.start(kind: kind, threadId: threadId) }
         }
+        .onChange(of: recorder.phase, initial: true) { _, phase in
+            if let event = DictationState.sheet(phase) { gate?.handle(event) }
+        }
+        // Closed, cancelled or swiped away: Send is free again.
+        .onDisappear { gate?.handle(.cancelled(.sheet)) }
     }
 
     /// A field that asked for dictation gets the text right away and is where
@@ -110,6 +118,7 @@ struct DictationView: View {
         guard client.baseURL == app.serverURL else { return }
         if let onInsert, !spoken.isEmpty {
             onInsert(spoken)
+            gate?.handle(.inserted(.sheet))
             operation.complete(on: app) { dismiss() }
         } else {
             text = spoken
@@ -127,6 +136,7 @@ struct DictationView: View {
             if let onInsert {
                 Button {
                     onInsert(trimmed)
+                    gate?.handle(.inserted(.sheet))
                     operation.complete(on: app) { dismiss() }
                 } label: { wide(insertLabel.0, insertLabel.1) }
                 .buttonStyle(.borderedProminent)

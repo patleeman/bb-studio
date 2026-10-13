@@ -65,6 +65,7 @@ struct PageWorkBar: View {
                     Image(systemName: sending ? "ellipsis" : "arrow.up.circle.fill").font(.title2)
                 }
                 .disabled(draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectId == nil || sending || draft.error != nil)
+                .blockedWhileDictating()
                 .accessibilityLabel("Start")
                 .padding(.trailing, 6)
                 .padding(.bottom, 4)
