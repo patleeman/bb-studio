@@ -176,6 +176,22 @@ it("offers a thread the Bot started with an automation for adoption, and adopts 
   expect(x.threads.get("thr_staff")?.archivedAt).toBeNull();
 });
 
+it("shows a runner paused when BB turned its automation off, and Resume turns it back on", async () => {
+  const x = await setup();
+  x.add({ id: "thr_lead", title: "Project Lead", parentThreadId: "bot1" });
+  x.started.push({ id: "thr_lead", title: "Project Lead", projectId: "proj_personal", parentThreadId: "bot1" });
+  x.automations.push({ id: "auto_lead", projectId: "proj_personal", name: "Lead heartbeat", enabled: true, trigger: { cron: "0 */2 * * *", timezone: "America/New_York" }, execution: { mode: "agent", targetThreadId: "thr_lead", prompt: "Check the project." }, nextRunAt: 7 });
+  const runner = await x.runners.adopt({ threadId: "thr_lead", automationId: "auto_lead" });
+  expect(runner).toMatchObject({ state: "active", nextRunAt: 7 });
+  // A run failed and BB disabled the automation: no next run, so not "active" with a bare cron.
+  Object.assign(x.automations[0]!, { enabled: false, nextRunAt: null, lastRunStatus: "failed" });
+  expect((await x.runners.list())[0]).toMatchObject({ state: "paused", nextRunAt: null });
+  // Resume re-enables it (the fake has BB's next run back).
+  x.automations[0]!.nextRunAt = 8;
+  expect(await x.runners.setState(runner.id, "active")).toMatchObject({ state: "active", nextRunAt: 8 });
+  expect(x.automations[0]).toMatchObject({ enabled: true });
+});
+
 it("keeps runner threads out of BB's thread list: a new one is spawned hidden, and is visible again once deleted", async () => {
   const x = await setup();
   const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });

@@ -183,10 +183,14 @@ export class Runners {
   }
 
   private view(row: RunnerRow, automation?: AutomationRow): RunnerView {
+    // BB can turn the automation off by itself (a failed run disables it, or
+    // someone paused it in BB): then it has no next run, so the runner shows
+    // paused, and Resume turns the automation back on.
+    const state = row.state === "active" && automation?.enabled === false ? "paused" : row.state;
     return {
-      id: row.id, name: row.name, job: row.job, threadId: row.thread_id, state: row.state, adopted: !!row.adopted,
+      id: row.id, name: row.name, job: row.job, threadId: row.thread_id, state, adopted: !!row.adopted,
       schedule: { cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}) },
-      nextRunAt: row.state === "active" ? automation?.nextRunAt ?? null : null,
+      nextRunAt: state === "active" ? automation?.nextRunAt ?? null : null,
       lastRunAt: Math.max(automation?.lastRunAt ?? 0, row.last_run_at ?? 0) || null,
       lastLevel: row.last_level, lastReport: row.last_report, lastReportAt: row.last_report_at, urgent: !!row.urgent,
     };
