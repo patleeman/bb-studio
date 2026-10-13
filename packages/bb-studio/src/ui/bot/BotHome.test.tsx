@@ -46,9 +46,8 @@ const sdk = { threads: { get: async ({ threadId }: { threadId: string }) => {
   set: (args: unknown) => state.setPref(args),
 } } };
 vi.mock("./Onboarding", () => ({
-  Greeting: ({ lines, onStarter }: { lines: string[]; onStarter(starter: unknown): void }) => React.createElement("div", null, lines.join(" "),
-    React.createElement("button", { onClick: () => onStarter({ kind: "customize" }) }, "Customize me")),
-  Composer: ({ onSend }: { onSend(text: string): void }) => React.createElement("button", { "aria-label": "Send", onClick: () => onSend("") }),
+  Welcome: ({ first, look, onCreate }: { first: boolean; look: { shape: string }; onCreate(goal: string): void }) => React.createElement("div", { "data-shape": look.shape }, first ? "Meet your Bot" : "Make another Bot",
+    React.createElement("button", { onClick: () => onCreate("Watch my PRs") }, "Create Bot")),
 }));
 vi.mock("@bb-studio/kit/app", () => ({
   PageColumn: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
@@ -109,18 +108,15 @@ const thread = (id: string, title: string) => ({ id, title, status: "idle", proj
 const empty = { needsYou: [], inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
 const dot = { id: "bot_main", name: "Dot", avatar: "🟣", shape: "blob", color: "#5b8def", state: "active", threadId: "thr_bot", createdAt: 1, updatedAt: 1 };
 
-test("with no Bot, greets as one; Customize edits the draft and the first message makes it", async () => {
+test("with no Bot, the welcome's Create makes it with the setup and opens its chat", async () => {
   state.data = { bot_get: { bot: null, run: null } };
+  state.call.mockImplementation((async (method: string) => method === "bot_create" ? { bot: { ...dot, name: "Chief of Staff" }, run: null } : {}) as never);
   await show(<BotPanel />);
-  expect(container.textContent).toContain("Hey! I'm your bot.");
-  act(() => button("Customize me").click());
-  const name = container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement;
-  act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(name, "Penny"); name.dispatchEvent(new Event("input", { bubbles: true })); });
-  act(() => click(container.querySelector('[aria-label="Shape hexagon"]')));
-  act(() => button("Save").click());
-  expect(container.querySelector("h1")?.textContent).toBe("Penny");
-  await act(async () => click(container.querySelector('[aria-label="Send"]')));
-  expect(state.call).toHaveBeenCalledWith("bot_create", { name: "Penny", avatar: "🤖", shape: "hexagon", color: "#5b8def" });
+  expect(container.textContent).toContain("Meet your Bot");
+  await act(async () => button("Create Bot").click());
+  expect(state.call).toHaveBeenCalledWith("bot_create", { name: "Chief of Staff", avatar: "🤖", shape: "blob", color: "#5b8def", setup: "Watch my PRs" });
+  expect(state.toThread).toHaveBeenCalledWith("thr_bot");
+  state.call.mockImplementation(async () => ({}));
 });
 
 test("Studio's old Bot address redirects to the Bot's own panel", async () => {
@@ -372,14 +368,14 @@ test("several Bots: the selected one (from the route) is expanded and scoped; a 
   expect(state.call).toHaveBeenCalledWith("bot_pause", { botId: "bot_scout" });
 });
 
-test("New bot: the create flow greets as a new bot and the first message makes a second one, then opens its chat", async () => {
+test("New bot: the welcome makes a second one, then opens its chat", async () => {
   state.pathname = "/plugins/studio/bot/new";
   state.data = { bot_get: { bot: dot, run: null } };
   state.call.mockImplementation((async (method: string) => method === "bot_create" ? { bot: scout, run: null } : {}) as never);
   await show(<BotPanel />);
-  expect(container.textContent).toContain("I'm a new bot");
-  await act(async () => click(container.querySelector('[aria-label="Send"]')));
-  expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "New bot", avatar: "🤖" }));
+  expect(container.textContent).toContain("Make another Bot");
+  await act(async () => button("Create Bot").click());
+  expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "New bot", avatar: "🤖", setup: "Watch my PRs" }));
   // Its chat opens as a BB thread.
   expect(state.toThread).toHaveBeenCalledWith("thr_scout");
   state.call.mockImplementation(async () => ({}));

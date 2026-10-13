@@ -441,7 +441,7 @@ export const rpcContract = defineRpcContract({
   /** A Bot (the primary without botId) and its heartbeat; bot null before one is made. */
   bot_get: { input: forBot, output: botView },
   /** Makes a Bot: from an existing thread, or a new chat in the personal project started with `prompt`. The first is the primary; later ones are additional Bots. */
-  bot_create: { input: z.object({ name: botName, avatar: botAvatar, shape: botShape.optional(), color: botColor.optional(), threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional(), external: externalBot.optional() }), output: botView },
+  bot_create: { input: z.object({ name: botName, avatar: botAvatar, shape: botShape.optional(), color: botColor.optional(), threadId: z.string().min(1).max(200).optional(), prompt: z.string().trim().min(1).max(20000).optional(), setup: z.string().trim().max(2000).optional(), external: externalBot.optional() }), output: botView },
   /** The external agent providers a bot can be imported from (Studio Agents), with their status and models. */
   bot_external_providers: { input: z.object({}), output: externalProviders },
   /**

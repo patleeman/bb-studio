@@ -4,7 +4,7 @@ import { MIGRATIONS } from "./migrations";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, spawnedBy, startedBy } from "./bot";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupPrompt, spawnedBy, startedBy } from "./bot";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -109,6 +109,18 @@ it("creates a Bot with a new chat in the personal project and names it in the he
   expect(prompts(x)).toEqual([botHeartbeat("Dot")]);
   await x.bots.set({ name: "Penny" });
   expect(prompts(x)).toEqual([botHeartbeat("Penny")]);
+});
+
+it("the first-time flow's setup becomes a first message that has the Bot set its own profile", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Chief of Staff", avatar: "🤖", setup: "Watch my PRs" });
+  const text = (x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string }[] }).input[0]!.text;
+  expect(text).toContain("I'd like help with: Watch my PRs");
+  expect(text).toContain("bot_profile_update");
+  expect(setupPrompt("  ")).toContain("haven't decided");
+  // A prompt still wins.
+  await x.bots.create({ name: "Scout", avatar: "🛰️", prompt: "Hi", setup: "ignored" });
+  expect((x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string }[] }).input[0]!.text).toBe("Hi");
 });
 
 it("makes a second Bot with its own thread, check-in, memory, skills and handoff, the first staying primary", async () => {

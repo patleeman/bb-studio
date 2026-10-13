@@ -4,8 +4,9 @@
 // the window's last Bot thread, or the Bot's chat, and shows the primary's
 // Info only when there's neither. A Bot's chat isn't embedded here: it opens as BB's own
 // thread page, from the Bots list or Info's Open chat. With no Bot yet, the
-// page greets the user as one and the first message makes it, then opens its
-// chat; "New bot" (/plugins/studio/bot/new) does the same for another Bot.
+// page is a welcome that asks what the Bot should help with; Create makes it
+// and opens its chat, where it sets itself up. "New bot"
+// (/plugins/studio/bot/new) does the same for another Bot.
 // The route picks the Bot (selection.ts); Studio's old address redirects here.
 import { errorMessage, relativeTime } from "@bb-studio/kit/format";
 import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "@bb-studio/kit/app";
@@ -17,8 +18,8 @@ import { pagePath } from "../../pages/constants";
 import { describeCron } from "../../schedule";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
-import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
-import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
+import { BOT_COLORS, BOT_SHAPES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
+import { Welcome } from "./Onboarding";
 import { useOpenThread } from "./workspace";
 import { botLanding, openedFromBotsList, readLastBotThread, threadRoute } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
@@ -147,72 +148,33 @@ export function BotRedirect() {
 /** shape null: the emoji avatar. */
 type Profile = { name: string; shape: string | null; color: string | null; role: string; emoji: string };
 
-/** The centered top of the page: avatar (its pencil edits the profile), name and live status. */
-function Identity({ avatar, profile, status, dot, onEdit, working = false, compact = false }: { avatar: string; profile: Profile; status: string; dot: string; onEdit(): void; working?: boolean; compact?: boolean }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <button type="button" className="group relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Edit profile" onClick={onEdit}>
-        <BotAvatar shape={profile.shape} color={profile.color} emoji={avatar} size={compact ? 36 : 48} working={working} />
-        <span className="absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground group-hover:text-foreground" aria-hidden><Icon name="Edit" className="size-3" /></span>
-      </button>
-      <h1 className={`${compact ? "mt-1" : "mt-1.5"} max-w-full truncate text-sm font-semibold`}>{profile.name}</h1>
-      <span className="flex max-w-full items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-status">
-        <span className={`size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
-        <span className="truncate">{status}</span>
-      </span>
-    </div>
-  );
-}
+/** The first Bot's name until it picks its own; a further Bot's. */
+export const FIRST_BOT_NAME = "Chief of Staff";
+export const NEXT_BOT_NAME = "New bot";
 
 /**
- * No Bot yet: the page already looks like its chat. It greets the user, a
- * chip opens the profile editor, and the first message makes the Bot.
+ * No Bot yet, or New bot: the welcome (Onboarding.tsx). Create makes the Bot
+ * with a default name and drawn avatar, its first message the setup (it asks
+ * a couple of questions, then names and draws itself), and opens its chat.
  */
 function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) {
-  const [profile, setProfile] = useState<Profile>(() => first
-    ? { name: "Bot", shape: DEFAULT_SHAPE, color: BOT_COLORS[0], role: "", emoji: "🤖" }
-    : { name: "New bot", shape: BOT_SHAPES[3] ?? DEFAULT_SHAPE, color: BOT_COLORS[2] ?? BOT_COLORS[0], role: "", emoji: "🤖" });
-  const [editing, setEditing] = useState(false);
+  const look = first
+    ? { shape: DEFAULT_SHAPE as string, color: BOT_COLORS[0] as string, emoji: "🤖" }
+    : { shape: (BOT_SHAPES[3] ?? DEFAULT_SHAPE) as string, color: (BOT_COLORS[2] ?? BOT_COLORS[0]) as string, emoji: "🤖" };
   const { run, busy, error } = useAction(onCreated);
   const openThread = useOpenThread();
-  const make = async (message: string) => {
+  const make = async (goal: string) => {
     if (busy) return false;
-    const made = await run("bot_create", { name: profile.name, avatar: profile.emoji || "🤖", ...(profile.shape ? { shape: profile.shape } : {}), color: profile.color ?? BOT_COLORS[0], ...(message.trim() ? { prompt: message.trim() } : {}) }) as BotView | null;
-    if (made?.bot && profile.role.trim()) await run("bot_set", { botId: made.bot.id, role: profile.role.trim() });
+    const made = await run("bot_create", { name: first ? FIRST_BOT_NAME : NEXT_BOT_NAME, avatar: look.emoji, shape: look.shape, color: look.color, setup: goal }) as BotView | null;
     // Its chat opens as BB's thread page; with no chat yet, the page moves to the new Bot's Info.
     if (made?.bot) {
       rememberBot(made.bot.id);
       if (made.bot.threadId) openThread(made.bot.threadId);
-      else if (!first) openAppPath(botPath(made.bot.id), { replace: true });
+      else openAppPath(botPath(made.bot.id), { replace: true });
     }
     return !!made;
   };
-  const starter = (next: Starter) => {
-    if (next.kind === "customize") setEditing(true);
-    else if (next.kind === "send") void make(next.text);
-    else void make("Set up a morning brief for me: weekdays at 8:00.");
-  };
-  const identity = { name: profile.name, avatar: profile.emoji || "🤖", shape: profile.shape, color: profile.color };
-  return (
-    <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-      <style>{BOT_STYLES}</style>
-      <header className="shrink-0 px-24 pt-5 pb-3"><Identity avatar={profile.emoji || "🤖"} profile={profile} status="New" dot="bg-muted-foreground/50" onEdit={() => setEditing(true)} /></header>
-      <>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex min-h-full w-full max-w-[44rem] flex-col justify-end px-4 py-6">
-            <ChatGreeting bot={identity} onStarter={starter} lines={first
-              ? ["Hey! I'm your bot.", "I see every project, check in on a schedule and tell you what needs you. Give me a name and a look, or just tell me what to keep an eye on."]
-              : ["Hey! I'm a new bot.", "I have my own chat, memory, skills and check-ins, and I see every project too. Give me a name and a look, or just tell me what I'm for."]} />
-          </div>
-        </div>
-        <div className="mx-auto w-full max-w-[44rem] shrink-0 px-4 pb-4">
-          {error ? <p role="alert" className="mb-2 px-1 text-xs text-destructive">{error}</p> : null}
-          <ChatComposer name={profile.name} onSend={(text) => make(text)} />
-        </div>
-      </>
-      {editing ? <ProfileDialog value={profile} onClose={() => setEditing(false)} onSave={(next) => { setProfile(next); setEditing(false); }} /> : null}
-    </div>
-  );
+  return <Welcome first={first} look={look} busy={!!busy} error={error} onCreate={make} />;
 }
 
 export type Sheet = "profile" | "skills" | "checkins" | "stop" | null;

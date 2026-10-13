@@ -1094,7 +1094,7 @@ bb studio reindex
 
 ![The Deploy watch runner's thread, opened from the Runners group as BB's thread page, the Bots list still beside it: its job prompt and first run, then an automation run, each ending [PASS] (their runner_report calls fold into Worked for)](assets/bot-runner-thread.png)
 
-![New bot: the + beside Bots opens the create flow, a "New bot" row selected above Dot, the greeting "Hey! I'm a new bot." with Customize me, and a message box whose first message makes it](assets/bot-new.png)
+![New bot: the + beside Bots opens the welcome, a "New bot" row selected above Dot, Make another Bot with one question, What should your Bot help with?, a few ideas and Create Bot](assets/bot-new.png)
 
 ![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; the Bot page is Scout's Info: Checks in weekdays at 18:00, Open chat, Pause and Stop, Memory and Skills, its own Check-in (Weekdays 18:00) and Skill curator under Automations, and Activity](assets/bot-two.png)
 
@@ -1108,7 +1108,7 @@ bb studio reindex
 
 ![Relay after a Claude Code → Codex handoff: the chat is the new Codex thread, whose real reply says it's here on Codex (gpt-6.1-sol), and its two earlier threads, each titled Relay, are under Earlier conversations in the Bots sidebar](assets/bot-handoff.png)
 
-![No Bot yet: the page greets you as one, with Plan my week, What needs me today?, Set up a morning brief and Customize me, and a message box; the first message makes it](assets/bot-create.png)
+![No Bot yet: a centered welcome, Meet your Bot, with a drawn blob avatar, one question (What should your Bot help with?), Create Bot, and ideas that fill it (Watch my projects, Morning brief, Plan my week, Triage threads); the Bots sidebar shows a Your first bot row](assets/bot-create.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
 the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
@@ -1174,8 +1174,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   it gains focus.
 - **New bot**: **+** next to **Bots** makes a new bot (BB's own **New
   thread** row stays above the list; BB always shows it). **New bot** opens
-  `/plugins/studio/bot/new`: the same greeting and **Customize me** as a
-  first bot, and your first message makes it.
+  `/plugins/studio/bot/new`: the same welcome as a first bot (Make another
+  Bot), and **Create Bot** makes it as "New bot" and opens its chat, where it
+  sets itself up.
 - **Several bots**: the first bot is the **primary**: the personal project's
   lead (the Chief of Staff before it), the one the iOS app shows, and the one
   agent tools act on outside a bot's thread. Each further bot has its own
@@ -1248,10 +1249,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   BB's own "thread completed" notices for threads it started still show in
   the chat: the plugin SDK has no way to turn them off. Recurring work goes
   to runners instead, which post none (below).
-- **Starting out**: with no Bot yet, the page says hello as one with four
-  chips: **Plan my week**, **What needs me today?** (both send), **Set up a
-  morning brief** (the Morning brief preset) and **Customize me** (Edit
-  profile).
+- **Starting out**: with no Bot yet, the page is a welcome with one
+  question, **What should your Bot help with?** (ideas fill it in), and
+  **Create Bot**. See No Bot yet below.
 - **Automations** (`src/automations.ts`, table `bot_automations`; Info,
   iOS ⋯ → Automations): one list of what wakes a Bot, four kinds.
   - **Check-in**: wakes the Bot's own thread with a short instruction on a
@@ -1454,11 +1454,18 @@ of Staff", with the same thread and check-ins; rename it from its page.
     ≈ $2.40. Opus 5.5's read is 0.05x, so there it breaks even nearer
     35 hours. On a subscription these are usage against your limits, not
     dollars billed. Update `src/bot-prices.ts` when prices change.
-- **No Bot yet**: the page greets you as your bot, with the same four chips
-  (**Customize me** opens Edit profile) and a message box; your first
-  message, or a chip, makes it
-  ("Bot", a blob, unless you customized it) and starts its chat in your
-  personal project. Its
+- **No Bot yet**: the page is a centered welcome, **Meet your Bot**, with
+  one question, **What should your Bot help with?** (ideas such as **Watch
+  my projects** and **Morning brief** fill it in; Talk can dictate it).
+  **Create Bot** (or Enter) makes it as "Chief of Staff", a drawn blob,
+  starts its chat in your personal project and opens that as BB's thread
+  page with the Bots list. Its first message is the setup (`bot_create`'s
+  `setup`, `setupPrompt` in `src/bot.ts`): what you asked for, and to
+  introduce itself, ask a couple of questions, then pick its own name,
+  description and look with `bot_profile_update`, and offer a check-in.
+  Leaving the question empty is fine: it asks. The Bots sidebar shows a
+  **Your first bot** row until it exists, and the iOS app has the same
+  flow. Its
   instructions come from Studio's agent configuration for its thread, not a
   first message, so its title isn't the instructions.
 - Its thread is an implementation detail. A handoff (`thread_handoff`)

@@ -165,6 +165,25 @@ export function modelChange(current: ThreadExecution, next: ThreadExecution): "u
   return next.model === current.model && (next.reasoning ?? current.reasoning ?? null) === (current.reasoning ?? null) ? "unchanged" : "in-place";
 }
 /**
+ * A new Bot's first message from the first-time flow (bot_create's `setup`,
+ * what the user wants help with; empty when they didn't say). The Bot
+ * introduces itself, asks a couple of questions, and then names and
+ * describes itself and picks its look with bot_profile_update.
+ */
+export function setupPrompt(goal: string): string {
+  const want = goal.trim();
+  return [
+    want ? `Hi! You're my new Bot. I'd like help with: ${want}` : "Hi! You're my new Bot. I haven't decided what you should help with yet.",
+    "",
+    "Let's set you up:",
+    "1. Introduce yourself in a sentence or two.",
+    want ? "2. Ask me one or two short questions about what I need, then wait for my answers." : "2. Ask me what I'd like help with, and one short follow-up, then wait for my answers.",
+    "3. Then pick a short name, a one-line description of your job, and a look (an emoji, a shape and a color) that fit it, and set them with bot_profile_update.",
+    "4. Say in a sentence what you'll keep an eye on, and offer a check-in schedule if one would help.",
+  ].join("\n");
+}
+
+/**
  * What a Bot may change about itself (bot_profile_update, and bot_set or
  * bot_avatar_generate from its thread). Every such edit is recorded in
  * bot_profile_changes, and the user can revert it.
@@ -564,7 +583,7 @@ export class Bots {
    * first is the primary (the personal project's lead); later ones are
    * additional Bots with their own thread.
    */
-  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string; external?: { providerId: string; model: string; permissionMode?: PermissionMode } }): Promise<BotView> {
+  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string; setup?: string; external?: { providerId: string; model: string; permissionMode?: PermissionMode } }): Promise<BotView> {
     let external = input.external;
     if (external && !EXTERNAL_PROVIDERS.some((each) => each.id === external!.providerId)) throw new Error(`${external.providerId} isn't an external agent provider.`);
     // Accept edits unless asked otherwise, where the provider supports it.
@@ -588,7 +607,7 @@ export class Bots {
           // Studio Agents' providers take no reasoning levels; the permission is the bot's (accept edits by default).
           ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: external.permissionMode, executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : {}),
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
-          input: [{ type: "text", text: input.prompt ?? `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`, mentions: [] }],
+          input: [{ type: "text", text: input.prompt ?? (input.setup !== undefined ? setupPrompt(input.setup) : `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`), mentions: [] }],
         } as never);
         threadId = thread.id;
       }

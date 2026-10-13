@@ -1,5 +1,6 @@
 // The Bot's workspace. First its onboarding, while the staged BB has no Bot
-// (greeting and starter chips); then a Bot with history: the Bots list in
+// (the welcome, then the first chat Create opens; that Bot then becomes Dot);
+// then a Bot with history: the Bots list in
 // BB's sidebar (it replaces BB's thread list on the Bot page and on the Bot's
 // threads) with the threads it started (one needing the user, one running, a
 // nested follow-up, a recurring automation), and its chat opened from its row
@@ -22,6 +23,8 @@ const CHILDREN = [
 ];
 /** The staged project's own threads (staged-bb.mjs), in BB's list. */
 export const ORBIT_TITLES = ["Draft the ORBIT-42 release notes", "Review the launch checklist"];
+/** What the first-time flow's capture asks its new Bot to help with. */
+const FIRST_GOAL = "Keep an eye on the ORBIT-42 launch and tell me each morning what needs me.";
 const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet points, please.";
 
 /** Staging's plugin-problem card is closed so it doesn't cover the page. */
@@ -343,12 +346,58 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
       button.click();
       return true;
     })()`);
-    await client.waitForText("Hey! I'm a new bot.", 30000);
-    for (const text of ["Customize me", "Dot"]) await client.waitForText(text, 30000);
+    await client.waitForText("Make another Bot", 30000);
+    for (const text of ["What should your Bot help with?", "Create Bot", "Dot"]) await client.waitForText(text, 30000);
     await client.waitForSelector(`${SIDEBAR} [data-testid=bot-new-row]`, 30000);
-    await client.waitForSelector('textarea[aria-label="Message New bot"]', 30000);
+    await client.waitForSelector("textarea#bot-welcome-goal", 30000);
     if (!(await client.evaluate("location.pathname")).endsWith("/plugins/studio/bot/new")) throw new Error("New bot didn't open /plugins/studio/bot/new");
     await sleep(800);
+  };
+
+  /**
+   * The first-time flow, on a fresh staging right after studio-bot-create:
+   * the welcome's Create makes the Bot (Chief of Staff, a blob) and opens its
+   * chat as BB's thread page, where it answers the setup with questions. It
+   * doesn't rename itself before they're answered. Afterwards it becomes Dot,
+   * the Bot the later captures expect (seededBot keeps an existing Bot).
+   */
+  const firstChat = async (client) => {
+    const { bot: before } = await pluginRpc("studio", "bot_get", {});
+    if (before) throw new Error("The staged BB already has a Bot; capture the first chat on a fresh staging (stop, then start).");
+    await client.navigate(BOT_PATH);
+    await dismissProblems(client);
+    await client.waitForSelector("textarea#bot-welcome-goal", 30000);
+    await client.evaluate(`(() => {
+      const field = document.querySelector("textarea#bot-welcome-goal");
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(field, ${JSON.stringify(FIRST_GOAL)});
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      return true;
+    })()`);
+    await sleep(300);
+    await client.evaluate(`(() => { [...document.querySelectorAll("button")].find((each) => each.textContent.trim() === "Create Bot").click(); return true; })()`);
+    let bot = null;
+    for (let i = 0; i < 40 && !bot?.threadId; i++) { ({ bot } = await pluginRpc("studio", "bot_get", {})); if (!bot?.threadId) await sleep(500); }
+    if (!bot?.threadId) throw new Error("Create Bot made no Bot with a chat");
+    if (bot.name !== "Chief of Staff" || bot.shape !== "blob") throw new Error(`The new Bot is ${bot.name} (${bot.shape}), not Chief of Staff (blob)`);
+    await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const nav = document.querySelector('${SIDEBAR}');
+        const outside = nav ? document.body.textContent.replace(nav.textContent, "") : "";
+        const at = outside.indexOf("set them with bot_profile_update");
+        // The Bot's reply, after the setup message, asks something.
+        if (location.pathname.endsWith("/threads/${bot.threadId}") && nav?.textContent.includes("Chief of Staff") && at >= 0 && outside.slice(at).includes("?")) return resolve(true);
+        if (Date.now() - started > 60000) return reject(new Error("The new Bot's chat didn't open as BB's thread page with the setup message and a question back"));
+        setTimeout(tick, 300);
+      };
+      tick();
+    }))()`, true);
+    await dismissProblems(client);
+    await sleep(1500);
+    return async () => {
+      await pluginRpc("studio", "bot_set", { name: "Dot", avatar: "🟣", shape: "blob", color: "#7c66dc", role: "" });
+    };
   };
 
   /** A second bot, Scout, selected: its page (its Info), its expanded sidebar entry; Dot is listed above it. */
@@ -619,13 +668,16 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
         const { bot } = await pluginRpc("studio", "bot_get", {});
         if (bot) throw new Error("The staged BB already has a Bot; capture onboarding on a fresh staging (stop, then start).");
         await client.navigate(BOT_PATH);
-        await client.waitForText("Hey! I'm your bot.", 30000);
-        for (const text of ["Plan my week", "What needs me today?", "Set up a morning brief", "Customize me"]) await client.waitForText(text);
-        await client.waitForSelector('textarea[aria-label="Message Bot"]');
-        await client.waitForSelector("svg[data-shape=blob]");
+        await dismissProblems(client);
+        await client.waitForText("Meet your Bot", 30000);
+        for (const text of ["What should your Bot help with?", "Create Bot", "Watch my projects", "Morning brief", "picks its own name and look"]) await client.waitForText(text);
+        await client.waitForSelector("textarea#bot-welcome-goal");
+        await client.waitForSelector("[data-testid=bot-welcome] svg[data-shape=blob]");
+        await client.waitForSelector(`${SIDEBAR} [data-testid=bot-new-row]`, 30000);
         await sleep(600);
       },
     },
+    { id: "studio-bot-first-chat", packageDir: "bb-studio", fileName: "bot-first-chat.png", setup: firstChat },
     { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: chat },
     { id: "studio-bot-leave", packageDir: "bb-studio", fileName: "bot-leave.png", setup: leave },
     { id: "studio-bot-runners", packageDir: "bb-studio", fileName: "bot-runners.png", setup: runnersInfo },

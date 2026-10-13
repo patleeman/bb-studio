@@ -143,6 +143,8 @@ function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(): void
   const selected = creating ? null : view.data?.bot ?? null;
   useEffect(() => { if (selected) rememberBot(selected.id); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [importing, setImporting] = useState(false);
+  // No Bot yet, once the list says so: a row for the welcome, not a message.
+  const none = !bots.length && !!list.data && !list.error;
   return (
     <nav aria-label="Bots" className="studio-root flex flex-col gap-0.5 px-1.5 pb-3">
       <style>{BOT_STYLES}</style>
@@ -154,16 +156,17 @@ function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(): void
           className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Download" className="size-3.5" /></button>
       </div>
       {importing ? <ImportBotDialog onClose={() => setImporting(false)} /> : null}
-      {creating && bots.length ? (
-        <div aria-current="page" data-testid="bot-new-row" className="flex min-w-0 items-center gap-2.5 rounded-md bg-state-active px-2 py-1.5 text-sm">
+      {(creating && bots.length) || none ? (
+        <button type="button" aria-current={creating || !threadId ? "page" : undefined} data-testid="bot-new-row" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}
+          className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-state-hover aria-[current=page]:bg-state-active">
           <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50"><Icon name="Plus" className="size-3" /></span>
-          <span className="min-w-0 flex-1 truncate">New bot</span>
-        </div>
+          <span className="min-w-0 flex-1 truncate">{none ? "Your first bot" : "New bot"}</span>
+        </button>
       ) : null}
       {bots.length ? bots.map((bot) => bot.id === selected?.id
         ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} active={activeThreadId} onThread={!!threadId} />
         : <BotRow key={bot.id} bot={bot} onNavigate={onNavigate} />)
-        : <p className="px-2 text-xs text-muted-foreground">{list.loading || view.loading ? "Loading…" : list.error ?? view.error ?? "No bot yet. Say hi to make one."}</p>}
+        : none ? null : <p className="px-2 text-xs text-muted-foreground">{list.loading || view.loading ? "Loading…" : list.error ?? view.error}</p>}
     </nav>
   );
 }
