@@ -1,5 +1,6 @@
 // Which Bot the Bot page shows, from its route: /plugins/studio/bot is the
-// primary Bot, /plugins/studio/bot/<botId> another, /plugins/studio/bot/new
+// primary Bot (when it doesn't open the last Bot thread, BotHome),
+// /plugins/studio/bot/<botId> any Bot's Info, /plugins/studio/bot/new
 // the create flow ("New bot"). Every bot_* call on the page, its sidebar and
 // its tabs carries the selected Bot's id (none for the primary).
 import { usePathname } from "@bb-studio/kit/app";
@@ -9,8 +10,11 @@ export const BOT_PATH = "/plugins/studio/bot";
 export const NEW_BOT = "new";
 export const NEW_BOT_PATH = `${BOT_PATH}/${NEW_BOT}`;
 
-/** A Bot's page; the primary's is the plain Bot page. */
-export const botPath = (botId?: string | null, primary = false) => botId && !primary ? `${BOT_PATH}/${encodeURIComponent(botId)}` : BOT_PATH;
+/**
+ * A Bot's Info page, by id (the primary's too). The bare Bot page, where the
+ * rail's Bot item goes, opens the window's last Bot thread instead (BotHome).
+ */
+export const botPath = (botId?: string | null) => botId ? `${BOT_PATH}/${encodeURIComponent(botId)}` : BOT_PATH;
 
 export interface BotSelection {
   /** The selected Bot; undefined for the primary. */

@@ -1,12 +1,15 @@
 // The Bot page (nav panel `bot`, /plugins/studio/bot[/<botId>]): the
 // selected Bot's Info (BotTabs.tsx), with BB's sidebar showing the Bots list
-// (BotSidebar.tsx). A Bot's chat isn't embedded here: it opens as BB's own
+// (BotSidebar.tsx). The bare /plugins/studio/bot (the rail's Bot item) opens
+// the window's last Bot thread, or the Bot's chat, and shows the primary's
+// Info only when there's neither. A Bot's chat isn't embedded here: it opens as BB's own
 // thread page, from the Bots list or Info's Open chat. With no Bot yet, the
 // page greets the user as one and the first message makes it, then opens its
 // chat; "New bot" (/plugins/studio/bot/new) does the same for another Bot.
 // The route picks the Bot (selection.ts); Studio's old address redirects here.
 import { errorMessage, relativeTime } from "@bb-studio/kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON } from "@bb-studio/kit/app";
+import { DANGER_BUTTON, GHOST_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "@bb-studio/kit/app";
+import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "@bb-studio/kit/ui";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import type { BotActivityView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
@@ -17,6 +20,7 @@ import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BOT_STYLES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Composer as ChatComposer, Greeting as ChatGreeting, type Starter } from "./Onboarding";
 import { useOpenThread } from "./workspace";
+import { botLanding, openedFromBotsList, readLastBotThread, threadRoute } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
@@ -85,12 +89,53 @@ export function useAction(refresh: () => void, botId?: string) {
 /** The Bot page: the selected Bot's `Info` (BotTabs.tsx passes it, so the two don't import each other), or the create flow. */
 export function BotHome({ Info }: { Info: ComponentType<{ view: BotView; refresh(): void }> }) {
   const { botId, creating } = useBotSelection();
+  const pathname = usePathname();
   const view = useLive<BotView>("bot_get", forBot(creating ? undefined : botId), { pollMs: 30_000 });
+  const landing = useBotLanding(isBareBotPath(pathname), view.data ?? undefined);
   if (view.loading && !view.data) return <PageColumn><p className="text-sm text-muted-foreground">Loading…</p></PageColumn>;
   if (view.error && !view.data) return <PageColumn><p role="alert" className="text-sm text-destructive">{view.error}</p></PageColumn>;
+  if (landing) return <PageColumn><p className="text-sm text-muted-foreground">Loading…</p></PageColumn>;
   const bot = view.data?.bot;
   if (!bot || creating) return <CreateBot key={creating ? "new" : "first"} first={!bot} onCreated={view.refresh} />;
   return <Info key={bot.id} view={view.data!} refresh={view.refresh} />;
+}
+
+/** The bare Bot page, where the rail's Bot item goes (not a Bot's Info by id, nor New bot). */
+export const isBareBotPath = (pathname: string) => pathname.replace(/\/+$/, "") === BOT_PATH;
+
+/**
+ * The rail's Bot item opens the window's last Bot thread (threadListSwitch.ts):
+ * on the bare Bot page it goes to that thread while it exists, else the Bot's
+ * chat, keeping the Bots list. The page's history entry becomes the thread's
+ * first, so Back doesn't return here and redirect again. True while it
+ * decides; false once the page itself should show (no Bot, or no thread).
+ */
+function useBotLanding(bare: boolean, view: BotView | undefined): boolean {
+  const sdk = useSdk();
+  const navigate = useBbNavigate();
+  const [settled, setSettled] = useState(false);
+  const chatId = view?.bot?.threadId ?? null;
+  const ready = bare && !!view;
+  useEffect(() => { if (!bare) setSettled(false); }, [bare]);
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    const locate = async (threadId: string) => {
+      try {
+        const thread = await sdk.threads.get({ threadId }) as { id: string; projectId: string; deletedAt?: number | null };
+        return thread && !thread.deletedAt ? threadRoute(thread.id, thread.projectId) : null;
+      } catch { return null; }
+    };
+    void botLanding(readLastBotThread(), chatId, locate).then((target) => {
+      if (cancelled) return;
+      if (!target) { setSettled(true); return; }
+      openedFromBotsList();
+      window.history.replaceState(window.history.state, "", target.path);
+      navigate.toThread(target.threadId);
+    });
+    return () => { cancelled = true; };
+  }, [ready, chatId, sdk, navigate]);
+  return bare && !settled;
 }
 
 /** Studio's old address (/plugins/studio/studio/bot): replaced by the Bot's own panel. */
@@ -137,7 +182,7 @@ function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) 
     if (made?.bot) {
       rememberBot(made.bot.id);
       if (made.bot.threadId) openThread(made.bot.threadId);
-      else if (!first) openAppPath(botPath(made.bot.id, made.bot.primary !== false), { replace: true });
+      else if (!first) openAppPath(botPath(made.bot.id), { replace: true });
     }
     return !!made;
   };

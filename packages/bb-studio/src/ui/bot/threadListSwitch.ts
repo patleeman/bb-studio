@@ -18,6 +18,9 @@
 // "__automatic__" would pick a Studio list everywhere (it picks the first
 // non-bundled one), so off Studio's lists it becomes BB's bundled list.
 //
+// The window also remembers the last thread it showed in "bots" mode; the
+// rail's Bot item lands there (BotHome's useBotLanding).
+//
 // Windows: the preference is global, so the focused window decides. A window
 // re-applies its mode when its route changes and when it gains focus.
 //
@@ -137,6 +140,58 @@ export function clickedHome(pathname: string): void {
   writeListMode(nextListMode(readListMode(), pathname, "home") as ListMode);
 }
 
+// --- This window's last Bot thread -------------------------------------------
+//
+// The Bot rail item lands on the thread the user last had open in "bots" mode
+// (the Bot's chat, a runner, a worker, any thread opened from the Bots list),
+// kept per window beside the mode. BotHome redirects the bare Bot page there.
+
+/** Where this window keeps the last thread it showed in "bots" mode. */
+export const LAST_THREAD_KEY = "studio.sidebar.lastBotThread";
+
+/** The thread to remember after showing `pathname` in `mode`, or null to keep the last one. Pure. */
+export function botThreadVisit(mode: ListMode | null, pathname: string): string | null {
+  return mode === "bots" ? threadIdForPath(pathname) : null;
+}
+
+/** This window's last Bot thread, or null. */
+export function readLastBotThread(): string | null {
+  try { return sessionStorage.getItem(LAST_THREAD_KEY) || null; } catch { return null; }
+}
+
+/** Notes the route just shown in `mode`: a thread in "bots" mode becomes the last Bot thread. */
+export function noteBotThread(mode: ListMode | null, pathname: string): void {
+  const threadId = botThreadVisit(mode, pathname);
+  if (!threadId) return;
+  try { sessionStorage.setItem(LAST_THREAD_KEY, threadId); } catch { /* private mode */ }
+}
+
+/** Forgets this window's last Bot thread (tests: a fresh window). */
+export function forgetLastBotThread(): void {
+  try { sessionStorage.removeItem(LAST_THREAD_KEY); } catch { /* private mode */ }
+}
+
+/** BB's Personal project: its threads route at /threads/<id>, others at /projects/<id>/threads/<id>. */
+export const PERSONAL_PROJECT = "proj_personal";
+/** A thread's route, as BB's getThreadRoutePath makes it. */
+export const threadRoute = (threadId: string, projectId: string) =>
+  projectId === PERSONAL_PROJECT ? `/threads/${encodeURIComponent(threadId)}` : `/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}`;
+
+/**
+ * Where the bare Bot page (the rail's Bot item) lands: the window's last Bot
+ * thread while it exists, else the Bot's chat, else null (the page shows the
+ * Bot's Info, or the create flow with no Bot). `locate` gives a thread's
+ * route, or null when it's gone.
+ */
+export async function botLanding(last: string | null, chatId: string | null, locate: (threadId: string) => Promise<string | null>): Promise<{ threadId: string; path: string } | null> {
+  for (const threadId of [...new Set([last, chatId])]) {
+    if (!threadId) continue;
+    const path = await locate(threadId);
+    if (path) return { threadId, path };
+  }
+  return null;
+}
+
 /** Forgets this window's mode (tests: a fresh window). */
 export function forgetListMode(): void {
   try { sessionStorage.removeItem(MODE_KEY); } catch { /* private mode */ }
@@ -198,7 +253,7 @@ export function syncThreadList(sdk: PluginBrowserBbSdk, pathname: string, call?:
       again = null;
       try {
         const mode = await modeFor(next.path, next.call);
-        if (mode) { writeListMode(mode); await apply(sdk, providerForMode(mode)); }
+        if (mode) { writeListMode(mode); noteBotThread(mode, next.path); await apply(sdk, providerForMode(mode)); }
       } catch { /* next route change or focus tries again */ }
       next = again as { path: string; call?: Call } | null;
     }

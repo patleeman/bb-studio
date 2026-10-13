@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   pathname: "/plugins/studio/bot",
   prefs: { value: "studio/bot", revision: 1 },
   setPref: vi.fn(async (_args: unknown) => ({})),
+  /** BB's threads: id → project (missing: gone). Empty: sdk.threads.get fails, as before it was mocked. */
+  threads: {} as Record<string, string>,
   activate: vi.fn(),
   inputs: [] as [string, unknown][],
 }));
@@ -36,7 +38,10 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
     React.createElement("button", { type: "button", onClick: () => onChange({ providerId: "codex", model: "gpt-5", reasoningLevel: "high" }) }, "pick codex")),
   experimental_PermissionModePicker: ({ value }: { value: string }) => React.createElement("span", { "data-permission": value }),
 }));
-const sdk = { system: { uiPreferences: {
+const sdk = { threads: { get: async ({ threadId }: { threadId: string }) => {
+  if (!(threadId in state.threads)) throw new Error("Thread not found");
+  return { id: threadId, projectId: state.threads[threadId], deletedAt: null };
+} }, system: { uiPreferences: {
   list: async () => ({ preferences: { "sidebar.threadListProvider": state.prefs } }),
   set: (args: unknown) => state.setPref(args),
 } } };
@@ -83,6 +88,7 @@ beforeEach(() => {
   state.setPref.mockClear();
   state.activate.mockClear();
   state.inputs = [];
+  state.threads = {};
   localStorage.clear();
   sessionStorage.clear();
   forgetListMode();
@@ -285,7 +291,7 @@ test("Edit profile saves shape, color and role; Skills (Share/Delete) live under
     bot_activity: empty,
     bot_skills: { skills: [{ name: "weekly-review", description: "Fridays: sum up the week", updatedAt: 1 }] },
   };
-  act(() => root.render(<BotPanel />));
+  await show(<BotPanel />);
   const { openAppPath } = await import("@bb-studio/kit/app");
   await act(async () => button("Memory").click());
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
@@ -352,7 +358,8 @@ test("several Bots: the selected one (from the route) is expanded and scoped; a 
   act(() => click(other));
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
   act(() => click(other.parentElement!.querySelector('[aria-label="Open Dot info"]')));
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot");
+  // The primary's Info by id too: the bare Bot page opens the last Bot thread.
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/bot_main");
   act(() => click(nav.querySelector("[data-testid=bot-main]")));
   expect(state.toThread).toHaveBeenCalledWith("thr_scout");
   act(() => click(nav.querySelector('[aria-label="Open Scout info"]')));
@@ -499,7 +506,7 @@ test("Skills: learn from work, the last review, approvals, pins and archived ski
       pending: [{ id: "pend_1", name: "deploy-check", action: "write", description: "Before a deploy", diff: "- old\n+ new", createdAt: 1 }],
     },
   };
-  act(() => root.render(<BotPanel />));
+  await show(<BotPanel />);
   act(() => button("Skills…").click());
   expect(container.textContent).toContain("Saved 1 skill · 2h ago");
   expect(container.textContent).toContain("Cheapest (claude-haiku-5-5)");
@@ -515,4 +522,45 @@ test("Skills: learn from work, the last review, approvals, pins and archived ski
   expect(state.call).toHaveBeenCalledWith("bot_skill_restore", { name: "old-report", botId: "bot_main" });
   await act(async () => click(container.querySelector('input[aria-label="Learn from work"]')));
   expect(state.call).toHaveBeenCalledWith("bot_learning_set", { enabled: false, botId: "bot_main" });
+});
+
+test("the bare Bot page (the rail's Bot item) opens this window's last Bot thread, keeping the Bots list", async () => {
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty };
+  state.threads = { thr_bot: "proj_personal", thr_runner: "proj_orbit" };
+  sessionStorage.setItem("studio.sidebar.lastBotThread", "thr_runner");
+  const replace = vi.spyOn(window.history, "replaceState");
+  await show(<BotPanel />);
+  expect(state.toThread).toHaveBeenCalledWith("thr_runner");
+  expect(state.toThread).toHaveBeenCalledTimes(1);
+  // The Bot page's history entry becomes the thread's, so Back doesn't land here and redirect again.
+  expect(replace.mock.calls.map((call) => call[2])).toContain("/projects/proj_orbit/threads/thr_runner");
+  expect(sessionStorage.getItem("studio.sidebar.listMode")).toBe("bots");
+  expect(container.querySelector("[data-testid=bot-info-status]")).toBeNull();
+  replace.mockRestore();
+});
+
+test("the bare Bot page falls back to the Bot's chat when the last thread is gone, and to Info with no thread", async () => {
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty };
+  state.threads = { thr_bot: "proj_personal" };
+  sessionStorage.setItem("studio.sidebar.lastBotThread", "thr_deleted");
+  await show(<BotPanel />);
+  expect(state.toThread).toHaveBeenCalledWith("thr_bot");
+  act(() => root.unmount());
+  root = createRoot(container);
+  state.toThread.mockClear();
+  state.data = { bot_get: { bot: { ...dot, threadId: null }, run: null }, bot_activity: empty };
+  sessionStorage.removeItem("studio.sidebar.lastBotThread");
+  await show(<BotPanel />);
+  expect(state.toThread).not.toHaveBeenCalled();
+  expect(container.querySelector("[data-testid=bot-info-status]")).not.toBeNull();
+});
+
+test("a Bot's Info by id (its ⓘ, Bot info) isn't redirected", async () => {
+  state.pathname = "/plugins/studio/bot/bot_main";
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty };
+  state.threads = { thr_bot: "proj_personal" };
+  sessionStorage.setItem("studio.sidebar.lastBotThread", "thr_bot");
+  await show(<BotPanel />);
+  expect(state.toThread).not.toHaveBeenCalled();
+  expect(container.querySelector("[data-testid=bot-info-status]")).not.toBeNull();
 });

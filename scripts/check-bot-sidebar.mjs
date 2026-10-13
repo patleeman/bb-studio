@@ -4,8 +4,10 @@
  * on a staged BB. It clicks through every kind of Bots list entry (the Bot's
  * chat, each runner, the Recent rows, a worker thread, an archived runner's
  * thread), reloads after each, and asserts the sidebar never leaves the Bots
- * list. Then Home on the rail must bring BB's list back, and a thread opened
- * from BB's list must keep it.
+ * list. The Bot rail item lands on the window's last Bot thread (the Bot's
+ * chat in a fresh window; a runner opened from the Bots list after Home),
+ * with the Bots list. Then Home on the rail must bring BB's list back, and a
+ * thread opened from BB's list must keep it.
  *
  *   node scripts/staged-bb.mjs start
  *   . "$TMPDIR/bb-studio-staged/capture.env"
@@ -110,6 +112,19 @@ async function clickRow(client, selector, label, threadId) {
   }
 }
 
+/** Clicks the Bot item on BB's rail; false when this BB has none. */
+const clickRailBot = (client) => client.evaluate(`(() => { const button = document.querySelector('nav[aria-label="Primary navigation"] [aria-label="Bot"]'); if (button) { button.click(); return true; } return false; })()`);
+
+/** Waits for `threadId`'s page. */
+async function waitForThread(client, threadId, label) {
+  const started = Date.now();
+  while (!(await path(client))?.match(new RegExp(`/threads/${threadId}(/|$)`))) {
+    if (Date.now() - started > 30000) throw new Error(`${label}: wanted thread ${threadId}, at ${await path(client)}`);
+    await sleep(200);
+  }
+  results.push(`${label}: landed on ${threadId}`);
+}
+
 const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();
 const client = new CdpClient(webSocketUrl);
 let archived = null;
@@ -131,10 +146,12 @@ try {
   await client.evaluate(`(() => { sessionStorage.clear(); return true; })()`);
   await client.navigate("/");
   await dismissProblems(client);
-  const railBot = await client.evaluate(`(() => { const button = document.querySelector('nav[aria-label="Primary navigation"] [aria-label="Bot"]'); if (button) { button.click(); return true; } return false; })()`);
+  const railBot = await clickRailBot(client);
   if (!railBot) await client.navigate(BOT_PATH);
+  // A fresh window has no last Bot thread: the Bot page lands on the Bot's chat.
+  await waitForThread(client, bot.threadId, "The Bot rail item in a fresh window");
   await client.waitForSelector(SIDEBAR, 30000);
-  await step(client, "bots", railBot ? "Bot rail item" : "Bot page");
+  await step(client, "bots", railBot ? "Bot rail item (the Bot's chat)" : "Bot page (the Bot's chat)");
 
   await clickRow(client, `${SIDEBAR} [data-testid=bot-main]`, "the Bot's chat", bot.threadId);
   await step(client, "bots", "Bot chat");
@@ -145,6 +162,25 @@ try {
     await clickRow(client, `${SIDEBAR} section[aria-label="Runners"] button[data-runner="${runner.id}"]`, `runner ${runner.name}`, runner.threadId);
     await step(client, "bots", `runner ${runner.name}${runner.threadId === archived ? " (archived thread)" : ""}`);
   }
+
+  // The Bot rail item lands on the last Bot thread: a runner opened from the Bots list, then Home.
+  const live = runners.find((runner) => runner.threadId && runner.threadId !== archived);
+  if (!live) throw new Error("No runner with a live thread");
+  await openGroup(client, "Runners");
+  await clickRow(client, `${SIDEBAR} section[aria-label="Runners"] button[data-runner="${live.id}"]`, `runner ${live.name}`, live.threadId);
+  await expectList(client, "bots", `runner ${live.name}`, 500);
+  await clickHome(client);
+  await expectList(client, "native", "Home on the runner", 500);
+  if (!(await clickRailBot(client))) throw new Error("This BB has no Bot rail item");
+  await waitForThread(client, live.threadId, "The Bot rail item after Home");
+  await step(client, "bots", `Bot rail item: back on runner ${live.name}`);
+  // Back doesn't return to the Bot page (which would land on the thread again).
+  await client.evaluate("history.back(), true");
+  await sleep(1500);
+  if ((await path(client)).replace(/\/+$/, "") === BOT_PATH) throw new Error("Back from the landed thread returned to the bare Bot page");
+  results.push(`Back from the landed thread went to ${await path(client)}, not the Bot page`);
+  await client.evaluate("history.forward(), true");
+  await waitForThread(client, live.threadId, "Forward to the runner");
 
   await openGroup(client, "Recent");
   const recent = await client.evaluate(`[...document.querySelectorAll('${SIDEBAR} section[aria-label="Recent"] button[data-thread]')].slice(0, 3).map((row) => ({ id: row.dataset.thread, title: row.title }))`);

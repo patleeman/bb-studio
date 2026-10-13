@@ -1014,8 +1014,17 @@ the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
 of Staff", with the same thread and check-ins; rename it from its page.
 
 - **Workspace**: its own nav panel, **Bot** in the rail (`/plugins/studio/bot`;
-  the old `/plugins/studio/studio/bot` redirects there). The Bot page is the
-  selected bot's **Info** (below), with **Open chat**. Its chat isn't
+  the old `/plugins/studio/studio/bot` redirects there). The rail item opens
+  the last Bot thread you had open in this window: the bot's chat, or a
+  runner or worker thread you opened from the Bots list (kept in session
+  storage beside the sidebar mode, updated on every thread page shown in
+  **bots** mode). With none, or once that thread is gone, it opens the
+  primary bot's chat; with no bot, or a bot without a chat, it shows the
+  create flow or the bot's Info. The redirect replaces the history entry, so
+  Back doesn't bounce to it, and the Bots list stays. A bot's **Info** has
+  its own address, `/plugins/studio/bot/<botId>` (the primary's too), which
+  its **ⓘ** opens, with **Open chat**; it is also the **Bot info** panel tab
+  beside a bot's thread. Its chat isn't
   embedded: it opens as BB's normal thread page, so it has everything a
   thread has, plugin message actions (Studio's reactions) and **Reply in
   side chat** included. With no bot yet, or on **New bot**, the page is the
@@ -1072,11 +1081,12 @@ of Staff", with the same thread and check-ins; rename it from its page.
   thread in the personal project (not a lead; a handoff moves it too), Memory
   page, skills, runners and check-ins. Its check-ins are its own automation
   on its thread (`Studio project heartbeat bot:<id>`). Every bot has the same
-  powers: it sees every project. The page shows the selected bot's Info: the
-  primary at `/plugins/studio/bot`, another at `/plugins/studio/bot/<botId>`;
+  powers: it sees every project. The page shows the selected bot's Info at
+  `/plugins/studio/bot/<botId>` (the bare page shows the primary's only when
+  it has no thread to open);
   its runners, check-ins, Memory and skills are that bot's. In a bot's own
   thread its tools act on that bot.
-- **Info**: the Bot page, and the **Bot info** tab in a thread's side panel
+- **Info**: a bot's Info page (`/plugins/studio/bot/<botId>`), and the **Bot info** tab in a thread's side panel
   (a thread panel action, so BB's panel launcher offers it on every thread;
   on a thread no bot owns it shows "Not a Bot thread"). It has the
   bot's avatar, name and live status (Working on N threads, Checks in …,

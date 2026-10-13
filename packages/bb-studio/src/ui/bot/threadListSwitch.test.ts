@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, clickedHome, forgetListMode, isBotPath, isStudioPath, listSwitch, MODE_KEY, NATIVE_LIST_PROVIDER as NATIVE, nextListMode, openedFromBotsList, providerForMode, readListMode, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath, type ListMode } from "./threadListSwitch";
+import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, botLanding, botThreadVisit, clickedHome, forgetLastBotThread, readLastBotThread, threadRoute, forgetListMode, isBotPath, isStudioPath, listSwitch, MODE_KEY, NATIVE_LIST_PROVIDER as NATIVE, nextListMode, openedFromBotsList, providerForMode, readListMode, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath, type ListMode } from "./threadListSwitch";
 
 describe("paths", () => {
   it("matches the Bot page and the Studio panel exactly", () => {
@@ -130,8 +130,46 @@ describe("listSwitch", () => {
   });
 });
 
+describe("the last Bot thread", () => {
+  it("is a thread shown in bots mode only", () => {
+    expect(botThreadVisit("bots", "/projects/proj_1/threads/thr_r/files")).toBe("thr_r");
+    expect(botThreadVisit("bots", "/threads/thr_chat")).toBe("thr_chat");
+    expect(botThreadVisit("bots", "/plugins/studio/bot")).toBeNull();
+    expect(botThreadVisit("native", "/threads/thr_chat")).toBeNull();
+    expect(botThreadVisit(null, "/threads/thr_chat")).toBeNull();
+  });
+  it("routes threads as BB does", () => {
+    expect(threadRoute("thr_1", "proj_personal")).toBe("/threads/thr_1");
+    expect(threadRoute("thr_1", "proj_9")).toBe("/projects/proj_9/threads/thr_1");
+  });
+  it("lands on the last thread, else the Bot's chat, else nowhere", async () => {
+    const routes: Record<string, string> = { thr_r: "/projects/p/threads/thr_r", thr_chat: "/threads/thr_chat" };
+    const locate = vi.fn(async (id: string) => routes[id] ?? null);
+    expect(await botLanding("thr_r", "thr_chat", locate)).toEqual({ threadId: "thr_r", path: "/projects/p/threads/thr_r" });
+    expect(await botLanding("thr_gone", "thr_chat", locate)).toEqual({ threadId: "thr_chat", path: "/threads/thr_chat" });
+    expect(await botLanding(null, "thr_chat", locate)).toEqual({ threadId: "thr_chat", path: "/threads/thr_chat" });
+    expect(await botLanding("thr_gone", null, locate)).toBeNull();
+    expect(await botLanding(null, null, locate)).toBeNull();
+    locate.mockClear();
+    expect(await botLanding("thr_gone2", "thr_gone2", locate)).toBeNull();
+    expect(locate).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("syncThreadList", () => {
-  afterEach(() => { localStorage.clear(); forgetListMode(); });
+  afterEach(() => { localStorage.clear(); forgetListMode(); forgetLastBotThread(); });
+  it("remembers the last thread shown in bots mode, per window", async () => {
+    const x = fake({ [KEY]: "other/list" });
+    await syncThreadList(x.sdk, "/plugins/studio/bot");
+    expect(readLastBotThread()).toBeNull();
+    openedFromBotsList();
+    await syncThreadList(x.sdk, "/projects/proj_1/threads/thr_runner");
+    expect(readLastBotThread()).toBe("thr_runner");
+    // Home leaves bots mode; a thread shown then isn't a Bot thread.
+    clickedHome("/projects/proj_1/threads/thr_runner");
+    await syncThreadList(x.sdk, "/threads/thr_other");
+    expect(readLastBotThread()).toBe("thr_runner");
+  });
   const fake = (prefs: Record<string, unknown>) => {
     const values = { ...prefs };
     const set = vi.fn(async ({ key, value }: { key: string; value: unknown }) => { values[key] = value; });

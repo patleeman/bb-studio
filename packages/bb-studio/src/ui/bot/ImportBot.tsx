@@ -54,7 +54,7 @@ export function ImportBotDialog({ onClose }: { onClose(): void }) {
     try {
       const made = await call("bot_create", { name: name.trim(), avatar: "🤖", shape, color, external: { providerId: provider.id, model, permissionMode: permission } }) as BotView;
       onClose();
-      if (made.bot) openAppPath(botPath(made.bot.id, made.bot.primary !== false));
+      if (made.bot) openAppPath(botPath(made.bot.id));
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {

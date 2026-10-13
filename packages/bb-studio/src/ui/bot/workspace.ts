@@ -42,7 +42,7 @@ export function useOpenBotInfo(): (bot: { id: string; primary?: boolean }, onBot
   const navigate = useBbNavigate();
   return useCallback((bot, onBotsThread) => {
     if (onBotsThread && navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })) return;
-    openAppPath(botPath(bot.id, bot.primary !== false));
+    openAppPath(botPath(bot.id));
   }, [navigate]);
 }
 

@@ -592,8 +592,9 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
   };
   const skillsSection = async (client) => {
     const skills = await seededSkills();
-    // From the Bot page: the lessons made the chat long, so it isn't the way in.
-    await client.navigate(BOT_PATH);
+    // From the Bot page (Info by id; the bare page opens the chat): the lessons made the chat long, so it isn't the way in.
+    const { bot: primary } = await pluginRpc("studio", "bot_get", {});
+    await client.navigate(`${BOT_PATH}/${primary.id}`);
     await client.waitForSelector(SIDEBAR, 30000);
     await dismissProblems(client);
     await openInfo(client);

@@ -174,7 +174,7 @@ function useOpenBot(onNavigate: () => void): (bot: BotSummary) => void {
   return (bot) => {
     rememberBot(bot.id);
     if (bot.threadId) openThread(bot.threadId);
-    else openAppPath(botPath(bot.id, bot.primary !== false));
+    else openAppPath(botPath(bot.id));
     onNavigate();
   };
 }
