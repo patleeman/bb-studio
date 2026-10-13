@@ -416,13 +416,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       await client.navigate("/plugins/studio/studio/setup");
       await client.waitForText("Set up BB Studio", 30000);
       await client.waitForText("Kinds");
-      for (const label of ["Pages", "Drawings", "Recordings and dictation", "Artifacts", "Designs"]) await client.waitForText(label);
+      for (const label of ["Pages", "Drawings", "Recordings and dictation", "Artifacts", "Designs", "Dashboards"]) await client.waitForText(label);
       await client.waitForText("Your designs are kept.");
       await client.evaluate(`(() => {
         const section = document.querySelector('section[aria-label="Kinds"]');
         if (!section) throw new Error("The Kinds section is missing");
         const switches = [...section.querySelectorAll('[role="switch"]')].map((each) => each.getAttribute("aria-label") + "=" + each.getAttribute("aria-checked"));
-        const want = ["Pages: turn off=true", "Drawings: turn off=true", "Recordings and dictation: turn off=true", "Artifacts: turn off=true", "Designs: turn on=false"];
+        const want = ["Pages: turn off=true", "Drawings: turn off=true", "Recordings and dictation: turn off=true", "Artifacts: turn off=true", "Designs: turn on=false", "Dashboards: turn off=true"];
         if (JSON.stringify(switches) !== JSON.stringify(want)) throw new Error("Kind switches: " + switches.join(", "));
         section.scrollIntoView({ block: "start" });
         return true;
