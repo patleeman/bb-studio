@@ -15,7 +15,7 @@ final class StudioPagingUITests: XCTestCase {
 
     /// The selected kind chip (the tab bar's selected tab aside).
     private var selectedKind: String {
-        app.buttons.matching(NSPredicate(format: "isSelected == true AND NOT (label IN %@)", ["Home", "Studio", "Bot", "Settings"]))
+        app.buttons.matching(NSPredicate(format: "isSelected == true AND NOT (label IN %@)", ["Threads", "Studio", "Bot", "Settings"]))
             .firstMatch.label
     }
 

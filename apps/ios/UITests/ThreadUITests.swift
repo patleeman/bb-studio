@@ -13,7 +13,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     func testHome() {
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10))
         shot("home-top")
         app.swipeUp()
         app.swipeUp()
@@ -513,7 +513,7 @@ final class ThreadUITests: XCTestCase {
     /// changed meanwhile, then stays live. Creates two scratch threads, held
     /// with a far-off send, and deletes them.
     func testResumeReconnects() throws {
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10))
         let tag = String(UUID().uuidString.prefix(6))
         XCUIDevice.shared.press(.home)
         sleep(3)

@@ -266,7 +266,7 @@ struct InboxView: View {
         .overlay {
             if !model.loaded { ProgressView() }
         }
-        .navigationTitle("Home")
+        .navigationTitle("Threads")
         .searchable(text: $query, prompt: "Search threads and messages")
         .task(id: query) { await model.search(app.client, query) }
         .sensoryFeedback(.impact(weight: .light), trigger: model.actions)

@@ -5,8 +5,12 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $model.tab) {
+            BotsTab()
+                .tabItem { Label("Bot", systemImage: "face.smiling") }
+                .tag(Tab.bot)
+
             InboxTab()
-                .tabItem { Label("Home", systemImage: "house") }
+                .tabItem { Label("Threads", systemImage: "bubble.left.and.bubble.right") }
             .tag(Tab.inbox)
 
             NavigationStack(path: $model.studioPath) {
@@ -14,10 +18,6 @@ struct RootView: View {
             }
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)
-
-            BotsTab()
-                .tabItem { Label("Bots", systemImage: "face.smiling") }
-                .tag(Tab.bot)
 
             NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gear") }

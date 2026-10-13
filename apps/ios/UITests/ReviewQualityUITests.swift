@@ -154,7 +154,7 @@ final class ReviewQualityUITests: XCTestCase {
         }
         let app = try diagnosticApplication(largeText: largeText)
         defer { app.terminate() }
-        app.tabBars.buttons["Home"].tap()
+        app.tabBars.buttons["Threads"].tap()
         let open = app.staticTexts[title].firstMatch
         XCTAssertTrue(open.waitForExistence(timeout: 20))
         reveal(open, in: app)
