@@ -55,7 +55,7 @@ export function BotCacheChip({ threadId, isCompactViewport }: PluginThreadHeader
       <DropdownMenuTrigger asChild>
         <button type="button" data-testid="bot-cache-chip" aria-label={`Prompt cache: ${label}`} title={`Prompt cache: ${label}`}
           className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground">
-          <Icon name={warm ? "Zap" : "Snowflake"} className="size-3.5" />
+          <Icon name={warm ? "Zap" : "CloudOff"} className="size-3.5" />
           {isCompactViewport ? null : <span className="tabular-nums">{label}</span>}
         </button>
       </DropdownMenuTrigger>
@@ -98,7 +98,7 @@ function ColdBanner({ threadId }: { threadId: string }) {
   const cost = state.costs.coldSend != null ? ` (~${formatUsd(state.costs.coldSend)})` : "";
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground" data-testid="bot-cache-banner" role="status">
-      <Icon name="Snowflake" className="size-3.5 shrink-0" />
+      <Icon name="CloudOff" className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1">Cache expired — next send re-reads ~{formatTokens(state.contextTokens)} tokens{cost}</span>
       <button type="button" className={GHOST_BUTTON} onClick={() => { dismissed.add(threadId); setHidden(true); }}>Dismiss</button>
       <button type="button" className={GHOST_BUTTON} onClick={() => { setHidden(true); void call("bot_cache_banner_hide", { threadId }); }}>Don't show for this thread</button>
