@@ -108,9 +108,12 @@ final class ThreadModel: ObservableObject {
     private func loadEarlier(_ client: BBClient) async -> OlderPage {
         loadingOlder = true
         defer { loadingOlder = false }
+        // A handoff can change the chain (and empty `earlierPages`) while a page is in flight.
+        let chain = chainBefore
         do {
             if let first = earlierPages.first, let cursor = earlierCursor {
                 let page = try await client.timeline(first.threadId, before: cursor)
+                guard chainBefore == chain, earlierPages.first?.threadId == first.threadId else { return .nothing }
                 let known = Set(first.rows.map(\.id))
                 let added = page.rows.filter { !known.contains($0.id) }
                 earlierCursor = page.timelinePage?.hasOlderRows == true ? page.timelinePage?.olderCursor : nil
@@ -122,6 +125,7 @@ final class ThreadModel: ObservableObject {
             let next = (earlierPages.first.flatMap { chainBefore.firstIndex(of: $0.threadId) } ?? chainBefore.count) - 1
             guard chainBefore.indices.contains(next) else { return .nothing }
             let page = try await client.timeline(chainBefore[next])
+            guard chainBefore == chain else { return .nothing }
             earlierCursor = page.timelinePage?.hasOlderRows == true ? page.timelinePage?.olderCursor : nil
             earlierPages.insert(BotChain.Page(threadId: chainBefore[next], rows: page.rows, continuation: next > 0 && earlierCursor == nil), at: 0)
             // Another thread of the chain is in, even an empty one: the chain moved on.
