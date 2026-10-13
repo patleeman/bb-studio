@@ -146,6 +146,36 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.forThread",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.send",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.keep",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.discard",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/BBClient+PageEditing.swift",
       "plugin": "studio",
       "method": "pages.editableMarkdown",

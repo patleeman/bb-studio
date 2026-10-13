@@ -31,8 +31,17 @@ final class PageEditorModel: ObservableObject {
         self.client = client
         self.store = store
         let demo = pageId == "qa-demo" && ProcessInfo.processInfo.arguments.contains("-qaPageDemo")
-        self.read = read ?? { demo ? "# Launch plan\n\nShip it" : try await client.editablePageMarkdown(pageId) }
-        self.edit = edit ?? { base, text in demo ? text : try await client.editPageDocument(pageId, expected: base, markdown: text) }
+        #if DEBUG
+        let demoText = demo ? "# Launch plan\n\nShip it" : NotesDemo.markdown(pageId)
+        #else
+        let demoText = demo ? "# Launch plan\n\nShip it" : nil
+        #endif
+        let fixture = demoText != nil
+        self.read = read ?? {
+            if let demoText { return demoText }
+            return try await client.editablePageMarkdown(pageId)
+        }
+        self.edit = edit ?? { base, text in fixture ? text : try await client.editPageDocument(pageId, expected: base, markdown: text) }
         do {
             if let draft = try store.load(server: client.baseURL, page: pageId) {
                 expected = draft.expected
@@ -141,6 +150,12 @@ final class PageEditorModel: ObservableObject {
         guard persist() else { return }
         await load()
         if !conflict { await save() }
+    }
+
+    /// Drops this phone's copy of a page that no longer exists.
+    func forgetDraft() {
+        try? store.remove(server: client.baseURL, page: pageId)
+        saved = text
     }
 
     func discardAndReload() async {

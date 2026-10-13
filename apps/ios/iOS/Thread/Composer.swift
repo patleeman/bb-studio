@@ -101,6 +101,8 @@ struct ComposerBar<Settings: View, Send: View>: View {
     /// No fill of its own, for a composer on glass.
     var clear = false
     var dictation: DictationGate? = nil
+    /// "Expand to page": the draft into a Notes page linked to the thread. Beside the mic.
+    var toPage: ComposerPageAction? = nil
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -133,6 +135,21 @@ struct ComposerBar<Settings: View, Send: View>: View {
                 AttachmentMenu(items: $attachments, symbol: "plus")
                 settings()
                 Spacer(minLength: 4)
+                if let toPage {
+                    Button(action: toPage.run) {
+                        Group {
+                            if toPage.busy { ProgressView() } else { Image(systemName: "note.text.badge.plus").font(.title3) }
+                        }
+                        .frame(width: 36, height: 36)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .foregroundStyle(.secondary)
+                    .disabled(toPage.disabled || toPage.busy)
+                    .accessibilityLabel(toPage.label)
+                    .accessibilityIdentifier("composerExpandToPage")
+                    .help(toPage.label)
+                }
                 if let talk {
                     HoldToTalkMic(talk: talk, tap: dictate)
                 } else {
@@ -153,6 +170,14 @@ struct ComposerBar<Settings: View, Send: View>: View {
         }
         .background(clear ? AnyShapeStyle(.clear) : AnyShapeStyle(.fill.tertiary), in: .rect(cornerRadius: 22))
     }
+}
+
+/// The composer's "Expand to page" button.
+struct ComposerPageAction {
+    var label: String
+    var busy = false
+    var disabled = false
+    var run: () -> Void
 }
 
 /// Covers the field while talking, so the draft underneath stays put.

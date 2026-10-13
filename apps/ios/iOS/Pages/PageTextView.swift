@@ -37,9 +37,11 @@ final class PageTextController {
 struct PageTextView: UIViewRepresentable {
     @Binding var text: String
     let controller: PageTextController
+    /// Told when the keyboard's dictation ends, fails, or holds a spot for a result.
+    var dictation: DictationGate? = nil
 
     func makeUIView(context: Context) -> UITextView {
-        let view = UITextView()
+        let view = DictationTextView()
         view.delegate = context.coordinator
         view.font = PageMarkdownStyle.body
         view.adjustsFontForContentSizeCategory = true
@@ -57,6 +59,7 @@ struct PageTextView: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
+        (view as? DictationTextView)?.onDictation = { [weak dictation] event in dictation?.handle(event) }
         guard view.text != text else { return }
         let selection = view.selectedRange
         view.text = text
@@ -73,6 +76,12 @@ struct PageTextView: UIViewRepresentable {
         func textViewDidChange(_ view: UITextView) {
             PageMarkdownStyle.apply(to: view)
             parent.text = view.text
+            parent.dictation?.handle(.edited)
+        }
+
+        func textViewDidEndEditing(_ view: UITextView) {
+            // The keyboard's dictation ends with the field's focus.
+            parent.dictation?.handle(.cancelled(.keyboard))
         }
 
         /// Return continues a list with the next item; Return on an empty item ends the list.
@@ -114,6 +123,26 @@ struct PageTextView: UIViewRepresentable {
             // Generous: anywhere from the line start through the box.
             return offset <= range.location + range.length + 1 ? range : nil
         }
+    }
+}
+
+/// Reports the keyboard's dictation, as the composer's field does (`PastingTextView`).
+final class DictationTextView: UITextView {
+    var onDictation: ((DictationState.Event) -> Void)?
+
+    override func dictationRecordingDidEnd() { onDictation?(.transcribing(.keyboard)) }
+
+    override func dictationRecognitionFailed() { onDictation?(.failed(.keyboard)) }
+
+    override var insertDictationResultPlaceholder: Any {
+        let placeholder = super.insertDictationResultPlaceholder
+        onDictation?(.placeholderAdded)
+        return placeholder
+    }
+
+    override func removeDictationResultPlaceholder(_ placeholder: Any, willInsertResult: Bool) {
+        super.removeDictationResultPlaceholder(placeholder, willInsertResult: willInsertResult)
+        onDictation?(.placeholderRemoved)
     }
 }
 

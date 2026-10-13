@@ -9,6 +9,8 @@ struct ThreadView: View {
     /// Send waits while dictation (the mic, a talk, or the keyboard's) has words on the way.
     @StateObject private var dictation = DictationGate()
     @StateObject private var bot = BotModel()
+    /// "Expand to page": the thread's open note and its editor.
+    @StateObject private var notes: ThreadNotes
     @State private var draft = ""
     @State private var mentions: [Mention] = []
     @ObservedObject private var outbox = Outbox.shared
@@ -62,6 +64,14 @@ struct ThreadView: View {
     /// Artifacts are built into Studio.
     private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("studio") }
 
+    /// Notes ("Expand to page") are Studio's too.
+    private var canUseNotes: Bool {
+        #if DEBUG
+        if NotesDemo.variant != nil { return true }
+        #endif
+        return runningPlugins.split(separator: ",").contains("studio")
+    }
+
     /// Hides the tab bar on iPhone, for a thread pushed from a list; a tab's
     /// own thread keeps it.
     private let hidesTabBar: Bool
@@ -79,6 +89,7 @@ struct ThreadView: View {
         self.botChrome = botChrome
         _talk = StateObject(wrappedValue: HoldToTalk(threadId: threadId))
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
+        _notes = StateObject(wrappedValue: ThreadNotes(threadId: threadId))
         _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
     }
 
@@ -167,6 +178,9 @@ struct ThreadView: View {
             let name = execution.model.map { id in options?.models.first { $0.id == id || $0.model == id }?.displayName ?? id }
             executionLabel = [name, execution.reasoningLevel].compactMap { $0 }.joined(separator: " · ")
         }
+        .fullScreenCover(item: $notes.editing) { note in
+            PageEditor(pageId: note.pageId ?? "", note: NoteDoneActions(note: note, notes: notes)) { await notes.refresh() }
+        }
         .sheet(isPresented: $editingFull) {
             FullComposer(text: $draft, canSend: canSend, send: {
                 editingFull = false
@@ -206,7 +220,11 @@ struct ThreadView: View {
                 draft = saved.text
                 mentions = saved.mentions
             }
+            #if DEBUG
+            if let demo = NotesDemo.draft { draft = demo }
+            #endif
             model.attach(app)
+            if canUseNotes { notes.attach(app) }
             Task { await muted.refresh() }
             Task { reactionSettings = (try? await client.reactionSettings()) ?? .defaults }
             if runningPlugins.split(separator: ",").contains("studio") {
@@ -227,7 +245,11 @@ struct ThreadView: View {
             try? await Task.sleep(for: .milliseconds(150))
             if let item = unreadItem() { position.scrollTo(id: item, anchor: .top) }
         }
-        .onDisappear { model.detach() }
+        .onDisappear {
+            model.detach()
+            notes.detach()
+        }
+        .onChange(of: canUseNotes) { _, can in if can { notes.attach(app) } }
         .modifier(TalkLifecycle(talk: talk, dictating: dictating))
         .onAppear {
             talk.send = { [model] text in
@@ -689,6 +711,24 @@ struct ThreadView: View {
         }
     }
 
+    /// Moves the draft into the thread's note and opens it. The composer is
+    /// cleared once the server has saved the text; attachments stay in it.
+    private func expandToPage() {
+        guard !dictation.blocksSend, !notes.expanding else { return }
+        if editing { return }
+        let text = draft
+        Task {
+            do {
+                if let next = try await notes.expand(draft: text, current: { draft }) {
+                    draft = next
+                    mentions = []
+                }
+            } catch {
+                model.error = "Couldn't expand to a page: \(BBClient.describe(error, server: client.baseURL))"
+            }
+        }
+    }
+
     /// Puts unsent text back in the composer, and in storage in case the thread closed meanwhile.
     private func restoreDraft(_ text: String, _ sentMentions: [Mention]) {
         Drafts.restore(model.threadId, text: text, mentions: sentMentions, serverURL: model.serverURL)
@@ -859,6 +899,9 @@ struct ThreadView: View {
                     .padding(.trailing, 6)
                 }
             }
+            if let note = notes.note, !editing {
+                NotesInProgressChip(note: note) { notes.editing = note }
+            }
             if composerFocused, let query = MentionSuggestions.query(in: draft) {
                 MentionSuggestions(query: query, threadId: model.threadId, projectId: model.thread?.projectId, pick: insert)
             } else if composerFocused, let query = CommandSuggestions.query(in: draft),
@@ -870,7 +913,10 @@ struct ThreadView: View {
                 text: $draft, focused: $composerFocused, attachments: $attachments,
                 placeholder: botChrome.map { "Message \($0.bot.name)" } ?? "Message",
                 dictate: { dictating = true }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil,
-                clear: botChrome != nil, dictation: dictation
+                clear: botChrome != nil, dictation: dictation,
+                toPage: canUseNotes && !editing ? ComposerPageAction(
+                    label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+                    busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil
             ) {
                 Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
                     .disabled(handoffStatus?.working == true)

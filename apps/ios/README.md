@@ -109,6 +109,36 @@ server through `-qaBotDemo onboarding` (`iOS/Bot/BotDemo.swift`;
 | --- | --- |
 | ![Meet your Bot: a blue blob avatar, one question, four ideas and Create Bot, light](docs/bot/onboarding.png) | ![The same welcome in dark mode](docs/bot/onboarding-dark.png) |
 
+## Expand to page
+
+When a message grows into meeting notes, the note button beside the mic in a
+thread's composer (the Bot's chat too) moves the draft into a Notes page linked
+to the thread, as on desktop (`notes.create`). The composer is cleared once the
+server has saved the text; attachments stay in it. With a note already open,
+the button adds the draft to the end of it. The note opens full screen in the
+page editor (`PageEditor`), which writes every change to the phone at once and
+to BB a moment after typing stops, and right away when you leave the app. The
+format bar's mic dictates into it, and so does the keyboard's.
+
+While the note is open, a **Notes in progress** chip above the composer
+reopens it (`notes.forThread`, read on appear and on Studio's `pages` signals;
+no polling). The editor's toolbar has the done actions: **Send to thread**
+(`notes.send`, auto: the Markdown, or a link and "Summarize these notes" when
+it's long), **Keep as page** (asks for a title; `notes.keep`) and **Discard**
+(asks first; `notes.discard`). Send and Keep save the latest typing first, and
+wait while dictation still has words on the way.
+
+| Draft and the expand button | Notes in progress | The note's editor |
+| --- | --- | --- |
+| ![Meeting notes typed in the Bot's composer, with the note button beside the mic](docs/notes/draft.png) | ![The Notes in progress chip above the empty composer](docs/notes/chip.png) | ![The note in the full-screen page editor, with Discard, Keep and Send to thread](docs/notes/editor.png) |
+
+| Keep as page | Discard |
+| --- | --- |
+| ![Keep as page asking for a title](docs/notes/keep.png) | ![Discard asking to confirm](docs/notes/discard.png) |
+
+Debug builds show these with no server: `-qaBotDemo chat -qaNotesDemo
+draft|chip|editor|keep|discard` (`iOS/Thread/NotesDemo.swift`).
+
 ## Dashboards
 
 Studio Dashboards render read-only as cards in one column on iPhone, and in as
