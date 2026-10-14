@@ -33,6 +33,11 @@ export function ThreadCodePanel({ threadId, params }: { threadId: string; params
   }, [rpc, threadId, attempt, lookup]);
 
   const view = tabView({ openId, worktreeId, error });
+  // Review comments submitted from this editor go to this thread.
+  const shownId = view.kind === "workspace" ? view.id : null;
+  useEffect(() => {
+    if (shownId) rpc.call("viewedFrom", { id: shownId, threadId }).catch(() => undefined);
+  }, [rpc, shownId, threadId]);
   if (view.kind === "workspace") return <WorkspaceView key={view.id} id={view.id} />;
   if (view.kind === "error")
     return (

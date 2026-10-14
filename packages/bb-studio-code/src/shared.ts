@@ -164,6 +164,11 @@ export const codeContract = defineRpcContract({
     input: z.object({ threadId: id }),
     output: z.object({ chip: z.object({ workspaceId: z.string().nullable(), title: z.string(), working: z.boolean() }).nullable() }),
   },
+  /** A thread's VS Code tab is showing the workspace: its review comments go to that thread. */
+  viewedFrom: {
+    input: z.object({ id, threadId: id }),
+    output: z.object({ ok: z.literal(true) }),
+  },
   /** What the workspace's VS Code reports, as the agent sees it; null with no editor open. */
   editorState: {
     input: z.object({ id }),

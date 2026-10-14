@@ -10,7 +10,8 @@ import { defineItemMention, mustGet } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { Activity } from "./src/server/activity";
-import { Bridges, editorContext } from "./src/server/bridge";
+import { Bridges, editorContext, shown } from "./src/server/bridge";
+import { CommentStore, commentCallSchema, describeThread, reviewMessage } from "./src/server/comments";
 import { installBridge } from "./src/server/bridge-extension";
 import { editOnDisk, editOutcome, editSchema } from "./src/server/edits";
 import { contained, listDir, readText } from "./src/server/files";
@@ -53,6 +54,7 @@ export default function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new WorkspaceStore(db);
+  const comments = new CommentStore(db);
   // Workspaces are Code's own, not Studio items: a change tells Code's views only.
   const changes = { changed: (id: string) => { try { bb.realtime.publish(CHANNEL, { id }); } catch { /* Views refetch. */ } } };
   // <dataDir>/plugins/<id>/, beside the plugin's database.
@@ -66,11 +68,14 @@ export default function plugin(bb: BbPluginApi) {
   // The bridge between each workspace's VS Code and the agent (src/server/bridge.ts).
   // An editor connecting starts following threads already at work (declared below).
   let followWorking: (workspaceId: string) => void = () => undefined;
+  // Review comments from the editor (src/server/comments.ts), declared below.
+  let commentCall: (workspaceId: string, call: unknown) => Promise<unknown> = async () => null;
   const bridges = new Bridges(
     (message) => bb.log.info(message),
     (id) => followWorking(id),
     // BB's shortcuts pressed inside VS Code: the page with that editor focused replays them.
     (id, key) => bb.realtime.publish(CHANNEL, { type: "key", id, key }),
+    (id, call) => commentCall(id, call),
   );
   void installBridge(join(root, "extensions")).catch((error) => bb.log.warn(`couldn't install the BB bridge extension: ${error instanceof Error ? error.message : String(error)}`));
   const servers = new CodeServers({
@@ -201,6 +206,7 @@ export default function plugin(bb: BbPluginApi) {
     },
     readFile: async ({ id, path }) => readText(safeFolders(must(id)), path),
     browseFolders: ({ path, showHidden }) => browseFolders(path, homedir(), showHidden),
+    viewedFrom: ({ id, threadId }) => { must(id); store.setReviewThread(id, threadId); return { ok: true as const }; },
     editorState: ({ id }) => ({ state: bridges.connected(id) ? bridges.state(id) : null }),
     threadChip: async ({ threadId }) => ({
       chip: chipFor({ threadId, threadPath: await threadPath(threadId), workspaces: store.list(), touched: touchedFiles.get(threadId) ?? null }),
@@ -503,8 +509,96 @@ export default function plugin(bb: BbPluginApi) {
     watcher.watch(thread.id);
   });
 
+  // ---- Review comments (src/server/comments.ts) ------------------------------
+
+  // Every window shows the workspace's comments, not only the one in use.
+  const commentsChanged = (workspaceId: string) => bridges.broadcast(workspaceId, { type: "comments" });
+  /** Where a review goes, with the thread's title for the editor to say. */
+  const reviewTarget = async (workspaceId: string) => {
+    const threadId = store.reviewThread(workspaceId);
+    if (!threadId) return null;
+    const thread = (await bb.sdk.threads.get({ threadId }).catch(() => null)) as { title?: string | null; archivedAt?: number | null } | null;
+    if (!thread || thread.archivedAt) return null;
+    return { threadId, title: thread.title?.trim() || "the chat" };
+  };
+  commentCall = async (workspaceId, raw) => {
+    const call = commentCallSchema.parse(raw);
+    const workspace = must(workspaceId);
+    const list = async () => ({ threads: comments.threads(workspaceId), target: (await reviewTarget(workspaceId))?.title ?? null });
+    switch (call.method) {
+      case "list":
+        return list();
+      case "add": {
+        const file = resolve(call.path);
+        if (!workspace.folders.some((folder) => inside(folder, file))) throw new Error("That file isn't in this workspace.");
+        comments.add(workspaceId, { ...call, path: file });
+        break;
+      }
+      case "reply":
+        if (comments.thread(call.threadId)?.workspaceId !== workspaceId) throw new Error("That comment thread is gone.");
+        comments.reply(call.threadId, "user", call.body);
+        break;
+      case "edit":
+        comments.edit(workspaceId, call.commentId, call.body);
+        break;
+      case "delete":
+        comments.delete(workspaceId, call.commentId);
+        break;
+      case "resolve":
+        if (comments.thread(call.threadId)?.workspaceId !== workspaceId) throw new Error("That comment thread is gone.");
+        comments.resolve(call.threadId, call.resolved);
+        break;
+      case "submit": {
+        const items = comments.pending(workspaceId);
+        if (!items.length) throw new Error("There are no comments to submit.");
+        const target = await reviewTarget(workspaceId);
+        if (!target) throw new Error("Open this workspace beside a chat first (its VS Code tab), so the review knows which agent to go to.");
+        const text = reviewMessage({ workspace: workspace.title, items, shown: (path) => shown(path, workspace.folders) });
+        await bb.sdk.threads.send({ threadId: target.threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }] } as never);
+        comments.markSent(workspaceId, target.threadId);
+        commentsChanged(workspaceId);
+        return { ...(await list()), sent: items.length, sentTo: target.title };
+      }
+    }
+    commentsChanged(workspaceId);
+    return list();
+  };
+
+  const showIn = (workspaceId: string) => {
+    const folders = store.get(workspaceId)?.folders ?? [];
+    return (path: string) => shown(path, folders);
+  };
+  bb.agents.registerTool({
+    name: "code_comments",
+    description: "The user's open code review comments sent to you from VS Code (Studio Code): each thread's id, file and lines, and what was said.",
+    parameters: z.object({}),
+    execute: (_input, ctx) => {
+      const open = comments.openFor(ctx.threadId);
+      return open.map((thread) => describeThread(thread, showIn(thread.workspaceId))).join("\n\n") || "No open review comments.";
+    },
+  });
+  bb.agents.registerTool({
+    name: "code_comment_reply",
+    description: "Answer a code review comment in its thread in the user's VS Code: what you changed, or why not. resolve: true marks the thread done once it's addressed.",
+    parameters: z.object({
+      id: z.string().min(1).max(100).describe("The comment thread id, from the review message or code_comments."),
+      body: z.string().trim().min(1).max(20_000).optional(),
+      resolve: z.boolean().optional(),
+    }),
+    execute: ({ id, body, resolve: done }, ctx) => {
+      const thread = comments.thread(id);
+      if (!thread || (thread.sentTo !== ctx.threadId && !comments.openFor(ctx.threadId).some((each) => each.id === id)))
+        throw new Error("No review comment thread with that id was sent to you. code_comments lists yours.");
+      if (!body && done === undefined) throw new Error("Give a body, resolve, or both.");
+      if (body) comments.reply(id, "agent", body, ctx.threadId);
+      if (done !== undefined) comments.resolve(id, done);
+      commentsChanged(thread.workspaceId);
+      return `${body ? "Replied" : "Updated"}${done ? " and resolved" : ""} ${id} in the user's VS Code.`;
+    },
+  });
+
   bb.agents.configure(() => ({
-    tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders", "code_editor_state", "code_show", "code_edit"],
+    tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders", "code_editor_state", "code_show", "code_edit", "code_comments", "code_comment_reply"],
     skills: ["studio-code"],
   }));
 }

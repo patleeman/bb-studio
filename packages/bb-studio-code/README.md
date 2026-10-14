@@ -25,6 +25,8 @@ The `studio-code` skill explains when to use them.
 - `code_editor_state` reports what you have open right now.
 - `code_show` opens a file in your editor, scrolls to the lines, and selects and highlights them ("BB showed you src/retry.ts:13").
 - `code_edit` edits live: up to 20 replace-once edits per call. You watch the text typed into your editor behind a "BB" caret. It is one undo step and merges with your unsaved changes, and it leaves saving to you. With no editor open, it edits the file on disk.
+- `code_comments` lists the open review comments you sent the agent.
+- `code_comment_reply` answers a review comment in its thread, and can resolve it.
 
 There are no CLI commands and no settings.
 
@@ -35,6 +37,12 @@ Every workspace runs the **BB Studio bridge**, a small VS Code extension that St
 With the same workspace open in several tabs, the agent talks to the one you used last. If no editor is open, `code_show` jumps there when you open one. **Copy for BB chat** in the editor's right-click menu copies the selection with its path and lines.
 
 **Follow mode.** While a thread works, Studio Code shows what it's doing in any open editor whose folders hold the files: reads, shell reads such as `sed -n` and `cat`, file changes and live edits. The status bar says what it's on ("Fix the retry: editing retry.ts", then "changed 2 files"). Lines it reads get a soft highlight. Lines it changed get a tint and accent bar until its next turn. **Follow** (the eye in the status bar, on by default) moves your editor to where the agent works, but never within a few seconds of your own typing or clicking. Threads working in other folders don't touch your editor.
+
+## Code review comments
+
+Review code the way you would a pull request. Comment on any line or selection with VS Code's own comments: the **+** in the gutter, or **Comments: Add Comment on Current Selection**. Each comment is **Pending** and waits, with Edit and Delete, until you send them together. **Submit review** (in the status bar with a count, and in each comment thread's header) sends every pending comment to the agent in one message, with each comment's file, lines and code.
+
+The review goes to the workspace's own thread, or else to the thread whose VS Code tab last showed the workspace. The agent answers in each comment thread (`code_comment_reply`) and resolves the ones it addressed. Its replies appear in every open editor as they're written, and a new answer opens its thread. Reply in a thread to keep talking: your reply is pending too, and goes with your next submit. Resolve and Reopen are in each thread's header. Comments follow their lines when code above them changes. They're kept in the plugin's database (`code_comments`), so they survive reloads.
 
 ## BB's shortcuts inside VS Code
 

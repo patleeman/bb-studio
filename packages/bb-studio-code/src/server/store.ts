@@ -3,6 +3,7 @@
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 import { ID_PREFIX, type Workspace } from "../shared";
+import { COMMENT_MIGRATIONS } from "./comments";
 
 export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS code_workspaces (
@@ -16,6 +17,8 @@ export const MIGRATIONS = [
   `ALTER TABLE code_workspaces ADD COLUMN share INTEGER NOT NULL DEFAULT 1;`,
   // When the user last opened the workspace's editor: Code's page opens the latest.
   `ALTER TABLE code_workspaces ADD COLUMN opened_at INTEGER;`,
+  // Review comments (src/server/comments.ts).
+  ...COMMENT_MIGRATIONS,
 ];
 
 type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; trusted: number; share: number; folders: string; archived: number; created_at: number; updated_at: number };
@@ -69,6 +72,16 @@ export class WorkspaceStore {
     return (this.db
       .prepare("SELECT * FROM code_workspaces WHERE archived = 0 ORDER BY COALESCE(opened_at, updated_at) DESC")
       .all() as Row[]).map(decode);
+  }
+
+  /** The thread a workspace's review goes to: its own thread, else the one whose VS Code tab last showed it. */
+  reviewThread(id: string): string | null {
+    const row = this.db.prepare("SELECT thread_id, review_thread_id FROM code_workspaces WHERE id = ?").get(id) as { thread_id: string | null; review_thread_id: string | null } | undefined;
+    return row?.thread_id ?? row?.review_thread_id ?? null;
+  }
+
+  setReviewThread(id: string, threadId: string): void {
+    this.db.prepare("UPDATE code_workspaces SET review_thread_id = ? WHERE id = ?").run(threadId, id);
   }
 
   markOpened(id: string): void {

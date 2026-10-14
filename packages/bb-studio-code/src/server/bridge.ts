@@ -18,7 +18,9 @@ export type BridgeCommand =
   | { type: "show"; path: string; startLine: number; endLine: number }
   | { type: "edit"; path: string; edits: TextEdit[] }
   /** What an agent is doing (src/server/activity.ts); `by` names its thread. */
-  | { type: "activity"; by: string; threadId: string; activity: Activity };
+  | { type: "activity"; by: string; threadId: string; activity: Activity }
+  /** The workspace's review comments changed (src/server/comments.ts): fetch them again. */
+  | { type: "comments" };
 /** A window's answer to a request. `code: "no-window"`: nothing on screen to do it in. */
 export type BridgeResult = { ok: boolean; detail: string; code?: "no-window" };
 
@@ -67,6 +69,8 @@ export class Bridges {
     private readonly onConnect: (id: string) => void = () => undefined,
     /** One of BB's shortcuts, pressed while VS Code had the keyboard. */
     private readonly onKey: (id: string, key: PassedKey) => void = () => undefined,
+    /** A call from the extension (`/call`, review comments); its answer, or a thrown message, goes back. */
+    private readonly onCall: (id: string, call: unknown) => Promise<unknown> = async () => { throw new Error("Not available."); },
   ) {}
 
   private readonly bridges = new Map<string, Bridge>();
@@ -163,6 +167,17 @@ export class Bridges {
     return true;
   }
 
+  /** Sends to every window connected to a workspace, for what each shows on its own (review comments). Returns how many. */
+  broadcast(id: string, command: BridgeCommand): number {
+    let sent = 0;
+    for (const window of this.bridges.get(id)?.windows.values() ?? []) {
+      if (!window.stream) continue;
+      window.stream.write(`data: ${JSON.stringify(command)}\n\n`);
+      sent++;
+    }
+    return sent;
+  }
+
   /** Whether any workspace has an editor open. */
   anyConnected(): boolean {
     return [...this.bridges.keys()].some((id) => this.connected(id));
@@ -220,7 +235,7 @@ export class Bridges {
       if (held) this.send(id, held);
       return;
     }
-    if (req.method !== "POST" || !["/state", "/result", "/key"].includes(url.pathname)) { res.writeHead(404).end(); return; }
+    if (req.method !== "POST" || !["/state", "/result", "/key", "/call"].includes(url.pathname)) { res.writeHead(404).end(); return; }
     let body = "";
     let size = 0;
     req.on("data", (chunk: Buffer) => {
@@ -232,6 +247,14 @@ export class Bridges {
       if (res.writableEnded) return;
       let parsed: unknown;
       try { parsed = JSON.parse(body); } catch { res.writeHead(400).end(); return; }
+      if (url.pathname === "/call") {
+        const answer = (status: number, body: unknown) => { if (!res.writableEnded) res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body)); };
+        this.onCall(id, parsed).then(
+          (result) => answer(200, { ok: true, result: result ?? null }),
+          (error: unknown) => answer(400, { ok: false, error: error instanceof Error ? error.message : String(error) }),
+        );
+        return;
+      }
       if (url.pathname === "/key") {
         const key = keySchema.safeParse(parsed);
         // Only BB's own shortcuts, exactly as the extension binds them.
@@ -271,7 +294,7 @@ export function isPassedKey(key: PassedKey): boolean {
 const resultSchema = z.object({ requestId: z.string().max(100), ok: z.boolean(), detail: z.string().max(2000), code: z.literal("no-window").optional() });
 
 /** A path as the user knows it: relative to the workspace folder that holds it. */
-function shown(path: string, folders: string[]): string {
+export function shown(path: string, folders: string[]): string {
   for (const folder of folders) {
     const inside = relative(folder, path);
     if (inside && !inside.startsWith("..") && !inside.startsWith("/")) return folders.length > 1 ? `${folder.split("/").at(-1)}/${inside}` : inside;

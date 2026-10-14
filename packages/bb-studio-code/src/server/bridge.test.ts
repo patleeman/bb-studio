@@ -28,9 +28,9 @@ function call(socketPath: string, method: string, path: string, body?: unknown):
 }
 
 /** Opens the event stream and resolves with the first event. */
-function nextEvent(socketPath: string): Promise<unknown> {
+function nextEvent(socketPath: string, window?: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const req = request({ socketPath, path: "/events", headers: auth(socketPath) }, (res) => {
+    const req = request({ socketPath, path: window ? `/events?window=${window}` : "/events", headers: auth(socketPath) }, (res) => {
       let buffer = "";
       res.on("data", (chunk) => {
         buffer += chunk;
@@ -170,5 +170,41 @@ describe("live typing types only what changes", () => {
     // Dropping "/ 1000" removes just that.
     expect(narrow("MAX_DELAY_MS / 1000", "MAX_DELAY_MS")).toEqual({ skip: 12, remove: 7, text: "" });
     expect(narrow("abc", "abc")).toEqual({ skip: 3, remove: 0, text: "" });
+  });
+});
+
+describe("/call", () => {
+  it("passes the extension's calls through and answers with the result or the error", async () => {
+    const calls: unknown[] = [];
+    const bridges = new Bridges(undefined, undefined, undefined, async (_id, input) => {
+      calls.push(input);
+      if ((input as { method?: string }).method === "submit") throw new Error("There are no comments to submit.");
+      return { threads: [] };
+    });
+    const socket = await bridges.open("ws_call", dir);
+    try {
+      expect(await call(socket, "POST", "/call", { method: "list" })).toEqual({ status: 200, text: JSON.stringify({ ok: true, result: { threads: [] } }) });
+      expect(await call(socket, "POST", "/call", { method: "submit" })).toEqual({ status: 400, text: JSON.stringify({ ok: false, error: "There are no comments to submit." }) });
+      expect(calls).toEqual([{ method: "list" }, { method: "submit" }]);
+    } finally {
+      await bridges.close("ws_call");
+    }
+  });
+});
+
+describe("broadcast", () => {
+  it("reaches every connected window, not only the one in use", async () => {
+    const bridges = new Bridges();
+    const socket = await bridges.open("ws_cast", dir);
+    try {
+      const first = nextEvent(socket, "a");
+      const second = nextEvent(socket, "b");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(bridges.broadcast("ws_cast", { type: "comments" })).toBe(2);
+      expect(await first).toEqual({ type: "comments" });
+      expect(await second).toEqual({ type: "comments" });
+    } finally {
+      await bridges.close("ws_cast");
+    }
   });
 });

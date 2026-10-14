@@ -9,7 +9,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Raise with every change to the extension, so workspaces get the new one. */
-export const BRIDGE_VERSION = "0.5.0";
+export const BRIDGE_VERSION = "0.6.0";
 const NAME = "studio-bridge";
 const PUBLISHER = "bb";
 export const BRIDGE_ID = `${PUBLISHER}.${NAME}`;
@@ -41,8 +41,40 @@ const MANIFEST = {
     commands: [
       { command: "bbStudio.copyForChat", title: "Copy for BB chat", category: "BB" },
       { command: "bbStudio.toggleFollow", title: "Follow the agent", category: "BB" },
+      // Review comments (src/server/comments.ts).
+      { command: "bbStudio.submitReview", title: "Submit Review to the Agent", category: "BB", icon: "$(send)" },
+      { command: "bbStudio.addComment", title: "Add Comment", category: "BB" },
+      { command: "bbStudio.reply", title: "Reply", category: "BB" },
+      { command: "bbStudio.editComment", title: "Edit", category: "BB", icon: "$(edit)" },
+      { command: "bbStudio.deleteComment", title: "Delete", category: "BB", icon: "$(trash)" },
+      { command: "bbStudio.saveComment", title: "Save", category: "BB" },
+      { command: "bbStudio.cancelEdit", title: "Cancel", category: "BB" },
+      { command: "bbStudio.resolveThread", title: "Resolve", category: "BB", icon: "$(check)" },
+      { command: "bbStudio.reopenThread", title: "Reopen", category: "BB", icon: "$(discard)" },
     ],
-    menus: { "editor/context": [{ command: "bbStudio.copyForChat", when: "editorHasSelection", group: "9_cutcopypaste@9" }] },
+    menus: {
+      "editor/context": [{ command: "bbStudio.copyForChat", when: "editorHasSelection", group: "9_cutcopypaste@9" }],
+      "comments/commentThread/context": [
+        { command: "bbStudio.addComment", group: "inline@1", when: "commentController == bb-review && commentThreadIsEmpty" },
+        { command: "bbStudio.reply", group: "inline@1", when: "commentController == bb-review && !commentThreadIsEmpty" },
+      ],
+      "comments/commentThread/title": [
+        { command: "bbStudio.submitReview", group: "navigation@1", when: "commentController == bb-review && bbStudio.reviewPending" },
+        { command: "bbStudio.resolveThread", group: "navigation@2", when: "commentController == bb-review && !commentThreadIsEmpty && commentThread != resolved" },
+        { command: "bbStudio.reopenThread", group: "navigation@2", when: "commentController == bb-review && commentThread == resolved" },
+      ],
+      "comments/comment/title": [
+        { command: "bbStudio.editComment", group: "inline@1", when: "commentController == bb-review && comment == pending" },
+        { command: "bbStudio.deleteComment", group: "inline@2", when: "commentController == bb-review && comment == pending" },
+      ],
+      "comments/comment/context": [
+        { command: "bbStudio.saveComment", group: "inline@1", when: "commentController == bb-review" },
+        { command: "bbStudio.cancelEdit", group: "inline@2", when: "commentController == bb-review" },
+      ],
+      // These take the comment they're on; only Submit makes sense from the palette.
+      commandPalette: ["addComment", "reply", "editComment", "deleteComment", "saveComment", "cancelEdit", "resolveThread", "reopenThread"]
+        .map((name) => ({ command: "bbStudio." + name, when: "false" })),
+    },
     keybindings: PASSED_KEYS.map((each) => ({
       key: each.other,
       mac: each.mac,
@@ -424,6 +456,7 @@ function listen() {
           try { command = JSON.parse(line.slice(6)); } catch { continue; }
           if (command && command.type === "show") show(command).catch((error) => vscode.window.showWarningMessage("BB couldn't show that: " + error.message));
           if (command && command.type === "activity") watch(command);
+          if (command && command.type === "comments") sync();
           if (command && command.type === "edit") {
             edit(command).then(
               (detail) => post("/result", { requestId: command.requestId, ok: true, detail }),
@@ -433,14 +466,187 @@ function listen() {
         }
       }
     });
-    // A fresh connection tells the plugin what's on screen now.
+    // A fresh connection tells the plugin what's on screen now, and shows its comments.
     report();
+    sync();
   });
   // However the stream ends (closed, reset, the plugin reloading), try again.
   let again = false;
   const retry = () => { if (again) return; again = true; setTimeout(listen, 2000); };
   req.on("error", retry);
   req.on("close", retry);
+}
+
+// ---- Review comments: the user comments, submits, and the agent answers ----
+
+// A request that answers: the plugin's reply, or its error message thrown.
+function call(input) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(input);
+    const req = http.request({ socketPath: SOCKET, path: "/call", method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data), "x-window": WINDOW, authorization: "Bearer " + token() } }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => { body += chunk; });
+      res.on("end", () => {
+        let parsed = null;
+        try { parsed = JSON.parse(body); } catch (error) { /* Not an answer. */ }
+        if (parsed && parsed.ok) resolve(parsed.result);
+        else reject(new Error(parsed && parsed.error || "BB couldn't do that."));
+      });
+    });
+    req.on("error", () => reject(new Error("BB isn't reachable right now.")));
+    req.end(data);
+  });
+}
+
+let review = null;
+// Each comment thread on screen, by its id in the plugin.
+const threads = new Map();
+const reviewStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+reviewStatus.command = "bbStudio.submitReview";
+
+function linesOf(document, start, end) {
+  return document.getText(new vscode.Range(start, 0, end, document.lineAt(end).text.length));
+}
+
+// Where a thread's lines are now: where they were, or the nearest place their
+// text moved to after edits above them.
+function placeOf(document, thread) {
+  const span = thread.endLine - thread.startLine;
+  const last = Math.max(document.lineCount - 1, 0);
+  const was = Math.min(thread.startLine - 1, last);
+  const matches = (start) => start >= 0 && start + span <= last && linesOf(document, start, start + span) === thread.lineText;
+  if (thread.lineText && !matches(was)) {
+    for (let distance = 1; distance <= last; distance++) {
+      if (matches(was - distance)) return was - distance;
+      if (matches(was + distance)) return was + distance;
+    }
+  }
+  return was;
+}
+
+function asComment(each, thread) {
+  return {
+    body: new vscode.MarkdownString(each.body),
+    mode: vscode.CommentMode.Preview,
+    author: { name: each.author === "agent" ? "Agent" : "You" },
+    label: each.pending ? "Pending" : undefined,
+    contextValue: each.pending ? "pending" : "sent",
+    // Ours, for the commands: which comment and thread this is.
+    reviewId: each.id,
+    reviewThread: thread.id,
+    text: each.body,
+  };
+}
+
+let syncing = Promise.resolve();
+function sync() {
+  syncing = syncing.then(syncNow, syncNow);
+  return syncing;
+}
+
+async function syncNow() {
+  if (!review) return;
+  let answer;
+  try { answer = await call({ method: "list" }); } catch (error) { return; }
+  const seen = new Set();
+  for (const thread of answer.threads) {
+    let document;
+    try { document = await vscode.workspace.openTextDocument(vscode.Uri.file(thread.path)); } catch (error) { continue; }
+    seen.add(thread.id);
+    const start = placeOf(document, thread);
+    const end = Math.min(start + thread.endLine - thread.startLine, Math.max(document.lineCount - 1, 0));
+    const range = new vscode.Range(start, 0, end, document.lineCount ? document.lineAt(end).text.length : 0);
+    const pending = thread.comments.some((each) => each.pending);
+    let shown = threads.get(thread.id);
+    const wasCount = shown ? shown.comments.length : 0;
+    if (!shown) {
+      shown = review.createCommentThread(document.uri, range, []);
+      shown.reviewThread = thread.id;
+      shown.collapsibleState = thread.resolved ? vscode.CommentThreadCollapsibleState.Collapsed : vscode.CommentThreadCollapsibleState.Expanded;
+      threads.set(thread.id, shown);
+    } else {
+      shown.range = range;
+    }
+    shown.comments = thread.comments.map((each) => asComment(each, thread));
+    // A new answer from the agent opens its thread.
+    const last = thread.comments[thread.comments.length - 1];
+    if (wasCount && thread.comments.length > wasCount && last && last.author === "agent") shown.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+    shown.contextValue = thread.resolved ? "resolved" : pending ? "pending" : "open";
+    shown.label = thread.resolved ? "Resolved" : pending ? "Pending: submit the review to send it" : "Sent to the agent";
+    shown.state = thread.resolved ? vscode.CommentThreadState.Resolved : vscode.CommentThreadState.Unresolved;
+    shown.canReply = true;
+  }
+  for (const [id, shown] of threads) if (!seen.has(id)) { shown.dispose(); threads.delete(id); }
+  const count = answer.threads.reduce((sum, thread) => sum + thread.comments.filter((each) => each.pending).length, 0);
+  vscode.commands.executeCommand("setContext", "bbStudio.reviewPending", count > 0);
+  if (!count) { reviewStatus.hide(); return; }
+  reviewStatus.text = "$(comment-discussion) Submit review (" + count + ")";
+  reviewStatus.tooltip = answer.target ? "Send your " + (count === 1 ? "comment" : count + " comments") + " to " + answer.target : "Open this workspace beside a chat to send your comments there";
+  reviewStatus.show();
+}
+
+// The comment box's Add Comment or Reply: a new thread on the lines it's on,
+// or a reply in one of ours. VS Code's own empty thread gives way to ours.
+async function comment(reply) {
+  const thread = reply.thread;
+  const body = (reply.text || "").trim();
+  if (!body) return;
+  if (thread.reviewThread) {
+    await call({ method: "reply", threadId: thread.reviewThread, body });
+  } else {
+    const document = await vscode.workspace.openTextDocument(thread.uri);
+    const range = thread.range || new vscode.Range(0, 0, 0, 0);
+    const start = range.start.line;
+    const end = Math.max(range.end.line, start);
+    await call({ method: "add", path: thread.uri.fsPath, startLine: start + 1, endLine: end + 1, lineText: linesOf(document, start, end), body });
+    thread.dispose();
+  }
+  await sync();
+}
+
+async function submitReview() {
+  const answer = await call({ method: "submit" });
+  await sync();
+  vscode.window.showInformationMessage("Sent " + (answer.sent === 1 ? "your comment" : answer.sent + " comments") + " to " + answer.sentTo + ".");
+}
+
+function editing(target, mode) {
+  const shown = threads.get(target.reviewThread);
+  if (!shown) return;
+  shown.comments = shown.comments.map((each) => each.reviewId === target.reviewId ? Object.assign({}, each, { mode, body: mode === vscode.CommentMode.Editing ? each.text : each.body }) : each);
+}
+
+async function saveComment(target) {
+  const body = typeof target.body === "string" ? target.body : target.body.value;
+  await call({ method: "edit", commentId: target.reviewId, body: body.trim() });
+  await sync();
+}
+
+// A command's error, said in VS Code.
+const guarded = (fn) => async (...args) => {
+  try { await fn(...args); } catch (error) { vscode.window.showWarningMessage("BB: " + (error && error.message || String(error))); }
+};
+
+function startReview(context) {
+  review = vscode.comments.createCommentController("bb-review", "BB review");
+  review.commentingRangeProvider = {
+    provideCommentingRanges: (document) => document.uri.scheme === "file" ? [new vscode.Range(0, 0, Math.max(document.lineCount - 1, 0), 0)] : [],
+  };
+  review.options = { prompt: "Comment for the agent", placeHolder: "It waits with your other comments until you submit the review." };
+  context.subscriptions.push(
+    review,
+    reviewStatus,
+    vscode.commands.registerCommand("bbStudio.addComment", guarded(comment)),
+    vscode.commands.registerCommand("bbStudio.reply", guarded(comment)),
+    vscode.commands.registerCommand("bbStudio.submitReview", guarded(submitReview)),
+    vscode.commands.registerCommand("bbStudio.editComment", (target) => editing(target, vscode.CommentMode.Editing)),
+    vscode.commands.registerCommand("bbStudio.cancelEdit", (target) => editing(target, vscode.CommentMode.Preview)),
+    vscode.commands.registerCommand("bbStudio.saveComment", guarded(saveComment)),
+    vscode.commands.registerCommand("bbStudio.deleteComment", guarded(async (target) => { await call({ method: "delete", commentId: target.reviewId }); await sync(); })),
+    vscode.commands.registerCommand("bbStudio.resolveThread", guarded(async (thread) => { await call({ method: "resolve", threadId: thread.reviewThread, resolved: true }); await sync(); })),
+    vscode.commands.registerCommand("bbStudio.reopenThread", guarded(async (thread) => { await call({ method: "resolve", threadId: thread.reviewThread, resolved: false }); await sync(); })),
+  );
 }
 
 async function copyForChat() {
@@ -467,6 +673,7 @@ exports.activate = (context) => {
   }));
   context.subscriptions.push(status);
   if (!SOCKET) return;
+  startReview(context);
   // The user's own typing and clicks pause following for a moment.
   context.subscriptions.push(
     vscode.window.onDidChangeTextEditorSelection((event) => { if (event.kind === vscode.TextEditorSelectionChangeKind.Keyboard || event.kind === vscode.TextEditorSelectionChangeKind.Mouse) lastUser = Date.now(); }),
