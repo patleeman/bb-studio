@@ -20,6 +20,8 @@ struct BotChatTimeline: View {
     var edit: ((String) -> Void)?
     var editableId: String?
     var openThread: (String) -> Void
+    /// The rows are the cached ones, for timing.
+    var cached = false
 
     var body: some View {
         let entries = BotChatEntry.build(rows, started: started)
@@ -33,6 +35,7 @@ struct BotChatTimeline: View {
                     bot: bot, row: row, first: first, last: last, projectId: projectId,
                     react: react, quote: quote, select: select,
                     edit: row.id == editableId ? edit : nil)
+                .modifier(ChatPerfRow(row: row, cached: cached))
             case .work(let rows):
                 BotWorkRow(rows: rows)
             case .child(let event, _):

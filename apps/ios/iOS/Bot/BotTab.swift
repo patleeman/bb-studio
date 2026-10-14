@@ -222,6 +222,7 @@ struct BotTab: View {
     private func load() async {
         #if DEBUG
         if let demo = BotDemo.current {
+            await BotDemo.latency()
             lead = BotLead(demo.bot)
             activity = demo.bot == nil ? nil : demo.activity
             chain = demo.chain

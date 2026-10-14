@@ -49,6 +49,127 @@ enum BotDemo {
         return arguments[index + 1]
     }
 
+    /// `-qaDemoLatency <ms>`: the chat's thread comes from a local server
+    /// behind that much latency (`BotDemo.Server`), and the bot and the Bots
+    /// list wait as long, as on a phone over Tailscale. `-qaDemoMessages <n>`
+    /// sizes the chat, `-qaDemoColdCache` drops what's cached first, and
+    /// `-qaDemoSend <text>` sends a message once the chat is in.
+    struct Served {
+        var latency: Duration
+        var messages: Int
+        var coldCache: Bool
+        var send: String?
+    }
+
+    static let served: Served? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        func value(_ name: String) -> String? {
+            arguments.firstIndex(of: name).flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+        }
+        guard variant != nil, let ms = value("-qaDemoLatency").flatMap(Int.init) else { return nil }
+        return Served(latency: .milliseconds(ms), messages: value("-qaDemoMessages").flatMap(Int.init) ?? 300,
+                      coldCache: arguments.contains("-qaDemoColdCache"), send: value("-qaDemoSend"))
+    }()
+
+    /// Drops the cached chat, for timing a first open.
+    static func dropCaches(serverURL: URL) {
+        DiskCache.remove("thread-\(threadId)", serverURL: serverURL)
+    }
+
+    /// Waits as long as a request to the server would.
+    static func latency() async {
+        if let served { try? await Task.sleep(for: served.latency) }
+    }
+
+    /// The chat's thread as a server would serve it: pages of the newest rows,
+    /// and a send that starts a turn and answers after a few seconds.
+    final class Server: @unchecked Sendable {
+        static let shared = Server()
+        private let lock = NSLock()
+        private var rows: [TimelineRow] = BotDemo.longRows
+        private var running = false
+        private var sends = 0
+        /// Called on the main actor when the thread changes, as BB's realtime would.
+        @MainActor var changed: (() -> Void)?
+
+        static let pageSize = 24
+
+        func client(_ baseURL: URL) -> BBClient {
+            let client = BBClient(baseURL: baseURL)
+            client.transport = { [self] method, path, body in
+                await BotDemo.latency()
+                return respond(method, path, body)
+            }
+            return client
+        }
+
+        private func respond(_ method: String, _ path: String, _ body: Data?) -> (Int, Data) {
+            let base = "/api/v1/threads/\(BotDemo.threadId)"
+            if method == "GET", path == base { return (200, lock.withLock { BotDemo.threadJSON(running: running) }) }
+            if method == "GET", path.hasPrefix(base + "/timeline") { return (200, page(path)) }
+            if method == "POST", path == base + "/send" {
+                let text = body.flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) }.flatMap(Self.text) ?? ""
+                send(text)
+                return (200, Data(#"{"ok":true}"#.utf8))
+            }
+            if method == "POST", path == base + "/read" { return (200, Data("{}".utf8)) }
+            return (404, Data(#"{"error":{"message":"Not in the demo"}}"#.utf8))
+        }
+
+        private static func text(_ body: JSONValue) -> String? {
+            guard case .object(let fields) = body, case .array(let input)? = fields["input"] else { return nil }
+            for part in input { if case .object(let item) = part, case .string(let text)? = item["text"] { return text } }
+            return nil
+        }
+
+        private func page(_ path: String) -> Data {
+            lock.withLock {
+                let components = URLComponents(string: path)
+                let before = components?.queryItems?.first { $0.name == "beforeAnchorSeq" }?.value.flatMap(Int.init)
+                let end = min(before ?? rows.count, rows.count)
+                let start = max(0, end - Self.pageSize)
+                struct Cursor: Encodable { var anchorSeq: Int; var anchorId: String }
+                struct PageInfo: Encodable { var hasOlderRows: Bool; var olderCursor: Cursor? }
+                struct Page: Encodable { var rows: [TimelineRow]; var maxSeq: Int; var timelinePage: PageInfo }
+                let slice = Array(rows[start..<end])
+                let info = PageInfo(hasOlderRows: start > 0, olderCursor: start > 0 ? Cursor(anchorSeq: start, anchorId: rows[start].id) : nil)
+                return (try? JSONEncoder().encode(Page(rows: slice, maxSeq: rows.count, timelinePage: info))) ?? Data()
+            }
+        }
+
+        private func send(_ text: String) {
+            let at = Date().timeIntervalSince1970 * 1000
+            let sent = lock.withLock {
+                sends += 1
+                running = true
+                rows.append(BotDemo.row(id: "sent\(sends)", role: "user", text: text, at: at))
+                return sends
+            }
+            notify()
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                lock.withLock {
+                    rows.append(BotDemo.row(id: "reply\(sent)", role: "assistant", text: "Got it. I'll take care of **that** now.", at: at + 3_000))
+                    running = false
+                }
+                notify()
+            }
+        }
+
+        private func notify() {
+            Task { @MainActor in changed?() }
+        }
+    }
+
+    fileprivate static func row(id: String, role: String, text: String, at: Double) -> TimelineRow {
+        let escaped = text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        return decode(#"{"id":"\#(id)","kind":"conversation","role":"\#(role)","text":"\#(escaped)","createdAt":\#(at)}"#)
+    }
+
+    fileprivate static func threadJSON(running: Bool) -> Data {
+        Data(#"{"id":"\#(threadId)","projectId":"proj_personal","title":"Juniper","status":"\#(running ? "active" : "idle")","createdAt":1,"updatedAt":\#(now)}"#.utf8)
+    }
+
     static var sheet: String? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-qaBotSheet"), arguments.indices.contains(index + 1) else { return nil }
@@ -63,7 +184,7 @@ enum BotDemo {
             lead: ThreadLead(threadId: threadId, heartbeat: "weekdays", time: "08:00"),
             shape: "blob", color: "#2ba59a", role: "My chief of staff. Keeps the week on track and chases loose ends.")
         return Fixture(bot: bot, activity: activity(needs: variant == "needs"), thread: thread(running: running, needs: variant == "needs"),
-                       rows: rows(variant), interactions: variant == "needs" ? interactions : [])
+                       rows: served != nil && variant == "chat" ? longRows : rows(variant), interactions: variant == "needs" ? interactions : [])
     }
 
     /// The Bots list: Juniper alone, or with two more for `-qaBotDemo list`.
@@ -106,7 +227,10 @@ enum BotDemo {
         decode(#"{"id":"\#(threadId)","projectId":"proj_personal","title":"Juniper","status":"\#(running || needs ? "active" : "idle")","createdAt":1,"updatedAt":\#(now),"hasPendingInteraction":\#(needs)}"#)
     }
 
-    private static func rows(_ variant: String) -> [TimelineRow] {
+    /// The served chat's rows, made once.
+    static let longRows: [TimelineRow] = rows("chat", long: served?.messages ?? 300)
+
+    private static func rows(_ variant: String, long: Int? = nil) -> [TimelineRow] {
         let yesterday = now - 86_400_000 - 3_600_000
         let today = now - 600_000
         func message(_ id: String, _ role: String, _ text: String, _ at: Double) -> String {
@@ -116,6 +240,7 @@ enum BotDemo {
         func work(_ id: String, _ tool: String, _ at: Double, status: String = "completed", output: String = "") -> String {
             #"{"id":"\#(id)","kind":"work","workKind":"tool","toolName":"\#(tool)","title":"\#(tool)","status":"\#(status)","output":"\#(output)","createdAt":\#(at)}"#
         }
+        if let long { return decode("[" + longChat(long, message: message, work: work).joined(separator: ",") + "]") }
         var items = [
             message("m1", "assistant", "Good morning! Three things today:\n\n- **Design review** at 10:00, the deck is ready\n- Two PRs waiting on you\n- Your flight to Lisbon checks in tonight", yesterday),
             message("m2", "user", "Thanks. Can you get the PRs moving?", yesterday + 60_000),
@@ -137,6 +262,29 @@ enum BotDemo {
             items.append(message("m5", "assistant", "Just one thing: the **Lisbon offsite budget** needs your sign-off by 3pm. The PRs are merged and the deck is final.\n\nWant me to draft the approval note?\n\n::next{reply=\"👍 Draft it|🕒 Remind me at 2|🙅 Not today\" do=\"📅 Block focus time\"}", today + 30_000))
         }
         return decode("[" + items.joined(separator: ",") + "]")
+    }
+
+    /// A long chat for timing: `count` messages of Markdown, lists, tables,
+    /// code, reactions and quick replies, with work between, over a few weeks.
+    private static func longChat(_ count: Int, message: (String, String, String, Double) -> String,
+                                 work: (String, String, Double, String, String) -> String) -> [String] {
+        let start = now - Double(count) * 1_800_000
+        let replies = [
+            "Here's where things stand:\n\n- **Design review** moved to Thursday\n- The deck has *two* open comments\n- [The brief](https://example.com/brief) is final\n\nAnything else?",
+            "## Release notes\n\nThe build is green. Three changes went in:\n\n1. Faster sync on launch\n2. Fixed the share sheet\n3. New `::next` chips\n\n::reactions{items=\"👍|🎉|👀\"}",
+            "I checked the logs. The failure is in the retry loop:\n\n```swift\nfunc retry() async throws {\n    for attempt in 1...3 {\n        do { return try await send() }\n        catch { try await Task.sleep(for: .seconds(attempt)) }\n    }\n}\n```\n\nIt never rethrows after the last attempt. Want me to fix it?",
+            "| Item | Owner | Due |\n| --- | --- | --- |\n| Budget | Dana | Fri |\n| Venue | Sam | Mon |\n| Flights | You | Tue |\n\nThe venue is the one to watch.",
+            "Quick summary of today: two meetings, one review, and the **Lisbon** flight checks in tonight. > Remember the passport.\n\n::next{reply=\"👍 Thanks|🕒 Later\" do=\"📅 Block time\"}",
+        ]
+        let asks = ["What's on today?", "Can you check the build?", "Why did the deploy fail?", "Who owns what for the offsite?", "Anything I'm forgetting?"]
+        var out: [String] = []
+        for index in 0..<(count / 2) {
+            let at = start + Double(index) * 3_600_000
+            out.append(message("u\(index)", "user", asks[index % asks.count], at))
+            if index % 3 == 0 { out.append(work("w\(index)", "bb_threads_list", at + 5_000, "completed", "")) }
+            out.append(message("a\(index)", "assistant", replies[index % replies.count], at + 30_000))
+        }
+        return out
     }
 
     private static var interactions: [PendingInteraction] {

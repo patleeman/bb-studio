@@ -58,6 +58,9 @@ public enum DiskCache {
     public static func load<T: Decodable>(_ type: T.Type, key: String, serverURL: URL = ServerScope.selectedURL) -> T? {
         read(type, from: url(key, serverURL: serverURL))
     }
+    public static func remove(_ key: String, serverURL: URL) {
+        try? FileManager.default.removeItem(at: url(key, serverURL: serverURL))
+    }
     // Durable outboxes contain their own per-item origins; preserve the legacy file.
     public static func saveUnscoped<T: Encodable>(_ value: T, as key: String) { write(value, to: url(key, serverURL: nil)) }
     public static func loadUnscoped<T: Decodable>(_ type: T.Type, key: String) -> T? { read(type, from: url(key, serverURL: nil)) }

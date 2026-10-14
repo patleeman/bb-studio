@@ -28,6 +28,7 @@ struct BotsTab: View {
         }
         .task(id: LoadKey(visible: model.tab == .bot, server: model.serverURL, attempt: attempt)) {
             guard model.tab == .bot else { return }
+            ChatPerf.open()
             consumeRoute()
             await load()
         }
@@ -103,6 +104,10 @@ struct BotsTab: View {
     private func load() async {
         #if DEBUG
         if let demo = BotDemo.bots {
+            if let served = BotDemo.served {
+                if served.coldCache, bots == nil { BotDemo.dropCaches(serverURL: model.serverURL) }
+                await BotDemo.latency()
+            }
             bots = demo
             summaries = BotDemo.summaries
             if decided == nil { decided = model.serverURL; open = demo.count > 1 ? nil : .primary }

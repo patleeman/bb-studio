@@ -8,6 +8,8 @@ final class ThreadModel: ObservableObject {
     @Published var rows: [TimelineRow] = []
     /// False until the first page arrives from the cache or the server.
     @Published var loaded = false
+    /// The rows on screen are the cached ones, until the server's arrive.
+    @Published private(set) var showsCache = false
     /// Bumped when the server's first page replaces rows drawn from the cache.
     @Published private(set) var replacedCache = 0
     @Published var hasOlder = false
@@ -172,7 +174,13 @@ final class ThreadModel: ObservableObject {
 
     func attach(_ app: AppModel) {
         guard app.serverURL == serverURL else { return }
-        let client = app.client
+        var client = app.client
+        #if DEBUG
+        if BotDemo.served != nil, threadId == BotDemo.threadId {
+            client = BotDemo.Server.shared.client(serverURL)
+            BotDemo.Server.shared.changed = { [weak self] in self?.scheduleRefresh(nil) }
+        }
+        #endif
         boundClient = client
         realtime = app.realtime
         app.realtime.subscribeThread(threadId)
@@ -240,7 +248,7 @@ final class ThreadModel: ObservableObject {
 
     func load() async {
         #if DEBUG
-        if let demo = BotDemo.current, threadId == BotDemo.threadId {
+        if BotDemo.served == nil, let demo = BotDemo.current, threadId == BotDemo.threadId {
             thread = demo.thread
             rows = demo.rows
             interactions = demo.interactions
@@ -252,6 +260,7 @@ final class ThreadModel: ObservableObject {
         var fromCache = false
         if rows.isEmpty, let snapshot = DiskCache.load(Snapshot.self, key: "thread-\(threadId)", serverURL: serverURL) {
             fromCache = true
+            showsCache = true
             thread = snapshot.thread
             rows = snapshot.rows
             loaded = true
@@ -270,6 +279,8 @@ final class ThreadModel: ObservableObject {
             }
             let fresh = try await thread
             loaded = true
+            showsCache = false
+            ChatPerf.serverRowsLanded(rows: rows.count)
             if fromCache { replacedCache += 1 }
             unreadFrom = Self.firstUnread(in: page.rows, thread: fresh)
             self.thread = fresh
@@ -297,7 +308,7 @@ final class ThreadModel: ObservableObject {
     /// at most one refresh every ~150ms.
     func scheduleRefresh(_ changes: Set<String>?) {
         #if DEBUG
-        if BotDemo.current != nil, threadId == BotDemo.threadId { return }
+        if BotDemo.served == nil, BotDemo.current != nil, threadId == BotDemo.threadId { return }
         #endif
         if let changes, let known = pending { pending = known.union(changes) } else { pending = nil }
         guard refreshTask == nil else { return }

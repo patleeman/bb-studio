@@ -234,6 +234,16 @@ struct ThreadView: View {
                 Task { await bot.load(client: client) }
             }
             await model.load()
+            #if DEBUG
+            if botChrome != nil, let text = BotDemo.served?.send {
+                // As a person would: into the composer with the keyboard up, then Send.
+                composerFocused = true
+                draft = text
+                try? await Task.sleep(for: .seconds(2))
+                ChatPerf.sent(text)
+                send()
+            }
+            #endif
         }
         .onChange(of: draft) { _, text in
             mentions.removeAll { !text.contains($0.token) }
@@ -434,7 +444,7 @@ struct ThreadView: View {
                         bot: botChrome.bot, rows: model.chainRows, threadId: model.threadId, projectId: model.thread?.projectId,
                         running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started,
                         react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
-                        edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread)
+                        edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread, cached: model.showsCache)
                 }
                 let items = botChrome != nil ? [] : TimelineItem.group(model.rows)
                 let unread = unreadItem(in: items)
