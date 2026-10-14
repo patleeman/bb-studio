@@ -1,7 +1,6 @@
-// The Bots sidebar: Studio's thread list provider ("Bot (Studio)"), which
-// replaces BB's thread list in a window in "bots" mode: from the Bot page or a
-// Bots list open until the user goes to another rail destination
-// (threadListSwitch.ts).
+// The sidebar: Studio's thread list provider ("Bot (Studio)"), which replaces
+// BB's thread list on every page but the Studio panel (threadListSwitch.ts).
+// Bots on top, then every thread as a two-line row (ThreadsSection.tsx).
 // A "Bots" list: every Bot (the primary first), the selected one (the Bot
 // page's route, selection.ts; on a thread, the thread's owner) expanded under
 // it into the threads it started: Needs you, Running, Runners, Recurring,
@@ -14,13 +13,14 @@ import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
-import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { BotActivityView, BotScheduledView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
-import { useCall, useLive } from "../live";
+import { useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
-import { clickedHome, HOME_RAIL_SELECTOR, isBotPath, readListMode, subscribeListMode, syncThreadList, threadIdForPath } from "./threadListSwitch";
+import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import { ImportBotDialog } from "./ImportBot";
+import { ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
@@ -74,55 +74,42 @@ function age(at: number, now = Date.now()): string {
   return relative.format(-Math.round(minutes / 10080), "week").replace(/\s?ago$/, "");
 }
 
-/** This window's sidebar mode (threadListSwitch.ts), re-rendering when it changes. */
-const useListMode = () => useSyncExternalStore(subscribeListMode, readListMode);
-
 /**
- * The provider's component, in a window in "bots" mode (and on the Bot page).
- * A window with no mode yet, on a thread, keeps it while the owner is asked
- * (no flicker). Anywhere else it shows only by mistake (a second window, a
- * reload mid-switch): it puts this window's list back at once and shows a
- * quiet placeholder for that moment.
+ * The provider's component. It shows on every page but the Studio panel; there
+ * it shows only by mistake (a second window, a reload mid-switch), puts this
+ * window's list back at once and shows a quiet placeholder for that moment.
  */
 export function BotThreadList({ onNavigate, activeThreadId }: PluginThreadListProps) {
   const sdk = useSdk();
-  const call = useCall();
   const pathname = usePathname();
-  const mode = useListMode();
-  const onBotPage = isBotPath(pathname);
-  const threadId = threadIdForPath(pathname);
-  const shows = onBotPage || mode === "bots" || (mode === null && !!threadId);
-  useEffect(() => { if (mode !== "bots") void syncThreadList(sdk, pathname, call); }, [sdk, call, mode, pathname]);
-  if (!shows) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
-  return <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} threadId={onBotPage ? null : threadId} />;
+  const onStudio = isStudioPath(pathname);
+  useEffect(() => { if (onStudio) void syncThreadList(sdk, pathname); }, [sdk, onStudio, pathname]);
+  if (onStudio) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
+  const threadId = isBotPath(pathname) ? null : threadIdForPath(pathname);
+  return (
+    <>
+      <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} threadId={threadId} />
+      <ThreadsSection activeThreadId={activeThreadId ?? null} onNavigate={onNavigate} />
+    </>
+  );
 }
 
 /**
  * Mounted in every window (an app overlay): keeps this window's mode and BB's
- * sidebar in line with its route (the Bots list, the Studio list, or BB's),
- * re-applies it when the window gains focus, so the window in use decides, and
- * watches BB's rail Home button.
- * A Bots list open sets the mode before it navigates, so it isn't synced here
- * against the route being left.
+ * sidebar in line with its route (the Studio list on the Studio panel, the
+ * Bots list everywhere else) and re-applies it when the window gains focus,
+ * so the window in use decides.
  */
 export function ThreadListSwitcher() {
   const sdk = useSdk();
-  const call = useCall();
   const pathname = usePathname();
   useEffect(() => {
     noteOpenThread(threadIdForPath(pathname));
-    const sync = () => void syncThreadList(sdk, pathname, call);
+    const sync = () => void syncThreadList(sdk, pathname);
     sync();
-    // Home on BB's rail leaves the Bots list, also when it doesn't change the route (on a thread, BB's Home is already active).
-    const home = (event: MouseEvent) => {
-      if (!(event.target instanceof Element) || !event.target.closest(HOME_RAIL_SELECTOR)) return;
-      clickedHome(window.location.pathname);
-      sync();
-    };
     window.addEventListener("focus", sync);
-    document.addEventListener("click", home, true);
-    return () => { window.removeEventListener("focus", sync); document.removeEventListener("click", home, true); };
-  }, [sdk, call, pathname]);
+    return () => window.removeEventListener("focus", sync);
+  }, [sdk, pathname]);
   return null;
 }
 
@@ -268,13 +255,13 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
           </Group>
         ) : null}
         {groups.recurring.length ? (
-          <Group id="recurring" title="Recurring" closed={layout.closed} onToggle={toggle}>
+          <Group id="recurring" title="Schedule" closed={layout.closed} onToggle={toggle}>
             {groups.recurring.map((item) => <RecurringRow key={item.id} item={item} />)}
           </Group>
         ) : null}
         {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
         {sideThreads.data?.threads.length ? (
-          <Group id="threads" title="Threads" closed={layout.closed} onToggle={toggle}>
+          <Group id="threads" title="Side threads" closed={layout.closed} onToggle={toggle}>
             {sideThreads.data.threads.map((thread) => <SideThreadRow key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
           </Group>
         ) : null}

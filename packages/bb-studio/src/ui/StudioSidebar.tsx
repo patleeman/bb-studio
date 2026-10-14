@@ -28,7 +28,6 @@ import { useWorkspace } from "./Workspace";
 import { BROWSE, panes } from "./workspace-state";
 import { isStudioPath, syncThreadList } from "./bot/threadListSwitch";
 import { studioSidebarModel, type SidebarItem } from "./studio-sidebar-model";
-import { useCall } from "./live";
 
 type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[]; views: SavedViewView[] };
 const CLOSED_KEY = "studio.sidebar.closed";
@@ -42,10 +41,9 @@ const ACTIVE = "bg-state-active text-foreground";
  */
 export function StudioThreadList({ onNavigate }: PluginThreadListProps) {
   const sdk = useSdk();
-  const call = useCall();
   const pathname = usePathname();
   const here = isStudioPath(pathname);
-  useEffect(() => { if (!here) void syncThreadList(sdk, pathname, call); }, [sdk, call, here, pathname]);
+  useEffect(() => { if (!here) void syncThreadList(sdk, pathname); }, [sdk, here, pathname]);
   if (!here) return <p className="px-3 py-2 text-xs text-muted-foreground">Loading threads…</p>;
   return <StudioItemsList onNavigate={onNavigate} />;
 }

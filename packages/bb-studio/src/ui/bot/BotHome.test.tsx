@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   threads: {} as Record<string, string>,
   activate: vi.fn(),
   inputs: [] as [string, unknown][],
+  toCompose: vi.fn(),
+  sidebarThreads: { status: "ready", threads: [] as unknown[], projects: [] as { id: string; name: string }[], sections: [], archivedPage: null } as Record<string, unknown>,
 }));
 vi.mock("../live", () => ({
   useCall: () => state.call,
@@ -28,8 +30,10 @@ vi.mock("../live", () => ({
 vi.mock("../ProjectLeads", () => ({ HeartbeatFields: () => null, useHeartbeatForm: () => ({ input: () => ({}) }) }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   ThreadTitle: ({ threadId }: { threadId: string }) => React.createElement("span", null, `title:${threadId}`),
-  useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openThreadPanel }),
+  useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openThreadPanel, toCompose: state.toCompose }),
   useSdk: () => sdk,
+  experimental_useSidebarThreads: () => state.sidebarThreads,
+  useSidebarThreadShortcut: () => null,
   experimental_ProviderIcon: ({ provider }: { provider: { id: string } }) => React.createElement("i", { "data-logo": provider.id }),
   experimental_useProviders: () => ({ status: "ready", providers: [{ id: "claude", displayName: "Claude" }, { id: "codex", displayName: "Codex" }] }),
   // The picker shows its value; its buttons pick Sonnet (same provider) or Codex (another).
@@ -56,6 +60,7 @@ vi.mock("@bb-studio/kit/app", () => ({
 }));
 vi.mock("@bb-studio/kit/ui", () => ({
   Icon: () => null,
+  cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
   Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => React.createElement("input", props),
   Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => React.createElement("textarea", props),
   Dialog: ({ children }: { children: React.ReactNode }) => React.createElement("div", { role: "dialog" }, children),
@@ -73,7 +78,7 @@ vi.mock("@bb-studio/kit/ui", () => ({
 
 const { ActivityPanel, BOT_PATH, BotRedirect } = await import("./BotHome");
 const { BotInfoPanel, BotPanel } = await import("./BotTabs");
-const { BotThreadList, ThreadListSwitcher } = await import("./BotSidebar");
+const { BotThreadList } = await import("./BotSidebar");
 const { forgetListMode } = await import("./threadListSwitch");
 const listProps = { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => {}, searchQuery: "" };
 
@@ -88,6 +93,9 @@ beforeEach(() => {
   state.activate.mockClear();
   state.inputs = [];
   state.threads = {};
+  state.prefs = { value: "studio/bot", revision: 1 };
+  state.toCompose.mockClear();
+  state.sidebarThreads = { status: "ready", threads: [], projects: [], sections: [], archivedPage: null };
   localStorage.clear();
   sessionStorage.clear();
   forgetListMode();
@@ -155,12 +163,12 @@ test("the Bots list: the bot on top, Needs you flat, started threads nested unde
   const nav = container.querySelector('nav[aria-label="Bots"]')!;
   expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Dot");
   const groups = [...nav.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"));
-  expect(groups).toEqual(["Needs you", "Running", "Recurring", "Recent", "Earlier conversations"]);
+  expect(groups).toEqual(["Needs you", "Running", "Schedule", "Recent", "Earlier conversations"]);
   // The running child pulls its parent into Running and nests under it.
   const running = nav.querySelector('section[aria-label="Running"]')!;
   expect(running.querySelector('li > button[data-thread="t2"] + ul button[data-thread="t3"]')).not.toBeNull();
   expect(nav.querySelector('section[aria-label="Recent"]')?.textContent).toContain("Weekly digest");
-  expect(nav.querySelector('section[aria-label="Recurring"]')?.textContent).toContain("Inbox sweep");
+  expect(nav.querySelector('section[aria-label="Schedule"]')?.textContent).toContain("Inbox sweep");
   // Earlier conversations start closed.
   expect(nav.textContent).not.toContain("Relay");
   // Opened, each shows the title bot_chain read: chain threads are hidden, so BB's ThreadTitle has none.
@@ -186,58 +194,58 @@ test("the Bots list: the bot on top, Needs you flat, started threads nested unde
   expect(container.querySelector('section[aria-label="Needs you"]')?.textContent).toContain("Approve deploy");
 });
 
-test("off the Bot page the Bots list puts BB's list back and shows a placeholder", async () => {
+test("on the Studio panel the Bots list puts Studio's list back and shows a placeholder", async () => {
+  state.pathname = "/plugins/studio/studio";
+  state.data = { bot_get: { bot: dot, run: null } };
+  await show(<BotThreadList {...listProps} />);
+  expect(container.querySelector("nav")).toBeNull();
+  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "studio/studio-items", expectedRevision: 1 });
+});
+
+test("the Bots list shows on every other page, with every thread below it as a two-line row naming its project", async () => {
   state.pathname = "/plugins/pages/pages";
-  state.data = { bot_get: { bot: dot, run: null } };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty } };
+  const row = (id: string, projectId: string, extra: Record<string, unknown> = {}) => ({
+    id, projectId, parentThreadId: null, isHidden: false, isArchived: false, isPinned: false, pinSortKey: null, isUnread: false,
+    hasPendingInteraction: false, indicator: "none", status: "idle", runtimeStatus: "idle", updatedAt: Date.now() - 3_600_000, latestAttentionAt: 0,
+    href: `/projects/${projectId}/threads/${id}`, ...extra,
+  });
+  state.sidebarThreads = { status: "ready", sections: [], archivedPage: null,
+    projects: [{ id: "proj_a", name: "Orbit" }, { id: "proj_b", name: "Garden" }],
+    threads: [
+      row("thr_old", "proj_a", { updatedAt: Date.now() - 86_400_000 * 2 }),
+      row("thr_new", "proj_b", { hasPendingInteraction: true }),
+      row("thr_pin", "proj_a", { isPinned: true, pinSortKey: "a", updatedAt: 0 }),
+      row("thr_child", "proj_a", { parentThreadId: "thr_old" }),
+      row("thr_hidden", "proj_a", { isHidden: true }),
+    ] };
   await show(<BotThreadList {...listProps} />);
-  expect(container.querySelector("nav")).toBeNull();
-  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "thread-list/thread-list", expectedRevision: 1 });
+  expect(container.querySelector("nav[aria-label=Bots]")).not.toBeNull();
+  const section = container.querySelector('[data-testid="threads-section"]')!;
+  const rows = [...section.querySelectorAll("[data-sidebar-thread-id]")];
+  expect(rows.map((each) => each.getAttribute("data-sidebar-thread-id"))).toEqual(["thr_pin", "thr_new", "thr_old"]);
+  expect(rows.map((each) => each.querySelector("[data-thread-project]")?.textContent)).toEqual(["Orbit", "Garden", "Orbit"]);
+  expect(rows[1]!.textContent).toContain("Needs you");
+  expect(rows[2]!.textContent).toContain("2d");
+  act(() => click(rows[2]));
+  expect(state.toThread).toHaveBeenCalledWith("thr_old", undefined);
+  act(() => click(section.querySelector('button[aria-label="New thread"]')));
+  expect(state.toCompose).toHaveBeenCalled();
 });
 
-test("a window with no mode, opened on a thread no Bot owns, asks once and puts BB's list back", async () => {
-  state.pathname = "/threads/thr_1";
-  state.call.mockImplementation((async (method: string) => method === "bot_thread_owner" ? { botId: null } : {}) as never);
-  state.data = { bot_get: { bot: dot, run: null } };
-  await show(<BotThreadList {...listProps} />);
-  expect(state.call).toHaveBeenCalledWith("bot_thread_owner", { threadId: "thr_1" });
-  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "thread-list/thread-list", expectedRevision: 1 });
-  expect(sessionStorage.getItem("studio.sidebar.listMode")).toBe("native");
-  expect(container.querySelector("nav")).toBeNull();
-  state.call.mockImplementation(async () => ({}));
-});
-
-test("after a Bots list open the Bots list stays on any thread, without asking who owns it", async () => {
+test("after a Bots list open the Bots list stays on any thread", async () => {
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, completed: [thread("t4", "Spawned work")] } };
   await show(<BotThreadList {...listProps} />);
   act(() => click(container.querySelector('[data-thread="t4"]')));
   expect(state.toThread).toHaveBeenCalledWith("t4");
-  expect(sessionStorage.getItem("studio.sidebar.listMode")).toBe("bots");
   state.pathname = "/threads/t4";
   await show(<BotThreadList {...listProps} activeThreadId="t4" />);
   expect(container.querySelector("nav")).not.toBeNull();
   expect(container.querySelector('[data-thread="t4"]')?.getAttribute("aria-current")).toBe("true");
-  // A runner in another project, reached any way: still the Bots list.
   state.pathname = "/projects/proj_1/threads/thr_run";
   await show(<BotThreadList {...listProps} activeThreadId="thr_run" />);
   expect(container.querySelector("nav")).not.toBeNull();
   expect(state.call).not.toHaveBeenCalledWith("bot_thread_owner", expect.anything());
-  expect(state.setPref).not.toHaveBeenCalled();
-});
-
-test("Home on BB's rail leaves the Bots list, even on a thread where BB's Home doesn't navigate", async () => {
-  sessionStorage.setItem("studio.sidebar.listMode", "bots");
-  state.pathname = "/projects/proj_1/threads/thr_run";
-  await show(<ThreadListSwitcher />);
-  expect(state.setPref).not.toHaveBeenCalled();
-  const rail = document.createElement("nav");
-  rail.setAttribute("aria-label", "Primary navigation");
-  rail.innerHTML = '<button type="button" aria-label="Home"><span>icon</span></button>';
-  document.body.append(rail);
-  await act(async () => { rail.querySelector("span")!.click(); });
-  await act(async () => {});
-  expect(sessionStorage.getItem("studio.sidebar.listMode")).toBe("native");
-  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "thread-list/thread-list", expectedRevision: 1 });
-  rail.remove();
 });
 
 test("the Bots list forgets the removed Threads tab's saved strips", async () => {
@@ -530,7 +538,6 @@ test("the bare Bot page (the rail's Bot item) opens this window's last Bot threa
   expect(state.toThread).toHaveBeenCalledTimes(1);
   // The Bot page's history entry becomes the thread's, so Back doesn't land here and redirect again.
   expect(replace.mock.calls.map((call) => call[2])).toContain("/projects/proj_orbit/threads/thr_runner");
-  expect(sessionStorage.getItem("studio.sidebar.listMode")).toBe("bots");
   expect(container.querySelector("[data-testid=bot-info-status]")).toBeNull();
   replace.mockRestore();
 });

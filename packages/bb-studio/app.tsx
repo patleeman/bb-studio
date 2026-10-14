@@ -265,9 +265,9 @@ export default definePluginApp((app) => {
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));
   app.slots.experimental_appOverlay({ id: "health-watch", component: HealthWatch });
-  // The Studio list replaces BB's thread list on the Studio page; the Bots list from the Bot page or a Bots list open until the user goes to another rail destination (src/ui/bot/threadListSwitch.ts).
-  app.slots.experimental_threadList({ id: STUDIO_LIST_ID, title: "Studio (Studio)", description: "Studio's kinds, saved views, tags and recent items. Studio switches to it on the Studio page and back when you leave.", component: StudioThreadList });
-  app.slots.experimental_threadList({ id: BOT_LIST_ID, title: "Bot (Studio)", description: "Bots and their threads. Studio switches to it on the Bot page and keeps it on the threads you open from it, and switches back when you go elsewhere on the rail.", component: BotThreadList });
+  // The Studio list replaces BB's thread list on the Studio page, the Bots list (Bots, then every thread) everywhere else (src/ui/bot/threadListSwitch.ts).
+  app.slots.experimental_threadList({ id: STUDIO_LIST_ID, title: "Studio (Studio)", description: "Studio's kinds, saved views, tags and recent items. Studio switches to it on the Studio page.", component: StudioThreadList });
+  app.slots.experimental_threadList({ id: BOT_LIST_ID, title: "Bot (Studio)", description: "Bots and their threads, then every thread as a two-line row. Studio shows it on every page but the Studio panel.", component: BotThreadList });
   app.slots.experimental_appOverlay({ id: "bot-list-switch", component: ThreadListSwitcher });
   // The thread panel's Automations tab and the header's clock badge.
   registerThreadAutomations(app);

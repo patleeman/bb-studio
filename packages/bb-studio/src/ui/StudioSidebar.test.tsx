@@ -64,9 +64,9 @@ test("on the Studio page it lists kinds, views, tags and recent items, with the 
   expect(state.setPref).not.toHaveBeenCalled();
 });
 
-test("off the Studio page it switches to that page's list and shows a placeholder", async () => {
+test("off the Studio page it switches to the Bots list and shows a placeholder", async () => {
   state.pathname = "/threads/thr_1";
   await show();
   expect(container.querySelector("nav")).toBeNull();
-  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "thread-list/thread-list", expectedRevision: 1 });
+  expect(state.setPref).toHaveBeenCalledWith({ key: "sidebar.threadListProvider", value: "studio/bot", expectedRevision: 1 });
 });

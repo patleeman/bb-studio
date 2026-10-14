@@ -21,7 +21,7 @@ import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Welcome } from "./Onboarding";
 import { useOpenThread } from "./workspace";
-import { botLanding, openedFromBotsList, readLastBotThread, threadRoute } from "./threadListSwitch";
+import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
 
 /** The Bot's nav panel: its id and path under /plugins/studio. */
@@ -130,7 +130,6 @@ function useBotLanding(bare: boolean, view: BotView | undefined): boolean {
     void botLanding(readLastBotThread(), chatId, locate).then((target) => {
       if (cancelled) return;
       if (!target) { setSettled(true); return; }
-      openedFromBotsList();
       window.history.replaceState(window.history.state, "", target.path);
       navigate.toThread(target.threadId);
     });

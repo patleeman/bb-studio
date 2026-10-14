@@ -7,7 +7,6 @@ import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
 import { botPath } from "./selection";
-import { openedFromBotsList } from "./threadListSwitch";
 
 /** The thread panel action that shows a Bot thread's Info (app.tsx). */
 export const BOT_INFO_ACTION = "bot-info";
@@ -19,7 +18,7 @@ export const BOT_INFO_ACTION = "bot-info";
  */
 export function useOpenThread(): (threadId: string) => void {
   const navigate = useBbNavigate();
-  return useCallback((threadId: string) => { openedFromBotsList(); navigate.toThread(threadId); }, [navigate]);
+  return useCallback((threadId: string) => { navigate.toThread(threadId); }, [navigate]);
 }
 
 /** Drops the strips the removed Threads tab saved (`studio.bot.<botId>.threads`). */
