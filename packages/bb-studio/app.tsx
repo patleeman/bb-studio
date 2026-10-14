@@ -38,6 +38,8 @@ import { BOT_PANEL, BOT_SUBPATH, BotRedirect } from "./src/ui/bot/BotHome";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
 import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
+import { BotThreadDirective, SIDE_THREAD_ACTION, SideThreadPanel } from "./src/ui/bot/SideThreads";
+import { BOT_THREAD_DIRECTIVE } from "./src/bot-side-threads";
 import { BotThreadList, ThreadListSwitcher } from "./src/ui/bot/BotSidebar";
 import { StudioThreadList } from "./src/ui/StudioSidebar";
 import { BOT_LIST_ID, STUDIO_LIST_ID } from "./src/ui/bot/threadListSwitch";
@@ -152,6 +154,10 @@ export default definePluginApp((app) => {
   // sidebar. Beside a Bot's thread, the "Bot info" panel action shows the same Info.
   app.slots.navPanel({ id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotPanel, headerContent: StudioBarSlot });
   app.slots.threadPanelAction({ id: BOT_INFO_ACTION, title: "Bot info", icon: "Bot", layout: "flush", component: BotInfoPanel });
+  // Side threads on a Bot's replies (src/bot-side-threads.ts): the row under
+  // each reply, and the side thread in a tab beside the chat.
+  app.slots.messageDirective({ id: BOT_THREAD_DIRECTIVE, component: BotThreadDirective });
+  app.slots.threadPanelAction({ id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
   // A Bot chat's prompt cache (src/bot-cache.ts): "Warm · 42m" in its header,
   // and a banner in its composer when the cache expired on a big chat.
   app.slots.experimental_threadHeaderAction({ id: "bot-cache", title: "Prompt cache", component: BotCacheChip });

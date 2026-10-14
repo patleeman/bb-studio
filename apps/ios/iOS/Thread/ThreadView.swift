@@ -445,7 +445,8 @@ struct ThreadView: View {
                         bot: botChrome.bot, rows: model.chainRows, threadId: model.threadId, projectId: model.thread?.projectId,
                         running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started,
                         react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
-                        edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread, cached: model.showsCache)
+                        edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread,
+                        sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: Set(model.rows.map(\.id)), cached: model.showsCache)
                 }
                 let items = botChrome != nil ? [] : TimelineItem.group(model.shownRows)
                 let unread = unreadItem(in: items)

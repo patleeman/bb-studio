@@ -217,6 +217,24 @@ extension BBClient {
         }
     }
 
+    /// The side threads on a Bot chat's replies (`bot_side_threads`), by reply id; empty on a Studio without them.
+    public func botSideThreads(threadId: String) async throws -> [String: BotSideThread] {
+        struct Output: Decodable { var threads: [BotSideThread] }
+        do {
+            let output: Output = try await rpc("studio", Studio.Method.bot_side_threads, ["threadId": .string(threadId)])
+            return Dictionary(output.threads.map { ($0.messageId, $0) }, uniquingKeysWith: { first, _ in first })
+        } catch where Self.isMissingRPC(error) {
+            return [:]
+        }
+    }
+
+    /// A reply's side thread, forked from the chat at that reply on first open (`bot_side_thread_open`).
+    public func openBotSideThread(threadId: String, messageId: String) async throws -> String {
+        struct Output: Decodable { var threadId: String }
+        let output: Output = try await rpc("studio", Studio.Method.bot_side_thread_open, ["threadId": .string(threadId), "messageId": .string(messageId)])
+        return output.threadId
+    }
+
     /// Sets the Bot's check-ins to a preset (`bot_checkin_preset`): one schedule and one line on its Memory page.
     @discardableResult
     public func setBotCheckinPreset(_ preset: BotCheckinPreset, botId: String? = nil) async throws -> BotInfo? {
@@ -611,5 +629,25 @@ public struct BotCacheState: Decodable, Hashable, Sendable {
             return left > 0 ? "Warm · \(max(1, Int((left / 60).rounded(.up))))m" : "Cold"
         }
         return label
+    }
+}
+
+/// A side thread on one of the Bot's replies: a fork of its chat at that reply.
+public struct BotSideThread: Codable, Hashable, Sendable {
+    public var messageId: String
+    public var threadId: String
+    public var replies: Int
+    /// Milliseconds, as Studio sends them.
+    public var lastReplyAt: Double?
+    public var working: Bool
+
+    /// "2 replies · 5m ago", "Working…", "Thread".
+    public func label(now: Date = .now) -> String {
+        let count = replies == 1 ? "1 reply" : "\(replies) replies"
+        if working { return replies > 0 ? "\(count) · working…" : "Working…" }
+        guard replies > 0 else { return "Thread" }
+        guard let lastReplyAt else { return count }
+        let at = Date(timeIntervalSince1970: lastReplyAt / 1000)
+        return "\(count) · \(at.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)))"
     }
 }

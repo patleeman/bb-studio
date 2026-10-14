@@ -6811,6 +6811,105 @@
         "additionalProperties": false
       }
     },
+    "bot_side_threads": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "messageId": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "replies": {
+                  "type": "number"
+                },
+                "lastReplyAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "working": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "messageId",
+                "threadId",
+                "replies",
+                "lastReplyAt",
+                "working"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "threads"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_side_thread_open": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId",
+          "messageId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "created": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "threadId",
+          "created"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_thread_owner": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

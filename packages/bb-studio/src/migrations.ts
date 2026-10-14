@@ -4,6 +4,7 @@ import { DESIGN_MIGRATIONS } from "./design/server/store";
 import { TALK_MIGRATIONS } from "./talk/server/store";
 import { MIGRATIONS as PAGE_MIGRATIONS } from "./pages/store";
 import { PAGE_NOTES_TABLE } from "./pages/notes";
+import { SIDE_THREADS_TABLE } from "./bot-side-threads";
 import { NEXT_LOG_MIGRATIONS } from "./explore/store";
 import { DASHBOARD_PROPOSALS_TABLE, DASHBOARD_TABLES } from "./dashboards/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
@@ -360,4 +361,6 @@ export const MIGRATIONS = [
   DASHBOARD_PROPOSALS_TABLE,
   // Notes (src/pages/notes.ts): pages made from a thread's draft, and their thread.
   PAGE_NOTES_TABLE,
+  // Side threads on a Bot's replies (src/bot-side-threads.ts): each fork and the reply it answers.
+  SIDE_THREADS_TABLE,
 ];

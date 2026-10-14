@@ -58,6 +58,8 @@ public enum Studio {
     public static let bot_cache_compact = "bot_cache_compact"
     public static let bot_memory = "bot_memory"
     public static let bot_chain = "bot_chain"
+    public static let bot_side_threads = "bot_side_threads"
+    public static let bot_side_thread_open = "bot_side_thread_open"
     public static let bot_thread_owner = "bot_thread_owner"
     public static let bot_checkin_preset = "bot_checkin_preset"
     public static let bot_skills = "bot_skills"
@@ -348,6 +350,10 @@ public enum Studio {
   public typealias BotMemory = BotMemoryOutput
 
   public typealias BotChain = BotChainOutput
+
+  public typealias BotSideThreads = BotSideThreadsOutput
+
+  public typealias BotSideThreadOpen = BotSideThreadOpenOutput
 
   public typealias BotThreadOwner = BotThreadOwnerOutput
 
@@ -6335,6 +6341,58 @@ public enum Studio {
     public init(threadIds: [String]? = nil, threads: [BotChainOutputThreadsItem]? = nil) {
       self.threadIds = threadIds
       self.threads = threads
+    }
+  }
+
+  public struct BotSideThreadsInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotSideThreadsOutputThreadsItem: Sendable, Hashable, Codable {
+    public var messageId: String?
+    public var threadId: String?
+    public var replies: Double?
+    public var lastReplyAt: Double?
+    public var working: Bool?
+
+    public init(messageId: String? = nil, threadId: String? = nil, replies: Double? = nil, lastReplyAt: Double? = nil, working: Bool? = nil) {
+      self.messageId = messageId
+      self.threadId = threadId
+      self.replies = replies
+      self.lastReplyAt = lastReplyAt
+      self.working = working
+    }
+  }
+
+  public struct BotSideThreadsOutput: Sendable, Hashable, Codable {
+    public var threads: [BotSideThreadsOutputThreadsItem]?
+
+    public init(threads: [BotSideThreadsOutputThreadsItem]? = nil) {
+      self.threads = threads
+    }
+  }
+
+  public struct BotSideThreadOpenInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var messageId: String?
+
+    public init(threadId: String? = nil, messageId: String? = nil) {
+      self.threadId = threadId
+      self.messageId = messageId
+    }
+  }
+
+  public struct BotSideThreadOpenOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var created: Bool?
+
+    public init(threadId: String? = nil, created: Bool? = nil) {
+      self.threadId = threadId
+      self.created = created
     }
   }
 

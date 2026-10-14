@@ -20,6 +20,11 @@ struct BotChatTimeline: View {
     var edit: ((String) -> Void)?
     var editableId: String?
     var openThread: (String) -> Void
+    /// Side threads on replies in the current thread, by reply id.
+    var sideThreads: [String: BotSideThread] = [:]
+    var replyInThread: (String) -> Void = { _ in }
+    /// The current thread's row ids: only its replies can start a side thread (earlier ones are archived).
+    var threadRows: Set<String> = []
     /// The rows are the cached ones, for timing.
     var cached = false
 
@@ -34,7 +39,9 @@ struct BotChatTimeline: View {
                 BotMessageRow(
                     bot: bot, row: row, first: first, last: last, projectId: projectId,
                     react: react, quote: quote, select: select,
-                    edit: row.id == editableId ? edit : nil)
+                    edit: row.id == editableId ? edit : nil,
+                    sideThread: sideThreads[row.id],
+                    replyInThread: !row.isUser && threadRows.contains(row.id) ? { replyInThread(row.id) } : nil)
                 .modifier(ChatPerfRow(row: row, cached: cached))
             case .work(let rows):
                 BotWorkRow(rows: rows)
@@ -75,6 +82,10 @@ struct BotMessageRow: View {
     var quote: (String) -> Void
     var select: (String) -> Void
     var edit: ((String) -> Void)?
+    /// This reply's side thread, when it has one.
+    var sideThread: BotSideThread?
+    /// Opens (or starts) the reply's side thread; nil where replies can't have one.
+    var replyInThread: (() -> Void)?
     @EnvironmentObject private var app: AppModel
 
     private static let avatarSize: CGFloat = 28
@@ -138,6 +149,7 @@ struct BotMessageRow: View {
                     .contextMenu { menu }
                 let reactions = Directive.reactions(in: text)
                 if !reactions.isEmpty { ReactionChips(items: reactions, react: react).padding(.top, 4) }
+                if let sideThread, let replyInThread { BotSideThreadRow(thread: sideThread, tint: tint, open: replyInThread) }
             }
             Spacer(minLength: 24)
         }
@@ -166,8 +178,33 @@ struct BotMessageRow: View {
         Button { UIPasteboard.general.string = plainText } label: { Label("Copy", systemImage: "doc.on.doc") }
         Button { select(plainText) } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
         Button { quote(plainText) } label: { Label("Quote", systemImage: "text.quote") }
+        if let replyInThread {
+            Button(action: replyInThread) { Label(sideThread == nil ? "Reply in Thread" : "Open Thread", systemImage: "bubble.left.and.bubble.right") }
+        }
         if let edit { Button { edit(plainText) } label: { Label("Edit", systemImage: "pencil") } }
         ShareLink(item: plainText) { Label("Share", systemImage: "square.and.arrow.up") }
+    }
+}
+
+/// "💬 2 replies · 5m ago" under a reply with a side thread; opens it.
+struct BotSideThreadRow: View {
+    let thread: BotSideThread
+    let tint: Color
+    var open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                Label(thread.label(now: context.date), systemImage: "bubble.left.and.bubble.right.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the side thread on this reply")
     }
 }
 

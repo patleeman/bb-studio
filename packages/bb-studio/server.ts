@@ -47,6 +47,7 @@ import { AVATAR_ROUTE, BOT_AVATAR_SETTINGS, imageMime, pickImageProvider } from 
 import { registerBotProfileTools } from "./src/bot-profile-tools";
 import { BotCacheWarmer } from "./src/bot-cache";
 import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
+import { BOT_THREAD_INSTRUCTIONS, SIDE_THREAD_INSTRUCTIONS, SideThreads } from "./src/bot-side-threads";
 import { alertBot, parseSchedule, Runners } from "./src/runners";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
@@ -178,13 +179,17 @@ export default async function plugin(bb: BbPluginApi) {
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS], skills: [], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
-    const bot = bots.forThread(context.thread.id, context.pluginMetadata);
+    // A side thread (a fork at one of its replies) runs as the Bot too.
+    const side = sideThreads.forThread(context.thread.id);
+    const sideBot = side ? bots.stored(side.botId) : null;
+    const bot = sideBot ? { ...sideBot, threadId: context.thread.id } : bots.forThread(context.thread.id, context.pluginMetadata);
     // An external bot's agent has its own memory and tools; Studio's don't reach it.
     if (bot?.kind === "external") return { tools: [], skills: [], instructions: bots.instructions(bot) };
     if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS], skills: [], instructions: bots.instructions(bot) };
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
-    const instructions = [bot ? bots.instructions(bot) : "", runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+    const threadsLine = bot?.state === "active" ? (sideBot ? SIDE_THREAD_INSTRUCTIONS : BOT_THREAD_INSTRUCTIONS) : "";
+    const instructions = [bot ? bots.instructions(bot) : "", threadsLine, runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
     return { tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: [], instructions };
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
@@ -457,6 +462,14 @@ export default async function plugin(bb: BbPluginApi) {
   resumeSweep();
   // Skills that learn (src/skill-learning.ts): background reviews of a Bot's work and the weekly curator.
   const learningBot = (bot: NonNullable<ReturnType<typeof bots.stored>>) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, kind: bot.kind ?? "studio" });
+  // Side threads on a Bot's replies (src/bot-side-threads.ts).
+  const sideThreads = new SideThreads({
+    db, sdk: bb.sdk, changed: tagsChanged,
+    botFor: (threadId) => bots.list().find((bot) => bots.chain(bot.id).includes(threadId)) ?? null,
+  });
+  bb.events.on("thread.idle", ({ thread }) => sideThreads.idle(thread.id));
+  bb.events.on("thread.active", ({ thread }) => sideThreads.touched(thread.id));
+  bb.events.on("thread.deleted", ({ thread }) => sideThreads.forget(thread.id));
   const learning: SkillLearning = new SkillLearning({
     db, sdk: bb.sdk, changed: tagsChanged,
     bots: () => bots.list().map(learningBot),
@@ -696,6 +709,8 @@ export default async function plugin(bb: BbPluginApi) {
       models: async (providerId) => (await bb.sdk.providers.models({ providerId })).models,
     }),
     bot_chain: async ({ botId }) => { const threads = await bots.chainThreads(botId); return { threadIds: threads.map((thread) => thread.id), threads }; },
+    bot_side_threads: async ({ threadId }) => ({ threads: await sideThreads.list(threadId) }),
+    bot_side_thread_open: ({ threadId, messageId }) => sideThreads.open(threadId, messageId),
     bot_thread_owner: ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? null }),
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),
     bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),

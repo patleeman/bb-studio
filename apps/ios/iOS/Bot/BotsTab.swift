@@ -194,7 +194,7 @@ struct BotSummary: Hashable {
 
     /// Markdown and the chat's reply chips read as noise in a one-line preview.
     static func plain(_ text: String) -> String {
-        text.replacingOccurrences(of: #"::\w+\{[^}]*\}"#, with: "", options: .regularExpression)
+        text.replacingOccurrences(of: #"::[\w-]+\{[^}]*\}"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression)
             .replacingOccurrences(of: #"[*_`#>]+"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)

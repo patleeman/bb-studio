@@ -23,6 +23,7 @@ struct BotTab: View {
     @State private var error: String?
     /// The chat's prompt cache (`bot_cache_state`), for the header.
     @State private var cache: BotCacheState?
+    @State private var sideThreads: [String: BotSideThread] = [:]
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
     private struct PollKey: Hashable { let interval: Duration?; let server: URL; let botId: String? }
 
@@ -149,7 +150,9 @@ struct BotTab: View {
     private func chrome(_ bot: BotInfo) -> BotChrome {
         let chain = chain.last == bot.lead.threadId ? chain : bot.lead.threadId.map { [$0] } ?? []
         return BotChrome(bot: bot, chain: chain, started: BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain),
+                         sideThreads: sideThreads,
                          openThread: { path.append(.thread(id: $0)) },
+                         replyInThread: { messageId in replyInThread(threadId: bot.lead.threadId, messageId: messageId) },
                          runningChanged: { _ in Task { await loadActivity() } },
                          followThread: { _ in attempt += 1 },
                          cache: cache)
@@ -294,6 +297,7 @@ struct BotTab: View {
         guard bot != nil else { activity = nil; return }
         let client = model.client
         if let threadId = bot?.lead.threadId, let state = try? await client.botCacheState(threadId: threadId), state != cache { cache = state }
+        if let threadId = bot?.lead.threadId, let side = try? await client.botSideThreads(threadId: threadId), side != sideThreads { sideThreads = side }
         guard let next = try? await client.botActivity(botId: botId) else { return }
         // An unchanged Activity redraws nothing.
         if next != activity { activity = next }
@@ -308,6 +312,21 @@ struct BotTab: View {
         }
         guard client.baseURL == model.serverURL else { return }
         for thread in fetched { startedThreads[thread.id] = thread }
+    }
+
+    /// Opens a reply's side thread; the first time, Studio forks the chat at that reply.
+    private func replyInThread(threadId: String?, messageId: String) {
+        guard let threadId else { return }
+        if let side = sideThreads[messageId] { path.append(.thread(id: side.threadId)); return }
+        Task {
+            do {
+                let side = try await model.client.openBotSideThread(threadId: threadId, messageId: messageId)
+                path.append(.thread(id: side))
+                await loadActivity()
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
     }
 
     /// The welcome's Create: the first Bot, with Studio's setup as its first message.

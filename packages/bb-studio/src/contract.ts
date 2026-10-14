@@ -253,6 +253,9 @@ const botCacheState = z.object({
   settings: warmSettings,
 });
 export type BotCacheStateView = z.infer<typeof botCacheState>;
+/** A side thread on one of a Bot's replies (src/bot-side-threads.ts). */
+const sideThread = z.object({ messageId: z.string(), threadId: z.string(), replies: z.number(), lastReplyAt: z.number().nullable(), working: z.boolean() });
+export type SideThreadView = z.infer<typeof sideThread>;
 const threadIdInput = z.string().min(1).max(200);
 /** A thread in the Bot's Activity: its own thread ("self") or one it started. */
 const botThread = z.object({
@@ -492,6 +495,10 @@ export const rpcContract = defineRpcContract({
   bot_memory: { input: forBot, output: z.object({ pageId: z.string().nullable() }) },
   /** The Bot's chat as one conversation: its thread and the ones it handed off from, oldest first. `threads` carries each one's title: they're hidden, so BB's title lookup shows nothing. */
   bot_chain: { input: forBot, output: z.object({ threadIds: z.array(z.string()), threads: z.array(z.object({ id: z.string(), title: z.string() })) }) },
+  /** The side threads on a Bot chat's replies (src/bot-side-threads.ts), by reply. */
+  bot_side_threads: { input: z.object({ threadId: threadIdInput }), output: z.object({ threads: z.array(sideThread) }) },
+  /** A reply's side thread: a fork of the chat at that reply, made on first open. */
+  bot_side_thread_open: { input: z.object({ threadId: threadIdInput, messageId: z.string().min(1).max(200) }), output: z.object({ threadId: z.string(), created: z.boolean() }) },
   /** The Bot a thread belongs to (its chat, a thread it started, a runner, an automation run), or null: the sidebar keeps the Bots list on it. */
   bot_thread_owner: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ botId: z.string().nullable() }) },
   /** A check-in preset: sets the schedule and adds its one-line instruction to the Memory page's Check-in section. */

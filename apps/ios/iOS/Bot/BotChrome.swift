@@ -7,8 +7,12 @@ struct BotChrome {
     var chain: [String] = []
     /// Threads the Bot started, from BB's thread metadata, with live status.
     var started: [BotStartedThread] = []
+    /// Side threads on the replies of its current thread, by reply id.
+    var sideThreads: [String: BotSideThread] = [:]
     /// Opens a thread inside the Bot tab.
     var openThread: (String) -> Void
+    /// Opens a reply's side thread, forking the chat there on first use.
+    var replyInThread: (String) -> Void = { _ in }
     /// The chat started or stopped running, or something came to need the user.
     var runningChanged: (Bool) -> Void = { _ in }
     /// The chat moved to a new thread (a handoff to another provider).
