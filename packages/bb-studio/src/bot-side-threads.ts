@@ -12,8 +12,10 @@
 //
 // The fork is hidden (it lives under its reply, not in BB's thread list) and
 // isn't Bot-owned work (src/bot-owned.ts): it's the user's conversation with
-// the Bot. It runs as the Bot, with the Bot's instructions and tools, but
-// without the directive: a side thread has no side threads.
+// the Bot. It runs as the Bot, with its instructions, but only the Bot
+// tools that read (server.ts, SIDE_THREAD_TOOLS): talking about a reply
+// never renames the Bot, edits its skills or schedules anything. No
+// directive either: a side thread has no side threads.
 //
 // Replies counts the side thread's turns that ended in a reply, recounted
 // from its timeline when it goes idle: BB also reports an idle while a fork
@@ -29,7 +31,7 @@ type Sdk = BbPluginApi["sdk"];
 
 export const BOT_THREAD_DIRECTIVE = "bot-thread";
 export const BOT_THREAD_INSTRUCTIONS = `End every reply except [PASS] with the line \`::${BOT_THREAD_DIRECTIVE}{}\` on its own, before the ::next line when you write one. It lets the user answer that reply in a side thread. Don't mention it.`;
-export const SIDE_THREAD_INSTRUCTIONS = "This is a side thread: the user forked your chat at one of your replies to talk about it. Stay on that reply's topic. Your main chat doesn't see this thread, so it won't know what you decide here.";
+export const SIDE_THREAD_INSTRUCTIONS = "This is a side thread: the user forked your chat at one of your replies to talk about it. Stay on that reply's topic. Your main chat doesn't see this thread, so it won't know what you decide here. Here you can read about yourself but not change yourself: your name, look and profile, your skills, your Memory page, your runners and schedules, or pausing and stopping stay with your main chat. When the user asks for one of those, say it's done from your main chat, and don't attempt it another way.";
 
 export const SIDE_THREADS_TABLE = `CREATE TABLE bot_side_threads (
        thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, source_thread_id TEXT NOT NULL, message_id TEXT NOT NULL,

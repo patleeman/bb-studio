@@ -165,6 +165,19 @@ export default async function plugin(bb: BbPluginApi) {
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_avatar_generate", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
   const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
+  /** A side thread (src/bot-side-threads.ts) talks about one reply: it reads the Bot, never changes it. */
+  const SIDE_THREAD_TOOLS = ["bot_get", "bot_activity", "bot_skill_list", "bot_skill_view", "bot_history_search", "runner_list", "automation_list"] as const;
+  // A fork inherits its Bot's session, tool list included, so configure can't
+  // take tools away from a side thread: each tool that changes the Bot
+  // refuses there instead. Installed before any tool registers.
+  const SIDE_THREAD_REFUSED = new Set<string>([...BOT_TOOLS, ...BOT_OWN_TOOLS].filter((name) => !(SIDE_THREAD_TOOLS as readonly string[]).includes(name)));
+  const registerAgentTool = bb.agents.registerTool.bind(bb.agents);
+  bb.agents.registerTool = ((tool: Parameters<typeof registerAgentTool>[0]) => registerAgentTool(!SIDE_THREAD_REFUSED.has(tool.name) ? tool : {
+    ...tool,
+    execute: (input: never, ctx: { threadId: string }) => sideThreads.forThread(ctx.threadId)
+      ? `Refused: this is a side thread, which can read about the Bot but not change it. Tell the user ${tool.name.replace(/_/g, " ")} is done from the Bot's main chat.`
+      : (tool.execute as (input: never, ctx: never) => unknown)(input, ctx as never),
+  } as never)) as typeof bb.agents.registerTool;
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
   const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS, dashboard: DASHBOARD_TOOLS };
@@ -180,15 +193,22 @@ export default async function plugin(bb: BbPluginApi) {
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS], skills: [], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     // A side thread (a fork at one of its replies) runs as the Bot too.
-    const side = sideThreads.forThread(context.thread.id);
-    const sideBot = side ? bots.stored(side.botId) : null;
+    // BB sets a fork's session up while it's made, before Studio records it:
+    // the fork's metadata says it's a side thread from the start.
+    const sideBotId = typeof context.pluginMetadata?.botSideThread === "string" ? context.pluginMetadata.botSideThread : sideThreads.forThread(context.thread.id)?.botId;
+    const sideBot = sideBotId ? bots.stored(sideBotId) : null;
+    if (sideBot && sideBot.kind !== "external") {
+      const asBot = { ...sideBot, threadId: context.thread.id };
+      const instructions = [bots.instructions(asBot), SIDE_THREAD_INSTRUCTIONS, off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+      return { tools: [...tools, ...SIDE_THREAD_TOOLS], skills: [], instructions };
+    }
     const bot = sideBot ? { ...sideBot, threadId: context.thread.id } : bots.forThread(context.thread.id, context.pluginMetadata);
     // An external bot's agent has its own memory and tools; Studio's don't reach it.
     if (bot?.kind === "external") return { tools: [], skills: [], instructions: bots.instructions(bot) };
     if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS], skills: [], instructions: bots.instructions(bot) };
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
-    const threadsLine = bot?.state === "active" ? (sideBot ? SIDE_THREAD_INSTRUCTIONS : BOT_THREAD_INSTRUCTIONS) : "";
+    const threadsLine = bot?.state === "active" ? BOT_THREAD_INSTRUCTIONS : "";
     const instructions = [bot ? bots.instructions(bot) : "", threadsLine, runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
     return { tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: [], instructions };
   });
