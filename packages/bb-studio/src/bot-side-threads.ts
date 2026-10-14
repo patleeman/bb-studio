@@ -21,9 +21,12 @@
 // from its timeline when it goes idle: BB also reports an idle while a fork
 // is set up, and the fork's own timeline holds only its new messages.
 //
-// The fork inherits the Bot's session, marker instruction included, so its
-// replies may carry `::bot-thread{}` too. bot_side_threads says whether a
-// thread is a Bot's chat, and the directive draws nothing where it isn't.
+// The fork keeps its source's session instructions, marker included, and
+// Studio's later instructions don't reach it. So the fork is made with an
+// agent-only seed (SIDE_THREAD_INSTRUCTIONS) telling it what it is and to
+// leave the marker out; the seed starts no turn. Should a reply still carry
+// `::bot-thread{}`, bot_side_threads says the thread isn't a Bot's chat and
+// the directive draws nothing.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 
@@ -31,7 +34,7 @@ type Sdk = BbPluginApi["sdk"];
 
 export const BOT_THREAD_DIRECTIVE = "bot-thread";
 export const BOT_THREAD_INSTRUCTIONS = `End every reply except [PASS] with the line \`::${BOT_THREAD_DIRECTIVE}{}\` on its own, before the ::next line when you write one. It lets the user answer that reply in a side thread. Don't mention it.`;
-export const SIDE_THREAD_INSTRUCTIONS = "This is a side thread: the user forked your chat at one of your replies to talk about it. Stay on that reply's topic. Your main chat doesn't see this thread, so it won't know what you decide here. Here you can read about yourself but not change yourself: your name, look and profile, your skills, your Memory page, your runners and schedules, or pausing and stopping stay with your main chat. When the user asks for one of those, say it's done from your main chat, and don't attempt it another way.";
+export const SIDE_THREAD_INSTRUCTIONS = "This is a side thread: the user forked your chat at one of your replies to talk about it. Stay on that reply's topic. Your main chat doesn't see this thread, so it won't know what you decide here. Here you can read about yourself but not change yourself: your name, look and profile, your skills, your Memory page, your runners and schedules, or pausing and stopping stay with your main chat. When the user asks for one of those, say it's done from your main chat, and don't attempt it another way. Your earlier replies end with ::bot-thread{}; that's for your main chat only, so don't write it here.";
 
 export const SIDE_THREADS_TABLE = `CREATE TABLE bot_side_threads (
        thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, source_thread_id TEXT NOT NULL, message_id TEXT NOT NULL,
@@ -173,6 +176,8 @@ export class SideThreads {
     const fork = await this.deps.sdk.threads.fork({
       sourceThreadId, sourceSeqEnd: reply.sourceSeqEnd, title: `${bot.name} · ${snippet(reply.text)}`,
       visibility: "hidden", pluginMetadata: { botSideThread: bot.id },
+      // A fork keeps its source's session instructions, so it's told here.
+      agentContextSeed: [{ type: "text", text: SIDE_THREAD_INSTRUCTIONS, mentions: [], visibility: "agent-only" }],
     } as never);
     this.deps.db.prepare("INSERT INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at) VALUES (?, ?, ?, ?, ?)")
       .run(fork.id, bot.id, sourceThreadId, messageId, Date.now());

@@ -44,6 +44,8 @@ it("forks the Bot's chat at the reply, hidden, and reopens the same fork", async
   expect(b).toEqual(a);
   expect(fork).toHaveBeenCalledTimes(1);
   expect(fork.mock.calls[0]![0]).toMatchObject({ sourceThreadId: "bot1", sourceSeqEnd: 10, visibility: "hidden", title: "Juno · Older reply", pluginMetadata: { botSideThread: "bot" } });
+  // The fork keeps its source's instructions: it's told it's a side thread in an agent-only seed.
+  expect(fork.mock.calls[0]![0]).toMatchObject({ agentContextSeed: [{ type: "text", visibility: "agent-only", text: expect.stringContaining("This is a side thread") }] });
   expect(await side.open("bot1", "r1")).toEqual({ threadId: "fork1", created: false });
   expect(side.forThread("fork1")).toEqual({ botId: "bot", sourceThreadId: "bot1", messageId: "r1" });
 });
