@@ -467,7 +467,7 @@ export default async function plugin(bb: BbPluginApi) {
     db, sdk: bb.sdk, changed: tagsChanged,
     botFor: (threadId) => bots.list().find((bot) => bots.chain(bot.id).includes(threadId)) ?? null,
   });
-  bb.events.on("thread.idle", ({ thread }) => sideThreads.idle(thread.id));
+  bb.events.on("thread.idle", ({ thread }) => void sideThreads.idle(thread.id).catch((error) => bb.log.warn(`Side thread replies: ${errorText(error)}`)));
   bb.events.on("thread.active", ({ thread }) => sideThreads.touched(thread.id));
   bb.events.on("thread.deleted", ({ thread }) => sideThreads.forget(thread.id));
   const learning: SkillLearning = new SkillLearning({
@@ -709,7 +709,7 @@ export default async function plugin(bb: BbPluginApi) {
       models: async (providerId) => (await bb.sdk.providers.models({ providerId })).models,
     }),
     bot_chain: async ({ botId }) => { const threads = await bots.chainThreads(botId); return { threadIds: threads.map((thread) => thread.id), threads }; },
-    bot_side_threads: async ({ threadId }) => ({ threads: await sideThreads.list(threadId) }),
+    bot_side_threads: async ({ threadId }) => ({ chat: sideThreads.isChat(threadId), threads: await sideThreads.list(threadId) }),
     bot_side_thread_open: ({ threadId, messageId }) => sideThreads.open(threadId, messageId),
     bot_thread_owner: ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? null }),
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),

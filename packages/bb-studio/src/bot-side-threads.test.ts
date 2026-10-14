@@ -13,12 +13,16 @@ const PAGES = [
 
 function setup() {
   const threads = new Map<string, { id: string; status: string; archivedAt: number | null }>();
-  const fork = vi.fn(async (args: { sourceThreadId: string; sourceSeqEnd: number }) => {
+  const fork = vi.fn(async (_args: { sourceThreadId: string; sourceSeqEnd: number }) => {
     const thread = { id: `fork${threads.size + 1}`, status: "idle", archivedAt: null };
     threads.set(thread.id, thread);
     return thread;
   });
-  const timeline = vi.fn(async (args: { beforeAnchorId?: string }) => args.beforeAnchorId ? PAGES[1] : PAGES[0]);
+  // A fork's timeline holds only its own messages.
+  const forkRows = new Map<string, { id: string; role: string; text: string; turnId: string }[]>();
+  const timeline = vi.fn(async (args: { threadId: string; beforeAnchorId?: string }) => forkRows.has(args.threadId)
+    ? { rows: forkRows.get(args.threadId), timelinePage: { hasOlderRows: false } }
+    : args.beforeAnchorId ? PAGES[1] : PAGES[0]);
   const get = vi.fn(async ({ threadId }: { threadId: string }) => {
     const thread = threads.get(threadId);
     if (!thread) throw Object.assign(new Error("Not found"), { status: 404 });
@@ -30,7 +34,7 @@ function setup() {
   bb.storage.migrate(db, [SIDE_THREADS_TABLE]);
   const changed = vi.fn();
   const side = new SideThreads({ db, sdk: bb.sdk, changed, botFor: (threadId) => threadId === "bot1" ? { id: "bot", name: "Juno" } : null });
-  return { side, fork, timeline, threads, changed };
+  return { side, fork, timeline, threads, changed, forkRows };
 }
 
 it("forks the Bot's chat at the reply, hidden, and reopens the same fork", async () => {
@@ -50,13 +54,24 @@ it("refuses threads that aren't a Bot's chat, and replies it can't find", async 
   await expect(side.open("bot1", "missing")).rejects.toThrow("Couldn't find that reply");
 });
 
-it("counts replies and lists side threads by reply, forgetting deleted ones", async () => {
-  const { side, threads, changed } = setup();
+it("counts replies from the fork's timeline and lists side threads by reply, forgetting deleted ones", async () => {
+  const { side, threads, changed, forkRows } = setup();
   await side.open("bot1", "r3");
-  side.idle("fork1");
-  side.idle("fork1");
-  side.idle("unrelated");
-  expect(changed).toHaveBeenCalledTimes(3);
+  // The idle BB reports while the fork is set up counts nothing.
+  forkRows.set("fork1", []);
+  await side.idle("fork1");
+  forkRows.set("fork1", [
+    { id: "u1", role: "user", text: "Why Friday?", turnId: "t1" },
+    { id: "a1", role: "assistant", text: "Checking.", turnId: "t1" },
+    { id: "a2", role: "assistant", text: "Because QA.", turnId: "t1" },
+    { id: "a3", role: "assistant", text: "Done.", turnId: "t2" },
+  ]);
+  await side.idle("fork1");
+  await side.idle("fork1");
+  await side.idle("unrelated");
+  expect(changed).toHaveBeenCalledTimes(2);
+  expect(side.isChat("bot1")).toBe(true);
+  expect(side.isChat("fork1")).toBe(false);
   threads.get("fork1")!.status = "active";
   expect(await side.list("bot1")).toEqual([{ messageId: "r3", threadId: "fork1", replies: 2, lastReplyAt: expect.any(Number), working: true }]);
   threads.delete("fork1");

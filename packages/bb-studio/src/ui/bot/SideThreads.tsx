@@ -11,7 +11,7 @@ import { useCall, useLive } from "../live";
 /** The thread panel action that shows a side thread (app.tsx). */
 export const SIDE_THREAD_ACTION = "bot-side-thread";
 
-type SideThreads = { threads: SideThreadView[] };
+type SideThreads = { chat: boolean; threads: SideThreadView[] };
 
 /** "Reply in thread", "Working…", "1 reply · 5m ago", "3 replies". */
 export function sideThreadLabel(thread: SideThreadView | undefined, now = Date.now()): string {
@@ -33,6 +33,10 @@ export function BotThreadDirective({ message }: PluginMessageDirectiveProps) {
   const thread = data?.threads.find((each) => each.messageId === message.id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Nothing until loaded, and nothing outside a Bot's chat: a side thread's
+  // own replies carry the directive too (src/bot-side-threads.ts).
+  if (!data?.chat) return null;
 
   const open = async () => {
     setBusy(true);

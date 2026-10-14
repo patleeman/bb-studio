@@ -6830,6 +6830,9 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "chat": {
+            "type": "boolean"
+          },
           "threads": {
             "type": "array",
             "items": {
@@ -6866,6 +6869,7 @@
           }
         },
         "required": [
+          "chat",
           "threads"
         ],
         "additionalProperties": false

@@ -6369,9 +6369,11 @@ public enum Studio {
   }
 
   public struct BotSideThreadsOutput: Sendable, Hashable, Codable {
+    public var chat: Bool?
     public var threads: [BotSideThreadsOutputThreadsItem]?
 
-    public init(threads: [BotSideThreadsOutputThreadsItem]? = nil) {
+    public init(chat: Bool? = nil, threads: [BotSideThreadsOutputThreadsItem]? = nil) {
+      self.chat = chat
       self.threads = threads
     }
   }

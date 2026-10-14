@@ -15,7 +15,13 @@
 // the Bot. It runs as the Bot, with the Bot's instructions and tools, but
 // without the directive: a side thread has no side threads.
 //
-// Replies counts the side thread's finished turns (thread.idle).
+// Replies counts the side thread's turns that ended in a reply, recounted
+// from its timeline when it goes idle: BB also reports an idle while a fork
+// is set up, and the fork's own timeline holds only its new messages.
+//
+// The fork inherits the Bot's session, marker instruction included, so its
+// replies may carry `::bot-thread{}` too. bot_side_threads says whether a
+// thread is a Bot's chat, and the directive draws nothing where it isn't.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 
@@ -47,7 +53,7 @@ export interface SideThreadView {
   working: boolean;
 }
 
-interface TimelineRow { id: string; kind?: string; role?: string; text?: string; sourceSeqEnd?: number }
+interface TimelineRow { id: string; kind?: string; role?: string; text?: string; sourceSeqEnd?: number; turnId?: string | null }
 interface TimelinePage { rows?: TimelineRow[]; timelinePage?: { hasOlderRows?: boolean; olderCursor?: { anchorSeq: number; anchorId: string } | null } }
 
 export interface SideThreadDeps {
@@ -92,10 +98,26 @@ export class SideThreads {
     return opened;
   }
 
-  /** A side thread finished a turn: one more reply. */
-  idle(threadId: string): void {
-    const result = this.deps.db.prepare("UPDATE bot_side_threads SET replies = replies + 1, last_reply_at = ? WHERE thread_id = ?").run(Date.now(), threadId);
-    if (result.changes) this.deps.changed();
+  /** Whether a thread is a Bot's chat, where replies can have side threads. */
+  isChat(threadId: string): boolean {
+    return this.deps.botFor(threadId) !== null;
+  }
+
+  /** A side thread went idle: recount its replies from its timeline. */
+  async idle(threadId: string): Promise<void> {
+    const row = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE thread_id = ?").get(threadId) as SideRow | undefined;
+    if (!row) return;
+    const turns = new Set<string>();
+    let cursor: { anchorSeq: number; anchorId: string } | null | undefined;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const result = await this.page(threadId, cursor);
+      for (const each of result.rows ?? []) if (each.role === "assistant" && each.text?.trim()) turns.add(each.turnId ?? each.id);
+      cursor = result.timelinePage?.olderCursor;
+      if (!result.timelinePage?.hasOlderRows || !cursor) break;
+    }
+    if (turns.size === row.replies) return;
+    this.deps.db.prepare("UPDATE bot_side_threads SET replies = ?, last_reply_at = ? WHERE thread_id = ?").run(turns.size, Date.now(), threadId);
+    this.deps.changed();
   }
 
   /** A side thread started or stopped working. */
@@ -133,15 +155,20 @@ export class SideThreads {
   private async findRow(threadId: string, rowId: string): Promise<TimelineRow | null> {
     let cursor: { anchorSeq: number; anchorId: string } | null | undefined;
     for (let page = 0; page < MAX_PAGES; page++) {
-      const result = await this.deps.sdk.threads.timeline({
-        threadId, segmentLimit: "20", ...(cursor ? { beforeAnchorSeq: String(cursor.anchorSeq), beforeAnchorId: cursor.anchorId } : {}),
-      } as never) as unknown as TimelinePage;
+      const result = await this.page(threadId, cursor);
       const row = result.rows?.find((each) => each.id === rowId);
       if (row) return row;
       cursor = result.timelinePage?.olderCursor;
       if (!result.timelinePage?.hasOlderRows || !cursor) return null;
     }
     return null;
+  }
+
+  /** One page of a thread's timeline, before the cursor when there is one. */
+  private async page(threadId: string, cursor: { anchorSeq: number; anchorId: string } | null | undefined): Promise<TimelinePage> {
+    return await this.deps.sdk.threads.timeline({
+      threadId, segmentLimit: "20", ...(cursor ? { beforeAnchorSeq: String(cursor.anchorSeq), beforeAnchorId: cursor.anchorId } : {}),
+    } as never) as unknown as TimelinePage;
   }
 }
 
