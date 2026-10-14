@@ -109,6 +109,26 @@ server through `-qaBotDemo onboarding` (`iOS/Bot/BotDemo.swift`;
 | --- | --- |
 | ![Meet your Bot: a blue blob avatar, one question, four ideas and Create Bot, light](docs/bot/onboarding.png) | ![The same welcome in dark mode](docs/bot/onboarding-dark.png) |
 
+## Bot chat: opening and sending
+
+The Bot chat opens on what the phone last saw: the Bots list and the bot
+(`BotSnapshot` in `iOS/Bot/BotTab.swift`) and the thread's last 50 messages
+(`TimelineCache`, one JSON file per thread, written after each load and
+update). With nothing cached it shows grey bubbles (`ChatSkeleton`), not a
+blank screen. The server's page goes in over the cached rows by id
+(`TimelineMerge`), so nothing redraws or jumps when they match. A sent
+message shows at once, faded, until the server's row for it replaces it
+(`PendingSend`). "Scroll to the bottom" goes to a marker view at the end of
+the chat rather than the lazy stack's edge, which could leave the chat blank
+after a send with the keyboard up.
+
+Signposts time the open (Points of Interest, `BotChatOpen`; `ChatPerf`).
+Debug builds print `[perf]` lines to stderr. To measure, launch with
+`simctl launch --console` and `-qaBotDemo chat -qaDemoLatency 600`: a local
+fake server serves a 300-message chat (`-qaDemoMessages`) through
+`BBClient.transport`. `-qaDemoColdCache` drops the caches first, and
+`-qaDemoSend <text>` types a message and sends it.
+
 ## Expand to page
 
 When a message grows into meeting notes, the note button beside the mic in a

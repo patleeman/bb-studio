@@ -297,7 +297,8 @@ struct ThreadView: View {
             if model.loaded {
                 timeline.id(timelineKey)
             } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Nothing cached yet: the shape of a chat, not a blank screen.
+                ChatSkeleton(bot: botChrome != nil)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -310,10 +311,10 @@ struct ThreadView: View {
             }
         }
         .animation(.snappy, value: finding)
-        // The cached rows go in at the bottom first; the server's page then
-        // swaps them, usually for fewer, and the lazy stack is left past its
-        // new end, blank until something redraws it. Start again at the bottom
-        // unless the reader has scrolled up into the cached rows.
+        // The server's page goes in over the cached rows by id, so the chat
+        // stays put. Only when it doesn't join up with them (more came in
+        // since than one page holds) does it replace them: start again at the
+        // bottom then, unless the reader has scrolled up into the cached rows.
         .onChange(of: model.replacedCache) { _, _ in
             if atBottom || pastEnd > Self.pastEndSlack { timelineKey += 1 }
         }
@@ -446,7 +447,7 @@ struct ThreadView: View {
                         react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
                         edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread, cached: model.showsCache)
                 }
-                let items = botChrome != nil ? [] : TimelineItem.group(model.rows)
+                let items = botChrome != nil ? [] : TimelineItem.group(model.shownRows)
                 let unread = unreadItem(in: items)
                 let editable = lastUserRowId
                 let sideChat = runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
@@ -497,6 +498,11 @@ struct ThreadView: View {
                         WorkingIndicator(thinking: model.shelf.thinking)
                     }
                 }
+                // Where "scroll to the bottom" goes. A lazy stack scrolled to its
+                // bottom edge while rows go in and the composer or keyboard moves
+                // can land where it draws nothing: after a send, a blank chat
+                // until the reply. Scrolling to a view lays that view out.
+                Color.clear.frame(height: 1).id(Self.bottomId)
             }
             .padding(.horizontal, botChrome != nil ? 12 : 16)
             .padding(.vertical, 8)
@@ -512,7 +518,7 @@ struct ThreadView: View {
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
         .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y + geometry.containerSize.height >= geometry.contentSize.height - 120
+            geometry.unobscuredBottom >= geometry.contentSize.height - 120
         } action: { _, isAtBottom in
             atBottom = isAtBottom
         }
@@ -522,8 +528,9 @@ struct ThreadView: View {
         // the timeline is left past its end, showing nothing. Bring it back
         // once nothing is scrolling, so a bounce at the bottom isn't fought.
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            let end = max(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.containerSize.height, -geometry.contentInsets.top)
-            return geometry.contentOffset.y - end
+            // Content shorter than the screen sits at the top: nothing is past its end.
+            let end = max(geometry.contentSize.height, geometry.visibleRect.minY + geometry.contentInsets.top + geometry.containerSize.height)
+            return geometry.unobscuredBottom - end
         } action: { _, distance in
             pastEnd = distance
             if scrollPhase == .idle { settlePastEnd() }
@@ -534,8 +541,12 @@ struct ThreadView: View {
         }
         // The first page lands at the bottom through `defaultScrollAnchor`;
         // scrolling by hand while lazy rows are still measuring can overshoot.
-        .onChange(of: model.rows.last?.id) { old, _ in
-            if old != nil, atBottom || model.rows.last?.isUser == true { scrollToBottom() }
+        .onChange(of: model.shownRows.last?.id) { old, _ in
+            if old != nil, atBottom || model.shownRows.last?.isUser == true { scrollToBottom() }
+        }
+        // The Bot's typing row goes in under the message just sent.
+        .onChange(of: showsWorking) { _, shows in
+            if shows, atBottom { scrollToBottom() }
         }
         // Older pages load when the reader reaches the top.
         .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -616,7 +627,7 @@ struct ThreadView: View {
     /// The page goes in above the reader, so bring back what was the first
     /// item. By id rather than offset: rows above are only estimated heights.
     private func loadOlder() async -> OlderPage {
-        let first = botChrome.map { BotChatEntry.build(model.chainRows, started: $0.started).first?.id } ?? TimelineItem.group(model.rows).first?.id
+        let first = botChrome.map { BotChatEntry.memo.entries(model.chainRows, started: $0.started).first?.id } ?? TimelineItem.group(model.rows).first?.id
         guard let first else { return .nothing }
         let result = await model.loadOlder()
         if result == .added { position.scrollTo(id: first, anchor: .top) }
@@ -625,6 +636,7 @@ struct ThreadView: View {
 
     /// Past this, the timeline is past its last row rather than bouncing.
     private static let pastEndSlack: CGFloat = 40
+    private static let bottomId = "timeline-bottom"
 
     private func settlePastEnd() {
         if pastEnd > Self.pastEndSlack { scrollToBottom(animated: false) }
@@ -632,9 +644,9 @@ struct ThreadView: View {
 
     private func scrollToBottom(animated: Bool = true) {
         if animated {
-            withAnimation(.snappy) { position.scrollTo(edge: .bottom) }
+            withAnimation(.snappy) { position.scrollTo(id: Self.bottomId, anchor: .bottom) }
         } else {
-            position.scrollTo(edge: .bottom)
+            position.scrollTo(id: Self.bottomId, anchor: .bottom)
         }
     }
 
@@ -845,7 +857,7 @@ struct ThreadView: View {
                 BotNeedsYouCard(interactions: model.interactions,
                                 resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) },
                                 openWeb: { showingWeb = true })
-                let replies = BotQuickReplies.items(in: model.rows)
+                let replies = BotQuickReplies.items(in: model.shownRows)
                 if model.interactions.isEmpty, model.thread?.isRunning != true, !replies.isEmpty, draft.isEmpty {
                     BotQuickReplies(items: replies, tint: BotPalette.color(botChrome.bot.color)) { send(text: $0) }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -1105,4 +1117,43 @@ struct PendingBubble: View {
 private struct OpenFile: Identifiable {
     let path: String
     var id: String { path }
+}
+
+extension ScrollGeometry {
+    /// The bottom of what the reader sees, in content coordinates: above the
+    /// composer and keyboard (the bottom inset). `containerSize` leaves the
+    /// insets out, so `contentOffset + containerSize` fell short of it by the
+    /// insets' height, and a chat scrolled past its end never came back.
+    var unobscuredBottom: CGFloat { visibleRect.maxY - contentInsets.bottom }
+}
+
+/// Grey bubbles where a chat's messages will be, until the first rows arrive.
+struct ChatSkeleton: View {
+    var bot = false
+    private static let bubbles: [(mine: Bool, width: CGFloat, height: CGFloat)] = [
+        (false, 0.7, 64), (true, 0.45, 40), (false, 0.8, 96), (false, 0.55, 40), (true, 0.6, 40), (false, 0.75, 80),
+    ]
+
+    var body: some View {
+        GeometryReader { proxy in
+            VStack(alignment: .leading, spacing: 14) {
+                Spacer(minLength: 0)
+                ForEach(Self.bubbles.indices, id: \.self) { index in
+                    let bubble = Self.bubbles[index]
+                    HStack(alignment: .top, spacing: 8) {
+                        if !bubble.mine, bot { Circle().fill(.quaternary).frame(width: 28, height: 28) }
+                        if bubble.mine { Spacer(minLength: 0) }
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(bubble.mine ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.quaternary))
+                            .frame(width: (proxy.size.width - 24) * bubble.width, height: bubble.height)
+                        if !bubble.mine { Spacer(minLength: 0) }
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading messages")
+    }
 }

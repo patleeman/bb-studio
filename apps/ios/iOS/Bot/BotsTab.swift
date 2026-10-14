@@ -16,10 +16,21 @@ struct BotsTab: View {
     @State private var attempt = 0
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let attempt: Int }
 
+    init() {
+        // The list as last seen: with one bot, its chat opens straight away
+        // instead of after `bot_list` answers.
+        let server = ServerScope.selectedURL
+        if let cached = BotSnapshot.bots(serverURL: server) {
+            _bots = State(initialValue: cached)
+            _decided = State(initialValue: server)
+            _open = State(initialValue: cached.count <= 1 ? .primary : nil)
+        }
+    }
+
     var body: some View {
         Group {
             if let open {
-                BotTab(botId: botId(open), back: { withAnimation(.snappy) { self.open = nil } })
+                BotTab(botId: botId(open), known: known(open), back: { withAnimation(.snappy) { self.open = nil } })
                     .id("\(model.serverURL.absoluteString)|\(botId(open) ?? "primary")")
                     .transition(.move(edge: .trailing))
             } else {
@@ -42,6 +53,11 @@ struct BotsTab: View {
         return bots?.first { $0.id == id }?.primary == true ? nil : id
     }
 
+    private func known(_ route: BotRoute) -> BotInfo? {
+        guard case .bot(let id) = route else { return bots?.first(where: \.primary) }
+        return bots?.first { $0.id == id }
+    }
+
     private var list: some View {
         NavigationStack {
             List {
@@ -59,7 +75,8 @@ struct BotsTab: View {
                         Label("Bots unavailable", systemImage: "exclamationmark.triangle")
                     } description: { Text(error) } actions: { Button("Retry") { attempt += 1 } }
                 } else if bots == nil {
-                    ProgressView()
+                    // Most people have one bot: the shape of its chat, not a spinner.
+                    ChatSkeleton(bot: true)
                 } else if bots?.isEmpty == true {
                     // Only from a bbstudio://bots link: the tab itself opens the welcome.
                     ContentUnavailableView {
@@ -104,11 +121,9 @@ struct BotsTab: View {
     private func load() async {
         #if DEBUG
         if let demo = BotDemo.bots {
-            if let served = BotDemo.served {
-                if served.coldCache, bots == nil { BotDemo.dropCaches(serverURL: model.serverURL) }
-                await BotDemo.latency()
-            }
+            await BotDemo.latency()
             bots = demo
+            BotSnapshot.save(bots: demo, serverURL: model.serverURL)
             summaries = BotDemo.summaries
             if decided == nil { decided = model.serverURL; open = demo.count > 1 ? nil : .primary }
             return
@@ -124,7 +139,8 @@ struct BotsTab: View {
         do {
             let next = try await client.bots()
             guard client.baseURL == model.serverURL else { return }
-            bots = next
+            if next != bots { bots = next }
+            BotSnapshot.save(bots: next, serverURL: client.baseURL)
             error = nil
             if decided == nil {
                 decided = client.baseURL

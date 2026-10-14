@@ -334,8 +334,8 @@ public enum BotSetup {
 }
 
 /// The Bot: who it is, its state, and its thread and check-ins.
-public struct BotInfo: Hashable, Sendable {
-    public enum State: String, Sendable { case active, paused, stopped }
+public struct BotInfo: Hashable, Sendable, Codable {
+    public enum State: String, Sendable, Codable { case active, paused, stopped }
     public enum Action: Sendable { case pause, resume, stop }
     public static let defaultName = "Bot"
     public static let defaultAvatar = "🤖"
@@ -555,7 +555,7 @@ public struct BotActivity: Decodable, Hashable, Sendable {
 }
 
 /// A lead thread (the Bot's) and its heartbeat.
-public struct ThreadLead: Hashable, Sendable {
+public struct ThreadLead: Hashable, Sendable, Codable {
     public var threadId: String?
     /// The heartbeat's cadence (`hourly`, `every15minutes`…), nil when it's off.
     public var heartbeat: String?

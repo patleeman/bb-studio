@@ -71,10 +71,14 @@ enum BotDemo {
                       coldCache: arguments.contains("-qaDemoColdCache"), send: value("-qaDemoSend"))
     }()
 
-    /// Drops the cached chat, for timing a first open.
-    static func dropCaches(serverURL: URL) {
-        DiskCache.remove("thread-\(threadId)", serverURL: serverURL)
+    /// With `-qaDemoColdCache`, drops the cached chat, bot and Bots list
+    /// once per launch, before anything reads them, for timing a first open.
+    @MainActor static func dropCachesIfAsked(serverURL: URL) {
+        guard served?.coldCache == true, !droppedCaches else { return }
+        droppedCaches = true
+        for key in ["thread-\(threadId)", "bot-primary", "bots"] { DiskCache.remove(key, serverURL: serverURL) }
     }
+    @MainActor private static var droppedCaches = false
 
     /// Waits as long as a request to the server would.
     static func latency() async {

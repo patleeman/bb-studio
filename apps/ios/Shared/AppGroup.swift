@@ -48,6 +48,8 @@ public enum ServerScope {
 /// Last-known API responses. Callers must bind writes to the request's origin.
 public enum DiskCache {
     private static var directory: URL { AppGroup.containerURL.appending(path: "Cache", directoryHint: .isDirectory) }
+    /// Where `key`'s file lives, for tests.
+    public static func fileURL(_ key: String, serverURL: URL) -> URL { url(key, serverURL: serverURL) }
     private static func url(_ key: String, serverURL: URL?) -> URL {
         let folder = serverURL.map { directory.appending(path: ServerScope.namespace($0), directoryHint: .isDirectory) } ?? directory
         return folder.appending(path: key.replacingOccurrences(of: "/", with: "_") + ".json")

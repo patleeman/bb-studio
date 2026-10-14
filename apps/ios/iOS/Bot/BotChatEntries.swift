@@ -93,6 +93,25 @@ enum BotChatEntry: Identifiable, Equatable {
         }
     }
 
+    /// The last layout, kept: the chat redraws on every keystroke in the
+    /// composer, and its rows rarely changed meanwhile.
+    @MainActor static let memo = Memo()
+
+    @MainActor final class Memo {
+        private var rows: [TimelineRow] = []
+        private var started: [BotStartedThread] = []
+        private var entries: [BotChatEntry] = []
+
+        func entries(_ rows: [TimelineRow], started: [BotStartedThread]) -> [BotChatEntry] {
+            // Same arrays (usually the very same storage): nothing to do.
+            if rows == self.rows, started == self.started { return entries }
+            self.rows = rows
+            self.started = started
+            entries = BotChatEntry.build(rows, started: started)
+            return entries
+        }
+    }
+
     /// Lays out the timeline as the Bot's chat. Work between two of the Bot's
     /// messages doesn't start a new run, so the avatar shows once per reply.
     /// `started` threads go in where they were made; ones older than the

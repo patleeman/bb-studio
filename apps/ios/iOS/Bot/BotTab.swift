@@ -26,6 +26,20 @@ struct BotTab: View {
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
     private struct PollKey: Hashable { let interval: Duration?; let server: URL; let botId: String? }
 
+    /// `known` is the bot as the Bots list has it.
+    init(botId: String? = nil, known: BotInfo? = nil, back: (() -> Void)? = nil) {
+        self.botId = botId
+        self.back = back
+        // The bot as last seen on this server, or as the list has it, so its
+        // chat opens at once rather than after `bot_get` answers.
+        if let saved = BotSnapshot.load(botId: botId, serverURL: ServerScope.selectedURL) {
+            _lead = State(initialValue: .bot(saved.bot))
+            _chain = State(initialValue: saved.chain)
+        } else if let known, known.lead.threadId != nil {
+            _lead = State(initialValue: .bot(known))
+        }
+    }
+
     private var bot: BotInfo? { if case .bot(let bot) = lead { bot } else { nil } }
     private var needsYou: Int { activity?.needsYou.count ?? 0 }
 
@@ -128,7 +142,7 @@ struct BotTab: View {
                 Button("Retry") { attempt += 1 }
             }
         case .loading:
-            ProgressView()
+            ChatSkeleton(bot: true)
         }
     }
 
@@ -223,9 +237,10 @@ struct BotTab: View {
         #if DEBUG
         if let demo = BotDemo.current {
             await BotDemo.latency()
-            lead = BotLead(demo.bot)
+            if BotLead(demo.bot) != lead { lead = BotLead(demo.bot) }
             activity = demo.bot == nil ? nil : demo.activity
             chain = demo.chain
+            remember(model.serverURL)
             startedThreads = demo.startedThreads
             if sheet == nil, attempt == 0, let shown = BotDemo.sheet.flatMap(BotSheet.init(rawValue:)) {
                 try? await Task.sleep(for: .milliseconds(800))
@@ -242,7 +257,9 @@ struct BotTab: View {
             startedThreads = [:]
         }
         do {
-            lead = BotLead(try await client.bot(botId))
+            // The same bot as the cached one redraws nothing.
+            let next = BotLead(try await client.bot(botId))
+            if next != lead { lead = next }
         } catch where BBClient.isCancellation(error) {
             return
         } catch {
@@ -257,10 +274,20 @@ struct BotTab: View {
                 lead = .unavailable(BBClient.describe(error, server: client.baseURL))
             }
         }
-        if bot?.lead.threadId != nil, let ids = try? await client.botChain(botId: botId) { chain = ids }
+        if bot?.lead.threadId != nil, let ids = try? await client.botChain(botId: botId), ids != chain { chain = ids }
+        if client.baseURL == model.serverURL { remember(client.baseURL) }
         // An Action button press with nothing to talk to must not start recording later.
         if botId == nil, bot?.lead.threadId == nil { model.botTalkPending = false }
         await loadActivity()
+    }
+
+    /// Keeps the bot and its chain for the next open; forgets a bot that's gone.
+    private func remember(_ serverURL: URL) {
+        switch lead {
+        case .bot(let bot): BotSnapshot.save(.init(bot: bot, chain: chain), botId: botId, serverURL: serverURL)
+        case .none: BotSnapshot.remove(botId: botId, serverURL: serverURL)
+        case .loading, .unavailable: break
+        }
     }
 
     private func loadActivity() async {
@@ -314,6 +341,46 @@ struct BotTab: View {
                 self.error = BBClient.describe(error, server: model.client.baseURL)
             }
         }
+    }
+}
+
+/// A bot and its chain as last seen, per server, so the Bot tab draws its chat
+/// before `bot_get` and `bot_chain` answer.
+@MainActor
+enum BotSnapshot {
+    struct Saved: Codable, Equatable {
+        var bot: BotInfo
+        var chain: [String]
+    }
+
+    static func key(_ botId: String?) -> String { "bot-\(botId ?? "primary")" }
+
+    static func load(botId: String?, serverURL: URL) -> Saved? {
+        #if DEBUG
+        BotDemo.dropCachesIfAsked(serverURL: serverURL)
+        #endif
+        return DiskCache.load(Saved.self, key: key(botId), serverURL: serverURL)
+    }
+
+    static func save(_ saved: Saved, botId: String?, serverURL: URL) {
+        guard DiskCache.load(Saved.self, key: key(botId), serverURL: serverURL) != saved else { return }
+        DiskCache.save(saved, as: key(botId), serverURL: serverURL)
+    }
+
+    static func remove(botId: String?, serverURL: URL) {
+        DiskCache.remove(key(botId), serverURL: serverURL)
+    }
+
+    /// The Bots list, for deciding at once between it and the one bot's chat.
+    static func bots(serverURL: URL) -> [BotInfo]? {
+        #if DEBUG
+        BotDemo.dropCachesIfAsked(serverURL: serverURL)
+        #endif
+        return DiskCache.load([BotInfo].self, key: "bots", serverURL: serverURL)
+    }
+
+    static func save(bots: [BotInfo], serverURL: URL) {
+        DiskCache.save(bots, as: "bots", serverURL: serverURL)
     }
 }
 

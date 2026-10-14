@@ -24,7 +24,7 @@ struct BotChatTimeline: View {
     var cached = false
 
     var body: some View {
-        let entries = BotChatEntry.build(rows, started: started)
+        let entries = BotChatEntry.memo.entries(rows, started: started)
         let live = Dictionary(started.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
         ForEach(entries) { entry in
             switch entry {
@@ -87,6 +87,8 @@ struct BotMessageRow: View {
         }
         // A run reads as one: bubbles 4pt apart, runs 20pt (the stack's 14 plus 6).
         .padding(.top, first ? 6 : -10)
+        // On its way to the server.
+        .opacity(row.id.hasPrefix("pending:") ? 0.6 : 1)
     }
 
     private var user: some View {

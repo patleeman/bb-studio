@@ -81,6 +81,29 @@ struct MarkdownText: View {
     /// thread in the app, and workspace files, as links or as paths in inline
     /// code, open in the thread's file viewer.
     static func inline(_ text: String) -> AttributedString {
+        // Parsing is the costly part of drawing a message, and a chat redraws
+        // its rows often. Text with thread mentions is parsed each time: its
+        // titles can arrive later, and reading them keeps it observing them.
+        if text.contains("@thread:") { return parseInline(text) }
+        let key = text as NSString
+        if let cached = inlineCache.object(forKey: key) { return cached.value }
+        let parsed = parseInline(text)
+        inlineCache.setObject(InlineBox(parsed), forKey: key)
+        return parsed
+    }
+
+    private final class InlineBox {
+        let value: AttributedString
+        init(_ value: AttributedString) { self.value = value }
+    }
+
+    nonisolated(unsafe) private static let inlineCache: NSCache<NSString, InlineBox> = {
+        let cache = NSCache<NSString, InlineBox>()
+        cache.countLimit = 2_000
+        return cache
+    }()
+
+    private static func parseInline(_ text: String) -> AttributedString {
         let linked = text.replacing(MarkdownRegex.threadMention) { match in
             let id = String(match.1)
             let title = ThreadTitles.titles[id].map { $0.replacingOccurrences(of: "]", with: "") } ?? id

@@ -5,14 +5,27 @@ final class ThreadModel: ObservableObject {
     let serverURL = ServerScope.selectedURL
     let threadId: String
     @Published var thread: ThreadEntry?
-    @Published var rows: [TimelineRow] = []
+    @Published var rows: [TimelineRow] = [] {
+        didSet {
+            chainMemo = nil
+            if !pendingSends.isEmpty { confirmPending() }
+        }
+    }
+    /// Messages sent from here that the server hasn't shown yet, drawn after the rows.
+    @Published private(set) var pendingSends: [PendingSend] = [] {
+        didSet { chainMemo = nil }
+    }
+    /// Rows that stood for a pending send already.
+    private var claimedRows = Set<String>()
     /// False until the first page arrives from the cache or the server.
     @Published var loaded = false
     /// The rows on screen are the cached ones, until the server's arrive.
     @Published private(set) var showsCache = false
     /// Bumped when the server's first page replaces rows drawn from the cache.
     @Published private(set) var replacedCache = 0
-    @Published var hasOlder = false
+    @Published var hasOlder = false {
+        didSet { if hasOlder != oldValue { chainMemo = nil } }
+    }
     /// Loading every earlier page, for find in thread.
     @Published var loadingAll = false
     @Published var error: String?
@@ -82,10 +95,12 @@ final class ThreadModel: ObservableObject {
     /// the Bot tab; once this thread's start is in, its earlier threads load
     /// above it as the reader scrolls up.
     @Published var chainBefore: [String] = [] {
-        didSet { if chainBefore != oldValue { earlierPages = []; earlierCursor = nil } }
+        didSet { if chainBefore != oldValue { earlierPages = []; earlierCursor = nil; chainMemo = nil } }
     }
     /// Earlier threads' loaded rows, oldest first; the first may be partly loaded.
-    @Published private(set) var earlierPages: [BotChain.Page] = []
+    @Published private(set) var earlierPages: [BotChain.Page] = [] {
+        didSet { chainMemo = nil }
+    }
     /// The cursor into `earlierPages.first`'s older rows, nil once its start is in.
     private var earlierCursor: TimelineCursor?
 
@@ -99,10 +114,26 @@ final class ThreadModel: ObservableObject {
     /// More to load above: this thread's older pages, then its earlier threads.
     var canLoadOlder: Bool { hasOlder || hasEarlier }
 
-    /// The whole chain as one conversation, handoff requests left out.
+    /// The whole chain as one conversation, handoff requests left out, and
+    /// messages on their way at the end. Worked out once per change: the view
+    /// asks on every redraw (each keystroke in the composer).
     var chainRows: [TimelineRow] {
-        guard !chainBefore.isEmpty else { return rows }
-        return BotChain.merge(earlierPages + [BotChain.Page(threadId: threadId, rows: rows, continuation: !hasOlder)])
+        if let chainMemo { return chainMemo }
+        let merged = chainBefore.isEmpty ? rows
+            : BotChain.merge(earlierPages + [BotChain.Page(threadId: threadId, rows: rows, continuation: !hasOlder)])
+        let shown = pendingSends.isEmpty ? merged : merged + pendingSends.map(\.row)
+        chainMemo = shown
+        return shown
+    }
+    private var chainMemo: [TimelineRow]?
+
+    /// This thread's rows and the messages on their way.
+    var shownRows: [TimelineRow] { pendingSends.isEmpty ? rows : rows + pendingSends.map(\.row) }
+
+    private func confirmPending() {
+        let left = TimelineMerge.unconfirmed(pendingSends, in: rows, claimed: &claimedRows)
+        if left.count != pendingSends.count { pendingSends = left }
+        if pendingSends.isEmpty { claimedRows = [] }
     }
 
     /// Loads the next page up the chain: the rest of the earliest loaded
@@ -155,6 +186,13 @@ final class ThreadModel: ObservableObject {
     init(threadId: String, client: BBClient? = nil) {
         self.threadId = threadId
         boundClient = client
+        // The cached rows are there for the view's first frame.
+        if let snapshot = TimelineCache.load(threadId, serverURL: serverURL), !snapshot.rows.isEmpty {
+            showsCache = true
+            thread = snapshot.thread
+            rows = snapshot.rows
+            loaded = true
+        }
     }
 
     /// The last timeline fetch in line. Fetches run one at a time, so a slow,
@@ -216,12 +254,6 @@ final class ThreadModel: ObservableObject {
 
     private var client: BBClient? { boundClient }
 
-    private struct Snapshot: Codable {
-        var thread: ThreadEntry?
-        var rows: [TimelineRow]
-    }
-
-    private var lastCached = ContinuousClock.now - .seconds(60)
     private var lastMarkedRead = ContinuousClock.now - .seconds(60)
     /// Rows arrived since the last mark.
     private var readPending = false
@@ -238,12 +270,9 @@ final class ThreadModel: ObservableObject {
         try? await client.markRead(threadId)
     }
 
-    /// A streaming turn grows the rows several times a second: write at most every
-    /// 10 seconds, and once more on the way out.
-    private func cache(force: Bool = true) {
-        guard force || ContinuousClock.now - lastCached > .seconds(10) else { return }
-        lastCached = .now
-        DiskCache.save(Snapshot(thread: thread, rows: Array(rows.suffix(200))), as: "thread-\(threadId)", serverURL: serverURL)
+    /// After each load and update; encoded and written off the main thread.
+    private func cache() {
+        TimelineCache.save(threadId, thread: thread, rows: rows, serverURL: serverURL)
     }
 
     func load() async {
@@ -257,20 +286,19 @@ final class ThreadModel: ObservableObject {
         }
         #endif
         guard let client else { return }
-        var fromCache = false
-        if rows.isEmpty, let snapshot = DiskCache.load(Snapshot.self, key: "thread-\(threadId)", serverURL: serverURL) {
-            fromCache = true
-            showsCache = true
-            thread = snapshot.thread
-            rows = snapshot.rows
-            loaded = true
-        }
         do {
             async let thread = client.thread(threadId)
             let page = try await inTimelineOrder { [self] in
                 let page = try await client.timeline(threadId)
-                rows = page.rows
-                shelf = Shelf(page)
+                // Drawn as soon as the rows are in, while the thread's details may still be on the way.
+                defer { loaded = true }
+                // Over the cached rows by id: the ones above the page stay, and
+                // nothing redraws when nothing changed.
+                let (merged, contiguous) = TimelineMerge.merge(rows, page: page.rows)
+                if merged != rows { rows = merged }
+                if !contiguous { replacedCache += 1 }
+                let next = Shelf(page)
+                if shelf != next { shelf = next }
                 olderCursor = page.timelinePage?.olderCursor
                 hasOlder = page.timelinePage?.hasOlderRows ?? false
                 maxSeq = page.maxSeq
@@ -279,9 +307,8 @@ final class ThreadModel: ObservableObject {
             }
             let fresh = try await thread
             loaded = true
-            showsCache = false
+            if showsCache { showsCache = false }
             ChatPerf.serverRowsLanded(rows: rows.count)
-            if fromCache { replacedCache += 1 }
             unreadFrom = Self.firstUnread(in: page.rows, thread: fresh)
             self.thread = fresh
             error = nil
@@ -347,7 +374,7 @@ final class ThreadModel: ObservableObject {
             error = nil
             if touched("interactions-changed", "queue-changed", "status-changed") { await loadInteractions() }
             if grew, !Task.isCancelled {
-                cache(force: false)
+                cache()
                 await markRead(client)
             }
         } catch where BBClient.isCancellation(error) {
@@ -360,7 +387,8 @@ final class ThreadModel: ObservableObject {
     private func refreshTimeline(_ client: BBClient, rewritten: Bool = false) async throws -> Bool {
         if rewritten { maxSeq = nil }
         let page = try await client.timeline(threadId, after: maxSeq)
-        shelf = Shelf(page)
+        let next = Shelf(page)
+        if shelf != next { shelf = next }
         if let delta = page.delta {
             guard let window = applying(delta) else {
                 // Rows out of step with BB's; start over from a full page.
@@ -468,14 +496,20 @@ final class ThreadModel: ObservableObject {
         do {
             // In timeline order, so a full refresh can't swap the rows under the cursor mid-fetch.
             let page = try await inTimelineOrder { [self] () async throws -> (TimelinePage, Int)? in
-                guard let cursor = olderCursor else { return nil }
-                let page = try await client.timeline(threadId, before: cursor)
+                guard var cursor = olderCursor else { return nil }
                 let known = Set(rows.map(\.id))
-                let added = page.rows.filter { !known.contains($0.id) }
-                rows = added + rows
-                olderCursor = page.timelinePage?.olderCursor
-                hasOlder = page.timelinePage?.hasOlderRows ?? false
-                return (page, added.count)
+                // Rows kept from the cache can sit above the server's first page:
+                // page past them rather than stop on a page with nothing new.
+                for _ in 0..<20 {
+                    let page = try await client.timeline(threadId, before: cursor)
+                    let added = page.rows.filter { !known.contains($0.id) }
+                    olderCursor = page.timelinePage?.olderCursor
+                    hasOlder = page.timelinePage?.hasOlderRows ?? false
+                    if !added.isEmpty { rows = added + rows }
+                    guard added.isEmpty, hasOlder, let next = olderCursor, next != cursor else { return (page, added.count) }
+                    cursor = next
+                }
+                return nil
             }
             guard let (page, added) = page else { return .nothing }
             Task { await ThreadTitles.fetchUnknown(in: page.rows.compactMap(\.text), client: client) }
@@ -507,22 +541,30 @@ final class ThreadModel: ObservableObject {
         guard let client else { return false }
         sending = true
         defer { sending = false }
+        // Shown at once, until the server's row for it comes in.
+        let pending = text.isEmpty ? nil : PendingSend(text: text, rows: rows)
+        if let pending { pendingSends.append(pending) }
+        func drop() { if let pending { pendingSends.removeAll { $0.row.id == pending.row.id } } }
         do {
             if attachments.isEmpty {
-                try await client.send(threadId, text: text, mentions: mentions)
+                // Queued behind a running turn: the shelf shows it, not the chat.
+                if try await client.send(threadId, text: text, mentions: mentions).delivery == "queued" { drop() }
             } else {
                 let projectId: String
                 if let known = thread?.projectId { projectId = known } else { projectId = try await client.thread(threadId).projectId }
                 let inputs = try await PendingAttachment.upload(attachments, projectId: projectId, client: client)
-                try await client.send(threadId, text: text, attachments: inputs, mentions: mentions)
+                if try await client.send(threadId, text: text, attachments: inputs, mentions: mentions).delivery == "queued" { drop() }
             }
             confirmations += 1
             await refreshLatest()
             return true
         } catch where BBClient.neverArrived(error) && attachments.isEmpty {
+            // The outbox shows it from here.
+            drop()
             Outbox.shared.add(threadId: threadId, text: text, mentions: mentions, serverURL: client.baseURL)
             return true
         } catch {
+            drop()
             self.error = BBClient.describe(error, server: client.baseURL)
             return false
         }
