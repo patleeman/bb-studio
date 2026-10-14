@@ -92,3 +92,16 @@ it("titles a side thread with the reply's plain start", () => {
   expect(snippet("::next{reply=\"x\"}")).toBe("Thread");
   expect(snippet("a".repeat(80))).toHaveLength(60);
 });
+
+it("lists a Bot's side threads for its sidebar, latest reply first, with their titles", async () => {
+  const { side, threads } = setup();
+  await side.open("bot1", "r1");
+  await side.open("bot1", "r3");
+  Object.assign(threads.get("fork1")!, { title: "Juno · Older reply" });
+  Object.assign(threads.get("fork2")!, { title: "Juno · Plan", status: "active" });
+  threads.get("fork2")!.archivedAt = null;
+  const listed = await side.forBot("bot");
+  expect(listed.map((each) => [each.threadId, each.title, each.working])).toEqual([["fork2", "Juno · Plan", true], ["fork1", "Juno · Older reply", false]]);
+  expect(listed[0]).toMatchObject({ sourceThreadId: "bot1", messageId: "r3", replies: 0 });
+  expect(await side.forBot("other")).toEqual([]);
+});

@@ -15,7 +15,7 @@ import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import type { BotActivityView, BotScheduledView, BotThreadView, BotView } from "../../contract";
+import type { BotActivityView, BotScheduledView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
@@ -231,6 +231,7 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
   const accent = { "--bot-accent": color } as CSSProperties;
   const toggle = (id: string) => setLayout({ closed: layout.closed.includes(id) ? layout.closed.filter((each) => each !== id) : [...layout.closed, id] });
   const onOpen = (threadId: string) => { openThread(threadId); onNavigate(); };
+  const sideThreads = useLive<{ threads: BotSideThreadListView[] }>("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
   const runners = useRunners(bot.id);
   const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
   const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} />;
@@ -272,7 +273,12 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
           </Group>
         ) : null}
         {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
-        {!groups.needsYou.length && !groups.running.length && !groups.recent.length ? (
+        {sideThreads.data?.threads.length ? (
+          <Group id="threads" title="Threads" closed={layout.closed} onToggle={toggle}>
+            {sideThreads.data.threads.map((thread) => <SideThreadRow key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
+          </Group>
+        ) : null}
+        {!groups.needsYou.length && !groups.running.length && !groups.recent.length && !sideThreads.data?.threads.length ? (
           <p className="px-2 text-xs text-muted-foreground">Threads {bot.name} starts show up here.</p>
         ) : null}
         {earlier.length ? (
@@ -327,6 +333,23 @@ function Row({ thread, active, onOpen }: { thread: BotThreadView; depth: number;
       <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[tone]}`} role="img" aria-label={TONE_LABEL[tone]} />
       <span className={`min-w-0 flex-1 truncate ${tone === "idle" ? "text-muted-foreground" : ""}`}>{thread.title}</span>
       <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{age(thread.updatedAt)}</span>
+    </button>
+  );
+}
+
+/** A side thread on one of the Bot's replies (src/bot-side-threads.ts): its title, replies and age. */
+function SideThreadRow({ thread, active, onOpen }: { thread: BotSideThreadListView; active: boolean; onOpen(threadId: string): void }) {
+  const replies = thread.replies === 1 ? "1 reply" : `${thread.replies} replies`;
+  // Titled "<Bot> · <reply>"; under its Bot, the reply is enough (and the name may have changed).
+  const title = thread.title.replace(/^[^·]{1,60} · /, "");
+  return (
+    <button type="button" data-thread={thread.threadId} aria-current={active ? "true" : undefined} onClick={() => onOpen(thread.threadId)} title={`${title} · ${replies}`}
+      className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
+      {thread.working
+        ? <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT.running}`} role="img" aria-label={TONE_LABEL.running} />
+        : <Icon name="MessageSquare" className="size-3.5 shrink-0 text-muted-foreground" />}
+      <span className="min-w-0 flex-1 truncate">{title}</span>
+      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{thread.replies ? `${thread.replies} · ` : ""}{age(thread.updatedAt)}</span>
     </button>
   );
 }

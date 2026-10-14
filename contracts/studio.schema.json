@@ -6875,6 +6875,68 @@
         "additionalProperties": false
       }
     },
+    "bot_side_threads_for_bot": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "sourceThreadId": {
+                  "type": "string"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "replies": {
+                  "type": "number"
+                },
+                "working": {
+                  "type": "boolean"
+                },
+                "updatedAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threadId",
+                "sourceThreadId",
+                "messageId",
+                "title",
+                "replies",
+                "working",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "threads"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_side_thread_open": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

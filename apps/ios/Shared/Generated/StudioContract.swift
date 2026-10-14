@@ -59,6 +59,7 @@ public enum Studio {
     public static let bot_memory = "bot_memory"
     public static let bot_chain = "bot_chain"
     public static let bot_side_threads = "bot_side_threads"
+    public static let bot_side_threads_for_bot = "bot_side_threads_for_bot"
     public static let bot_side_thread_open = "bot_side_thread_open"
     public static let bot_thread_owner = "bot_thread_owner"
     public static let bot_checkin_preset = "bot_checkin_preset"
@@ -352,6 +353,8 @@ public enum Studio {
   public typealias BotChain = BotChainOutput
 
   public typealias BotSideThreads = BotSideThreadsOutput
+
+  public typealias BotSideThreadsForBot = BotSideThreadsForBotOutput
 
   public typealias BotSideThreadOpen = BotSideThreadOpenOutput
 
@@ -6374,6 +6377,42 @@ public enum Studio {
 
     public init(chat: Bool? = nil, threads: [BotSideThreadsOutputThreadsItem]? = nil) {
       self.chat = chat
+      self.threads = threads
+    }
+  }
+
+  public struct BotSideThreadsForBotInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotSideThreadsForBotOutputThreadsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var sourceThreadId: String?
+    public var messageId: String?
+    public var title: String?
+    public var replies: Double?
+    public var working: Bool?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, sourceThreadId: String? = nil, messageId: String? = nil, title: String? = nil, replies: Double? = nil, working: Bool? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.sourceThreadId = sourceThreadId
+      self.messageId = messageId
+      self.title = title
+      self.replies = replies
+      self.working = working
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct BotSideThreadsForBotOutput: Sendable, Hashable, Codable {
+    public var threads: [BotSideThreadsForBotOutputThreadsItem]?
+
+    public init(threads: [BotSideThreadsForBotOutputThreadsItem]? = nil) {
       self.threads = threads
     }
   }

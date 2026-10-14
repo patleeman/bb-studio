@@ -710,6 +710,7 @@ export default async function plugin(bb: BbPluginApi) {
     }),
     bot_chain: async ({ botId }) => { const threads = await bots.chainThreads(botId); return { threadIds: threads.map((thread) => thread.id), threads }; },
     bot_side_threads: async ({ threadId }) => ({ chat: sideThreads.isChat(threadId), threads: await sideThreads.list(threadId) }),
+    bot_side_threads_for_bot: async ({ botId }) => { const bot = bots.stored(botId); return { threads: bot ? await sideThreads.forBot(bot.id) : [] }; },
     bot_side_thread_open: ({ threadId, messageId }) => sideThreads.open(threadId, messageId),
     bot_thread_owner: ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? null }),
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),

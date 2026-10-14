@@ -53,6 +53,16 @@ export interface SideThreadView {
   working: boolean;
 }
 
+export interface BotSideThreadView {
+  threadId: string;
+  sourceThreadId: string;
+  messageId: string;
+  title: string;
+  replies: number;
+  working: boolean;
+  updatedAt: number;
+}
+
 interface TimelineRow { id: string; kind?: string; role?: string; text?: string; sourceSeqEnd?: number; turnId?: string | null }
 interface TimelinePage { rows?: TimelineRow[]; timelinePage?: { hasOlderRows?: boolean; olderCursor?: { anchorSeq: number; anchorId: string } | null } }
 
@@ -86,6 +96,23 @@ export class SideThreads {
       return { messageId: row.message_id, threadId: row.thread_id, replies: row.replies, lastReplyAt: row.last_reply_at, working: thread?.status === "active" };
     }));
     return views.filter((view): view is SideThreadView => view !== null);
+  }
+
+  /** A Bot's side threads across its chain, for its sidebar: the latest reply first. */
+  async forBot(botId: string): Promise<BotSideThreadView[]> {
+    const rows = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE bot_id = ? ORDER BY created_at DESC, rowid DESC").all(botId) as SideRow[];
+    const views = await Promise.all(rows.map(async (row) => {
+      const thread = await this.deps.sdk.threads.get({ threadId: row.thread_id }).catch((error: { status?: number }) => error?.status === 404 ? "gone" as const : null);
+      if (thread === "gone") { this.forget(row.thread_id); return null; }
+      if (!thread || thread.archivedAt) return null;
+      return {
+        threadId: row.thread_id, sourceThreadId: row.source_thread_id, messageId: row.message_id,
+        // Hidden threads don't show in BB's own title lookup, so the title comes from here.
+        title: thread.title?.trim() || thread.titleFallback?.trim() || "Thread",
+        replies: row.replies, working: thread.status === "active", updatedAt: row.last_reply_at ?? row.created_at,
+      };
+    }));
+    return views.filter((view): view is BotSideThreadView => view !== null).sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   /** The reply's side thread, forked from the chat at that reply when it has none. */
