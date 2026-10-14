@@ -1,13 +1,13 @@
-// The Bot page (nav panel `bot`, /plugins/studio/bot[/<botId>]): the
-// selected Bot's Info (BotTabs.tsx), with BB's sidebar showing the Bots list
-// (BotSidebar.tsx). The bare /plugins/studio/bot (the rail's Bot item) opens
+// The Bot page (under the Studio panel, /plugins/studio/studio/bot[/<botId>]):
+// the selected Bot's Info (BotTabs.tsx), with BB's sidebar showing the Bots
+// list (BotSidebar.tsx). The bare /plugins/studio/studio/bot opens
 // the window's last Bot thread, or the Bot's chat, and shows the primary's
 // Info only when there's neither. A Bot's chat isn't embedded here: it opens as BB's own
 // thread page, from the Bots list or Info's Open chat. With no Bot yet, the
 // page is a welcome that asks what the Bot should help with; Create makes it
 // and opens its chat, where it sets itself up. "New bot"
-// (/plugins/studio/bot/new) does the same for another Bot.
-// The route picks the Bot (selection.ts); Studio's old address redirects here.
+// (/plugins/studio/studio/bot/new) does the same for another Bot.
+// The route picks the Bot (selection.ts).
 import { errorMessage, relativeTime } from "@bb-studio/kit/format";
 import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "@bb-studio/kit/app";
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
@@ -24,10 +24,8 @@ import { useOpenThread } from "./workspace";
 import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
 
-/** The Bot's nav panel: its id and path under /plugins/studio. */
-export const BOT_PANEL = "bot";
 export { BOT_PATH };
-/** Studio's old address for the Bot (/plugins/studio/studio/bot), which redirects. */
+/** The Bot page's path under the Studio panel. */
 export const BOT_SUBPATH = "bot";
 type Preset = "morning" | "evening" | "working" | "off";
 /** Check-in presets (bot_checkin_preset): one schedule and one line on the Memory page each. */
@@ -136,12 +134,6 @@ function useBotLanding(bare: boolean, view: BotView | undefined): boolean {
     return () => { cancelled = true; };
   }, [ready, chatId, sdk, navigate]);
   return bare && !settled;
-}
-
-/** Studio's old address (/plugins/studio/studio/bot): replaced by the Bot's own panel. */
-export function BotRedirect() {
-  useEffect(() => { openAppPath(BOT_PATH, { replace: true }); }, []);
-  return null;
 }
 
 /** shape null: the emoji avatar. */

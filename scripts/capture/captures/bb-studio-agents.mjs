@@ -6,7 +6,7 @@
 // configured); an imported Hermes bot's Info (the Bot page, saying its memory
 // and tools live on the provider) and an imported Grok bot's chat (BB's
 // thread page) after one exchange each.
-const BOT_PATH = "/plugins/studio/bot";
+const BOT_PATH = "/plugins/studio/studio/bot";
 const SIDEBAR = 'nav[aria-label="Bots"]';
 const IMPORTS = [
   { name: "Hermes", shape: "cloud", color: "#7c66dc", providerId: "hermes", reply: /I'm Hermes/ },

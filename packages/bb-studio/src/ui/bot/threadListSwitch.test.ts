@@ -4,11 +4,12 @@ import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, botLanding, botTh
 
 describe("paths", () => {
   it("matches the Bot page and the Studio panel exactly", () => {
-    expect(isBotPath("/plugins/studio/bot")).toBe(true);
-    expect(isBotPath("/plugins/studio/bot/")).toBe(true);
-    expect(isBotPath("/plugins/studio/bot/bot_1")).toBe(true);
-    expect(isBotPath("/plugins/studio/botany")).toBe(false);
+    expect(isBotPath("/plugins/studio/studio/bot")).toBe(true);
+    expect(isBotPath("/plugins/studio/studio/bot/")).toBe(true);
+    expect(isBotPath("/plugins/studio/studio/bot/bot_1")).toBe(true);
+    expect(isBotPath("/plugins/studio/studio/botany")).toBe(false);
     expect(isStudioPath("/plugins/studio/studio/")).toBe(true);
+    expect(isStudioPath("/plugins/studio/studio/bot/bot_1")).toBe(false);
     expect(isStudioPath("/plugins/studio/studios")).toBe(false);
     expect(isStudioPath("/plugins/pages/pages")).toBe(false);
   });
@@ -29,7 +30,7 @@ describe("threadIdForPath", () => {
     expect(threadIdForPath("/projects/proj_1")).toBeNull();
     expect(threadIdForPath("/projects/proj_1/archived")).toBeNull();
     expect(threadIdForPath("/archived")).toBeNull();
-    expect(threadIdForPath("/plugins/studio/bot")).toBeNull();
+    expect(threadIdForPath("/plugins/studio/studio/bot")).toBeNull();
     expect(threadIdForPath("/plugins/x/threads/thr_1")).toBeNull();
   });
 });
@@ -38,7 +39,7 @@ describe("nextListMode", () => {
   it("the Studio panel is studio; every other route, threads included, is bots", () => {
     for (const path of ["/plugins/studio/studio", "/plugins/studio/studio/browse"]) expect(nextListMode(path)).toBe("studio");
     for (const path of [
-      "/", "/threads/thr_1", "/projects/proj_1/threads/thr_1/files", "/plugins/studio/bot", "/plugins/studio/bot/bot_1",
+      "/", "/threads/thr_1", "/projects/proj_1/threads/thr_1/files", "/plugins/studio/studio/bot", "/plugins/studio/studio/bot/bot_1",
       "/plugins/pages/pages", "/settings", "/extensions", "/skills", "/archived", "/projects/proj_1",
     ]) expect(nextListMode(path)).toBe("bots");
   });
@@ -92,7 +93,7 @@ describe("the last Bot thread", () => {
   it("is a thread shown in bots mode only", () => {
     expect(botThreadVisit("bots", "/projects/proj_1/threads/thr_r/files")).toBe("thr_r");
     expect(botThreadVisit("bots", "/threads/thr_chat")).toBe("thr_chat");
-    expect(botThreadVisit("bots", "/plugins/studio/bot")).toBeNull();
+    expect(botThreadVisit("bots", "/plugins/studio/studio/bot")).toBeNull();
     expect(botThreadVisit("studio", "/threads/thr_chat")).toBeNull();
     expect(botThreadVisit(null, "/threads/thr_chat")).toBeNull();
   });
@@ -128,7 +129,7 @@ describe("syncThreadList", () => {
   const KEY = "sidebar.threadListProvider";
   it("remembers the last thread shown, per window", async () => {
     const x = fake({ [KEY]: "other/list" });
-    await syncThreadList(x.sdk, "/plugins/studio/bot");
+    await syncThreadList(x.sdk, "/plugins/studio/studio/bot");
     expect(readLastBotThread()).toBeNull();
     await syncThreadList(x.sdk, "/projects/proj_1/threads/thr_runner");
     expect(readLastBotThread()).toBe("thr_runner");
@@ -151,7 +152,7 @@ describe("syncThreadList", () => {
   });
   it("folds calls during a write into one pass with the latest route", async () => {
     const x = fake({ [KEY]: NATIVE });
-    const first = syncThreadList(x.sdk, "/plugins/studio/bot");
+    const first = syncThreadList(x.sdk, "/plugins/studio/studio/bot");
     void syncThreadList(x.sdk, "/plugins/studio/studio");
     void syncThreadList(x.sdk, "/plugins/studio/studio/browse");
     await first;

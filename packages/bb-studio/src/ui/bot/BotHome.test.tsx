@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
   call: vi.fn(async () => ({})),
   toThread: vi.fn((_threadId: string) => {}),
   openThreadPanel: vi.fn((_options: unknown) => true),
-  pathname: "/plugins/studio/bot",
+  pathname: "/plugins/studio/studio/bot",
   prefs: { value: "studio/bot", revision: 1 },
   setPref: vi.fn(async (_args: unknown) => ({})),
   /** BB's threads: id → project (missing: gone). Empty: sdk.threads.get fails, as before it was mocked. */
@@ -76,7 +76,7 @@ vi.mock("@bb-studio/kit/ui", () => ({
   DropdownMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect(): void }) => React.createElement("button", { onClick: onSelect }, children),
 }));
 
-const { ActivityPanel, BOT_PATH, BotRedirect } = await import("./BotHome");
+const { ActivityPanel, BOT_PATH } = await import("./BotHome");
 const { BotInfoPanel, BotPanel } = await import("./BotTabs");
 const { BotThreadList } = await import("./BotSidebar");
 const { forgetListMode } = await import("./threadListSwitch");
@@ -88,7 +88,7 @@ beforeEach(() => {
   state.call.mockClear();
   state.toThread.mockClear();
   state.openThreadPanel.mockClear();
-  state.pathname = "/plugins/studio/bot";
+  state.pathname = "/plugins/studio/studio/bot";
   state.setPref.mockClear();
   state.activate.mockClear();
   state.inputs = [];
@@ -127,11 +127,8 @@ test("with no Bot, the welcome's Create makes it with the setup and opens its ch
   state.call.mockImplementation(async () => ({}));
 });
 
-test("Studio's old Bot address redirects to the Bot's own panel", async () => {
-  const { openAppPath } = await import("@bb-studio/kit/app");
-  act(() => root.render(<BotRedirect />));
-  expect(BOT_PATH).toBe("/plugins/studio/bot");
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot", { replace: true });
+test("the Bot page lives under the Studio panel", () => {
+  expect(BOT_PATH).toBe("/plugins/studio/studio/bot");
 });
 
 test("Activity: one quiet line when all is empty, sections only when non-empty, the recent few completed", () => {
@@ -349,7 +346,7 @@ const scout = { ...dot, id: "bot_scout", name: "Scout", avatar: "🛰️", threa
 
 test("several Bots: the selected one (from the route) is expanded and scoped; a row opens its chat, its ⓘ its Info", async () => {
   const { openAppPath } = await import("@bb-studio/kit/app");
-  state.pathname = "/plugins/studio/bot/bot_scout";
+  state.pathname = "/plugins/studio/studio/bot/bot_scout";
   state.data = { bot_list: { bots: [{ ...dot, primary: true }, scout] }, bot_get: { bot: scout, run: null }, bot_activity: empty };
   await show(<BotThreadList {...listProps} />);
   const nav = container.querySelector('nav[aria-label="Bots"]')!;
@@ -363,13 +360,13 @@ test("several Bots: the selected one (from the route) is expanded and scoped; a 
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
   act(() => click(other.parentElement!.querySelector('[aria-label="Open Dot info"]')));
   // The primary's Info by id too: the bare Bot page opens the last Bot thread.
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/bot_main");
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main");
   act(() => click(nav.querySelector("[data-testid=bot-main]")));
   expect(state.toThread).toHaveBeenCalledWith("thr_scout");
   act(() => click(nav.querySelector('[aria-label="Open Scout info"]')));
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/bot_scout");
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_scout");
   act(() => click(nav.querySelector("[data-testid=bot-new]")));
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/bot/new");
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/new");
   // The page, its Info, acts on the selected Bot.
   await show(<BotPanel />);
   act(() => click(button("Pause")));
@@ -377,7 +374,7 @@ test("several Bots: the selected one (from the route) is expanded and scoped; a 
 });
 
 test("New bot: the welcome makes a second one, then opens its chat", async () => {
-  state.pathname = "/plugins/studio/bot/new";
+  state.pathname = "/plugins/studio/studio/bot/new";
   state.data = { bot_get: { bot: dot, run: null } };
   state.call.mockImplementation((async (method: string) => method === "bot_create" ? { bot: scout, run: null } : {}) as never);
   await show(<BotPanel />);
@@ -464,7 +461,7 @@ test("Import bot links to Studio Agents settings when no provider is ready", asy
 
 test("an external bot shows its provider's logo and hides Memory, skills and runners with a note", async () => {
   const herm = { ...dot, id: "bot_h", name: "Herm", primary: false, kind: "external", providerId: "hermes", model: "hermes-agent" };
-  state.pathname = "/plugins/studio/bot/bot_h";
+  state.pathname = "/plugins/studio/studio/bot/bot_h";
   state.data = { bot_get: { bot: herm, run: null }, bot_activity: empty };
   await show(<BotPanel />);
   expect(container.querySelector('[data-logo="hermes"]')).not.toBeNull();
@@ -559,7 +556,7 @@ test("the bare Bot page falls back to the Bot's chat when the last thread is gon
 });
 
 test("a Bot's Info by id (its ⓘ, Bot info) isn't redirected", async () => {
-  state.pathname = "/plugins/studio/bot/bot_main";
+  state.pathname = "/plugins/studio/studio/bot/bot_main";
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty };
   state.threads = { thr_bot: "proj_personal" };
   sessionStorage.setItem("studio.sidebar.lastBotThread", "thr_bot");

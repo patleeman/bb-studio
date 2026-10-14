@@ -16,7 +16,7 @@
 // navigation provider preference, the navigation row says New bot (Studio's
 // replaces BB's on the Bot page); BB 0.46 has none, so New bot is the Bots
 // list's + and the row keeps BB's New thread.
-export const BOT_PATH = "/plugins/studio/bot";
+export const BOT_PATH = "/plugins/studio/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
   { title: "Check the launch checklist for blockers", prompt: "Reply with one short sentence: no blockers on the launch checklist." },
@@ -350,7 +350,7 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     for (const text of ["What should your Bot help with?", "Create Bot", "Dot"]) await client.waitForText(text, 30000);
     await client.waitForSelector(`${SIDEBAR} [data-testid=bot-new-row]`, 30000);
     await client.waitForSelector("textarea#bot-welcome-goal", 30000);
-    if (!(await client.evaluate("location.pathname")).endsWith("/plugins/studio/bot/new")) throw new Error("New bot didn't open /plugins/studio/bot/new");
+    if (!(await client.evaluate("location.pathname")).endsWith("/plugins/studio/studio/bot/new")) throw new Error("New bot didn't open /plugins/studio/studio/bot/new");
     await sleep(800);
   };
 

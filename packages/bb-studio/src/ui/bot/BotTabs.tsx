@@ -1,7 +1,7 @@
 // A Bot's Info: its profile, controls (Pause/Resume, Stop, the ⋯ menu with
 // Edit profile, Memory, Skills, Check-ins and Switch model), Memory, skills,
 // automations (check-ins, reminders, watchers, runners) and activity. It is
-// the Bot page itself (/plugins/studio/bot[/<botId>], BotPanel), and the
+// the Bot page itself (/plugins/studio/studio/bot[/<botId>], BotPanel), and the
 // "Bot info" thread panel action beside a Bot's thread (BotInfoPanel). Its
 // chat and the threads it lists open as BB threads.
 import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";

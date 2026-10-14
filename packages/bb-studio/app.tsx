@@ -35,7 +35,7 @@ import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
-import { BOT_PANEL, BOT_SUBPATH, BotRedirect } from "./src/ui/bot/BotHome";
+import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
 import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
@@ -106,8 +106,9 @@ function StudioRoot({ subPath }: { subPath: string }) {
   if (path === "") return <StudioWorkspace />;
   if (path === "browse") return <StudioPanel />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
-  // The Bot has its own panel now; its old address goes there.
-  if (path === BOT_SUBPATH) return <BotRedirect />;
+  // The Bot page: the selected Bot's Info, or the create flow; its chat and
+  // threads open as BB threads, with the Bots list in BB's sidebar.
+  if (path === BOT_SUBPATH || path.startsWith(`${BOT_SUBPATH}/`)) return <BotPanel />;
   // Conversations about items: chats/item/…, chats/choose/…, chats/quote/….
   if (path === CHATS_PATH || path.startsWith(`${CHATS_PATH}/`)) return <ConversationPage subPath={path.slice(CHATS_PATH.length + 1)} />;
   // A built-in kind: <segment>/<id> is one item; <segment> alone is the
@@ -151,10 +152,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "item-gestures", component: ItemGestures });
   app.slots.experimental_appOverlay({ id: "legacy-chats", component: LegacyChats });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
-  // The user's Bots: the Bot page is the selected Bot's Info (or the create
-  // flow); its chat and threads open as BB threads, with the Bots list in BB's
-  // sidebar. Beside a Bot's thread, the "Bot info" panel action shows the same Info.
-  app.slots.navPanel({ id: BOT_PANEL, title: "Bot", icon: "Bot", path: BOT_PANEL, component: BotPanel, headerContent: StudioBarSlot });
+  // Beside a Bot's thread, the "Bot info" panel action shows the Bot page's Info.
   app.slots.threadPanelAction({ id: BOT_INFO_ACTION, title: "Bot info", icon: "Bot", layout: "flush", component: BotInfoPanel });
   // Side threads on a Bot's replies (src/bot-side-threads.ts): the row under
   // each reply, and the side thread in a tab beside the chat.

@@ -1200,16 +1200,16 @@ The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
 the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
 of Staff", with the same thread and check-ins; rename it from its page.
 
-- **Workspace**: its own nav panel, **Bot** in the rail (`/plugins/studio/bot`;
-  the old `/plugins/studio/studio/bot` redirects there). The rail item opens
-  the last Bot thread you had open in this window: the bot's chat, or a
+- **Workspace**: the Bot page lives under the Studio panel
+  (`/plugins/studio/studio/bot`); the rail has no Bot item, since the Bots
+  list is always in the sidebar. The bare page opens the last Bot thread you had open in this window: the bot's chat, or a
   runner or worker thread you opened from the Bots list (kept in session
   storage beside the sidebar mode, updated on every thread page shown in
   **bots** mode). With none, or once that thread is gone, it opens the
   primary bot's chat; with no bot, or a bot without a chat, it shows the
   create flow or the bot's Info. The redirect replaces the history entry, so
   Back doesn't bounce to it, and the Bots list stays. A bot's **Info** has
-  its own address, `/plugins/studio/bot/<botId>` (the primary's too), which
+  its own address, `/plugins/studio/studio/bot/<botId>` (the primary's too), which
   its **ⓘ** opens, with **Open chat**; it is also the **Bot info** panel tab
   beside a bot's thread. Its chat isn't
   embedded: it opens as BB's normal thread page, so it has everything a
@@ -1249,7 +1249,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   its route changes or it gains focus.
 - **New bot**: **+** next to **Bots** makes a new bot (BB's own **New
   thread** row stays above the list; BB always shows it). **New bot** opens
-  `/plugins/studio/bot/new`: the same welcome as a first bot (Make another
+  `/plugins/studio/studio/bot/new`: the same welcome as a first bot (Make another
   Bot), and **Create Bot** makes it as "New bot" and opens its chat, where it
   sets itself up.
 - **Several bots**: the first bot is the **primary**: the personal project's
@@ -1259,11 +1259,11 @@ of Staff", with the same thread and check-ins; rename it from its page.
   page, skills, runners and check-ins. Its check-ins are its own automation
   on its thread (`Studio project heartbeat bot:<id>`). Every bot has the same
   powers: it sees every project. The page shows the selected bot's Info at
-  `/plugins/studio/bot/<botId>` (the bare page shows the primary's only when
+  `/plugins/studio/studio/bot/<botId>` (the bare page shows the primary's only when
   it has no thread to open);
   its runners, check-ins, Memory and skills are that bot's. In a bot's own
   thread its tools act on that bot.
-- **Info**: a bot's Info page (`/plugins/studio/bot/<botId>`), and the **Bot info** tab in a thread's side panel
+- **Info**: a bot's Info page (`/plugins/studio/studio/bot/<botId>`), and the **Bot info** tab in a thread's side panel
   (a thread panel action, so BB's panel launcher offers it on every thread;
   on a thread no bot owns it shows "Not a Bot thread"). It has the
   bot's avatar, name and live status (Working on N threads, Checks in …,

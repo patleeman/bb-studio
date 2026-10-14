@@ -31,10 +31,10 @@ const STUDIO_LISTS = new Set([BOT_LIST_PROVIDER, STUDIO_LIST_PROVIDER]);
 export const NATIVE_LIST_PROVIDER = "thread-list/thread-list";
 export const AUTOMATIC_PROVIDER = "__automatic__";
 
-/** True on the Bot page (/plugins/studio/bot and anything under it). */
-export const isBotPath = (pathname: string) => /^\/plugins\/studio\/bot(\/|$)/.test(pathname);
-/** True on the Studio panel (/plugins/studio/studio and anything under it). */
-export const isStudioPath = (pathname: string) => /^\/plugins\/studio\/studio(\/|$)/.test(pathname);
+/** True on the Bot page (/plugins/studio/studio/bot and anything under it). */
+export const isBotPath = (pathname: string) => /^\/plugins\/studio\/studio\/bot(\/|$)/.test(pathname);
+/** True on the Studio panel (/plugins/studio/studio and anything under it), except the Bot page, which keeps the Bots list. */
+export const isStudioPath = (pathname: string) => /^\/plugins\/studio\/studio(\/|$)/.test(pathname) && !isBotPath(pathname);
 
 /**
  * The thread a BB thread page shows, or null. BB routes a Personal thread at
