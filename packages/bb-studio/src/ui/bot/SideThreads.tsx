@@ -1,6 +1,7 @@
 // Side threads on the desktop (src/bot-side-threads.ts): the row under a Bot
-// reply (its `::bot-thread{}` directive), "Reply in thread" or
-// "🧵 2 replies · 5m", and the tab beside the chat that shows the side thread.
+// reply with a side thread (its `::bot-thread{}` directive), "2 replies · 5m",
+// and the tab beside the chat that shows the side thread. Starting one is
+// the reply's "Reply in thread" action (reply-in-thread.ts).
 import { errorMessage, relativeTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { ThreadChat, useBbNavigate, type PluginMessageDirectiveProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
@@ -34,9 +35,10 @@ export function BotThreadDirective({ message }: PluginMessageDirectiveProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Nothing until loaded, and nothing outside a Bot's chat: a side thread's
-  // own replies carry the directive too (src/bot-side-threads.ts).
-  if (!data?.chat) return null;
+  // Only a reply with a side thread: "Reply in thread" is in the reply's
+  // action bar (reply-in-thread.ts). Nothing outside a Bot's chat either: a
+  // side thread's own replies may carry the directive too.
+  if (!data?.chat || !thread) return null;
 
   const open = async () => {
     setBusy(true);
