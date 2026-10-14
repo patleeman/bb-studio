@@ -75,11 +75,7 @@ extension BBClient {
     /// Any file on the thread's host, as BB web loads a reply's images.
     func hostFileURL(threadId: String, path: String) -> URL? {
         let name = path.split(separator: "/").last ?? ""
-        guard path.hasPrefix("/"), name.contains("."),
-            var components = URLComponents(
-                url: baseURL.appending(path: "api/v1/threads/\(threadId)/host-files/content"), resolvingAgainstBaseURL: true)
-        else { return nil }
-        components.queryItems = [URLQueryItem(name: "path", value: path)]
-        return components.url
+        guard path.hasPrefix("/"), name.contains(".") else { return nil }
+        return URL(string: Self.hostFilePath(threadId: threadId, path: path), relativeTo: baseURL)?.absoluteURL
     }
 }

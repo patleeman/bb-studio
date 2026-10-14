@@ -91,10 +91,7 @@ extension BBClient {
     /// Any file on the thread's host, like a screenshot in `/tmp`, which the
     /// workspace endpoint can't reach. Read the way BB web opens such links.
     public func hostFile(threadId: String, path: String) async throws -> WorkspaceFile {
-        var components = URLComponents()
-        components.queryItems = [URLQueryItem(name: "path", value: path)]
-        let (status, data) = try await raw(
-            method: "GET", path: "/api/v1/threads/\(threadId)/host-files/content?\(components.percentEncodedQuery ?? "")", body: nil)
+        let (status, data) = try await raw(method: "GET", path: Self.hostFilePath(threadId: threadId, path: path), body: nil)
         guard (200..<300).contains(status) else {
             throw BBError(status: status, message: Self.errorMessage(data) ?? "HTTP \(status) for \(path)")
         }
@@ -104,6 +101,16 @@ extension BBClient {
         }
         return WorkspaceFile(
             content: data.base64EncodedString(), contentEncoding: "base64", mimeType: mimeType, sizeBytes: data.count)
+    }
+
+    /// BB's route for a host file: the absolute path, without its leading
+    /// slash, in the URL itself, each segment encoded (BB web's
+    /// buildThreadHostFileContentUrl). Not a `path` query: BB would read
+    /// the last segment as the file.
+    public static func hostFilePath(threadId: String, path: String) -> String {
+        let segments = path.drop(while: { $0 == "/" }).split(separator: "/", omittingEmptySubsequences: false)
+            .map { String($0).addingPercentEncoding(withAllowedCharacters: CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))) ?? String($0) }
+        return "/api/v1/threads/\(threadId)/host-files/" + segments.joined(separator: "/")
     }
 
     /// Uncommitted changes as one unified diff per file, keyed by path.
