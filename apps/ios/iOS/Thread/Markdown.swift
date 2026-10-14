@@ -81,7 +81,7 @@ struct MarkdownText: View {
     /// thread in the app, and workspace files, as links or as paths in inline
     /// code, open in the thread's file viewer.
     static func inline(_ text: String) -> AttributedString {
-        let linked = text.replacing(/@thread:(thr_[A-Za-z0-9]+)/) { match in
+        let linked = text.replacing(MarkdownRegex.threadMention) { match in
             let id = String(match.1)
             let title = ThreadTitles.titles[id].map { $0.replacingOccurrences(of: "]", with: "") } ?? id
             return "[@\(title)](bbstudio://thread/\(id))"
@@ -133,14 +133,14 @@ enum ThreadTitles {
 
     /// `@thread:thr_x` becomes `@Title` when the title is known.
     static func resolve(_ text: String) -> String {
-        text.replacing(/@thread:(thr_[A-Za-z0-9]+)/) { match in
+        text.replacing(MarkdownRegex.threadMention) { match in
             titles[String(match.1)].map { "@" + $0 } ?? String(match.0)
         }
     }
 
     /// Mentioned threads whose titles haven't been seen yet.
     static func unknownMentions(in texts: [String]) -> Set<String> {
-        Set(texts.flatMap { $0.matches(of: /@thread:(thr_[A-Za-z0-9]+)/).map { String($0.1) } })
+        Set(texts.flatMap { $0.matches(of: MarkdownRegex.threadMention).map { String($0.1) } })
             .filter { titles[$0] == nil }
     }
 }
@@ -232,10 +232,10 @@ enum MarkdownBlock {
                     flush()
                     blocks.append(.inlineVis(InlineVis(directive)))
                 }
-            } else if let heading = trimmed.firstMatch(of: /^(#{1,6})\s+(.*)$/) {
+            } else if let heading = trimmed.firstMatch(of: MarkdownRegex.heading) {
                 flush()
                 blocks.append(.heading(heading.1.count, String(heading.2)))
-            } else if trimmed.wholeMatch(of: /^([-*_])(\s*\1){2,}$/) != nil {
+            } else if trimmed.wholeMatch(of: MarkdownRegex.rule) != nil {
                 flush()
                 blocks.append(.rule)
             } else if trimmed.hasPrefix(">") {
@@ -251,7 +251,7 @@ enum MarkdownBlock {
                     index += 1
                 }
                 blocks.append(.table(header: header, rows: rows))
-            } else if let item = line.firstMatch(of: /^(\s*)([-*+]|\d{1,3}[.)])\s+(.*)$/) {
+            } else if let item = line.firstMatch(of: MarkdownRegex.listItem) {
                 if !paragraph.isEmpty || !quote.isEmpty { flush() }
                 let indent = item.1.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
                 if let last = indents.last, indent > last {
@@ -264,7 +264,7 @@ enum MarkdownBlock {
                 var marker = ListItem.Marker.bullet
                 if item.2.first?.isNumber == true {
                     marker = .number(String(item.2.dropLast()) + ".")
-                } else if let task = text.firstMatch(of: /^\[([ xX])\]\s+(.*)$/) {
+                } else if let task = text.firstMatch(of: MarkdownRegex.task) {
                     marker = .task(task.1 != " ")
                     text = String(task.2)
                 }
@@ -292,12 +292,12 @@ enum MarkdownBlock {
             MarkdownBlock.image(alt: String($0.1), src: String($0.2 ?? $0.3 ?? ""))
         }
         guard !images.isEmpty else { return [.paragraph(text)] }
-        let rest = text.replacing(imagePattern, with: "").replacing(/[ \t]{2,}/, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        let rest = text.replacing(imagePattern, with: "").replacing(MarkdownRegex.spaces, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         return (rest.isEmpty ? [] : [.paragraph(rest)]) + images
     }
 
     private static func isTableDivider(_ line: String) -> Bool {
-        line.trimmingCharacters(in: .whitespaces).wholeMatch(of: /\|?(\s*:?-+:?\s*\|)+\s*(:?-+:?\s*)?/) != nil
+        line.trimmingCharacters(in: .whitespaces).wholeMatch(of: MarkdownRegex.tableDivider) != nil
     }
 
     private static func cells(_ line: String) -> [String] {
@@ -314,11 +314,18 @@ struct Directive {
     let name: String
     let attributes: [String: String]
 
+    // A regex literal is parsed again every time it runs. Rows call this for
+    // every line of every message on each render, so build them once and skip
+    // lines that can't be directives: a long Bot chat hung the main thread
+    // until the watchdog killed the app (0x8BADF00D in Regex.init).
+    nonisolated(unsafe) private static let lineRegex = /::([A-Za-z][\w-]*)\{(.*)\}/
+    nonisolated(unsafe) private static let pairRegex = /([\w-]+)="([^"]*)"/
+
     init?(line: String) {
-        guard let match = line.wholeMatch(of: /::([A-Za-z][\w-]*)\{(.*)\}/) else { return nil }
+        guard line.hasPrefix("::"), line.hasSuffix("}"), let match = line.wholeMatch(of: Self.lineRegex) else { return nil }
         name = String(match.1)
         var attributes: [String: String] = [:]
-        for pair in match.2.matches(of: /([\w-]+)="([^"]*)"/) {
+        for pair in match.2.matches(of: Self.pairRegex) {
             attributes[String(pair.1)] = String(pair.2)
         }
         self.attributes = attributes
@@ -547,4 +554,16 @@ struct CodeBlock: View {
         }
         .background(.fill.tertiary, in: .rect(cornerRadius: 10))
     }
+}
+
+/// Regexes built once: a regex literal is parsed again each time it runs,
+/// and these run for every line of every message on each render.
+enum MarkdownRegex {
+    nonisolated(unsafe) static let threadMention = /@thread:(thr_[A-Za-z0-9]+)/
+    nonisolated(unsafe) static let heading = /^(#{1,6})\s+(.*)$/
+    nonisolated(unsafe) static let rule = /^([-*_])(\s*\1){2,}$/
+    nonisolated(unsafe) static let listItem = /^(\s*)([-*+]|\d{1,3}[.)])\s+(.*)$/
+    nonisolated(unsafe) static let task = /^\[([ xX])\]\s+(.*)$/
+    nonisolated(unsafe) static let spaces = /[ \t]{2,}/
+    nonisolated(unsafe) static let tableDivider = /\|?(\s*:?-+:?\s*\|)+\s*(:?-+:?\s*)?/
 }
