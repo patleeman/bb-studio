@@ -656,7 +656,10 @@ refused.
   - *Script*: a shell command on the BB host that prints JSON or text. It
     runs only after you approve its exact command and folder in the
     dashboard; the approval is pinned to their SHA-256, so any change needs a
-    new approval. Agents can propose a script but can't approve one. 30 s
+    new approval. One approval covers every widget on that dashboard that
+    runs the same command and folder (say, one script whose output several
+    widgets `select` from), and revoking it stops all of them; another
+    dashboard asks again. Agents can propose a script but can't approve one. 30 s
     and 1 MB per run. See [Script approval](#script-approval).
   - *Push*: an agent sends data with `widget_set_data`, or a script with
     `bb studio dashboards set-data <id> <widget> '<json>'`. Never polled.

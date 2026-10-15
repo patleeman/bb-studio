@@ -142,6 +142,26 @@ describe("script approval", () => {
   }
   const approved = async (host: ReturnType<typeof dashboardHost>, id: string) => ((await call(host, "dashboards.get", { id })).dashboard as View).widgets[0]!.script!.approved;
 
+  it("approves a command once for every widget on the dashboard that runs it", () => withHost(async (host) => {
+    const { id, widgetId, sha256 } = await scripted(host);
+    const same = { kind: "script", command: "echo 1", cwd: "/tmp", intervalSec: 300 };
+    await tool(host, "dashboard_edit", { dashboardId: id, ops: [
+      { op: "add", type: "stat", source: { ...same, select: "a" } },
+      { op: "add", type: "stat", source: { ...same, command: "echo 2" } },
+    ] });
+    const other = (await call(host, "dashboards.create", { name: "Y" })).dashboard.id as string;
+    await tool(host, "dashboard_edit", { dashboardId: other, ops: [{ op: "add", type: "stat", source: same }] });
+    const states = async (dashboardId: string) => ((await call(host, "dashboards.get", { id: dashboardId })).dashboard as View).widgets.map((widget) => widget.script!.approved);
+    await approve(host, id, widgetId, sha256);
+    // Same command and folder: approved; a different command or another dashboard: not.
+    expect(await states(id)).toEqual([true, true, false]);
+    expect(await states(other)).toEqual([false]);
+    // Revoking it from any of them stops all of them.
+    const second = ((await call(host, "dashboards.get", { id })).dashboard as View).widgets[1]!.id;
+    await call(host, "dashboards.revokeScript", { id, widgetId: second });
+    expect(await states(id)).toEqual([false, false, false]);
+  }, { now: () => clock.now }));
+
   it("refuses a direct approve without the dialog's nonce", () => withHost(async (host) => {
     const { id, widgetId, sha256 } = await scripted(host);
     await expect(call(host, "dashboards.approveScript", { id, widgetId, sha256 })).rejects.toThrow();

@@ -322,8 +322,14 @@ export class DashboardStore {
       .run(id, widgetId, sha256, command, cwd, this.now());
   }
 
-  revoke(id: string, widgetId: string): void {
-    this.db.prepare("DELETE FROM dashboard_script_approvals WHERE dashboard_id = ? AND widget_id = ?").run(id, widgetId);
+  /** Whether the user approved this exact command (by hash) for any widget on the dashboard. */
+  commandApproved(id: string, sha256: string): boolean {
+    return !!this.db.prepare("SELECT 1 FROM dashboard_script_approvals WHERE dashboard_id = ? AND sha256 = ? LIMIT 1").get(id, sha256);
+  }
+
+  /** Drops the widget's approval and, with `sha256`, that command's approval for every widget on the dashboard. */
+  revoke(id: string, widgetId: string, sha256?: string): void {
+    this.db.prepare("DELETE FROM dashboard_script_approvals WHERE dashboard_id = ? AND (widget_id = ? OR sha256 = ?)").run(id, widgetId, sha256 ?? null);
   }
 
   /** Records who wrote a script widget's command. */

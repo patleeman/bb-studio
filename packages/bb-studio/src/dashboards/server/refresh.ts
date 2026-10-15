@@ -24,9 +24,15 @@ export interface RefresherDeps {
   log?(message: string): void;
 }
 
+/**
+ * An approval belongs to the exact command and folder, not to one widget: once
+ * the user approves it, every widget on that dashboard running the same
+ * command (often with a different `select`) runs too. Another dashboard asks
+ * again, and so does any change to the command.
+ */
 export function isApproved(store: DashboardStore, dashboardId: string, widget: Widget): boolean {
   if (widget.source.kind !== "script") return false;
-  return store.approval(dashboardId, widget.id)?.sha256 === scriptHash(widget.source);
+  return store.commandApproved(dashboardId, scriptHash(widget.source));
 }
 
 export class Refresher {

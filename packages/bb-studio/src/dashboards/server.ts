@@ -247,7 +247,10 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
       return { ok: true };
     },
     "dashboards.revokeScript"({ id, widgetId }) {
-      store.revoke(mustGet(id).id, widgetId);
+      const row = mustGet(id);
+      const widget = store.doc(row.id).widgets.find((each) => each.id === widgetId);
+      // Revoking a command stops every widget on the dashboard that shares it.
+      store.revoke(row.id, widgetId, widget?.source.kind === "script" ? scriptHash(widget.source) : undefined);
       changed(id);
       return { ok: true };
     },
