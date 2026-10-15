@@ -158,9 +158,11 @@ export default definePluginApp((app) => {
   // itself may end with the directive, which now draws nothing.
   app.slots.messageDirective({ id: BOT_THREAD_DIRECTIVE, component: BotThreadDirective });
   app.slots.threadPanelAction({ id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
-  // "2 replies · 5m" under each Bot reply with side threads, and the overlay its click opens them through.
+  // "2 replies · 5m" under each Bot reply with side threads, and what its click
+  // opens them through: a header action, since only components inside the thread
+  // view can open a tab beside it (BB declines openThreadPanel from an overlay).
   app.contentScripts.register({ id: "bot-reply-in-thread", mount: ({ signal }) => mountSideThreadRows(signal) });
-  app.slots.experimental_appOverlay({ id: "side-thread-opener", component: SideThreadOpener });
+  app.slots.experimental_threadHeaderAction({ id: "side-thread-opener", title: "Side threads", component: SideThreadOpener });
   // A Bot chat's prompt cache (src/bot-cache.ts): "Warm · 42m" in its header,
   // and a banner in its composer when the cache expired on a big chat.
   app.slots.experimental_threadHeaderAction({ id: "bot-cache", title: "Prompt cache", component: BotCacheChip });

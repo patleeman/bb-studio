@@ -29,6 +29,8 @@ export function SideThreadPanel({ params }: PluginThreadPanelProps) {
 /**
  * Opens a side thread when a reply's row asks (the content script can't
  * navigate): beside the chat, or as the thread where there's no side panel.
+ * It's a thread header action that draws nothing: openThreadPanel only
+ * works from inside the thread view.
  */
 export function SideThreadOpener() {
   const navigate = useBbNavigate();
