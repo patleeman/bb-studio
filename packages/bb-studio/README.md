@@ -1177,9 +1177,9 @@ bb studio reindex
 
 ## Bot
 
-![The Bot's chat in a staged BB: BB's own thread page for Dot, with its first exchange, a finished-thread notice and its two-bullet answer on what's left before Friday's ORBIT-42 release; in BB's sidebar the Bots list, Dot on top (Working on 1 thread, its ⓘ beside it) and the threads it started under Needs you, Running, Recurring (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it](assets/bot.png)
+![The Bot's chat in a staged BB: BB's own thread page for Dot, with its first exchange, a finished-thread notice and its two-bullet answer on what's left before Friday's ORBIT-42 release; in BB's sidebar Studio's list: Threads on top (the Orbit project's threads as two-line rows, the sort and group menu beside the heading), then Bots with Dot tinted while its chat is open (Working on 1 thread, its ⓘ beside it) and the threads it started under Needs you, Running, Schedule (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it](assets/bot.png)
 
-![Leaving the Bots: Plan the ORBIT-42 retro, a thread no bot owns, on BB's thread page with BB's own thread list back in the sidebar; it lists the project's threads and leaves out the threads Dot started, which Studio hides from it](assets/bot-leave.png)
+![Leaving the Bot page: Home on the rail, then Plan the ORBIT-42 retro, a thread no bot owns, opened from the Threads section; the sidebar keeps Studio's list, Threads on top with the retro selected above the project's other threads, and Bots below with the threads Dot started under Dot, not repeated in Threads](assets/bot-leave.png)
 
 ![Runners: Dot's Info, the Bot page opened from its ⓘ, with the Bots sidebar's Runners group (Inbox watch, and Deploy watch also under Needs you); Info's Automations list both runners with their schedules and last reports (Inbox watch logged "two newsletters"; Deploy watch's urgent "health check failing since build 419"), above Activity](assets/bot-runners.png)
 
@@ -1187,7 +1187,7 @@ bb studio reindex
 
 ![New bot: the + beside Bots opens the welcome, a "New bot" row selected above Dot, Make another Bot with one question, What should your Bot help with?, a few ideas and Create Bot](assets/bot-new.png)
 
-![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; the Bot page is Scout's Info: Checks in weekdays at 18:00, Open chat, Pause and Stop, Memory and Skills, its own Check-in (Weekdays 18:00) and Skill curator under Automations, and Activity](assets/bot-two.png)
+![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; the Bot page is Scout's Info: Checks in weekdays at 18:00, Open chat, Pause and Stop, Memory and Skills, its own Check-in (Weekdays 6:00 PM) and Skill curator under Automations, and Activity](assets/bot-two.png)
 
 ![Import bot: the dialog over Dot's Info lists Hermes (picked, Ready) and Grok (Ready) with their logos, OpenClaw and Dot as Not configured with a pointer to Studio Agents settings, the model hermes-fixture, Accept edits, and a name, shape and color for the new bot](assets/bot-import.png)
 
@@ -1383,7 +1383,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   path), once per failure, until it's on again. Studio checks at startup,
   on the five-minute sweep and shortly after a runner's or Bot's thread
   goes idle or fails; the plugin SDK has no automation events.
-  ![Info's Automations in a staged BB: Dot's original Check-in (weekdays 8:00), the Skill curator (weekly, when idle) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; the Bots sidebar lists the reminder and the evening check-in under Recurring](assets/bot-automations.png)
+  ![Info's Automations in a staged BB: Dot's original Check-in (weekdays 8:00), the Skill curator (weekly, when idle) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; the Bots sidebar lists the reminder and the evening check-in under Schedule](assets/bot-automations.png)
 
 - **Schedule editor** (`src/ui/bot/ScheduleEditor.tsx`, compiled by
   `src/schedule.ts`): presets, weekday chips, several times a day, every N
@@ -1404,7 +1404,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   machine's is named ("(London time)"). Anything else (a day of the month,
   a month) shows as "Custom: <cron>".
 
-  ![The schedule editor editing the Release watch watcher: its bash script and 30 s timeout, what to do with the output, Wakes: The bot; presets, the Every… mode, every day on, every 15 minutes from 0:00 to 23:59, quiet hours 22:00–7:00, no end date, the America/New_York timezone, and the preview "Every 15 min, every day · quiet 22:00–7:00" with its cron */15 7-21 * * *](assets/bot-schedule-editor.png)
+  ![The schedule editor editing the Release watch watcher: its bash script and 30 s timeout, what to do with the output, Wakes: The bot; presets, the Every… mode, every day on, every 15 minutes from 0:00 to 23:59, quiet hours 10:00 PM–7:00 AM, no end date, the America/New_York timezone, and the preview "Every 15 min, every day · quiet 10:00 PM–7:00 AM" with its cron */15 7-21 * * *](assets/bot-schedule-editor.png)
 - **Memory**: one Studio page per Bot, "<name>'s Memory" in the personal
   project, made the first time it's needed (its thread starts, or
   **Memory** in the ⋯ menu). Its top section, `## Check-in`, is what the Bot

@@ -1,21 +1,19 @@
 // The Bot's workspace. First its onboarding, while the staged BB has no Bot
 // (the welcome, then the first chat Create opens; that Bot then becomes Dot);
-// then a Bot with history: the Bots list in
-// BB's sidebar (it replaces BB's thread list on the Bot page and on the Bot's
-// threads) with the threads it started (one needing the user, one running, a
-// nested follow-up, a recurring automation), and its chat opened from its row
-// as BB's own thread page. The row's ⓘ opens its Info, the Bot page
-// (/plugins/studio/bot[/<botId>]). Then Home on the rail and a thread no Bot owns opened from BB's list, where BB's own
-// thread list is back without the Bot's threads, which Studio hides from it.
+// then a Bot with history: Studio's list in BB's sidebar (`studio/bot`, on
+// every page but the Studio panel), Threads on top and the Bots below, with
+// the threads Dot started (one needing the user, one running, a nested
+// follow-up, a scheduled automation), and its chat opened from its row as BB's
+// own thread page. The row's ⓘ opens its Info, the Bot page under the Studio
+// panel (/plugins/studio/studio/bot[/<botId>]). Then Home on the rail and a
+// thread no Bot owns opened from the Threads section: the same list stays,
+// and the Bot's threads show only under Dot, not in Threads.
 // Last, two runners (src/runners.ts): one that logs, one that tells and then
 // raises something urgent; the Bots sidebar's Runners group, Info's Runners
 // in Automations, and a runner's thread opened from the sidebar as BB's
 // thread page, with the Bot's chat holding only the runner's lines.
-// Then several bots: New bot opening the create flow, and a second bot,
-// Scout, selected, with Dot listed above it. Where BB has a sidebar
-// navigation provider preference, the navigation row says New bot (Studio's
-// replaces BB's on the Bot page); BB 0.46 has none, so New bot is the Bots
-// list's + and the row keeps BB's New thread.
+// Then several bots: New bot (the Bots heading's +) opening the create flow,
+// and a second bot, Scout, selected, with Dot listed above it.
 export const BOT_PATH = "/plugins/studio/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
@@ -40,6 +38,8 @@ export const dismissProblems = (client) => client.evaluate(`(() => new Promise((
   tick();
 }))()`, true);
 export const SIDEBAR = 'nav[aria-label="Bots"]';
+/** The Threads section above the Bots (ThreadsSection.tsx). */
+export const THREADS = 'section[data-testid="threads-section"]';
 export const LIST_PREF = "sidebar.threadListProvider";
 const SCOUT = { name: "Scout", avatar: "🛰️", shape: "hexagon", color: "#2ba59a", prompt: "Hi Scout. In one short sentence, say you'll watch competitors' release notes for anything that affects ORBIT-42." };
 /** The selected Bot's row opens its chat as BB's thread page; the Bots list stays. `text` must show in the chat, outside the sidebar. */
@@ -74,9 +74,9 @@ const openInfo = async (client, name = "Dot") => {
 };
 
 /**
- * Home on BB's rail: the window leaves the Bots list. BB counts thread pages
- * as Home, so on a thread the click doesn't navigate; from elsewhere it goes
- * back to the last Home route.
+ * Home on BB's rail. BB counts thread pages as Home, so on a thread the click
+ * doesn't navigate; from elsewhere it goes back to the last Home route. The
+ * sidebar keeps Studio's list either way.
  */
 export const clickHome = async (client) => {
   await client.clickAriaButtonWithPointer("Home", 'nav[aria-label="Primary navigation"]');
@@ -178,7 +178,7 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     if (pref !== "studio/bot") throw new Error(`On the Bot page the thread list is ${pref}, not studio/bot`);
     // The Bots list sits in BB's sidebar itself, left of the page, not a column inside it.
     await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}').getBoundingClientRect().left > 120) throw new Error("The Bots list isn't in BB's sidebar"); return true; })()`);
-    for (const text of ["Needs you", "Running", "Recurring", "Recent", "Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", "Inbox sweep", "Pull the ORBIT-42 thread digests", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 90000);
+    for (const text of ["Needs you", "Running", "Schedule", "Recent", "Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", "Inbox sweep", "Pull the ORBIT-42 thread digests", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 90000);
     // The follow-up nests under the thread that started it.
     await client.evaluate(`(() => {
       if (!document.querySelector('${SIDEBAR} li > button[data-thread] + ul button[data-thread]')) throw new Error("No nested sub-thread in the Bot sidebar");
@@ -290,7 +290,11 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     await sleep(1500);
   };
 
-  /** Leaving the Bot page (Home on the rail) and opening a thread no Bot owns from BB's list: BB's own thread list, without the threads the Bot started. */
+  /**
+   * Leaving the Bot page: Home on the rail, then a thread no Bot owns opened
+   * from the Threads section. Studio's list stays (Threads above Bots), and
+   * the threads Dot started show under Dot, not in Threads.
+   */
   const OTHER = "Plan the ORBIT-42 retro";
   const leave = async (client) => {
     await seededBot();
@@ -299,34 +303,33 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
       other = await json(["thread", "spawn", "--project", projectId, "--title", OTHER, "--prompt", "Reply with one short sentence: the ORBIT-42 retro is Monday at 10."]);
       await bbCli(["thread", "wait", other.id, "--status", "idle", "--timeout", "180"]).catch(() => {});
     }
-    // Home, then the rail's Bot item, as a user arrives. (A page loaded straight on the Bot page makes BB's Home return to it:
-    // BB records the route Home was active on, and it counts the Bot page as Home until Studio's rail item registers.)
-    await client.navigate("/");
-    await client.clickAriaButtonWithPointer("Bot", 'nav[aria-label="Primary navigation"]');
+    await client.navigate(BOT_PATH);
     await client.waitForSelector(SIDEBAR, 30000);
-    // The window keeps the Bots list on any thread until another rail destination: Home, then the thread from BB's list.
-    await clickHome(client);
-    await openFromBbList(client, OTHER);
-    if (!(await client.evaluate("location.pathname")).endsWith(`/threads/${other.id}`)) throw new Error(`BB's list didn't open ${OTHER}`);
-    for (let i = 0; i < 40 && JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF])) !== "thread-list/thread-list"; i++) await sleep(500);
-    const pref = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
-    if (pref !== "thread-list/thread-list") throw new Error(`After leaving the Bot page the thread list is ${pref}, not BB's`);
-    await client.waitForText("New thread", 30000);
-    await client.waitForText(OTHER, 30000);
-    await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}')) throw new Error("The Bots list is still showing"); return true; })()`);
-    // Studio hides the Bot's threads from BB's list: the CLI's list and the sidebar both leave them out.
-    const botOwned = ["Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", ...CHILDREN.map((child) => child.title)];
-    const all = await json(["thread", "list", "--project", projectId, "--include-hidden"]);
-    const visible = (await json(["thread", "list", "--project", projectId])).map((thread) => thread.title);
-    for (const title of botOwned) {
-      if (!all.some((thread) => thread.title === title)) throw new Error(`The Bot's thread ${title} wasn't seeded`);
-      if (visible.includes(title)) throw new Error(`The Bot's thread ${title} isn't hidden from BB's list`);
-    }
-    for (const title of ORBIT_TITLES) await client.waitForText(title, 30000);
+    await dismissProblems(client);
+    // The rail has no Bot item: the Bot page lives under the Studio panel.
     await client.evaluate(`(() => {
-      const text = document.body.textContent;
+      const rail = document.querySelector('nav[aria-label="Primary navigation"]');
+      if (rail && [...rail.querySelectorAll("button, a")].some((each) => (each.getAttribute("aria-label") ?? each.textContent.trim()) === "Bot")) throw new Error("The rail still has a Bot item");
+      return true;
+    })()`);
+    await clickHome(client);
+    await client.waitForSelector(THREADS, 30000);
+    await openFromBbList(client, OTHER);
+    if (!(await client.evaluate("location.pathname")).endsWith(`/threads/${other.id}`)) throw new Error(`The Threads section didn't open ${OTHER}`);
+    await sleep(1000);
+    const pref = JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
+    if (pref !== "studio/bot") throw new Error(`After leaving the Bot page the thread list is ${pref}, not studio/bot`);
+    for (const title of ORBIT_TITLES) await client.waitForText(title, 30000);
+    const botOwned = ["Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", ...CHILDREN.map((child) => child.title)];
+    await client.evaluate(`(() => {
+      const threads = document.querySelector('${THREADS}');
+      const bots = document.querySelector('${SIDEBAR}');
+      if (!threads || !bots) throw new Error("The sidebar lacks Threads or Bots");
+      if (!(threads.compareDocumentPosition(bots) & Node.DOCUMENT_POSITION_FOLLOWING)) throw new Error("Threads isn't above Bots");
+      const text = threads.textContent;
+      for (const title of ${JSON.stringify([OTHER, ...ORBIT_TITLES])}) if (!text.includes(title)) throw new Error("Threads lacks " + title);
       const shown = ${JSON.stringify(botOwned)}.filter((title) => text.includes(title));
-      if (shown.length) throw new Error("BB's list shows the Bot's threads: " + shown.join(", "));
+      if (shown.length) throw new Error("Threads repeats the Bot's threads: " + shown.join(", "));
       return true;
     })()`);
     await dismissProblems(client);
@@ -428,7 +431,7 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
       tick();
     }))()`, true);
     // Scout's own check-in (the Evening wrap-up preset) and its own Memory and Skills.
-    for (const text of ["Checks in weekdays at 18:00", "Weekdays 18:00", "Memory", "Skills", "Open chat"]) await client.waitForText(text, 30000);
+    for (const text of ["Checks in weekdays at 18:00", "Weekdays 6:00 PM", "Memory", "Skills", "Open chat"]) await client.waitForText(text, 30000);
     await sleep(1500);
   };
 
@@ -596,7 +599,7 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     await client.evaluate(`(() => {
       const editor = document.querySelector('[data-testid=automation-editor]');
       const text = editor.textContent;
-      for (const want of ["Edit Release watch", "Script", "Every 15 min, every day · quiet 22:00–7:00", "*/15 7-21 * * *", "Quiet hours", "Timezone", "Morning and evening"]) if (!text.includes(want)) throw new Error("The schedule editor lacks " + want);
+      for (const want of ["Edit Release watch", "Script", "Every 15 min, every day · quiet 10:00 PM–7:00 AM", "*/15 7-21 * * *", "Quiet hours", "Timezone", "Morning and evening"]) if (!text.includes(want)) throw new Error("The schedule editor lacks " + want);
       if (!editor.querySelector('[role=group][aria-label=Days] [aria-pressed=true]')) throw new Error("No day chips on");
       return true;
     })()`);
