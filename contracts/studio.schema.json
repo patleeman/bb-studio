@@ -6352,6 +6352,32 @@
               "string",
               "null"
             ]
+          },
+          "compactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "number"
+                },
+                "tokens": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "threadId",
+                "at",
+                "tokens"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [

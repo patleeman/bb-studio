@@ -570,6 +570,22 @@ public struct BotActivity: Decodable, Hashable, Sendable {
     public var scheduled: [Scheduled]
     public var completed: [Thread]
     public var latest: String?
+    /// Compactions Studio's cache warmer ran; older Studios leave it out.
+    public var compactions: [Compaction]?
+
+    /// One compaction Studio ran before a Bot chat's prompt cache expired.
+    public struct Compaction: Decodable, Hashable, Sendable {
+        public var threadId: String
+        /// Milliseconds.
+        public var at: Double
+        public var tokens: Double?
+
+        public init(threadId: String, at: Double, tokens: Double? = nil) {
+            self.threadId = threadId
+            self.at = at
+            self.tokens = tokens
+        }
+    }
 }
 
 /// A lead thread (the Bot's) and its heartbeat.

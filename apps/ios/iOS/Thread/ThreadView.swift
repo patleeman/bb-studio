@@ -443,7 +443,7 @@ struct ThreadView: View {
                     if !model.canLoadOlder { BotHero(bot: botChrome.bot, status: botStatus, working: model.thread?.isRunning == true) }
                     BotChatTimeline(
                         bot: botChrome.bot, rows: model.chainRows, threadId: model.threadId, projectId: model.thread?.projectId,
-                        running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started,
+                        running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started, compactions: botChrome.compactions,
                         react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
                         edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread,
                         sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: Set(model.rows.map(\.id)), cached: model.showsCache)
@@ -628,7 +628,7 @@ struct ThreadView: View {
     /// The page goes in above the reader, so bring back what was the first
     /// item. By id rather than offset: rows above are only estimated heights.
     private func loadOlder() async -> OlderPage {
-        let first = botChrome.map { BotChatEntry.memo.entries(model.chainRows, started: $0.started).first?.id } ?? TimelineItem.group(model.rows).first?.id
+        let first = botChrome.map { BotChatEntry.memo.entries(model.chainRows, started: $0.started, compactions: $0.compactions).first?.id } ?? TimelineItem.group(model.rows).first?.id
         guard let first else { return .nothing }
         let result = await model.loadOlder()
         if result == .added { position.scrollTo(id: first, anchor: .top) }

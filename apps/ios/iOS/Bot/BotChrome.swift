@@ -7,6 +7,8 @@ struct BotChrome {
     var chain: [String] = []
     /// Threads the Bot started, from BB's thread metadata, with live status.
     var started: [BotStartedThread] = []
+    /// Compactions Studio ran before the cache expired, so their "/compact" reads as Studio's.
+    var compactions: [BotActivity.Compaction] = []
     /// Side threads on the replies of its current thread, by reply id.
     var sideThreads: [String: BotSideThread] = [:]
     /// Opens a thread inside the Bot tab.

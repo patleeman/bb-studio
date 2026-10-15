@@ -101,6 +101,7 @@ final class BotChatTests: XCTestCase {
             case .message(let row, let first, let last): "\(row.id)\(first ? "F" : "")\(last ? "L" : "")"
             case .work: "work"
             case .child(_, let id): "child:\(id)"
+            case .autoCompacted: "compacted"
             }
         }
         XCTAssertEqual(shape, ["day", "u1F", "u2L", "work", "a1F", "work", "a2L", "day", "a3FL"])
@@ -155,9 +156,33 @@ final class BotChatTests: XCTestCase {
             case .message(let row, _, _): row.id
             case .work: "work"
             case .child(let event, _): "\(event.verb == .started ? "started" : "update"):\(event.threadId ?? "-"):\(event.status.rawValue)"
+            case .autoCompacted: "compacted"
             }
         }
         XCTAssertEqual(shape, ["day", "a1", "work", "started:t_run:running", "a2", "update:t_run:failed"])
+    }
+
+    func testStudiosCompactionIsAMarkerAndTheUsersStaysABubble() throws {
+        let timeline = try rows("""
+        [
+          {"id":"a1","kind":"conversation","role":"assistant","text":"Done.","createdAt":\(day1)},
+          {"id":"c1","kind":"conversation","role":"user","text":"/compact","createdAt":\(day1 + 60_000)},
+          {"id":"c2","kind":"conversation","role":"user","text":"/compact","createdAt":\(day1 + 3_600_000)}
+        ]
+        """)
+        let compactions = [BotActivity.Compaction(threadId: "thr_bot", at: day1 + 30_000, tokens: 181_234)]
+        let shape: [String] = BotChatEntry.build(timeline, compactions: compactions).map {
+            switch $0 {
+            case .day: "day"
+            case .message(let row, _, _): row.id
+            case .work: "work"
+            case .child: "child"
+            case .autoCompacted(_, let id): "compacted:\(id)"
+            }
+        }
+        XCTAssertEqual(shape, ["day", "a1", "compacted:c1", "c2"])
+        XCTAssertEqual(BotChatEntry.autoCompactedLabel(compactions[0]), "Auto-compacted by Studio before the cache expired · ~181k tokens")
+        XCTAssertEqual(BotChatEntry.autoCompactedLabel(.init(threadId: "t", at: 0)), "Auto-compacted by Studio before the cache expired")
     }
 
     func testPassRepliesAreSilent() throws {

@@ -1153,6 +1153,7 @@ export class Bots {
     }
     scheduled.sort((a, b) => Number(b.kind === "heartbeat") - Number(a.kind === "heartbeat") || (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity));
     const latest = output?.output ? output.output.slice(-1200) : null;
-    return { needsYou, inProgress, waiting, scheduled, completed, latest };
+    const compactions = (this.deps.db.prepare("SELECT thread_id AS threadId, at, tokens FROM bot_cache_compactions WHERE bot_id = ? ORDER BY at").all(bot.id) as { threadId: string; at: number; tokens: number | null }[]);
+    return { needsYou, inProgress, waiting, scheduled, completed, latest, compactions };
   }
 }

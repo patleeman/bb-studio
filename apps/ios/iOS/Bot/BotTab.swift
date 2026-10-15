@@ -150,6 +150,7 @@ struct BotTab: View {
     private func chrome(_ bot: BotInfo) -> BotChrome {
         let chain = chain.last == bot.lead.threadId ? chain : bot.lead.threadId.map { [$0] } ?? []
         return BotChrome(bot: bot, chain: chain, started: BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain),
+                         compactions: activity?.compactions ?? [],
                          sideThreads: sideThreads,
                          openThread: { path.append(.thread(id: $0)) },
                          replyInThread: { messageId in replyInThread(threadId: bot.lead.threadId, messageId: messageId) },

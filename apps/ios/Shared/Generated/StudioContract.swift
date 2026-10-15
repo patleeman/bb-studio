@@ -6064,6 +6064,18 @@ public enum Studio {
     }
   }
 
+  public struct BotActivityOutputCompactionsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var at: Double?
+    public var tokens: Double?
+
+    public init(threadId: String? = nil, at: Double? = nil, tokens: Double? = nil) {
+      self.threadId = threadId
+      self.at = at
+      self.tokens = tokens
+    }
+  }
+
   public struct BotActivityOutput: Sendable, Hashable, Codable {
     public var needsYou: [BotActivityOutputNeedsYouItem]?
     public var inProgress: [BotActivityOutputInProgressItem]?
@@ -6071,14 +6083,16 @@ public enum Studio {
     public var scheduled: [BotActivityOutputScheduledItem]?
     public var completed: [BotActivityOutputCompletedItem]?
     public var latest: String?
+    public var compactions: [BotActivityOutputCompactionsItem]?
 
-    public init(needsYou: [BotActivityOutputNeedsYouItem]? = nil, inProgress: [BotActivityOutputInProgressItem]? = nil, waiting: [BotActivityOutputWaitingItem]? = nil, scheduled: [BotActivityOutputScheduledItem]? = nil, completed: [BotActivityOutputCompletedItem]? = nil, latest: String? = nil) {
+    public init(needsYou: [BotActivityOutputNeedsYouItem]? = nil, inProgress: [BotActivityOutputInProgressItem]? = nil, waiting: [BotActivityOutputWaitingItem]? = nil, scheduled: [BotActivityOutputScheduledItem]? = nil, completed: [BotActivityOutputCompletedItem]? = nil, latest: String? = nil, compactions: [BotActivityOutputCompactionsItem]? = nil) {
       self.needsYou = needsYou
       self.inProgress = inProgress
       self.waiting = waiting
       self.scheduled = scheduled
       self.completed = completed
       self.latest = latest
+      self.compactions = compactions
     }
   }
 

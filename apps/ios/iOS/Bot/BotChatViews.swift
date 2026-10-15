@@ -14,6 +14,8 @@ struct BotChatTimeline: View {
     let thinking: String?
     /// Threads the Bot started, placed where they were made, with live status.
     let started: [BotStartedThread]
+    /// Compactions Studio ran before the cache expired.
+    var compactions: [BotActivity.Compaction] = []
     var react: (String) -> Void
     var quote: (String) -> Void
     var select: (String) -> Void
@@ -29,7 +31,7 @@ struct BotChatTimeline: View {
     var cached = false
 
     var body: some View {
-        let entries = BotChatEntry.memo.entries(rows, started: started)
+        let entries = BotChatEntry.memo.entries(rows, started: started, compactions: compactions)
         let live = Dictionary(started.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
         ForEach(entries) { entry in
             switch entry {
@@ -45,6 +47,8 @@ struct BotChatTimeline: View {
                 .modifier(ChatPerfRow(row: row, cached: cached))
             case .work(let rows):
                 BotWorkRow(rows: rows)
+            case .autoCompacted(let compaction, _):
+                BotAutoCompactedMarker(compaction: compaction)
             case .child(let event, _):
                 BotChildCard(event: event, live: event.threadId.flatMap { live[$0] }) {
                     if let id = event.threadId { openThread(id) }
@@ -67,6 +71,21 @@ struct BotDaySeparator: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 10)
             .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Studio's "/compact" before the cache expired, centered and quiet like a day.
+struct BotAutoCompactedMarker: View {
+    let compaction: BotActivity.Compaction
+
+    var body: some View {
+        Text(BotChatEntry.autoCompactedLabel(compaction))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
     }
 }
 

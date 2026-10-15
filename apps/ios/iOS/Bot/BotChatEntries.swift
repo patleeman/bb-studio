@@ -83,6 +83,8 @@ enum BotChatEntry: Identifiable, Equatable {
     case work([TimelineRow])
     /// A thread the Bot started, or news of one.
     case child(BotChildEvent, id: String)
+    /// The "/compact" Studio's cache warmer sent, not the user.
+    case autoCompacted(BotActivity.Compaction, id: String)
 
     var id: String {
         switch self {
@@ -90,6 +92,7 @@ enum BotChatEntry: Identifiable, Equatable {
         case .message(let row, _, _): row.id
         case .work(let rows): "work:\(rows.first?.id ?? "")"
         case .child(_, let id): "child:\(id)"
+        case .autoCompacted(_, let id): "compacted:\(id)"
         }
     }
 
@@ -100,14 +103,16 @@ enum BotChatEntry: Identifiable, Equatable {
     @MainActor final class Memo {
         private var rows: [TimelineRow] = []
         private var started: [BotStartedThread] = []
+        private var compactions: [BotActivity.Compaction] = []
         private var entries: [BotChatEntry] = []
 
-        func entries(_ rows: [TimelineRow], started: [BotStartedThread]) -> [BotChatEntry] {
+        func entries(_ rows: [TimelineRow], started: [BotStartedThread], compactions: [BotActivity.Compaction] = []) -> [BotChatEntry] {
             // Same arrays (usually the very same storage): nothing to do.
-            if rows == self.rows, started == self.started { return entries }
+            if rows == self.rows, started == self.started, compactions == self.compactions { return entries }
             self.rows = rows
             self.started = started
-            entries = BotChatEntry.build(rows, started: started)
+            self.compactions = compactions
+            entries = BotChatEntry.build(rows, started: started, compactions: compactions)
             return entries
         }
     }
@@ -116,7 +121,7 @@ enum BotChatEntry: Identifiable, Equatable {
     /// messages doesn't start a new run, so the avatar shows once per reply.
     /// `started` threads go in where they were made; ones older than the
     /// loaded rows wait until that history loads.
-    static func build(_ rows: [TimelineRow], started: [BotStartedThread] = [], calendar: Calendar = .current) -> [BotChatEntry] {
+    static func build(_ rows: [TimelineRow], started: [BotStartedThread] = [], compactions: [BotActivity.Compaction] = [], calendar: Calendar = .current) -> [BotChatEntry] {
         let items = TimelineItem.group(rows.filter(shows))
         var entries: [BotChatEntry] = []
         var lastDay: Date?
@@ -172,6 +177,12 @@ enum BotChatEntry: Identifiable, Equatable {
                     card(event, id: row.id, at: time)
                     continue
                 }
+                if let compaction = autoCompaction(row, compactions) {
+                    closeRun()
+                    lastSender = nil
+                    entries.append(.autoCompacted(compaction, id: row.id))
+                    continue
+                }
                 let first = lastSender != row.isUser
                 if first { closeRun() } else if let index = openMessage, case .message(let previous, let wasFirst, _) = entries[index] {
                     entries[index] = .message(previous, first: wasFirst, last: false)
@@ -214,6 +225,26 @@ enum BotChatEntry: Identifiable, Equatable {
             return BotChildEvent(threadId: nil, title: "\(count) threads", status: outcomes.contains { $0.status == "failed" } ? .failed : .finished, verb: .update)
         }
         return nil
+    }
+
+    /// The warmer's compaction behind a "/compact" user message: one Studio
+    /// recorded up to two minutes before it. Without one it was the user's.
+    static func autoCompaction(_ row: TimelineRow, _ compactions: [BotActivity.Compaction]) -> BotActivity.Compaction? {
+        guard !compactions.isEmpty, row.isConversation, row.isUser,
+              row.text?.trimmingCharacters(in: .whitespacesAndNewlines) == "/compact",
+              let sent = date(row.createdAt ?? row.startedAt)?.timeIntervalSince1970 else { return nil }
+        return compactions.last { compaction in
+            let delay = sent - compaction.at / 1000
+            return delay >= -5 && delay <= 120
+        }
+    }
+
+    /// "Auto-compacted by Studio before the cache expired · ~180k tokens".
+    static func autoCompactedLabel(_ compaction: BotActivity.Compaction) -> String {
+        let label = "Auto-compacted by Studio before the cache expired"
+        guard let tokens = compaction.tokens, tokens > 0 else { return label }
+        let size = tokens >= 1000 ? "\(Int((tokens / 1000).rounded()))k" : "\(Int(tokens))"
+        return "\(label) · ~\(size) tokens"
     }
 
     /// BB times are milliseconds; older rows used seconds.

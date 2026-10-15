@@ -295,6 +295,8 @@ const botActivity = z.object({
   completed: z.array(botThread),
   /** The end of the Bot thread's latest reply, for the home's chat preview. */
   latest: z.string().nullable(),
+  /** Compactions Studio's cache warmer ran in the last 30 days, so chats can tell them from a manual "/compact". */
+  compactions: z.array(z.object({ threadId: z.string(), at: z.number(), tokens: z.number().nullable() })).optional(),
 });
 export type BotActivityView = z.infer<typeof botActivity>;
 /** A Bot's runner (src/runners.ts): a long-lived thread on its own schedule that reports only through runner_report. */
