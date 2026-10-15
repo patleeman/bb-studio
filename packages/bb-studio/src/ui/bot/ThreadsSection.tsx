@@ -111,7 +111,7 @@ const PILL: Partial<Record<ThreadState, { className: string; label: string }>> =
   error: { className: "bg-destructive text-white", label: "Failed" },
 };
 
-const PAGE = 40;
+const PAGE = 10;
 
 export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId: string | null; onNavigate(): void }) {
   const state = experimental_useSidebarThreads();
