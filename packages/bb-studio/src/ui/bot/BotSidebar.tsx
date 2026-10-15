@@ -1,6 +1,6 @@
 // The sidebar: Studio's thread list provider ("Bot (Studio)"), which replaces
 // BB's thread list on every page but the Studio panel (threadListSwitch.ts).
-// Bots on top, then every thread as a two-line row (ThreadsSection.tsx).
+// Threads on top, under BB's New thread (ThreadsSection.tsx), then Bots.
 // A "Bots" list: every Bot (the primary first), the selected one (the Bot
 // page's route, selection.ts; on a thread, the thread's owner) expanded under
 // it into the threads it started: Needs you, Running, Runners, Recurring,
@@ -88,8 +88,8 @@ export function BotThreadList({ onNavigate, activeThreadId }: PluginThreadListPr
   const threadId = isBotPath(pathname) ? null : threadIdForPath(pathname);
   return (
     <>
-      <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} threadId={threadId} />
       <ThreadsSection activeThreadId={activeThreadId ?? null} onNavigate={onNavigate} />
+      <BotsList onNavigate={onNavigate} activeThreadId={activeThreadId ?? null} threadId={threadId} />
     </>
   );
 }

@@ -1224,12 +1224,16 @@ of Staff", with the same thread and check-ins; rename it from its page.
   side chat** included. With no bot yet, or on **New bot**, the page is the
   create flow, and the first message opens the new bot's chat.
 - **Sidebar**: on every page but the Studio panel, BB's sidebar shows
-  Studio's list in place of its thread list: **Bots** on top, then
-  **Threads**, every top-level thread as a two-line row (status dot, title
-  and age, or a **Needs you** or **Failed** pill; the project's name on the
-  second line), pinned first and then newest, with no per-project sections.
-  Sub-threads and hidden threads stay out of **Threads**; **+** beside it
-  starts a new thread, and ⌘-click or middle-click opens a row in a split.
+  Studio's list in place of its thread list: **Threads** on top, right
+  under BB's **New thread**, then **Bots**. **Threads** lists every
+  top-level thread as a two-line row: the title, and on the right the age or
+  what the thread needs (a **Needs you** or **Failed** pill, a working or
+  unread dot, a pin); the project's name on the second line. Pinned come
+  first, then newest. The menu beside the heading sorts by last activity or
+  creation and can group under project headings (kept on this device).
+  Sub-threads, hidden threads and the Bots list's own threads stay out. Each
+  row has BB's thread menu (right-click or ⋯) and Archive on hover;
+  ⌘-click or middle-click opens a row in a split.
   The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
   Settings → Appearance). Under **Bots**, every bot (the primary first) with
   its avatar, tinted in its color; the selected one opens into the
