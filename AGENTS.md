@@ -87,11 +87,12 @@ BB application in a staged environment before handoff.
   added over 1,200 fake ORBIT-42 sessions that had to be deleted.
   - Start staged BBs only through `scripts/staged-bb.mjs`, using
     `BB_STAGED_DIR` and `BB_STAGED_PORT` for extra instances. It gives Codex
-    its own `CODEX_HOME` inside the instance and shares only `auth.json`
-    through a symlink. Don't launch `bb-app` with your own environment.
-  - Claude Code isn't isolated yet: staged runs still write to
-    `~/.claude/projects`. Prefer Codex for staged fixtures, and keep Claude
-    Code handoffs in captures to the minimum the screenshot needs.
+    its own `CODEX_HOME` (sharing only `auth.json` through a symlink) and
+    Claude Code its own `CLAUDE_CONFIG_DIR` through a `claude` wrapper (the
+    sign-in stays in the Keychain). Don't launch `bb-app` with your own
+    environment.
+  - Don't use Pi in staged fixtures. bb gives the Pi bridge no environment,
+    so its sessions always land in the real `~/.bb/pi-bridge-sessions`.
   - If you add a script that runs agents outside a staged BB, give it a
     separate provider home, or use a mode that saves nothing, such as
     `codex exec --ephemeral`.
