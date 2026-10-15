@@ -25,13 +25,18 @@ the pane, splits, moves to another pane, Rename, and Copy link.
 
 ### The Studio tab in a thread
 
-A thread's side panel has one **Studio** tab (**+ → Studio**) for every kind
-that opens beside the chat: pages, drawings, designs, dashboards and
-artifacts. It opens on the thread's collection: **This thread** (items made
-or linked in it, and the page it was started from), then **Recent** in the
-thread's project. Search covers every kind, and the chips above the list
-filter to one. An item opens in place in its kind's editor, with a back
-arrow to the collection. **New** offers each kind that can be made here,
+A thread's side panel has one **Studio** tab (**+ → Studio**) for every
+kind: pages, drawings, designs, dashboards, artifacts, recordings and
+dictations, and each kind an add-on registers with Studio. It opens on the
+thread's collection: **This thread** (items made or linked in it, and the
+page it was started from), then **Recent** in the thread's project. Search
+covers every kind, and the chips above the list filter to one. As in the
+library, dictations stay out of **All**; their chip and search find them.
+Studio's own kinds open in place in their editor, with a back arrow to the
+collection; a recording or dictation opens Talk's recording view (transcript
+and playback). An add-on's item opens its page in BB's main area, as from
+the library, and the tab stays on the collection; a new add-on kind appears
+with its own chip without any change to Studio. **New** offers each kind that can be made and opened here,
 makes the item in the thread's project and links it to the thread. The
 save icon opens Artifacts' save picker for the latest reply's files. Reply
 cards and **Expand to page** open the Studio tab on their item

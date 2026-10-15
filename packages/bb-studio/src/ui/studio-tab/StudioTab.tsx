@@ -1,9 +1,10 @@
 // The Studio tab in a thread's workbench: one panel action for every kind
 // that opens beside the conversation. It opens on the thread's collection
 // (this thread's items, then recent ones; search and a kind filter), and an
-// item opens in place in its kind's editor, with a way back. Cards open it
-// with `{ kind, id }`; see ./model.ts for params and the old per-kind tab ids.
-import { ICON_BUTTON, Icon, ItemTile, PRIMARY_BUTTON, THUMBNAIL, cn, studioItemProps } from "@bb-studio/kit/app";
+// item opens in place in its kind's editor, with a way back; an add-on's item
+// opens its page in BB's main area. Cards open it with `{ kind, id }`; see
+// ./model.ts for params, kinds and the old per-kind tab ids.
+import { ICON_BUTTON, Icon, ItemTile, PRIMARY_BUTTON, THUMBNAIL, cn, openAppPath, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, untitled } from "@bb-studio/kit/format";
 import { useRealtime, useRpc, useSdk, type JsonValue } from "@get-bb/plugin-sdk/app";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -16,18 +17,19 @@ import { REALTIME_CHANNEL as DASHBOARDS_CHANNEL } from "../../dashboards/shared"
 import { REALTIME_CHANNEL as DESIGN_CHANNEL } from "../../design/shared";
 import { REALTIME_CHANNEL as DRAW_CHANNEL } from "../../draw/shared";
 import { REALTIME_CHANNEL as PAGES_CHANNEL } from "../../pages/constants";
+import { RECORDING_CHANGED } from "../../talk/shared/format";
 import { appliedKinds } from "../kinds-snapshot";
-import { enabledKinds, tabKind, tabSections, tabTarget, type TabKind, type TabKindInfo, type TabTarget } from "./model";
+import { collectionKinds, enabledKinds, itemOpening, tabSections, tabTarget, type CollectionKind, type TabKind, type TabKindInfo, type TabTarget } from "./model";
 
 const PageView = lazy(() => import("../../pages/ui/PagePanel").then((module) => ({ default: module.PageTab })));
 const DrawingView = lazy(() => import("../../draw/ui/drawing-editor").then((module) => ({ default: module.DrawingEditor })));
 const DesignView = lazy(() => import("../../design/ui/design-tab").then((module) => ({ default: module.TabCanvas })));
 const DashboardView = lazy(() => import("../../dashboards/ui/dashboard-tab").then((module) => ({ default: module.TabDashboard })));
 const ArtifactView = lazy(() => import("../../artifacts/ui/artifact-viewer").then((module) => ({ default: module.ArtifactViewer })));
+const RecordingView = lazy(() => import("../../talk/ui/recordings-panel").then((module) => ({ default: module.RecordingDetail })));
 const SavePicker = lazy(() => import("../../artifacts/ui/save-picker").then((module) => ({ default: module.SavePicker })));
 
 type Item = z.output<(typeof rpcContract)["overview"]["output"]>["items"][number];
-type Kind = ProviderView["kinds"][number];
 const BACK = "Studio";
 
 /** One item in its kind's in-thread view. */
@@ -39,16 +41,17 @@ export function ItemView({ kind, id, threadId, onBack }: { kind: TabKind; id: st
         : kind === "drawing" ? <DrawingView key={id} drawingId={id} threadId={threadId} {...props} />
         : kind === "design" ? <DesignView key={id} designId={id} {...props} />
         : kind === "dashboard" ? <DashboardView key={id} dashboardId={id} {...props} />
+        : kind === "recording" || kind === "dictation" ? <RecordingView key={id} id={id} onBack={onBack} />
         : <ArtifactView key={id} artifactId={id} threadId={threadId} {...props} />}
     </Suspense>
   );
 }
 
-export function StudioTab({ threadId, params, initial }: { threadId: string; params: JsonValue | null; initial?: { target: TabTarget; filter: TabKind | null } }) {
+export function StudioTab({ threadId, params, initial }: { threadId: string; params: JsonValue | null; initial?: { target: TabTarget; filter: string | null } }) {
   const enabled = useMemo(() => enabledKinds(appliedKinds()?.off ?? new Set()), []);
   const asked = useMemo(() => initial?.target ?? tabTarget(params, enabled), [initial, params, enabled]);
   const [target, setTarget] = useState<TabTarget>(asked);
-  const [filter, setFilter] = useState<TabKind | null>(initial?.filter ?? null);
+  const [filter, setFilter] = useState<string | null>(initial?.filter ?? null);
   // BB keeps this tab mounted when a card opens it on another item, so a new
   // target replaces the one on screen.
   const [openedWith, setOpenedWith] = useState(asked);
@@ -95,6 +98,7 @@ function useKindChanges(onChange: () => void) {
   useRealtime(DESIGN_CHANNEL, onChange);
   useRealtime(DASHBOARDS_CHANNEL, onChange);
   useRealtime(ARTIFACTS_CHANNEL, onChange);
+  useRealtime(RECORDING_CHANGED, onChange);
 }
 
 function Collection({
@@ -107,8 +111,8 @@ function Collection({
 }: {
   threadId: string;
   enabled: readonly TabKindInfo[];
-  filter: TabKind | null;
-  onFilter(kind: TabKind | null): void;
+  filter: string | null;
+  onFilter(key: string | null): void;
   onOpen(kind: TabKind, id: string): void;
   onSave(): void;
 }) {
@@ -116,7 +120,7 @@ function Collection({
   const pages = useRpc<typeof pagesContract>();
   const sdk = useSdk();
   const [items, setItems] = useState<Item[] | null>(null);
-  const [kinds, setKinds] = useState<Map<string, Kind>>(new Map());
+  const [providers, setProviders] = useState<ProviderView[]>([]);
   const [linked, setLinked] = useState<Set<string>>(new Set());
   const [thread, setThread] = useState<{ projectId: string | null; status: string } | null>(null);
   const [query, setQuery] = useState("");
@@ -146,9 +150,7 @@ function Collection({
     ]).then(
       ([overview, links, chatPage]) => {
         if (!live) return;
-        const byKind = new Map<string, Kind>();
-        for (const provider of overview.providers) for (const kind of provider.kinds) if (tabKind(kind.id)?.pluginId === provider.pluginId) byKind.set(kind.id, kind);
-        setKinds(byKind);
+        setProviders(overview.providers);
         setItems(overview.items);
         setLinked(new Set([...links, ...chatPage]));
       },
@@ -160,8 +162,15 @@ function Collection({
   }, [rpc, pages, threadId, refreshKey]);
 
   const projectId = thread?.projectId ?? null;
-  const sections = useMemo(() => tabSections(items ?? [], { enabled, filter, query, linked, projectId }), [items, enabled, filter, query, linked, projectId]);
-  const creatable = enabled.filter((each) => kinds.get(each.kind)?.create?.mode === "rpc");
+  const kinds = useMemo(() => collectionKinds(enabled, providers), [enabled, providers]);
+  const sections = useMemo(() => tabSections(items ?? [], { kinds, filter, query, linked, projectId }), [items, kinds, filter, query, linked, projectId]);
+  const creatable = kinds.flatMap((each) => (each.creatable && each.tab ? [each.tab] : []));
+  const open = (item: Item) => {
+    const opening = itemOpening(item, kinds);
+    if (opening?.open === "tab") onOpen(opening.kind, opening.id);
+    // Add-on kinds have no in-thread view: their page opens in BB's main area, as from the library.
+    else if (opening) openAppPath(opening.href);
+  };
 
   const create = async (info: TabKindInfo) => {
     setMenu(false);
@@ -180,7 +189,7 @@ function Collection({
     }
   };
 
-  const shown = filter ? tabKind(filter) : null;
+  const shown = filter ? (kinds.find((each) => each.key === filter) ?? null) : null;
   const noun = (shown?.plural ?? "items").toLowerCase();
   return (
     <div className="studio-root flex h-full flex-col bg-background text-foreground">
@@ -220,11 +229,11 @@ function Collection({
           </div>
         ) : null}
       </div>
-      {enabled.length > 1 ? (
+      {kinds.length > 1 ? (
         <div role="group" aria-label="Kind" className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 py-1.5">
           <Chip pressed={!filter} onClick={() => onFilter(null)}>All</Chip>
-          {enabled.map((each) => (
-            <Chip key={each.kind} pressed={filter === each.kind} onClick={() => onFilter(filter === each.kind ? null : each.kind)}>
+          {kinds.map((each) => (
+            <Chip key={each.key} pressed={filter === each.key} onClick={() => onFilter(filter === each.key ? null : each.key)}>
               {each.plural}
             </Chip>
           ))}
@@ -242,7 +251,7 @@ function Collection({
               <ul className="flex flex-col">
                 {section.items.map((item) => (
                   <li key={`${item.pluginId}:${item.id}`}>
-                    <ItemRow item={item} info={tabKind(item.kind)!} onOpen={() => onOpen(item.kind as TabKind, item.id)} />
+                    <ItemRow item={item} info={kinds.find((each) => each.key === `${item.pluginId}:${item.kind}`)!} onOpen={() => open(item)} />
                   </li>
                 ))}
               </ul>
@@ -267,7 +276,7 @@ function Chip({ pressed, onClick, children }: { pressed: boolean; onClick(): voi
   );
 }
 
-function ItemRow({ item, info, onOpen }: { item: Item; info: TabKindInfo; onOpen(): void }) {
+function ItemRow({ item, info, onOpen }: { item: Item; info: CollectionKind; onOpen(): void }) {
   const [failed, setFailed] = useState(false);
   return (
     <button

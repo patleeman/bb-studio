@@ -279,7 +279,8 @@ function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnTyp
   );
 }
 
-export function RecordingDetail({ id }: { id: string }) {
+/** `onBack` replaces going to Studio's collection, as in a thread's Studio tab. */
+export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => void }) {
   const { rpc, data, error, refetch } = useRecording(id);
   const provider = useRecordingProvider();
   const move = async (target: string | null) => {
@@ -337,7 +338,7 @@ export function RecordingDetail({ id }: { id: string }) {
     return () => talk.setViewing(null);
   }, [id]);
   // The collection is Studio's.
-  const toCollection = useCallback((replace = false) => toRecordings(replace), []);
+  const toCollection = useCallback((replace = false) => (onBack ? onBack() : toRecordings(replace)), [onBack]);
   // The recording went away while open: deleted elsewhere, or discarded
   // because it finished without a word.
   const gone = Boolean(data && error && /No recording/.test(error));
