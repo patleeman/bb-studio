@@ -209,6 +209,7 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
   const status = statusLabel(view.run, bot.state, running);
   const groups = sidebarGroups(activity.data);
   const ids = chain.data?.threadIds ?? [];
+  const chatOpen = active !== null && (active === bot.threadId || ids.includes(active));
   const earlier = bot.threadId && ids.at(-1) === bot.threadId ? ids.slice(0, -1).reverse() : [];
   // Bot info opens beside the Bot's own chat when it opens.
   useOpenBotInfoOnChat(active, bot.threadId ? [...ids, bot.threadId] : ids);
@@ -226,8 +227,9 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
   return (
     <div className="flex flex-col" style={accent}>
       {/* The bot: its row opens its chat as a BB thread; ⓘ opens its Info. */}
-      <div className="group/bot flex min-w-0 items-center rounded-md pr-1" style={{ background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" }}>
-      <button type="button" aria-current={!bot.threadId || active === bot.threadId ? "page" : undefined} data-testid="bot-main" title={`${bot.name}: ${status}`}
+      {/* Tinted in the Bot's color only while its chat (or an earlier conversation of it) is the open thread. */}
+      <div className="group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover" style={chatOpen ? { background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" } : undefined}>
+      <button type="button" aria-current={chatOpen ? "page" : undefined} data-testid="bot-main" title={`${bot.name}: ${status}`}
         onClick={() => openBot(bot)}
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left hover:brightness-110">
         <span className="relative shrink-0">
