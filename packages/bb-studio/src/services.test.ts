@@ -14,6 +14,20 @@ function setup() {
 }
 
 describe("Studio services", () => {
+  it("drops the Spaces feature's leftover space_folders table", () => {
+    const { db } = setup();
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'space_folders'").get()).toBeUndefined();
+  });
+
+  it("takes an item's origin thread from its earliest created link, ignoring other roles", () => {
+    const { services } = setup();
+    services.linkThread({ threadId: "thr_chat", ref: page, role: "chat", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });
+    services.linkThread({ threadId: "thr_late", ref: page, role: "created", state: "idle", createdAt: 9, updatedAt: 9, metadata: {} });
+    services.linkThread({ threadId: "thr_maker", ref: page, role: "created", state: "idle", createdAt: 5, updatedAt: 5, metadata: {} });
+    services.linkThread({ threadId: "thr_talk", ref: task, role: "new-thread", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });
+    expect(services.originThreads()).toEqual(new Map([["pages:opaque-page", "thr_maker"]]));
+  });
+
   it("keeps existing item threads when adding multiple item refs", () => {
     const { services } = setup();
     services.linkThread({ threadId: "thr_old", ref: page, role: "chat", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });

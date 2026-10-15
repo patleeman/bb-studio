@@ -53,6 +53,17 @@ export class StudioServices {
     return rows.flatMap((row) => this.threads(readRef(row.plugin_id, row.item_id)).filter((thread) => thread.threadId === threadId));
   }
 
+  /**
+   * The thread that made each item, by `<plugin>:<id>`: its earliest link
+   * with the "created" role. Items no thread made are absent.
+   */
+  originThreads(): Map<string, string> {
+    const rows = this.db.prepare(`SELECT plugin_id, item_id, thread_id FROM item_threads t WHERE role = 'created'
+      AND NOT EXISTS (SELECT 1 FROM item_threads e WHERE e.plugin_id = t.plugin_id AND e.item_id = t.item_id AND e.role = 'created'
+        AND (e.created_at < t.created_at OR (e.created_at = t.created_at AND e.thread_id < t.thread_id)))`).all() as { plugin_id: string; item_id: string; thread_id: string }[];
+    return new Map(rows.map((row) => [`${row.plugin_id}:${row.item_id}`, row.thread_id]));
+  }
+
   activeThreads(): ItemThread[] {
     const refs = this.db.prepare("SELECT DISTINCT plugin_id, item_id FROM item_threads WHERE state NOT IN ('archived', 'deleted')").all() as { plugin_id: string; item_id: string }[];
     return refs.flatMap((row) => this.threads(readRef(row.plugin_id, row.item_id)).filter((thread) => thread.state !== "archived" && thread.state !== "deleted"));

@@ -175,18 +175,28 @@ describe("sorting", () => {
 });
 
 describe("grouping", () => {
-  it("shows an item under each of its tags, in the listed order, and untagged items last", () => {
-    const items = [item("a", { tags: ["s2", "s1"] }), item("b"), item("c", { tags: ["s1"] })];
-    const groups = groupItems(items, "tag", { label: (id) => id || "Untagged", order: ["s1", "s2"] });
-    expect(groups.map((group) => [group.label, group.items.map((each) => each.id)])).toEqual([
-      ["s1", ["a", "c"]],
-      ["s2", ["a"]],
-      ["Untagged", ["b"]],
-    ]);
+  const label = (id: string) => id || "None";
+  const ids = (groups: ReturnType<typeof groupItems>) => groups.map((group) => [group.label, group.items.map((each) => each.id)]);
+  it("orders groups by their most recent item, keeping the sort within each, and items with none last", () => {
+    const items = [item("a", { projectId: "p1", updatedAt: 50 }), item("b", { updatedAt: 90 }), item("c", { projectId: "p2", updatedAt: 70 }), item("d", { projectId: "p1", updatedAt: 60 })];
+    expect(ids(groupItems(items, "project", { label }))).toEqual([["p2", ["c"]], ["p1", ["a", "d"]], ["None", ["b"]]]);
   });
-  it("orders unlisted groups by label", () => {
-    const items = [item("a", { projectId: "p2" }), item("b", { projectId: "p1" }), item("c")];
-    const labels: Record<string, string> = { p1: "Zebra", p2: "Apple", "": "Global" };
-    expect(groupItems(items, "project", { label: (id) => labels[id]! }).map((group) => group.label)).toEqual(["Apple", "Zebra", "Global"]);
+  it("groups by the thread that made each item", () => {
+    const thread = (id: string) => ({ id, title: id.toUpperCase() });
+    const items = [item("a", { thread: thread("t1"), updatedAt: 10 }), item("b", { thread: null, updatedAt: 99 }), item("c", { thread: thread("t2"), updatedAt: 30 }), item("d", { thread: thread("t1"), updatedAt: 20 })];
+    expect(ids(groupItems(items, "thread", { label }))).toEqual([["t2", ["c"]], ["t1", ["a", "d"]], ["None", ["b"]]]);
+  });
+  it("groups by kind", () => {
+    const items = [item("a", { kind: "page", updatedAt: 1 }), item("b", { kind: "drawing", updatedAt: 2 })];
+    expect(ids(groupItems(items, "kind", { label }))).toEqual([["drawing", ["b"]], ["page", ["a"]]]);
+  });
+  it("shows an item under each of its tags, and untagged items last", () => {
+    const items = [item("a", { tags: ["s2", "s1"], updatedAt: 5 }), item("b", { updatedAt: 9 }), item("c", { tags: ["s1"], updatedAt: 1 })];
+    expect(ids(groupItems(items, "tag", { label }))).toEqual([["s1", ["a", "c"]], ["s2", ["a"]], ["None", ["b"]]]);
+  });
+  it("breaks ties by label", () => {
+    const items = [item("a", { projectId: "p2", updatedAt: 1 }), item("b", { projectId: "p1", updatedAt: 1 })];
+    const labels: Record<string, string> = { p1: "Zebra", p2: "Apple" };
+    expect(groupItems(items, "project", { label: (id) => labels[id]! }).map((group) => group.label)).toEqual(["Apple", "Zebra"]);
   });
 });

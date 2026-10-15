@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { RECORDING_KINDS } from "./talk/server/studio";
+import { studioSidebarModel } from "./ui/studio-sidebar-model";
 import { compileQuery, describeFilter, facetCounts, formatQuery, parseQuery, suggest, toggleFilter, type QueryVocabulary } from "./query";
 
 const vocabulary: QueryVocabulary = {
@@ -50,6 +52,18 @@ describe("query", () => {
     expect(compileQuery(parseQuery(""), vocabulary).test(dictation)).toBe(false);
     expect(compileQuery(parseQuery("kind:dictation"), vocabulary).test(dictation)).toBe(true);
     expect(compileQuery(parseQuery("words"), vocabulary).test(dictation)).toBe(true);
+  });
+
+  it("keeps Talk's dictations out of All items, but not out of their sidebar entry, kind filter or search", () => {
+    const kinds = RECORDING_KINDS.map((kind) => ({ ...kind }));
+    const real = { ...vocabulary, kinds };
+    const entry = studioSidebarModel({ providers: [{ pluginId: "talk", name: "Talk", state: "ready", kinds } as never], items: [], tags: [], views: [] }, []).kinds.find((kind) => kind.label === "Dictations")!;
+    expect(compileQuery(parseQuery(""), real).test(dictation)).toBe(false);
+    expect(compileQuery(parseQuery("project:bb-studio"), real).test({ ...dictation, projectId: "proj_a" })).toBe(false);
+    expect(compileQuery(parseQuery(entry.query), real).test(dictation)).toBe(true);
+    expect(compileQuery(parseQuery("kind:Dictations"), real).test(dictation)).toBe(true);
+    expect(compileQuery(parseQuery("standup"), real).test(dictation)).toBe(true);
+    expect(compileQuery(parseQuery(""), real).test({ ...dictation, kind: "recording" })).toBe(true);
   });
 
   it("matches nothing for a value that names nothing", () => {

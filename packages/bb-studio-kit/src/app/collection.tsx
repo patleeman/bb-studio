@@ -107,7 +107,9 @@ export interface CollectionFilter {
   empty: string;
 }
 
-const GROUP_LABELS: Record<GroupBy, string> = { none: "None", kind: "Kind", project: "Project", tag: "Tag" };
+const GROUP_LABELS: Record<GroupBy, string> = { thread: "Thread", project: "Project", kind: "Kind", tag: "Tag", none: "None" };
+/** The group of items with no thread, project or tag. */
+const NO_GROUP: Record<Exclude<GroupBy, "none">, string> = { thread: "No thread", project: "No project", kind: "No kind", tag: "No tag" };
 const ALL = "all";
 const GLOBAL = "global";
 const UNTAGGED = "untagged";
@@ -166,6 +168,7 @@ export function CollectionPage({
   extraCreateItems,
   handlers,
   filter,
+  defaultGroupBy = "none",
 }: {
   title: string;
   kinds: readonly CollectionKind[];
@@ -191,10 +194,12 @@ export function CollectionPage({
   extraCreateItems?: readonly { id: string; label: string; icon: string; onSelect(projectId: string | null): void }[];
   handlers: CollectionHandlers;
   filter?: CollectionFilter;
+  /** The grouping until the user picks one. */
+  defaultGroupBy?: GroupBy;
 }) {
   const [query, setQuery] = useState("");
   const [project, setProject] = useStoredState<string>(`${storageKey}:project`, ALL);
-  const [groupChoice, setGroupBy] = useStoredState<GroupBy>(`${storageKey}:group`, "none", GROUP_BYS);
+  const [groupChoice, setGroupBy] = useStoredState<GroupBy>(`${storageKey}:groupBy`, defaultGroupBy, GROUP_BYS);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [tagFilter, setTagFilter] = useStoredState<string>(`${storageKey}:tag`, ALL);
   const [renaming, setRenaming] = useState(false);
@@ -277,20 +282,25 @@ export function CollectionPage({
 
   // Grouping by something with one value, or that this collection lacks, is no grouping.
   const tagged = tagging && !!items?.some((item) => item.tags?.length);
+  const threaded = !!items?.some((item) => item.thread !== undefined);
   const groupable = (by: GroupBy) =>
-    by === "none" || by === "project" || (by === "kind" && !single) || (by === "tag" && tagged);
+    by === "none" || by === "project" || (by === "kind" && !single) || (by === "tag" && tagged) || (by === "thread" && threaded);
   const grouping = groupable(groupChoice) ? groupChoice : "none";
   const groups = useMemo<Group[] | null>(() => {
     if (grouping === "none") return null;
+    const threadTitles = new Map(shown.flatMap((item) => (item.thread ? [[item.thread.id, item.thread.title] as const] : [])));
     const label = (id: string) =>
-      grouping === "kind"
-        ? (kinds.find((kind) => kind.id === id)?.plural ?? id)
-        : grouping === "project"
-          ? projectName(projects, id || null)
-          : (tagById.get(id)?.name ?? "Untagged");
-    const order = grouping === "kind" ? kinds.map((kind) => kind.id) : grouping === "tag" ? tags?.map((tag) => tag.id) : undefined;
-    return groupItems(shown, grouping, { label, order });
-  }, [grouping, shown, kinds, projects, tagById, tags]);
+      !id
+        ? NO_GROUP[grouping]
+        : grouping === "kind"
+          ? (kinds.find((kind) => kind.id === id)?.plural ?? id)
+          : grouping === "project"
+            ? projectName(projects, id)
+            : grouping === "thread"
+              ? threadTitles.get(id) || "Untitled thread"
+              : (tagById.get(id)?.name ?? "Tag");
+    return groupItems(shown, grouping, { label });
+  }, [grouping, shown, kinds, projects, tagById]);
   // Rows in the order they show, for shift-click ranges.
   const ordered = useMemo(
     () => (groups ? [...new Map(groups.flatMap((group) => group.items).map((item) => [itemKey(item), item])).values()] : shown),
@@ -516,10 +526,12 @@ export function CollectionPage({
   // A column the rows are grouped by would repeat the group header.
   const showKind = !single && grouping !== "kind";
   const showProject = grouping !== "project";
-  // Below 48rem of list width the Kind column goes (the tile shows
-  // the kind); below 36rem rows stack into a name and a menu.
+  // Tags get their own column when the collection has any; it goes with Kind.
+  const showTags = tagged;
+  // Below 48rem of list width the Kind and Tags columns go (the tile shows
+  // the kind, chips follow the name); below 36rem rows stack into a name and a menu.
   const template = (wide: boolean) =>
-    `minmax(0,1fr)${wide && showKind ? " 110px" : ""}${showProject ? " minmax(0,160px)" : ""}${columns.map(() => " 90px").join("")} 130px`;
+    `minmax(0,1fr)${wide && showKind ? " 110px" : ""}${showProject ? " minmax(0,140px)" : ""}${wide && showTags ? " 150px" : ""}${columns.map(() => " 90px").join("")} 120px`;
   const gridTemplate = { "--cols": template(true), "--cols-narrow": template(false) } as CSSProperties;
   const gridColumns = "[grid-template-columns:var(--cols)] @max-3xl/list:[grid-template-columns:var(--cols-narrow)]";
 
@@ -598,7 +610,9 @@ export function CollectionPage({
     </DropdownMenu>
   );
   const groupGlyph = (id: string) =>
-    grouping === "kind" ? (
+    grouping === "thread" ? (
+      <Icon name="MessageSquare" className={cn("size-3.5", !id && "opacity-50")} />
+    ) : grouping === "kind" ? (
       <Icon name={kinds.find((kind) => kind.id === id)?.icon ?? "File"} className="size-3.5" />
     ) : grouping === "tag" ? (
       tagById.get(id) ? <TagDot color={tagById.get(id)!.color} /> : null
@@ -679,7 +693,7 @@ export function CollectionPage({
             <div className={cn("flex min-w-0 items-center gap-1.5 font-medium", !item.title && "text-muted-foreground")}>
               <span className="truncate">{untitled(item.title)}</span>
               {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
-              {tagging ? <TagChips ids={item.tags} tags={tagById} onPick={pickTag} /> : null}
+              {tagging ? <span className={cn("contents", showTags && "@3xl/list:hidden")}><TagChips ids={item.tags} tags={tagById} onPick={pickTag} /></span> : null}
             </div>
             {parent ? <div className="truncate text-xs text-muted-foreground">{parent}</div> : null}
             {!parent ? preview(item, "truncate") : null}
@@ -695,6 +709,11 @@ export function CollectionPage({
         {showProject ? (
           <div role="gridcell" className="truncate text-muted-foreground @max-xl/list:hidden">
             {projectLabel(item)}
+          </div>
+        ) : null}
+        {showTags ? (
+          <div role="gridcell" className="flex min-w-0 items-center gap-1 overflow-hidden @max-3xl/list:hidden">
+            <TagChips ids={item.tags} tags={tagById} max={item.tags && item.tags.length > 2 ? 1 : 2} onPick={pickTag} />
           </div>
         ) : null}
         {columns.map((column) => (
@@ -998,6 +1017,7 @@ export function CollectionPage({
                   </span>
                   {showKind ? header("Kind", "kind", "@max-3xl/list:hidden") : null}
                   {showProject ? header("Project", "project") : null}
+                  {showTags ? header("Tags", null, "@max-3xl/list:hidden") : null}
                   {columns.map((column) => header(column.label, `fact:${column.id}`, "text-right"))}
                   {header("Last activity", "updatedAt")}
                 </div>
@@ -1023,7 +1043,7 @@ export function CollectionPage({
                               <Icon name={open ? "ChevronDown" : "ChevronRight"} className="size-3.5" />
                               <span className="flex w-4 justify-center">{groupGlyph(group.id)}</span>
                               <span className="truncate text-foreground">{group.label}</span>
-                              <span className="tabular-nums">{group.items.length}</span>
+                              <span className="shrink-0 tabular-nums">· {plural(group.items.length, "item")}</span>
                             </button>
                           </div>
                           {open ? group.items.map((item) => row(item, group.id)) : null}

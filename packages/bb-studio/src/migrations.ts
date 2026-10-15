@@ -368,4 +368,6 @@ export const MIGRATIONS = [
   SIDE_THREADS_MANY,
   // Live HTML artifacts (src/artifacts/live): shared state, event log and takes.
   ARTIFACT_LIVE_TABLES,
+  // Spaces are gone and nothing reads their folders any more.
+  `DROP TABLE IF EXISTS space_folders`,
 ];

@@ -4,8 +4,11 @@ import type { StudioItem, StudioKind } from "../contract";
 import { untitled } from "../format";
 
 export type CollectionKind = StudioKind & { pluginId: string };
-/** `tags` holds tag ids, when the collection has tags. */
-export type CollectionItem = StudioItem & { pluginId: string; tags?: readonly string[] };
+/**
+ * `tags` holds tag ids, when the collection has tags. `thread` is the thread
+ * that made the item (null: none), when the host knows it.
+ */
+export type CollectionItem = StudioItem & { pluginId: string; tags?: readonly string[]; thread?: { id: string; title: string } | null };
 
 /** Where an item's key is unique: ids are only unique within a plugin. */
 export const itemKey = (item: { pluginId: string; id: string }) => `${item.pluginId}:${item.id}`;
@@ -32,45 +35,53 @@ export function parseSort(text: string): Sort {
   return known && (direction === "asc" || direction === "desc") ? { key: key as SortKey, descending: direction === "desc" } : DEFAULT_SORT;
 }
 
-export type GroupBy = "none" | "kind" | "project" | "tag";
-export const GROUP_BYS: readonly GroupBy[] = ["none", "kind", "project", "tag"];
+export type GroupBy = "thread" | "project" | "kind" | "tag" | "none";
+export const GROUP_BYS: readonly GroupBy[] = ["thread", "project", "kind", "tag", "none"];
 
 export interface Group {
-  /** A kind, project or tag id; "" for items with none. */
+  /** A thread, kind, project or tag id; "" for items with none. */
   id: string;
   label: string;
   items: CollectionItem[];
 }
 
+/** The group ids an item belongs to; [] puts it in the group of items with none. */
+function groupIds(item: CollectionItem, by: Exclude<GroupBy, "none">): string[] {
+  if (by === "thread") return item.thread ? [item.thread.id] : [];
+  if (by === "kind") return [item.kind];
+  if (by === "project") return item.projectId ? [item.projectId] : [];
+  return [...(item.tags ?? [])];
+}
+
 /**
  * Splits sorted items into groups, keeping their order within each. An item
- * with two tags shows in both groups. Groups follow `order`
- * (the kinds or tags as listed) or else their labels, and the group
- * of items with none comes last.
+ * with two tags shows in both groups. Groups with the most recent activity
+ * come first (then by label), and the group of items with none comes last.
  */
 export function groupItems(
   items: readonly CollectionItem[],
   by: Exclude<GroupBy, "none">,
-  context: { label(id: string): string; order?: readonly string[] },
+  context: { label(id: string): string },
 ): Group[] {
   const groups = new Map<string, CollectionItem[]>();
+  const latest = new Map<string, number>();
   const add = (id: string, item: CollectionItem) => {
     const list = groups.get(id);
     if (list) list.push(item);
     else groups.set(id, [item]);
+    latest.set(id, Math.max(latest.get(id) ?? -Infinity, item.updatedAt));
   };
   for (const item of items) {
-    const ids = by === "kind" ? [item.kind] : by === "project" ? [item.projectId ?? ""] : (item.tags ?? []);
+    const ids = groupIds(item, by);
     if (!ids.length) add("", item);
     for (const id of ids) add(id, item);
   }
-  const rank = new Map(context.order?.map((id, index) => [id, index]));
   const text = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
   return [...groups]
     .map(([id, list]) => ({ id, label: context.label(id), items: list }))
     .sort((a, b) => {
       if (!a.id || !b.id) return a.id ? -1 : b.id ? 1 : 0;
-      return (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity) || text(a.label, b.label);
+      return latest.get(b.id)! - latest.get(a.id)! || text(a.label, b.label);
     });
 }
 

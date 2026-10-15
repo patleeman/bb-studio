@@ -61,6 +61,8 @@ import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { planMove } from "./src/move-items";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
+import { ThreadTitles } from "./src/thread-titles";
+import { withTagHint } from "./src/create-tag-hint";
 import { SearchIndex } from "./src/search-index";
 import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
@@ -100,6 +102,11 @@ export default async function plugin(bb: BbPluginApi) {
   const changes = new ChangeLog();
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
+  // Create tools nudge agents to tag what they make (src/create-tag-hint.ts).
+  const tagNames = new TagStore(db);
+  const registerTool = bb.agents.registerTool.bind(bb.agents);
+  bb.agents.registerTool = ((tool: Parameters<typeof registerTool>[0]) =>
+    registerTool(withTagHint(tool as never, () => tagNames.list().map((tag) => tag.name)))) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
   const artifacts = registerArtifacts(bb, db);
   bb.onDispose(() => artifacts.dispose());
@@ -222,6 +229,18 @@ export default async function plugin(bb: BbPluginApi) {
   const tags = new TagStore(db);
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
+  const threadTitles = new ThreadTitles(async (threadId) => ((await bb.sdk.threads.get({ threadId })) as { title?: string | null }).title ?? "");
+  /** Adds each item's tag ids and the thread that made it. */
+  const listed = async <T extends { pluginId: string; id: string }>(items: readonly T[]) => {
+    const assigned = tags.assignments();
+    const origins = services.originThreads();
+    const keys = items.map((item) => `${item.pluginId}:${item.id}`);
+    const titles = await threadTitles.titles(keys.flatMap((key) => origins.get(key) ?? []));
+    return items.map((item, index) => {
+      const threadId = origins.get(keys[index]!);
+      return { ...item, tags: assigned.get(keys[index]!) ?? [], thread: threadId ? { id: threadId, title: titles.get(threadId) ?? "" } : null };
+    });
+  };
   const workspace = new WorkspacePresence();
   const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
   bb.onDispose(() => searchIndex.dispose());
@@ -330,10 +349,9 @@ export default async function plugin(bb: BbPluginApi) {
       closed = tabs.prune(provider.pluginId, live) || closed;
     }
     if (closed) tabsChanged();
-    const assigned = tags.assignments();
     return {
       providers: result.providers,
-      items: result.items.map((item) => ({ ...item, tags: assigned.get(`${item.pluginId}:${item.id}`) ?? [] })),
+      items: await listed(result.items),
       tags: tags.list(),
       views: views.list(),
     };
@@ -810,9 +828,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     changes: ({ since }) => changes.since(since),
     items: async ({ pluginId, ids }) => {
-      const assigned = tags.assignments();
-      const items = await hub.get(pluginId, ids);
-      return { items: items.map((item) => ({ ...item, tags: assigned.get(`${pluginId}:${item.id}`) ?? [] })) };
+      return { items: await listed(await hub.get(pluginId, ids)) };
     },
     sidebar: () => readSidebar(),
     tabs: async () => ({ tabs: tabViews(await tabData()) }),

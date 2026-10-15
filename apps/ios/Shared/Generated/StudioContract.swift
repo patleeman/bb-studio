@@ -951,6 +951,16 @@ public enum Studio {
     }
   }
 
+  public struct OverviewOutputItemsItemThread: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+
+    public init(id: String? = nil, title: String? = nil) {
+      self.id = id
+      self.title = title
+    }
+  }
+
   public struct OverviewOutputItemsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var kind: String?
@@ -970,8 +980,9 @@ public enum Studio {
     public var template: Bool?
     public var pluginId: String?
     public var tags: [String]?
+    public var thread: OverviewOutputItemsItemThread?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: OverviewOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [OverviewOutputItemsItemFactsItem]? = nil, badge: OverviewOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: OverviewOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [OverviewOutputItemsItemFactsItem]? = nil, badge: OverviewOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil, thread: OverviewOutputItemsItemThread? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -990,6 +1001,7 @@ public enum Studio {
       self.template = template
       self.pluginId = pluginId
       self.tags = tags
+      self.thread = thread
     }
   }
 
@@ -1123,6 +1135,16 @@ public enum Studio {
     }
   }
 
+  public struct ItemsOutputItemsItemThread: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+
+    public init(id: String? = nil, title: String? = nil) {
+      self.id = id
+      self.title = title
+    }
+  }
+
   public struct ItemsOutputItemsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var kind: String?
@@ -1142,8 +1164,9 @@ public enum Studio {
     public var template: Bool?
     public var pluginId: String?
     public var tags: [String]?
+    public var thread: ItemsOutputItemsItemThread?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil, thread: ItemsOutputItemsItemThread? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -1162,6 +1185,7 @@ public enum Studio {
       self.template = template
       self.pluginId = pluginId
       self.tags = tags
+      self.thread = thread
     }
   }
 

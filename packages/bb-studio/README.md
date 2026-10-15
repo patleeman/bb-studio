@@ -75,6 +75,17 @@ Include/Exclude menu. Clearing search keeps the filters; **Clear filters** keeps
 the search text. **Save view** remembers the query, and **Views** appears once a
 view exists. Query syntax such as `kind:page` still completes in search.
 
+**Group by**, in the display menu beside the item count, groups the list by
+Thread (the default), Project, Kind or Tag, or None for one flat table. Thread
+is the thread that made the item (its first `created` link); items no thread
+made go under **No thread**. Groups with the latest activity come first, the
+table's sort applies inside each, and each heading collapses. An item with two
+tags shows under both. The choice is kept per device; saved views keep only
+the query. A **Tags** column shows each item's tag chips, with **+N** for the
+rest. All items leaves out Dictations; their sidebar entry, the Kind filter
+and search still show them. Studio's create tools ask agents to reuse an
+existing tag, and their result lists the tags there are.
+
 ![Live BB screenshot of Studio filters on mobile](assets/filters-mobile.png)
 
 The same controls work at phone width. Both captures check menu selection,

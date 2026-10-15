@@ -56,7 +56,8 @@ const threadOption = z.object({
 export type ThreadOptionView = z.infer<typeof threadOption>;
 const savedView = z.object({ id: z.string(), name: z.string(), query: z.string() });
 export type SavedViewView = z.infer<typeof savedView>;
-const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()) });
+/** `thread` is the thread that made the item, with its title; null when no thread did. */
+const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()), thread: z.object({ id: z.string(), title: z.string() }).nullable() });
 
 export { TABS_CHANNEL } from "./ids";
 

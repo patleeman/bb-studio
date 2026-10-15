@@ -391,6 +391,29 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "thread": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -410,7 +433,8 @@
                 "href",
                 "archived",
                 "pluginId",
-                "tags"
+                "tags",
+                "thread"
               ],
               "additionalProperties": false
             }
@@ -639,6 +663,29 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "thread": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -658,7 +705,8 @@
                 "href",
                 "archived",
                 "pluginId",
-                "tags"
+                "tags",
+                "thread"
               ],
               "additionalProperties": false
             }

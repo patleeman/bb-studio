@@ -509,6 +509,7 @@ export function StudioPanel() {
         projects={projects}
         defaultProjectId={onlyProject ? onlyProject.id : (context.projectId ?? null)}
         storageKey="studio:collection"
+        defaultGroupBy="thread"
         tags={data?.tags ?? []}
         extraCreateItems={extraCreateItems}
         kind={onlyKind?.id ?? "all"}
