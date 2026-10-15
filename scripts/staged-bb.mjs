@@ -15,10 +15,14 @@
  * BB_STAGED_PORT picks its server port (default 48986); the host daemon, the
  * capture Chrome take the next two ports. stop deletes the directory, so
  * every start seeds the same state.
+ *
+ * Codex runs on its own CODEX_HOME inside the instance, sharing only the
+ * sign-in, so fixture sessions never land in ~/.codex/sessions with your
+ * real ones.
  */
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { cp, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -41,6 +45,7 @@ if (!Number.isInteger(port) || port < 1024 || port > 65531) throw new Error(`BB_
 const serverUrl = `http://127.0.0.1:${port}`;
 const dataDir = join(stagedDir, "data");
 const binDir = join(stagedDir, "bb-app", "node_modules", ".bin");
+const codexHome = join(stagedDir, "codex-home");
 const fixturesDir = join(repoRoot, "scripts/capture/fixtures");
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 
@@ -56,7 +61,7 @@ const ORBIT_THREADS = [
 // BB_HOST_DAEMON_PORT would send the CLI to the BB you work in.
 function stagedEnv(extra) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("BB_")));
-  return { ...env, PATH: `${binDir}:${process.env.PATH}`, ...extra };
+  return { ...env, PATH: `${binDir}:${process.env.PATH}`, CODEX_HOME: codexHome, ...extra };
 }
 
 function run(command, args, { cwd = stagedDir, quiet = false } = {}) {
@@ -161,6 +166,7 @@ async function start() {
   }
   await rm(stagedDir, { recursive: true, force: true });
   await mkdir(stagedDir, { recursive: true });
+  await useOwnCodexHome();
 
   const version = await stableVersion();
   process.stdout.write(`Installing bb-app ${version} in ${stagedDir}\n`);
@@ -262,6 +268,17 @@ async function seed({ plugins, capturePlugin, ref, version }) {
     ].join("\n"),
   );
   process.stdout.write(`\nSeeded project Orbit (${project.id}). Point captures at it with:\n  . "${envFile}"\n`);
+}
+
+// Codex writes every session it runs to CODEX_HOME/sessions. Give the staged
+// BB its own home so fixture runs stay out of ~/.codex. auth.json is a
+// symlink, not a copy: Codex rewrites it in place when it refreshes the
+// sign-in, so a copy would leave ~/.codex holding a rotated-out token.
+async function useOwnCodexHome() {
+  await mkdir(codexHome, { recursive: true });
+  const realHome = process.env.CODEX_HOME?.trim() || join(homedir(), ".codex");
+  const auth = join(realHome, "auth.json");
+  if (existsSync(auth)) await symlink(auth, join(codexHome, "auth.json"));
 }
 
 async function stop() {
