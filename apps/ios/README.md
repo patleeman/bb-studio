@@ -120,7 +120,9 @@ blank screen. The server's page goes in over the cached rows by id
 message shows at once, faded, until the server's row for it replaces it
 (`PendingSend`). "Scroll to the bottom" goes to a marker view at the end of
 the chat rather than the lazy stack's edge, which could leave the chat blank
-after a send with the keyboard up.
+after a send with the keyboard up. Only a short scroll from near the bottom animates, toward the edge;
+farther ones jump to the marker, since an animated scroll to an id in a lazy
+stack re-aims as rows above measure and visibly runs through the chat.
 
 Signposts time the open (Points of Interest, `BotChatOpen`; `ChatPerf`).
 Debug builds print `[perf]` lines to stderr. To measure, launch with

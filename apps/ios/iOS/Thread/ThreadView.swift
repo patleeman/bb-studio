@@ -643,11 +643,22 @@ struct ThreadView: View {
         if pastEnd > Self.pastEndSlack { scrollToBottom(animated: false) }
     }
 
+    /// Animates only a short way, from near the bottom, and then toward the
+    /// edge rather than the marker. An animated scroll to an id in a lazy
+    /// stack goes to where the stack estimates it, and re-aims as unmeasured
+    /// rows above measure in: after a send in a long chat of uneven rows,
+    /// the whole transcript visibly scrolled past. A jump to the marker
+    /// (no animation) lays it out at once, and draws the end after a raised
+    /// keyboard, where a scroll to the edge alone could land blank.
     private func scrollToBottom(animated: Bool = true) {
-        if animated {
-            withAnimation(.snappy) { position.scrollTo(id: Self.bottomId, anchor: .bottom) }
-        } else {
+        guard animated, atBottom else {
             position.scrollTo(id: Self.bottomId, anchor: .bottom)
+            return
+        }
+        withAnimation(.snappy) { position.scrollTo(edge: .bottom) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            if atBottom || pastEnd > Self.pastEndSlack { position.scrollTo(id: Self.bottomId, anchor: .bottom) }
         }
     }
 
