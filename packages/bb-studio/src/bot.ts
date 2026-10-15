@@ -28,6 +28,7 @@ import { join } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { SIDE_CHAT_PLUGIN } from "./bot-side-threads";
 import type { BotActivityView, BotAvatarHistoryView, BotProfileChangeView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "./contract";
 import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-providers";
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
@@ -282,13 +283,16 @@ export function descendants<T extends Pick<ListedThread, "id" | "sourceThreadId"
  * archives with it (lifecycleOwnerThreadId). A fork's sourceThreadId alone
  * doesn't count: the user forks or continues a Bot's chat too. Stop uses it.
  */
-export function spawnedBy(thread: Partial<Pick<ListedThread, "parentThreadId" | "lifecycleOwnerThreadId">>, botThreads: ReadonlySet<string>): boolean {
+export function spawnedBy(thread: Partial<Pick<ListedThread, "parentThreadId" | "lifecycleOwnerThreadId" | "originPluginId">>, botThreads: ReadonlySet<string>): boolean {
+  // BB's side-chat makes the chat a side chat's lifecycle owner: it's the user's conversation, not the Bot's work.
+  if (thread.originPluginId === SIDE_CHAT_PLUGIN) return false;
   return [thread.parentThreadId, thread.lifecycleOwnerThreadId].some((id) => !!id && botThreads.has(id));
 }
 
-/** A hidden fork: a side chat or a skill review, not work the Bot owns. */
-function hiddenFork(thread: Partial<Pick<ListedThread, "visibility" | "originKind" | "parentThreadId" | "lifecycleOwnerThreadId">>): boolean {
-  return thread.visibility === "hidden" && thread.originKind === "fork" && !thread.parentThreadId && !thread.lifecycleOwnerThreadId;
+/** A hidden fork: a side chat (BB's side-chat, or one without an owner) or a skill review, not work the Bot owns. */
+function hiddenFork(thread: Partial<Pick<ListedThread, "visibility" | "originKind" | "parentThreadId" | "lifecycleOwnerThreadId" | "originPluginId">>): boolean {
+  if (thread.visibility !== "hidden" || thread.originKind !== "fork") return false;
+  return thread.originPluginId === SIDE_CHAT_PLUGIN || (!thread.parentThreadId && !thread.lifecycleOwnerThreadId);
 }
 
 /** Whether BB's metadata says one of `botThreads` started this thread, forks included (Activity and history). */

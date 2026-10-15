@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
-import { toast } from "sonner";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
 import { ItemGestures } from "./src/ui/ItemGestures";
@@ -39,9 +38,9 @@ import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
 import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
-import { BotThreadDirective, SIDE_THREAD_ACTION, SideThreadPanel } from "./src/ui/bot/SideThreads";
+import { BotThreadDirective, SIDE_THREAD_ACTION, SideThreadOpener, SideThreadPanel } from "./src/ui/bot/SideThreads";
 import { BOT_THREAD_DIRECTIVE } from "./src/bot-side-threads";
-import { mountSideThreadRows, openSideThread, REPLY_IN_THREAD_TITLE } from "./src/ui/bot/reply-in-thread";
+import { mountSideThreadRows } from "./src/ui/bot/reply-in-thread";
 import { BotThreadList, ThreadListSwitcher } from "./src/ui/bot/BotSidebar";
 import { StudioThreadList } from "./src/ui/StudioSidebar";
 import { BOT_LIST_ID, STUDIO_LIST_ID } from "./src/ui/bot/threadListSwitch";
@@ -159,23 +158,9 @@ export default definePluginApp((app) => {
   // itself may end with the directive, which now draws nothing.
   app.slots.messageDirective({ id: BOT_THREAD_DIRECTIVE, component: BotThreadDirective });
   app.slots.threadPanelAction({ id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
-  // "Reply in thread" in a Bot reply's action bar, hidden on other threads and your own messages.
-  app.slots.messageAction({
-    id: "bot-reply-in-thread",
-    title: REPLY_IN_THREAD_TITLE,
-    icon: "MessageSquarePlus",
-    async run(context) {
-      if (context.message.role !== "assistant") return;
-      try {
-        const threadId = await openSideThread(context.threadId, context.message.id);
-        if (!context.openPanel({ actionId: SIDE_THREAD_ACTION, title: "Thread", params: { threadId } })) toast.error("Open the Bot's chat with its side panel to see the thread.");
-      } catch (cause) {
-        toast.error(cause instanceof Error ? cause.message : String(cause));
-      }
-    },
-  });
-  // The action only on a Bot chat's replies, and "2 replies · 5m" under each reply with a side thread.
+  // "2 replies · 5m" under each Bot reply with side threads, and the overlay its click opens them through.
   app.contentScripts.register({ id: "bot-reply-in-thread", mount: ({ signal }) => mountSideThreadRows(signal) });
+  app.slots.experimental_appOverlay({ id: "side-thread-opener", component: SideThreadOpener });
   // A Bot chat's prompt cache (src/bot-cache.ts): "Warm · 42m" in its header,
   // and a banner in its composer when the cache expired on a big chat.
   app.slots.experimental_threadHeaderAction({ id: "bot-cache", title: "Prompt cache", component: BotCacheChip });

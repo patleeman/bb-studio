@@ -261,6 +261,8 @@ it("lists the threads a Bot owns in Activity though they're hidden from BB's lis
   x.add({ id: "run_sub", parentThreadId: "run", visibility: "hidden", status: "idle" });
   x.add({ id: "side_chat", sourceThreadId: "bot1", originKind: "fork", visibility: "hidden", status: "idle" });
   x.add({ id: "user_fork", sourceThreadId: "bot1", originKind: "fork", status: "idle" });
+  // BB's side-chat makes the chat its fork's lifecycle owner: still the user's side chat, not the Bot's work.
+  x.add({ id: "bb_side_chat", sourceThreadId: "bot1", lifecycleOwnerThreadId: "bot1", originKind: "fork", originPluginId: "side-chat", visibility: "hidden", status: "active" });
   (x.bots as unknown as { deps: { ownedThreads(botId: string): ReadonlySet<string> } }).deps.ownedThreads = () => new Set(["run"]);
   const activity = await x.bots.activity();
   expect(activity.inProgress.map((t) => t.id)).toEqual(["child"]);

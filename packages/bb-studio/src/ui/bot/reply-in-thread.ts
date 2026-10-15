@@ -1,23 +1,15 @@
-// Side threads in a Bot chat on the desktop, drawn by Studio itself rather
-// than by anything the Bot writes (src/bot-side-threads.ts):
-//
-// - "Reply in thread" in each Bot reply's action bar, a message action. BB
-//   registers message actions for every thread and both roles, so this
-//   content script hides the button everywhere but a Bot chat's replies, as
-//   the reactions do (their action-decoration.ts). BB draws the button's icon
-//   itself (no plugin icon asset), so it's found by its aria-label, which no
-//   BB action shares.
-// - "2 replies · 5m" under each reply that has a side thread. BB marks each
-//   message with data-timeline-row-id, which is the message id side threads
-//   are keyed by, and content scripts are where decorating BB's own page
-//   belongs. The row opens the side thread by pressing the reply's own
-//   "Reply in thread", which opens the existing one.
+// "2 replies · 5m" under each Bot reply with side threads (src/bot-side-threads.ts),
+// drawn by Studio rather than by anything the Bot writes. BB marks each
+// message with data-timeline-row-id, which is the message id side threads are
+// keyed by, and content scripts are where decorating BB's own page belongs.
+// Starting a side thread is BB's own "Reply in side chat". A row's click asks
+// Studio's app overlay to open the side thread beside the chat
+// (OPEN_SIDE_THREAD_EVENT; content scripts can't navigate).
 import { relativeTime } from "@bb-studio/kit/format";
 import type { SideThreadView } from "../../contract";
 
-/** The action's title, which is also its button's aria-label. */
-export const REPLY_IN_THREAD_TITLE = "Reply in thread";
-const ACTION = `button[aria-label="${REPLY_IN_THREAD_TITLE}"]`;
+/** A row's click: `detail.threadId` is the side thread to open (SideThreadOpener). */
+export const OPEN_SIDE_THREAD_EVENT = "studio:open-side-thread";
 const ROW = "data-studio-side-thread";
 /** How often an open Bot chat's side threads are fetched again. */
 const REFRESH_MS = 10_000;
@@ -27,11 +19,6 @@ async function rpc<T>(method: string, input: unknown): Promise<T> {
   const body = await response.json().catch(() => null) as { ok?: boolean; result?: T; error?: { message?: string } } | null;
   if (!body?.ok) throw new Error(body?.error?.message ?? "Studio couldn't do that.");
   return body.result as T;
-}
-
-/** Opens (or starts) a reply's side thread; its thread id. */
-export async function openSideThread(threadId: string, messageId: string): Promise<string> {
-  return (await rpc<{ threadId: string }>("bot_side_thread_open", { threadId, messageId })).threadId;
 }
 
 /** The thread the page shows: /threads/<id>, or a project's /projects/<p>/threads/<id>. */
@@ -45,22 +32,6 @@ export function sideThreadLabel(thread: SideThreadView, now = Date.now()): strin
   if (thread.working) return thread.replies ? `${replies} · working…` : "Working…";
   if (!thread.replies) return "Thread";
   return thread.lastReplyAt ? `${replies} · ${relativeTime(thread.lastReplyAt, now)}` : replies;
-}
-
-/** A message action button's role, from the message around it (the reactions' roleOf). */
-function roleOf(button: Element): "assistant" | "user" | null {
-  for (let node: Element | null = button.parentElement, depth = 0; node && depth < 10; node = node.parentElement, depth++) {
-    for (const attribute of ["data-role", "data-message-role", "data-conversation-role", "data-testid"]) {
-      const role = node.getAttribute(attribute)?.toLowerCase();
-      if (role === "assistant" || role === "assistant-message" || role === "message-assistant") return "assistant";
-      if (role === "user" || role === "user-message" || role === "message-user") return "user";
-    }
-    if (node.classList.contains("group/message")) {
-      if (node.classList.contains("ml-auto")) return "user";
-      if (node.classList.contains("w-full")) return "assistant";
-    }
-  }
-  return null;
 }
 
 type Chat = { chat: boolean; threads: SideThreadView[] };
@@ -80,19 +51,16 @@ function makeRow(): HTMLButtonElement {
 }
 
 /**
- * Keeps a Bot chat's side threads on screen: "Reply in thread" only on its
- * replies, and a reply-count row under each reply with a side thread. Asks
- * the plugin about the page's thread (bot_side_threads) and again every few
- * seconds; until it knows, the action stays hidden. Undoes everything on abort.
+ * Keeps a reply-count row under each Bot reply with side threads. Asks the
+ * plugin about the page's thread (bot_side_threads), and again every few
+ * seconds while it's a Bot's chat. Removes its rows on abort.
  */
 export function mountSideThreadRows(
   signal: AbortSignal,
   load: (threadId: string) => Promise<Chat> = (threadId) => rpc<Chat>("bot_side_threads", { threadId }),
-  open: (threadId: string, messageId: string) => Promise<unknown> = openSideThread,
 ): void {
   const chats = new Map<string, { data: Chat; at: number }>();
   const loading = new Set<string>();
-  const hidden = new Set<HTMLElement>();
   const rows = new Set<HTMLElement>();
   let frame: number | undefined;
   let disposed = false;
@@ -112,13 +80,6 @@ export function mountSideThreadRows(
     if (threadId && (!known || (known.data.chat && Date.now() - known.at > REFRESH_MS))) fetchChat(threadId);
     const chat = known?.data.chat === true ? known.data : null;
 
-    for (const button of document.querySelectorAll<HTMLButtonElement>(ACTION)) {
-      const show = !!chat && roleOf(button) !== "user";
-      if (show && hidden.has(button)) { button.style.removeProperty("display"); hidden.delete(button); }
-      if (!show && !hidden.has(button)) { button.style.display = "none"; hidden.add(button); }
-    }
-    for (const button of hidden) if (!button.isConnected) hidden.delete(button);
-
     const byMessage = new Map((chat?.threads ?? []).map((thread) => [thread.messageId, thread]));
     const now = Date.now();
     for (const message of document.querySelectorAll<HTMLElement>("[data-timeline-row-id]")) {
@@ -127,16 +88,14 @@ export function mountSideThreadRows(
       if (!thread) { if (row) { row.remove(); rows.delete(row); } continue; }
       if (!row) {
         row = makeRow();
-        const messageId = message.getAttribute("data-timeline-row-id")!;
-        // The reply's own action opens the side thread beside the chat; without one, Studio opens it.
         row.addEventListener("click", () => {
-          const action = message.querySelector<HTMLButtonElement>(ACTION);
-          if (action) action.click();
-          else if (threadId) void open(threadId, messageId);
+          const sideThread = row!.getAttribute("data-thread");
+          if (sideThread) window.dispatchEvent(new CustomEvent(OPEN_SIDE_THREAD_EVENT, { detail: { threadId: sideThread } }));
         });
         (message.querySelector("[data-message-column]") ?? message).appendChild(row);
         rows.add(row);
       }
+      row.setAttribute("data-thread", thread.threadId);
       const label = `💬 ${sideThreadLabel(thread, now)}`;
       if (row.textContent !== label) row.textContent = label;
     }
@@ -159,9 +118,7 @@ export function mountSideThreadRows(
     observer.disconnect();
     clearInterval(timer);
     if (frame !== undefined) cancelAnimationFrame(frame);
-    for (const button of hidden) button.style.removeProperty("display");
     for (const row of rows) row.remove();
-    hidden.clear();
     rows.clear();
   }, { once: true });
   sweep();

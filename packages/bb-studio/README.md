@@ -1478,15 +1478,18 @@ of Staff", with the same thread and check-ins; rename it from its page.
   running. Resume after Stop turns back on exactly the automations and
   runners Stop paused, not ones that were already off; if one fails, the
   Bot stays stopped and Resume retries the rest. Nothing is deleted.
-- **Side threads** (`src/bot-side-threads.ts`, `src/ui/bot/SideThreads.tsx`;
-  table `bot_side_threads`; `bot_side_threads`, `bot_side_thread_open`).
-  Slack-style threads on the Bot's replies. The Bot ends each reply with
-  `::bot-thread{}`, which renders "Reply in thread" under it. The first click
-  forks the Bot's chat at that reply (`sourceSeqEnd`, hidden), so the side
-  thread knows the chat up to the reply and nothing after; it then reads
-  "2 replies · 5m ago" and opens the fork in a tab beside the chat. The fork
-  runs as the Bot, but its main chat doesn't see what's said there. On iOS,
-  a Bot reply's menu has Reply in Thread, and the same row shows under it.
+- **Side threads** (`src/bot-side-threads.ts`, `src/ui/bot/reply-in-thread.ts`,
+  `src/ui/bot/SideThreads.tsx`; table `bot_side_threads`; `bot_side_threads`,
+  `bot_side_threads_for_bot`, `bot_side_thread_open`). Slack-style threads on
+  the Bot's replies, built on BB's side-chat plugin: start one with its
+  **Reply in side chat** on a reply. Studio matches each side chat of a Bot's
+  chat to the reply it quotes, and draws "💬 2 replies · 5m" under that
+  reply itself (nothing the Bot writes), which opens the newest side chat.
+  The Bots sidebar lists them under **Side threads**. A side chat runs as the
+  Bot but can't change it: the Bot tools that would refuse there. It isn't
+  the Bot's work either, so it stays out of Activity and Stop. On iOS a
+  reply's menu has Reply in Thread, which starts a side chat the same way
+  (or forks the chat itself when side-chat is off), and shows the same row.
 - **Prompt cache** (`src/bot-cache.ts`, prices in `src/bot-prices.ts`;
   tables `bot_cache_settings`, `bot_cache_pings`, `bot_cache_banner_off`).
   Claude Code caches a Bot chat's history for an hour; each send then reads

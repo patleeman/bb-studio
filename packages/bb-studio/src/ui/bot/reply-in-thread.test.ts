@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
 import type { SideThreadView } from "../../contract";
-import { mountSideThreadRows, sideThreadLabel, threadInPath } from "./reply-in-thread";
+import { mountSideThreadRows, OPEN_SIDE_THREAD_EVENT, sideThreadLabel, threadInPath } from "./reply-in-thread";
 
 // As stable BB draws a chat: rows marked with their message id, no role attributes,
 // the message wrapper's classes, and the action bar with BB's own icons.
@@ -28,32 +28,29 @@ it("labels a side thread by its replies", () => {
   expect(sideThreadLabel(thread({ working: true }))).toBe("2 replies · working…");
 });
 
-it("shows Reply in thread only on a Bot chat's replies, and the reply count under a reply with a side thread", async () => {
+it("draws the reply count under a Bot reply with side threads, and asks to open the newest on click", async () => {
   document.body.innerHTML = page;
   history.replaceState(null, "", "/threads/thr_bot");
   const controller = new AbortController();
   const load = vi.fn(async (threadId: string) => ({ chat: threadId === "thr_bot", threads: threadId === "thr_bot" ? [thread()] : [] }));
   mountSideThreadRows(controller.signal, load);
-  // Hidden until it's known to be a Bot chat.
-  expect(shown("reply")).toBe(false);
   await settle();
-  expect([shown("reply"), shown("mine"), shown("other")]).toEqual([true, false, true]);
   expect(rowOf("thr_bot:assistant:a1")?.textContent).toMatch(/^💬 2 replies · /);
   expect(rowOf("thr_bot:assistant:a2")).toBeNull();
+  // BB's own actions are left as they are.
+  expect([shown("reply"), shown("mine"), shown("other")]).toEqual([true, true, true]);
 
-  // The row opens the side thread through the reply's own action.
-  const clicked = vi.fn();
-  document.getElementById("reply")!.addEventListener("click", clicked);
+  const opened = vi.fn();
+  window.addEventListener(OPEN_SIDE_THREAD_EVENT, (event) => opened((event as CustomEvent).detail));
   rowOf("thr_bot:assistant:a1")!.click();
-  expect(clicked).toHaveBeenCalledOnce();
+  expect(opened).toHaveBeenCalledWith({ threadId: "fork1" });
 
-  // Another thread: no action, no rows.
+  // Another thread: no rows.
   history.replaceState(null, "", "/threads/thr_other");
   await new Promise((resolve) => setTimeout(resolve, 1100));
   await settle();
-  expect(shown("reply")).toBe(false);
   expect(rowOf("thr_bot:assistant:a1")).toBeNull();
 
   controller.abort();
-  expect([shown("reply"), shown("mine")]).toEqual([true, true]);
+  expect(document.querySelector("[data-studio-side-thread]")).toBeNull();
 });

@@ -174,7 +174,7 @@ export default async function plugin(bb: BbPluginApi) {
   const registerAgentTool = bb.agents.registerTool.bind(bb.agents);
   bb.agents.registerTool = ((tool: Parameters<typeof registerAgentTool>[0]) => registerAgentTool(!SIDE_THREAD_REFUSED.has(tool.name) ? tool : {
     ...tool,
-    execute: (input: never, ctx: { threadId: string }) => sideThreads.forThread(ctx.threadId)
+    execute: async (input: never, ctx: { threadId: string }) => await sideThreads.isSideThread(ctx.threadId)
       ? `Refused: this is a side thread, which can read about the Bot but not change it. Tell the user ${tool.name.replace(/_/g, " ")} is done from the Bot's main chat.`
       : (tool.execute as (input: never, ctx: never) => unknown)(input, ctx as never),
   } as never)) as typeof bb.agents.registerTool;
@@ -487,6 +487,8 @@ export default async function plugin(bb: BbPluginApi) {
     botFor: (threadId) => bots.list().find((bot) => bots.chain(bot.id).includes(threadId)) ?? null,
   });
   bb.events.on("thread.idle", ({ thread }) => void sideThreads.idle(thread.id).catch((error) => bb.log.warn(`Side thread replies: ${errorText(error)}`)));
+  // A side chat made on a Bot's chat (BB's side-chat plugin) becomes one of its side threads.
+  bb.events.on("thread.created", ({ thread }) => void sideThreads.created(thread).catch((error) => bb.log.warn(`Side chat: ${errorText(error)}`)));
   bb.events.on("thread.active", ({ thread }) => sideThreads.touched(thread.id));
   bb.events.on("thread.deleted", ({ thread }) => sideThreads.forget(thread.id));
   const learning: SkillLearning = new SkillLearning({
