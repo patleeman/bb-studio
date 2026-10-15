@@ -6916,6 +6916,47 @@
                 },
                 "updatedAt": {
                   "type": "number"
+                },
+                "menu": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "parentThreadId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "pinnedAt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "sectionId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "isUnread": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "parentThreadId",
+                    "pinnedAt",
+                    "sectionId",
+                    "status",
+                    "isUnread"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -6925,7 +6966,8 @@
                 "title",
                 "replies",
                 "working",
-                "updatedAt"
+                "updatedAt",
+                "menu"
               ],
               "additionalProperties": false
             }

@@ -187,8 +187,8 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
 
 const ARCHIVE_KEYS = ["bb--core/archive"];
 
-/** BB's own Archive (with its Undo toast), one click on hover. */
-function ArchiveButton({ thread, title }: { thread: ReturnType<typeof menuTarget>; title: string }) {
+/** BB's own Archive (with its Undo toast), one click on hover: a sidebar thread, or a Bot's side thread (BotSidebar.tsx). */
+export function ArchiveButton({ thread, title }: { thread: ReturnType<typeof menuTarget>; title: string }) {
   const archive = experimental_useThreadActions(thread, { keys: ARCHIVE_KEYS })[0]?.action;
   if (!archive || archive.disabled) return null;
   return (
@@ -200,7 +200,8 @@ function ArchiveButton({ thread, title }: { thread: ReturnType<typeof menuTarget
   );
 }
 
-function RenameInput({ thread, onDone }: { thread: Thread; onDone(): void }) {
+/** Rename in place: a sidebar thread, or a Bot's side thread (BotSidebar.tsx). */
+export function RenameInput({ thread, onDone }: { thread: Pick<Thread, "id" | "title" | "displayTitle">; onDone(): void }) {
   const sdk = useSdk();
   const [value, setValue] = useState(thread.title ?? thread.displayTitle);
   const commit = () => {

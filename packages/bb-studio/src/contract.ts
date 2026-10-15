@@ -256,7 +256,11 @@ export type BotCacheStateView = z.infer<typeof botCacheState>;
 /** A side thread on one of a Bot's replies (src/bot-side-threads.ts). */
 const sideThread = z.object({ messageId: z.string(), threadId: z.string(), replies: z.number(), lastReplyAt: z.number().nullable(), working: z.boolean() });
 export type SideThreadView = z.infer<typeof sideThread>;
-const botSideThread = z.object({ threadId: z.string(), sourceThreadId: z.string(), messageId: z.string(), title: z.string(), replies: z.number(), working: z.boolean(), updatedAt: z.number() });
+const botSideThread = z.object({
+  threadId: z.string(), sourceThreadId: z.string(), messageId: z.string(), title: z.string(), replies: z.number(), working: z.boolean(), updatedAt: z.number(),
+  /** What BB's thread menu needs: archive, rename, pin… */
+  menu: z.object({ projectId: z.string(), parentThreadId: z.string().nullable(), pinnedAt: z.number().nullable(), sectionId: z.string().nullable(), status: z.string(), isUnread: z.boolean() }),
+});
 export type BotSideThreadListView = z.infer<typeof botSideThread>;
 const threadIdInput = z.string().min(1).max(200);
 /** A thread in the Bot's Activity: its own thread ("self") or one it started. */

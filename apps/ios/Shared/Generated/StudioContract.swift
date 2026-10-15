@@ -6392,6 +6392,24 @@ public enum Studio {
     }
   }
 
+  public struct BotSideThreadsForBotOutputThreadsItemMenu: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var parentThreadId: String?
+    public var pinnedAt: Double?
+    public var sectionId: String?
+    public var status: String?
+    public var isUnread: Bool?
+
+    public init(projectId: String? = nil, parentThreadId: String? = nil, pinnedAt: Double? = nil, sectionId: String? = nil, status: String? = nil, isUnread: Bool? = nil) {
+      self.projectId = projectId
+      self.parentThreadId = parentThreadId
+      self.pinnedAt = pinnedAt
+      self.sectionId = sectionId
+      self.status = status
+      self.isUnread = isUnread
+    }
+  }
+
   public struct BotSideThreadsForBotOutputThreadsItem: Sendable, Hashable, Codable {
     public var threadId: String?
     public var sourceThreadId: String?
@@ -6400,8 +6418,9 @@ public enum Studio {
     public var replies: Double?
     public var working: Bool?
     public var updatedAt: Double?
+    public var menu: BotSideThreadsForBotOutputThreadsItemMenu?
 
-    public init(threadId: String? = nil, sourceThreadId: String? = nil, messageId: String? = nil, title: String? = nil, replies: Double? = nil, working: Bool? = nil, updatedAt: Double? = nil) {
+    public init(threadId: String? = nil, sourceThreadId: String? = nil, messageId: String? = nil, title: String? = nil, replies: Double? = nil, working: Bool? = nil, updatedAt: Double? = nil, menu: BotSideThreadsForBotOutputThreadsItemMenu? = nil) {
       self.threadId = threadId
       self.sourceThreadId = sourceThreadId
       self.messageId = messageId
@@ -6409,6 +6428,7 @@ public enum Studio {
       self.replies = replies
       self.working = working
       self.updatedAt = updatedAt
+      self.menu = menu
     }
   }
 

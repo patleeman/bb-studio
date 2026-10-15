@@ -491,6 +491,9 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.created", ({ thread }) => void sideThreads.created(thread).catch((error) => bb.log.warn(`Side chat: ${errorText(error)}`)));
   bb.events.on("thread.active", ({ thread }) => sideThreads.touched(thread.id));
   bb.events.on("thread.deleted", ({ thread }) => sideThreads.forget(thread.id));
+  // Archived from its menu (or BB's): the Bot's lists drop it, and bring it back unarchived.
+  bb.events.on("thread.archived", ({ thread }) => sideThreads.touched(thread.id));
+  bb.events.on("thread.unarchived", ({ thread }) => sideThreads.touched(thread.id));
   const learning: SkillLearning = new SkillLearning({
     db, sdk: bb.sdk, changed: tagsChanged,
     bots: () => bots.list().map(learningBot),

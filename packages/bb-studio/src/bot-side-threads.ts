@@ -72,11 +72,16 @@ export interface BotSideThreadView {
   replies: number;
   working: boolean;
   updatedAt: number;
+  /** What BB's thread menu needs (archive, rename, pin…), from the thread itself. */
+  menu: { projectId: string; parentThreadId: string | null; pinnedAt: number | null; sectionId: string | null; status: string; isUnread: boolean };
 }
 
 interface TimelineRow { id: string; kind?: string; role?: string; text?: string; sourceSeqEnd?: number; turnId?: string | null }
 interface TimelinePage { rows?: TimelineRow[]; timelinePage?: { hasOlderRows?: boolean; olderCursor?: { anchorSeq: number; anchorId: string } | null } }
-type ThreadLike = { id: string; originPluginId?: string | null; originKind?: string | null; sourceThreadId?: string | null; archivedAt?: number | null; status?: string; title?: string | null; titleFallback?: string | null };
+type ThreadLike = {
+  id: string; originPluginId?: string | null; originKind?: string | null; sourceThreadId?: string | null; archivedAt?: number | null; status?: string; title?: string | null; titleFallback?: string | null;
+  projectId?: string; parentThreadId?: string | null; pinnedAt?: number | null; sectionId?: string | null; lastReadAt?: number | null; updatedAt?: number;
+};
 
 export interface SideThreadDeps {
   db: Database.Database;
@@ -140,6 +145,10 @@ export class SideThreads {
       // Hidden threads don't show in BB's own title lookup, so the title comes from here.
       title: thread.title?.trim() || thread.titleFallback?.trim() || "Thread",
       replies: row.replies, working: thread.status === "active", updatedAt: row.last_reply_at ?? row.created_at,
+      menu: {
+        projectId: thread.projectId ?? "", parentThreadId: thread.parentThreadId ?? null, pinnedAt: thread.pinnedAt ?? null, sectionId: thread.sectionId ?? null,
+        status: thread.status ?? "idle", isUnread: !!thread.updatedAt && (thread.lastReadAt ?? 0) < thread.updatedAt,
+      },
     })).sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
