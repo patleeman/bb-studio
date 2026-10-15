@@ -85,7 +85,12 @@ function useWidgetTheme(): WidgetTheme {
   }, [dark]);
 }
 
-export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView; state: DashboardState }) {
+export function DashboardBoard({ dashboard, state, leading }: {
+  dashboard: DashboardView;
+  state: DashboardState;
+  /** Before Edit in the toolbar: the thread tab's back button and name. */
+  leading?: ReactNode;
+}) {
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState(false);
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
@@ -128,6 +133,7 @@ export function DashboardBoard({ dashboard, state }: { dashboard: DashboardView;
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-1 border-b border-border/70 px-3 py-1.5" role="toolbar" aria-label="Dashboard">
+      {leading}
       <button type="button" aria-pressed={editing} className={BAR_BUTTON} onClick={() => { setEditing((on) => !on); setPicking(false); }}>
         <Icon name={editing ? "Check" : "Edit"} /> {editing ? "Done" : "Edit"}
       </button>

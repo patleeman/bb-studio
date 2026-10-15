@@ -633,6 +633,11 @@ refused.
   archive, duplicate, templates and **Export → Dashboard JSON**.
   `/plugins/studio/studio/dashboards` opens the library filtered to them.
   **Setup → Kinds** turns them off (their data stays; nothing refreshes).
+- **In a thread.** The thread workbench's **Dashboards** tab lists the
+  dashboards made or edited in that thread, then recent ones; search finds
+  any. One opens beside the conversation with its toolbar and grid, sized to
+  the panel (so a narrow panel gets the 8- or 4-column layout). An open tab
+  counts as viewing: widgets refresh and scripts can be approved there.
 - **The grid.** [react-grid-layout](https://github.com/react-grid-layout/react-grid-layout)
   2.3.0 (MIT), 12 columns wide, 8 below 1100 px and 4 below 700 px. **Edit**
   lets you drag tiles by their header, resize them from the corner, **Add

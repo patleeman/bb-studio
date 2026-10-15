@@ -8,6 +8,8 @@ export const PLUGIN_ID = "dashboards";
 export const ROUTE_SEGMENT = "dashboards";
 export const DASHBOARD_KIND = "dashboard";
 export const DASHBOARD_ICON = "studio/dashboard";
+/** The thread workbench's Dashboards tab. */
+export const DASHBOARD_TAB = "dashboards";
 /** Realtime channel: dashboard edits and fresh widget data. */
 export const REALTIME_CHANNEL = "dashboards";
 export const DASHBOARD_UPDATE_TYPE = "dashboard:updated";

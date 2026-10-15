@@ -17,7 +17,7 @@ import { ExcalidrawPicker } from "./src/draw/ui/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./src/draw/ui/composer-registration";
 import { DESIGN_ICON, DESIGN_TAB, isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
-import { isDashboardId } from "./src/dashboards/shared";
+import { DASHBOARD_ICON, DASHBOARD_KIND, DASHBOARD_TAB, isDashboardId } from "./src/dashboards/shared";
 import { QuestionFormView } from "./src/design/ui/question-form";
 import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
@@ -98,6 +98,8 @@ const PagesTab = lazy(() => import("./src/pages/ui/PagePanel"));
 const DrawingsTab = lazy(() => import("./src/draw/ui/drawings-tab"));
 /** The thread's Design tab, with the canvas; loaded when first opened. */
 const DesignTab = lazy(() => import("./src/design/ui/design-tab"));
+/** The thread's Dashboards tab, with the grid and charts; loaded when first opened. */
+const DashboardsTab = lazy(() => import("./src/dashboards/ui/dashboard-tab"));
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
@@ -239,6 +241,17 @@ export default definePluginApp((app) => {
   }
   app.slots.messageDirective({ id: "design", component: whenOn(kinds, "design", DesignCard) });
   app.slots.pendingInteraction({ id: QUESTIONS_RENDERER, component: QuestionFormView });
+  // Dashboards (built in): the thread's Dashboards tab, beside the conversation.
+  if (on(DASHBOARD_KIND)) {
+    app.slots.threadPanelAction({
+      id: DASHBOARD_TAB,
+      title: "Dashboards",
+      icon: DASHBOARD_ICON,
+      layout: "flush",
+      run: async ({ openPanel }) => { await openPanel({ title: "Dashboards" }); },
+      component: (props) => <Suspense fallback={null}><DashboardsTab {...props} /></Suspense>,
+    });
+  }
   // Recordings (built in): the recorder overlay and pill, the composer's
   // microphone, hold-to-talk, dictation into other plugins' fields, the
   // `::recording{id="rec_…"}` card, Talk's commands and its Models settings.
