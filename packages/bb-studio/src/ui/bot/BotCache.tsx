@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useComposer, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { BotCacheStateView } from "../../contract";
-import { formatTokens, formatUsd, formatWake } from "../../bot-cache-format";
+import { formatTokens, formatUsd } from "../../bot-cache-format";
 import { useCall, useLive } from "../live";
 
 const POLL_MS = 60_000;
@@ -64,6 +64,7 @@ export function BotCacheChip({ threadId, isCompactViewport }: PluginThreadHeader
           <span className="font-medium text-foreground">Prompt cache: {label}</span>
           {state.warming.reason ? <span>{state.warming.reason}.</span> : null}
           {state.warming.active && state.warming.nextPingAt ? <span>Next keep-alive ping around {clock(state.warming.nextPingAt)}.</span> : null}
+          {state.warming.compactAt ? <span>Compacts around {clock(state.warming.compactAt)}.</span> : state.warming.lastCompactAt ? <span>Compacted at {clock(state.warming.lastCompactAt)}.</span> : null}
           {cost ? <span>{cost}</span> : null}
           {error ? <span role="alert" className="text-destructive">{error}</span> : null}
         </div>
@@ -108,7 +109,6 @@ function ColdBanner({ threadId }: { threadId: string }) {
 
 const THRESHOLDS = [50_000, 100_000, 150_000, 200_000, 300_000];
 const IDLE_HOURS = [1, 2, 3, 4, 6, 8];
-const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 /** Bot info's Prompt cache section: the state, warming's cost, its settings, and Compact. */
 export function BotCacheSection({ botId, threadId }: { botId: string; threadId: string | null }) {
@@ -156,13 +156,9 @@ export function BotCacheSection({ botId, threadId }: { botId: string; threadId: 
             <select aria-label="Idle cutoff" className={select} value={settings.idleHours} disabled={busy} onChange={(event) => set({ idleHours: Number(event.target.value) })}>
               {idles.map((each) => <option key={each} value={each}>{each}</option>)}
             </select>h without a message</label>
-          <label className="flex items-center gap-1" title={`Waking hours, ${formatWake(settings.wakeStart, settings.wakeEnd)} on this computer's clock`}>from
-            <select aria-label="Waking hours start" className={select} value={Math.floor(settings.wakeStart / 60)} disabled={busy} onChange={(event) => set({ wakeStart: Number(event.target.value) * 60 })}>
-              {HOURS.map((hour) => <option key={hour} value={hour}>{hour}:00</option>)}
-            </select>to
-            <select aria-label="Waking hours end" className={select} value={Math.floor(settings.wakeEnd / 60) % 24} disabled={busy} onChange={(event) => set({ wakeEnd: Number(event.target.value) * 60 || 1440 })}>
-              {HOURS.map((hour) => <option key={hour} value={hour}>{hour}:00</option>)}
-            </select></label>
+          <label className="flex items-center gap-1" title="When warming stops for the idle cutoff, compact the chat once while its cache is still warm">
+            <input type="checkbox" checked={settings.compactBeforeExpiry} disabled={busy} aria-label="Compact before the cache expires" onChange={(event) => set({ compactBeforeExpiry: event.target.checked })} />
+            then compact before it expires</label>
         </div>
       ) : null}
       {error ? <span role="alert" className="text-destructive">{error}</span> : null}

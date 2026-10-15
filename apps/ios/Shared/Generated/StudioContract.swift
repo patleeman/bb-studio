@@ -6118,12 +6118,16 @@ public enum Studio {
     public var nextPingAt: Double?
     public var reason: String?
     public var lastPingAt: Double?
+    public var lastCompactAt: Double?
+    public var compactAt: Double?
 
-    public init(active: Bool? = nil, nextPingAt: Double? = nil, reason: String? = nil, lastPingAt: Double? = nil) {
+    public init(active: Bool? = nil, nextPingAt: Double? = nil, reason: String? = nil, lastPingAt: Double? = nil, lastCompactAt: Double? = nil, compactAt: Double? = nil) {
       self.active = active
       self.nextPingAt = nextPingAt
       self.reason = reason
       self.lastPingAt = lastPingAt
+      self.lastCompactAt = lastCompactAt
+      self.compactAt = compactAt
     }
   }
 
@@ -6143,15 +6147,13 @@ public enum Studio {
     public var enabled: Bool?
     public var thresholdTokens: Double?
     public var idleHours: Double?
-    public var wakeStart: Double?
-    public var wakeEnd: Double?
+    public var compactBeforeExpiry: Bool?
 
-    public init(enabled: Bool? = nil, thresholdTokens: Double? = nil, idleHours: Double? = nil, wakeStart: Double? = nil, wakeEnd: Double? = nil) {
+    public init(enabled: Bool? = nil, thresholdTokens: Double? = nil, idleHours: Double? = nil, compactBeforeExpiry: Bool? = nil) {
       self.enabled = enabled
       self.thresholdTokens = thresholdTokens
       self.idleHours = idleHours
-      self.wakeStart = wakeStart
-      self.wakeEnd = wakeEnd
+      self.compactBeforeExpiry = compactBeforeExpiry
     }
   }
 
@@ -6188,16 +6190,14 @@ public enum Studio {
     public var enabled: Bool?
     public var thresholdTokens: Int?
     public var idleHours: Double?
-    public var wakeStart: Int?
-    public var wakeEnd: Int?
+    public var compactBeforeExpiry: Bool?
 
-    public init(botId: String? = nil, enabled: Bool? = nil, thresholdTokens: Int? = nil, idleHours: Double? = nil, wakeStart: Int? = nil, wakeEnd: Int? = nil) {
+    public init(botId: String? = nil, enabled: Bool? = nil, thresholdTokens: Int? = nil, idleHours: Double? = nil, compactBeforeExpiry: Bool? = nil) {
       self.botId = botId
       self.enabled = enabled
       self.thresholdTokens = thresholdTokens
       self.idleHours = idleHours
-      self.wakeStart = wakeStart
-      self.wakeEnd = wakeEnd
+      self.compactBeforeExpiry = compactBeforeExpiry
     }
   }
 
@@ -6233,12 +6233,16 @@ public enum Studio {
     public var nextPingAt: Double?
     public var reason: String?
     public var lastPingAt: Double?
+    public var lastCompactAt: Double?
+    public var compactAt: Double?
 
-    public init(active: Bool? = nil, nextPingAt: Double? = nil, reason: String? = nil, lastPingAt: Double? = nil) {
+    public init(active: Bool? = nil, nextPingAt: Double? = nil, reason: String? = nil, lastPingAt: Double? = nil, lastCompactAt: Double? = nil, compactAt: Double? = nil) {
       self.active = active
       self.nextPingAt = nextPingAt
       self.reason = reason
       self.lastPingAt = lastPingAt
+      self.lastCompactAt = lastCompactAt
+      self.compactAt = compactAt
     }
   }
 
@@ -6258,15 +6262,13 @@ public enum Studio {
     public var enabled: Bool?
     public var thresholdTokens: Double?
     public var idleHours: Double?
-    public var wakeStart: Double?
-    public var wakeEnd: Double?
+    public var compactBeforeExpiry: Bool?
 
-    public init(enabled: Bool? = nil, thresholdTokens: Double? = nil, idleHours: Double? = nil, wakeStart: Double? = nil, wakeEnd: Double? = nil) {
+    public init(enabled: Bool? = nil, thresholdTokens: Double? = nil, idleHours: Double? = nil, compactBeforeExpiry: Bool? = nil) {
       self.enabled = enabled
       self.thresholdTokens = thresholdTokens
       self.idleHours = idleHours
-      self.wakeStart = wakeStart
-      self.wakeEnd = wakeEnd
+      self.compactBeforeExpiry = compactBeforeExpiry
     }
   }
 

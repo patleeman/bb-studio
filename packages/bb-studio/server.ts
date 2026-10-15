@@ -525,7 +525,8 @@ export default async function plugin(bb: BbPluginApi) {
     quietSince: (threadId, updatedAt) => warmer.quietSince(threadId, updatedAt),
   });
   // Prompt-cache warming for Bot chats (src/bot-cache.ts): a tiny ping about
-  // every 55 minutes while the user is around; nothing in the first 5 minutes.
+  // every 55 minutes while the user is around, and one compaction before the
+  // cache expires once they've gone idle; nothing in the first 5 minutes.
   const warmer: BotCacheWarmer = new BotCacheWarmer({
     db, sdk: bb.sdk, pluginId: "studio", changed: tagsChanged, log: (message) => bb.log.warn(message),
     bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, state: bot.state, threadId: bot.threadId, kind: bot.kind ?? "studio" })),
@@ -736,9 +737,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_cache_set: ({ botId, ...patch }) => {
       const bot = bots.stored(botId);
       if (!bot) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first.");
-      const next = { ...warmer.settings(bot.id), ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)) };
-      if (next.wakeStart === next.wakeEnd) throw new Error("Waking hours need a start and an end that differ.");
-      warmer.setSettings(bot.id, next);
+      warmer.setSettings(bot.id, patch);
       return warmer.state(cacheThread(undefined, bot.id));
     },
     bot_cache_banner_hide: ({ threadId }) => { warmer.hideBanner(threadId); return { ok: true as const }; },

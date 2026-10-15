@@ -1,7 +1,7 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  awake, BotCacheWarmer, breakEvenHours, CACHE_TTL_MS, coldSendUsd, decideWarm, DEFAULT_WARM, formatTokens, formatUsd, inOverage,
+  BotCacheWarmer, breakEvenHours, CACHE_TTL_MS, coldSendUsd, decideWarm, DEFAULT_WARM, formatTokens, formatUsd, inOverage,
   isPingRequest, isUserRequest, PING_EVERY_MS, PING_TEXT, pingUsd, STARTUP_GRACE_MS, warmingPerHourUsd, warmSendUsd, type WarmInput,
 } from "./bot-cache";
 import { MODEL_PRICES, priceFor } from "./bot-prices";
@@ -11,10 +11,10 @@ import { tallyTurns } from "./skill-learning";
 
 const MIN = 60_000, HOUR = 60 * MIN;
 const T0 = 1_800_000_000_000;
-/** Idle, big, warm (last turn 10 minutes ago), the user wrote 30 minutes ago, 14:00 local, long after startup. */
+/** Idle, big, warm (last turn 10 minutes ago), the user wrote 30 minutes ago, long after startup. */
 const base = (patch: Partial<WarmInput> = {}): WarmInput => ({
   now: T0, startedAt: T0 - 10 * HOUR, settings: DEFAULT_WARM, botState: "active", busy: false, contextTokens: 300_000, warmable: true,
-  lastTurnAt: T0 - 10 * MIN, lastUserAt: T0 - 30 * MIN, overage: false, localMinutes: 14 * 60, ...patch,
+  lastTurnAt: T0 - 10 * MIN, lastUserAt: T0 - 30 * MIN, overage: false, lastCompactAt: null, ...patch,
 });
 
 describe("decideWarm", () => {
@@ -30,25 +30,26 @@ describe("decideWarm", () => {
   });
 
   it("stops after the idle cutoff with no user message, and a ping doesn't reset it", () => {
+    const noCompact = { ...DEFAULT_WARM, compactBeforeExpiry: false };
     // The user wrote 3 hours ago; a ping 55 minutes ago kept the cache warm, but that isn't the user.
-    expect(decideWarm(base({ lastUserAt: T0 - 3 * HOUR, lastTurnAt: T0 - 55 * MIN }))).toEqual({ action: "off", reason: "idle" });
-    expect(decideWarm(base({ lastUserAt: null }))).toEqual({ action: "off", reason: "idle" });
+    expect(decideWarm(base({ settings: noCompact, lastUserAt: T0 - 3 * HOUR, lastTurnAt: T0 - 55 * MIN }))).toEqual({ action: "off", reason: "idle" });
+    expect(decideWarm(base({ settings: noCompact, lastUserAt: null }))).toEqual({ action: "off", reason: "idle" });
     expect(decideWarm(base({ lastUserAt: T0 - 2.9 * HOUR, lastTurnAt: T0 - 55 * MIN }))).toEqual({ action: "ping" });
     expect(decideWarm(base({ lastUserAt: T0 - 5 * HOUR, settings: { ...DEFAULT_WARM, idleHours: 6 }, lastTurnAt: T0 - 55 * MIN }))).toEqual({ action: "ping" });
   });
 
   it("resumes when the user writes again", () => {
-    expect(decideWarm(base({ lastUserAt: T0 - 4 * HOUR, lastTurnAt: T0 - 55 * MIN })).action).toBe("off");
+    expect(decideWarm(base({ lastUserAt: T0 - 4 * HOUR, lastTurnAt: T0 - 55 * MIN })).action).toBe("compact");
     // Their message is a turn too: the cache is fresh, the next ping is 55 minutes on.
     expect(decideWarm(base({ lastUserAt: T0 - MIN, lastTurnAt: T0 - MIN }))).toMatchObject({ action: "wait", at: T0 - MIN + PING_EVERY_MS });
   });
 
-  it("stops in overage, outside waking hours, when paused or stopped, and when turned off", () => {
+  it("stops in overage, when paused or stopped, and when turned off; there are no waking hours", () => {
     const due = { lastTurnAt: T0 - 55 * MIN };
     expect(decideWarm(base({ ...due, overage: true }))).toEqual({ action: "off", reason: "overage" });
-    expect(decideWarm(base({ ...due, localMinutes: 23 * 60 }))).toEqual({ action: "off", reason: "asleep" });
-    expect(decideWarm(base({ ...due, localMinutes: 6 * 60 + 59 }))).toEqual({ action: "off", reason: "asleep" });
-    expect(decideWarm(base({ ...due, localMinutes: 7 * 60 }))).toEqual({ action: "ping" });
+    // 1 AM local is like any other time.
+    const oneAm = new Date(2026, 9, 15, 1, 0).getTime();
+    expect(decideWarm(base({ now: oneAm, startedAt: oneAm - 10 * HOUR, lastTurnAt: oneAm - 55 * MIN, lastUserAt: oneAm - HOUR }))).toEqual({ action: "ping" });
     expect(decideWarm(base({ ...due, botState: "paused" }))).toEqual({ action: "off", reason: "paused" });
     expect(decideWarm(base({ ...due, botState: "stopped" }))).toEqual({ action: "off", reason: "stopped" });
     expect(decideWarm(base({ ...due, settings: { ...DEFAULT_WARM, enabled: false } }))).toEqual({ action: "off", reason: "disabled" });
@@ -71,10 +72,35 @@ describe("decideWarm", () => {
     expect(decideWarm(base({ startedAt: T0 - 5 * MIN, lastTurnAt: T0 - 55 * MIN }))).toEqual({ action: "ping" });
   });
 
-  it("reads waking hours that wrap past midnight", () => {
-    expect(awake(23 * 60 + 30, 22 * 60, 2 * 60)).toBe(true);
-    expect(awake(60, 22 * 60, 2 * 60)).toBe(true);
-    expect(awake(12 * 60, 22 * 60, 2 * 60)).toBe(false);
+});
+
+describe("decideWarm: compaction before expiry", () => {
+  // The user wrote 4 hours ago (past the 3-hour cutoff); a ping 10 minutes ago kept the cache warm.
+  const idle = (patch: Partial<WarmInput> = {}) => base({ lastUserAt: T0 - 4 * HOUR, lastTurnAt: T0 - 10 * MIN, ...patch });
+
+  it("compacts once at the ping's due time while the cache is still warm", () => {
+    expect(decideWarm(idle())).toEqual({ action: "compact", at: T0 - 10 * MIN + PING_EVERY_MS });
+    expect(decideWarm(idle({ lastTurnAt: T0 - 55 * MIN }))).toEqual({ action: "compact", at: T0 });
+  });
+
+  it("not again in the same idle stretch, and again after a user message", () => {
+    expect(decideWarm(idle({ lastCompactAt: T0 - 5 * MIN, lastTurnAt: T0 - 5 * MIN }))).toEqual({ action: "off", reason: "compacted" });
+    expect(decideWarm(idle({ lastUserAt: null, lastCompactAt: T0 - 5 * MIN }))).toEqual({ action: "off", reason: "compacted" });
+    // The user wrote after the compaction: warming resumes, and the next idle stretch compacts again.
+    expect(decideWarm(base({ lastCompactAt: T0 - 5 * HOUR, lastUserAt: T0 - 30 * MIN }))).toMatchObject({ action: "wait", reason: "due" });
+    expect(decideWarm(idle({ lastCompactAt: T0 - 5 * HOUR }))).toMatchObject({ action: "compact" });
+  });
+
+  it("doesn't compact in overage, cold, small, busy, disabled, paused or with the setting off", () => {
+    expect(decideWarm(idle({ overage: true }))).toEqual({ action: "off", reason: "overage" });
+    expect(decideWarm(idle({ lastTurnAt: T0 - 59.5 * MIN }))).toEqual({ action: "off", reason: "cold" });
+    expect(decideWarm(idle({ lastTurnAt: null }))).toEqual({ action: "off", reason: "cold" });
+    expect(decideWarm(idle({ contextTokens: 50_000 }))).toEqual({ action: "off", reason: "small" });
+    expect(decideWarm(idle({ busy: true }))).toMatchObject({ action: "wait", reason: "busy" });
+    expect(decideWarm(idle({ settings: { ...DEFAULT_WARM, enabled: false } }))).toEqual({ action: "off", reason: "disabled" });
+    expect(decideWarm(idle({ botState: "paused" }))).toEqual({ action: "off", reason: "paused" });
+    expect(decideWarm(idle({ warmable: false }))).toEqual({ action: "off", reason: "unpriced" });
+    expect(decideWarm(idle({ settings: { ...DEFAULT_WARM, compactBeforeExpiry: false } }))).toEqual({ action: "off", reason: "idle" });
   });
 });
 
@@ -167,6 +193,7 @@ async function warmer(options: { model?: string; tokens?: number; lastTurnAt?: n
     "provider/rateLimits/updated": [],
   };
   const send = vi.fn(async (_args: unknown) => ({ ok: true, delivery: "sent" }));
+  const compact = vi.fn(async (_args: unknown) => ({ ok: true }));
   const markRead = vi.fn(async () => ({}));
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
@@ -176,15 +203,15 @@ async function warmer(options: { model?: string; tokens?: number; lastTurnAt?: n
       events: { list: (async ({ types }: { types: string[] }) => events[types[0]!] ?? []) as never },
       send: send as never,
       markRead: markRead as never,
-      compact: (async () => ({ ok: true })) as never,
+      compact: compact as never,
     },
   } });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const bots = [{ id: "bot_main", name: "Dot", state: "active" as const, threadId: "thr_main" }, { id: "bot_ext", name: "Herm", state: "active" as const, threadId: "thr_ext", kind: "external" as const }];
-  const w = new BotCacheWarmer({ db, sdk: bb.sdk, pluginId: "studio", bots: () => bots, now: () => now, localMinutes: () => 14 * 60 });
-  return { w, send, markRead, events, db, advance: (ms: number) => { now += ms; } };
+  const w = new BotCacheWarmer({ db, sdk: bb.sdk, pluginId: "studio", bots: () => bots, now: () => now });
+  return { w, send, compact, markRead, events, db, advance: (ms: number) => { now += ms; } };
 }
 
 describe("BotCacheWarmer", () => {
@@ -244,6 +271,34 @@ describe("BotCacheWarmer", () => {
     x.w.setSettings("bot_main", { enabled: false });
     expect(await x.w.state("thr_main")).toMatchObject({ state: "off", label: "Warming off", banner: false, settings: { enabled: false } });
     expect(x.w.settings("bot_main")).toEqual({ ...DEFAULT_WARM, enabled: false });
+  });
+
+  it("compacts an idle chat once before its cache expires, then not again until the user writes", async () => {
+    // The user wrote 4 hours ago; the last turn (a ping) 50 minutes ago.
+    const x = await warmer({ lastUserAt: T0 - 4 * HOUR });
+    expect(await x.w.state("thr_main")).toMatchObject({ warming: { active: false, compactAt: T0 + 5 * MIN } });
+    x.advance(6 * MIN);
+    await x.w.tick();
+    expect(x.compact).toHaveBeenCalledWith({ threadId: "thr_main" });
+    expect(x.send).not.toHaveBeenCalled();
+    await x.w.idle("thr_main");
+    expect(x.w.lastCompact("thr_main")).toBe(T0 + 6 * MIN);
+    // The size from before compaction is stale: no "re-reads ~300k" banner.
+    x.advance(2 * HOUR);
+    const state = await x.w.state("thr_main");
+    expect(state).toMatchObject({ banner: false, contextTokens: null, warming: { lastCompactAt: T0 + 6 * MIN } });
+    // A turn after compaction reports the new size; still once per idle stretch.
+    x.events["thread/tokenUsage/updated"] = [{ type: "thread/tokenUsage/updated", createdAt: T0 + 2 * HOUR, data: {} }];
+    x.advance(10 * MIN);
+    await x.w.tick();
+    expect(x.compact).toHaveBeenCalledTimes(1);
+    expect(await x.w.state("thr_main")).toMatchObject({ warming: { reason: "Compacted before the cache expired; no message from you since" } });
+  });
+
+  it("stores compactBeforeExpiry and ignores waking hours", async () => {
+    const x = await warmer();
+    expect(x.w.setSettings("bot_main", { compactBeforeExpiry: false })).toEqual({ ...DEFAULT_WARM, compactBeforeExpiry: false });
+    expect(x.db.prepare("SELECT wake_start, wake_end FROM bot_cache_settings").get()).toEqual({ wake_start: 420, wake_end: 1380 });
   });
 
   it("answers bot_cache_state for a thread that isn't a Bot's chat", async () => {

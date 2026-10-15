@@ -1507,7 +1507,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   reply's menu has Reply in Thread, which starts a side chat the same way
   (or forks the chat itself when side-chat is off), and shows the same row.
 - **Prompt cache** (`src/bot-cache.ts`, prices in `src/bot-prices.ts`;
-  tables `bot_cache_settings`, `bot_cache_pings`, `bot_cache_banner_off`).
+  tables `bot_cache_settings`, `bot_cache_pings`, `bot_cache_compactions`,
+  `bot_cache_banner_off`).
   Claude Code caches a Bot chat's history for an hour; each send then reads
   it at a fraction of the input price, and once it expires the next send
   writes it all again at 2x. Studio **warms** each Bot's own chat (not its
@@ -1516,9 +1517,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   ping about every 55 minutes after the last turn or ping. Warming stops
   after the idle cutoff with no message from you (pings, check-ins and
   Studio's notices don't count), in provider overage (the cache lasts
-  5 minutes there), outside waking hours (the host's local time), while the
-  Bot is paused or stopped, and while the chat is busy. Your next message
-  resumes it. An expired cache isn't pinged (that would pay the write your
+  5 minutes there), while the Bot is paused or stopped, and while the chat
+  is busy; there are no waking hours. Your next message resumes it. An expired cache isn't pinged (that would pay the write your
   next message pays anyway), and nothing is sent in the first 5 minutes
   after Studio starts. Only Claude models are warmed; OpenAI's cache can't
   be kept for an hour, so those chats only get the estimates.
@@ -1533,18 +1533,26 @@ of Staff", with the same thread and check-ins; rename it from its page.
     threads and pings only go to idle ones. Learn from work doesn't count a
     ping as a user turn, a ping doesn't stop a running review, and the skill
     curator's 2-hour idle wait ignores pings.
+  - **Compaction before expiry**: when warming stops for the idle cutoff
+    while the cache is still warm, Studio compacts the chat once, when the
+    next ping would have been due (55 minutes after the last turn), through
+    the same path as **Compact**. Compaction reads the history from the warm
+    cache, so your next message writes a short summary instead of the whole
+    history. Once per idle stretch (a message from you starts a new one),
+    and never in overage, on a cold, small or busy chat, or with warming
+    off. The chip shows when it will compact or when it did, and the
+    cold-send banner doesn't show the size from before compaction.
   - **Header chip** on a Bot's chat: **Warm · 42m** (minutes left),
     **Cold** or **Warming off**, with why, the next ping, the costs, a
     warming switch and **Compact now…** in its menu. The iOS app shows the
     same line, small, beside the Bot's status.
   - **Cold-send banner**: on a cold Bot chat above the threshold, the
     composer says "Cache expired — next send re-reads ~N tokens (~$X)" with
-    **Dismiss** and **Don't show for this thread**. Studio never suggests
-    compacting; **Compact** is a manual action in Bot info and the chip's
-    menu.
+    **Dismiss** and **Don't show for this thread**. **Compact** is also a
+    manual action in Bot info and the chip's menu.
   - **Settings** (Bot info → Prompt cache, `bot_cache_set`): warming on or
-    off (on), size threshold (100k tokens), idle cutoff (3 hours), waking
-    hours (7:00–23:00). Bot info shows "Warming ≈ $0.07/h" from the price
+    off (on), size threshold (100k tokens), idle cutoff (3 hours), compact
+    before expiry (on). Bot info shows "Warming ≈ $0.07/h" from the price
     table. RPCs: `bot_cache_state` (`threadId`, or `botId` for its chat),
     `bot_cache_set`, `bot_cache_banner_hide`, `bot_cache_compact`.
   - **Economics, honestly**: warming pays a cache read an hour; letting it
@@ -1552,7 +1560,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     that breaks even around 20 idle hours (about 17 with pings every
     55 minutes), so a few hours of warming while you're around is cheap
     insurance, and warming overnight isn't worth it, hence the idle cutoff
-    and waking hours. A 300k-token chat on Claude Opus 5.5 ($4 input,
+    and the compaction before it. A 300k-token chat on Claude Opus 5.5 ($4 input,
     $0.20 cache read): warming ≈ $0.07/h, a warm send ≈ $0.06, a cold send
     ≈ $2.40. Opus 5.5's read is 0.05x, so there it breaks even nearer
     35 hours. On a subscription these are usage against your limits, not

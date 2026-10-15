@@ -6447,13 +6447,27 @@
                   "number",
                   "null"
                 ]
+              },
+              "lastCompactAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "compactAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
               }
             },
             "required": [
               "active",
               "nextPingAt",
               "reason",
-              "lastPingAt"
+              "lastPingAt",
+              "lastCompactAt",
+              "compactAt"
             ],
             "additionalProperties": false
           },
@@ -6501,19 +6515,15 @@
               "idleHours": {
                 "type": "number"
               },
-              "wakeStart": {
-                "type": "number"
-              },
-              "wakeEnd": {
-                "type": "number"
+              "compactBeforeExpiry": {
+                "type": "boolean"
               }
             },
             "required": [
               "enabled",
               "thresholdTokens",
               "idleHours",
-              "wakeStart",
-              "wakeEnd"
+              "compactBeforeExpiry"
             ],
             "additionalProperties": false
           }
@@ -6557,15 +6567,8 @@
             "minimum": 0.5,
             "maximum": 24
           },
-          "wakeStart": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 1439
-          },
-          "wakeEnd": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 1440
+          "compactBeforeExpiry": {
+            "type": "boolean"
           }
         }
       },
@@ -6634,13 +6637,27 @@
                   "number",
                   "null"
                 ]
+              },
+              "lastCompactAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "compactAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
               }
             },
             "required": [
               "active",
               "nextPingAt",
               "reason",
-              "lastPingAt"
+              "lastPingAt",
+              "lastCompactAt",
+              "compactAt"
             ],
             "additionalProperties": false
           },
@@ -6688,19 +6705,15 @@
               "idleHours": {
                 "type": "number"
               },
-              "wakeStart": {
-                "type": "number"
-              },
-              "wakeEnd": {
-                "type": "number"
+              "compactBeforeExpiry": {
+                "type": "boolean"
               }
             },
             "required": [
               "enabled",
               "thresholdTokens",
               "idleHours",
-              "wakeStart",
-              "wakeEnd"
+              "compactBeforeExpiry"
             ],
             "additionalProperties": false
           }

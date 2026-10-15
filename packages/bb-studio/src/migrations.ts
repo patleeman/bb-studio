@@ -370,4 +370,12 @@ export const MIGRATIONS = [
   ARTIFACT_LIVE_TABLES,
   // Spaces are gone and nothing reads their folders any more.
   `DROP TABLE IF EXISTS space_folders`,
+  // Prompt cache (src/bot-cache.ts): compaction before expiry, per Bot (on by
+  // default), and the compactions Studio ran (once per idle stretch). Waking
+  // hours are gone; wake_start/wake_end stay, unread.
+  `ALTER TABLE bot_cache_settings ADD COLUMN compact_before_expiry INTEGER NOT NULL DEFAULT 1;
+   CREATE TABLE bot_cache_compactions (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, thread_id TEXT NOT NULL, at INTEGER NOT NULL, tokens INTEGER
+     );
+   CREATE INDEX bot_cache_compactions_thread ON bot_cache_compactions (thread_id, at);`,
 ];

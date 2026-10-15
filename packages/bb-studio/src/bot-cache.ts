@@ -18,13 +18,21 @@
 //     pings, check-ins and Studio's own notices don't count as user messages;
 //   - the provider is in overage (its cache lasts 5 minutes there, so
 //     warming can't help);
-//   - it's outside waking hours (7:00–23:00 in the host's local time);
 //   - the Bot is paused or stopped, or warming is off for it;
 //   - the chat is busy (a turn refreshes the cache anyway).
+// There are no waking hours: the idle cutoff alone ends warming.
 // Once the cache has expired Studio doesn't ping again: that would pay the
 // full write the user's next message pays anyway. A user message makes the
 // cache warm again and resumes warming. Nothing is sent in the first
 // 5 minutes after Studio starts.
+//
+// Compaction before expiry (compactBeforeExpiry, on by default): when warming
+// stops for the idle cutoff while the cache is still warm, Studio compacts the
+// chat once instead of the ping that would have been due (55 minutes after the
+// last turn). Compaction reads the history from the warm cache, so the user's
+// next message writes a short summary instead of the whole history. It's once
+// per idle stretch (bot_cache_compactions; a new user message starts another)
+// and follows the same rules as a ping: not in overage, cold, small or busy.
 //
 // Pings are as quiet as BB allows. The message is agent-only, so BB shows no
 // user row; the Bot's "[PASS]" reply still shows on the desktop (BB has no
@@ -36,7 +44,8 @@
 // user-turn count (isPingRequest), the curator's idle wait (quietSince), and
 // a review running beside the chat isn't stopped by one.
 //
-// Settings are per Bot (bot_cache_settings). Pings are logged (bot_cache_pings).
+// Settings are per Bot (bot_cache_settings). Pings are logged (bot_cache_pings),
+// compactions before expiry too (bot_cache_compactions).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { priceFor, type ModelPrice } from "./bot-prices";
@@ -56,13 +65,16 @@ const PING_TAIL_TOKENS = 120;
 const PING_OUTPUT_TOKENS = 10;
 const HOUR = 3_600_000;
 
-export type WarmSettings = { enabled: boolean; thresholdTokens: number; idleHours: number; wakeStart: number; wakeEnd: number };
-/** wakeStart and wakeEnd are minutes after local midnight. */
-export const DEFAULT_WARM: WarmSettings = { enabled: true, thresholdTokens: 100_000, idleHours: 3, wakeStart: 7 * 60, wakeEnd: 23 * 60 };
+export type WarmSettings = { enabled: boolean; thresholdTokens: number; idleHours: number; compactBeforeExpiry: boolean };
+export const DEFAULT_WARM: WarmSettings = { enabled: true, thresholdTokens: 100_000, idleHours: 3, compactBeforeExpiry: true };
+/** Waking hours are gone; their NOT NULL columns still get the old defaults. */
+const OLD_WAKE_START = 7 * 60, OLD_WAKE_END = 23 * 60;
 
-export type WarmOffReason = "unpriced" | "disabled" | "paused" | "stopped" | "small" | "cold" | "overage" | "idle" | "asleep";
+export type WarmOffReason = "unpriced" | "disabled" | "paused" | "stopped" | "small" | "cold" | "overage" | "idle" | "compacted";
 export type WarmDecision =
   | { action: "ping" }
+  /** Compact the chat once it's `at` (the ping's due time), before the cache expires. */
+  | { action: "compact"; at: number }
   | { action: "wait"; at: number; reason: "due" | "busy" | "startup" }
   | { action: "off"; reason: WarmOffReason };
 
@@ -80,14 +92,8 @@ export interface WarmInput {
   /** The user's last message; pings and Studio's notices aren't. */
   lastUserAt: number | null;
   overage: boolean;
-  /** Minutes after local midnight at `now`. */
-  localMinutes: number;
-}
-
-/** Whether `minutes` is inside waking hours; a start after the end wraps past midnight. */
-export function awake(minutes: number, start: number, end: number): boolean {
-  if (start === end) return true;
-  return start < end ? minutes >= start && minutes < end : minutes >= start || minutes < end;
+  /** When Studio last compacted this chat before expiry. */
+  lastCompactAt: number | null;
 }
 
 /** Whether to ping a Bot's chat now, wait, or not warm it (and why). */
@@ -103,12 +109,17 @@ export function decideWarm(input: WarmInput): WarmDecision {
   // A minute's margin: a ping that lands after expiry pays the full write.
   if (now >= expires - 60_000) return { action: "off", reason: "cold" };
   if (input.overage) return { action: "off", reason: "overage" };
-  if (input.lastUserAt == null || now - input.lastUserAt >= settings.idleHours * HOUR) return { action: "off", reason: "idle" };
-  if (!awake(input.localMinutes, settings.wakeStart, settings.wakeEnd)) return { action: "off", reason: "asleep" };
   const due = input.lastTurnAt + PING_EVERY_MS;
   const grace = input.startedAt + STARTUP_GRACE_MS;
   // A cache that expires before Studio may send is lost.
   if (grace >= expires - 60_000) return { action: "off", reason: "cold" };
+  if (input.lastUserAt == null || now - input.lastUserAt >= settings.idleHours * HOUR) {
+    // Once per idle stretch: a compaction after the user's last message ends it.
+    const compacted = input.lastCompactAt != null && (input.lastUserAt == null || input.lastCompactAt >= input.lastUserAt);
+    if (compacted) return { action: "off", reason: "compacted" };
+    if (!settings.compactBeforeExpiry) return { action: "off", reason: "idle" };
+    return { action: "compact", at: Math.max(due, grace) };
+  }
   if (now < Math.max(due, grace)) return { action: "wait", at: Math.max(due, grace), reason: due >= grace ? "due" : "startup" };
   return { action: "ping" };
 }
@@ -122,7 +133,7 @@ export const OFF_REASON: Record<WarmOffReason, string> = {
   cold: "The cache expired; your next message refills it",
   overage: "The provider is in overage, where the cache lasts 5 minutes",
   idle: "No message from you for a while",
-  asleep: "Outside waking hours",
+  compacted: "Compacted before the cache expired; no message from you since",
 };
 
 // ---- Costs ----
@@ -139,7 +150,7 @@ export function warmingPerHourUsd(tokens: number, price: ModelPrice): number { r
 /** Idle hours of warming that cost as much as one cold re-write saves. */
 export function breakEvenHours(tokens: number, price: ModelPrice): number { return (coldSendUsd(tokens, price) - warmSendUsd(tokens, price)) / warmingPerHourUsd(tokens, price); }
 
-export { formatTokens, formatUsd, formatWake } from "./bot-cache-format";
+export { formatTokens, formatUsd } from "./bot-cache-format";
 
 // ---- Reading a thread ----
 
@@ -194,8 +205,6 @@ export interface WarmerDeps {
   changed?(): void;
   log?(message: string): void;
   now?(): number;
-  /** Minutes after local midnight; the host's zone. */
-  localMinutes?(now: number): number;
 }
 
 type Observed = {
@@ -212,14 +221,14 @@ export type CacheStateView = {
   warmUntil: number | null;
   model: string | null;
   contextTokens: number | null;
-  warming: { active: boolean; nextPingAt: number | null; reason: string | null; lastPingAt: number | null };
+  warming: { active: boolean; nextPingAt: number | null; reason: string | null; lastPingAt: number | null; lastCompactAt: number | null; compactAt: number | null };
   costs: { warmingPerHour: number | null; coldSend: number | null; warmSend: number | null };
   /** Show the cold-send banner in the composer. */
   banner: boolean;
   settings: WarmSettings;
 };
 
-type SettingsRow = { bot_id: string; enabled: number; threshold_tokens: number; idle_hours: number; wake_start: number; wake_end: number };
+type SettingsRow = { bot_id: string; enabled: number; threshold_tokens: number; idle_hours: number; compact_before_expiry: number };
 type Pending = { sentAt: number; wasRead: boolean };
 
 export class BotCacheWarmer {
@@ -234,22 +243,18 @@ export class BotCacheWarmer {
   }
 
   private now(): number { return this.deps.now?.() ?? Date.now(); }
-  private local(now: number): number {
-    if (this.deps.localMinutes) return this.deps.localMinutes(now);
-    const date = new Date(now);
-    return date.getHours() * 60 + date.getMinutes();
-  }
 
   settings(botId: string): WarmSettings {
     const row = this.deps.db.prepare("SELECT * FROM bot_cache_settings WHERE bot_id = ?").get(botId) as SettingsRow | undefined;
-    return row ? { enabled: !!row.enabled, thresholdTokens: row.threshold_tokens, idleHours: row.idle_hours, wakeStart: row.wake_start, wakeEnd: row.wake_end } : { ...DEFAULT_WARM };
+    return row ? { enabled: !!row.enabled, thresholdTokens: row.threshold_tokens, idleHours: row.idle_hours, compactBeforeExpiry: !!row.compact_before_expiry } : { ...DEFAULT_WARM };
   }
 
   setSettings(botId: string, patch: Partial<WarmSettings>): WarmSettings {
-    const next = { ...this.settings(botId), ...patch };
-    this.deps.db.prepare(`INSERT INTO bot_cache_settings (bot_id, enabled, threshold_tokens, idle_hours, wake_start, wake_end, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (bot_id) DO UPDATE SET enabled = excluded.enabled, threshold_tokens = excluded.threshold_tokens, idle_hours = excluded.idle_hours, wake_start = excluded.wake_start, wake_end = excluded.wake_end, updated_at = excluded.updated_at`)
-      .run(botId, next.enabled ? 1 : 0, next.thresholdTokens, next.idleHours, next.wakeStart, next.wakeEnd, this.now());
+    const current = this.settings(botId);
+    const next: WarmSettings = { enabled: patch.enabled ?? current.enabled, thresholdTokens: patch.thresholdTokens ?? current.thresholdTokens, idleHours: patch.idleHours ?? current.idleHours, compactBeforeExpiry: patch.compactBeforeExpiry ?? current.compactBeforeExpiry };
+    this.deps.db.prepare(`INSERT INTO bot_cache_settings (bot_id, enabled, threshold_tokens, idle_hours, compact_before_expiry, wake_start, wake_end, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (bot_id) DO UPDATE SET enabled = excluded.enabled, threshold_tokens = excluded.threshold_tokens, idle_hours = excluded.idle_hours, compact_before_expiry = excluded.compact_before_expiry, updated_at = excluded.updated_at`)
+      .run(botId, next.enabled ? 1 : 0, next.thresholdTokens, next.idleHours, next.compactBeforeExpiry ? 1 : 0, OLD_WAKE_START, OLD_WAKE_END, this.now());
     for (const bot of this.deps.bots()) if (bot.id === botId && bot.threadId) this.nextCheck.delete(bot.threadId);
     this.deps.changed?.();
     return next;
@@ -263,6 +268,12 @@ export class BotCacheWarmer {
   lastPing(threadId: string): { sentAt: number; quietSince: number | null } | null {
     const row = this.deps.db.prepare("SELECT sent_at, quiet_since FROM bot_cache_pings WHERE thread_id = ? ORDER BY sent_at DESC LIMIT 1").get(threadId) as { sent_at: number; quiet_since: number | null } | undefined;
     return row ? { sentAt: row.sent_at, quietSince: row.quiet_since } : null;
+  }
+
+  /** When Studio last compacted this chat before its cache expired. */
+  lastCompact(threadId: string): number | null {
+    const row = this.deps.db.prepare("SELECT MAX(at) AS at FROM bot_cache_compactions WHERE thread_id = ?").get(threadId) as { at: number | null } | undefined;
+    return row?.at ?? null;
   }
 
   /** A ping is on its way or running in this thread. */
@@ -293,13 +304,14 @@ export class BotCacheWarmer {
     const cached = this.observed.get(threadId);
     if (cached && now - cached.at < maxAgeMs) return cached;
     const { sdk } = this.deps;
-    const [thread, context, options, usage, limits, requests] = await Promise.all([
+    const [thread, context, options, usage, limits, requests, compactions] = await Promise.all([
       sdk.threads.get({ threadId }).catch(() => null),
       sdk.threads.context({ threadId }).catch(() => null),
       sdk.threads.defaultExecutionOptions({ threadId }).catch(() => null),
       sdk.threads.events.list({ threadId, types: ["thread/tokenUsage/updated"], order: "desc", limit: "1" }).catch(() => []),
       sdk.threads.events.list({ threadId, types: ["provider/rateLimits/updated"], order: "desc", limit: "1" }).catch(() => []),
       sdk.threads.events.list({ threadId, types: ["client/turn/requested"], order: "desc", limit: "30" }).catch(() => []),
+      sdk.threads.events.list({ threadId, types: ["thread/compacted"], order: "desc", limit: "1" }).catch(() => []),
     ]);
     const loose = thread as unknown as { status?: string; hasPendingInteraction?: boolean; queuedWork?: unknown[] | null; updatedAt?: number; lastReadAt?: number | null; latestAttentionAt?: number } | null;
     const lastUsage = (usage as EventRow[])[0];
@@ -309,10 +321,13 @@ export class BotCacheWarmer {
     const usedTokens = (context as { usage?: { usedTokens?: number } | null } | null)?.usage?.usedTokens;
     const lastPing = this.lastPing(threadId)?.sentAt ?? null;
     const lastTurnAt = Math.max(lastUsage?.createdAt ?? 0, lastPing ?? 0) || null;
+    // Compacted since the last usage report: the context size from before is stale until the next turn.
+    const compactedAt = (compactions as EventRow[])[0]?.createdAt ?? this.lastCompact(threadId);
+    const stale = compactedAt != null && compactedAt >= (lastUsage?.createdAt ?? 0);
     const observed: Observed = {
       at: now, botId: bot.id, threadId, model, price: priceFor(model),
       busy: !loose || ["active", "pending", "starting", "stopping"].includes(loose.status ?? "") || !!loose.hasPendingInteraction || !!loose.queuedWork?.length,
-      contextTokens: typeof usedTokens === "number" ? usedTokens : null,
+      contextTokens: typeof usedTokens === "number" && !stale ? usedTokens : null,
       lastTurnAt,
       lastUserAt: userRequest?.createdAt ?? null,
       overage: inOverage((lastLimit?.data as { rateLimits?: RateLimits } | undefined)?.rateLimits, lastLimit?.createdAt, now),
@@ -329,7 +344,7 @@ export class BotCacheWarmer {
       now, startedAt: this.startedAt, settings: this.settings(bot.id), botState: bot.state,
       busy: observed.busy || this.pending.has(observed.threadId), contextTokens: observed.contextTokens,
       warmable: !!observed.price?.warmable, lastTurnAt: observed.lastTurnAt, lastUserAt: observed.lastUserAt,
-      overage: observed.overage, localMinutes: this.local(now),
+      overage: observed.overage, lastCompactAt: this.lastCompact(observed.threadId),
     });
   }
 
@@ -337,7 +352,7 @@ export class BotCacheWarmer {
   async state(threadId: string): Promise<CacheStateView> {
     const bot = this.botFor(threadId);
     const settings = bot ? this.settings(bot.id) : { ...DEFAULT_WARM };
-    const empty: CacheStateView = { botId: null, threadId, state: "off", label: "", warmUntil: null, model: null, contextTokens: null, warming: { active: false, nextPingAt: null, reason: null, lastPingAt: null }, costs: { warmingPerHour: null, coldSend: null, warmSend: null }, banner: false, settings };
+    const empty: CacheStateView = { botId: null, threadId, state: "off", label: "", warmUntil: null, model: null, contextTokens: null, warming: { active: false, nextPingAt: null, reason: null, lastPingAt: null, lastCompactAt: null, compactAt: null }, costs: { warmingPerHour: null, coldSend: null, warmSend: null }, banner: false, settings };
     if (!bot) return empty;
     const observed = await this.observe(bot, threadId);
     const now = this.now();
@@ -353,9 +368,11 @@ export class BotCacheWarmer {
     return {
       botId: bot.id, threadId, state, label, warmUntil, model: observed.model, contextTokens: tokens,
       warming: {
-        active, nextPingAt: decision.action === "wait" ? decision.at : decision.action === "ping" ? now : null,
-        reason: decision.action === "off" ? OFF_REASON[decision.reason] : decision.action === "wait" && decision.reason === "busy" ? "Working; a turn refreshes the cache" : null,
+        active: decision.action === "ping" || decision.action === "wait", nextPingAt: decision.action === "wait" ? decision.at : decision.action === "ping" ? now : null,
+        reason: decision.action === "off" ? OFF_REASON[decision.reason] : decision.action === "wait" && decision.reason === "busy" ? "Working; a turn refreshes the cache" : decision.action === "compact" ? "No message from you for a while; compacts before the cache expires" : null,
         lastPingAt: this.lastPing(threadId)?.sentAt ?? null,
+        lastCompactAt: this.lastCompact(threadId),
+        compactAt: decision.action === "compact" ? decision.at : null,
       },
       costs: {
         warmingPerHour: price && tokens != null ? warmingPerHourUsd(tokens, price) : null,
@@ -386,6 +403,9 @@ export class BotCacheWarmer {
         if (decision.action === "ping") {
           if (await this.ping(bot, observed)) sent++;
           this.nextCheck.set(bot.threadId, now + 5 * 60_000);
+        } else if (decision.action === "compact") {
+          if (decision.at > now) this.nextCheck.set(bot.threadId, decision.at);
+          else { await this.autoCompact(bot, observed); this.nextCheck.set(bot.threadId, now + 5 * 60_000); }
         } else {
           this.nextCheck.set(bot.threadId, decision.action === "wait" ? decision.at : now + 10 * 60_000);
         }
@@ -415,6 +435,25 @@ export class BotCacheWarmer {
     }
     this.deps.db.prepare("INSERT INTO bot_cache_pings (bot_id, thread_id, sent_at, quiet_since) VALUES (?, ?, ?, ?)").run(bot.id, threadId, now, quiet);
     this.deps.db.prepare("DELETE FROM bot_cache_pings WHERE sent_at < ?").run(now - 30 * 24 * HOUR);
+    this.observed.delete(threadId);
+    this.deps.changed?.();
+    return true;
+  }
+
+  /** Compacts an idle chat before its cache expires (decideWarm's "compact"), once per idle stretch. */
+  private async autoCompact(bot: CacheBot, observed: Observed): Promise<boolean> {
+    const threadId = observed.threadId;
+    const now = this.now();
+    this.pending.set(threadId, { sentAt: now, wasRead: observed.wasRead });
+    try {
+      await this.deps.sdk.threads.compact({ threadId });
+    } catch (error) {
+      this.pending.delete(threadId);
+      this.deps.log?.(`Cache warming: compacting ${threadId} before expiry failed: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+    this.deps.db.prepare("INSERT INTO bot_cache_compactions (bot_id, thread_id, at, tokens) VALUES (?, ?, ?, ?)").run(bot.id, threadId, now, observed.contextTokens);
+    this.deps.db.prepare("DELETE FROM bot_cache_compactions WHERE at < ?").run(now - 30 * 24 * HOUR);
     this.observed.delete(threadId);
     this.deps.changed?.();
     return true;
