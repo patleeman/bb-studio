@@ -1,6 +1,7 @@
 // The sidebar's Threads section, under Bots: every top-level thread in one
 // list, pinned first and then newest, as two-line rows. The first line has the
-// status dot, title and age (or a pill when the thread waits on the user); the
+// title and, on the right, the age, or in its place what the thread needs: a
+// pill (Needs you, Failed), a dot (working, unread) or a pin; the
 // second names the project, so there are no per-project sections. Sub-threads
 // and hidden threads stay out, and so does every thread the Bots section
 // shows (bot_listed_threads). Each row has BB's own thread menu (right-click
@@ -143,13 +144,9 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
         aria-current={active ? "page" : undefined}
         onClick={(event) => { event.preventDefault(); if (!renaming) open(thread.id, event.metaKey || event.ctrlKey); }}
         onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); open(thread.id, true); } }}
-        className={cn("group/thread-row flex min-w-0 flex-col rounded-md py-1 pr-1 pl-1 text-sm", active ? "bg-state-active" : "hover:bg-state-hover")}
+        className={cn("group/thread-row flex min-w-0 flex-col rounded-md py-1 pr-1 pl-2 text-sm", active ? "bg-state-active" : "hover:bg-state-hover")}
       >
         <span className="flex h-5 min-w-0 items-center gap-1.5">
-          {thread.isPinned && state === "idle"
-            ? <Icon name="Pin" aria-label="Pinned" className="mx-[1.5px] size-3 shrink-0 text-muted-foreground" />
-            : <span role={dot.label ? "img" : undefined} aria-label={dot.label ?? undefined} aria-hidden={dot.label ? undefined : true} title={dot.label ?? undefined}
-                className={cn("mx-[4.5px] size-[7px] shrink-0 rounded-full", dot.className)} />}
           {renaming ? <RenameInput thread={thread} onDone={() => setRenaming(false)} /> : (
             <span className={cn("min-w-0 flex-1 truncate", loud ? "font-semibold" : state === "idle" && !active ? "text-muted-foreground" : "")}>
               <ThreadTitle threadId={thread.id} />
@@ -159,7 +156,11 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
           <span className={cn("shrink-0", menuOpen ? "hidden" : "group-hover/thread-row:hidden")}>
             {pill
               ? <span className={cn("whitespace-nowrap rounded-full px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide", pill.className)}>{pill.label}</span>
-              : <time dateTime={new Date(at).toISOString()} className="text-[11px] tabular-nums text-muted-foreground">{compactAge(at)}</time>}
+              : dot.label
+                ? <span role="img" aria-label={dot.label} title={dot.label} className={cn("mr-1 block size-[7px] rounded-full", dot.className)} />
+                : thread.isPinned
+                  ? <Icon name="Pin" aria-label="Pinned" className="size-3 text-muted-foreground" />
+                  : <time dateTime={new Date(at).toISOString()} className="text-[11px] tabular-nums text-muted-foreground">{compactAge(at)}</time>}
           </span>
           <span className={cn("shrink-0", menuOpen ? "flex" : "hidden group-hover/thread-row:flex max-md:pointer-coarse:flex")}>
             <ThreadActionsMenu
@@ -176,7 +177,7 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
             />
           </span>
         </span>
-        <span data-thread-project="" className="min-w-0 truncate pl-[22px] text-xs leading-4 text-muted-foreground">{project ?? " "}</span>
+        <span data-thread-project="" className="min-w-0 truncate text-xs leading-4 text-muted-foreground">{project ?? " "}</span>
       </a>
     </ThreadActionsContextMenu>
   );
