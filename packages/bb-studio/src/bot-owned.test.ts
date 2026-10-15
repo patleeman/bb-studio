@@ -31,9 +31,10 @@ async function setup() {
   bb.storage.migrate(db, MIGRATIONS);
   const bots = [{ id: "bot_main", chain: ["thr_old_chief", "thr_k3mtxc4nju"] }];
   const skip = new Set<string>();
-  const owned = new BotOwnedThreads({ db, sdk: bb.sdk, bots: () => bots, skip: () => skip, sweepDelayMs: 0 });
+  const handed = vi.fn(async (_thread: { id: string; title: string; projectId: string | null }, _botId: string) => {});
+  const owned = new BotOwnedThreads({ db, sdk: bb.sdk, bots: () => bots, skip: () => skip, handed, sweepDelayMs: 0 });
   dispose.push(async () => owned.dispose());
-  return { owned, threads, add, update, automations, runs, skip, db, callRpc, bots };
+  return { owned, threads, add, update, automations, runs, skip, db, callRpc, bots, handed };
 }
 
 /** Patrick's data: the Bot's child made an automation; each run is a top-level thread. */
@@ -180,6 +181,10 @@ it("adopts a thread the user hands a Bot: hidden, owned with what it spawns, and
   expect(x.threads.get("thr_user")?.visibility).toBe("hidden");
   expect(x.owned.ownerOf("thr_user")).toBe("bot_scout");
   expect(x.owned.owned("bot_scout").has("thr_user")).toBe(true);
+  // The Bot hears about it once; dropping it on the same Bot again says nothing.
+  expect(x.handed).toHaveBeenCalledWith({ id: "thr_user", title: "Mine", projectId: "proj_personal" }, "bot_scout");
+  await x.owned.adopt("thr_user", "bot_scout");
+  expect(x.handed).toHaveBeenCalledTimes(1);
   // What it spawns later is the Bot's too, at once and on a sweep.
   x.add({ id: "thr_user_child", parentThreadId: "thr_user" });
   await x.owned.created(x.threads.get("thr_user_child")!);

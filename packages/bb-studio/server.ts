@@ -423,6 +423,16 @@ export default async function plugin(bb: BbPluginApi) {
   const ownedThreads = new BotOwnedThreads({
     db, sdk: bb.sdk, changed: tagsChanged, log: (message) => bb.log.warn(message),
     bots: () => bots.list().map((bot) => ({ id: bot.id, chain: bots.chain(bot.id) })),
+    // A thread the user handed a Bot: a line in its chat, and a note asking for a short read of it.
+    handed: async (thread, botId) => {
+      const bot = bots.stored(botId);
+      if (!bot?.threadId) return;
+      const link = thread.projectId ? `[${thread.title.replace(/[[\]]/g, "")}](/projects/${thread.projectId}/threads/${thread.id})` : `**${thread.title}**`;
+      await alertBot(bb.sdk, {
+        botThreadId: bot.threadId, line: `📥 Handed to you: ${link}`,
+        note: `The user dragged this thread (${thread.id}) onto you in Studio's sidebar: it's yours now and lists under you. Read it (bb thread show ${thread.id}, bb thread output ${thread.id}) and reply in one or two short lines: what it's about and whether it waits on you or the user. Don't start work on it unless it plainly waits on you.`,
+      });
+    },
     skip: () => runners.threadIds(),
   });
   const sweepOwned = () => void ownedThreads.sweep().catch((error) => bb.log.warn(`Hiding Bot threads failed: ${errorText(error)}`));

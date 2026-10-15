@@ -26,7 +26,8 @@
 //
 // The user can also hand a Bot a thread (drag it onto the Bot in the
 // sidebar: adopt). It's hidden and recorded as "adopted"; that wins over any
-// other owner, and what the thread spawns is the Bot's too.
+// other owner, and what the thread spawns is the Bot's too. The Bot's chat
+// gets a line saying so (handed).
 //
 // Studio records each thread it hid (bot_hidden_threads) and never hides a
 // thread twice: a thread the user made visible again stays visible, the
@@ -106,6 +107,8 @@ export interface BotOwnedDeps {
   /** Threads hidden elsewhere (runners): left alone here. */
   skip?(): ReadonlySet<string>;
   changed?(): void;
+  /** A thread the user just handed a Bot (adopt), to tell the Bot. Not on a repeat drop. */
+  handed?(thread: { id: string; title: string; projectId: string | null }, botId: string): Promise<void>;
   log?(message: string): void;
   /** How long thread.created waits before a sweep (an automation links its run after the thread exists). */
   sweepDelayMs?: number;
@@ -166,12 +169,15 @@ export class BotOwnedThreads {
     const chained = this.chains().get(threadId);
     if (chained) throw new Error(chained === botId ? "That's already this bot's chat." : "That's another bot's chat; it can't move.");
     if (this.deps.skip?.().has(threadId)) throw new Error("That's a runner; it stays with its bot.");
+    if (this.adopted().get(threadId) === botId) return { botId };
     const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null) as ThreadLike | null;
     if (!thread || thread.archivedAt) throw new Error("That thread isn't there anymore.");
     if (thread.visibility !== "hidden") await this.deps.sdk.threads.update({ threadId, visibility: "hidden" } as never);
     this.deps.db.prepare("INSERT INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'adopted', ?) ON CONFLICT (thread_id) DO UPDATE SET bot_id = excluded.bot_id, reason = excluded.reason, hidden_at = excluded.hidden_at").run(threadId, botId, Date.now());
     this.owners.set(threadId, botId);
     this.deps.changed?.();
+    const title = thread.title || thread.titleFallback || "Untitled thread";
+    await this.deps.handed?.({ id: threadId, title, projectId: (thread as { projectId?: string | null }).projectId ?? null }, botId).catch((error) => this.deps.log?.(`Couldn't tell the bot about ${threadId}: ${(error as Error)?.message ?? error}`));
     return { botId };
   }
 

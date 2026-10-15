@@ -1240,7 +1240,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   row has BB's thread menu (right-click or ⋯) and Archive on hover;
   ⌘-click or middle-click opens a row in a split. Drag a row onto a bot
   under **Bots** to hand the thread to it: the thread moves under that bot
-  with the threads it spawns later (`bot_thread_adopt`). A thread in one
+  with the threads it spawns later (`bot_thread_adopt`), and the bot's chat
+  gets a 📥 line linking it, which the bot answers with a line or two on
+  what the thread is about and whether it waits on anyone. A thread in one
   bot's list drags onto another bot the same way; a bot's own chat and its
   runners stay put.
   The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
