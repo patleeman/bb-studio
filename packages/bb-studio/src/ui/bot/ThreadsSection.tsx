@@ -11,6 +11,7 @@ import {
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
   experimental_ThreadActionsMenu as ThreadActionsMenu,
   experimental_useSidebarThreads,
+  experimental_useThreadActions,
   ThreadTitle,
   useBbNavigate,
   useSdk,
@@ -162,7 +163,8 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
                   ? <Icon name="Pin" aria-label="Pinned" className="size-3 text-muted-foreground" />
                   : <time dateTime={new Date(at).toISOString()} className="text-[11px] tabular-nums text-muted-foreground">{compactAge(at)}</time>}
           </span>
-          <span className={cn("shrink-0", menuOpen ? "flex" : "hidden group-hover/thread-row:flex max-md:pointer-coarse:flex")}>
+          <span className={cn("shrink-0 items-center gap-0.5", menuOpen ? "flex" : "hidden group-hover/thread-row:flex max-md:pointer-coarse:flex")}>
+            <ArchiveButton thread={target} title={thread.displayTitle} />
             <ThreadActionsMenu
               thread={target}
               requestRename={() => setRenaming(true)}
@@ -180,6 +182,21 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
         <span data-thread-project="" className="min-w-0 truncate text-xs leading-4 text-muted-foreground">{project ?? " "}</span>
       </a>
     </ThreadActionsContextMenu>
+  );
+}
+
+const ARCHIVE_KEYS = ["bb--core/archive"];
+
+/** BB's own Archive (with its Undo toast), one click on hover. */
+function ArchiveButton({ thread, title }: { thread: ReturnType<typeof menuTarget>; title: string }) {
+  const archive = experimental_useThreadActions(thread, { keys: ARCHIVE_KEYS })[0]?.action;
+  if (!archive || archive.disabled) return null;
+  return (
+    <button type="button" aria-label={`${archive.label} ${title}`} title={archive.label}
+      onClick={(event) => { event.preventDefault(); event.stopPropagation(); void archive.run(); }}
+      className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground">
+      <Icon name={archive.icon} className="size-3.5" aria-hidden />
+    </button>
   );
 }
 

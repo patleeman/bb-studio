@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   activate: vi.fn(),
   inputs: [] as [string, unknown][],
   toCompose: vi.fn(),
+  archived: [] as string[],
   sidebarThreads: { status: "ready", threads: [] as unknown[], projects: [] as { id: string; name: string }[], sections: [], archivedPage: null } as Record<string, unknown>,
 }));
 vi.mock("../live", () => ({
@@ -36,6 +37,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_ThreadActionsContextMenu: ({ children, requestRename, thread }: { children: React.ReactNode; requestRename(id: string): void; thread: { id: string } }) =>
     React.createElement("div", { "data-menu-for": thread.id }, children, React.createElement("button", { type: "button", "data-rename": thread.id, onClick: () => requestRename(thread.id) }, "rename")),
   experimental_ThreadActionsMenu: ({ trigger }: { trigger(props: object): React.ReactNode }) => trigger({}),
+  experimental_useThreadActions: (thread: { id: string }) => [{ key: "bb--core/archive", pluginId: "bb--core", action: { label: "Archive", icon: "Archive", run: () => state.archived.push(thread.id) } }],
   useSidebarThreadShortcut: () => null,
   experimental_ProviderIcon: ({ provider }: { provider: { id: string } }) => React.createElement("i", { "data-logo": provider.id }),
   experimental_useProviders: () => ({ status: "ready", providers: [{ id: "claude", displayName: "Claude" }, { id: "codex", displayName: "Codex" }] }),
@@ -241,6 +243,11 @@ test("the Bots list shows on every other page, with every thread below it as a t
   });
   act(() => { input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
   expect(sdk.threads.update).toHaveBeenCalledWith({ threadId: "thr_old", title: "Renamed" });
+  // Archive on hover runs BB's own Archive for that row, without opening it.
+  state.toThread.mockClear();
+  act(() => click(section.querySelector('button[aria-label^="Archive"]')));
+  expect(state.archived).toEqual(["thr_pin"]);
+  expect(state.toThread).not.toHaveBeenCalled();
 });
 
 test("after a Bots list open the Bots list stays on any thread", async () => {
