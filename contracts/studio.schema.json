@@ -7134,6 +7134,41 @@
         "additionalProperties": false
       }
     },
+    "bot_thread_adopt": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "botId",
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "botId"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_checkin_preset": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
