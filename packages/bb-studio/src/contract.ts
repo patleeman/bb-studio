@@ -501,6 +501,8 @@ export const rpcContract = defineRpcContract({
   bot_side_threads: { input: z.object({ threadId: threadIdInput }), output: z.object({ chat: z.boolean(), threads: z.array(sideThread) }) },
   /** A Bot's side threads across its chain, latest reply first: its sidebar's Threads. */
   bot_side_threads_for_bot: { input: forBot, output: z.object({ threads: z.array(botSideThread) }) },
+  /** Every thread the Bots list shows (each Bot's chain, the threads it owns, its side threads): the sidebar's Threads section leaves them out. */
+  bot_listed_threads: { input: z.object({}), output: z.object({ threadIds: z.array(z.string()) }) },
   /** A reply's side thread: a fork of the chat at that reply, made on first open. */
   bot_side_thread_open: { input: z.object({ threadId: threadIdInput, messageId: z.string().min(1).max(200) }), output: z.object({ threadId: z.string(), created: z.boolean() }) },
   /** The Bot a thread belongs to (its chat, a thread it started, a runner, an automation run), or null: the sidebar keeps the Bots list on it. */

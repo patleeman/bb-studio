@@ -131,6 +131,11 @@ export class BotOwnedThreads {
     return ids;
   }
 
+  /** Every thread any Bot has: its chain, the threads it owns as last seen, and the ones Studio hid for it. */
+  all(): Set<string> {
+    return new Set([...this.chains().keys(), ...this.owners.keys(), ...this.recorded()]);
+  }
+
   /**
    * The Bot a thread belongs to (its chain, a thread it owns as last seen, or
    * one Studio hid for it, runners included), or null. The browser asks this

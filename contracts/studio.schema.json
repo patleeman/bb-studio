@@ -6937,6 +6937,29 @@
         "additionalProperties": false
       }
     },
+    "bot_listed_threads": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "threadIds"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_side_thread_open": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

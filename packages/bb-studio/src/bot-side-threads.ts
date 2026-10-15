@@ -103,6 +103,11 @@ export class SideThreads {
     return views.filter((view): view is SideThreadView => view !== null);
   }
 
+  /** Every side thread, any Bot's. */
+  threadIds(): string[] {
+    return (this.deps.db.prepare("SELECT thread_id FROM bot_side_threads").all() as { thread_id: string }[]).map((row) => row.thread_id);
+  }
+
   /** A Bot's side threads across its chain, for its sidebar: the latest reply first. */
   async forBot(botId: string): Promise<BotSideThreadView[]> {
     const rows = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE bot_id = ? ORDER BY created_at DESC, rowid DESC").all(botId) as SideRow[];

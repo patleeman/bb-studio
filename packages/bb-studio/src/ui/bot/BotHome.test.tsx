@@ -33,6 +33,9 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openThreadPanel, toCompose: state.toCompose }),
   useSdk: () => sdk,
   experimental_useSidebarThreads: () => state.sidebarThreads,
+  experimental_ThreadActionsContextMenu: ({ children, requestRename, thread }: { children: React.ReactNode; requestRename(id: string): void; thread: { id: string } }) =>
+    React.createElement("div", { "data-menu-for": thread.id }, children, React.createElement("button", { type: "button", "data-rename": thread.id, onClick: () => requestRename(thread.id) }, "rename")),
+  experimental_ThreadActionsMenu: ({ trigger }: { trigger(props: object): React.ReactNode }) => trigger({}),
   useSidebarThreadShortcut: () => null,
   experimental_ProviderIcon: ({ provider }: { provider: { id: string } }) => React.createElement("i", { "data-logo": provider.id }),
   experimental_useProviders: () => ({ status: "ready", providers: [{ id: "claude", displayName: "Claude" }, { id: "codex", displayName: "Codex" }] }),
@@ -42,7 +45,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
     React.createElement("button", { type: "button", onClick: () => onChange({ providerId: "codex", model: "gpt-5", reasoningLevel: "high" }) }, "pick codex")),
   experimental_PermissionModePicker: ({ value }: { value: string }) => React.createElement("span", { "data-permission": value }),
 }));
-const sdk = { threads: { get: async ({ threadId }: { threadId: string }) => {
+const sdk = { threads: { update: vi.fn(async (_args: unknown) => ({})), get: async ({ threadId }: { threadId: string }) => {
   if (!(threadId in state.threads)) throw new Error("Thread not found");
   return { id: threadId, projectId: state.threads[threadId], deletedAt: null };
 } }, system: { uiPreferences: {
@@ -201,7 +204,7 @@ test("on the Studio panel the Bots list puts Studio's list back and shows a plac
 
 test("the Bots list shows on every other page, with every thread below it as a two-line row naming its project", async () => {
   state.pathname = "/plugins/pages/pages";
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty } };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty }, bot_listed_threads: { threadIds: ["thr_bot_side"] } };
   const row = (id: string, projectId: string, extra: Record<string, unknown> = {}) => ({
     id, projectId, parentThreadId: null, isHidden: false, isArchived: false, isPinned: false, pinSortKey: null, isUnread: false,
     hasPendingInteraction: false, indicator: "none", status: "idle", runtimeStatus: "idle", updatedAt: Date.now() - 3_600_000, latestAttentionAt: 0,
@@ -215,6 +218,7 @@ test("the Bots list shows on every other page, with every thread below it as a t
       row("thr_pin", "proj_a", { isPinned: true, pinSortKey: "a", updatedAt: 0 }),
       row("thr_child", "proj_a", { parentThreadId: "thr_old" }),
       row("thr_hidden", "proj_a", { isHidden: true }),
+      row("thr_bot_side", "proj_a"),
     ] };
   await show(<BotThreadList {...listProps} />);
   expect(container.querySelector("nav[aria-label=Bots]")).not.toBeNull();
@@ -228,6 +232,15 @@ test("the Bots list shows on every other page, with every thread below it as a t
   expect(state.toThread).toHaveBeenCalledWith("thr_old", undefined);
   act(() => click(section.querySelector('button[aria-label="New thread"]')));
   expect(state.toCompose).toHaveBeenCalled();
+  // BB's thread menu wraps each row; its Rename edits the title in place.
+  act(() => click(section.querySelector('[data-rename="thr_old"]')));
+  const input = section.querySelector<HTMLInputElement>('input[aria-label="Thread title"]')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Renamed");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  act(() => { input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+  expect(sdk.threads.update).toHaveBeenCalledWith({ threadId: "thr_old", title: "Renamed" });
 });
 
 test("after a Bots list open the Bots list stays on any thread", async () => {

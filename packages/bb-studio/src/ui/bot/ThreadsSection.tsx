@@ -2,17 +2,22 @@
 // list, pinned first and then newest, as two-line rows. The first line has the
 // status dot, title and age (or a pill when the thread waits on the user); the
 // second names the project, so there are no per-project sections. Sub-threads
-// and hidden threads (a Bot's earlier conversations) stay out; a Bot's own
-// threads also show under it in the Bots section.
+// and hidden threads stay out, and so does every thread the Bots section
+// shows (bot_listed_threads). Each row has BB's own thread menu (right-click
+// or the hover ⋯), with rename done in place.
 import { cn, Icon } from "@bb-studio/kit/ui";
 import {
+  experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
+  experimental_ThreadActionsMenu as ThreadActionsMenu,
   experimental_useSidebarThreads,
   ThreadTitle,
   useBbNavigate,
+  useSdk,
   useSidebarThreadShortcut,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { useMemo, useState } from "react";
+import { useLive } from "../live";
 
 type Thread = PluginSidebarThread;
 export type ThreadState = "needs-you" | "working" | "error" | "unread" | "idle";
@@ -30,9 +35,9 @@ export function threadState(thread: Pick<Thread, "status" | "runtimeStatus" | "i
 
 const recency = (thread: Thread) => Math.max(thread.updatedAt, thread.latestAttentionAt);
 
-/** The rows the section shows: top-level, visible, unarchived threads, pinned first in pin order, then newest. */
-export function listedThreads(threads: readonly Thread[]): Thread[] {
-  const shown = threads.filter((thread) => !thread.parentThreadId && !thread.isHidden && !thread.isArchived);
+/** The rows the section shows: top-level, visible, unarchived threads the Bots section doesn't, pinned first in pin order, then newest. */
+export function listedThreads(threads: readonly Thread[], botThreads: ReadonlySet<string> = new Set()): Thread[] {
+  const shown = threads.filter((thread) => !thread.parentThreadId && !thread.isHidden && !thread.isArchived && !botThreads.has(thread.id));
   const pinned = shown.filter((thread) => thread.isPinned).sort((a, b) => (a.pinSortKey ?? "").localeCompare(b.pinSortKey ?? ""));
   const rest = shown.filter((thread) => !thread.isPinned).sort((a, b) => recency(b) - recency(a));
   return [...pinned, ...rest];
@@ -69,7 +74,9 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
   const open = (threadId: string, split: boolean) => { navigate.toThread(threadId, split ? { split: true } : undefined); onNavigate(); };
   const [limit, setLimit] = useState(PAGE);
   const [closed, setClosed] = useState(false);
-  const rows = useMemo(() => listedThreads(state.threads), [state.threads]);
+  const listed = useLive<{ threadIds: string[] }>("bot_listed_threads", {}, { pollMs: 60_000 });
+  const botThreads = useMemo(() => new Set(listed.data?.threadIds ?? []), [listed.data]);
+  const rows = useMemo(() => listedThreads(state.threads, botThreads), [state.threads, botThreads]);
   const projects = useMemo(() => new Map(state.projects.map((project) => [project.id, project.name])), [state.projects]);
   return (
     <section aria-label="Threads" data-testid="threads-section" className="flex flex-col gap-0.5 px-1.5 pb-3">
@@ -103,36 +110,101 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
   );
 }
 
+/** BB's thread menu target for a sidebar thread. */
+function menuTarget(thread: Thread) {
+  return {
+    id: thread.id,
+    projectId: thread.projectId,
+    parentThreadId: thread.parentThreadId,
+    archivedAt: thread.archivedAt,
+    pinnedAt: thread.pinnedAt,
+    sectionId: thread.sectionId,
+    isUnread: thread.isUnread,
+    status: thread.status,
+    environment: thread.environment?.id ? { id: thread.environment.id, path: thread.environment.path } : null,
+  };
+}
+
 function ThreadRow({ thread, project, active, open }: { thread: Thread; project: string | null; active: boolean; open(threadId: string, split: boolean): void }) {
   const shortcut = useSidebarThreadShortcut(thread.id);
+  const [renaming, setRenaming] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const state = threadState(thread);
   const dot = DOT[state];
   const pill = PILL[state];
   const at = recency(thread);
   const loud = state !== "idle" && state !== "working";
+  const target = menuTarget(thread);
   return (
-    <a
-      href={thread.href}
-      data-sidebar-thread-id={thread.id}
-      aria-current={active ? "page" : undefined}
-      onClick={(event) => { event.preventDefault(); open(thread.id, event.metaKey || event.ctrlKey); }}
-      onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); open(thread.id, true); } }}
-      className={cn("flex min-w-0 flex-col rounded-md py-1 pr-2 pl-1 text-sm", active ? "bg-state-active" : "hover:bg-state-hover")}
-    >
-      <span className="flex h-5 min-w-0 items-center gap-1.5">
-        {thread.isPinned && state === "idle"
-          ? <Icon name="Pin" aria-label="Pinned" className="mx-[1.5px] size-3 shrink-0 text-muted-foreground" />
-          : <span role={dot.label ? "img" : undefined} aria-label={dot.label ?? undefined} aria-hidden={dot.label ? undefined : true} title={dot.label ?? undefined}
-              className={cn("mx-[4.5px] size-[7px] shrink-0 rounded-full", dot.className)} />}
-        <span className={cn("min-w-0 flex-1 truncate", loud ? "font-semibold" : state === "idle" && !active ? "text-muted-foreground" : "")}>
-          <ThreadTitle threadId={thread.id} />
+    <ThreadActionsContextMenu thread={target} requestRename={() => setRenaming(true)} disabled={renaming}>
+      <a
+        href={thread.href}
+        data-sidebar-thread-id={thread.id}
+        aria-current={active ? "page" : undefined}
+        onClick={(event) => { event.preventDefault(); if (!renaming) open(thread.id, event.metaKey || event.ctrlKey); }}
+        onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); open(thread.id, true); } }}
+        className={cn("group/thread-row flex min-w-0 flex-col rounded-md py-1 pr-1 pl-1 text-sm", active ? "bg-state-active" : "hover:bg-state-hover")}
+      >
+        <span className="flex h-5 min-w-0 items-center gap-1.5">
+          {thread.isPinned && state === "idle"
+            ? <Icon name="Pin" aria-label="Pinned" className="mx-[1.5px] size-3 shrink-0 text-muted-foreground" />
+            : <span role={dot.label ? "img" : undefined} aria-label={dot.label ?? undefined} aria-hidden={dot.label ? undefined : true} title={dot.label ?? undefined}
+                className={cn("mx-[4.5px] size-[7px] shrink-0 rounded-full", dot.className)} />}
+          {renaming ? <RenameInput thread={thread} onDone={() => setRenaming(false)} /> : (
+            <span className={cn("min-w-0 flex-1 truncate", loud ? "font-semibold" : state === "idle" && !active ? "text-muted-foreground" : "")}>
+              <ThreadTitle threadId={thread.id} />
+            </span>
+          )}
+          {shortcut ? <span aria-hidden className="shrink-0 rounded bg-state-hover px-1 text-[10px] text-muted-foreground">{shortcut.label}</span> : null}
+          <span className={cn("shrink-0", menuOpen ? "hidden" : "group-hover/thread-row:hidden")}>
+            {pill
+              ? <span className={cn("whitespace-nowrap rounded-full px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide", pill.className)}>{pill.label}</span>
+              : <time dateTime={new Date(at).toISOString()} className="text-[11px] tabular-nums text-muted-foreground">{compactAge(at)}</time>}
+          </span>
+          <span className={cn("shrink-0", menuOpen ? "flex" : "hidden group-hover/thread-row:flex max-md:pointer-coarse:flex")}>
+            <ThreadActionsMenu
+              thread={target}
+              requestRename={() => setRenaming(true)}
+              onOpenChange={setMenuOpen}
+              align="start"
+              trigger={(props) => (
+                <button type="button" aria-label={`Actions for ${thread.displayTitle}`} {...props} onClick={(event) => { event.preventDefault(); event.stopPropagation(); props.onClick?.(event); }}
+                  className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground">
+                  <Icon name="MoreHorizontal" className="size-3.5" aria-hidden />
+                </button>
+              )}
+            />
+          </span>
         </span>
-        {shortcut ? <span aria-hidden className="shrink-0 rounded bg-state-hover px-1 text-[10px] text-muted-foreground">{shortcut.label}</span> : null}
-        {pill
-          ? <span className={cn("shrink-0 whitespace-nowrap rounded-full px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide", pill.className)}>{pill.label}</span>
-          : <time dateTime={new Date(at).toISOString()} className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{compactAge(at)}</time>}
-      </span>
-      <span data-thread-project="" className="min-w-0 truncate pl-[22px] text-xs leading-4 text-muted-foreground">{project ?? " "}</span>
-    </a>
+        <span data-thread-project="" className="min-w-0 truncate pl-[22px] text-xs leading-4 text-muted-foreground">{project ?? " "}</span>
+      </a>
+    </ThreadActionsContextMenu>
+  );
+}
+
+function RenameInput({ thread, onDone }: { thread: Thread; onDone(): void }) {
+  const sdk = useSdk();
+  const [value, setValue] = useState(thread.title ?? thread.displayTitle);
+  const commit = () => {
+    const title = value.trim();
+    onDone();
+    if (!title || title === thread.title) return;
+    sdk.threads.update({ threadId: thread.id, title }).catch((error: unknown) => console.warn(`Couldn't rename: ${error instanceof Error ? error.message : String(error)}`));
+  };
+  return (
+    <input
+      autoFocus
+      aria-label="Thread title"
+      value={value}
+      onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}
+      onChange={(event) => setValue(event.currentTarget.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key === "Enter") commit();
+        if (event.key === "Escape") onDone();
+      }}
+      className="h-5 min-w-0 flex-1 rounded-sm border border-input bg-background px-1 text-sm outline-none focus:border-ring"
+    />
   );
 }
