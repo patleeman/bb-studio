@@ -48,8 +48,8 @@ export function ArtifactCard({ attributes, message }: PluginMessageDirectiveProp
           openAppPath(artifactHref(artifact.id));
       }}
       body={version.type === "other" ? undefined : (
-        // A player is a row high; other previews get room.
-        <div className={version.type === "audio" ? "" : "h-80"}>
+        // A player is a row high and an HTML page fits its height; other previews get room.
+        <div className={version.type === "audio" || version.type === "html" ? "" : "h-80"}>
           <ArtifactBody artifactId={artifact.id} version={version} view="preview" dense threadId={message.threadId} />
         </div>
       )}

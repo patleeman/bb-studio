@@ -48,6 +48,17 @@ function shim(state: unknown, theme: Theme): string {
     }
   });
   const touch = () => post({ op: "touch" });
+  // The page's height, for a chat card that fits it. Only reported changes.
+  let height = 0;
+  const measure = () => {
+    // The body's bottom, not scrollHeight, which never drops below the frame's own height.
+    const body = document.body;
+    if (!body) return;
+    const next = Math.ceil(body.getBoundingClientRect().bottom + window.scrollY + (parseFloat(getComputedStyle(body).marginBottom) || 0));
+    if (next !== height) { height = next; post({ op: "size", height }); }
+  };
+  addEventListener("load", measure);
+  addEventListener("DOMContentLoaded", () => { measure(); new ResizeObserver(measure).observe(document.body || document.documentElement); });
   addEventListener("pointerdown", touch, true);
   addEventListener("keydown", touch, true);
 })();`;

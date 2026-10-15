@@ -34,9 +34,28 @@ type FrameMessage =
   | { op: "expose"; actions: string[] }
   | { op: "send"; label: string; data: unknown }
   | { op: "result"; id: string; ok: boolean; value?: unknown; error?: string }
-  | { op: "touch" };
+  | { op: "touch" }
+  | { op: "size"; height: number };
 
-export function LiveHtmlFrame({ artifactId, versionId, name, threadId }: { artifactId: string; versionId: string; name: string; threadId: string | null }) {
+/** A fitted chat card stays within these heights; past the most, the page scrolls. */
+const MIN_HEIGHT = 120;
+const MAX_HEIGHT = 640;
+
+export function LiveHtmlFrame({
+  artifactId,
+  versionId,
+  name,
+  threadId,
+  fit = false,
+}: {
+  artifactId: string;
+  versionId: string;
+  name: string;
+  threadId: string | null;
+  /** Height follows the page's, as in a chat card; otherwise it fills its box. */
+  fit?: boolean;
+}) {
+  const [height, setHeight] = useState<number | null>(null);
   const rpc = useRpc<typeof liveContract>();
   const frame = useRef<HTMLIFrameElement>(null);
   const [clientId] = useState(() => crypto.randomUUID());
@@ -77,6 +96,9 @@ export function LiveHtmlFrame({ artifactId, versionId, name, threadId }: { artif
         case "result":
           // RPC input must be JSON: no undefined fields.
           rpc.call("artifacts.live.result", message.ok ? { commandId: message.id, clientId, ok: true, value: message.value ?? null } : { commandId: message.id, clientId, ok: false, error: String(message.error ?? "The action failed.").slice(0, 2000) }).catch(report);
+          break;
+        case "size":
+          if (typeof message.height === "number" && Number.isFinite(message.height)) setHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(message.height))));
           break;
         case "send":
           void sendTake(message.label, message.data);
@@ -124,8 +146,9 @@ export function LiveHtmlFrame({ artifactId, versionId, name, threadId }: { artif
       referrerPolicy="no-referrer"
       // The page's prefers-color-scheme follows BB's theme. A page that doesn't
       // opt into dark still gets the browser's light canvas.
-      style={{ colorScheme: dark ? "dark" : "light" }}
-      className="size-full border-0"
+      // Until the page reports its height, a fitted card keeps the old 320 px.
+      style={{ colorScheme: dark ? "dark" : "light", ...(fit ? { height: height ?? 320 } : {}) }}
+      className={fit ? "block w-full border-0" : "size-full border-0"}
     />
   );
 }

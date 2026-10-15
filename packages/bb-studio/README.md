@@ -399,6 +399,7 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
   (`artifacts_live`, or `bb studio artifacts state|watch|actions|do`), and
   `send(label, data)`, which puts an @artifact pill holding that data in the
   thread's composer. A playground's HTML works unchanged as an artifact.
+  In a chat card the page's frame fits its height (120–640 px).
 - **Save from a thread.** **Artifacts** in the thread panel launcher lists the
   files the latest reply created, changed or generated, the thread's storage
   files, and what the thread already saved. Nothing is saved automatically.

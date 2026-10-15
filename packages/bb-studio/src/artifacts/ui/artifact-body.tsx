@@ -100,7 +100,7 @@ export function ArtifactBody({
     );
   }
   if (version.type === "html" && view === "preview") {
-    return <LiveHtmlFrame key={version.id} artifactId={artifactId} versionId={version.id} name={version.name} threadId={threadId} />;
+    return <LiveHtmlFrame key={version.id} artifactId={artifactId} versionId={version.id} name={version.name} threadId={threadId} fit={dense} />;
   }
   if (version.type === "pdf") {
     // Chrome's PDF viewer won't load in a sandboxed frame; the route only
