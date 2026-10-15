@@ -1,12 +1,13 @@
-// The sidebar's Threads section, under Bots: every top-level thread in one
-// list, pinned first and then newest, as two-line rows. The first line has the
-// title and, on the right, the age, or in its place what the thread needs: a
-// pill (Needs you, Failed), a dot (working, unread) or a pin; the
-// second names the project, so there are no per-project sections. Sub-threads
-// and hidden threads stay out, and so does every thread the Bots section
-// shows (bot_listed_threads). Each row has BB's own thread menu (right-click
-// or the hover ⋯), with rename done in place.
-import { cn, Icon } from "@bb-studio/kit/ui";
+// The sidebar's Threads section, under Bots: every top-level thread, pinned
+// first and then newest (by last activity or creation), in one list of
+// two-line rows whose second line names the project, or grouped under project
+// headings (the menu beside the heading; kept on this device). The first line
+// has the title and, on the right, the age, or in its place what the thread
+// needs: a pill (Needs you, Failed), a dot (working, unread) or a pin.
+// Sub-threads and hidden threads stay out, and so does every thread the Bots
+// section shows (bot_listed_threads). Each row has BB's own thread menu
+// (right-click or the hover ⋯) and Archive on hover, with rename in place.
+import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
 import {
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
   experimental_ThreadActionsMenu as ThreadActionsMenu,
@@ -37,11 +38,53 @@ export function threadState(thread: Pick<Thread, "status" | "runtimeStatus" | "i
 
 const recency = (thread: Thread) => Math.max(thread.updatedAt, thread.latestAttentionAt);
 
-/** The rows the section shows: top-level, visible, unarchived threads the Bots section doesn't, pinned first in pin order, then newest. */
-export function listedThreads(threads: readonly Thread[], botThreads: ReadonlySet<string> = new Set()): Thread[] {
+/** How the section orders and groups its rows; kept on this device. */
+export interface ThreadsView {
+  sort: "activity" | "created";
+  group: "none" | "project";
+}
+const VIEW_KEY = "studio.threads.view";
+const DEFAULT_VIEW: ThreadsView = { sort: "activity", group: "none" };
+
+export function readThreadsView(): ThreadsView {
+  try {
+    const raw = JSON.parse(localStorage.getItem(VIEW_KEY) ?? "null") as Partial<ThreadsView> | null;
+    return {
+      sort: raw?.sort === "created" ? "created" : "activity",
+      group: raw?.group === "project" ? "project" : "none",
+    };
+  } catch {
+    return DEFAULT_VIEW;
+  }
+}
+
+function useThreadsView(): [ThreadsView, (patch: Partial<ThreadsView>) => void] {
+  const [view, setView] = useState(readThreadsView);
+  const update = (patch: Partial<ThreadsView>) => setView((current) => {
+    const next = { ...current, ...patch };
+    try { localStorage.setItem(VIEW_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+    return next;
+  });
+  return [view, update];
+}
+
+/** Rows grouped by project, projects in the order their first row appears. */
+export function groupByProject(rows: readonly Thread[]): { projectId: string; threads: Thread[] }[] {
+  const groups = new Map<string, Thread[]>();
+  for (const thread of rows) {
+    const group = groups.get(thread.projectId);
+    if (group) group.push(thread);
+    else groups.set(thread.projectId, [thread]);
+  }
+  return [...groups].map(([projectId, threads]) => ({ projectId, threads }));
+}
+
+/** The rows the section shows: top-level, visible, unarchived threads the Bots section doesn't, pinned first in pin order, then newest by `sort`. */
+export function listedThreads(threads: readonly Thread[], botThreads: ReadonlySet<string> = new Set(), sort: ThreadsView["sort"] = "activity"): Thread[] {
   const shown = threads.filter((thread) => !thread.parentThreadId && !thread.isHidden && !thread.isArchived && !botThreads.has(thread.id));
   const pinned = shown.filter((thread) => thread.isPinned).sort((a, b) => (a.pinSortKey ?? "").localeCompare(b.pinSortKey ?? ""));
-  const rest = shown.filter((thread) => !thread.isPinned).sort((a, b) => recency(b) - recency(a));
+  const key = sort === "created" ? (thread: Thread) => thread.createdAt : recency;
+  const rest = shown.filter((thread) => !thread.isPinned).sort((a, b) => key(b) - key(a));
   return [...pinned, ...rest];
 }
 
@@ -78,7 +121,8 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
   const [closed, setClosed] = useState(false);
   const listed = useLive<{ threadIds: string[] }>("bot_listed_threads", {}, { pollMs: 60_000 });
   const botThreads = useMemo(() => new Set(listed.data?.threadIds ?? []), [listed.data]);
-  const rows = useMemo(() => listedThreads(state.threads, botThreads), [state.threads, botThreads]);
+  const [view, setView] = useThreadsView();
+  const rows = useMemo(() => listedThreads(state.threads, botThreads, view.sort), [state.threads, botThreads, view.sort]);
   const projects = useMemo(() => new Map(state.projects.map((project) => [project.id, project.name])), [state.projects]);
   return (
     <section aria-label="Threads" data-testid="threads-section" className="flex flex-col gap-0.5 px-1.5 pb-3">
@@ -87,8 +131,7 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
           <span className="truncate">Threads</span>
           <Icon name={closed ? "ChevronRight" : "ChevronDown"} className="size-3 opacity-0 group-hover:opacity-100" />
         </button>
-        <button type="button" aria-label="New thread" title="New thread" onClick={() => { navigate.toCompose(); onNavigate(); }}
-          className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-3.5" /></button>
+        <ViewMenu view={view} onChange={setView} />
       </div>
       {closed ? null : state.status === "loading" && !rows.length ? (
         <p className="px-2 text-xs text-muted-foreground">Loading…</p>
@@ -98,9 +141,18 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
         <p className="px-2 text-xs text-muted-foreground">No threads yet.</p>
       ) : (
         <>
-          {rows.slice(0, limit).map((thread) => (
-            <ThreadRow key={thread.id} thread={thread} project={projects.get(thread.projectId) ?? null} active={activeThreadId === thread.id} open={open} />
-          ))}
+          {view.group === "project"
+            ? groupByProject(rows.slice(0, limit)).map((group) => (
+              <div key={group.projectId} role="group" aria-label={projects.get(group.projectId) ?? "Project"} className="flex flex-col gap-0.5">
+                <p className="truncate px-2 pt-1.5 text-xs font-medium text-muted-foreground">{projects.get(group.projectId) ?? "Project"}</p>
+                {group.threads.map((thread) => (
+                  <ThreadRow key={thread.id} thread={thread} project={null} active={activeThreadId === thread.id} open={open} />
+                ))}
+              </div>
+            ))
+            : rows.slice(0, limit).map((thread) => (
+              <ThreadRow key={thread.id} thread={thread} project={projects.get(thread.projectId) ?? null} active={activeThreadId === thread.id} open={open} />
+            ))}
           {rows.length > limit ? (
             <button type="button" onClick={() => setLimit(limit + PAGE)} className="h-7 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground">
               Show more
@@ -109,6 +161,33 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
         </>
       )}
     </section>
+  );
+}
+
+const SORTS: { id: ThreadsView["sort"]; label: string }[] = [{ id: "activity", label: "Last activity" }, { id: "created", label: "Created" }];
+const GROUPS: { id: ThreadsView["group"]; label: string }[] = [{ id: "none", label: "None" }, { id: "project", label: "Project" }];
+
+/** Sort and group, beside the Threads heading. */
+function ViewMenu({ view, onChange }: { view: ThreadsView; onChange(patch: Partial<ThreadsView>): void }) {
+  const check = (on: boolean) => <Icon name="Check" className={cn("ml-auto size-3.5", on ? "" : "invisible")} aria-hidden />;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" aria-label="Sort and group threads" title="Sort and group"
+          className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="ArrowUpDown" className="size-3.5" /></button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-40">
+        <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+        {SORTS.map((sort) => (
+          <DropdownMenuItem key={sort.id} aria-checked={view.sort === sort.id} onSelect={() => onChange({ sort: sort.id })}>{sort.label}{check(view.sort === sort.id)}</DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Group by</DropdownMenuLabel>
+        {GROUPS.map((group) => (
+          <DropdownMenuItem key={group.id} aria-checked={view.group === group.id} onSelect={() => onChange({ group: group.id })}>{group.label}{check(view.group === group.id)}</DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -179,7 +258,7 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
             />
           </span>
         </span>
-        <span data-thread-project="" className="min-w-0 truncate text-xs leading-4 text-muted-foreground">{project ?? " "}</span>
+        {project === null ? null : <span data-thread-project="" className="min-w-0 truncate text-xs leading-4 text-muted-foreground">{project}</span>}
       </a>
     </ThreadActionsContextMenu>
   );

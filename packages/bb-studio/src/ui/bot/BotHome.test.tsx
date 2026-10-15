@@ -66,6 +66,12 @@ vi.mock("@bb-studio/kit/app", () => ({
 vi.mock("@bb-studio/kit/ui", () => ({
   Icon: () => null,
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => children,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => React.createElement("div", { role: "menu" }, children),
+  DropdownMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect(): void }) => React.createElement("button", { type: "button", role: "menuitem", onClick: onSelect }, children),
+  DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => React.createElement("span", null, children),
+  DropdownMenuSeparator: () => null,
   Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => React.createElement("input", props),
   Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => React.createElement("textarea", props),
   Dialog: ({ children }: { children: React.ReactNode }) => React.createElement("div", { role: "dialog" }, children),
@@ -74,11 +80,6 @@ vi.mock("@bb-studio/kit/ui", () => ({
   DialogFooter: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   DialogTitle: ({ children }: { children: React.ReactNode }) => React.createElement("h2", null, children),
   DialogDescription: ({ children }: { children: React.ReactNode }) => React.createElement("p", null, children),
-  DropdownMenu: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
-  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => children,
-  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
-  DropdownMenuSeparator: () => null,
-  DropdownMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect(): void }) => React.createElement("button", { onClick: onSelect }, children),
 }));
 
 const { ActivityPanel, BOT_PATH } = await import("./BotHome");
@@ -215,8 +216,8 @@ test("the Bots list shows on every other page, with every thread below it as a t
   state.sidebarThreads = { status: "ready", sections: [], archivedPage: null,
     projects: [{ id: "proj_a", name: "Orbit" }, { id: "proj_b", name: "Garden" }],
     threads: [
-      row("thr_old", "proj_a", { updatedAt: Date.now() - 86_400_000 * 2 }),
-      row("thr_new", "proj_b", { hasPendingInteraction: true }),
+      row("thr_old", "proj_a", { updatedAt: Date.now() - 86_400_000 * 2, createdAt: 300 }),
+      row("thr_new", "proj_b", { hasPendingInteraction: true, createdAt: 100 }),
       row("thr_pin", "proj_a", { isPinned: true, pinSortKey: "a", updatedAt: 0 }),
       row("thr_child", "proj_a", { parentThreadId: "thr_old" }),
       row("thr_hidden", "proj_a", { isHidden: true }),
@@ -232,8 +233,7 @@ test("the Bots list shows on every other page, with every thread below it as a t
   expect(rows[2]!.textContent).toContain("2d");
   act(() => click(rows[2]));
   expect(state.toThread).toHaveBeenCalledWith("thr_old", undefined);
-  act(() => click(section.querySelector('button[aria-label="New thread"]')));
-  expect(state.toCompose).toHaveBeenCalled();
+  expect(section.querySelector('button[aria-label="New thread"]')).toBeNull();
   // BB's thread menu wraps each row; its Rename edits the title in place.
   act(() => click(section.querySelector('[data-rename="thr_old"]')));
   const input = section.querySelector<HTMLInputElement>('input[aria-label="Thread title"]')!;
@@ -248,6 +248,14 @@ test("the Bots list shows on every other page, with every thread below it as a t
   act(() => click(section.querySelector('button[aria-label^="Archive"]')));
   expect(state.archived).toEqual(["thr_pin"]);
   expect(state.toThread).not.toHaveBeenCalled();
+  // Sort by creation, then group under project headings: the project leaves the rows.
+  const item = (label: string) => [...section.querySelectorAll('[role="menuitem"]')].find((each) => each.textContent?.startsWith(label))!;
+  act(() => click(item("Created")));
+  expect([...section.querySelectorAll("[data-sidebar-thread-id]")].map((each) => each.getAttribute("data-sidebar-thread-id"))).toEqual(["thr_pin", "thr_old", "thr_new"]);
+  act(() => click(item("Project")));
+  expect([...section.querySelectorAll('[role="group"]')].map((each) => each.getAttribute("aria-label"))).toEqual(["Orbit", "Garden"]);
+  expect(section.querySelector("[data-thread-project]")).toBeNull();
+  expect(JSON.parse(localStorage.getItem("studio.threads.view")!)).toEqual({ sort: "created", group: "project" });
 });
 
 test("after a Bots list open the Bots list stays on any thread", async () => {
